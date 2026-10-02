@@ -191,6 +191,32 @@ export type UpdateResult = {
    * number, and `x-github.issue-roundtrip` is enabled. Never blocks the flip.
    */
   issueRoundtrip?: IssueRoundtripResult;
+  /**
+   * Dropped-claim worktree footprint
+   * (bug-unclaim-leaves-worktree-record-without-reaper): present ONLY when THIS
+   * update dropped the item's claim (claimed → unclaimed) while a
+   * `worktree_path` record still stands.
+   *
+   * This is the unclaim contract, surfaced on the call that causes it: the
+   * claim's footprint does NOT die with the assignee. The worktree, its branch,
+   * its `.arggon.env` and its `arggon-claim.json` stamp all outlive the claim,
+   * and `update` is a frontmatter-only op with no git lifecycle (it is the very
+   * call `cleanup` uses to CLEAR such a record) — so it reports the footprint
+   * and names the release path instead of reaping the worktree implicitly. Both
+   * release commands are listed because both surfaces have their own spelling;
+   * the rule behind them is one kernel rule (`classifyReleaseEntry`).
+   */
+  claimFootprint?: ClaimFootprintReceipt;
+};
+
+/** The dropped claim's surviving worktree footprint + the release paths. */
+export type ClaimFootprintReceipt = {
+  /** Absolute worktree path still recorded on the item. */
+  worktreePath: string;
+  /** Branch still checked out there (the item's `branch` field was cleared). */
+  branch: string | null;
+  /** The release command per surface — one rule, two spellings. */
+  release: { cli: string; native: string };
 };
 
 /** Shared CSV split (trim parts, drop empties) — also used by create --labels. */
@@ -814,6 +840,27 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
       }
     }
 
+    // Dropped-claim worktree footprint (bug-unclaim-leaves-worktree-record-without-reaper):
+    // the unclaim contract, reported on the call that causes it. Gated on THIS
+    // run dropping a claim (wasClaimed → unclaimed) with a `worktree_path`
+    // record surviving on the item: the worktree, its branch, its `.arggon.env`
+    // and its claim stamp outlive the assignee, and nothing reaps them here —
+    // `cleanup --release <id>` (native `cleanup({ release })`) is the path, and
+    // this receipt is what names it. The receipt reads the footprint from the
+    // item file JUST written (so a caller that released the record in the same
+    // run, like `cleanup`, never sees a stale claim).
+    const claimFootprint: ClaimFootprintReceipt | undefined =
+      wasClaimed && !willBeClaimed && (updated.worktreePath ?? null) !== null
+        ? {
+            worktreePath: resolve(updated.worktreePath!),
+            branch: updated.branch ?? null,
+            release: {
+              cli: `arggon cleanup --release ${updated.id}`,
+              native: `tools.arggon.cleanup({ release: ${JSON.stringify(updated.id)} })`,
+            },
+          }
+        : undefined;
+
     return {
       id: updated.id,
       path: targetPath,
@@ -832,6 +879,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
       movedFrom,
       ...(renamedFrom ? { renamedFrom } : {}),
       ...(issueRoundtrip ? { issueRoundtrip } : {}),
+      ...(claimFootprint ? { claimFootprint } : {}),
     };
   };
 

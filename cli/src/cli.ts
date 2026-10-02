@@ -1108,6 +1108,15 @@ program
               console.log(`  issue round-trip skipped: ${sanitizeHumanError(rt.skipped)}`);
             }
           }
+          // The unclaim contract, surfaced on the call that drops the claim
+          // (bug-unclaim-leaves-worktree-record-without-reaper): `update` clears
+          // the assignee, never the worktree. Loud, because the unclaimed
+          // worktree is what accumulates as unowned clutter.
+          if (result.claimFootprint) {
+            console.log(
+              `⚠ claim dropped: the worktree ${sanitizeHumanError(result.claimFootprint.worktreePath)} still stands (its claim stamp and .arggon.env die with it) — release it with: ${sanitizeHumanError(result.claimFootprint.release.cli)}`,
+            );
+          }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           if (json) {
@@ -2311,9 +2320,7 @@ program
             } else if (env.path !== undefined) {
               console.log(`  env: kept — ${sanitizeHumanError(env.warning ?? "already exists")}`);
             } else {
-              console.log(
-                `  env: skipped — ${sanitizeHumanError(env.warning ?? "not prepared")}`,
-              );
+              console.log(`  env: skipped — ${sanitizeHumanError(env.warning ?? "not prepared")}`);
             }
           }
           if (result.linkedNodeModules) {
@@ -2475,98 +2482,139 @@ program
     "ancestry-only classification: skip the gh fallback that detects squash-merged PRs when the branch fails the ancestry check (offline/CI use)",
     true,
   )
+  .option(
+    "--release <id>",
+    "release the named item's dropped claim: remove its worktree, delete its branch, reap the start-created .arggon.env + arggon-claim.json stamp and clear worktree_path (the inverse of `start --worktree`; mutually exclusive with --prune)",
+  )
+  .option(
+    "--take-over-worktree",
+    "release a worktree whose stamped owner is presumed dead (records nothing — the stamp is reaped; required only when the single-writer detection refuses a --release)",
+    false,
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { prune?: boolean; commit?: boolean; gh?: boolean; json?: boolean }) => {
-    const json = jsonEnabled(opts);
-    try {
-      const result = runCleanup({
-        cwd: process.cwd(),
-        prune: Boolean(opts.prune),
-        commit: opts.commit === false ? false : undefined,
-        // Commander names a `--no-gh` option `gh` (default true, false when
-        // the flag is passed); reading `noGh` made the flag a silent no-op
-        // (bug-cleanup-no-gh-ignored).
-        noGh: opts.gh === false,
-      });
-      if (json) {
-        // Per-candidate prune failures are reported in the payload (each
-        // pruned entry may carry action "failed" + error/leftoverBranch) and
-        // deliberately keep the exit code at 0 (task-cleanup-json-exit-code,
-        // docs/json-output.md §cleanup): --json consumers gate on the
-        // payload, never on the process exit code — the exitCode=1 rule in
-        // the human path below does not apply here. CLEANUP_FAILED is
-        // reserved for top-level errors (non-git tree, undetectable default
-        // branch).
-        successJson(
-          "cleanup",
-          {
-            base: result.base,
-            candidates: result.entries,
-            pruned: result.pruned,
-            failures: result.failures,
-            ...(result.compose ? { compose: result.compose } : {}),
-            ...(result.commit ? { commit: commitPayload(result.commit) } : {}),
-          },
-          readConventionVersion(result.root),
-        );
-        return;
-      }
-      const removable = result.entries.filter((e) => e.removable);
-      console.log(
-        `arggon cleanup: ${result.entries.length} tracked worktree(s), base ${sanitizeHumanError(result.base)}`,
-      );
-      for (const entry of result.entries) {
-        if (entry.removable) {
-          console.log(
-            `  removable: ${sanitizeHumanError(entry.id)} -> ${sanitizeHumanError(entry.path)} (${entry.action})`,
-          );
-        } else {
-          console.log(
-            `  skipped:   ${sanitizeHumanError(entry.id)} (${sanitizeHumanError(entry.reason ?? "")})`,
-          );
-        }
-      }
-      for (const action of result.pruned) {
-        if (action.action === "failed") {
-          const leftover = action.leftoverBranch
-            ? ` (leftover branch: ${action.leftoverBranch})`
-            : "";
-          console.error(
-            sanitizeHumanError(`  failed:    ${action.id}: ${action.error}${leftover}`),
-          );
-        } else {
-          console.log(`  pruned:    ${sanitizeHumanError(action.id)}: ${action.action}`);
-        }
-      }
-      const commitLine = formatCommitLine(result.commit);
-      if (commitLine) console.log(`  ${commitLine}`);
-      for (const failure of result.failures) {
-        console.error(sanitizeHumanError(`  failed:    ${failure}`));
-      }
-      if (result.compose?.dockerUnavailable) {
-        console.log(
-          `  note:      compose reaping declared (x-worktree.services: ${sanitizeHumanError(result.compose.declared)}) but docker not found — nothing reaped`,
-        );
-      }
-      if (!opts.prune && removable.length > 0) {
-        console.log(`next: arggon cleanup --prune removes ${removable.length} worktree(s)`);
-      }
-      if (result.failures.length > 0) process.exitCode = 1;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (json) {
-        failJson({
-          command: "cleanup",
-          message,
-          code: "CLEANUP_FAILED",
-          conventionVersion: readConventionVersion(process.cwd()),
+  .action(
+    (opts: {
+      prune?: boolean;
+      commit?: boolean;
+      gh?: boolean;
+      release?: string;
+      takeOverWorktree?: boolean;
+      json?: boolean;
+    }) => {
+      const json = jsonEnabled(opts);
+      try {
+        const result = runCleanup({
+          cwd: process.cwd(),
+          prune: Boolean(opts.prune),
+          commit: opts.commit === false ? false : undefined,
+          // Commander names a `--no-gh` option `gh` (default true, false when
+          // the flag is passed); reading `noGh` made the flag a silent no-op
+          // (bug-cleanup-no-gh-ignored).
+          noGh: opts.gh === false,
+          ...(opts.release !== undefined ? { release: opts.release } : {}),
+          ...(opts.takeOverWorktree === true ? { releaseTakeOverWorktree: true } : {}),
         });
-        return;
+        if (json) {
+          // Per-candidate prune/release failures are reported in the payload
+          // (each pruned/released entry may carry action "failed" +
+          // error/leftoverBranch) and deliberately keep the exit code at 0
+          // (task-cleanup-json-exit-code, docs/json-output.md §cleanup):
+          // --json consumers gate on the payload, never on the process exit
+          // code — the exitCode=1 rule in the human path below does not apply
+          // here. CLEANUP_FAILED is reserved for top-level errors (non-git
+          // tree, undetectable default branch).
+          successJson(
+            "cleanup",
+            {
+              base: result.base,
+              candidates: result.entries,
+              pruned: result.pruned,
+              ...(result.release
+                ? { release: result.release.entry, released: result.release.actions }
+                : {}),
+              failures: result.failures,
+              ...(result.compose ? { compose: result.compose } : {}),
+              ...(result.commit ? { commit: commitPayload(result.commit) } : {}),
+            },
+            // Read by the run BEFORE it could remove the directory this command
+            // was invoked from (a release runs where the record lives).
+            result.conventionVersion,
+          );
+          return;
+        }
+        const removable = result.entries.filter((e) => e.removable);
+        console.log(
+          `arggon cleanup: ${result.entries.length} tracked worktree(s), base ${sanitizeHumanError(result.base)}`,
+        );
+        for (const entry of result.entries) {
+          if (entry.removable) {
+            console.log(
+              `  removable: ${sanitizeHumanError(entry.id)} -> ${sanitizeHumanError(entry.path)} (${entry.action})`,
+            );
+          } else {
+            console.log(
+              `  skipped:   ${sanitizeHumanError(entry.id)} (${sanitizeHumanError(entry.reason ?? "")})`,
+            );
+          }
+        }
+        for (const action of result.pruned) {
+          if (action.action === "failed") {
+            const leftover = action.leftoverBranch
+              ? ` (leftover branch: ${action.leftoverBranch})`
+              : "";
+            console.error(
+              sanitizeHumanError(`  failed:    ${action.id}: ${action.error}${leftover}`),
+            );
+          } else {
+            console.log(`  pruned:    ${sanitizeHumanError(action.id)}: ${action.action}`);
+          }
+        }
+        // The release arm reports under its own verb: a released claim is not a
+        // pruned worktree, and reading them apart is the point of the split
+        // (bug-unclaim-leaves-worktree-record-without-reaper).
+        if (result.release) {
+          const entry = result.release.entry;
+          console.log(
+            entry.releasable
+              ? `arggon cleanup: released ${sanitizeHumanError(entry.id)} (${sanitizeHumanError(entry.action ?? "")})`
+              : `arggon cleanup: REFUSED to release ${sanitizeHumanError(entry.id)}: ${sanitizeHumanError(entry.reason ?? "")}`,
+          );
+          for (const action of result.release.actions) {
+            console.log(
+              `  released:  ${sanitizeHumanError(action.id)}: ${sanitizeHumanError(action.action)}`,
+            );
+          }
+        }
+        const commitLine = formatCommitLine(result.commit);
+        if (commitLine) console.log(`  ${commitLine}`);
+        for (const failure of result.failures) {
+          console.error(sanitizeHumanError(`  failed:    ${failure}`));
+        }
+        if (result.compose?.dockerUnavailable) {
+          console.log(
+            `  note:      compose reaping declared (x-worktree.services: ${sanitizeHumanError(result.compose.declared)}) but docker not found — nothing reaped`,
+          );
+        }
+        if (!opts.prune && removable.length > 0) {
+          console.log(`next: arggon cleanup --prune removes ${removable.length} worktree(s)`);
+        }
+        if (result.failures.length > 0) process.exitCode = 1;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          failJson({
+            command: "cleanup",
+            message,
+            code: "CLEANUP_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        printHumanError("arggon cleanup", message);
+        process.exitCode = 1;
       }
-      printHumanError("arggon cleanup", message);
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 program
   .command("board")

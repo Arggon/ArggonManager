@@ -14,6 +14,7 @@ import {
   readFileSync,
   readlinkSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -481,9 +482,7 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     // The worktree was kept, prepared (the linked install is there) — and the
     // claim never happened: the item copy is untouched.
     expect(existsSync(join(expectedPath, "ArggonManager"))).toBe(true);
-    expect(
-      existsSync(join(expectedPath, "node_modules", "fake-gate-dep")),
-    ).toBe(true);
+    expect(existsSync(join(expectedPath, "node_modules", "fake-gate-dep"))).toBe(true);
     const itemCopy = join(
       expectedPath,
       "ArggonManager",
@@ -494,7 +493,10 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     );
     expect(readFileSync(itemCopy, "utf8")).toContain("status: todo");
     expect(
-      git(["status", "--porcelain", "--", "ArggonManager/launch/auth/login/task-alpha.md"], expectedPath),
+      git(
+        ["status", "--porcelain", "--", "ArggonManager/launch/auth/login/task-alpha.md"],
+        expectedPath,
+      ),
     ).toBe("");
   });
 
@@ -1011,47 +1013,47 @@ describe("post-start shell variant (task-post-start-env)", () => {
  * (Module scope: shared by the cleanup describes, incl. the Compose-reap one.)
  */
 function initCleanupRepo(): { dir: string; paths: Record<string, string> } {
-    const dir = initRepo();
-    const paths: Record<string, string> = {};
+  const dir = initRepo();
+  const paths: Record<string, string> = {};
 
-    // alpha: full merged cycle via start --worktree.
-    const alpha = runStart(
-      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
-      { git: localGit() },
-    );
-    paths["task-alpha"] = alpha.worktreePath!;
-    runUpdate({ cwd: alpha.worktreePath!, id: "task-alpha", status: "done", now: NOW });
-    git(["add", "ArggonManager"], alpha.worktreePath!);
-    git(["commit", "--quiet", "-m", "close task-alpha"], alpha.worktreePath!);
-    git(["merge", "--quiet", "feat/task-alpha"], dir);
+  // alpha: full merged cycle via start --worktree.
+  const alpha = runStart(
+    { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+    { git: localGit() },
+  );
+  paths["task-alpha"] = alpha.worktreePath!;
+  runUpdate({ cwd: alpha.worktreePath!, id: "task-alpha", status: "done", now: NOW });
+  git(["add", "ArggonManager"], alpha.worktreePath!);
+  git(["commit", "--quiet", "-m", "close task-alpha"], alpha.worktreePath!);
+  git(["merge", "--quiet", "feat/task-alpha"], dir);
 
-    // bravo: worktree exists, item still todo on main.
-    paths["task-bravo"] = resolve(dirname(dir), `${basename(dir)}-task-bravo`);
-    git(["worktree", "add", "--quiet", "-b", "feat/task-bravo", paths["task-bravo"]], dir);
-    runUpdate({ cwd: dir, id: "task-bravo", worktreePath: paths["task-bravo"], now: NOW });
+  // bravo: worktree exists, item still todo on main.
+  paths["task-bravo"] = resolve(dirname(dir), `${basename(dir)}-task-bravo`);
+  git(["worktree", "add", "--quiet", "-b", "feat/task-bravo", paths["task-bravo"]], dir);
+  runUpdate({ cwd: dir, id: "task-bravo", worktreePath: paths["task-bravo"], now: NOW });
 
-    // charlie: done on main but its branch carries an unmerged commit.
-    paths["task-charlie"] = resolve(dirname(dir), `${basename(dir)}-task-charlie`);
-    git(["worktree", "add", "--quiet", "-b", "feat/task-charlie", paths["task-charlie"]], dir);
-    const charlieNote = join(paths["task-charlie"], "unmerged.txt");
-    spawnSync("touch", [charlieNote]);
-    git(["add", "unmerged.txt"], paths["task-charlie"]);
-    git(["commit", "--quiet", "-m", "wip"], paths["task-charlie"]);
-    runUpdate({
-      cwd: dir,
-      id: "task-charlie",
-      status: "in_progress",
-      assignee: "arggon",
-      branch: "feat/task-charlie",
-      worktreePath: paths["task-charlie"],
-      now: NOW,
-    });
-    runUpdate({ cwd: dir, id: "task-charlie", status: "done", now: NOW });
+  // charlie: done on main but its branch carries an unmerged commit.
+  paths["task-charlie"] = resolve(dirname(dir), `${basename(dir)}-task-charlie`);
+  git(["worktree", "add", "--quiet", "-b", "feat/task-charlie", paths["task-charlie"]], dir);
+  const charlieNote = join(paths["task-charlie"], "unmerged.txt");
+  spawnSync("touch", [charlieNote]);
+  git(["add", "unmerged.txt"], paths["task-charlie"]);
+  git(["commit", "--quiet", "-m", "wip"], paths["task-charlie"]);
+  runUpdate({
+    cwd: dir,
+    id: "task-charlie",
+    status: "in_progress",
+    assignee: "arggon",
+    branch: "feat/task-charlie",
+    worktreePath: paths["task-charlie"],
+    now: NOW,
+  });
+  runUpdate({ cwd: dir, id: "task-charlie", status: "done", now: NOW });
 
-    // Commit the crafted main-copy records so the tree is clean.
-    git(["add", "ArggonManager"], dir);
-    git(["commit", "--quiet", "-m", "records"], dir);
-    return { dir, paths };
+  // Commit the crafted main-copy records so the tree is clean.
+  git(["add", "ArggonManager"], dir);
+  git(["commit", "--quiet", "-m", "records"], dir);
+  return { dir, paths };
 }
 
 describe("arggon cleanup", () => {
@@ -1884,7 +1886,9 @@ describe("arggon cleanup reaps declared Compose projects (ADR 0019 layer 2, task
 
     // The absence is reported once, never as a failure, and the prune
     // completes (the worktree removal does not wait for Docker).
-    expect(compose.calls).toEqual([{ project: basename(paths["task-alpha"]).toLowerCase(), cwd: dir }]);
+    expect(compose.calls).toEqual([
+      { project: basename(paths["task-alpha"]).toLowerCase(), cwd: dir },
+    ]);
     expect(result.compose).toEqual({ declared: "true", dockerUnavailable: true });
     expect(result.failures).toEqual([]);
     expect(result.pruned.map((a) => a.action)).toEqual([
@@ -1901,9 +1905,7 @@ describe("arggon cleanup reaps declared Compose projects (ADR 0019 layer 2, task
 
     const result = runCleanup({ cwd: dir, prune: true, noGh: true }, { compose: compose.down });
 
-    expect(result.failures).toEqual([
-      "task-alpha: Cannot connect to the Docker daemon",
-    ]);
+    expect(result.failures).toEqual(["task-alpha: Cannot connect to the Docker daemon"]);
     const failed = result.pruned.find((a) => a.action === "failed");
     expect(failed).toMatchObject({
       id: "task-alpha",
@@ -1927,7 +1929,9 @@ describe("arggon cleanup reaps declared Compose projects (ADR 0019 layer 2, task
 
     const result = runCleanup({ cwd: dir, prune: true, noGh: true }, { compose: compose.down });
 
-    expect(compose.calls).toEqual([{ project: basename(paths["task-alpha"]).toLowerCase(), cwd: dir }]);
+    expect(compose.calls).toEqual([
+      { project: basename(paths["task-alpha"]).toLowerCase(), cwd: dir },
+    ]);
     expect(result.failures).toEqual([]);
     expect(result.pruned.map((a) => a.action)).toEqual([
       `reaped compose project ${basename(paths["task-alpha"]).toLowerCase()}`,
@@ -1959,5 +1963,280 @@ describe("arggon cleanup reaps declared Compose projects (ADR 0019 layer 2, task
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("docker not found — nothing reaped");
     expect(r.stdout).toContain(`removed worktree ${paths["task-alpha"]}`);
+  });
+});
+
+/**
+ * The unclaim release contract (bug-unclaim-leaves-worktree-record-without-reaper).
+ *
+ * `update --status todo` clears the assignee but NOT the claim's worktree: the
+ * footprint (worktree, branch, `.arggon.env`, `arggon-claim.json`) outlives the
+ * claim, and `update` is frontmatter-only. So the contract is split — `update`
+ * REPORTS the footprint and names the release path, and `cleanup --release <id>`
+ * (the worktree domain, one shared rule with the native `cleanup({ release })`)
+ * is what reaps it, refusing a worktree another live session holds.
+ *
+ * WHERE a claim's records live is load-bearing for the tests: `start --worktree`
+ * writes them in the WORKTREE copy (the claim commit rides the feature branch),
+ * so an unclaimed-claim release normally runs from inside that worktree. Two
+ * shapes are therefore exercised: merged-to-main (the record in the primary, so
+ * it is CLEARED) and still-unmerged (the record inside the worktree, so it is
+ * DISPOSED with it).
+ */
+describe("claim release — unclaim leaves nothing (bug-unclaim-leaves-worktree-record-without-reaper)", () => {
+  /** The stamp's path inside a worktree's git dir (never the work tree). */
+  function stampPath(worktreePath: string): string {
+    return join(git(["rev-parse", "--absolute-git-dir"], worktreePath), "arggon-claim.json");
+  }
+
+  /** A tracked write inside the claimed worktree, newer than the stamp. */
+  function foreignWrite(worktreePath: string, id = "task-alpha"): void {
+    const file = join(worktreePath, `ArggonManager/launch/auth/login/${id}.md`);
+    writeFileSync(file, `${readFileSync(file, "utf8")}\n<!-- a live writer -->\n`, "utf8");
+    const when = new Date(Date.now() + 60_000);
+    utimesSync(file, when, when);
+  }
+
+  function itemData(dir: string, id: string, cwd = dir): Record<string, unknown> {
+    const raw = readFileSync(join(cwd, "ArggonManager/launch/auth/login", `${id}.md`), "utf8");
+    return parseFrontmatter(raw).data as Record<string, unknown>;
+  }
+
+  /** Claim with a worktree, then merge the claim branch so main carries the records. */
+  function claimedAndMerged(dir: string, id = "task-alpha"): string {
+    const started = runStart(
+      { cwd: dir, id, assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    const wt = started.worktreePath!;
+    git(["merge", "--quiet", `--ff-only`, `feat/${id}`], dir);
+    return wt;
+  }
+
+  it("claim → unclaim → release leaves nothing behind (worktree, record, branch, env, stamp)", () => {
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+    // Resolved while the worktree exists: the stamp lives in ITS git dir.
+    const stamp = stampPath(wt);
+    expect(existsSync(stamp)).toBe(true);
+    expect(existsSync(join(wt, ".arggon.env"))).toBe(true);
+    expect(itemData(dir, "task-alpha")).toMatchObject({
+      status: "in_progress",
+      assignee: "arggon",
+      worktree_path: wt,
+    });
+
+    // The unclaim: assignee + branch go, the worktree record STAYS. The
+    // footprint is reported on this very call, naming the release path.
+    const unclaimed = runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    expect(unclaimed.claimFootprint).toMatchObject({
+      worktreePath: resolve(wt),
+      release: {
+        cli: "arggon cleanup --release task-alpha",
+        native: 'tools.arggon.cleanup({ release: "task-alpha" })',
+      },
+    });
+    expect(itemData(dir, "task-alpha")).toMatchObject({ status: "todo", worktree_path: wt });
+    expect(itemData(dir, "task-alpha").assignee).toBeUndefined();
+    // Before the release: `cleanup` still SEES the worktree and skips it,
+    // because the item is `todo`, not done/cancelled — nothing reaps it, which
+    // is the bug this contract closes.
+    const listed = runCleanup({ cwd: dir, noGh: true });
+    expect(listed.entries[0]).toMatchObject({ id: "task-alpha", removable: false });
+    expect(listed.entries[0]?.reason).toContain("todo");
+
+    // The release: the inverse of start.
+    const released = runCleanup({
+      cwd: dir,
+      release: "task-alpha",
+      releaseIdentity: "arggon",
+    });
+
+    expect(released.failures).toEqual([]);
+    expect(released.release?.entry).toMatchObject({
+      id: "task-alpha",
+      releasable: true,
+      // The branch comes from the WORKTREE: the unclaim cleared the item field.
+      branch: "feat/task-alpha",
+    });
+    expect(released.release?.actions.map((action) => action.action)).toEqual([
+      "reaped arggon-claim.json stamp",
+      `removed worktree ${wt}`,
+      "deleted branch feat/task-alpha",
+      "cleared worktree_path",
+    ]);
+    // Nothing is left: no worktree, no record, no branch, no stamp, no env file.
+    expect(existsSync(wt)).toBe(false);
+    expect(worktreeCount(dir)).toBe(1);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    expect(existsSync(stamp)).toBe(false);
+    expect(existsSync(join(wt, ".arggon.env"))).toBe(false);
+    expect(itemData(dir, "task-alpha").worktree_path).toBeUndefined();
+    // A distinct action family: never mixed into `pruned`, never a survey.
+    expect(released.pruned).toEqual([]);
+    expect(released.entries).toEqual([]);
+    // The cleared record rides one tracker commit (`released`, not `pruned`).
+    expect(released.commit?.message).toBe("chore(tasks): released task-alpha");
+  });
+
+  it("releases from inside the worktree when the record still lives there (claim never merged)", () => {
+    const dir = initRepo();
+    const started = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    const wt = started.worktreePath!;
+    // The claim records live in the worktree copy (the claim commit rides the
+    // feature branch), so that is where an unclaim reads them — and where the
+    // release runs, from the claiming session.
+    const unclaimed = runUpdate({ cwd: wt, id: "task-alpha", status: "todo", now: NOW });
+    expect(unclaimed.claimFootprint).toMatchObject({ worktreePath: resolve(wt) });
+    // `arggon update` auto-commits its own item write (tracker hygiene), so the
+    // worktree is clean when the release removes it — git refuses a dirty one.
+    commitAllIfDirty(wt, "unclaim task-alpha");
+    // The primary checkout never saw the claim, so it has nothing to release.
+    expect(runCleanup({ cwd: dir, release: "task-alpha" }).release?.entry.reason).toContain(
+      "no worktree recorded",
+    );
+
+    const released = runCleanup({ cwd: wt, release: "task-alpha", releaseIdentity: "arggon" });
+
+    expect(released.failures).toEqual([]);
+    expect(released.release?.entry.branch).toBe("feat/task-alpha");
+    expect(released.release?.actions.map((action) => action.action)).toEqual([
+      "reaped arggon-claim.json stamp",
+      `removed worktree ${wt}`,
+      "deleted branch feat/task-alpha",
+      "disposed worktree_path record with the worktree",
+    ]);
+    // The whole copy went with the worktree: worktree, stamp, env, branch.
+    expect(existsSync(wt)).toBe(false);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    expect(worktreeCount(dir)).toBe(1);
+    // The envelope still reports the convention version it read before the
+    // removal took its own working directory away.
+    expect(released.conventionVersion).toBe(5);
+    // Nothing was written outside the removed copy, so no tracker commit.
+    expect(released.commit).toBeUndefined();
+  });
+
+  it("a plain unclaim of a never-worktree item is unchanged (no footprint, no release)", () => {
+    const dir = initRepo();
+    const claimed = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", now: NOW },
+      { git: localGit() },
+    );
+    expect(claimed.worktreePath).toBeNull();
+
+    const unclaimed = runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+
+    // No worktree → no footprint receipt, nothing to name, same `changed` list
+    // this item always produced on an unclaim.
+    expect(unclaimed.claimFootprint).toBeUndefined();
+    expect(unclaimed.changed).toEqual(["status", "assignee", "branch", "claimed_at"]);
+    expect(itemData(dir, "task-alpha").status).toBe("todo");
+    expect(itemData(dir, "task-alpha").branch).toBeUndefined();
+    expect(itemData(dir, "task-alpha").worktree_path).toBeUndefined();
+    // And releasing it is an explicit, reported refusal — never a silent no-op.
+    const released = runCleanup({ cwd: dir, release: "task-alpha" });
+    expect(released.release?.entry.releasable).toBe(false);
+    expect(released.release?.entry.reason).toContain("no worktree recorded");
+    expect(released.failures[0]).toContain("task-alpha: ");
+  });
+
+  it("refuses to release a worktree another session holds (a live writer is never robbed)", () => {
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+    // The stamped session ("arggon") unclaims; a DIFFERENT identity tries to
+    // release, and the worktree moved since the stamp (the F12 signature).
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    foreignWrite(wt);
+
+    const refused = runCleanup({ cwd: dir, release: "task-alpha", releaseIdentity: "other" });
+
+    expect(refused.release?.entry.releasable).toBe(false);
+    expect(refused.release?.entry.reason).toContain("refusing to release the worktree");
+    expect(refused.release?.entry.reason).toContain("arggon");
+    expect(refused.release?.entry.foreignWrites).toMatchObject({ owner: "arggon", total: 1 });
+    // A refusal leaves the whole footprint intact and is reported on BOTH
+    // surfaces (the action list and the flat failures).
+    expect(refused.release?.actions).toEqual([
+      { id: "task-alpha", action: "failed", error: refused.release?.entry.reason },
+    ]);
+    expect(refused.failures).toHaveLength(1);
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(true);
+    expect(itemData(dir, "task-alpha").worktree_path).toBe(wt);
+    expect(existsSync(stampPath(wt))).toBe(true);
+
+    // The audited hatch for a presumed-DEAD owner releases it anyway (the same
+    // one `start --take-over-worktree` has), and reports the replaced stamp.
+    const taken = runCleanup({
+      cwd: dir,
+      release: "task-alpha",
+      releaseIdentity: "other",
+      releaseTakeOverWorktree: true,
+    });
+    expect(taken.failures).toEqual([]);
+    expect(taken.release?.entry.takeOver).toMatchObject({ replacedIdentity: "arggon" });
+    expect(existsSync(wt)).toBe(false);
+    expect(itemData(dir, "task-alpha").worktree_path).toBeUndefined();
+  });
+
+  it("refuses a release under a LIVE claim, and refuses --release together with --prune", () => {
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+
+    // Still claimed: the premise (an ABANDONED claim) does not hold yet.
+    const refused = runCleanup({ cwd: dir, release: "task-alpha", releaseIdentity: "arggon" });
+    expect(refused.release?.entry.reason).toContain("still claimed by arggon");
+    expect(existsSync(wt)).toBe(true);
+
+    // Two reapers, one run: refused outright rather than racing for one worktree.
+    expect(() => runCleanup({ cwd: dir, prune: true, release: "task-alpha", noGh: true })).toThrow(
+      /either --release <id> or --prune/,
+    );
+  });
+
+  it("the human CLI run names the release and its refusal (never a silent no-op)", () => {
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+
+    const json = runCli(["cleanup", "--release", "task-alpha", "--json"], dir);
+    // --json keeps the exit code at 0 (the payload is the contract); the human
+    // path below is what exits non-zero on a refusal.
+    expect(json.status).toBe(0);
+    const envelope = JSON.parse(json.stdout) as {
+      release?: { releasable: boolean; branch: string | null };
+      released?: Array<{ action: string }>;
+      pruned?: unknown;
+      commit?: { message: string };
+    };
+    expect(envelope.release).toMatchObject({ releasable: true, branch: "feat/task-alpha" });
+    expect(envelope.released?.map((action) => action.action)).toContain(`removed worktree ${wt}`);
+    expect(envelope.pruned).toEqual([]);
+    expect(envelope.commit?.message).toBe("chore(tasks): released task-alpha");
+    expect(existsSync(wt)).toBe(false);
+
+    // A second claim: unclaimed, then refused in the HUMAN path (exit 1) with
+    // the stamped owner named.
+    const bravo = claimedAndMerged(dir, "task-bravo");
+    runUpdate({ cwd: dir, id: "task-bravo", status: "todo", now: NOW });
+    foreignWrite(bravo, "task-bravo");
+    const human = runCli(["cleanup", "--release", "task-bravo"], dir);
+    expect(human.status).not.toBe(0);
+    expect(human.stdout + human.stderr).toContain("REFUSED to release task-bravo");
+    expect(existsSync(bravo)).toBe(true);
+  });
+
+  it("the unclaim itself names the release path in the human CLI output", () => {
+    const dir = initRepo();
+    claimedAndMerged(dir);
+
+    const unclaimed = runCli(["update", "task-alpha", "--status", "todo"], dir);
+
+    expect(unclaimed.stdout).toContain("claim dropped");
+    expect(unclaimed.stdout).toContain("arggon cleanup --release task-alpha");
   });
 });

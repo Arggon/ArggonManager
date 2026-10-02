@@ -318,6 +318,15 @@ export type UpdatePayload = {
   renamedFrom?: string;
   cascadeSkipped: UpdateResult["cascadeSkipped"];
   issueRoundtrip?: UpdateResult["issueRoundtrip"];
+  /**
+   * Dropped-claim worktree footprint (bug-unclaim-leaves-worktree-record-without-reaper):
+   * present when this update dropped the claim while a `worktree_path` record
+   * survived — the surviving worktree/branch/env/stamp plus the release
+   * command per surface. `update` never reaps a worktree (it is frontmatter-only,
+   * and it is the same call `cleanup` uses to clear the record), so the
+   * unclaim contract rides this receipt on BOTH surfaces.
+   */
+  claimFootprint?: UpdateResult["claimFootprint"];
   commit?: CommitPayload;
 };
 
@@ -335,6 +344,7 @@ export function updateOperation(opts: UpdateOperationOptions): CommandOutcome<Up
         ...(result.renamedFrom ? { renamedFrom: result.renamedFrom } : {}),
         cascadeSkipped: result.cascadeSkipped,
         ...(result.issueRoundtrip ? { issueRoundtrip: result.issueRoundtrip } : {}),
+        ...(result.claimFootprint ? { claimFootprint: result.claimFootprint } : {}),
         ...(commit ? { commit: commitPayload(commit) } : {}),
       },
       readConventionVersion(result.root),

@@ -197,6 +197,12 @@ A failure after the worktree exists **never** rolls it back: the worktree and br
 
 When the work is done and merged, `arggon cleanup` lists (and with `--prune` removes) the stale worktrees; a kept worktree you do not want (e.g. after a claim conflict) is discarded with the exact command the failure message prints (`git worktree remove --force <path>`, plus `git branch -D <branch>` when start created the branch). `cleanup --prune` also auto-commits (it clears `worktree_path`), so push main right after it — an unpushed cleanup auto-commit has traveled as contraband on a branch cut before.
 
+`--prune` only reaps **finished** work (terminal item + merged branch), so it cannot reap an **abandoned claim**: an item back in `todo` is invisible to it. That is what `--release <id>` is for (bug-unclaim-leaves-worktree-record-without-reaper) — the inverse of `start --worktree`, the other arm of the same worktree domain:
+
+- `arggon cleanup --release <id>` (native: `tools.arggon.cleanup({ release: "<id>" })`) removes that item's worktree, deletes its branch, reaps the start-created `.arggon.env` and the `arggon-claim.json` stamp, and clears the `worktree_path` record — reported as its own `release`/`released` action family, never mixed into `pruned`. Run it from the checkout whose tracker copy carries the record: the claim commit rides the feature branch, so before it merges that copy is the **worktree itself** (release from the claiming session's worktree).
+- It is **refused**, never forced, while the item is still claimed, or when the stamp names another identity whose window shows a live writer (`arggon cleanup --release <id> --take-over-worktree` / `tools.arggon.cleanup({ release, take_over_worktree: true })` is the audited hatch for a presumed-dead owner, exactly like `start --take-over-worktree`; the worktree removal is forced only under that flag, so uncommitted work is never discarded silently).
+- `--release` and `--prune` are mutually exclusive — two reapers, one run.
+
 Native `tools.arggon.start` uses that same kernel dependency-preparation path before its explicit claim commit. Its bounded `preparation` and `claimCommit` receipts make a required install, pre-commit gate, or claim-commit failure a typed failure (with the worktree kept and an attach/retry instruction), never an unqualified success; see §Orchestration → Native `start` dependency contract.
 
 One primary claimable id per branch when possible. Open a PR early; keep it small.
@@ -234,11 +240,25 @@ arggon update <id> --status blocked --blocked-reason "Waiting on OAuth app crede
 
 ### Unclaim
 
-`in_progress` → `todo` clears `assignee` (v0). Prefer that over leaving a stale claim:
+`in_progress` → `todo` clears `assignee` and the recorded `branch` (v0). Prefer
+that over leaving a stale claim:
 
 ```bash
 arggon update <id> --status todo
 ```
+
+**Unclaiming does not release the worktree.** A claim made through
+`start --worktree` also owns a worktree, a branch, a `.arggon.env` and a claim
+stamp, and the assignee is only one of those: the worktree survives the unclaim
+(only `worktree_path` stays recorded, since `update` is a frontmatter-only
+operation — it is the very call `cleanup` uses to clear that record, and it must
+never destroy a working tree on a status flip). So the unclaim call itself
+reports what it left behind and names the path that reaps it — `claimFootprint`
+in the `--json` envelope, `⚠ claim dropped: … release it with: arggon cleanup
+--release <id>` on stdout, and the native `update` tool's `claimFootprint`
+carrying `tools.arggon.cleanup({ release: "<id>" })`. If you drop a claim that
+created a worktree, release it with `arggon cleanup --release <id>` (§Cleanup);
+nothing else will, because `--prune` only reaps terminal, merged work.
 
 ### Reopen
 
@@ -263,7 +283,7 @@ Non-trivial items are **orchestrated by default**: a coordinator agent delegates
 - **Wave planning by file-disjointness:** group claimable items into waves whose members touch disjoint files/modules. Items that would collide go in different waves.
 - **Claim before dispatch (task-coordinator-claims-through-native-start):** claim every item you are about to delegate — `tools.arggon.start({ id, assignee, worktree: true })` (CLI: `arggon start <id> --worktree`) — **before** launching its worker, then launch into the path the claim returned. The claim is not bookkeeping wrapped around the worktree, it _is_ the worktree step: one call takes the single-writer stamp (§Single-writer ownership), creates `../<repo>-<id>`, pre-builds the workspace packages that copy owns, writes the claim commit and records `branch` + `worktree_path` on the item. The ordering is the substance: the worker's prompt must carry the worktree path, and the **recorded** `worktree_path` is the only honest source for it — `../<repo>-<id>` is a convention guess that drifts silently. A worker-first claim leaves every `start` guarantee inert — no stamp (so no foreign-writer detection), no recorded `worktree_path` (`cleanup` can then neither classify nor reap the worktree), no worktree install/pre-build and no `gateBins` receipt — which is how unowned worktrees accumulate beside items that are still `todo`.
   - Never hand-roll `git worktree add` for a claim, and never let a dispatched worker be the first claimant.
-  - Never claim an item you are not dispatching: an idle claim takes the item out of the pool and records a writer that is not writing. Unclaim it instead — `tools.arggon.update({ id, status: "todo" })` clears the assignee (v0; `--force` on `update` is human-only and never the remedy).
+  - Never claim an item you are not dispatching: an idle claim takes the item out of the pool and records a writer that is not writing. Unclaim it instead — `tools.arggon.update({ id, status: "todo" })` clears the assignee (v0; `--force` on `update` is human-only and never the remedy). **When the claim created a worktree, the unclaim is only half the job** (bug-unclaim-leaves-worktree-record-without-reaper): the worktree, its branch, its `.arggon.env` and its claim stamp outlive the assignee, `cleanup --prune` cannot reap a `todo` item, and nothing reaps it otherwise. So unclaim **and release** — `tools.arggon.cleanup({ release: id })` (CLI: `arggon cleanup --release <id>`), run from the checkout carrying the record (§Cleanup: the worktree copy, until the claim branch merges). The unclaim's own `claimFootprint` receipt names that command on both surfaces; a release is refused while another session's live writer holds the worktree (`take_over_worktree` / `--take-over-worktree` is the audited hatch for a dead owner).
   - A start **refusal is evidence, not a retry** — read the cause it names (see §Native `start` dependency contract): claim already taken → do not dispatch that item, pick another or reconcile the existing claim; gate binaries that do not resolve inside the worktree → `npm ci` in the returned worktree, then re-run `start` to attach. That refusal has **two** arms with the same remedy — it is **unconditional** for a worktree this start created (a `start` that created the worktree vouches for its install; `bug-start-install-ordering`) and is what `x-tracker.strict-gate-bins` (armed in this repo) turns on for an **attach**; `--force` never applies to `start` and never gets you past either. A single-writer refusal (§Single-writer ownership) is the same shape — coordinate with the stamped session; `--take-over-worktree` is only for a **dead** owner, never a live one.
 - **Per-item worktrees:** one subagent per item, each working in its own worktree — the item's recorded `worktree_path` (`../<repo>-<id>` is the naming convention `start` follows, not a path to re-derive), created by that claim and never by hand; no two subagents share a working tree.
 - **Code review (lead architect):** the coordinator reviews **every** subagent PR before merge — against the review bar in `ArggonManager/docs/engineering.md` (architecture-first, conventions first, quality/scalability/security bar, tests travel with behavior, docs travel with code, scope stays on the item, **blocking smoke test** — probe evidence in the verdict for CLI changes, real-browser drive via Playwright CLI for UI) plus the coordination specifics: surgical staging, no cross-item files, no unrelated reformatting, acceptance ticks honest. Change requests and verdicts go back to the subagent via `arggon comment <item-id>` on the item (auto-committed to the tracker) — never as GitHub PR comments — and are addressed before merge; only a review that passes merges. Verdict comments start with the bounded `verdict: approve | request-changes` header line (`docs/engineering.md` §Review bar → Review verdicts), which `arggon sync --json` classifies report-only per PR-reconciled item. Green CI is necessary, not sufficient.
