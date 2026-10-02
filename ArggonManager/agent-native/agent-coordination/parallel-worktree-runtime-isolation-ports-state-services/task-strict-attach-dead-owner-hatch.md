@@ -84,7 +84,7 @@ documented for when they cannot.
   With it, this run's stamp is written and carries a bounded, dated
   `takeovers` chain (`MAX_CLAIM_TAKEOVERS`) whose newest entry names the
   replaced stamp (`identity`, `item`, `branch`, `claimedAt`, `assignee`).
-- The receipt gains `takeOver: { takeover, files, total }` — the same evidence
+- The receipt gains `takeOver: { at, by, replacedIdentity, replacedClaimedAt, replaced, files, total }` (`replaced` = the stamp it replaced, in full) — the same evidence
   the detection saw, in the same bounded shape. The fired evidence is
   deliberately moved OUT of `foreignWrites` on a take-over: both surfaces'
   strict gate already reads `claim.foreignWrites`, so an authorized take-over
@@ -101,6 +101,57 @@ documented for when they cannot.
 - An unwritable git dir degrades the take-over to an unrecorded one
   (`stamped: false` + warning) and never throws — the previous stamp stands, so
   the next attach re-detects the same evidence.
+
+### 2026-10-02 @Arggon — review round 2: smoke evidence + a live #568 defect the smoke bar caught
+
+**Smoke probe (real CLI on a disposable fixture; engineering.md §89).** A scratch
+repo + tracker tree + bare remote in `/tmp/opencode/takeover-probe-*` (never this
+repo's tracker), driven with `dist/cli.js`:
+
+- `(a)` `start task-dead-owner-probe --assignee arggon --worktree` with
+  `x-tracker.strict-worktree-writes: true`, a stamp owned by a crashed `ghost`,
+  and one tracked file (`README.md`) dirtier than that stamp →
+  `START_FAILED`, message names `--take-over-worktree`, the manual `rm` and the
+  literal "confirm no live writer"; the item file stayed byte-identical, no claim
+  commit landed, and the stamp still read `ghost`.
+- `(b)` the same fixture plus `--take-over-worktree` → `ok: true`,
+  `pushed: true`, `claim.takeOver = { at, by: "arggon", replacedIdentity: "ghost",
+  replacedClaimedAt, replaced: { identity: "ghost", item, branch, claimedAt,
+  assignee, surface: "cli" }, files: ["README.md"], total: 1 }`, `foreignWrites`
+  absent, the claim commit landed (`e917711 claim: task-dead-owner-probe`), and
+  the stamp now reads `identity: arggon` with a one-entry `takeovers` chain.
+- Human channel, no `--json`: `note: single-writer take-over — took over the
+  worktree from ses_secondcorpse (claimed …) at … as arggon: 1 tracked file was
+  modified after that claim: README.md — the stamped session was presumed dead; …`.
+- `(c)` `start <id> --take-over-worktree` without `--worktree` → `START_FAILED`
+  ("--take-over-worktree requires --worktree …").
+
+**Live defect found by the bar (fixed here, in-lane):** `StartGit.fileStatus`
+trims its output, and porcelain is POSITIONAL — `" M README.md"` became
+`"M README.md"`, so `parseTrackedModifications` read `EADME.md`, the `stat`
+failed, and the CLI's single-writer detection **never fired against real git
+output**: with strict armed, a dead-owner attach claimed silently instead of
+refusing (observed in the first probe run). #568's unit tests missed it because
+their fake runner emitted faithful ` M <path>` lines. Fixed by a raw
+(non-trimming) `StartGit.statusPorcelain` probe, and pinned three ways: a unit
+test whose runner trims `fileStatus` but answers raw (detection must still fire),
+a real-CLI regression in `cli/src/claim-race.test.ts` (refusal + take-over over
+real git, which fails on the pre-fix code), and the smoke probe above. The
+native/plugin surface was never affected: it passes no `status` override, so the
+kernel's own non-trimming probe runs.
+
+**Review rulings recorded:** (1) the take-over is unreachable from MCP/no-TTY
+today — ACCEPTED: a take-over is attributable (`by`, `replacedIdentity`, the
+persisted chain) and agents already had the documented manual `rm` as the
+no-TTY recovery; wiring a native input field is a follow-up. (2) the persisted
+chain has no surface reader yet — filed by the coordinator as a follow-up, no
+reader added here. (3) an UNRECORDED take-over (unwritable git dir) now prints a
+`warning: take-over NOT recorded — …` line beside the note, so the human
+channel cannot read it as taken-over; `--json` is unchanged. (4) the refusal
+message now puts every remedy BEFORE the named-file list (the human channel clips
+a composite error line at 2000 chars and keeps the head, so a long file list
+pushed the remedies off screen) and restores the literal "confirm no live
+writer" the docs promise.
 
 **Native gap (open question for the coordinator):** the kernel honors
 `takeOver`, but the native `start` tool has no input field to set it, and
