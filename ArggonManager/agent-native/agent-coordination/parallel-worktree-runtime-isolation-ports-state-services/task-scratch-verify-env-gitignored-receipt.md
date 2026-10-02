@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: cancelled
 id: task-scratch-verify-env-gitignored-receipt
 title: scratch-verify-env-gitignored-receipt
 parent: parallel-worktree-runtime-isolation-ports-state-services
