@@ -266,7 +266,7 @@ control, surface or state indicator, add its boundary pair to that test —
 
 ## Propose schema / convention changes
 
-1. Open an issue describing the change and why (agents + humans must share one rule).
+1. Create a work item in the tracker (`arggon create task "<title>" --parent <story-id>`) describing the change and why (agents + humans must share one rule).
 2. Update **`ArggonManager/docs/convention.md`** in the same PR as any CLI/validate behavior that depends on it.
 3. Update sample the tracker and `templates/` when the change affects them.
 4. Breaking changes need an ADR under `ArggonManager/docs/adr/` and a bump of the tracker `.convention.yml` `version` when applicable.
