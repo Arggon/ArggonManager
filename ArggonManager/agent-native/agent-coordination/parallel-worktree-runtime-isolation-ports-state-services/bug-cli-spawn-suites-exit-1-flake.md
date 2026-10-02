@@ -5,7 +5,7 @@ id: bug-cli-spawn-suites-exit-1-flake
 title: "CI flake: suites that SPAWN the CLI intermittently exit 1 (handoff lib/dist import error; row-table-stdout adopt --ack)"
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [ci, flaky]
-priority: p3
+priority: p2
 created: "2026-10-02"
 updated: "2026-10-02"
 ---
