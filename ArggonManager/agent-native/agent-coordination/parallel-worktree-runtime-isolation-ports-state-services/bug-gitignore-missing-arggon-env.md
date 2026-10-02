@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-gitignore-missing-arggon-env
 title: "`.gitignore` does not ignore `.arggon.env`, so the 0.5.0 worktree env contract drops an untracked file into every worktree"
+assignee: Arggon
+branch: fix/bug-gitignore-missing-arggon-env
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [worktree, hygiene]
 priority: p2
 created: "2026-10-02"
 updated: "2026-10-02"
+claimed_at: "2026-10-02T18:59:12.784Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-gitignore-missing-arggon-env
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-gitignore-missing-arggon-env.md

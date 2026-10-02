@@ -41,3 +41,8 @@ playwright-report/
 # (docs/opencode2.md recommends them over the tracked mise.toml only for
 # personal overrides; worktrees must keep inheriting the committed PATH).
 mise.local.toml
+
+# spec worktree-env-contract-016: `arggon start --worktree` writes a
+# per-worktree identity `.arggon.env` at every worktree root. It is machine
+# state — never commit it, and do not remove this entry as dead weight.
+.arggon.env
