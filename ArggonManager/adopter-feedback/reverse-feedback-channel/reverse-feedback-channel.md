@@ -8,6 +8,7 @@ labels: []
 created: "2026-10-02"
 updated: "2026-10-02"
 ---
+
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/reverse-feedback-channel.md (epic index; required).
   parent MUST be the initiative id. Container ids must not start with task-/bug-.
@@ -15,12 +16,19 @@ updated: "2026-10-02"
 
 # Reverse feedback channel
 
+# Reverse feedback channel
+
 ## Context
 
-<!-- Why this epic exists. -->
+The umbrella for turning adopter-side friction into work ArggonManager actually
+picks up — without letting an agent write to a public tracker, and without
+letting public automation read an agent's output as instructions.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [x] A validated, evidence-backed design exists
+      ([`exploration-adopter-feedback-channel-018`](../docs/explorations/exploration-adopter-feedback-channel-018.md))
+- [ ] An ADR settles the cross-cutting decision and the spec passes
+      `arggon spec analyze` with no NEW findings
 
 ## Notes
