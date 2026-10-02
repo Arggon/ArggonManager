@@ -246,3 +246,7 @@ B1 probe          → `npx --yes arggon-manager@0.5.0 init --no-commit` then
 Suite went 2165 → 2166 (one new pin). The only failures I hit en route were my own two bad pins, both fixed: an `AGENTS.md` `not.toContain("git worktree add")` that can never pass (the replacement forbids the command by name — now pins the instruction instead) and a `.not.includes` typo on a string.
 
 Item boxes ticked in this round: **1** (contract states claim step, ordering, prohibitions — now in all five carriers) and **3** (seam test pins the claim duty's presence, and the pins now cover every carrier). Box **2** left unticked for the coordinator lane; box **4** left unticked (its seam-test half is delivered, its reconciled-frontmatter half is box 2). Item stays `in_progress`, PR stays a draft.
+
+### handoff 2026-10-02 @ses_f02bcc476ffes6LrJvCQylx0li (session: ses_f02bcc476ffes6LrJvCQylx0li) — next: Re-review PR #589 (draft): B1 probe empty, 5 carriers fixed, 2166 tests green; merge if satisfied
+- branch: feat/task-coordinator-claims-through-native-start
+- open questions: Is a follow-up item warranted for the reverted .convention.yml stamps at the next release regen?; box 2 (two drifted items) stays with the coordinator
