@@ -31,6 +31,7 @@ import {
   prepareWorktreeDependencies,
   prepareWorktreeEnv,
   readWorktreeClaimStamp,
+  type GateBinResolution,
   type WorktreeClaimReceipt,
   strictGateBinFailure,
   strictGateBinViolations,
@@ -734,6 +735,89 @@ describe("strictGateBinFailure (task-start-gate-strict-mode)", () => {
     const message = strictGateBinFailure(bins, worktree);
     expect(message).toContain("tsx: resolves from");
     expect(message).toContain(externalBin);
+  });
+
+  it("puts the npm ci remedy BEFORE the named-bin list, so a head-clipped refusal keeps the fix (task-strictgatebinfailure-tail-clipped-by-head-clip)", () => {
+    // The reachable worst case: the FULL MAX_GATE_BINS list `resolveGateBins`
+    // can report (its hard cap — the same list the native seam's own
+    // worst-case test builds), every bin a long name resolving through PATH
+    // from a deep sibling checkout's .bin, ~330 chars an entry. Both channels
+    // clip a composite refusal keeping its HEAD (the native `startFailure` at
+    // MAX_NATIVE_ERROR_CHARS = 2048), so what leads is what survives.
+    const worktree = join("home", "dev", "projects", "ArggonManager-strict-gate-bin-task");
+    const siblingBinDir = join(
+      "home",
+      "dev",
+      "projects",
+      "a",
+      "very",
+      "deeply",
+      "nested",
+      "module",
+      "resolution",
+      "path",
+      "with",
+      "plenty",
+      "of",
+      "long",
+      "segment",
+      "names",
+      "in",
+      "a",
+      "sibling",
+      "checkout",
+      "node_modules",
+      ".bin",
+    );
+    const names = Array.from(
+      { length: MAX_GATE_BINS },
+      (_, index) => `worktree-gate-binary-number-${index}-with-a-very-long-name-for-the-clip`,
+    );
+    const bins: GateBinResolution[] = names.map((name) => ({
+      name,
+      source: "path",
+      path: join(siblingBinDir, name),
+    }));
+    const message = strictGateBinFailure(bins, worktree) ?? "";
+    const entry = (name: string): string =>
+      `${name}: resolves only via PATH from ${join(siblingBinDir, name)} (outside the worktree)`;
+    const firstEntry = entry(names[0]!);
+    const lastEntry = entry(names[MAX_GATE_BINS - 1]!);
+
+    // Only the ORDER moved: every clause is verbatim, nothing reworded, added
+    // or dropped — the remedy, the diagnosis, and the whole named list.
+    expect(message).toContain(`Fix: run \`npm ci\` in ${worktree} for a worktree-local install.`);
+    expect(message).toContain(
+      "x-tracker.strict-gate-bins is set: refusing the claim commit — gate binaries do not resolve inside the worktree:",
+    );
+    expect(message).toContain(firstEntry);
+    // The remedy leads the diagnosis AND precedes the FIRST named bin, not
+    // merely the last one.
+    expect(message.indexOf("npm ci")).toBeLessThan(
+      message.indexOf("x-tracker.strict-gate-bins is set"),
+    );
+    expect(message.indexOf("npm ci")).toBeLessThan(message.indexOf(firstEntry));
+    // …and the whole named list still trails, last bin included.
+    expect(message.endsWith(`${lastEntry}.`)).toBe(true);
+
+    // The clip really bites here — otherwise the ordering above would pass on
+    // any message. The native seam's `clip` keeps the HEAD and always returns
+    // exactly `max` chars for an over-cap value; mirror it so this pins the
+    // same window the agent receives.
+    const MAX_NATIVE_ERROR_CHARS = 2048;
+    expect(message.length).toBeGreaterThan(MAX_NATIVE_ERROR_CHARS);
+    const clipped =
+      message.length > MAX_NATIVE_ERROR_CHARS
+        ? `${message.slice(0, MAX_NATIVE_ERROR_CHARS - 1)}…`
+        : message;
+    expect(clipped).toHaveLength(MAX_NATIVE_ERROR_CHARS);
+    // The remedy survives the clip, and so does the head of the evidence.
+    expect(clipped).toContain("npm ci");
+    expect(clipped).toContain(firstEntry);
+    // Negative control: the tail named bin is what the clip ate (it is present
+    // in the full message, so this cannot pass by naming nothing).
+    expect(clipped).not.toContain(lastEntry);
+    expect(message.slice(MAX_NATIVE_ERROR_CHARS)).toContain(lastEntry);
   });
 });
 
