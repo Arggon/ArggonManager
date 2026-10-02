@@ -145,3 +145,68 @@ Run in the PR worktree `/home/arggon/Projects/ArggonManager-bug-aged-exploration
 5. After the three edits land, re-read `exploration-ui-improvements-012.md:169` and `exploration-open-source-agent-tooling-013.md:805-812,828-840` and confirm the count is 20, the rec-3 bullet names `task-decide-codebase-memory-default-discovery`, and the 0019 gloss matches decision points 1–3.
 
 Nothing else is unverified: I read the full diff, both explorations' surrounding sections (§0/§A/§B/§C/§D/§E/§G, the matrix, the recommendation list, `task-record-shell-tasks-pilot-negative-result`'s full body and both comments), the scanner grammar and baseline logic in `cli/src/spec.ts`, the 5 linked ADRs, `agents.md:209/309/428/439`, all 26 named tracker items, both manifests, `ci.yml`, the committed baseline and its git history, and PR #599's check rollup + failed-job log.
+
+### 2026-10-02 @Arggon
+Round-1 review (`verdict: request-changes`) addressed — all four findings. Head is now `d3640d5d`; item left `in_progress` for the coordinator.
+
+**One thing up front, because it changes how finding 4 must be read:** the branch now contains a merge of current `origin/main` (one conflict — this item's file, resolved by keeping the worker comment/handoff *and* the reviewer's verdict, chronologically). **No history rewrite, no force-push** — the branch carries tracker auto-commits (`agents.md` §0).
+
+### 1. Wrong count — fixed, and every other integer swept
+
+`exploration-ui-improvements-012.md:169` now reads **20**, not 21. Verified mechanically, not by eye:
+
+- filed-work table parsed per row → `ui-web-board-v2` 9, `ui-tui-v2` 7, `ui-native-panel-v2` 2, `ui-foundation` 2 = **20**;
+- the Recommendation section's id union = the **same 20** ids (`set(...) == set(...)` true, 20 unique, no dupes);
+- every one of the 20 ids' `status:` read straight from its tracker file → **20 done, 0 not done**;
+- epic `ui` re-read from `arggon report` → `todo=0 in_progress=0 blocked=0 done=39 cancelled=0 (total 39)`, so the "39 done / 0 todo / 0 in_progress" claim stands.
+
+Full integer sweep over every line this PR adds to either file (ADR numbers `0001/0002/0008/0010/0011/0019`, `opencode2-shell-tasks@0.1.1`, `opencode-chromium@1.7.2`, `2.0.x`, PR #423, dates `2026-09-28`/`2026-10-02`, the seven recommendation bullets, and the seven wave bullets): every one now matches its source. Two collateral claims were tightened while in there — rec 5's "registration unverified on 2.0.x" is left as the honest range §B/pilot measured (2.0.16 and 2.0.18 are both 2.0.x), and the rec-3 paragraph no longer says the comparison-matrix row is "below it" (the matrix is **above** the Decision gate — my round-1 text had that backwards, and it would have been a second wrong location claim).
+
+### 2. Stale rec 3 — reworded as undecided, live item named
+
+The bullet no longer claims "no item names it" and no longer reads as a rejection. It now says: **undecided, and deliberately left that way** — §C's verdict ("Adopt as an already-compatible developer standard") and the matrix's "Adopt as dev standard" row are this document's *dated research position*; the repository has recorded **no decision** either way (no ADR, no playbook, no repo doc, `AGENTS.md` included); the open question is tracked as `task-decide-codebase-memory-default-discovery` (`todo`, filed 2026-10-02 from this PR's own review), which owns the disposition; the bullet deliberately does not close it. Nothing was converted from "not decided" into "not adopted" — the word "not adopted" is gone from rec 3 only (recs 4/5/6/7 keep their own, independently verified dispositions).
+
+Bookkeeping bug **in that new item, not in this diff**, reported rather than fixed: its placement comment says `ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-decide-codebase-memory-default-discovery.md` while the file lives under `agent-native/ecosystem-ops/methodology-improvements/`. Nothing validates that line today, but whoever claims the item will be misled.
+
+### 3. ADR 0019 gloss — restated to decision points 1–3, status marked
+
+Old gloss ("a per-worktree dev container stays the escape hatch") read as permission for the option point 3 **rejects**. Now, with its still-`Proposed` status explicit (product-owner acceptance recorded in `Deciders`, not yet merged as `Accepted`) and the section intro softened from "decided later" to "taken up later":
+
+- **layer 1** — env contract (`.arggon.env` + per-OS state/cache dirs, spec `spec-worktree-env-contract-016`) is the default;
+- **layer 2** — ephemeral per-worktree **service** containers (Compose) are a documented opt-in pattern, never a kernel feature;
+- **rejected as defaults** — per-worktree **dev-environment** containers, distrobox/toolbox, per-worktree VMs (the dev-container option survives only as a last-resort escape hatch for toolchains that cannot run on the host);
+- Nix/devbox stays "optional, per-project complement outside arggon's scope" (out of scope, never an arggon requirement);
+- **ADR 0019 does not mention `mise` at all** — verified by grepping that file (and `mise` does appear elsewhere on `main`, e.g. `install-ergonomics.md` / `docs/opencode2.md`, so the claim is scoped to 0019 on purpose).
+
+I also dropped the implication that 0019 answers the *toolchain* half of §0's thread: it decides runtime isolation, not toolchain materialization.
+
+### 4. CI — rerun reported, not chased
+
+| Run | Tree | Result |
+| --- | --- | --- |
+| `37073594139` attempt 1 | `e1f883da` | `cli` FAILURE — `SpawnHarnessError` / `child-boot-failed` / "kernel artifact drift: the repo's built artifacts were REWRITTEN while this child ran" |
+| `37073594139` attempt 2 (`gh run rerun 37073594139 --failed`) | `e1f883da` — **identical tree** | `cli` **FAILURE again**, byte-identical signature; `ui-smoke` success |
+| `37078281306` | `d3640d5d` (head) | `cli` **SUCCESS**, `ui-smoke` SUCCESS |
+| `37078281310` | `d3640d5d` (head) | `tasks-validate` SUCCESS |
+
+Straight answer to the reviewer's conditional: **the rerun did not pass on the identical tree**, so I am not claiming it did. The failure is the tracked spawn/artifact-drift class (`bug-spawn-lanes-load-flake`) that the harness itself raises as "not an assertion failure", on a docs-only diff, and it reproduced twice. **CI at head `d3640d5d` is green on all three jobs** (`cli`, `tasks-validate`, `ui-smoke`) and the PR reports `MERGEABLE`. For the record, the shuffle-safe CI fix `eea4266f` (PR #546) was *already* in this branch's base, so the red→green difference between the two heads is the merge of current `main`, not a retry.
+
+### Gates (head `d3640d5d`)
+
+| Gate | Expected | Observed |
+| --- | --- | --- |
+| `npm run arggon -- spec analyze --baseline ArggonManager/spec-analyze-baseline.json` | 0 new, exit 0 | `0 new, 1 resolved, 5 unchanged, 5 total`, exit 0 |
+| `npm run arggon -- validate` | ok | `arggon validate: ok (0 warning(s), convention v5)`, exit 0 |
+| `npx vitest run cli/src/prose-format.test.ts cli/src/spec-decision-gaps.test.ts` | green | 2 files / 27 tests passed |
+| `npm run lint` | clean | exit 0, no output |
+| pre-commit hook | runs, never bypassed | green on both commits; `--no-verify` never used |
+
+Marker probe after the fixes (`parseDecisionSection` + `decisionSectionHasAdrRef` + `decisionSectionHasNoAdrMarker`): 012 → `{headingLine: 165, hasAdrRef: true, hasNoAdrMarker: true}`, 013 → `{headingLine: 771, hasAdrRef: true, hasNoAdrMarker: true}`. `cli/src/spec.ts` is byte-identical to base.
+
+### Baseline rationale corrected (reviewer advisory)
+
+My round-1 sentence — "refreshing it would delete the evidence that these two findings existed" — was **wrong**, and it is retracted. `findingKey` (`cli/src/spec.ts:976-979`) includes the full message and the age is embedded in it ("after 9 day(s)"), so the committed 012 entry was already flipping to `resolved` from 9→10 day drift alone and would have kept rotating regardless: that entry was never a durable record of the finding. The surviving `resolved` line is **fingerprint churn, not proof of closure**; the closure evidence is the two markers plus `0 new … exit 0`. Leaving the baseline unrefreshed still stands on the convention argument (`agents.md` §Specs and plans documents it only as the NEW-findings wave gate; no refresh-on-resolution workflow; both baselines committed once and never refreshed). The PR body now carries the corrected wording.
+
+### Tracker-write hazard re-check
+
+Every write went through `npm run arggon -- …` with this worktree as cwd; the native `tools.arggon.*` surface stays read-only because it resolves the tracker root from the session cwd (the primary checkout). Branch commits: `6d231f50` (merge main), `d3640d5d` (the three corrections) — plus round 1's `fc9a14e9`/`21b52684`/`e1f883da`. `git status` in this worktree is clean. The primary checkout has been advancing throughout from other sessions (e.g. `ee0789cfe`-era tracker commits); none of them are mine, and none of my commits are reachable from `main`.
