@@ -72,3 +72,7 @@ npm test 2118 passed / 116 files · npm run lint · npm run build · npm run che
 
 ## Finding for the coordinator (not filed by me, per the no-self-filing rule)
 The suite's local `runCli(args, cwd, env)` in `opencode/plugins/arggon/tools.test.ts` takes the env MAP, while `cli/src/test-spawn.ts`'s `runCli(args, cwd, options)` takes an OPTIONS object. Passing `{ env }` to the local wrapper gives the spawned child an environment with a single variable literally named `env` — PATH is silently lost and any PATH-based assertion in a `tools.test.ts` case fails in a way that looks like a product bug (for us: the CLI child found the host's real docker). Cheap hardening: rename the local wrapper (e.g. `runCliWithEnv`) or assert the child's env once in that file. Left undone here (out of scope, and a sibling worker's fence risk).
+
+### handoff 2026-10-02 @ses_f055baad1ffeJBgIqkg18b8dKY (session: ses_f055baad1ffeJBgIqkg18b8dKY) — next: Review + merge PR #574, then flip the item done (acceptance ticked, all gates green).
+- branch: feat/task-native-cleanup-compose-parity
+- open questions: Bundle conflicts expected on merge — regenerate after merging main, never hand-edit; local runCli(env) vs test-spawn runCli({env}) footgun left unfiled for the coordinator
