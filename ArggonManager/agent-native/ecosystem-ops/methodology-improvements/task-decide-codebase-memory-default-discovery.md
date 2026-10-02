@@ -19,10 +19,13 @@ updated: "2026-10-02"
 
 ## Context
 
-<!-- Why this task exists. -->
+Found while reviewing PR #599 (bug-aged-exploration-decisions): exploration-open-source-agent-tooling-013 recommendation 3 — make codebase-memory-mcp the default code-discovery aid for agents — is the one recommendation the repository records NOWHERE. `grep -rl codebase-memory` over the tracked tree hits only that exploration file and the negative-result item body. PR #599 recorded it as "not adopted in this repository" (nothing cross-cutting chosen, so no ADR was owed), which is a true statement about the record but leaves the recommendation unresolved: it was neither adopted nor explicitly rejected.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] Decide adopt or reject explicitly, and record it where an agent will actually read it (playbook, `AGENTS.md` seam guidance, or an ADR if cross-cutting)
+- [ ] If adopted: the mechanism that makes it the default for agents (skill reference, init-generated guidance, or seam config), plus its cost/limits stated honestly (it is an MCP server, so adopters must register it)
+- [ ] If rejected: record the reason in exploration 013's Decision section so the recommendation is closed rather than dangling
+- [ ] Exploration 013 updated to point at this decision
 
 ## Notes
