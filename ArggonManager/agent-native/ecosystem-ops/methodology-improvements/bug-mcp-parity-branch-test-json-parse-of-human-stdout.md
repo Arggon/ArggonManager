@@ -23,6 +23,9 @@ updated: "2026-10-02"
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] The test parses the JSON envelope robustly (find the envelope in stdout, or assert both surfaces are JSON-only in this mode) so a human success line cannot produce a bare `SyntaxError`
+- [ ] A failing assertion names WHICH surface produced the bad output (CLI vs MCP) and echoes the raw text, so the next occurrence is diagnosable in one read
+- [ ] The test still asserts real parity — do not weaken it into "both parse somehow"; a genuine CLI/MCP divergence must still fail
+- [ ] The fix is in the test/harness (the reader), not a change to `arggon branch` output, unless the human line is genuinely wrong for `--json` mode — if so, file that separately
 
 ## Notes
