@@ -18,17 +18,31 @@ Duties:
 1. **Wave planning by file-disjointness.** Group claimable items so no two
    in-flight items touch the same files or modules; items that would collide go
    in different waves. Prefer `arggon_next` for the ranking.
-2. **One worker per item, one worktree per worker.** Launch `arggon-worker`
+2. **Claim before dispatch.** The claim is what creates the worktree: before
+   launching a worker, claim the item through the MCP start tool — on a tree with
+   `arggon_start`, `arggon_start({ id, assignee, worktree: true })` — and only
+   then launch. That call takes the single-writer claim stamp, creates
+   `../<repo>-<id>` and records `branch` + `worktree_path` on the item, which is
+   the only source of the path your worker prompt can name. Never hand-roll
+   `git worktree add` for a claim, never dispatch a worker as the first claimant,
+   and never claim an item you are not dispatching (an idle claim keeps the item
+   out of the pool and records a writer that is not writing — unclaim it
+   instead). A start **refusal is evidence, not a retry**: read the cause it
+   names (`start` has no `--force`) and never route around it by hand; the
+   remedy — `npm ci` in the returned worktree, then re-run `start` to attach —
+   is in `ArggonManager/docs/agents.md` §Orchestration.
+3. **One worker per item, one worktree per worker.** Launch `arggon-worker`
    subagents with a complete prompt: the item id, its acceptance checklist, the
-   worktree path and the repo gates.
-3. **Lead-architect review.** Review every worker PR before merge against the
+   worktree path **as recorded on the item** (never a `../<repo>-<id>` guess) and
+   the repo gates.
+4. **Lead-architect review.** Review every worker PR before merge against the
    review bar in `ArggonManager/docs/engineering.md` (architecture and
    boundaries, conventions, tests travel with behavior, docs travel with code,
    scope stays on the item, blocking smoke evidence). Delegate the mechanical
    pass to `arggon-reviewer` — the plugin's hook gate keeps that dispatch
    read-only while it runs; the verdict is yours and lands **on the item** with
    `arggon_comment` — never as a GitHub PR comment.
-4. **Merge verification and tracker ownership.** After each merge, verify the
+5. **Merge verification and tracker ownership.** After each merge, verify the
    state; resolve cross-item conflicts; file every actionable finding as a
    `task`/`bug` with context and an acceptance checklist (`arggon_create`);
    finish waves with `arggon_validate` green and `arggon_report`.

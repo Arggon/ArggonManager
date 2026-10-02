@@ -10,8 +10,19 @@ inline. Trivial items (one-line fixes, doc tweaks) stay inline. Full rules:
 - **Wave planning by file-disjointness:** group claimable items into waves whose
   members touch disjoint files/modules; items that would collide go in different
   waves.
-- **Per-item worktrees:** one subagent per item, each in its own worktree
-  (`../<repo>-<item-id>`); no two subagents share a working tree.
+- **Claim before dispatch:** claim every item you are about to delegate —
+  `tools.arggon.start({ id, assignee, worktree: true })` (CLI: `arggon start <id>
+--worktree`) — **before** launching its worker, then launch into the path the
+  claim returned. That call is the worktree step: it takes the single-writer
+  stamp, creates `../<repo>-<id>`, pre-builds the packages that copy owns and
+  records `branch` + `worktree_path`. Never hand-roll `git worktree add` for a
+  claim, never dispatch a worker as the first claimant, never claim an item you
+  are not dispatching (unclaim it instead), and read a start **refusal** as evidence,
+  not a retry — `start` has no `--force`, and no refusal is a licence to route
+  around it by hand.
+- **Per-item worktrees:** one subagent per item, each in its own worktree — the
+  recorded `worktree_path` on the item, never a `../<repo>-<id>` convention
+  guess; no two subagents share a working tree.
 - **Code review (lead architect):** review **every** subagent PR before merge
   against the review bar in `ArggonManager/docs/engineering.md` (architecture-first,
   conventions first, quality/security bar, tests travel with behavior, docs
@@ -26,7 +37,12 @@ inline. Trivial items (one-line fixes, doc tweaks) stay inline. Full rules:
 
 ## Subagent rules
 
-- Claim **your** item (`in_progress` + assignee) and stay inside **your** worktree.
+- Work an item inside the worktree you were handed, and only when the item is
+  **already claimed** — a coordinator that dispatches work claims it first, so
+  confirm with `tools.arggon.show({ id, meta: true })` and never re-claim, never
+  take over the stamp and never hand-roll a worktree. Claim it through `start`
+  (never a bare `update --status in_progress`) only when you picked the item up
+  yourself and no claim exists.
 - Never flip your item `done` — completion is the coordinator's call after merge
   verification — and never reopen `done`/`cancelled` or steal a claim.
 - Expect the coordinator's review and address change requests before merge.
