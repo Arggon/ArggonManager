@@ -59,6 +59,15 @@ export type StartOptions = {
    */
   worktree?: boolean;
   /**
+   * Deliberate take-over of a presumed-dead stamped owner
+   * (task-strict-attach-dead-owner-hatch, `start --take-over-worktree`): on
+   * an attach whose single-writer detection fired, record a dated take-over
+   * naming the replaced stamp and re-stamp the worktree with this run's
+   * identity. Default OFF and only meaningful with `worktree` (without a
+   * worktree there is no stamp to take over — the flag is then rejected).
+   */
+  takeOverWorktree?: boolean;
+  /**
    * Skip the `x-worktree.post-start` hook for this invocation
    * (task-start-post-hook). The hook only ever runs on new-worktree creation.
    */
@@ -184,7 +193,9 @@ export type StartResult = {
    * Present only with `--worktree` (the stamp is worktree-scoped); a fired
    * `foreignWrites` report is a WARNING by default — with
    * `x-tracker.strict-worktree-writes: true` it refuses the claim before any
-   * item mutation instead.
+   * item mutation instead. A deliberate `--take-over-worktree` moves that
+   * evidence into `takeOver` (task-strict-attach-dead-owner-hatch), so exactly
+   * one of `foreignWrites` / `takeOver` is ever present.
    */
   claim?: WorktreeClaimReceipt;
   /**
@@ -532,6 +543,16 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
   const id = opts.id.trim();
   if (!id) throw new Error("id is required");
 
+  // The take-over flag is worktree-scoped (task-strict-attach-dead-owner-hatch):
+  // without `--worktree` there is no claim stamp to take over, and a silently
+  // ignored flag is how a recovery step gets believed to have happened.
+  if (opts.takeOverWorktree === true && opts.worktree !== true) {
+    throw new Error(
+      "--take-over-worktree requires --worktree (it takes over a claimed worktree's ownership " +
+        "stamp; a plain start writes no stamp)",
+    );
+  }
+
   const gitRunner = deps.git ?? defaultStartGit();
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
@@ -860,6 +881,10 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
         itemId: id,
         branch: name,
         surface: "cli",
+        // Deliberate take-over (task-strict-attach-dead-owner-hatch): only
+        // recorded when a detection FIRES, so passing the flag on a clean
+        // attach is a no-op rather than a re-stamp.
+        ...(opts.takeOverWorktree === true ? { takeOver: true } : {}),
         ...(opts.now !== undefined ? { now: opts.now } : {}),
         status: (cwd) => {
           try {
@@ -878,6 +903,12 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     // default) keeps the documented report-only behavior byte-identical: the
     // detection rides the receipt (`claim.foreignWrites`) and the claim
     // commit remains authoritative.
+    //
+    // A `--take-over-worktree` run (task-strict-attach-dead-owner-hatch) is
+    // NOT here: the kernel reports the fired evidence as `claim.takeOver`
+    // instead of `claim.foreignWrites`, so this gate — unchanged — treats the
+    // authorized replacement of a presumed-dead stamp as resolved, and the
+    // take-over rides the receipt loudly.
     if (config.tracker.strictWorktreeWrites === true && prepared.claim?.foreignWrites) {
       const refusal = strictWorktreeWriteFailure(prepared.claim.foreignWrites);
       if (refusal !== null) {

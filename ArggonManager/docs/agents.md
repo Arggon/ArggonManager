@@ -160,7 +160,21 @@ owner's own re-attach never fires — the stamp is refreshed with its identity).
 Detection is bounded and best-effort: one porcelain read plus one `stat` per
 dirty path, covering the UNCOMMITTED collision window; committed work is
 history, and a missing or unreadable stamp (pre-feature worktrees) degrades to
-no detection, never to a false accusation. A fired detection never re-stamps the worktree, so the previous owner stays stamped and every retry re-detects — a strict refusal cannot be unlocked by retrying. If the stamped session is gone, confirm no live writer and remove the stamp by hand: `rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"`.
+no detection, never to a false accusation. A fired detection never re-stamps the worktree, so the previous owner stays stamped and every retry re-detects — a strict refusal cannot be unlocked by retrying. If the stamped session is gone, there are two recovery paths, and both start with the same step — confirm no live writer (ask the coordinator if you cannot tell):
+
+1. `arggon start <id> --worktree --take-over-worktree` — the designed, auditable
+   path (task-strict-attach-dead-owner-hatch). It applies only when the
+   detection actually fired: it re-stamps the worktree with your identity and
+   records a dated take-over naming the stamp it replaced (`claim.takeOver` in
+   `--json`, `note: single-writer take-over — …` on stdout, plus a bounded
+   `takeovers` chain in the stamp itself). On a clean attach there is nothing to
+   take over, so the flag changes nothing. Never use it to override a LIVE
+   owner: coordination is the refusal's first remedy and always cheaper.
+2. Remove the stamp by hand:
+   `rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"` —
+   the escape hatch where the take-over is not available (e.g. the native
+   `start` tool, which has no flag for it yet). It discards the ownership
+   record, so prefer (1).
 
 #### Failure semantics
 

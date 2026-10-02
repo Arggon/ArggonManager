@@ -55,6 +55,7 @@ import {
   updateOperation,
   validateOperation,
   worktreeForeignWriteWarning,
+  worktreeTakeoverWarning,
   type TrendResult,
 } from "@arggondev/lib";
 
@@ -2212,6 +2213,11 @@ program
     "skip the x-worktree.post-start hook (it only runs when a new worktree is created)",
   )
   .option(
+    "--take-over-worktree",
+    "take over a worktree whose stamped owner session is dead: records a dated take-over naming the replaced stamp and re-stamps the worktree (only when the single-writer detection fired; requires --worktree)",
+    false,
+  )
+  .option(
     "--post-start-shell <shell>",
     'shell for the x-worktree.post-start hook: "inherit" (default) or "login" ($SHELL -lc; overrides x-worktree.post-start-shell)',
   )
@@ -2224,6 +2230,7 @@ program
         openPr?: boolean;
         worktree?: boolean;
         hook?: boolean;
+        takeOverWorktree?: boolean;
         postStartShell?: string;
         json?: boolean;
       },
@@ -2256,6 +2263,7 @@ program
           openPr: Boolean(opts.openPr),
           worktree: Boolean(opts.worktree),
           noHook: opts.hook === false,
+          takeOverWorktree: Boolean(opts.takeOverWorktree),
           postStartShell: opts.postStartShell as "inherit" | "login" | undefined,
         });
         if (json) {
@@ -2362,6 +2370,14 @@ program
             // here — it fails the start before the claim.
             console.log(
               `  note: single-writer check — ${sanitizeHumanError(worktreeForeignWriteWarning(result.claim.foreignWrites))}`,
+            );
+          }
+          if (result.claim?.takeOver !== undefined) {
+            // Deliberate take-over (task-strict-attach-dead-owner-hatch): the
+            // one place the single-writer gate is overridden on purpose, so it
+            // prints what it overrode — the replaced stamp and the evidence.
+            console.log(
+              `  note: single-writer take-over — ${sanitizeHumanError(worktreeTakeoverWarning(result.claim.takeOver))}`,
             );
           }
           if (result.manifestCoverage === "stale") {

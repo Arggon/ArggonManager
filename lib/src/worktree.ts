@@ -1424,6 +1424,56 @@ export type WorktreeClaimStamp = {
   assignee?: string;
   /** Writing surface (`cli`/`native`), diagnostic only. */
   surface?: string;
+  /**
+   * Take-overs this worktree has seen, oldest first, capped at
+   * `MAX_CLAIM_TAKEOVERS` (task-strict-attach-dead-owner-hatch): the
+   * persisted audit trail of a deliberate `--take-over-worktree`, so the
+   * record of "who replaced whose dead claim" survives the process that made
+   * it. Absent on a stamp written by an ordinary start (default byte-identical
+   * shape). The evidence each take-over saw (which files, how many) is NOT
+   * persisted here — it rides the run's receipt; the chain is deliberately
+   * tiny so a long-lived worktree's stamp file stays bounded.
+   */
+  takeovers?: WorktreeClaimTakeoverRecord[];
+};
+
+/**
+ * One persisted take-over entry: who took the worktree over, when, and which
+ * stamp it replaced. Deliberately narrow (four fields) so the chain in the
+ * stamp file cannot grow with a chatty history.
+ */
+export type WorktreeClaimTakeoverRecord = {
+  /** ISO-8601 take-over time. */
+  at: string;
+  /** Identity that took the worktree over (the new stamped owner). */
+  by: string;
+  /** Identity of the stamp this take-over replaced (the presumed-dead owner). */
+  replacedIdentity: string;
+  /** That stamp's claim timestamp. */
+  replacedClaimedAt: string;
+};
+
+/**
+ * Cap on the persisted take-over chain (the oldest entries are dropped): a
+ * worktree stamped many times over its life keeps its last
+ * `MAX_CLAIM_TAKEOVERS` deliberate take-overs, the same bounded-receipt
+ * discipline as `MAX_CLAIM_WRITE_NAMES` (a trash-taking session must not grow
+ * the stamp without bound, and the newest is the diagnostic one).
+ */
+export const MAX_CLAIM_TAKEOVERS = 5;
+
+/**
+ * One run's take-over receipt (task-strict-attach-dead-owner-hatch): the
+ * deliberate replacement of a presumed-dead stamp, with the evidence the
+ * caller acted on. The rich, per-run view of the persisted chain entry.
+ */
+export type WorktreeClaimTakeover = WorktreeClaimTakeoverRecord & {
+  /** The full stamp that was replaced (item, branch, assignee, surface). */
+  replaced: WorktreeClaimStamp;
+  /** Tracked paths modified after the replaced claim, capped at `MAX_CLAIM_WRITE_NAMES`. */
+  files: string[];
+  /** Full count of tracked paths modified after the replaced claim. */
+  total: number;
 };
 
 /**
@@ -1497,6 +1547,7 @@ export function readWorktreeClaimStamp(
     ) {
       return null;
     }
+    const takeovers = parseTakeoverChain(record.takeovers);
     return {
       identity,
       item,
@@ -1508,10 +1559,43 @@ export function readWorktreeClaimStamp(
       ...(typeof record.surface === "string" && record.surface.length > 0
         ? { surface: record.surface }
         : {}),
+      ...(takeovers.length > 0 ? { takeovers } : {}),
     };
   } catch {
     return null;
   }
+}
+
+/**
+ * Tolerant parse of a persisted take-over chain: a non-array is no chain, and
+ * an entry missing any of the four fields is DROPPED rather than kept
+ * half-formed. The chain is diagnostic history, so a corrupt entry must cost
+ * one line of history, never the whole stamp (an unreadable stamp degrades to
+ * no detection, which would silently disarm the gate).
+ */
+function parseTakeoverChain(value: unknown): WorktreeClaimTakeoverRecord[] {
+  if (!Array.isArray(value)) return [];
+  const entries: WorktreeClaimTakeoverRecord[] = [];
+  for (const entry of value) {
+    if (entry === null || typeof entry !== "object") continue;
+    const record = entry as Record<string, unknown>;
+    const at = typeof record.at === "string" ? record.at : undefined;
+    const by = typeof record.by === "string" ? record.by : undefined;
+    const replacedIdentity =
+      typeof record.replacedIdentity === "string" ? record.replacedIdentity : undefined;
+    const replacedClaimedAt =
+      typeof record.replacedClaimedAt === "string" ? record.replacedClaimedAt : undefined;
+    if (
+      at === undefined ||
+      by === undefined ||
+      replacedIdentity === undefined ||
+      replacedClaimedAt === undefined
+    ) {
+      continue;
+    }
+    entries.push({ at, by, replacedIdentity, replacedClaimedAt });
+  }
+  return entries.slice(-MAX_CLAIM_TAKEOVERS);
 }
 
 /**
@@ -1634,6 +1718,13 @@ export function worktreeForeignWriteWarning(report: WorktreeForeignWriteReport):
  * start) refuses the claim before any item mutation. The remedy names the
  * coordination step, not a destructive one — the stamped session may simply be
  * mid-task (that is the F12 incident, seen from outside).
+ *
+ * The message also names the designed hatch for the DEAD-owner case
+ * (`start --take-over-worktree`, task-strict-attach-dead-owner-hatch) and the
+ * manual `rm` recovery, in that order: coordinate → audited take-over →
+ * manual stamp removal. Both are conditional on the stamped session being
+ * gone, so the first (non-destructive, and correct for a live owner) stays the
+ * obvious path.
  */
 export function strictWorktreeWriteFailure(report: WorktreeForeignWriteReport): string | null {
   if (report.total === 0) return null;
@@ -1646,9 +1737,32 @@ export function strictWorktreeWriteFailure(report: WorktreeForeignWriteReport): 
     `${named}${extra > 0 ? ` (and ${extra} more)` : ""}. ` +
     "Another session may be writing here; coordinate with the stamped session (or have it " +
     "re-attach to refresh the stamp), then re-run start --worktree to attach. This refusal " +
-    "never re-stamps the worktree, so a retry re-detects the same evidence; if the stamped " +
-    "session is gone, confirm no live writer and remove the stamp by hand " +
+    "never re-stamps the worktree, so a retry re-detects the same evidence. If the stamped " +
+    "session is gone (crashed), two recovery paths exist, both requiring that confirmation " +
+    "first: re-run with the take-over flag (start --worktree --take-over-worktree), which " +
+    "re-stamps the worktree and records a dated take-over naming the replaced stamp, or remove " +
+    "the stamp by hand " +
     '(rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json").'
+  );
+}
+
+/**
+ * The bounded LOUD sentence for a recorded take-over
+ * (task-strict-attach-dead-owner-hatch): names the presumed-dead stamp that
+ * was replaced, when, by whom, and the evidence the caller acted on. The
+ * default path never renders this — it exists because a take-over is the one
+ * place where a single-writer gate is deliberately overridden, so the
+ * override says out loud what it overrode.
+ */
+export function worktreeTakeoverWarning(takeover: WorktreeClaimTakeover): string {
+  const extra = takeover.total - takeover.files.length;
+  const named = takeover.files.join(", ");
+  return (
+    `took over the worktree from ${takeover.replacedIdentity} (claimed ` +
+    `${takeover.replaced.claimedAt}) at ${takeover.at} as ${takeover.by}: ` +
+    `${takeover.total} tracked file${takeover.total === 1 ? " was" : "s were"} modified after ` +
+    `that claim: ${named}${extra > 0 ? ` (and ${extra} more)` : ""} — the stamped session was ` +
+    "presumed dead; confirm that before writing here"
   );
 }
 
@@ -1664,6 +1778,17 @@ export type WorktreeClaimRequest = {
   assignee?: string;
   /** Writing surface (`cli`/`native`), diagnostic only. */
   surface?: "cli" | "native";
+  /**
+   * Deliberate take-over of a presumed-dead stamped owner
+   * (task-strict-attach-dead-owner-hatch), surfaced as
+   * `start --take-over-worktree`. Default OFF, and then the flag changes
+   * NOTHING: no fired detection means nothing to take over from, and a fired
+   * one keeps the anti-unlock branch (the previous stamp stays, `foreignWrites`
+   * is reported). Only a fired detection PLUS this flag re-stamps the worktree
+   * and records the take-over. The caller owns the judgement — the kernel only
+   * records it, so this is never a time-based or silent expiry.
+   */
+  takeOver?: boolean;
   /** Claim timestamp; a Date or ISO string, defaulting to the current time. */
   now?: string | Date;
   /** Porcelain-probe override (tests); defaults to a real `git status`. */
@@ -1687,6 +1812,18 @@ export type WorktreeClaimReceipt = {
    * the consequence on the surfaces.
    */
   foreignWrites?: WorktreeForeignWriteReport;
+  /**
+   * A deliberate take-over of a presumed-dead stamped owner
+   * (task-strict-attach-dead-owner-hatch), present only when the caller passed
+   * `deps.claim.takeOver` AND a detection fired. The fired evidence moves out
+   * of `foreignWrites` into this field: both surfaces' strict gate already
+   * reads `claim.foreignWrites`, so an authorized take-over is resolved with no
+   * surface change and the native tool inherits the kernel mechanism for free.
+   * Nothing is hidden — the same owner, claim time and newer files are here,
+   * the replaced stamp is persisted in the new stamp's `takeovers` chain, and
+   * the CLI prints a loud take-over note.
+   */
+  takeOver?: WorktreeClaimTakeover;
   /** Degradation note (e.g. the stamp could not be written) — never blocking. */
   warning?: string;
 };
@@ -1702,27 +1839,19 @@ export type WorktreeClaimReceipt = {
  * would see a matching stamp, skip detection, and claim silently over the
  * foreign window — the gate would unlock itself. With the previous stamp
  * kept, every retry re-detects against the SAME evidence until the stamped
- * owner re-attaches (refreshing it legitimately) or the documented manual
- * recovery (`rm <git-dir>/arggon-claim.json`) is used. Best-effort by
- * invariant — every degradation lands in the receipt as a warning, never as a
- * throw.
+ * owner re-attaches (refreshing it legitimately), the caller records a
+ * deliberate take-over (task-strict-attach-dead-owner-hatch), or the
+ * documented manual recovery (`rm <git-dir>/arggon-claim.json`) is used. A
+ * take-over is the only sanctioned exception to the anti-unlock rule, and it
+ * is never inferred: it requires the caller's explicit `takeOver` and writes
+ * an auditable chain entry. Best-effort by invariant — every degradation lands
+ * in the receipt as a warning, never as a throw.
  */
 function prepareWorktreeClaim(
   worktreePath: string,
   request: WorktreeClaimRequest,
 ): WorktreeClaimReceipt {
   const previous = readWorktreeClaimStamp(worktreePath, request);
-  let foreignWrites: WorktreeForeignWriteReport | undefined;
-  if (previous !== null && previous.identity !== request.identity) {
-    foreignWrites = detectWorktreeForeignWrites(worktreePath, previous, request) ?? undefined;
-    if (foreignWrites !== undefined) {
-      // Anti-unlock: keep the previous stamp (see above); nothing is written.
-      return {
-        stamped: true,
-        foreignWrites,
-      };
-    }
-  }
   const claimedDate =
     request.now === undefined
       ? new Date()
@@ -1730,6 +1859,56 @@ function prepareWorktreeClaim(
         ? request.now
         : new Date(request.now);
   const claimedAt = (Number.isNaN(claimedDate.getTime()) ? new Date() : claimedDate).toISOString();
+  let foreignWrites: WorktreeForeignWriteReport | undefined;
+  let takeOver: WorktreeClaimTakeover | undefined;
+  if (previous !== null && previous.identity !== request.identity) {
+    foreignWrites = detectWorktreeForeignWrites(worktreePath, previous, request) ?? undefined;
+    if (foreignWrites !== undefined) {
+      // Anti-unlock: keep the previous stamp (see above); nothing is written —
+      // UNLESS the caller explicitly took the worktree over
+      // (task-strict-attach-dead-owner-hatch), which is the one sanctioned way
+      // past a fired detection when the stamped session is dead. The take-over
+      // is recorded, not inferred: the new stamp carries the replaced stamp in
+      // its `takeovers` chain, and the receipt reports the take-over INSTEAD of
+      // `foreignWrites` so the armed strict gate (which reads that field) treats
+      // the authorized replacement as resolved. A take-over with nothing to take
+      // over from never reaches here: no detection fired, so the normal
+      // refresh below runs and no chain entry is written.
+      if (request.takeOver !== true) {
+        return {
+          stamped: true,
+          foreignWrites,
+        };
+      }
+      takeOver = {
+        at: claimedAt,
+        by: request.identity,
+        replacedIdentity: previous.identity,
+        replacedClaimedAt: previous.claimedAt,
+        replaced: previous,
+        files: [...foreignWrites.files],
+        total: foreignWrites.total,
+      };
+    }
+  }
+  // The take-over chain travels with the stamp: every write carries the
+  // previous chain forward (bounded, newest last), and a take-over appends its
+  // own entry. A worktree that never saw a take-over writes no `takeovers` key
+  // at all — the default stamp stays byte-identical.
+  const chain =
+    takeOver === undefined
+      ? (previous?.takeovers ?? [])
+      : // One entry per taker: re-taking over as the same identity replaces that
+        // taker's older entry rather than stacking duplicates.
+        [
+          ...(previous?.takeovers ?? []).filter((entry) => entry.by !== takeOver.by),
+          {
+            at: takeOver.at,
+            by: takeOver.by,
+            replacedIdentity: takeOver.replacedIdentity,
+            replacedClaimedAt: takeOver.replacedClaimedAt,
+          },
+        ];
   const stamped = writeWorktreeClaimStamp(
     worktreePath,
     {
@@ -1741,11 +1920,18 @@ function prepareWorktreeClaim(
         ? { assignee: request.assignee }
         : {}),
       ...(request.surface !== undefined ? { surface: request.surface } : {}),
+      ...(chain.length > 0 ? { takeovers: chain.slice(-MAX_CLAIM_TAKEOVERS) } : {}),
     },
     request,
   );
   return {
     stamped,
+    // A take-over that could not be persisted is reported as an unrecorded one:
+    // the previous stamp stands, so the next attach re-detects the same
+    // evidence. Never a throw, and never silent.
+    ...(takeOver !== undefined
+      ? { takeOver, ...(stamped ? {} : { warning: "could not write the claim stamp" }) }
+      : {}),
     ...(stamped ? {} : { warning: "could not write the claim stamp" }),
   };
 }

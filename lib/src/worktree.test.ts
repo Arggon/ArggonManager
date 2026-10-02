@@ -31,16 +31,19 @@ import {
   prepareWorktreeDependencies,
   prepareWorktreeEnv,
   readWorktreeClaimStamp,
+  type WorktreeClaimReceipt,
   strictGateBinFailure,
   strictGateBinViolations,
   strictWorktreeWriteFailure,
   unlinkWorktreeEnv,
   worktreeCacheBase,
   worktreeForeignWriteWarning,
+  worktreeTakeoverWarning,
   worktreeComposeProject,
   worktreeStateBase,
   WORKTREE_ENV_KEYS,
   detectWorktreeForeignWrites,
+  MAX_CLAIM_TAKEOVERS,
   MAX_CLAIM_WRITE_NAMES,
 } from "./worktree.js";
 
@@ -1210,6 +1213,357 @@ describe("claim stamp: single-writer detection (task-single-writer-worktree-enfo
     expect(refusal).toContain("refusing the claim");
     expect(refusal).toContain("a.ts, b.ts");
     expect(strictWorktreeWriteFailure({ ...report, files: [], total: 0 })).toBeNull();
+  });
+
+  it("keeps every live-owner refusal clause and names the take-over flag before the manual recovery", () => {
+    const refusal =
+      strictWorktreeWriteFailure({
+        owner: "ses_a",
+        claimedAt: NOW_ISO,
+        files: ["a.ts"],
+        total: 1,
+      }) ?? "";
+    // The live-owner path is unchanged: coordinate first, refresh by re-attach,
+    // never re-stamp on a refusal.
+    expect(refusal).toContain("coordinate with the stamped session");
+    expect(refusal).toContain("have it re-attach to refresh the stamp");
+    expect(refusal).toContain("never re-stamps the worktree");
+    // The dead-owner path gains a designed hatch BEFORE the manual `rm`, and
+    // the manual recovery itself is still named (invariant from #568).
+    expect(refusal).toContain("--take-over-worktree");
+    expect(refusal).toContain(
+      'rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"',
+    );
+    expect(refusal.indexOf("--take-over-worktree")).toBeLessThan(refusal.indexOf('rm "$(git -C'));
+  });
+});
+
+describe("claim stamp: deliberate take-over of a dead owner (task-strict-attach-dead-owner-hatch)", () => {
+  const NOW = new Date("2026-10-01T10:00:00Z");
+  const NOW_ISO = "2026-10-01T10:00:00.000Z";
+  const LATER = new Date("2026-10-01T11:00:00Z");
+  const LATER_ISO = "2026-10-01T11:00:00.000Z";
+
+  function stampedFixture(): { primary: string; worktree: string; gitDir: string } {
+    const f = fixture();
+    const gitDir = join(f.worktree, ".git");
+    mkdirSync(gitDir, { recursive: true });
+    return { primary: f.primary, worktree: f.worktree, gitDir };
+  }
+
+  /** Write a dirty-tracked line set with one real file per path. */
+  function dirtyStatus(worktree: string, paths: string[], mtime: Date): () => string {
+    for (const rel of paths) {
+      const file = join(worktree, rel);
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, "content", "utf8");
+      utimesSync(file, mtime, mtime);
+    }
+    return () => paths.map((rel) => ` M ${rel}`).join("\n");
+  }
+
+  /** Stamp the worktree as `ses_a` (the session that then dies). */
+  function stampDeadOwner(
+    primary: string,
+    worktree: string,
+    gitDir: string,
+  ): { gitDir: () => string; stampPath: string } {
+    prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_a",
+        assignee: "smoke",
+        itemId: "task-x",
+        branch: "feat/x",
+        surface: "native",
+        now: NOW,
+        gitDir: () => gitDir,
+        status: () => "",
+      },
+    });
+    return { gitDir: () => gitDir, stampPath: join(gitDir, "arggon-claim.json") };
+  }
+
+  it("re-stamps and records a dated take-over naming the replaced stamp, moving the evidence out of foreignWrites", () => {
+    const { primary, worktree, gitDir } = stampedFixture();
+    const probes = stampDeadOwner(primary, worktree, gitDir);
+    const status = dirtyStatus(worktree, ["src/wip.ts", "src/more.ts"], LATER);
+    // The recovery: the stamped session is dead, its uncommitted work is in
+    // the worktree, and the new session takes over DELIBERATELY.
+    const claim = prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_b",
+        assignee: "smoke",
+        itemId: "task-x",
+        branch: "feat/x",
+        surface: "native",
+        now: LATER,
+        takeOver: true,
+        ...probes,
+        status,
+      },
+    }).claim;
+    // The receipt names the replaced stamp and the evidence acted on...
+    expect(claim?.takeOver).toEqual({
+      at: LATER_ISO,
+      by: "ses_b",
+      replacedIdentity: "ses_a",
+      replacedClaimedAt: NOW_ISO,
+      replaced: {
+        identity: "ses_a",
+        item: "task-x",
+        branch: "feat/x",
+        claimedAt: NOW_ISO,
+        assignee: "smoke",
+        surface: "native",
+      },
+      files: ["src/wip.ts", "src/more.ts"],
+      total: 2,
+    });
+    // ...and `foreignWrites` is absent, so the armed strict gate (which reads
+    // exactly that field) treats the authorized take-over as resolved.
+    expect(claim?.foreignWrites).toBeUndefined();
+    expect(claim?.stamped).toBe(true);
+    expect(claim?.warning).toBeUndefined();
+    // The stamp now belongs to the new owner and carries the audit trail.
+    expect(readWorktreeClaimStamp(worktree, probes)).toEqual({
+      identity: "ses_b",
+      item: "task-x",
+      branch: "feat/x",
+      claimedAt: LATER_ISO,
+      assignee: "smoke",
+      surface: "native",
+      takeovers: [
+        { at: LATER_ISO, by: "ses_b", replacedIdentity: "ses_a", replacedClaimedAt: NOW_ISO },
+      ],
+    });
+  });
+
+  it("keeps the anti-unlock refusal when the flag is absent (live owner)", () => {
+    const { primary, worktree, gitDir } = stampedFixture();
+    const probes = stampDeadOwner(primary, worktree, gitDir);
+    const status = dirtyStatus(worktree, ["src/wip.ts"], LATER);
+    const claim = prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_b",
+        itemId: "task-x",
+        branch: "feat/x",
+        now: LATER,
+        ...probes,
+        status,
+      },
+    }).claim;
+    expect(claim?.takeOver).toBeUndefined();
+    expect(claim?.foreignWrites).toMatchObject({ owner: "ses_a", total: 1 });
+    expect(readWorktreeClaimStamp(worktree, probes)?.identity).toBe("ses_a");
+  });
+
+  it("is a no-op with nothing to take over from: the owner's own re-attach keeps the stamp shape", () => {
+    const { primary, worktree, gitDir } = stampedFixture();
+    const probes = stampDeadOwner(primary, worktree, gitDir);
+    // A detection that never fires: same identity (the live owner re-attaching).
+    const claim = prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_a",
+        assignee: "smoke",
+        itemId: "task-x",
+        branch: "feat/x",
+        surface: "native",
+        now: LATER,
+        takeOver: true,
+        ...probes,
+        status: () => " M src/wip.ts\n",
+      },
+    }).claim;
+    expect(claim).toEqual({ stamped: true });
+    const stamp = readWorktreeClaimStamp(worktree, probes);
+    expect(stamp).toEqual({
+      identity: "ses_a",
+      item: "task-x",
+      branch: "feat/x",
+      claimedAt: LATER_ISO,
+      assignee: "smoke",
+      surface: "native",
+    });
+    // Default identity (#533 discipline): no take-over, no chain key at all.
+    expect(Object.keys(stamp ?? {})).not.toContain("takeovers");
+  });
+
+  it("leaves the default stamp byte-identical: a run without the flag writes no chain", () => {
+    const { primary, worktree, gitDir } = stampedFixture();
+    const probes = stampDeadOwner(primary, worktree, gitDir);
+    const dirty = dirtyStatus(worktree, ["src/wip.ts"], LATER);
+    prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_b",
+        itemId: "task-x",
+        branch: "feat/x",
+        now: LATER,
+        ...probes,
+        status: dirty,
+      },
+    });
+    // The refusal left the previous stamp standing: unchanged bytes.
+    expect(readFileSync(probes.stampPath, "utf8")).not.toContain("takeovers");
+  });
+
+  it("caps the persisted chain at MAX_CLAIM_TAKEOVERS, keeping the newest entries", () => {
+    const { primary, worktree, gitDir } = stampedFixture();
+    const probes: { gitDir: () => string } = { gitDir: () => gitDir };
+    for (let round = 0; round < MAX_CLAIM_TAKEOVERS + 2; round++) {
+      // Each round: a fresh dead owner stamps, then the next identity takes
+      // over — so the chain grows one entry per round.
+      const owner = `ses_dead_${round}`;
+      const at = new Date(LATER.getTime() + round * 60_000);
+      prepareWorktreeDependencies(primary, worktree, {
+        claim: {
+          identity: owner,
+          itemId: "task-x",
+          branch: "feat/x",
+          now: at,
+          ...probes,
+          status: () => "",
+        },
+      });
+      const status = dirtyStatus(worktree, ["src/wip.ts"], new Date(at.getTime() + 1_000));
+      prepareWorktreeDependencies(primary, worktree, {
+        claim: {
+          identity: `ses_taker_${round}`,
+          itemId: "task-x",
+          branch: "feat/x",
+          now: at,
+          takeOver: true,
+          ...probes,
+          status,
+        },
+      });
+    }
+    const chain = readWorktreeClaimStamp(worktree, probes)?.takeovers ?? [];
+    expect(chain).toHaveLength(MAX_CLAIM_TAKEOVERS);
+    // Newest last, and the oldest rounds were dropped.
+    expect(chain[0].replacedIdentity).toBe(`ses_dead_${2}`);
+    expect(chain[chain.length - 1].replacedIdentity).toBe(`ses_dead_${MAX_CLAIM_TAKEOVERS + 1}`);
+  });
+
+  it("carries an existing chain forward on an ordinary re-stamp (the trail is the worktree's)", () => {
+    const { primary, worktree, gitDir } = stampedFixture();
+    const probes = stampDeadOwner(primary, worktree, gitDir);
+    const at = LATER;
+    const status = dirtyStatus(worktree, ["src/wip.ts"], at);
+    prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_b",
+        itemId: "task-x",
+        branch: "feat/x",
+        now: at,
+        takeOver: true,
+        ...probes,
+        status,
+      },
+    });
+    // A later plain attach by the taker's own identity: no detection fires, so
+    // no new entry — but the history of the take-over is not thrown away.
+    prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_b",
+        itemId: "task-x",
+        branch: "feat/x",
+        now: new Date(at.getTime() + 60_000),
+        ...probes,
+        status,
+      },
+    });
+    expect(readWorktreeClaimStamp(worktree, probes)?.takeovers).toEqual([
+      { at: LATER_ISO, by: "ses_b", replacedIdentity: "ses_a", replacedClaimedAt: NOW_ISO },
+    ]);
+  });
+
+  it("drops a malformed chain entry instead of the whole stamp (the gate must not silently disarm)", () => {
+    const { worktree, gitDir } = stampedFixture();
+    const stampPath = join(gitDir, "arggon-claim.json");
+    writeFileSync(
+      stampPath,
+      `${JSON.stringify(
+        {
+          identity: "ses_a",
+          item: "task-x",
+          branch: "feat/x",
+          claimedAt: NOW_ISO,
+          takeovers: [
+            "nonsense",
+            { at: NOW_ISO, by: "ses_x" },
+            { at: NOW_ISO, by: "ses_x", replacedIdentity: "ses_old", replacedClaimedAt: NOW_ISO },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    expect(readWorktreeClaimStamp(worktree, { gitDir: () => gitDir })).toEqual({
+      identity: "ses_a",
+      item: "task-x",
+      branch: "feat/x",
+      claimedAt: NOW_ISO,
+      takeovers: [
+        { at: NOW_ISO, by: "ses_x", replacedIdentity: "ses_old", replacedClaimedAt: NOW_ISO },
+      ],
+    });
+  });
+
+  it("reports an unrecorded take-over when the stamp cannot be written, and never throws", () => {
+    const { primary, worktree, gitDir } = stampedFixture();
+    const probes = stampDeadOwner(primary, worktree, gitDir);
+    const status = dirtyStatus(worktree, ["src/wip.ts"], LATER);
+    // A read-only git dir: the previous stamp is still READABLE (so the
+    // detection fires) but the atomic write cannot land.
+    chmodSync(gitDir, 0o500);
+    let claim: WorktreeClaimReceipt | undefined;
+    try {
+      claim = prepareWorktreeDependencies(primary, worktree, {
+        claim: {
+          identity: "ses_b",
+          itemId: "task-x",
+          branch: "feat/x",
+          now: LATER,
+          takeOver: true,
+          ...probes,
+          status,
+        },
+      }).claim;
+    } finally {
+      chmodSync(gitDir, 0o755);
+    }
+    expect(claim).toMatchObject({
+      stamped: false,
+      warning: "could not write the claim stamp",
+      takeOver: { by: "ses_b", replacedIdentity: "ses_a" },
+    });
+    // The previous stamp stands, so the next attach re-detects the evidence.
+    expect(readWorktreeClaimStamp(worktree, probes)?.identity).toBe("ses_a");
+  });
+
+  it("renders the loud take-over sentence from one record", () => {
+    const warning = worktreeTakeoverWarning({
+      at: LATER_ISO,
+      by: "ses_b",
+      replacedIdentity: "ses_a",
+      replacedClaimedAt: NOW_ISO,
+      replaced: {
+        identity: "ses_a",
+        item: "task-x",
+        branch: "feat/x",
+        claimedAt: NOW_ISO,
+      },
+      files: ["a.ts", "b.ts"],
+      total: 3,
+    });
+    expect(warning).toContain("took over the worktree from ses_a");
+    expect(warning).toContain(LATER_ISO);
+    expect(warning).toContain("as ses_b");
+    expect(warning).toContain("3 tracked files were modified after that claim");
+    expect(warning).toContain("a.ts, b.ts");
+    expect(warning).toContain("(and 1 more)");
+    expect(warning).toContain("presumed dead");
   });
 });
 

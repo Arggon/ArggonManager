@@ -1158,4 +1158,100 @@ describe("start --worktree claim stamp: single-writer detection (task-single-wri
     const result = runStart({ cwd: dir, id, assignee: "arggon", now: NOW }, { git });
     expect(result.claim).toBeUndefined();
   });
+
+  it("refuses --take-over-worktree without --worktree (a flag that cannot act is never ignored)", () => {
+    const { dir, id } = primedTask();
+    const git = fakeGit();
+    expect(() =>
+      runStart({ cwd: dir, id, assignee: "arggon", now: NOW, takeOverWorktree: true }, { git }),
+    ).toThrow(/--take-over-worktree requires --worktree/);
+    // The refusal is before any mutation: the item was never claimed.
+    expect(git.calls.some((c) => c.op === "commit")).toBe(false);
+  });
+
+  it("recovers a dead owner under strict: the take-over records the replaced stamp and the claim lands", () => {
+    const { dir, id, worktreePath, stampPath, createGit } = primedWriterTask(true);
+    runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git: createGit });
+    // The stamped session crashed mid-task: its stamp is there, and its
+    // uncommitted work is dirtier than the claim.
+    stampAsForeignSession(stampPath, id, "feat/task-rate-limit", NOW);
+    foreignWrite(worktreePath, "src/wip.ts", NOW);
+    const git = writerGit(worktreePath, ["src/wip.ts"]);
+
+    // (1) The strict gate refuses the plain re-attach — the live-owner
+    // consequence is unchanged, and the refusal names the hatch.
+    let refusal = "";
+    try {
+      runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: LATER }, { git });
+    } catch (err) {
+      refusal = err instanceof Error ? err.message : String(err);
+    }
+    expect(refusal).toContain("x-tracker.strict-worktree-writes is set");
+    expect(refusal).toContain("--take-over-worktree");
+    expect(refusal).toContain(FOREIGN_SESSION);
+    expect(git.calls.some((c) => c.op === "commit")).toBe(false);
+
+    // (2) The deliberate take-over resolves it: the receipt names the replaced
+    // stamp, the evidence, and when — and the claim commits.
+    const result = runStart(
+      {
+        cwd: dir,
+        id,
+        assignee: "arggon",
+        worktree: true,
+        now: LATER,
+        takeOverWorktree: true,
+      },
+      { git },
+    );
+    expect(result.claim?.takeOver).toEqual({
+      at: LATER.toISOString(),
+      by: "arggon",
+      replacedIdentity: FOREIGN_SESSION,
+      replacedClaimedAt: NOW.toISOString(),
+      replaced: {
+        identity: FOREIGN_SESSION,
+        assignee: "arggon",
+        item: id,
+        branch: "feat/task-rate-limit",
+        claimedAt: NOW.toISOString(),
+        surface: "native",
+      },
+      files: ["src/wip.ts"],
+      total: 1,
+    });
+    // The evidence is not lost: it moved out of the strict gate's field.
+    expect(result.claim?.foreignWrites).toBeUndefined();
+    expect(result.committed).toBe(true);
+    expect(git.calls.some((c) => c.op === "commit")).toBe(true);
+    // The persisted stamp belongs to the new owner and keeps the audit trail.
+    expect(JSON.parse(readFileSync(stampPath, "utf8"))).toMatchObject({
+      identity: "arggon",
+      claimedAt: LATER.toISOString(),
+      takeovers: [
+        {
+          at: LATER.toISOString(),
+          by: "arggon",
+          replacedIdentity: FOREIGN_SESSION,
+          replacedClaimedAt: NOW.toISOString(),
+        },
+      ],
+    });
+  });
+
+  it("is a no-op on a clean attach: no chain entry, no receipt change", () => {
+    const { dir, id, worktreePath, stampPath, createGit } = primedWriterTask(true);
+    runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git: createGit });
+    // Same-identity re-attach (the live owner): nothing to take over, so the
+    // flag changes nothing about the default flow.
+    const git = writerGit(worktreePath, []);
+    const result = runStart(
+      { cwd: dir, id, assignee: "arggon", worktree: true, now: LATER, takeOverWorktree: true },
+      { git },
+    );
+    expect(result.claim).toEqual({ stamped: true });
+    expect(result.committed).toBe(true);
+    expect(JSON.parse(readFileSync(stampPath, "utf8"))).toMatchObject({ identity: "arggon" });
+    expect(readFileSync(stampPath, "utf8")).not.toContain("takeovers");
+  });
 });
