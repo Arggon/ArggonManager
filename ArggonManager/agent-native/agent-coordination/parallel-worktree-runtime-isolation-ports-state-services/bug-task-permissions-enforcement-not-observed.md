@@ -27,3 +27,12 @@ updated: "2026-10-02"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-02 @Coordinator
+### 2026-10-02 @Coordinator
+Found while fixing bug-opencode-jsonc-malformed-permissions: after the file was repaired, the coordinator session's shell layer still ALLOWED `git push --force --dry-run origin HEAD` and `git commit --no-verify -m probe` (dry runs, no side effects) — i.e. the project's `permissions` block is not enforced by this runtime. `~/.config/opencode/opencode.json` carries no permissions block, so the project file is the only source. What the malformed file proved is the opposite direction: unparseable config made every shell call fail closed (`Permission denied: shell`), which is how the defect surfaced.
+
+## Acceptance
+- [ ] Determine per client runtime (OpenCode V2 session, ZCode plugin, headless/agent seams) whether the project `permissions` block is read at all, and record which layer honors it.
+- [ ] If it is not honored, decide the carrier: an enforceable gate in the methodology (kernel/plugin-side refusal the way steals/reopens are gated) or documented client setup; do not leave the file claiming enforcement it does not deliver.
+- [ ] A probe harness that runs one denied and one allowed command per supported runtime, wired into the gates where practical.
