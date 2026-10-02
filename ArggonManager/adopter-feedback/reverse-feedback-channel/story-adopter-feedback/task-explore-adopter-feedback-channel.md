@@ -13,6 +13,7 @@ updated: "2026-10-02"
 claimed_at: "2026-10-02T14:18:08.885Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-explore-adopter-feedback-channel
 ---
+
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-explore-adopter-feedback-channel.md
   Leaves live only under a story. id is the filename stem: task-explore-adopter-feedback-channel.
@@ -35,9 +36,9 @@ never learns.
 
 **The two existing friction protocols cannot see an adopter**, because both are
 maintainer-side, local and single-machine:
-[`docs/labs/adversarial-audit.md`](../../../../docs/labs/adversarial-audit.md)
+[`docs/labs/adversarial-audit.md`](../../../docs/labs/adversarial-audit.md)
 (invariant attacks + normative-doc conformance) and
-[`docs/labs/telemetry-mining.md`](../../../../docs/labs/telemetry-mining.md)
+[`docs/labs/telemetry-mining.md`](../../../docs/labs/telemetry-mining.md)
 (`~/.zcode/cli/log/*.jsonl` + one checkout's tracker history). Both file through
 `arggon create` **into this repo**. `telemetry-mining.md`'s own signature —
 "repeated identical findings across repos → **systemic**, not local — file once,
@@ -53,7 +54,7 @@ key is not speculative value here.
 **The proposal under evaluation was an instruction for agents to open a GitHub
 issue on friction.** Validated against code, docs and dated external precedent;
 recorded in
-[`exploration-adopter-feedback-channel-018`](../../../../docs/explorations/exploration-adopter-feedback-channel-018.md).
+[`exploration-adopter-feedback-channel-018`](../../../docs/explorations/exploration-adopter-feedback-channel-018.md).
 
 Verdict, on evidence: the **instinct is right and load-bearing** (the reverse
 channel is genuinely missing) but the **mechanism is refuted** by a named
@@ -123,15 +124,61 @@ before the spec exists and `arggon spec analyze` reports no NEW findings.**
 - [x] Phase 5 done: 2–3 approaches with trade-offs; the user's original proposal
       is evaluated as Approach 1 and **refuted on cited evidence**, with three
       named alternatives and the converged external architecture recorded
-- [x] Artifact written: [`exploration-adopter-feedback-channel-018`](../../../../docs/explorations/exploration-adopter-feedback-channel-018.md),
+- [x] Artifact written: [`exploration-adopter-feedback-channel-018`](../../../docs/explorations/exploration-adopter-feedback-channel-018.md),
       including an explicit "evidence gaps" section
 - [x] `arggon validate` green; exploration ids/links resolve
-- [ ] **ADR written** settling the cross-cutting parts: the methodology-carrier
+- [x] **ADR written** settling the cross-cutting parts: the methodology-carrier
       change (**behavioral** impact class per `docs/agents.md` §Changing the
       methodology itself), opt-out semantics, and the explicit non-goal of
-      automatic publication
-- [ ] **Spec + plan written** from the edge-case table, then a clean
-      `spec analyze` run — the gate that releases implementation tasks
+      automatic publication — [ADR 0020](../../../docs/adr/0020-adopter-friction-channel.md)
+- [x] **Spec + plan written** from the edge-case table, then a clean
+      `spec analyze` run — the gate that releases implementation tasks —
+      [spec-friction-capture-017](../../../docs/specs/spec-friction-capture-017.md)
+      (all 13 hunted dimensions mapped one-to-one onto its acceptance criteria)
+      and
+      [plan-friction-capture-017](../../../docs/plans/plan-friction-capture-017.md);
+      `spec analyze` holds at the same **7 pre-existing findings**, zero NEW
+
+## Recommendation (coordinator decision)
+
+**Needs a spec — written, not filed for approval.** The reverse channel is real
+and the exploration's verdict stands: the _instinct_ (adopters should be able to
+send friction back) is load-bearing, the _mechanism_ (agent-opened GitHub
+issues) is refuted by a named incident. What lands is stage 1 of ADR 0020:
+
+`arggon friction` → local bounded log **outside** the tracker → stable-fields-only
+fingerprint → redacted report → human-gated tier-A/tier-B output.
+
+Two things the coordinator should know that were **not** in the prior research:
+
+1. **`doctor` gains a `friction` staleness block.** An adopter that has acked its
+   generated docs receives the trigger only as an ADR 0016 proposal, so without
+   this block "the channel is not live" is invisible — the same failure ADR 0016
+   already had to fix for docs. It is the `deftai` maxim ("a disabled capability
+   nobody can see is absent") applied to a mechanism this repo already owns.
+2. **The evals harness is ruled out as the capture vehicle** (ADR 0020 §5) and
+   kept as a stage-2 _producer_. `skills/arggon-cli/evals/` runs against
+   `dist/cli.js` in a synthetic temp fixture it creates itself, scores pass/fail
+   into stdout for a maintainer to read, and never touches an adopter — putting
+   capture back inside one machine's local test loop, the exact blind spot
+   `telemetry-mining.md` already documents. What it _is_ good for: an eval FAIL is
+   machine-derived, so its fingerprint fields are stable structured values rather
+   than LLM-authored prose — precisely the Sentry hazard the dedupe design turns
+   on.
+
+Implementation tasks and spikes filed under `story-adopter-feedback` (6 tasks
+chained T1→T6 per the plan, 3 spikes). Per the ADR 0017 gate, **none may be
+claimed** until the coordinator's decision on the ADR/spec lands.
+
+**Known defect found; fixed where in scope, reported where not.** Item bodies in
+this story linked docs with a four-level `..` prefix, which resolves one directory
+above the tracker root and is **broken** — the correct depth from
+`ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/`
+is three levels, reaching `ArggonManager/docs/`. Fixed in this item and in all
+nine items filed here, so the links this exploration chain depends on resolve.
+**Still broken, deliberately not touched** (outside this item's scope — they are
+other items' bodies): `bug-contributing-github-issue-contradiction.md` and
+`bug-prettier-glues-split-inline-code-span.md`.
 
 ## Notes
 

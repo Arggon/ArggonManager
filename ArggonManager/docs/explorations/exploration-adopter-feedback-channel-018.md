@@ -360,10 +360,13 @@ tier-B fallback** and **Approach 1 explicitly rejected** on the evidence above.
 Adopted by the maintainer 2026-10-02.
 
 Decision record → [`task-explore-adopter-feedback-channel`](../../adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-explore-adopter-feedback-channel.md).
-Cross-cutting decision → ADR: **not yet written**; the ADR should settle the
-carrier change (methodology carrier edit = **behavioral** impact class per
-`docs/agents.md` §Changing the methodology itself), the opt-out semantics, and
-the explicit non-goal of automatic publication.
+Cross-cutting decision → [ADR 0020](../adr/0020-adopter-friction-channel.md)
+(written 2026-10-02, same day): it settles the carrier change as a **behavioral**
+impact class per `docs/agents.md` §Changing the methodology itself, adds the
+`doctor` staleness block that makes an un-merged trigger visible, settles the
+opt-out semantics (gates capture, never discoverability), records the hard
+non-goal of automatic publication, and rules the evals harness out as the capture
+vehicle while keeping it as a stage-2 producer.
 
 Artifacts, in protocol order: this doc → ADR → **spec** (the edge-case table
 above becomes its acceptance criteria) → plan → tasks with `depends_on`. **No

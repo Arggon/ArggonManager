@@ -49,8 +49,13 @@ agent write to GitHub.
       issue convention; no incident of an adopter leaking paths via this exact
       trigger (PixelLeak is the same failure _shape_, a different cause);
       convergent designs are small-project, not proven at scale
-- [ ] The decision is recorded as an ADR (carrier change is **behavioral**) and the
-      hunted edge cases become spec acceptance criteria
+- [x] The decision is recorded as an ADR (carrier change is **behavioral**) and the
+      hunted edge cases become spec acceptance criteria —
+      [ADR 0020](../../../docs/adr/0020-adopter-friction-channel.md) and
+      [spec-friction-capture-017](../../../docs/specs/spec-friction-capture-017.md)
+      (13 hunted dimensions → 13 mapped criteria, plus non-goals and surface/carrier
+      discipline), with the plan at
+      [plan-friction-capture-017](../../../docs/plans/plan-friction-capture-017.md)
 
 ## Notes
 
