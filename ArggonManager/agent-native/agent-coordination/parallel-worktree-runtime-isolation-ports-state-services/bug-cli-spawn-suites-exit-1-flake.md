@@ -40,3 +40,9 @@ CI order is `npm ci` → `npm run build` → `check:plugin` → `npm run test`, 
 - [ ] Fix at the spawn/runner level — bounded concurrency, or a serial lane for process-spawning suites, or retry-on-spawn-failure — NOT per test.
 - [ ] Scope: every suite that spawns the CLI (handoff, row-table-stdout, board/tui, comment-race, headless), not the two observed files.
 - [ ] Keep the existing dry-run/ordering discipline: a spawn failure must be distinguishable from a real assertion failure in the test output.
+
+### 2026-10-02 @Coordinator
+### 2026-10-02 @Coordinator — third instance, priority raised to p2
+PR #573's first `cli` run failed with the same shape in a THIRD different test: `row-table-stdout.test.ts > adopt skip path > escapes the skip-path storyId…` → `expected 1 to be +0`. That makes three PRs in a row (#571 handoff, #576 adopt --ack, #573 adopt skip path) with a rerun-green spawned-CLI exit-1, i.e. roughly one in three PR CI runs is red for this class alone — every merge in this wave paid a rerun, so this is now the top CI-reliability item and should be worked next rather than left open.
+
+Sharpened suspicion: every instance is a suite that spawns the real CLI (via tsx) under parallel vitest, and every instance is `expected 1 to be +0` with no assertion detail — consistent with the child being killed or failing to boot (EMFILE/EPIPE/EAGAIN under spawn pressure, or the runner's memory ceiling), NOT with a product assertion. A cheap discriminator to try first: have the failing spawn print its stderr in the test's failure message (the handoff instance already leaked a module-load stack, which is the kind of evidence that settles it).
