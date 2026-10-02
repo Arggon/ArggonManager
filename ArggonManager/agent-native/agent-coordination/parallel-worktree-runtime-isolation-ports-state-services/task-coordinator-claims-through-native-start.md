@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-coordinator-claims-through-native-start
 title: The coordinator contract never tells the coordinator to claim through `tools.arggon.start` — live worktrees on items that are still `todo`/unclaimed
+assignee: Arggon
+branch: feat/task-coordinator-claims-through-native-start
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [opencode-seam, methodology, worktree]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-02"
+claimed_at: "2026-10-02T15:37:33.470Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-coordinator-claims-through-native-start
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-coordinator-claims-through-native-start.md
