@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-native-refusal-advice-clipped-by-head-clip
 title: "Native gate-bin and fresh-worktree-install refusals append their advice AFTER the kernel refusal, so MAX_NATIVE_ERROR_CHARS can clip the remedy away"
+assignee: Arggon
+branch: fix/bug-native-refusal-advice-clipped-by-head-clip
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [opencode-seam, parity]
 priority: p2
 created: "2026-10-02"
 updated: "2026-10-02"
+claimed_at: "2026-10-02T18:59:19.451Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-native-refusal-advice-clipped-by-head-clip
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-native-refusal-advice-clipped-by-head-clip.md
