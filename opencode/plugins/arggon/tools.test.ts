@@ -2005,6 +2005,44 @@ describe("worktree domain tools (W4)", () => {
     ).trim();
   }
 
+  /** A tracked write inside the claimed worktree, after the stamp (the F12 signature). */
+  function foreignWrite(worktreePath: string): void {
+    const itemFile = join(
+      worktreePath,
+      "ArggonManager",
+      "launch-mvp",
+      "auth",
+      "story-login",
+      "task-rate-limit.md",
+    );
+    writeFileSync(itemFile, readFileSync(itemFile, "utf8") + "\n<!-- foreign edit -->\n", "utf8");
+    const when = new Date(Date.now() + 60_000);
+    utimesSync(itemFile, when, when);
+  }
+
+  /** The claim stamp file as the kernel wrote it. */
+  function readStamp(dir: string, worktreePath: string): Record<string, unknown> {
+    return JSON.parse(
+      readFileSync(join(worktreeGitDir(dir, worktreePath), "arggon-claim.json"), "utf8"),
+    ) as Record<string, unknown>;
+  }
+
+  /**
+   * Claim the seeded item and return the worktree path — the state every
+   * single-writer/take-over test starts from (one stamped owner, no newer
+   * writes yet).
+   */
+  async function startAndStamp(
+    defs: ArgonToolDefinition[],
+    sessionID: string,
+  ): Promise<string> {
+    const first = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID },
+    );
+    return String((first.output as { worktreePath?: unknown }).worktreePath);
+  }
+
   it("stamps the worktree with the calling session and warns (report-only) when a foreign session attaches over newer writes (task-single-writer-worktree-enforcement)", async () => {
     const dir = seedGitTree();
     const { domain } = fakeDomain(dir);
@@ -2122,6 +2160,212 @@ describe("worktree domain tools (W4)", () => {
     const claimed = itemData(dir, "task-rate-limit", worktreePath);
     expect(claimed.assignee).toBe("smoke");
     expect(readFileSync(itemFile, "utf8")).toContain("<!-- foreign edit -->");
+    // The refusal names the take-over hatch, NOT a plain re-run: a retry
+    // cannot succeed while the fired detection stands (the anti-unlock rule
+    // keeps the previous stamp, so every retry re-detects).
+    expect(message).toContain("A plain re-run cannot clear this");
+    expect(message).toContain("takeOverWorktree: true");
+    expect(message).toContain("confirming no live writer");
+    expect(message).not.toContain("assignee: \"smoke\" }) —");
+  });
+
+  it("takes over a presumed-dead stamped owner on the native seam: the claim lands and the stamp carries the chain (task-strict-attach-dead-owner-hatch)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    // One stamped owner (ses_a) whose session is presumed dead, then a
+    // foreign tracked write inside its window — the F12 signature.
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    const previous = readStamp(dir, worktreePath);
+    foreignWrite(worktreePath);
+    // The gate is ARMED: without the take-over input this attach refuses.
+    armStrictWorktreeWrites(dir);
+
+    const taken = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke", takeOverWorktree: true },
+      { sessionID: "ses_b" },
+    );
+    const output = taken.output as Record<string, unknown>;
+    expect(output.worktreeCreated).toBe(false);
+    // The armed strict gate is resolved BY the kernel's take-over: the fired
+    // evidence moved out of `foreignWrites`, so the unchanged gate never fires.
+    expect(output.claimCommitted).toBe(true);
+    const preparation = output.preparation as {
+      claim?: {
+        stamped: boolean;
+        foreignWrites?: unknown;
+        takeOver?: {
+          at: string;
+          by: string;
+          replacedIdentity: string;
+          replacedClaimedAt: string;
+          replaced: Record<string, unknown>;
+          files: string[];
+          total: number;
+        };
+      };
+    };
+    expect(preparation.claim?.foreignWrites).toBeUndefined();
+    const takeOver = preparation.claim?.takeOver;
+    expect(takeOver?.by).toBe("ses_b");
+    expect(takeOver?.replacedIdentity).toBe("ses_a");
+    expect(takeOver?.replacedClaimedAt).toBe(previous.claimedAt);
+    expect(Date.parse(String(takeOver?.at))).not.toBeNaN();
+    // The replaced stamp is reported in FULL, and the evidence the detection
+    // saw moved here (never dropped — the bounded mapping is a whitelist).
+    expect(takeOver?.replaced).toEqual({
+      identity: "ses_a",
+      item: "task-rate-limit",
+      branch: "feat/task-rate-limit",
+      claimedAt: previous.claimedAt,
+      assignee: "smoke",
+      surface: "native",
+    });
+    expect(takeOver?.total).toBe(1);
+    expect(takeOver?.files).toEqual([
+      "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md",
+    ]);
+    // The worktree is re-stamped with the new identity, and the chain is the
+    // persisted audit trail of who replaced whose dead claim.
+    const after = readStamp(dir, worktreePath);
+    expect(after.identity).toBe("ses_b");
+    expect(after.item).toBe("task-rate-limit");
+    expect(after.takeovers).toEqual([
+      {
+        at: takeOver?.at,
+        by: "ses_b",
+        replacedIdentity: "ses_a",
+        replacedClaimedAt: previous.claimedAt,
+      },
+    ]);
+    // The item's copy in the worktree really is claimed by the taker.
+    expect(itemData(dir, "task-rate-limit", worktreePath)).toMatchObject({
+      status: "in_progress",
+      assignee: "smoke",
+    });
+  });
+
+  it("keeps the take-over byte-identical when no detection fired (default identity, task-strict-attach-dead-owner-hatch)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    // A clean attach by the SAME owner: nothing to take over from, so the flag
+    // must change NOTHING — not even a chain entry in the stamp.
+    await startAndStamp(defs, "ses_a");
+    const worktreePath = join(dirname(dir), `${basename(dir)}-task-rate-limit`);
+    const before = readStamp(dir, worktreePath);
+
+    const retry = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke", takeOverWorktree: true },
+      { sessionID: "ses_a" },
+    );
+    const preparation = (retry.output as Record<string, unknown>).preparation as {
+      claim?: Record<string, unknown>;
+    };
+    expect(preparation.claim).toEqual({ stamped: true });
+    // Same identity, refreshed claim time only: no `takeovers` key anywhere.
+    const after = readStamp(dir, worktreePath);
+    expect(after.identity).toBe("ses_a");
+    expect(after.takeovers).toBeUndefined();
+    expect(after.claimedAt).not.toBe(before.claimedAt);
+  });
+
+  it("keeps the take-over a no-op on a fired detection without the input, and never silently ignores the input (task-strict-attach-dead-owner-hatch)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    foreignWrite(worktreePath);
+    const before = readStamp(dir, worktreePath);
+
+    // No input: the default is byte-identical to the CLI's — the detection
+    // still rides `foreignWrites` and the previous stamp is left alone.
+    const plain = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_b" },
+    );
+    const claim = (plain.output as Record<string, unknown>).preparation as {
+      claim?: { stamped: boolean; foreignWrites?: { owner: string }; takeOver?: unknown };
+    };
+    expect(claim.claim?.stamped).toBe(true);
+    expect(claim.claim?.takeOver).toBeUndefined();
+    expect(claim.claim?.foreignWrites?.owner).toBe("ses_a");
+    expect(readStamp(dir, worktreePath)).toEqual(before);
+
+    // The take-over input WITHOUT a worktree is rejected rather than ignored:
+    // a silently dropped flag is how a recovery step gets believed to have run.
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({
+        id: "task-rate-limit",
+        assignee: "smoke",
+        worktree: false,
+        takeOverWorktree: true,
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    const message = String((typed.envelope.error as { message?: unknown }).message);
+    expect(message).toContain("takeOverWorktree requires worktree");
+  });
+
+  it("bounds the take-over evidence: an over-cap named-file list and the replaced stamp's chain both fold into `truncated` (task-strict-attach-dead-owner-hatch)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    // Twelve tracked writes in the stamped owner's window: the kernel names at
+    // most 10, so `total > files.length` and the count must not read as the
+    // whole set.
+    for (let index = 0; index < 12; index += 1) {
+      const file = join(worktreePath, `dirty-${String(index).padStart(2, "0")}.md`);
+      writeFileSync(file, `dirty ${index}\n`, "utf8");
+      git(worktreePath, ["add", `dirty-${String(index).padStart(2, "0")}.md`]);
+    }
+    const stampPath = join(worktreeGitDir(dir, worktreePath), "arggon-claim.json");
+    // An attacker-shaped stamp: a huge free-text identity and a chain far
+    // above the kernel's own 5-entry cap, read back out of the git dir.
+    const hostile = JSON.parse(readFileSync(stampPath, "utf8")) as Record<string, unknown>;
+    hostile.identity = "x".repeat(5_000);
+    hostile.takeovers = Array.from({ length: 40 }, (_unused, index) => ({
+      at: `2020-01-0${(index % 9) + 1}T00:00:00.000Z`,
+      by: `taker-${index}`,
+      replacedIdentity: `owner-${index}`,
+      replacedClaimedAt: "2019-01-01T00:00:00.000Z",
+    }));
+    writeFileSync(stampPath, `${JSON.stringify(hostile)}\n`, "utf8");
+
+    const taken = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke", takeOverWorktree: true },
+      { sessionID: "ses_b" },
+    );
+    const preparation = (taken.output as Record<string, unknown>).preparation as {
+      claim?: {
+        takeOver?: {
+          replacedIdentity: string;
+          replaced: {
+            identity: string;
+            takeovers?: Array<{ by: string }>;
+          };
+          files: string[];
+          total: number;
+        };
+      };
+      truncated?: boolean;
+    };
+    const takeOver = preparation.claim?.takeOver;
+    expect(takeOver?.total).toBeGreaterThan(takeOver?.files.length ?? 0);
+    expect(takeOver?.files.length).toBeLessThanOrEqual(32);
+    // Free text is bounded, and the replaced stamp's chain is capped by the
+    // mapping's own list cap rather than passed through wholesale.
+    expect(String(takeOver?.replacedIdentity).length).toBeLessThanOrEqual(200);
+    expect(String(takeOver?.replaced.identity).length).toBeLessThanOrEqual(200);
+    expect(takeOver?.replaced.takeovers?.length).toBeLessThanOrEqual(32);
+    // A capped list is never passed off as the whole set.
+    expect(preparation.truncated).toBe(true);
   });
 
   it("start refuses to steal a claim and removes the worktree it just created", async () => {

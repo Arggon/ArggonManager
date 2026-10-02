@@ -162,19 +162,25 @@ dirty path, covering the UNCOMMITTED collision window; committed work is
 history, and a missing or unreadable stamp (pre-feature worktrees) degrades to
 no detection, never to a false accusation. A fired detection never re-stamps the worktree, so the previous owner stays stamped and every retry re-detects — a strict refusal cannot be unlocked by retrying. If the stamped session is gone, there are two recovery paths, and both start with the same step — confirm no live writer (ask the coordinator if you cannot tell):
 
-1. `arggon start <id> --worktree --take-over-worktree` — the designed, auditable
-   path (task-strict-attach-dead-owner-hatch). It applies only when the
+1. Take the worktree over explicitly — the designed, auditable path
+   (task-strict-attach-dead-owner-hatch). It applies only when the
    detection actually fired: it re-stamps the worktree with your identity and
    records a dated take-over naming the stamp it replaced (`claim.takeOver` in
    `--json`, `note: single-writer take-over — …` on stdout, plus a bounded
    `takeovers` chain in the stamp itself). On a clean attach there is nothing to
    take over, so the flag changes nothing. Never use it to override a LIVE
    owner: coordination is the refusal's first remedy and always cheaper.
+   - CLI: `arggon start <id> --worktree --take-over-worktree`
+   - Native tool: `tools.arggon.start({ id, assignee, takeOverWorktree: true })`
+     (default OFF, requires `worktree`; the take-over rides
+     `preparation.claim.takeOver`).
 2. Remove the stamp by hand:
    `rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"` —
-   the escape hatch where the take-over is not available (e.g. the native
-   `start` tool, which has no flag for it yet). It discards the ownership
+   the escape hatch for the case where the take-over is not available at all
+   (an older CLI or plugin build without the flag). It discards the ownership
    record, so prefer (1).
+
+A strict worktree-write refusal therefore never advises a plain re-run: while the fired detection stands, every retry re-detects against the same evidence, so the refusal names the take-over input instead.
 
 #### Failure semantics
 
