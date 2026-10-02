@@ -272,6 +272,61 @@ describe("opencode seam: fresh init", () => {
     }
   });
 
+  it("the coordinator contract claims through native start BEFORE dispatch (task-coordinator-claims-through-native-start)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    // Whitespace-flattened so the pins survive any re-wrap of the prose: the
+    // contract is a prompt, its wording is not formatting.
+    const coordinator = readFileSync(
+      join(dir, ".opencode/agents/arggon-coordinator.md"),
+      "utf8",
+    ).replace(/\s+/g, " ");
+    // The claim duty exists at all — this is the step the template used to
+    // omit entirely, which left coordinators hand-rolling worktrees on items
+    // that stayed `todo`/unclaimed.
+    expect(coordinator).toContain("**Claim before dispatch.**");
+    // …through the NATIVE start with the worktree flag, not the headless CLI
+    // and not a bare `update --status in_progress` (that claims no worktree).
+    expect(coordinator).toMatch(
+      /tools\.arggon\.start\(\{\s*id,\s*assignee:[^}]*worktree: true\s*\}\)/,
+    );
+    expect(coordinator).not.toMatch(/arggon start <id>/);
+    // ORDERING: the claim duty precedes the worker-launch duty, so a
+    // coordinator that reads the duties top-down claims first.
+    expect(coordinator.indexOf("**Claim before dispatch.**")).toBeLessThan(
+      coordinator.indexOf("**One worker per item, one worktree per worker.**"),
+    );
+    // The worktree path in the launch prompt is the item's RECORDED path.
+    expect(coordinator).toContain("worktree_path` on the item");
+    expect(coordinator).toContain("as recorded on the item");
+    // Prohibitions: no hand-rolled worktree, no worker-first claim, no idle
+    // claim — each phrased so a regex cannot pass on a negated quote.
+    expect(coordinator).toContain("Never hand-roll `git worktree add` for a claim");
+    expect(coordinator).toContain("never dispatch a worker as the first claimant");
+    expect(coordinator).toContain("never claim an item you are not dispatching");
+    // A start refusal is evidence, not a retry (native refusal semantics).
+    expect(coordinator).toContain("refusal is evidence, not a retry");
+    // Router, not a second carrier: the full contract stays in the playbook.
+    expect(coordinator).toContain("`ArggonManager/docs/agents.md` §Orchestration");
+  });
+
+  it("the docs carrier keeps the claim duty the coordinator template summarizes", () => {
+    // task-coordinator-claims-through-native-start: the template is a summary,
+    // `ArggonManager/docs/agents.md` §Orchestration carries the rules. The two
+    // must not drift into contradicting each other (the template used to omit
+    // the claim entirely, the playbook used to assign it to the worker).
+    const flat = readFileSync(join(repoRoot, "ArggonManager/docs/agents.md"), "utf8").replace(
+      /\s+/g,
+      " ",
+    );
+    expect(flat).toContain(
+      "**Claim before dispatch (task-coordinator-claims-through-native-start):**",
+    );
+    expect(flat).toContain("tools.arggon.start({ id, assignee, worktree: true })");
+    expect(flat).not.toContain("each worker claims its item");
+    expect(flat).not.toContain("Claim **your** item (`in_progress` + assignee)");
+  });
+
   it("the generated seam carries the minimal shell gates without breaking ordinary sessions (W4)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
