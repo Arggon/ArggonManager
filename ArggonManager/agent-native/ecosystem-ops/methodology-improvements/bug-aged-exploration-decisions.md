@@ -27,7 +27,7 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-aged-exploration-decision
 
 ## Acceptance
 
-- [ ] Each exploration links its ADR or records "No ADR required — <reason>" per agents.md §Specs and plans
-- [ ] `spec analyze` vs baseline shows 0 new findings
+- [x] Each exploration links its ADR or records "No ADR required — <reason>" per agents.md §Specs and plans
+- [x] `spec analyze` vs baseline shows 0 new findings
 
 ## Notes

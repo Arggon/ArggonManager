@@ -1,7 +1,7 @@
 ---
 exploration_id: ui-improvements-012
 title: "UI surfaces v2: web board, terminal TUI and OpenCode panel — improvements and features"
-status: open
+status: decided
 created: 2026-09-22
 ---
 
@@ -164,9 +164,29 @@ SaaS/hosted board (viewer spike + cheap-infra), do-nothing (measured defects).
 
 ## Decision
 
-No ADR is required while the plan stays inside the existing packages (ADR 0001
-and ADR 0002 hold). A component framework, a new `viewer` package or anything
-that adds a runtime dependency would require the superseding ADR first.
+No ADR required — the recommendation was an **execution plan inside the packages
+that already exist**, so nothing cross-cutting was decided and no ADR was owed.
+The plan has now shipped exactly that way (verified 2026-10-02): all **21** items
+in the filed-work table below are `done` (epic `ui`: 39 done, 0 todo, 0
+in_progress) and the lane added **no runtime dependency** — the root
+`dependencies` are `@arggondev/lib` and `commander`, `lib` declares none, and
+the UI work is devDependency-only (`@playwright/test`, `@axe-core/playwright`).
+
+What governed it, unchanged and unamended:
+
+- [ADR 0001 — CLI stack](../adr/0001-cli-stack.md): the dependency-light product
+  shape the in-place plan preserves.
+- [ADR 0002 — Board viewer v0](../adr/0002-board-viewer-v0.md): the v0 board;
+  candidate 2 (a `viewer` package with a component framework) stays deferred by
+  this same decision, so picking it up later needs a superseding ADR.
+- [ADR 0008 — Review smoke gate and UI smoke tooling](../adr/0008-review-smoke-gate.md):
+  `task-ui-browser-smoke-ci` **implemented** its decided-but-unbuilt tier 2 (the
+  `ui-smoke` CI job running `@smoke`), which is why the wave needed no new
+  decision of its own.
+
+The trigger for revisiting is unchanged: a component framework, a new `viewer`
+package, or anything that adds a runtime dependency would require the
+superseding ADR first.
 
 Filed work (epic `ui`, parent `arggon-manager`, priority p2):
 

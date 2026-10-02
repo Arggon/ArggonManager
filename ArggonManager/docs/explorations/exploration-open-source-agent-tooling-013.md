@@ -1,7 +1,7 @@
 ---
 exploration_id: open-source-agent-tooling-013
 title: Open-source agent tooling for ArggonManager
-status: open
+status: decided
 created: 2026-09-24
 ---
 
@@ -770,8 +770,15 @@ Run `arggon board --serve` against a disposable fixture and have the agent:
 
 ## Decision gate
 
-No ADR is proposed yet. If the pilot passes, the next work item should be a
-small **dev-only tooling ADR/playbook** that records:
+No ADR required — the gate below never opened, and nothing this exploration
+adopted needed one. Its only conditional candidate was `opencode2-shell-tasks`,
+whose pilot **failed** (2026-09-28, PR #423), and every other recommendation
+resolved either into an already-decided lane or into a dev-only change with no
+runtime dependency. The dev-only tooling ADR/playbook proposed by the gate is
+therefore **not** filed.
+
+The gate as originally framed: *if the pilot passes*, the next work item should
+be a small **dev-only tooling ADR/playbook** that records:
 
 - the exact OpenCode and package versions;
 - local-only installation and origin policy;
@@ -780,10 +787,67 @@ small **dev-only tooling ADR/playbook** that records:
 - the fallback and removal procedure;
 - the context/schema budget measurement.
 
-Until that gate passes, the correct status is **pilot proposed**, not “adopted.”
 Pilot 2's gate did not pass (2026-09-28, FAIL), so `opencode2-shell-tasks` stays
-**not adopted** and no ADR/playbook follows from it; the remaining candidates are
-still at *pilot proposed*.
+**not adopted** and no ADR/playbook follows from it. `opencode-chromium@1.7.2`
+and `@playwright/mcp` were never adopted either, so they are not *pilot proposed*
+any more — they are **held**, with no fixed release and no verified V2
+registration to record. Outcome per recommendation, verified 2026-10-02:
+
+1. **§0 native/CLI worktree-readiness parity — adopted**, as a product fix on
+   2026-09-28. `bug-native-start-worktree-no-install` is done, the contract it
+   created is the "Native `start` dependency contract" section of
+   `ArggonManager/docs/agents.md`, and the cold-start smoke
+   `smoke:native-start-cold` runs in CI.
+2. **§D/§E/§G low-context CLI/test lane — adopted, dev-only.** devDependencies
+   `@ast-grep/cli`, `fast-check`, `@axe-core/playwright` and `@playwright/test`,
+   plus `sgconfig.yml` and `tools/ast-grep/rules/*.yml`; items
+   `task-ast-grep-structural-rules`, `task-fast-check-invariant-properties` and
+   `task-ui-browser-smoke-ci` are all done.
+3. **§C `codebase-memory-mcp` as the default discovery aid — not adopted in this
+   repository.** No ADR, playbook, item or repo doc names it (`AGENTS.md`
+   included), so it stayed a developer-local tool and there is no repository
+   decision to record.
+4. **§A `opencode2-shell-tasks@0.1.1` — not adopted**, measured FAIL: items
+   `task-pilot-opencode2-shell-tasks-server-only` and
+   `task-record-shell-tasks-pilot-negative-result` (both done) and
+   [PR #423](https://github.com/Arggon/ArggonManager/pull/423), with the gate
+   table in §A.
+5. **§B `opencode-chromium@1.7.2` — not adopted, the hold stands.** Absent from
+   `package.json`; §B's verdict (no fixed release, registration unverified on
+   2.0.x) is unchanged.
+6. **§D `@playwright/mcp` as an opt-in fallback — not adopted.** That lane is
+   already decided by [ADR 0008](../adr/0008-review-smoke-gate.md); the package is
+   absent from `package.json`, and the V2-schema translation caveat stays open
+   here.
+7. **No second tracker, framework, hosted planner or persistent memory —
+   honored.** Root `dependencies` are unchanged (`@arggondev/lib`,
+   `commander`) and `lib` declares none.
+
+Two cross-cutting questions this exploration raised were decided later, in their
+own records, so neither needs a new ADR here:
+
+- §0's "optional providers after parity" (`mise`, Devbox, Nix, Dev Container as
+  adapters over a committed project contract) was taken up in
+  [ADR 0019 — Worktree runtime isolation](../adr/0019-worktree-runtime-isolation.md)
+  from [exploration-worktree-env-isolation-017](exploration-worktree-env-isolation-017.md):
+  the env contract is the default and a per-worktree dev container stays the
+  escape hatch. Recommendation 1 itself closed a gap **inside** the existing
+  native-surface contract
+  ([ADR 0010](../adr/0010-opencode2-native-architecture.md) /
+  [ADR 0011](../adr/0011-native-first-architecture.md)) rather than choosing
+  something new — which is why a bug fix, its carrier documentation and its
+  deterministic smoke were the whole record.
+- The browser lane (§D) was already decided by
+  [ADR 0008 — Review smoke gate and UI smoke tooling](../adr/0008-review-smoke-gate.md)
+  (Playwright CLI agent-first, axe in CI, MCP as fallback, Playwright dev-only).
+  This exploration restates it, adds the V2-schema caveat for `@playwright/mcp`,
+  and does not supersede it.
+
+The gate that would still demand an ADR: the first time a browser plugin is
+actually adopted — a fixed `opencode-chromium` release plus registration/E2E
+proof, or `@playwright/mcp` with a translated V2 config — that adoption is its
+own ADR. Any background-job surface this repository builds itself needs one for
+its permission boundary, which is exactly what the failed pilot measured.
 
 ## Sources
 
