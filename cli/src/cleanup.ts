@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+import { basename, resolve } from "node:path";
 import {
   classifyCleanupEntry,
   commitTrackerMutation,
@@ -7,10 +8,12 @@ import {
   itemsById,
   loadItems,
   readAutoCommitConfig,
+  readConventionConfig,
   repoRootFromTasks,
   resolveAutoCommit,
   runUpdate,
   trackerCommitMessage,
+  worktreeComposeProject,
   type CleanupEntry,
   type CleanupGit,
   type GhExecutor,
@@ -54,6 +57,64 @@ export function boundedEnvelopeText(value: unknown, max: number): string {
   );
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
+
+/**
+ * One Compose teardown, injectable for tests (no daemon in CI). Runs
+ * `docker compose -p <project> down -v --remove-orphans` (cwd = the repo
+ * root — no Compose file is needed: `down` resolves the project through the
+ * containers' `com.docker.compose.project` labels). Contract: throwing an
+ * error whose `code` is `"ENOENT"` signals that the docker CLI is absent —
+ * the report-only degradation for the whole run; any other throw is a
+ * per-item reap failure (never fatal).
+ */
+export type ComposeDown = (project: string, cwd: string) => void;
+
+/** `docker compose down` timeout (bounded like the gh lookup's 30s). */
+export const COMPOSE_DOWN_TIMEOUT_MS = 120_000;
+
+function defaultComposeDown(project: string, cwd: string): void {
+  try {
+    execFileSync(
+      "docker",
+      ["compose", "-p", project, "down", "-v", "--remove-orphans"],
+      {
+        cwd,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: COMPOSE_DOWN_TIMEOUT_MS,
+      },
+    );
+  } catch (err) {
+    // Absent docker CLI: rethrow untouched — the ENOENT `code` IS the
+    // report-only signal the runCleanup reap step keys on.
+    if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") throw err;
+    const stderr =
+      err !== null && typeof err === "object" && "stderr" in err
+        ? String((err as { stderr: unknown }).stderr).trim()
+        : "";
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `docker compose -p ${project} down -v --remove-orphans failed` +
+        (stderr ? `: ${stderr}` : ` (${message})`),
+    );
+  }
+}
+
+/** Compose reaping report (ADR 0019 layer 2): present only when the repo declares services. */
+export type CleanupComposeReport = {
+  /**
+   * The raw `x-worktree.services` declaration: `"true"` (the per-worktree
+   * project is named exactly `<repo>-<item-id>`) or the declared base name
+   * (the project is `<base>-<repo>-<item-id>`, lowercased).
+   */
+  declared: string;
+  /**
+   * True when the docker CLI was absent (first reap attempt failed with
+   * `ENOENT`): reaping degraded to report-only for the rest of the run —
+   * never a failure, never fatal (the ADR's report-only path).
+   */
+  dockerUnavailable?: boolean;
+};
 
 export type CleanupOptions = {
   cwd: string;
@@ -101,8 +162,15 @@ export type CleanupResult = {
   entries: CleanupEntry[];
   /** Actions performed (only with prune: true). */
   pruned: CleanupAction[];
-  /** Per-item failures during prune (removal/branch-delete errors). */
+  /** Per-item failures during prune (removal/branch-delete/compose-reap errors). */
   failures: string[];
+  /**
+   * Compose reaping report (ADR 0019 layer 2, task-cleanup-declared-services),
+   * present only when the repo's convention declares services
+   * (`x-worktree.services` in `.convention.yml`). Absent — and no Docker
+   * invocation — when nothing is declared.
+   */
+  compose?: CleanupComposeReport;
   /** Tracker auto-commit outcome for the cleared worktree_path records (prune only). */
   commit?: TrackerCommitResult;
 };
@@ -111,6 +179,8 @@ export type CleanupDeps = {
   git?: CleanupGit;
   /** gh executor for the squash-merge fallback; defaults to the real gh CLI. */
   gh?: GhExecutor;
+  /** Compose teardown executor; defaults to the real docker CLI (ComposeDown contract). */
+  compose?: ComposeDown;
 };
 
 /**
@@ -122,9 +192,14 @@ export type CleanupDeps = {
  * merged are reported as skipped and never touched. Before anything is
  * removed, both the local branch AND its remote counterpart (when
  * `origin/<branch>` exists) must be merged into the base, so a lost push can
- * never leave a stranded remote tip (bug-cleanup-partial-failure). Per-item
- * prune failures are reported and never abort the run. Throws on non-git
- * trees or undetectable default branch (CLI maps to CLEANUP_FAILED).
+ * never leave a stranded remote tip (bug-cleanup-partial-failure). When the
+ * repo's convention declares services (`x-worktree.services`, ADR 0019 layer
+ * 2), each removable worktree's Compose project is torn down with
+ * `docker compose -p <project> down -v --remove-orphans` before the worktree
+ * removal; with no declaration (or no docker CLI) cleanup never invokes
+ * Docker — report-only by construction. Per-item prune failures (including
+ * compose reap failures) are reported and never abort the run. Throws on
+ * non-git trees or undetectable default branch (CLI maps to CLEANUP_FAILED).
  */
 export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): CleanupResult {
   const gitRunner = deps.git ?? defaultCleanupGit();
@@ -148,8 +223,61 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
   const failures: string[] = [];
   const clearedPaths: string[] = [];
   const clearedIds: string[] = [];
+  // Compose reaping declaration (ADR 0019 layer 2). Read once; a malformed
+  // convention file degrades to the report-only path (no declaration): never
+  // reaping is always safe, and the tree's convention error is already loudly
+  // reported by validate/start — cleanup does not grow a second one.
+  let services: string | null = null;
+  try {
+    services = readConventionConfig(root).worktree.services;
+  } catch {
+    services = null;
+  }
+  const compose: CleanupComposeReport | undefined = services
+    ? { declared: services }
+    : undefined;
+  let composeUnavailable = false;
   if (opts.prune) {
     for (const entry of entries.filter((e) => e.removable)) {
+      // Compose reaping (ADR 0019 layer 2, task-cleanup-declared-services):
+      // FIRST, before the worktree removal — the stack that lives only for
+      // the run dies with the worktree (exploration 017 F8). Only a repo
+      // whose convention declares services ever reaches Docker; everything
+      // else stays report-only (the kernel never probes for or invokes
+      // Docker the convention didn't declare). The teardown is
+      // `docker compose -p <project> down -v --remove-orphans` — no Compose
+      // file needed, the project resolves through container labels; on a
+      // project that is already gone the same command exits 0 with only a
+      // "No resource found to remove" warning (verified live, Docker 29.7.2 /
+      // Compose 5.5.1, 2026-10-01), so the already-gone case needs no
+      // probing. Failures are non-fatal and land on BOTH surfaces — the
+      // structured `pruned` action and the flat `failures` list
+      // (bug-cli-cleanup-branch-delete-missing-failure discipline); a failed
+      // reap never wedges the worktree removal.
+      if (compose && entry.path && !composeUnavailable) {
+        // The worktree id is the worktree directory's basename
+        // (`<repo>-<item-id>` — the same value `ARGGON_WORKTREE_ID` carries),
+        // so the derivation needs no repo-name resolution of its own.
+        const project = worktreeComposeProject(compose.declared, basename(entry.path));
+        try {
+          (deps.compose ?? defaultComposeDown)(project, root);
+          pruned.push({ id: entry.id, action: `reaped compose project ${project}` });
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") {
+            // Absent docker CLI: report once, degrade the whole run to the
+            // report-only path. Not a failure — the ADR's graceful no-op.
+            composeUnavailable = true;
+            compose.dockerUnavailable = true;
+          } else {
+            const message = boundedEnvelopeText(
+              err instanceof Error ? err.message : String(err),
+              MAX_ENVELOPE_DETAIL_CHARS,
+            );
+            failures.push(`${entry.id}: ${message}`);
+            pruned.push({ id: entry.id, action: "failed", error: message });
+          }
+        }
+      }
       // Squash-merged entries need `git branch -D`: their tip is not an
       // ancestor of base (that is why the PR lookup ran), so `-d` would refuse.
       const deleteBranch = entry.via
@@ -249,5 +377,5 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
         })
       : undefined;
 
-  return { root, base, entries, pruned, failures, commit };
+  return { root, base, entries, pruned, failures, ...(compose ? { compose } : {}), commit };
 }

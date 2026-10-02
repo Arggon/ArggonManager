@@ -258,6 +258,7 @@ export {
   unlinkNodeModulesLink,
   unlinkWorktreeEnv,
   worktreeCacheBase,
+  worktreeComposeProject,
   worktreeStateBase,
   MAX_MISSING_DEPENDENCIES,
   MAX_GATE_BINS,

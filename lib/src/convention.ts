@@ -120,6 +120,18 @@ export type WorktreeConfig = {
    * both keep the documented default of enabled.
    */
   env: boolean | null;
+  /**
+   * Compose reaping declaration from `x-worktree.services` (ADR 0019 layer 2,
+   * task-cleanup-declared-services): `"true"` = the per-worktree Compose
+   * project is named exactly the worktree id `<repo>-<item-id>`; any other
+   * non-null value is the adopter's declared base project name, and the
+   * worktree project reaped is `<base>-<repo>-<item-id>` (lowercased — the
+   * adopter pattern's `name: "<base>${WORKTREE_SUFFIX:-}"`). `null` (unset or
+   * an explicit `false`) declares nothing: `cleanup --prune` never invokes
+   * Docker — the report-only path is the safety gate, the kernel never probes
+   * for or invokes Docker the convention didn't declare.
+   */
+  services: string | null;
 };
 
 /** `x-github` namespaced extension options (task-issue-roundtrip). */
@@ -301,7 +313,12 @@ export function parseConventionConfig(
   let generatedProjectName: string | null = null;
   const importLabelTypes: Record<string, ItemType> = {};
   let importHasLabelTypes = false;
-  const worktree: WorktreeConfig = { postStart: null, postStartShell: null, env: null };
+  const worktree: WorktreeConfig = {
+    postStart: null,
+    postStartShell: null,
+    env: null,
+    services: null,
+  };
   const github: GitHubConfig = { issueRoundtrip: false };
   let version = CONVENTION_VERSION_DEFAULT;
   let section: string | null = null;
@@ -513,6 +530,35 @@ export function parseConventionConfig(
         worktree.env = value === "true";
         continue;
       }
+      if (key === "services") {
+        // Compose reaping declaration (ADR 0019 layer 2,
+        // task-cleanup-declared-services): `true` = the per-worktree Compose
+        // project is named exactly the worktree id `<repo>-<item-id>`;
+        // anything else non-empty is the adopter's base project name (reaped
+        // as `<base>-<repo>-<item-id>`, lowercased — the adopter pattern's
+        // `name: "<base>${WORKTREE_SUFFIX:-}"`); `false` = declaration
+        // explicitly closed. Compose project names are `[a-z0-9][a-z0-9_-]*`
+        // after lowercasing, so the declared base is validated here, at parse
+        // time, against the same alphabet (uppercase allowed, lowercased at
+        // derivation).
+        if (value === "true") {
+          worktree.services = "true";
+          continue;
+        }
+        if (value === "false") {
+          worktree.services = null;
+          continue;
+        }
+        const base = stripQuotes(value);
+        if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(base)) {
+          throw new Error(
+            `${sourcePath}: 'services' must be true, false, or a Compose project base name ` +
+              `([A-Za-z0-9][A-Za-z0-9_-]*, got ${JSON.stringify(value)})`,
+          );
+        }
+        worktree.services = base;
+        continue;
+      }
       if (key !== "post-start") continue;
       const command = stripQuotes(value);
       if (!command) {
@@ -593,7 +639,7 @@ export function readConventionConfig(dir: string): ConventionConfig {
       playbooks: { maxAgeDays: null },
       tracker: { autoCommit: null, allowSteal: null, strictGateBins: null },
       import: { labelTypes: null },
-      worktree: { postStart: null, postStartShell: null, env: null },
+      worktree: { postStart: null, postStartShell: null, env: null, services: null },
       github: { issueRoundtrip: false },
       generated: {},
       generatedProjectName: null,

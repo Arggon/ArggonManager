@@ -32,6 +32,7 @@ import {
   strictGateBinViolations,
   unlinkWorktreeEnv,
   worktreeCacheBase,
+  worktreeComposeProject,
   worktreeStateBase,
   WORKTREE_ENV_KEYS,
 } from "./worktree.js";
@@ -926,5 +927,28 @@ describe("prepareWorktreeEnv (spec worktree-env-contract-016)", () => {
       expect(unlinkWorktreeEnv(f.worktree)).toBe(false);
       expect(lstatSync(join(f.worktree, ".arggon.env")).isSymbolicLink()).toBe(true);
     });
+  });
+});
+
+describe("worktreeComposeProject (ADR 0019 layer 2, task-cleanup-declared-services)", () => {
+  it("services: true names the project exactly the worktree id, lowercased", () => {
+    expect(worktreeComposeProject("true", "MyRepo-task-123")).toBe("myrepo-task-123");
+    expect(worktreeComposeProject("true", "arggonmanager-task-cleanup-declared-services")).toBe(
+      "arggonmanager-task-cleanup-declared-services",
+    );
+  });
+
+  it("a declared base follows the pattern doc naming: <base>-<repo>-<item-id>, lowercased", () => {
+    expect(worktreeComposeProject("myapp", "MyRepo-task-123")).toBe("myapp-myrepo-task-123");
+    expect(worktreeComposeProject("MyApp", "repo-task-9")).toBe("myapp-repo-task-9");
+  });
+
+  it("mixed case in the worktree id is lowercased with the base", () => {
+    // Compose lowercases the whole project name ([a-z0-9_-], verified live on
+    // Docker 29.7.2, 2026-10-01); the derivation pre-applies that so `down`
+    // targets the same label `up` recorded.
+    expect(worktreeComposeProject("Shop", "ArggonManager-task-7")).toBe(
+      "shop-arggonmanager-task-7",
+    );
   });
 });
