@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-cli-spawn-suites-exit-1-flake
 title: "CI flake: suites that SPAWN the CLI intermittently exit 1 (handoff lib/dist import error; row-table-stdout adopt --ack)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [ci, flaky]
 priority: p2
 created: "2026-10-02"
 updated: "2026-10-02"
-claimed_at: "2026-10-02T05:39:14.329Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-cli-spawn-suites-exit-1-flake
 ---
 <!--
