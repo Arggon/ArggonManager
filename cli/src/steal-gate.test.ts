@@ -146,6 +146,42 @@ describe("x-tracker.strict-gate-bins parsing (task-start-gate-strict-mode)", () 
   });
 });
 
+describe("x-tracker.strict-worktree-writes parsing (task-single-writer-worktree-enforcement)", () => {
+  it("defaults to null (report-only detection) when absent or under other options", () => {
+    expect(parseConventionConfig("version: 5\n").tracker.strictWorktreeWrites).toBeNull();
+    expect(
+      parseConventionConfig("version: 5\nx-tracker:\n  auto-commit: false\n").tracker
+        .strictWorktreeWrites,
+    ).toBeNull();
+  });
+
+  it("parses an explicit true/false without disturbing the sibling options", () => {
+    const armed = parseConventionConfig(
+      "x-tracker:\n  auto-commit: false\n  strict-gate-bins: true\n  strict-worktree-writes: true\n",
+    ).tracker;
+    expect(armed.strictWorktreeWrites).toBe(true);
+    expect(armed.autoCommit).toBe(false);
+    expect(armed.strictGateBins).toBe(true);
+    expect(
+      parseConventionConfig("x-tracker:\n  strict-worktree-writes: false\n").tracker
+        .strictWorktreeWrites,
+    ).toBe(false);
+  });
+
+  it("throws a parse error on invalid values (like strict-gate-bins)", () => {
+    expect(() =>
+      parseConventionConfig("x-tracker:\n  strict-worktree-writes: strict\n"),
+    ).toThrow(/'strict-worktree-writes' must be a boolean/);
+  });
+
+  it("ignores unknown x-tracker keys (forward compat preserved)", () => {
+    expect(
+      parseConventionConfig("x-tracker:\n  strict-worktree-writes-typo: true\n").tracker
+        .strictWorktreeWrites,
+    ).toBeNull();
+  });
+});
+
 describe("gateSteal (CLI update action, before runUpdate)", () => {
   it("refuses when the repo has not armed steal (default)", async () => {
     const { dir, id } = primedTree();

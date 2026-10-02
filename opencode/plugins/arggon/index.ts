@@ -2187,6 +2187,12 @@ type NativePreparationReceipt = {
    * `start --worktree` run does).
    */
   env?: NativeEnvReceipt
+  /**
+   * Claim-stamp receipt (task-single-writer-worktree-enforcement), forwarded
+   * from the kernel when the caller requested stamping (every `start
+   * --worktree` run does).
+   */
+  claim?: NativeClaimReceipt
   truncated?: boolean
 }
 
@@ -2210,6 +2216,26 @@ type NativeEnvReceipt = {
   keys?: string[]
   seededDotenv?: string
   gitignored?: boolean
+  warning?: string
+}
+
+/** The claim-stamp detection a start attaches with (`WorktreeForeignWriteReport`). */
+type NativeClaimWriteReport = {
+  owner: string
+  claimedAt: string
+  files: string[]
+  total: number
+}
+
+/**
+ * The claim-stamp receipt (task-single-writer-worktree-enforcement),
+ * structurally the kernel's `WorktreeClaimReceipt`: `stamped` reports the
+ * rolling ownership stamp; a fired `foreignWrites` report is a WARNING by
+ * default and an attach refusal under `x-tracker.strict-worktree-writes`.
+ */
+type NativeClaimReceipt = {
+  stamped: boolean
+  foreignWrites?: NativeClaimWriteReport
   warning?: string
 }
 
@@ -2254,6 +2280,7 @@ function boundedPreparation(input: {
   gateBins?: NativeGateBinResolution[]
   steps?: NativePrepStep[]
   env?: NativeEnvReceipt
+  claim?: NativeClaimReceipt
 }): NativePreparationReceipt {
   const built = input.builtWorkspaces
     .slice(0, MAX_NATIVE_PREPARATION_NAMES)
@@ -2295,12 +2322,20 @@ function boundedPreparation(input: {
   // Env contract fragment (spec worktree-env-contract-016): projected, not
   // re-derived — the kernel owns the check and the six-key shape.
   const env = input.env === undefined ? undefined : boundedEnvReceipt(input.env)
+  // Claim-stamp fragment (task-single-writer-worktree-enforcement): projected,
+  // not re-derived — the kernel owns detection and the MAX_CLAIM_WRITE_NAMES
+  // cap, which is below this function's own list cap, so only the per-string
+  // bound is re-applied and an over-cap file list folds into `truncated`.
+  const claim =
+    input.claim === undefined ? undefined : boundedClaimReceipt(input.claim)
   const truncated =
     input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
     input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
     (input.steps?.length ?? 0) > steps.length ||
     input.missingDependenciesTotal > input.missingDependencies.length ||
     (input.gateBins?.length ?? 0) > gateBins.length ||
+    (claim?.foreignWrites !== undefined &&
+      claim.foreignWrites.total > claim.foreignWrites.files.length) ||
     built.some((name, index) => name !== input.builtWorkspaces[index]) ||
     linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
     missing.some((name, index) => name !== input.missingDependencies[index]) ||
@@ -2323,8 +2358,35 @@ function boundedPreparation(input: {
     gateBins,
     ...(steps.length > 0 ? { steps } : {}),
     ...(env !== undefined ? { env } : {}),
+    ...(claim !== undefined ? { claim } : {}),
     ...(truncated ? { truncated: true } : {}),
   }
+}
+
+/**
+ * Bound one claim-stamp receipt fragment: only the free-text fields (`owner`,
+ * `claimedAt`, each `files` entry, `warning`) are re-bounded; `stamped` and
+ * `total` are honest counts the kernel owns.
+ */
+function boundedClaimReceipt(input: NativeClaimReceipt): NativeClaimReceipt {
+  const bounded: NativeClaimReceipt = { stamped: input.stamped }
+  if (input.foreignWrites !== undefined) {
+    bounded.foreignWrites = {
+      owner: boundedNativeText(input.foreignWrites.owner, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+      claimedAt: boundedNativeText(
+        input.foreignWrites.claimedAt,
+        MAX_NATIVE_PREPARATION_VALUE_CHARS,
+      ),
+      files: input.foreignWrites.files
+        .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+        .map((file) => boundedNativeText(file, MAX_NATIVE_PREPARATION_VALUE_CHARS)),
+      total: input.foreignWrites.total,
+    }
+  }
+  if (input.warning !== undefined) {
+    bounded.warning = boundedNativeText(input.warning, MAX_NATIVE_PREPARATION_VALUE_CHARS)
+  }
+  return bounded
 }
 
 /**
@@ -3100,6 +3162,7 @@ async function nativeStart(
   kernel: ArgonKernel,
   input: Record<string, unknown>,
   options: ArgonToolOptions,
+  tool?: ArgonToolCallContext,
 ): Promise<{ ok: boolean; envelope: Record<string, unknown> }> {
   const id = asString(input.id)
   if (id === undefined) {
@@ -3153,7 +3216,7 @@ async function nativeStart(
       worktreeCreated: false,
       branchCreated: false,
     }
-    return await nativeStartBody(kernel, input, options, progress, item, root, assignee)
+    return await nativeStartBody(kernel, input, options, progress, item, root, assignee, tool)
   } catch (error) {
     return safeUnexpectedStartFailure(kernel, error, progress, { id, version })
   }
@@ -3168,9 +3231,15 @@ async function nativeStartBody(
   item: Record<string, unknown>,
   root: string,
   assignee: string,
+  tool?: ArgonToolCallContext,
 ): Promise<{ ok: boolean; envelope: Record<string, unknown> }> {
   const { id, branch, version } = progress
   const primaryRoot = canonicalRoot(options, root)
+  // Calling-session identity for the claim stamp
+  // (task-single-writer-worktree-enforcement): the session id when the host
+  // hands one over, else the assignee — the same rolling stamp the CLI writes
+  // with its assignee identity.
+  const claimIdentity = sessionToken(tool?.sessionID) ?? assignee
 
   const wantWorktree = input.worktree !== false
   // `worktree: false` is an explicit branch-only mode. Do not attach to (or
@@ -3348,6 +3417,13 @@ async function nativeStartBody(
             identity: { itemId: id, branch },
             enabled: kernel.readConventionConfig(root).worktree.env !== false,
           },
+          claim: {
+            identity: claimIdentity,
+            assignee,
+            itemId: id,
+            branch,
+            surface: "native",
+          },
         }),
       )
     } catch (error) {
@@ -3396,6 +3472,32 @@ async function nativeStartBody(
           `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
           "it attaches to the existing worktree and retries the claim commit.",
         "strict gate-bin gate refused",
+      )
+    }
+  }
+
+  // Single-writer enforcement (task-single-writer-worktree-enforcement): with
+  // `x-tracker.strict-worktree-writes: true` a fired attach-time detection —
+  // the worktree stamped by a DIFFERENT session, with tracked files modified
+  // after that claim — refuses the claim BEFORE any item mutation, naming the
+  // stamped owner and the newer files. Unset (the default) keeps the
+  // documented report-only behavior byte-identical: the detection rides the
+  // preparation receipt (`claim.foreignWrites`) and the claim commit remains
+  // authoritative.
+  if (worktreePath !== undefined) {
+    const foreignWrites = progress.preparation?.claim?.foreignWrites
+    const strictWriteRefusal =
+      kernel.readConventionConfig(root).tracker.strictWorktreeWrites === true &&
+      foreignWrites !== undefined
+        ? kernel.strictWorktreeWriteFailure(foreignWrites)
+        : null
+    if (strictWriteRefusal !== null) {
+      return failBeforeClaim(
+        `${strictWriteRefusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
+          "Then re-run " +
+          `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
+          "it attaches to the existing worktree and retries the claim commit.",
+        "strict worktree-write gate refused",
       )
     }
   }
@@ -3838,8 +3940,8 @@ const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
     // documented in ArggonManager/docs/agents.md + playbooks/opencode.md and
     // asserted by the contract tests; the loose envelope never rejects a valid payload.
     output: OBJECT,
-    run: (kernel, input, options) =>
-      guarded(kernel, "start", "START_FAILED", () => nativeStart(kernel, input, options)),
+    run: (kernel, input, options, tool) =>
+      guarded(kernel, "start", "START_FAILED", () => nativeStart(kernel, input, options, tool)),
   },
   {
     name: "branch",

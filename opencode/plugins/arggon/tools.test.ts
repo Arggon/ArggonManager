@@ -35,6 +35,7 @@ import {
   readdirSync,
   rmSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1982,6 +1983,145 @@ describe("worktree domain tools (W4)", () => {
       },
     ]);
     expect(output.claimCommitted).toBe(true);
+  });
+
+  /** Arm `x-tracker.strict-worktree-writes` on the seeded tree (committed). */
+  function armStrictWorktreeWrites(dir: string): void {
+    const config = join(dir, "ArggonManager", ".convention.yml");
+    writeFileSync(
+      config,
+      `${readFileSync(config, "utf8")}x-tracker:\n  strict-worktree-writes: true\n`,
+      "utf8",
+    );
+    git(dir, ["add", "ArggonManager/.convention.yml"]);
+    git(dir, ["commit", "-qm", "test: arm the strict worktree-write gate"]);
+  }
+
+  /** The worktree's git dir, where the kernel writes the claim stamp. */
+  function worktreeGitDir(dir: string, worktreePath: string): string {
+    return gitOut(
+      worktreePath,
+      ["rev-parse", "--absolute-git-dir"],
+    ).trim();
+  }
+
+  it("stamps the worktree with the calling session and warns (report-only) when a foreign session attaches over newer writes (task-single-writer-worktree-enforcement)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    // First session claims and stamps the worktree.
+    const first = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_a" },
+    );
+    const firstOutput = first.output as Record<string, unknown>;
+    const worktreePath = String(firstOutput.worktreePath);
+    const firstPreparation = firstOutput.preparation as {
+      claim?: { stamped: boolean; foreignWrites?: unknown };
+    };
+    expect(firstPreparation.claim?.stamped).toBe(true);
+    expect(firstPreparation.claim?.foreignWrites).toBeUndefined();
+    const gitDir = worktreeGitDir(dir, worktreePath);
+    const stamp = JSON.parse(readFileSync(join(gitDir, "arggon-claim.json"), "utf8")) as {
+      identity: string;
+      item: string;
+      surface: string;
+    };
+    expect(stamp.identity).toBe("ses_a");
+    expect(stamp.surface).toBe("native");
+    expect(stamp.item).toBe("task-rate-limit");
+
+    // A foreign session's tracked write inside the claimed worktree, after
+    // the stamp (the F12 signature).
+    const itemFile = join(worktreePath, "ArggonManager", "launch-mvp", "auth", "story-login", "task-rate-limit.md");
+    const foreignContent = readFileSync(itemFile, "utf8") + "\n<!-- foreign edit -->\n";
+    writeFileSync(itemFile, foreignContent, "utf8");
+    const when = new Date(Date.now() + 60_000);
+    utimesSync(itemFile, when, when);
+
+    // The foreign session's own start attach: report-only default, so the
+    // detection rides the receipt and the claim still lands.
+    const second = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_b" },
+    );
+    const secondOutput = second.output as Record<string, unknown>;
+    const secondPreparation = secondOutput.preparation as {
+      claim?: {
+        stamped: boolean;
+        foreignWrites?: { owner: string; files: string[]; total: number };
+      };
+    };
+    expect(secondOutput.worktreeCreated).toBe(false);
+    expect(secondPreparation.claim?.foreignWrites?.owner).toBe("ses_a");
+    expect(secondPreparation.claim?.foreignWrites?.total).toBe(1);
+    expect(secondPreparation.claim?.foreignWrites?.files).toEqual([
+      "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md",
+    ]);
+    expect(secondOutput.claimCommitted).toBe(true);
+  });
+
+  it("keeps the single-writer flow byte-identical by default: the owner's own attach never fires (task-single-writer-worktree-enforcement)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_a" },
+    );
+    const retry = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_a" },
+    );
+    const output = retry.output as Record<string, unknown>;
+    const preparation = output.preparation as {
+      claim?: { stamped: boolean; foreignWrites?: unknown; warning?: string };
+    };
+    expect(output.worktreeCreated).toBe(false);
+    expect(preparation.claim).toEqual({ stamped: true });
+    expect(output.claimCommitted).toBe(true);
+  });
+
+  it("refuses the attach before the claim update under strict-worktree-writes when a foreign session's window saw newer writes (task-single-writer-worktree-enforcement)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_a" },
+    );
+    armStrictWorktreeWrites(dir);
+    const worktreePath = join(dirname(dir), `${basename(dir)}-task-rate-limit`);
+    const itemFile = join(worktreePath, "ArggonManager", "launch-mvp", "auth", "story-login", "task-rate-limit.md");
+    writeFileSync(itemFile, readFileSync(itemFile, "utf8") + "\n<!-- foreign edit -->\n", "utf8");
+    const when = new Date(Date.now() + 60_000);
+    utimesSync(itemFile, when, when);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute(
+        { id: "task-rate-limit", assignee: "smoke" },
+        { sessionID: "ses_b" },
+      );
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    const payload = typed.envelope;
+    const claimCommit = payload.claimCommit as Record<string, unknown>;
+    expect(claimCommit).toMatchObject({ status: "not-attempted", committed: false });
+    expect(claimCommit.reason).toBe("strict worktree-write gate refused");
+    const message = String((payload.error as { message?: unknown }).message);
+    expect(message).toContain("x-tracker.strict-worktree-writes is set");
+    expect(message).toContain("refusing the claim");
+    expect(message).toContain("ses_a");
+    expect(message).toContain(worktreePath);
+    // The claim never mutated the item copy in the worktree.
+    const claimed = itemData(dir, "task-rate-limit", worktreePath);
+    expect(claimed.assignee).toBe("smoke");
+    expect(readFileSync(itemFile, "utf8")).toContain("<!-- foreign edit -->");
   });
 
   it("start refuses to steal a claim and removes the worktree it just created", async () => {

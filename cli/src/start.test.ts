@@ -8,8 +8,10 @@ import {
   readlinkSync,
   rmSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { basename, join, relative, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -884,5 +886,276 @@ describe("worktree link farm (task-start-worktree-lib-resolution)", () => {
     // And without an install there is nothing to point.
     const bare = mkdtempSync(join(tmpdir(), "arggon-point-bare-"));
     expect(pointWorkspaceAtLocal(primary, bare, "@arggondev/lib")).toBe(false);
+  });
+});
+
+describe("start --worktree claim stamp: single-writer detection (task-single-writer-worktree-enforcement)", () => {
+  const LATER = new Date("2026-09-10T12:00:00Z");
+  const FOREIGN_SESSION = "ses_f0821d67";
+
+  /**
+   * A primed task plus the (not yet created) worktree path its start will
+   * use. The faked `worktreeAdd` creates a REAL git repository, so the
+   * kernel's git-dir probe resolves and the claim stamp is physically written
+   * (`<worktree>/.git/arggon-claim.json`). The porcelain probe itself stays on
+   * the injected runner: a test fakes `git status` output for the worktree
+   * while the files it names are real, with mtimes set explicitly.
+   */
+  function primedWriterTask(strict: boolean): {
+    dir: string;
+    id: string;
+    worktreePath: string;
+    stampPath: string;
+    createGit: StartGit & { calls: Call[] };
+  } {
+    const { dir, id } = primedTask();
+    const worktreePath = resolve(dir, "..", `${basename(dir)}-${id}`);
+    if (strict) {
+      const configPath = join(dir, "ArggonManager", ".convention.yml");
+      writeFileSync(
+        configPath,
+        readFileSync(configPath, "utf8") + "x-tracker:\n  strict-worktree-writes: true\n",
+      );
+    }
+    const createGit = fakeGit({
+      worktreeAdd: (_cwd, path) => {
+        mkdirSync(path, { recursive: true });
+        execFileSync("git", ["init", "-q", path]);
+        cpSync(join(dir, "ArggonManager"), join(path, "ArggonManager"), { recursive: true });
+      },
+    });
+    return {
+      dir,
+      id,
+      worktreePath,
+      stampPath: join(worktreePath, ".git", "arggon-claim.json"),
+      createGit,
+    };
+  }
+
+  /** Overwrite the stamp as a NATIVE session would have left it. */
+  function stampAsForeignSession(
+    stampPath: string,
+    itemId: string,
+    branch: string,
+    claimedAt: Date,
+  ): void {
+    writeFileSync(
+      stampPath,
+      `${JSON.stringify(
+        {
+          identity: FOREIGN_SESSION,
+          assignee: "arggon",
+          item: itemId,
+          branch,
+          claimedAt: claimedAt.toISOString(),
+          surface: "native",
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+  }
+
+  /** Write a tracked-style foreign file into the worktree, newer than `after`. */
+  function foreignWrite(worktreePath: string, rel: string, after: Date): void {
+    const file = join(worktreePath, rel);
+    mkdirSync(join(file, ".."), { recursive: true });
+    writeFileSync(file, "foreign work\n", "utf8");
+    const when = new Date(after.getTime() + 60_000);
+    utimesSync(file, when, when);
+  }
+
+  /** Fake git whose root reads clean but whose worktree reports `dirty`. */
+  function writerGit(worktreePath: string, dirty: string[]): StartGit & { calls: Call[] } {
+    return fakeGit({
+      worktreeList: () => [worktreePath],
+      fileStatus: (cwd, file) => {
+        if (file !== ".") return ` M ${file}`;
+        return cwd === worktreePath && dirty.length > 0
+          ? dirty.map((rel) => ` M ${rel}`).join("\n")
+          : "";
+      },
+    });
+  }
+
+  it("stamps the worktree at claim time; the receipt carries the claim state (default)", () => {
+    const { dir, id, worktreePath, stampPath, createGit } = primedWriterTask(false);
+    const result = runStart(
+      { cwd: dir, id, assignee: "arggon", worktree: true, now: NOW },
+      { git: createGit },
+    );
+    expect(result.worktreeCreated).toBe(true);
+    expect(result.claim).toEqual({ stamped: true });
+    expect(JSON.parse(readFileSync(stampPath, "utf8"))).toMatchObject({
+      identity: "arggon",
+      assignee: "arggon",
+      item: id,
+      branch: "feat/task-rate-limit",
+      claimedAt: NOW.toISOString(),
+      surface: "cli",
+    });
+    expect(existsSync(stampPath)).toBe(true);
+    expect(worktreePath).toContain(id);
+  });
+
+  it("keeps the single-writer flow byte-identical by default: same-identity attach, no warning, claim lands", () => {
+    const { dir, id, worktreePath, stampPath, createGit } = primedWriterTask(false);
+    runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git: createGit });
+    // The owner's own fix-and-re-attach cycle: same identity, no foreign writes.
+    const git = writerGit(worktreePath, []);
+    const result = runStart(
+      { cwd: dir, id, assignee: "arggon", worktree: true, now: LATER },
+      { git },
+    );
+    expect(result.worktreeCreated).toBe(false);
+    // The claim stamp is refreshed — and NOTHING else about the flow changed:
+    // no fired detection, no warning, the claim commit stays authoritative.
+    expect(result.claim).toEqual({ stamped: true });
+    expect(result.committed).toBe(true);
+    expect(result.pushed).toBe(true);
+    expect(result.gateBins).toEqual([]);
+    expect(result.env?.written).toBe(false);
+    expect(git.calls.some((c) => c.op === "commit")).toBe(true);
+    expect(JSON.parse(readFileSync(stampPath, "utf8")).claimedAt).toBe(LATER.toISOString());
+  });
+
+  it("warns (named, bounded) when attaching a worktree a foreign session stamped over newer writes", () => {
+    const { dir, id, worktreePath, stampPath, createGit } = primedWriterTask(false);
+    runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git: createGit });
+    // A native session stamped the worktree after the CLI claim (the
+    // cross-surface shape), and its window saw tracked writes.
+    stampAsForeignSession(stampPath, id, "feat/task-rate-limit", NOW);
+    foreignWrite(worktreePath, "src/foreign.ts", NOW);
+    const git = writerGit(worktreePath, ["src/foreign.ts"]);
+    const result = runStart(
+      { cwd: dir, id, assignee: "arggon", worktree: true, now: LATER },
+      { git },
+    );
+    // Report-only default: the detection rides the receipt, the claim lands.
+    expect(result.claim?.foreignWrites).toEqual({
+      owner: FOREIGN_SESSION,
+      claimedAt: NOW.toISOString(),
+      files: ["src/foreign.ts"],
+      total: 1,
+    });
+    expect(result.committed).toBe(true);
+    expect(git.calls.some((c) => c.op === "commit")).toBe(true);
+  });
+
+  it("stays silent when the foreign stamp window saw no newer tracked writes", () => {
+    const { dir, id, worktreePath, stampPath, createGit } = primedWriterTask(false);
+    runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git: createGit });
+    stampAsForeignSession(stampPath, id, "feat/task-rate-limit", LATER);
+    // An OLD file below the stamp: reported dirty but predates the claim.
+    foreignWrite(worktreePath, "old.ts", new Date(NOW.getTime() - 86_400_000));
+    const git = writerGit(worktreePath, ["old.ts"]);
+    const result = runStart(
+      { cwd: dir, id, assignee: "arggon", worktree: true, now: LATER },
+      { git },
+    );
+    expect(result.claim).toEqual({ stamped: true });
+    expect(result.committed).toBe(true);
+  });
+
+  it("degrades to unstamped without blocking when the worktree has no git dir", () => {
+    const { dir, id } = primedTask();
+    const worktreePath = resolve(dir, "..", `${basename(dir)}-${id}`);
+    mkdirSync(worktreePath, { recursive: true });
+    cpSync(join(dir, "ArggonManager"), join(worktreePath, "ArggonManager"), { recursive: true });
+    const git = fakeGit({ worktreeList: () => [worktreePath] });
+    const result = runStart(
+      { cwd: dir, id, assignee: "arggon", worktree: true, now: NOW },
+      { git },
+    );
+    expect(result.claim).toEqual({
+      stamped: false,
+      warning: "could not write the claim stamp",
+    });
+    expect(result.committed).toBe(true);
+  });
+
+  it("refuses the claim before any mutation under strict-worktree-writes when the stamp is foreign over newer writes", () => {
+    const { dir, id, worktreePath, stampPath, createGit } = primedWriterTask(true);
+    runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git: createGit });
+    stampAsForeignSession(stampPath, id, "feat/task-rate-limit", NOW);
+    foreignWrite(worktreePath, "src/foreign.ts", NOW);
+    foreignWrite(worktreePath, "src/more.ts", NOW);
+    const git = writerGit(worktreePath, ["src/foreign.ts", "src/more.ts"]);
+    let message = "";
+    try {
+      runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: LATER }, { git });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).toContain("x-tracker.strict-worktree-writes is set");
+    expect(message).toContain("refusing the claim");
+    expect(message).toContain(FOREIGN_SESSION);
+    expect(message).toContain(NOW.toISOString());
+    expect(message).toContain("src/foreign.ts, src/more.ts");
+    expect(message).toContain(worktreePath);
+    expect(message).toContain("coordinate with the stamped session");
+    expect(message).toContain(`arggon start ${id} --worktree`);
+    // Refused BEFORE the claim: no commit, no item mutation in the worktree.
+    expect(git.calls.some((c) => c.op === "commit")).toBe(false);
+    const itemFile = join(
+      worktreePath,
+      "ArggonManager",
+      "launch-mvp",
+      "auth",
+      "story-login",
+      `${id}.md`,
+    );
+    expect(readFileSync(itemFile, "utf8")).toContain(`assignee: arggon`);
+  });
+
+  it("keeps the stamped owner when a strict refusal fires, so a retry re-detects instead of silently claiming (no self-unlocking gate)", () => {
+    const { dir, id, worktreePath, stampPath, createGit } = primedWriterTask(true);
+    runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git: createGit });
+    stampAsForeignSession(stampPath, id, "feat/task-rate-limit", NOW);
+    foreignWrite(worktreePath, "src/foreign.ts", NOW);
+    const git = writerGit(worktreePath, ["src/foreign.ts"]);
+    const attempt = (): string => {
+      try {
+        runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: LATER }, { git });
+        return "";
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
+    };
+    // (1) A refused attach must NOT hand ownership to the refused caller...
+    expect(attempt()).toContain("refusing the claim");
+    expect(JSON.parse(readFileSync(stampPath, "utf8"))).toMatchObject({
+      identity: FOREIGN_SESSION,
+      claimedAt: NOW.toISOString(),
+    });
+    // (2) ...otherwise the retry would match its own stamp, skip detection and
+    // claim silently over the stamped owner's uncommitted work.
+    const retry = attempt();
+    expect(retry).toContain("refusing the claim");
+    expect(retry).toContain(FOREIGN_SESSION);
+    expect(retry).toContain("src/foreign.ts");
+    expect(git.calls.some((c) => c.op === "commit")).toBe(false);
+  });
+
+  it("commits normally under strict-worktree-writes when the stamp is the caller's own", () => {
+    const { dir, id, worktreePath, createGit } = primedWriterTask(true);
+    runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git: createGit });
+    const git = writerGit(worktreePath, []);
+    const result = runStart(
+      { cwd: dir, id, assignee: "arggon", worktree: true, now: LATER },
+      { git },
+    );
+    // Strict mode never invents a violation: the owner's own re-attach commits.
+    expect(result.claim).toEqual({ stamped: true });
+    expect(result.committed).toBe(true);
+  });
+
+  it("leaves plain (non-worktree) start without the claim field", () => {
+    const { dir, id } = primedTask();
+    const git = fakeGit();
+    const result = runStart({ cwd: dir, id, assignee: "arggon", now: NOW }, { git });
+    expect(result.claim).toBeUndefined();
   });
 });

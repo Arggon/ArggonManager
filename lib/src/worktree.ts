@@ -1334,6 +1334,15 @@ export type WorktreeDependencyPreparation = {
    * never blocks the claim.
    */
   env?: WorktreeEnvReceipt;
+  /**
+   * The claim-stamp receipt (task-single-writer-worktree-enforcement), when
+   * the caller requested it (`deps.claim`) — present on every `start
+   * --worktree` run of both surfaces, absent from direct kernel callers that
+   * pass no `deps.claim` (legacy shape unchanged). Best-effort: the stamp and
+   * a fired `foreignWrites` detection never block the claim by themselves; the
+   * surfaces decide the consequence via `x-tracker.strict-worktree-writes`.
+   */
+  claim?: WorktreeClaimReceipt;
 };
 
 /**
@@ -1373,6 +1382,375 @@ export function unlinkWorktreeEnv(worktreePath: string): boolean {
 }
 
 /**
+ * Claim-stamp bookkeeping (task-single-writer-worktree-enforcement,
+ * exploration 017 F12): single-writer ownership of a claimed worktree is
+ * convention, not enforcement — this is the detection layer underneath it.
+ *
+ * Every `start --worktree` writes a small claim stamp recording WHICH identity
+ * claimed the worktree and WHEN (the file lives inside the worktree's git dir,
+ * so it never appears in `git status`, never blocks `git worktree remove`, and
+ * needs no cleanup lifecycle — git owns that directory). On an ATTACH, the
+ * previous stamp is read before it is replaced: a DIFFERENT identity plus
+ * tracked files modified after the stamped claim is the F12 signature (a
+ * concurrent writer active under someone else's claim), reported as a named,
+ * bounded warning on both surfaces — or escalated to an attach refusal by
+ * `x-tracker.strict-worktree-writes`, mirroring `strict-gate-bins`.
+ *
+ * Detection is deliberately bounded: one `git status --porcelain` of the
+ * worktree plus one `stat` per dirty tracked path — no full-tree walks, no
+ * filesystem watchers. It observes the UNCOMMITTED collision window; foreign
+ * work that was already committed is history, not a live second writer, and an
+ * unreadable or missing stamp degrades to no detection (pre-feature
+ * worktrees), never to a false accusation.
+ */
+
+/** The stamp file, inside the worktree's git dir (never in the work tree). */
+const CLAIM_STAMP_FILE = "arggon-claim.json";
+
+/** One claim stamp as written at start and read back at attach. */
+export type WorktreeClaimStamp = {
+  /**
+   * Owner identity: the calling session id on the native surface, the
+   * resolved assignee on the CLI (which has no session id).
+   */
+  identity: string;
+  /** The claimed item id. */
+  item: string;
+  /** The recorded working branch at claim time. */
+  branch: string;
+  /** ISO-8601 claim timestamp — the mtime anchor for attach-time detection. */
+  claimedAt: string;
+  /** Assignee at claim time, when known (named in reports). */
+  assignee?: string;
+  /** Writing surface (`cli`/`native`), diagnostic only. */
+  surface?: string;
+};
+
+/**
+ * Cap on the dirty tracked paths a detection report NAMES (the count stays
+ * exact): the same bounded shape as `missingDependencies` — a trashed
+ * worktree must not inflate the receipt, but must not hide how much is dirty.
+ */
+export const MAX_CLAIM_WRITE_NAMES = 10;
+
+/**
+ * Read-only `git rev-parse --absolute-git-dir` probe (injectable for tests):
+ * the worktree's git dir, or undefined when the probe did not answer.
+ */
+export type GitDirRunner = (cwd: string) => string | undefined;
+
+/** Read-only `git status --porcelain` probe (injectable for tests). */
+export type WorktreeStatusRunner = (cwd: string) => string | undefined;
+
+function defaultAbsoluteGitDir(cwd: string): string | undefined {
+  const result = spawnSync("git", ["rev-parse", "--absolute-git-dir"], {
+    cwd,
+    encoding: "utf8",
+    timeout: 10_000,
+  });
+  const out = String(result.stdout ?? "").trim();
+  if (result.error !== undefined || result.status !== 0 || out.length === 0) return undefined;
+  return out;
+}
+
+function defaultWorktreeStatus(cwd: string): string | undefined {
+  const result = spawnSync("git", ["status", "--porcelain"], {
+    cwd,
+    encoding: "utf8",
+    timeout: 10_000,
+  });
+  if (result.error !== undefined || result.status !== 0) return undefined;
+  return String(result.stdout ?? "");
+}
+
+/** Absolute path of a worktree's claim stamp, or undefined without a git dir. */
+function claimStampPath(worktreePath: string, deps: { gitDir?: GitDirRunner }): string | undefined {
+  const gitDir = (deps.gitDir ?? defaultAbsoluteGitDir)(worktreePath);
+  if (gitDir === undefined || gitDir.length === 0) return undefined;
+  return join(gitDir, CLAIM_STAMP_FILE);
+}
+
+/**
+ * Read a worktree's claim stamp (tolerantly: any absence, parse error, or
+ * missing field is `null` — a corrupt stamp degrades to no detection, never
+ * to a false accusation). Never throws.
+ */
+export function readWorktreeClaimStamp(
+  worktreePath: string,
+  deps: { gitDir?: GitDirRunner } = {},
+): WorktreeClaimStamp | null {
+  const path = claimStampPath(worktreePath, deps);
+  if (path === undefined) return null;
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+    if (parsed === null || typeof parsed !== "object") return null;
+    const record = parsed as Record<string, unknown>;
+    const identity = typeof record.identity === "string" ? record.identity : undefined;
+    const item = typeof record.item === "string" ? record.item : undefined;
+    const branch = typeof record.branch === "string" ? record.branch : undefined;
+    const claimedAt = typeof record.claimedAt === "string" ? record.claimedAt : undefined;
+    if (
+      identity === undefined ||
+      item === undefined ||
+      branch === undefined ||
+      claimedAt === undefined
+    ) {
+      return null;
+    }
+    return {
+      identity,
+      item,
+      branch,
+      claimedAt,
+      ...(typeof record.assignee === "string" && record.assignee.length > 0
+        ? { assignee: record.assignee }
+        : {}),
+      ...(typeof record.surface === "string" && record.surface.length > 0
+        ? { surface: record.surface }
+        : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write a worktree's claim stamp (atomically: temp file + rename), best-effort
+ * — a stamp that cannot be written only costs detection coverage on the next
+ * attach, so the write never blocks the claim. Returns true when written.
+ */
+function writeWorktreeClaimStamp(
+  worktreePath: string,
+  stamp: WorktreeClaimStamp,
+  deps: { gitDir?: GitDirRunner },
+): boolean {
+  const path = claimStampPath(worktreePath, deps);
+  if (path === undefined) return false;
+  const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
+  try {
+    writeFileSync(tmp, `${JSON.stringify(stamp, null, 2)}\n`, "utf8");
+    renameSync(tmp, path);
+    return true;
+  } catch {
+    try {
+      rmSync(tmp, { force: true });
+    } catch {
+      // already gone
+    }
+    return false;
+  }
+}
+
+/**
+ * The tracked-modified paths of `git status --porcelain` output, in output
+ * order: every line that is not untracked (`??`), ignored (`!!`), or blank;
+ * rename lines (`R  old -> new`) contribute the post-rename path. Raw output
+ * (not trimmed): the leading status columns matter to the parser.
+ */
+export function parseTrackedModifications(porcelain: string): string[] {
+  const paths: string[] = [];
+  for (const line of porcelain.split("\n")) {
+    if (line.trim().length === 0) continue;
+    const code = line.slice(0, 2);
+    if (code === "??" || code === "!!") continue;
+    let path = line.slice(3).trim();
+    const arrow = path.indexOf(" -> ");
+    if (arrow !== -1) path = path.slice(arrow + 4);
+    path = path.replace(/^"|"$/g, "");
+    if (path.length > 0) paths.push(path);
+  }
+  return paths;
+}
+
+/** A fired attach-time detection: who owned the window and what moved. */
+export type WorktreeForeignWriteReport = {
+  /** Identity the worktree was stamped with (the previous owner). */
+  owner: string;
+  /** That owner's claim timestamp (the mtime anchor), ISO-8601. */
+  claimedAt: string;
+  /** Tracked paths modified after the claim, capped at `MAX_CLAIM_WRITE_NAMES`. */
+  files: string[];
+  /** Full count of tracked paths modified after the claim. */
+  total: number;
+};
+
+/**
+ * Compare a worktree's dirty tracked files against a previous owner's claim
+ * stamp (attach-time detection, F12): a tracked path whose mtime is NEWER than
+ * the stamped claim was written during that owner's window — by the owner
+ * (uncommitted work) or by a concurrent writer — and the attacher cannot tell
+ * which. Bounded: one porcelain read plus one `stat` per dirty path, no
+ * full-tree walks. Best-effort: a status probe that does not answer, an
+ * unparsable stamp timestamp, or an unreadable path degrades toward no fire.
+ */
+export function detectWorktreeForeignWrites(
+  worktreePath: string,
+  stamp: WorktreeClaimStamp,
+  deps: { status?: WorktreeStatusRunner } = {},
+): WorktreeForeignWriteReport | null {
+  const claimedMs = Date.parse(stamp.claimedAt);
+  if (!Number.isFinite(claimedMs)) return null;
+  const porcelain = (deps.status ?? defaultWorktreeStatus)(worktreePath);
+  if (porcelain === undefined) return null;
+  const files: string[] = [];
+  let total = 0;
+  for (const rel of parseTrackedModifications(porcelain)) {
+    let mtimeMs: number;
+    try {
+      mtimeMs = statSync(resolve(worktreePath, rel)).mtimeMs;
+    } catch {
+      continue; // raced or unreadable: nothing to compare for this path
+    }
+    if (mtimeMs > claimedMs) {
+      total++;
+      if (files.length < MAX_CLAIM_WRITE_NAMES) files.push(rel);
+    }
+  }
+  if (total === 0) return null;
+  return { owner: stamp.identity, claimedAt: stamp.claimedAt, files, total };
+}
+
+/**
+ * The bounded warning sentence for a fired detection (report-only default):
+ * names the stamped owner, the claim time, and the newer tracked files. The
+ * same observation feeds `strictWorktreeWriteFailure` when the flag is armed —
+ * the flag changes the consequence, never the observation.
+ */
+export function worktreeForeignWriteWarning(report: WorktreeForeignWriteReport): string {
+  const extra = report.total - report.files.length;
+  const named = report.files.join(", ");
+  return (
+    `the worktree is stamped by session ${report.owner} (claimed ${report.claimedAt}) and ` +
+    `${report.total} tracked file${report.total === 1 ? " was" : "s were"} modified after that ` +
+    `claim: ${named}${extra > 0 ? ` (and ${extra} more)` : ""} — that session's uncommitted ` +
+    "work or a concurrent writer; check before writing here"
+  );
+}
+
+/**
+ * The actionable refusal for `x-tracker.strict-worktree-writes: true`
+ * (task-single-writer-worktree-enforcement), or null when nothing fired. Same
+ * observation as the warning, stronger consequence: the caller (CLI or native
+ * start) refuses the claim before any item mutation. The remedy names the
+ * coordination step, not a destructive one — the stamped session may simply be
+ * mid-task (that is the F12 incident, seen from outside).
+ */
+export function strictWorktreeWriteFailure(report: WorktreeForeignWriteReport): string | null {
+  if (report.total === 0) return null;
+  const extra = report.total - report.files.length;
+  const named = report.files.join(", ");
+  return (
+    `x-tracker.strict-worktree-writes is set: refusing the claim — the worktree is stamped by ` +
+    `session ${report.owner} (claimed ${report.claimedAt}) and ${report.total} tracked ` +
+    `file${report.total === 1 ? " was" : "s were"} modified after that claim: ` +
+    `${named}${extra > 0 ? ` (and ${extra} more)` : ""}. ` +
+    "Another session may be writing here; coordinate with the stamped session (or have it " +
+    "re-attach to refresh the stamp), then re-run start --worktree to attach. This refusal " +
+    "never re-stamps the worktree, so a retry re-detects the same evidence; if the stamped " +
+    "session is gone, confirm no live writer and remove the stamp by hand " +
+    '(rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json").'
+  );
+}
+
+/** Claim-stamp request passed to `prepareWorktreeDependencies` (`deps.claim`). */
+export type WorktreeClaimRequest = {
+  /** Owner identity to stamp (session id on native, assignee on CLI). */
+  identity: string;
+  /** The claimed item id. */
+  itemId: string;
+  /** The recorded working branch. */
+  branch: string;
+  /** Assignee at claim time, when known (named in reports). */
+  assignee?: string;
+  /** Writing surface (`cli`/`native`), diagnostic only. */
+  surface?: "cli" | "native";
+  /** Claim timestamp; a Date or ISO string, defaulting to the current time. */
+  now?: string | Date;
+  /** Porcelain-probe override (tests); defaults to a real `git status`. */
+  status?: WorktreeStatusRunner;
+  /** Git-dir-probe override (tests); defaults to a real `git rev-parse`. */
+  gitDir?: GitDirRunner;
+};
+
+/** The additive claim-stamp receipt fragment (`preparation.claim`). */
+export type WorktreeClaimReceipt = {
+  /**
+   * True when the worktree carries a claim stamp after the run — this run's
+   * stamp, or the PREVIOUS owner's when a fired detection suppressed the
+   * replacement (a refusal must never refresh the stamp it refused against).
+   */
+  stamped: boolean;
+  /**
+   * A fired attach-time detection (present only when the previous stamp named
+   * a DIFFERENT identity and tracked files moved after that claim). Never
+   * blocks the claim by itself — `x-tracker.strict-worktree-writes` decides
+   * the consequence on the surfaces.
+   */
+  foreignWrites?: WorktreeForeignWriteReport;
+  /** Degradation note (e.g. the stamp could not be written) — never blocking. */
+  warning?: string;
+};
+
+/**
+ * Stamp-or-detect one worktree for a start run: read the previous stamp, fire
+ * the detection when a DIFFERENT identity owned the window, then write this
+ * run's stamp (the rolling ownership record). One deliberate exception — the
+ * anti-unlock rule (review on task-single-writer-worktree-enforcement): when
+ * the detection FIRES, the replacement is suppressed and the previous stamp
+ * stands. Writing the new stamp anyway would let a STRICT-refused attach
+ * re-stamp the worktree with the refused caller's identity, so the retry
+ * would see a matching stamp, skip detection, and claim silently over the
+ * foreign window — the gate would unlock itself. With the previous stamp
+ * kept, every retry re-detects against the SAME evidence until the stamped
+ * owner re-attaches (refreshing it legitimately) or the documented manual
+ * recovery (`rm <git-dir>/arggon-claim.json`) is used. Best-effort by
+ * invariant — every degradation lands in the receipt as a warning, never as a
+ * throw.
+ */
+function prepareWorktreeClaim(
+  worktreePath: string,
+  request: WorktreeClaimRequest,
+): WorktreeClaimReceipt {
+  const previous = readWorktreeClaimStamp(worktreePath, request);
+  let foreignWrites: WorktreeForeignWriteReport | undefined;
+  if (previous !== null && previous.identity !== request.identity) {
+    foreignWrites = detectWorktreeForeignWrites(worktreePath, previous, request) ?? undefined;
+    if (foreignWrites !== undefined) {
+      // Anti-unlock: keep the previous stamp (see above); nothing is written.
+      return {
+        stamped: true,
+        foreignWrites,
+      };
+    }
+  }
+  const claimedDate =
+    request.now === undefined
+      ? new Date()
+      : request.now instanceof Date
+        ? request.now
+        : new Date(request.now);
+  const claimedAt = (Number.isNaN(claimedDate.getTime()) ? new Date() : claimedDate).toISOString();
+  const stamped = writeWorktreeClaimStamp(
+    worktreePath,
+    {
+      identity: request.identity,
+      item: request.itemId,
+      branch: request.branch,
+      claimedAt,
+      ...(request.assignee !== undefined && request.assignee.length > 0
+        ? { assignee: request.assignee }
+        : {}),
+      ...(request.surface !== undefined ? { surface: request.surface } : {}),
+    },
+    request,
+  );
+  return {
+    stamped,
+    ...(stamped ? {} : { warning: "could not write the claim stamp" }),
+  };
+}
+
+/**
  * The Compose project `cleanup --prune` reaps for a worktree, derived from the
  * `x-worktree.services` declaration (ADR 0019 layer 2,
  * task-cleanup-declared-services) and the worktree id — the worktree
@@ -1408,8 +1786,19 @@ export function worktreeComposeProject(services: string, worktreeId: string): st
 export function prepareWorktreeDependencies(
   primaryRoot: string,
   worktreePath: string,
-  deps: { runBuild?: WorkspaceBuildRunner; env?: WorktreeEnvRequest } = {},
+  deps: {
+    runBuild?: WorkspaceBuildRunner;
+    env?: WorktreeEnvRequest;
+    claim?: WorktreeClaimRequest;
+  } = {},
 ): WorktreeDependencyPreparation {
+  // Claim stamp (task-single-writer-worktree-enforcement): runs FIRST, before
+  // any write of this run, so the detection observes exactly the writes that
+  // happened between the previous owner's stamp and this attach. Absent
+  // `deps.claim` = the caller did not request stamping: the receipt keeps its
+  // legacy shape.
+  const claimReceipt =
+    deps.claim === undefined ? undefined : prepareWorktreeClaim(worktreePath, deps.claim);
   // Worktree env contract (spec worktree-env-contract-016): runs first and
   // best-effort, so even a later install-gate refusal leaves the kept
   // worktree with its env contract in place. Absent `deps.env` = the caller
@@ -1481,6 +1870,7 @@ export function prepareWorktreeDependencies(
     steps,
     ...(stepsTruncated ? { stepsTruncated: true as const } : {}),
     ...(envReceipt !== undefined ? { env: envReceipt } : {}),
+    ...(claimReceipt !== undefined ? { claim: claimReceipt } : {}),
   };
 }
 

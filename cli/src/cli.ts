@@ -54,6 +54,7 @@ import {
   toContractWorkItem,
   updateOperation,
   validateOperation,
+  worktreeForeignWriteWarning,
   type TrendResult,
 } from "@arggondev/lib";
 
@@ -2275,6 +2276,7 @@ program
               gateBins: result.gateBins,
               prepSteps: result.prepSteps,
               env: result.env,
+              ...(result.claim !== undefined ? { claim: result.claim } : {}),
               ...(result.postStartRelink !== undefined
                 ? { postStartRelink: result.postStartRelink }
                 : {}),
@@ -2353,6 +2355,14 @@ program
                 .join("; ");
               console.log(`  note: dependency prep — ${sanitizeHumanError(named)}`);
             }
+          }
+          if (result.claim?.foreignWrites !== undefined) {
+            // Single-writer detection (task-single-writer-worktree-enforcement):
+            // the report-only default. A refusal (strict flag) never reaches
+            // here — it fails the start before the claim.
+            console.log(
+              `  note: single-writer check — ${sanitizeHumanError(worktreeForeignWriteWarning(result.claim.foreignWrites))}`,
+            );
           }
           if (result.manifestCoverage === "stale") {
             // A mirrored install is only as current as the primary's: name what

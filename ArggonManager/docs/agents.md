@@ -137,6 +137,31 @@ shape only) before `git worktree remove`, so an unignored one never wedges
 pruning. The receipt rides both surfaces: the CLI envelope's additive `env`
 field and the native `preparation.env`.
 
+#### Single-writer ownership (claim stamp, exploration 017 F12)
+
+One claimed item → one worktree → one writer session: ownership is a
+convention every agent must hold, and start now carries the detection layer
+underneath it. Every `start --worktree` writes a claim stamp (`arggon-claim.json`
+inside the worktree's **git dir** — never in the work tree, so it cannot dirty
+`git status`, block `git worktree remove`, or need cleanup) recording the owning
+identity (calling session id on the native tools, assignee on the CLI), the
+item, branch, claim timestamp, and surface. On an **attach** the previous stamp
+is read before it is replaced: a DIFFERENT identity plus tracked files modified
+after that claim is reported — a bounded, named warning (`claim.foreignWrites`
+in `--json`; `note: single-writer check — …` on stdout; the native
+`preparation.claim`) naming the stamped owner, the claim time, and up to 10 of
+the newer files with an exact total. Read it as "a concurrent writer may be
+active under the previous owner's claim" and check before writing — the F12
+incident (a claimed worktree written into by a concurrent session) is exactly
+this signature. With `x-tracker.strict-worktree-writes: true` the same
+observation refuses the attach before any item mutation; the remedy is
+coordination with the stamped session, then re-running `start --worktree` (the
+owner's own re-attach never fires — the stamp is refreshed with its identity).
+Detection is bounded and best-effort: one porcelain read plus one `stat` per
+dirty path, covering the UNCOMMITTED collision window; committed work is
+history, and a missing or unreadable stamp (pre-feature worktrees) degrades to
+no detection, never to a false accusation. A fired detection never re-stamps the worktree, so the previous owner stays stamped and every retry re-detects — a strict refusal cannot be unlocked by retrying. If the stamped session is gone, confirm no live writer and remove the stamp by hand: `rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"`.
+
 #### Failure semantics
 
 A failure after the worktree exists **never** rolls it back: the worktree and branch are kept for inspection, and the error names the failing step, the worktree path, the remediation, and the fact that re-running `arggon start <id> --worktree` attaches to it. A failed push is the exception — attach does not retry it, and the error instructs `git push -u origin <branch>` manually.
