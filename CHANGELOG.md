@@ -6,27 +6,114 @@ All notable changes to ArggonManager are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0](https://github.com/Arggon/ArggonManager/compare/arggon-manager-v0.4.1...arggon-manager-v0.5.0) (2026-10-02)
+
+### Added
+
+- **Worktree env contract**: `start --worktree` writes a gitignored `.arggon.env`
+  carrying the worktree identity (`ARGON_ITEM`, `ARGGON_WORKTREE_ID`,
+  `ARGGON_WORKTREE_PATH`, `ARGGON_WORKTREE_BRANCH`) plus per-OS
+  `ARGGON_STATE_DIR` / `ARGGON_CACHE_DIR`, seeds `.env` copy-if-absent, and
+  reports the outcome in the additive `env` receipt — `written: false` with a
+  warning never blocks the claim (#566, spec worktree-env-contract-016).
+  **Adopter migration:** read the contract keys instead of hardcoding paths;
+  `x-worktree.env: false` opts out, and `cleanup --prune` reaps a
+  start-created env file.
+- **Single-writer worktree enforcement**: every `start --worktree` stamps its
+  ownership in `arggon-claim.json` inside the worktree's **git dir** (never the
+  work tree, so it cannot dirty `git status` or block `git worktree remove`).
+  An attach under a different identity with tracked files modified after that
+  stamp reports `claim.foreignWrites` — bounded (one `git status --porcelain`
+  plus one `stat` per dirty path, 10 names with an exact total), best-effort,
+  and never a claim blocker by default. `x-tracker.strict-worktree-writes: true`
+  turns the same observation into an attach refusal before any item mutation,
+  and a fired detection never re-stamps the worktree, so a retry cannot unlock
+  the gate itself (#568).
+- **Dead-owner take-over**: `arggon start <id> --worktree --take-over-worktree`
+  authorizes replacing a stamp whose owner is gone (a crashed session), naming
+  who was replaced and when in a bounded chain persisted in the stamp. Default
+  off; the manual `rm <git-dir>/arggon-claim.json` recovery stays documented for
+  clients without the flag (#573).
+- **Compose reaping on prune**: `x-worktree.services` in `.convention.yml`
+  declares per-worktree Compose projects (`true` → `<repo>-<item-id>`, a base
+  name → `<base>-<repo>-<item-id>`, lowercased). `cleanup --prune` runs
+  `docker compose -p <project> down -v --remove-orphans` **before** the worktree
+  removal for every removable entry — report-only (never a failure) without
+  Docker, non-fatal with bounded detail on failure, tolerant of an
+  already-gone project by exit code — and the plugin's native prune loop now
+  matches the CLI byte for byte (#569, #574).
+- **Gate-bin readiness**: `x-tracker.strict-gate-bins: true` refuses the claim
+  when a declared project gate binary resolves outside the worktree, naming the
+  offending bins with their observed source plus the `npm ci` remedy (#533) — the
+  `gateBins` receipt that reports each resolution shipped in 0.4.1.
+- **Board**: dark mode and a density toggle.
+- **TUI**: vim motions, a help overlay and color control; kernel filter
+  predicates with saved views; claim/move actions routed through the kernel
+  update path instead of their own writes.
+- **Release pipeline**: release-please proposes the version bump; `release.yml`
+  runs an ordered guard, tags, publishes `@arggondev/lib` **before**
+  `arggon-manager` (OIDC trusted publishing), and attaches both tarballs.
+  `release.md` is now only the operator's exception manual — the manual
+  bump/pack/publish runbook is retired (ADR 0018, spec release-pipeline-015).
+- **Methodology**: the greenfield exploration protocol (exploration-015 +
+  ADR 0017) is wired into the carriers, so a new area opens with an
+  exploration gate instead of an implementation.
+
+### Changed
+
+- **Kernel-facing**: `cleanup --json` pins its exit-code contract — exit 0 with
+  a `failures[]` payload, never a non-zero exit for a partial prune — and
+  branch-delete failures land there with both catch surfaces bounded (#515,
+  task-cleanup-json-exit-code).
+- **Supply chain**: every `uses:` in the shipped workflows is pinned to a full
+  commit SHA with a human-readable version comment, kept that way by a grep
+  gate (#567); the release seam pin stays a literal and is now enforced against
+  the regenerated seam by `cli/src/ci-seam-pin.test.ts`, so a stale pin is a
+  red test rather than a silent outage (ADR 0018 amendment).
+- **Kernel-facing**: comment authors resolve without `gh`, and a missing
+  dependency is named instead of surfacing as an opaque failure (#558).
+- **MCP**: the CLI spawn spec is derived for the `--import` loader form, so the
+  stdio server and the CLI stay in step (#543).
+- **Docs**: adopter pattern doc for per-worktree ephemeral service containers,
+  a UI + `/api/item` documentation refresh, ADR index rows added with ADRs
+  0014/0015 → Accepted, and ADR 0019 amended with the claim/concurrency layer
+  (decision point 4) that `start`'s stamp/detection implements.
+- **Machine hygiene**: per-machine `.zcode/` harness state is no longer tracked —
+  it churned `git status` and blocked `start` (bug-harness-config-churn).
 
 ### Fixed
 
+- **start**: a fresh `start --worktree` always leaves a gate-usable install, or
+  refuses before the claim with the named binaries, the preparation log and the
+  `npm ci` remedy (#551); a stale primary install is reported as
+  `manifestCoverage: "stale"` with the missing dependencies named.
+- **start**: the single-writer detection reads **raw** `git status --porcelain`.
+  A trimming helper shifted porcelain's positional status column, so the parsed
+  path lost its first character and the detection silently never fired against
+  real git — the unit fakes had masked it; the regression is now pinned against
+  real git and the real CLI (#573).
+- **Board**: the live-reload e2e spec waits on the server's readiness signals
+  instead of an evaluate poll, which raced the reload and produced a false
+  failure (#521).
 - **init**: the generated `opencode.jsonc` no longer emits bare
   `"formatter": true`. The built-in prettier runs as `<prettier> --write $FILE`
   with the session's project directory as cwd and resolves `.prettierignore`
-  from that cwd, so a session rooted in the primary checkout that edits a file
+  from that cwd, so a session rooted in the primary checkout that edited a file
   in a sibling `arggon start --worktree` worktree bypassed the ignore file and
-  reformatted gitignored files into large style-only churn. The template now
-  ships a `formatter.prettier.command` override that anchors the same
-  invocation at the edited file's own git root (the worktree root for
-  worktrees): non-ignored files format exactly as before, and the command
-  exits 0 without formatting when no prettier resolves (e.g. a cold worktree
-  before `start` links the install). Fixed for new adopters by the template
-  (task-formatter-override-template, from the incident fixed in this repo by
-  #531).
+  reformatted gitignored files into large style-only churn. The template ships a
+  `formatter.prettier.command` override that anchors the same invocation at the
+  edited file's own git root: non-ignored files format exactly as before, and
+  the command exits 0 without formatting when no prettier resolves (e.g. a cold
+  worktree before `start` links the install) (#541, #531).
   **Adopter migration:** `init` never rewrites an adopter-modified
-  `opencode.jsonc`, so existing adopters must hand-apply the override — copy
-  the `formatter` block from `templates/docs/opencode.jsonc` (or a fresh
-  `arggon init` on a scratch fixture) into your config.
+  `opencode.jsonc`, so existing adopters must hand-apply the override — copy the
+  `formatter` block from `templates/docs/opencode.jsonc` (or run a fresh
+  `arggon init` on a scratch fixture) into their config.
+- **Config**: this repo's own `opencode.jsonc` `permissions` block did not parse
+  — the array closed early and one rule was stranded outside it, so the
+  workflow gates were silently unenforced and agent sessions failed every shell
+  call closed. Repaired, and pinned by `cli/src/opencode-permissions.test.ts`
+  (#576).
 
 ## [0.4.1] - 2026-10-01
 
