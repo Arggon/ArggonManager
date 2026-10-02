@@ -27,3 +27,12 @@ updated: "2026-10-02"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-02 @Coordinator
+### 2026-10-01 @Coordinator
+Filed from the task-cleanup-declared-services review (PR #569): the CLI's `cleanup --prune` reaps declared per-worktree Compose projects (x-worktree.services manifest; ADR 0019 command shape) BEFORE git worktree remove — but the plugin's nativeCleanup prune loop does NOT (safe today: report-only omission; the MCP arggon_cleanup tool spawns the CLI and DOES reap, so MCP callers get the behavior transitively). The kernel helper `worktreeComposeProject` is already exported, so plugin adoption is trivial per the worker.
+
+## Acceptance
+- [ ] nativeCleanup prune loop reaps the declared Compose project for each removable entry (same ADR 0019 command shape, same no-op semantics, same bounded failure reporting), before the worktree removal.
+- [ ] Parity test: CLI and native prune envelopes byte-comparable on the same fixture (modulo the documented surface differences).
+- [ ] Absent-docker degradation matches the CLI's run-wide report-only shape.
