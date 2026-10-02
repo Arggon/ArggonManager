@@ -2,12 +2,13 @@
 type: task
 status: todo
 id: task-matrix-reaches-adopters
-title: "`adapters/capability-matrix.json` never reaches an adopter: it is not in the package `files` (blocked by the tagged-version guard) so `doctor` reports \"not found\" in every adopter tree"
+title: '`adapters/capability-matrix.json` never reaches an adopter: it is not in the package `files` (blocked by the tagged-version guard) so `doctor` reports "not found" in every adopter tree'
 parent: story-capability-matrix
 labels: [adopters, packaging]
 created: "2026-10-02"
 updated: "2026-10-02"
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-capability-matrix/task-matrix-reaches-adopters.md
   Leaves live only under a story. id is the filename stem: task-matrix-reaches-adopters.
@@ -29,6 +30,25 @@ This is also a sequencing trap for the sibling adapter tasks (T2/T4/T5): any per
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] the matrix reaches an adopter tree — either `adapters/` joins the pack
+      `files` allowlist (a shipping change, so it must land with a release that
+      bumps the version past the tagged one) or a scaffold path (`arggon init`,
+      template-bundled) writes `adapters/capability-matrix.json` into the adopter
+      tree; the decision is recorded in this item's Notes
+- [ ] `arggon doctor` in a FRESH `arggon init` tree reports `matrix.present:
+    true` with the expected row/gap counts (verified on a temp fixture, not on
+      this repo)
+- [ ] the reading path stays tree-only, so the headless pack↔checkout envelope
+      parity gate (`cli/src/headless-ci.test.ts`, "packed-bin --json envelopes
+      are byte-identical to the checkout CLI") is still green
+- [ ] the chosen destination is covered by the pack allowlist test in
+      `cli/src/pack-contents.test.ts`, and the version guard is satisfied by an
+      actual release rather than a manual bump
+- [ ] `arggon validate`, the full test suite, lint and `npm run check:plugin` are
+      green on the change
+- [ ] the matrix's own gap rows are re-derived from the seam this path delivers
+      (a Claude Code adopter tree that now carries the matrix still has no hook
+      gate and no session context hook — do not flip those rows just because the
+      file is visible)
 
 ## Notes

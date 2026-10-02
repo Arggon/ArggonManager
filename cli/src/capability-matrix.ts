@@ -34,7 +34,7 @@ import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { sanitizeHumanText } from "@arggondev/lib";
 
-/** Matrix file location, relative to the tree root or the installed package root. */
+/** Matrix file location, relative to the root of the examined tree. */
 export const MATRIX_PATH = "adapters/capability-matrix.json";
 
 /** Matrix `schemaVersion` this reader understands. */

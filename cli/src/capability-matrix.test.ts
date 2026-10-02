@@ -19,6 +19,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { MAX_HUMAN_VALUE_CHARS } from "@arggondev/lib";
 import {
   formatMatrixLines,
   MATRIX_PATH,
@@ -131,7 +132,14 @@ describe("capability matrix: committed file matches its schema", () => {
     for (const row of gaps) {
       expect(typeof row.note, `gap row ${row.invariant}/${row.agent} has no note`).toBe("string");
       expect((row.note ?? "").trim().length).toBeGreaterThan(0);
-      expect((row.note ?? "").length).toBeLessThanOrEqual(400);
+      // The human renderer clips every value at MAX_HUMAN_VALUE_CHARS before
+      // escaping, so a longer note would reach `doctor` as a silently truncated
+      // line — a lie in a data file. The bound IS the renderer's cap, not a
+      // round number that drifts from it.
+      expect(
+        (row.note ?? "").length,
+        `gap row ${row.invariant}/${row.agent} is clipped when rendered`,
+      ).toBeLessThanOrEqual(MAX_HUMAN_VALUE_CHARS);
     }
     // A non-gap row declares `note: null` — no orphan notes to keep in sync.
     for (const row of rows.filter((r) => !r.gap)) {
@@ -139,17 +147,91 @@ describe("capability matrix: committed file matches its schema", () => {
     }
   });
 
-  it("reports the gaps that are real: no shipped Claude Code adapter yet", () => {
-    const rows = committed().rows;
-    // ADR 0020: Claude Code "remains docs + CLAUDE.md" until the S6 follow-on
-    // story lands, so every claude row is a gap and says what enforces it
-    // meanwhile. A gap row for a shipped seam would be stale data, and this
-    // report is only as trustworthy as its honesty.
-    expect(rows.filter((row) => row.agent === "claude").every((row) => row.gap)).toBe(true);
-    expect(rows.filter((row) => row.agent !== "claude").some((row) => row.gap)).toBe(false);
-    expect(
-      rows.filter((row) => row.package === "none").every((row) => row.agent === "claude"),
-    ).toBe(true);
+  it("credits the surfaces an init'd tree actually gives Claude Code", () => {
+    const claude = committed().rows.filter((row) => row.agent === "claude");
+    const byInvariant = new Map(claude.map((row) => [row.invariant, row]));
+    // `.mcp.json` is an init-generated destination (DOC_PATH_MAP["mcp-json"],
+    // cli/src/docs.ts) that docs/agents.md says exists to "serve other clients
+    // (e.g. Claude Code)", and it registers the same `arggon mcp` server the
+    // zcode bundle registers in its manifest. So the invariants that surface
+    // delivers are NOT gaps here — claiming they were (round-1 F1) overstated
+    // the missing coverage.
+    for (const invariant of ["same-rules", "state-in-git", "claim-integrity"]) {
+      const row = byInvariant.get(invariant);
+      expect(row, `claude row for ${invariant} disappeared`).toBeDefined();
+      expect(row?.gap, `${invariant} is delivered through .mcp-json -> arggon mcp`).toBe(false);
+      expect(row?.mechanism).toContain("arggon mcp");
+      expect(row?.package).toBe("claude-code");
+    }
+    // What Claude Code genuinely lacks is client-native and agent-scoped: a
+    // hook gate and a session context hook. No `.claude/` config or hook
+    // template ships anywhere in `templates/`, so these stay gaps.
+    for (const invariant of ["discipline-enforceable", "docs-travel-with-code"]) {
+      expect(byInvariant.get(invariant)?.gap, `${invariant} has no client-native mechanism`).toBe(
+        true,
+      );
+    }
+  });
+
+  it("never claims a gap on a surface `arggon init` ships to every client", () => {
+    // The false-absence lint (round-1 F1): a gap note must name something the
+    // agent's CLIENT cannot do, never a surface every tree already has. A note
+    // that says the `arggon mcp` server / the generated playbook / the skill /
+    // the pre-commit gate is missing is factually wrong — init writes all of
+    // them into every scaffolded tree — and it is indistinguishable from a real
+    // gap once it is printed.
+    const shippedToEveryTree = [
+      "arggon mcp",
+      "arggon-cli",
+      ".mcp.json",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "pre-commit",
+    ];
+    // Only the GAP CLAUSE is linted: a note's job is to name what the client
+    // cannot do, and everything after a contrastive connective ("..., so the
+    // kernel, pre-commit and CI carry it alone") is the enforcement story, not
+    // a claim of absence. Linting the whole note would flag the honest
+    // "what still enforces it" half as a false absence.
+    const gapClause = (note: string): string =>
+      note.split(/,?\s+(?:so|therefore|meanwhile|but)\s+/)[0] ?? note;
+    for (const row of committed().rows.filter((r) => r.gap)) {
+      const head = gapClause(row.note ?? "");
+      for (const surface of shippedToEveryTree) {
+        const claimedMissing = new RegExp(`no [^.:;]*\\b${surface}`, "i").test(head);
+        expect(
+          claimedMissing,
+          `gap note ${row.invariant}/${row.agent} claims "${surface}" is missing, but init ships it to every tree`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("makes every gap about a client-native capability, not the shared floor", () => {
+    // The converse guard, so a gap cannot be reworded into vagueness: a gap
+    // must name what the CLIENT cannot do — a hook gate, a permission DSL, a
+    // session context hook, or a bundled agent/command/skill set.
+    const clientNative = ["hook", "permission", "session context", "bundle"];
+    for (const row of committed().rows.filter((r) => r.gap)) {
+      const note = (row.note ?? "").toLowerCase();
+      expect(
+        clientNative.some((capability) => note.includes(capability)),
+        `gap note ${row.invariant}/${row.agent} names no client-native capability`,
+      ).toBe(true);
+    }
+  });
+
+  it("gives every non-gap row a client-scoped mechanism (no floor-only 'not a gap')", () => {
+    // The converse of the lint above: a non-gap row must name the client seam
+    // that delivers the invariant. A row that only says "docs + CLI floor"
+    // while claiming `gap: false` is the shape that hides a gap.
+    for (const row of committed().rows.filter((r) => !r.gap)) {
+      expect(
+        row.mechanism,
+        `${row.invariant}/${row.agent} claims delivery without naming a client mechanism`,
+      ).toMatch(/^(opencode|zcode|claude):/);
+      expect(row.package).toBe(row.agent === "claude" ? "claude-code" : row.agent);
+    }
   });
 
   it("stays a bounded data file", () => {
