@@ -180,3 +180,7 @@ Also for the coordinator: three stash entries are sitting in the shared repo
 `stash@{1}` "seam-pin worker diagnostics … made in primary", `stash@{2}` "wip-item3")
 — none are mine; their own notes say the owning session should pop them into the
 right branch.
+
+### handoff 2026-10-03 @Arggon — next: Review PR #607 (tasks-validate pass 36s on 220bfa6b); merge when cli+ui-smoke are green, then flip this item done
+- branch: fix/bug-seam-drift-gate-blocks-new-generated-seam-content
+- open questions: Accept the recorded weakening? (repo CI no longer proves the PINNED release reproduces the seam); file a follow-up for the unprovenanced .opencode/agents/arggon-prover.md dest?
