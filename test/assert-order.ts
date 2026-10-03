@@ -78,7 +78,11 @@ function quoted(text: string): string {
  * - the needles are present but out of order, or two needles resolve to the
  *   same index (equal indices are not "before", so they fail);
  * - fewer than two needles are given, which asserts nothing and is almost
- *   always a caller mistake (use `toContain`/`assertPresent` for presence).
+ *   always a caller mistake (use `toContain` for presence); or
+ * - fewer than TWO REQUIRED needles are given, which is the same "asserts
+ *   nothing" defect reached the other way round — a call whose every clause is
+ *   optional returns silently whether or not any clause is present. See
+ *   REQUIRED_NEEDLES below.
  *
  * Optional needles (`{ text, optional: true }`) may be absent; when present
  * they must still sit in their declared slot relative to the required ones.
@@ -91,6 +95,30 @@ export function assertOrder(subject: string, ...needles: readonly OrderNeedle[])
     throw new Error(
       "assertOrder: needs at least two needles — one clause cannot be out of order. " +
         "For presence alone use expect(subject).toContain(text).",
+    );
+  }
+
+  // At least two clauses must be REQUIRED. An order is a claim about two
+  // things, so optional clauses may REFINE a required order but may never be
+  // the whole of it: `assertOrder(msg, {a, optional}, {b, optional})` asserts
+  // nothing at all and used to return silently, which is the same defect this
+  // helper exists to kill, wearing a different hat.
+  //
+  // The floor is checked against the CALL, not against the DATA, on purpose. A
+  // weaker "at least one clause present" rule would make the guard's meaning
+  // depend on the message the test happens to produce: the same assertion would
+  // pass on one input and throw on another, so reading the test would not tell
+  // you whether it can assert anything. Requiring two REQUIRED needles makes
+  // that a static property visible in the source, which is what lets a reviewer
+  // check it without running anything.
+  if (needles.filter((needle) => !resolve(needle).optional).length < 2) {
+    throw new Error(
+      "assertOrder: needs at least two REQUIRED needles — an order is a claim about two " +
+        "clauses. Optional needles can refine a required order but cannot be the whole of " +
+        "it: a call whose clauses are all optional asserts nothing at all, which is the " +
+        "defect this helper exists to prevent. Mark at least two needles required (a bare " +
+        `string) and pass the genuinely conditional ones as { text, optional: true }. ` +
+        `Got ${needles.length} needle(s), all optional or fewer than two required.`,
     );
   }
 

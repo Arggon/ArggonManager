@@ -87,7 +87,7 @@ describe("assertOrder (bug-vacuous-substring-ordering-assertions)", () => {
         assertOrder(conditional, "advice.", { text: "(and 7 more)", optional: true }, "tail."),
       ).not.toThrow();
       expect(() =>
-        assertOrder(conditional, { text: "(and 7 more)", optional: true }, "advice."),
+        assertOrder(conditional, "tail.", { text: "(and 7 more)", optional: true }, "advice."),
       ).toThrow(/out of order/);
     });
 
@@ -100,6 +100,7 @@ describe("assertOrder (bug-vacuous-substring-ordering-assertions)", () => {
           "npm ci",
           { text: "and 1 more", optional: true },
           "absent-but-required",
+          "git: wrote 3 files",
         ),
       ).toThrow(/needle #3 is ABSENT/);
     });
@@ -117,6 +118,53 @@ describe("assertOrder (bug-vacuous-substring-ordering-assertions)", () => {
       expect(() =>
         assertOrder(message, "npm ci", denied as OrderNeedle, "git: wrote 3 files"),
       ).toThrow(/needle #2 is ABSENT/);
+    });
+  });
+
+  // Review F2: an all-optional call used to return silently — the same
+  // "passes while asserting nothing" defect, reached by marking every clause
+  // optional instead of by leaving one absent. It is now rejected at the CALL,
+  // so the guarantee is readable in the source rather than dependent on the
+  // message a particular run happens to produce.
+  describe("an all-optional call is refused (review F2)", () => {
+    it("throws when EVERY needle is optional, present or not", () => {
+      expect(() =>
+        assertOrder(
+          message,
+          { text: "clause-one", optional: true },
+          { text: "clause-two", optional: true },
+        ),
+      ).toThrow(/at least two REQUIRED needles/);
+    });
+
+    it("throws when only ONE needle is required, however many are optional", () => {
+      expect(() => assertOrder(message, "npm ci", { text: "clause-two", optional: true })).toThrow(
+        /at least two REQUIRED needles/,
+      );
+    });
+
+    it("throws BEFORE looking at the subject — a static property of the call", () => {
+      // Even when every optional clause IS present, the call is refused: the
+      // floor is about what the assertion can ever mean, not about this run.
+      const allPresent = "clause-one clause-two";
+      expect(() =>
+        assertOrder(
+          allPresent,
+          { text: "clause-one", optional: true },
+          { text: "clause-two", optional: true },
+        ),
+      ).toThrow(/at least two REQUIRED needles/);
+    });
+
+    it("accepts exactly two required needles plus any number of optional", () => {
+      expect(() =>
+        assertOrder(
+          message,
+          "npm ci",
+          { text: "and 1 more", optional: true },
+          "git: wrote 3 files",
+        ),
+      ).not.toThrow();
     });
   });
 });

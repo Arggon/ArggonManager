@@ -59,7 +59,7 @@ invalid:
   - |
     expect(drift.indexOf("lags")).toBeGreaterThanOrEqual(drift.indexOf("diff"));
   # The one-sided form: the anchor is a variable holding another needle's index,
-  # which is how most of the 22 swept sites were written.
+  # which is how 8 of the 23 swept assertions were written.
   - |
     expect(message.indexOf("npm ci")).toBeLessThan(firstNamedIndex);
   - |

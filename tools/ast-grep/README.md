@@ -147,8 +147,8 @@ is worse than none, because it still reads like coverage.
 
 - two-sided — `expect(a.indexOf(x)).toBeLessThan(b.indexOf(y))`;
 - one-sided — `expect(a.indexOf(x)).toBeLessThan(idx)`, where `idx` is a
-  variable holding another needle's position (this is how all 22 swept sites
-  were written).
+  variable holding another needle's position (8 of the 23 swept assertions
+  were written that way; the other 15 were two-sided).
 
 Every matcher in the family fires: `toBeLessThan`, `toBeGreaterThan`,
 `toBeLessThanOrEqual`, `toBeGreaterThanOrEqual`.
