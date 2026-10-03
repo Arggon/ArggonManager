@@ -591,6 +591,59 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     expect(git(["log", "--format=%s"], expectedPath)).toContain("claim: task-alpha");
   });
 
+  it("puts the readiness ARRAY on the --json failure envelope, not only in the message", () => {
+    // End-to-end wire check (task-cli-start-remediation-tail-clipped-on-human-channel):
+    // the human message bounds the bin names to what the clip can show, and
+    // `gateBins` rides the SUCCESS envelope only — so without this additive
+    // field the observation would be unreachable on the failure path. Cap +
+    // count + array, the `missingDependencies` / `missingDependenciesTotal` shape.
+    const dir = initRepo();
+    // A bin-bearing devDependency the worktree's manifest declares but nothing
+    // installs: the gate-bin probe reads the WORKTREE manifest, so the worktree
+    // reports a bin it cannot resolve — the observation whose NAMES the human
+    // message has to bound.
+    const manifest = JSON.stringify({
+      name: "fixture",
+      private: true,
+      devDependencies: { "fake-gate-dep": "1.0.0" },
+    });
+    writeFileSync(join(dir, "package.json"), manifest);
+    const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
+    git(["worktree", "add", "--quiet", "-b", "feat/task-alpha", expectedPath], dir);
+    writeFileSync(join(expectedPath, "package.json"), manifest);
+    runUpdate({
+      cwd: dir,
+      id: "task-alpha",
+      status: "in_progress",
+      assignee: "arggon",
+      branch: "feat/task-alpha",
+      worktreePath: expectedPath,
+      now: NOW,
+    });
+    git(["add", "ArggonManager", "package.json"], dir);
+    git(["commit", "--quiet", "-m", "pre-created worktree"], dir);
+    setPreCommitHook(dir, '#!/bin/sh\necho "gate: deliberate failure" >&2\nexit 1\n');
+
+    const result = runCli(
+      ["start", "task-alpha", "--assignee", "arggon", "--worktree", "--json"],
+      dir,
+    );
+    expect(result.status).toBe(1);
+    const body = JSON.parse(result.stdout) as {
+      ok: boolean;
+      error: { code: string; message: string };
+      readiness?: { hasInstall: boolean; gateBins: { name: string; source: string }[] };
+    };
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("START_FAILED");
+    // The message still carries the human line, raw and unelided.
+    expect(body.error.message).toContain("committing the claim");
+    // …and the array rides alongside it, enumerable and complete.
+    expect(body.readiness?.gateBins.map((bin) => bin.name)).toEqual(["fake-gate-dep"]);
+    expect(body.readiness?.gateBins[0]?.source).toBe("missing");
+    expect(body.readiness?.hasInstall).toBe(false);
+  });
+
   it("leaves repos without a pre-commit hook unaffected", () => {
     const dir = initRepo();
     const result = runStart(
