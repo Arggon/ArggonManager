@@ -2,7 +2,7 @@
 type: task
 status: in_progress
 id: task-adr0020-claude-seam-statement-stale
-title: "ADR 0020 now understates the Claude Code seam: `.mcp.json` → `arggon mcp` delivers 15 tools/envelopes, so \"remains docs + CLAUDE.md\" is no longer accurate"
+title: 'ADR 0020 now understates the Claude Code seam: `.mcp.json` → `arggon mcp` delivers 15 tools/envelopes, so "remains docs + CLAUDE.md" is no longer accurate'
 assignee: Arggon
 branch: feat/task-adr0020-claude-seam-statement-stale
 parent: methodology-improvements
@@ -12,6 +12,7 @@ updated: "2026-10-03"
 claimed_at: "2026-10-03T02:50:04.107Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr0020-claude-seam-statement-stale
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr0020-claude-seam-statement-stale.md
   Leaves live only under a story. id is the filename stem: task-adr0020-claude-seam-statement-stale.
@@ -31,8 +32,8 @@ The ADR is the durable record and it currently understates a shipped surface —
 
 ## Acceptance
 
-- [ ] A dated amendment to ADR 0020 corrects the Claude Code statement: name the `.mcp.json` → `arggon mcp` 15-tool surface as delivered, and state the actual gaps (no client-side hook/permission gate, no session context hook)
-- [ ] The amendment is sourced to shipped code (`cli/src/docs.ts` init destination, `docs/agents.md` "still serves other clients"), not to the capability matrix's prose
-- [ ] `Status: Accepted` and the ADR's number are untouched; nothing rewritten in place
+- [x] A dated amendment to ADR 0020 corrects the Claude Code statement: name the `.mcp.json` → `arggon mcp` 15-tool surface as delivered, and state the actual gaps (no client-side hook/permission gate, no session context hook) — PR #610, three dated amendments (frontmatter bullet + one blockquote at §Context, one at §Consequences); both gaps stated as the client-side layer the follow-on story owes
+- [x] The amendment is sourced to shipped code (`cli/src/docs.ts` init destination, `docs/agents.md` "still serves other clients"), not to the capability matrix's prose — `DOC_PATH_MAP["mcp-json"]`, `TIER1_DOCS`, `AGENT_TEMPLATES` (claude), the 15 tools in `cli/src/mcp-server.ts`; the matrix prose is cited nowhere
+- [x] `Status: Accepted` and the ADR's number are untouched; nothing rewritten in place — the ADR diff is additive (62 insertions / 0 deletions, plus a 4-line reflow to stamp the PR number); both original sentences still readable verbatim
 
 ## Notes
