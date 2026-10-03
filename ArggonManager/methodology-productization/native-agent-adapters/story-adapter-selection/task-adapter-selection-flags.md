@@ -100,3 +100,54 @@ The F2 regression test was checked against the pre-fix order, not assumed to fai
 ### handoff 2026-10-03 @Arggon — next: Coordinator: review + merge feat/task-adapter-selection-flags (PR open), then flip the item to done.
 - branch: feat/task-adapter-selection-flags
 - open questions: Second opinion wanted on the fresh-scaffold default (no marker -> every known agent, vs the empty set a literal spec reading gives); and on whether doctor --agents should classify acked-then-drifted …
+
+### 2026-10-03 @Arggon
+## Round 1 addressed — all 6 blocking + 5 should-fix (PR #606 updated)
+
+Branch `feat/task-adapter-selection-flags`, worktree `/home/arggon/Projects/ArggonManager-task-adapter-selection-flags`. Item left `in_progress` for re-review.
+
+### Blocking
+
+| # | Fix | Regression test — and how it was proved non-vacuous |
+| --- | --- | --- |
+| F1 | `stale` now requires a state entry whose checksum matches; a present dest with **no provenance state** is adopter-owned → `adopter-edited` (what `docs.ts:1013` actually does with it) | pre-init adopter tree: asserts `adopter-edited`, `stale == 0`, and that a re-run really keeps the bytes |
+| F2 | `present` = byte-equal to the current render ONLY. Added `acknowledged` + `acknowledged-drifted`, mirroring `docs.acknowledged`/`docs.acknowledgedDrifted`; docstring rewritten; **every** human label names the action init takes ("`adopted-edited` (yours; init skips it unless --backup)", "`stale` (arggon init would refresh it)"). An acked entry is never `present`, never `stale`, never `adopter-edited`. "Template moved on" stays orthogonal in `docs.outdated` | `Object.keys(counts)` pinned to all 8 counters, so a new status cannot vanish from the totals; plus the acknowledged test below |
+| F2b | ordering kept (acked decided by its own checksum, ahead of the render compare) | acked-then-**edited** file — the only case where the two orders diverge. **Mutation-checked**: moving the branch back below the checksum compare now fails this test (it left the suite green before) |
+| F3 | new `replaced` outcome + `counts.replaced` for `modified-backup`; `total = written + replaced + skipped` | `--backup` on an adopter-edited adapter file: `replaced`, reason carries `archived to backup/…`, archived bytes equal the adopter's edit, destination regenerated, `counts.replaced == 1` |
+| F4 | re-init path already correct — now covered | delete a zcode dest → re-init `--agents opencode`: **stays missing**, opencode seam intact, row `skipped` with the deselection reason; `--no-agents` through the CLI: still missing; widen to `opencode,zcode`: materialized. **Mutation-checked**: deleting `init.ts:302` fails only this test |
+| F5 | `resolveAgentSelection` hoisted above `applyProposals` | `--propose --agents cursor`: full recursive listing byte-identical, no `backup/`, no `.proposed-*`. **Mutation-checked** (resolution moved back after `applyProposals`) |
+| F6 | both tokens recorded from commander's per-token `option:agents` / `option:no-agents` events; the combination is refused in **either** order; either token alone still works | `runCli` for both orders → `INIT_FAILED` + empty tree; `--agents opencode` alone → `mode: "select"`; `--no-agents` alone → `mode: "none"`. **Mutation-checked** (removing the CLI check) |
+
+The three mutation checks were run by actually moving the reviewed code back and re-running, not asserted: F2b / F4 / F5 / F6 each turned the suite red on the dedicated test only.
+
+### Should fix
+
+- **`AGENTS.md` / `SKILL.md` seam surface — decision: DOCUMENTED CAVEAT, not a selection-aware render.** Reason: selection-dependent bytes break provenance. The recorded `x-generated` checksum could no longer describe the file after a later re-init under a different selection, so init would classify the previously-generated `AGENTS.md` as adopter-modified and **skip** it — a subtle breakage worse than a caveat. The caveat keeps `AGENTS.md` selection-independent and inside budget: **2,005 → 2,031 B** (bound 2,048; `npm run context:report` confirms `pass`). SKILL.md states that the plugin ships with the opencode seam and that without it the CLI is the complete surface.
+- **`.mcp.json` gating** documented where it was implied only: `agents.md` §MCP server, §OpenCode V2, and `README.md` tier-1 list — it is part of the `claude` seam, so `--no-agents` omits it.
+- **The false `--backup` test comment** is gone: the never-overwrite test now says `--backup` is deliberately absent (it regenerates) and points at the `replaced` test that covers it.
+- **`printInitAdapters` "does not grow"** comment corrected — the summary line prints on every run, and it now shows the `replaced` count.
+- **`--agents` sample** regenerated from a real `doctor --json --agents` run: it named **9** divergences, not 12, and the caption now says so (a subset of `docs.modified`'s 12; the rest are non-adapter destinations). Measured counts, including the new acked bucket.
+
+### Spec §S2 amended (coordinator decision applied)
+
+"Default: every detected agent" replaced with the two-part rule and its reason: a marker present → that agent; **no marker at all (a fresh scaffold) → every KNOWN agent**, because a literal reading makes a first `arggon init` detect nothing and ship no adapter — silently dropping the seams init has always generated and breaking the generated `AGENTS.md` contract and README's tier-1 list. Marker list included; `--json` reports which rule fired. The two S2 acceptance boxes this PR satisfies are ticked, each with a pointer to what satisfies it.
+
+### Gates (all exit 0, re-run on the published head)
+
+`npm run build` · `npm test` (**120 files / 2253 tests**, was 2247 — +6 new) · `npm run lint` · `arggon validate --json` (`ok:true`, 0/0) · `arggon spec validate --json` (`ok:true`) · `npm run check:plugin` (bundle byte-identical, 457,609 B) · `npx prettier --check` on all six touched docs.
+
+`npm run context:report` → all bounds pass: AGENTS.md **2,031 B** (≤2,048) · MCP tools/list 16,253 B (≤16,384 adv.) · **native arggon tools 12,162 B** (≤12,288 adv.) · item block 252 B · fixed per-session total 31,553 B. The AGENTS.md figure moved **because of this PR's caveat** (+26 B, inside the bound); the MCP/native figures are unmoved — `check:plugin` proves the plugin bundle is unchanged by this diff and the MCP schemas come from `mcp-server.ts` + `lib/`, neither touched here.
+
+### Probe evidence (also in the PR body)
+
+Four reviewer-requested probes, each with expected/observed: both token orders (refusal, nothing written — was silent last-wins), `--propose --agents cursor` (recursive listing md5 identical before/after, 0 side files — used to write them first), `--agents ""` (`INIT_FAILED`, not a silent "all"), and the F1 no-state tree (`adopter-edited`, `stale: 0`, and init really keeps the adopter's bytes).
+
+That last probe also corrected my own fixture: I had planned to strip a state entry by hand, but init **never records state for a file it did not write**, so the pre-init adopter tree reaches the no-state branch naturally — no surgery needed.
+
+### Refusal to report (no force-push)
+
+**The branch is not rebased onto `origin/main`, and I did not force-push.** I rebased (13 commits behind, one conflict in this item file — both appends kept: the reviewer's verdict then my note) and the push was **refused** as non-fast-forward, since a rebase of published history cannot fast-forward and force-pushing was not authorized. Rather than route around it, I restored the published history — the local branch is byte-identical to `origin/feat/task-adapter-selection-flags` and all three round-1 commits are on the PR.
+
+The rebased tree is preserved verbatim as `backup/rebased-round1` (tag `rebased-round1-tip`) if you want it: its `cli/`, `templates/`, `skills/`, `README.md` and `ArggonManager/docs/` content is **byte-identical** to the published branch — only the base differs — so nothing about the fixes depends on it. The 13 stale commits are all `chore(tasks):` item-file commits touching none of this PR's files, so the review diff is unaffected. Per the repo's merge guidance this PR should **merge, not squash** (it carries tracker auto-commits).
+
+Also noted for the record: `npm run build` must precede `npm test` — the pack-parity gate compares the packed bin against `dist`, so a stale `dist` shows up as a spurious `headless-ci` envelope mismatch. It cost me one false alarm; not a code defect.
