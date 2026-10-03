@@ -96,3 +96,7 @@ The F2 regression test was checked against the pre-fix order, not assumed to fai
 - Tree-only detection and matrix resolution both read the examined tree, never the installed package, so `doctor --json` stays byte-identical between the packed bin and the checkout CLI (the pack-parity gate).
 - The generated `.agents/skills/**` bundle is deliberately NOT an adapter artifact (agent-agnostic; the matrix lists it as a surface that can never be the missing thing for any client), so it is generated whatever `--agents` says — asserted by a test.
 - Two sessions died before this one with the work uncommitted; it was adopted, rebased, finished and landed rather than restarted. No new work was found that belongs to another item. The one judgement call worth a second opinion: the fresh-scaffold default — a tree with NO agent marker selects every KNOWN agent rather than the empty set a literal reading of the spec gives — implemented and documented because narrowing there would silently delete the seams `init` has always shipped and break the generated AGENTS.md contract.
+
+### handoff 2026-10-03 @Arggon — next: Coordinator: review + merge feat/task-adapter-selection-flags (PR open), then flip the item to done.
+- branch: feat/task-adapter-selection-flags
+- open questions: Second opinion wanted on the fresh-scaffold default (no marker -> every known agent, vs the empty set a literal spec reading gives); and on whether doctor --agents should classify acked-then-drifted …
