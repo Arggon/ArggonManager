@@ -41,6 +41,14 @@ import {
   TIER2_DESTS,
   type DocsPlan,
 } from "./docs.js";
+import {
+  agentForTemplate,
+  resolveAgentSelection,
+  MAX_ADAPTER_ARTIFACTS,
+  type AdapterArtifact,
+  type AdapterSelectionReport,
+  type AgentSelection,
+} from "./adapters.js";
 
 const CONVENTION_YML =
   `version: ${CONVENTION_VERSION}\n` +
@@ -86,6 +94,16 @@ export type InitOptions = {
    * recovered (no git history / untracked dest).
    */
   proposeWholeFile?: boolean;
+  /**
+   * Which adapter seams to materialize (spec §S2,
+   * task-adapter-selection-flags): the raw comma-separated `--agents` value.
+   * Undefined selects by DETECTION. Mutually exclusive with `noAgents`; an
+   * unknown name throws (the CLI reports `INIT_FAILED` naming the agent) so a
+   * typo can never silently install a different seam than intended.
+   */
+  agents?: string;
+  /** `--no-agents`: docs + CLI only, no adapter seam materialized. */
+  noAgents?: boolean;
 };
 
 export type InitResult = {
@@ -105,6 +123,14 @@ export type InitResult = {
   conventionPath: string;
   /** Side-file upgrade proposals (--propose, task-init-propose-acked-updates, additive). */
   proposals?: ProposalEntry[];
+  /**
+   * Per-artifact adapter selection outcome (spec §S2,
+   * task-adapter-selection-flags, additive): which agents were detected,
+   * selected and deselected, plus one `written`/`skipped` row per adapter
+   * destination with the reason. Never a deletion — a deselected seam's files
+   * are left exactly as they were. Present on every init run.
+   */
+  adapters: AdapterSelectionReport;
   /** Tracker auto-commit outcome for the files written this run. */
   commit?: TrackerCommitResult;
   /**
@@ -209,6 +235,12 @@ export type InitPlan = {
   scaffold: InitPlanEntry[];
   /** Per-destination doc plan (pure; includes bytes a real run would write). */
   docs: DocsPlan;
+  /**
+   * Resolved adapter selection (spec §S2): which agent seams this run
+   * materializes, and why. Pure (tree markers only), computed once and handed
+   * to the doc planner, so the plan and the real run can never disagree.
+   */
+  adapters: AgentSelection;
   /** Fatal precondition, identical to the error runInit would throw. */
   error?: string;
 };
@@ -237,6 +269,17 @@ export function planInit(opts: InitOptions): InitPlan {
     layout,
     conventionPath,
   };
+  // Adapter selection (spec §S2, task-adapter-selection-flags), resolved from
+  // the flags plus the tree's own markers. The doc planner receives the very
+  // same list, so `--dry-run` and the real run cannot disagree about which
+  // seams materialize. Fatal (throws) on `--agents` + `--no-agents` and on an
+  // unknown agent name — a typo must never silently install a different seam;
+  // the CLI surfaces both as `INIT_FAILED`.
+  const adapters = resolveAgentSelection({
+    root,
+    ...(opts.agents !== undefined ? { agents: opts.agents } : {}),
+    ...(opts.noAgents !== undefined ? { noAgents: opts.noAgents } : {}),
+  });
 
   if (alreadyInitialized && !opts.force) {
     // Idempotent upgrade path: only missing templates are restored.
@@ -256,7 +299,9 @@ export function planInit(opts: InitOptions): InitPlan {
         backup: opts.backup,
         now: opts.now,
         layout,
+        agents: adapters.selected,
       }),
+      adapters,
     };
   }
 
@@ -275,6 +320,7 @@ export function planInit(opts: InitOptions): InitPlan {
       scaffold: [],
       docs: { entries: [], created: [], updated: [], backedUp: [], modified: [], skipped: [] },
       error: `${strayTracker}/ exists but is missing .convention.yml. Re-run with --force to scaffold, or fix manually.`,
+      adapters,
     };
   }
 
@@ -325,11 +371,15 @@ export function planInit(opts: InitOptions): InitPlan {
       prev: carried,
       prevProjectName: carriedName,
       layout,
+      // The resolved adapter selection (spec §S2), so the fresh-scaffold path
+      // honors --agents / --no-agents exactly like the already-initialized one.
+      agents: adapters.selected,
       // The scaffold write (above, in runInit) lands before docs are applied,
       // so the plan sees the convention file it will exist by then and plans
       // the pending x-generated rewrite against the scaffolded content.
       rawState: updateGeneratedSection(CONVENTION_YML, carried, carriedName),
     }),
+    adapters,
   };
 }
 
@@ -340,6 +390,62 @@ function listBundledTemplates(): string[] {
   const templatesSrc = bundledTemplatesDir();
   if (!existsSync(templatesSrc)) return [];
   return readdirSync(templatesSrc).filter((name) => name.endsWith(".md"));
+}
+
+/**
+ * Per-artifact adapter report (spec §S2, task-adapter-selection-flags) built
+ * from the ONE doc plan, so `--dry-run` and the real run classify identically:
+ * a destination the plan wrote (created/updated) is `written`, every other plan
+ * decision is `skipped` carrying that decision's own reason, and a destination
+ * the plan never considered at all (a bundled artifact whose source is absent
+ * from this install) is reported as skipped with an explicit reason rather than
+ * vanishing. Agent ids come from the plan entries themselves, so a destination
+ * is attributed by the same classifier the generator used — never re-derived
+ * from a second list that could drift.
+ *
+ * Rows are capped (`MAX_ADAPTER_ARTIFACTS`); `counts` totals every destination,
+ * so a cut is visible instead of silently shrinking the numbers.
+ */
+function adapterReport(
+  selection: AgentSelection,
+  plan: DocsPlan,
+  layout: TrackerLayout,
+): AdapterSelectionReport {
+  const byDest = new Map(plan.entries.map((e) => [e.dest, e] as const));
+  const rows: AdapterArtifact[] = [];
+  let written = 0;
+  let skipped = 0;
+  for (const { dest, template } of currentGeneratedTemplates({ layout })) {
+    const agent = agentForTemplate(template);
+    if (agent === null) continue;
+    const entry = byDest.get(dest);
+    if (entry === undefined) {
+      skipped++;
+      rows.push({
+        agent,
+        path: dest,
+        outcome: "skipped",
+        reason: "no generation decision — the bundled source for this artifact is absent",
+      });
+      continue;
+    }
+    const isWritten = entry.decision === "created" || entry.decision === "updated";
+    if (isWritten) written++;
+    else skipped++;
+    rows.push({
+      agent,
+      path: dest,
+      outcome: isWritten ? "written" : "skipped",
+      reason: entry.reason,
+    });
+  }
+  return {
+    scope: "generate",
+    selection,
+    artifacts: rows.slice(0, MAX_ADAPTER_ARTIFACTS),
+    truncated: rows.length > MAX_ADAPTER_ARTIFACTS,
+    counts: { total: written + skipped, written, skipped },
+  };
 }
 
 /**
@@ -813,6 +919,12 @@ export type InitDryRunResult = {
   restored: string[];
   /** Proposal plan with --propose (task-init-propose-acked-updates, additive). */
   proposals?: ProposalEntry[];
+  /**
+   * Per-artifact adapter selection outcome (spec §S2, additive). `scope` is
+   * `propose` here: a proposal sweep writes no adapter file, so the counts are
+   * zero and the selection itself is still reported.
+   */
+  adapters: AdapterSelectionReport;
   /** Same not-a-git-repo warning a real run would surface. */
   warning?: string;
 };
@@ -856,10 +968,23 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
       skipped: [],
       restored: [],
       proposals,
+      // A proposal sweep writes no adapter file, so `scope: "propose"` with
+      // zero counts; the selection itself is still resolved and reported, so
+      // `--agents` + `--propose` is visible in the envelope instead of silent.
+      adapters: {
+        scope: "propose",
+        selection: plan.adapters,
+        artifacts: [],
+        truncated: false,
+        counts: { total: 0, written: 0, skipped: 0 },
+      },
       warning,
     };
   }
 
+  // Same builder as the real run, from the same plan: the per-artifact rows a
+  // dry run prints are exactly the ones the run it previews will report.
+  const adapters = adapterReport(plan.adapters, plan.docs, plan.layout);
   const docEntries: InitPlanEntry[] = plan.docs.entries.map((e) => ({
     dest: e.dest,
     decision: e.decision,
@@ -881,6 +1006,7 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
       backedUp: plan.docs.backedUp,
       skipped: plan.docs.skipped,
       restored: plan.scaffold.map((e) => e.dest).sort(),
+      adapters,
       warning,
     };
   }
@@ -901,6 +1027,7 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
     backedUp: plan.docs.backedUp,
     skipped: plan.docs.skipped,
     restored: [],
+    adapters,
     warning,
   };
 }
@@ -917,6 +1044,14 @@ export function runInit(opts: InitOptions): InitResult {
     if (!existsSync(conventionPath)) throw new Error(NOT_INITIALIZED_PROPOSE_ERROR);
     const proposals = planProposals(root, Boolean(opts.full), opts.now, opts.proposeWholeFile);
     applyProposals(root, proposals, opts.now);
+    // Selection is resolved even in propose mode so `--agents`+`--propose` is
+    // reported the same way; `scope: "propose"` says the sweep wrote no adapter
+    // file (proposals are doc side files, listed in `proposals[]`).
+    const selection = resolveAgentSelection({
+      root,
+      ...(opts.agents !== undefined ? { agents: opts.agents } : {}),
+      ...(opts.noAgents !== undefined ? { noAgents: opts.noAgents } : {}),
+    });
     return {
       root,
       alreadyInitialized: true,
@@ -929,6 +1064,13 @@ export function runInit(opts: InitOptions): InitResult {
       restored: [],
       conventionPath,
       proposals,
+      adapters: {
+        scope: "propose",
+        selection,
+        artifacts: [],
+        truncated: false,
+        counts: { total: 0, written: 0, skipped: 0 },
+      },
       warning: isGitRepo(root) ? undefined : NOT_A_REPO_WARNING,
     };
   }
@@ -939,6 +1081,9 @@ export function runInit(opts: InitOptions): InitResult {
   if (plan.error) throw new Error(plan.error);
   const root = plan.root;
   const conventionPath = plan.conventionPath;
+  // Per-artifact adapter report (spec §S2) from the plan, so the selection is
+  // decided once and the buckets match `--dry-run` exactly.
+  const adapters = adapterReport(plan.adapters, plan.docs, plan.layout);
   const trackerName = relative(root, dirname(conventionPath)).split(sep).join("/");
   const tasksDir = dirname(conventionPath);
   // Compute once up front; attached to every result shape below.
@@ -966,6 +1111,9 @@ export function runInit(opts: InitOptions): InitResult {
       skipped: docs.skipped,
       restored,
       conventionPath,
+      // Built from the plan, not from the apply result, so a dry run over the
+      // same options reports the same rows before anything is written.
+      adapters,
       commit: commitGeneratedDocs(root, written, opts.commit),
       warning: gitWarning,
     };
@@ -996,6 +1144,7 @@ export function runInit(opts: InitOptions): InitResult {
     skipped: docs.skipped,
     restored: [],
     conventionPath,
+    adapters,
     commit: commitGeneratedDocs(root, written, opts.commit),
     warning: gitWarning,
   };
