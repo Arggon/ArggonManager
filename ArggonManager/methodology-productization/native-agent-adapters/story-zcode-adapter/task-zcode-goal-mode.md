@@ -1515,3 +1515,7 @@ $ (cd "$RECORDED_WORKTREE" && arggon goal task-wrongwt --json)
 PR #605 body updated with the new probe, the seam/drift-gate note, the corrected delivery note and the refreshed gate numbers; head is `92aff9e1`, mergeable, ready for review.
 
 Item stays `in_progress`; spec/plan `status` stays `proposed` (§S5's box also covers `task-zcode-automations`); the 15 pre-existing stamp mismatches remain stated-not-fixed (`arggon adopt --ack` is a human step).
+
+### handoff 2026-10-03 @Arggon — next: coordinator: squash-merge PR #605 (head 7cf2c62f, mergeable, gates green, tasks-validate drift gate PASS) then flip the item
+- branch: feat/task-zcode-goal-mode
+- open questions: docs/convention.md:150 overstatement left for open bug-parity-suite-cannot-catch-wrong-input-at-call-sites; 15 stamp mismatches await human arggon adopt --ack
