@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adapter-selection-flags
 title: init --agents/--no-agents + doctor --agents (plan T2)
+assignee: Arggon
 parent: story-adapter-selection
 labels: []
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-03"
+claimed_at: "2026-10-03T02:47:05.730Z"
 depends_on: [task-methodology-carriers]
 ---
 <!--
