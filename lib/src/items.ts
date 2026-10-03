@@ -327,17 +327,36 @@ export function itemsById(items: WorkItem[]): Map<string, WorkItem> {
  * (`- [ ]x`) and a bare `- [ ] x` ARE rows — decided and documented in
  * `ArggonManager/docs/convention.md` §Acceptance rows.
  *
- * `m` gives `^`/`$` their per-line meaning, and `$` also matches before a
- * `\r`, so the captured text never contains the carriage return of a CRLF
- * body. That is the fix for the CRLF inversion: a `.`-based per-line regex
- * does not match `\r`, so the board and the TUI detail block used to read a
- * CRLF item as "no acceptance rows" while this gate still refused the flip.
- * Do NOT re-express this as `.*` over `split("\n")` — that is the old bug.
+ * Matched against ONE line at a time (see `ACCEPTANCE_LINE_BREAK`); this regex
+ * itself carries no `m` flag because the caller hands it a single line.
  */
 const ACCEPTANCE_MARKER = /^[ \t]*[-*] \[( |x|X)\][ \t]*/;
 
 /** The tail of a marker line that actually carries text (the gate's `[^\s]`). */
 const ACCEPTANCE_TEXT = /^\S/;
+
+/**
+ * Where an acceptance row may START — the ECMAScript **LineTerminator** set,
+ * and nothing else: `\n` (LF), `\r` (CR), `\u2028` (LINE SEPARATOR) and
+ * `\u2029` (PARAGRAPH SEPARATOR).
+ *
+ * This set is the whole reason the row scan cannot be written as
+ * `split("\n")`. The done gate has always been a `/…/gm` regex, and JS `^`
+ * under `m` anchors after **every** LineTerminator — all four, not just `\n`.
+ * Splitting on `\n` alone therefore glues the rest of a CR-separated,
+ * U+2028-separated or U+2029-separated body onto the previous line, and a
+ * criterion the gate used to refuse on silently becomes invisible:
+ * `- [x] a\u2028- [ ] b\n` reads as one ticked row and the flip is ALLOWED.
+ * That is a gate false-pass, so the refusal set must match, not merely
+ * overlap (bug-three-acceptance-parsers-diverging, review F1).
+ *
+ * Deliberately NOT in the set: `\v` (U+000B) and `\f` (U+000C). They are
+ * whitespace but not LineTerminators, so `^` under `m` never anchored after
+ * them — `- [x] a\v- [ ] b` is ONE row to the gate, and must stay one.
+ * `\u00a0` and friends likewise stay inside the tail, where the gate's `[^\s]`
+ * (mirrored by `ACCEPTANCE_TEXT`) rejects them as leading whitespace.
+ */
+const ACCEPTANCE_LINE_BREAK = /[\n\r\u2028\u2029]/;
 
 /**
  * One acceptance checkbox row, as the kernel classifies it.
@@ -407,10 +426,14 @@ export function acceptanceBody(source: AcceptanceBodySource): string {
  *
  * Pure; O(lines). A marker that reaches end-of-line with nothing after it is
  * returned as a non-criterion row so renderers can still show the box.
+ *
+ * The split is `ACCEPTANCE_LINE_BREAK` (the LineTerminator set), never `"\n"`:
+ * see that constant for the gate-false-pass that a `\n`-only split produces on
+ * CR / U+2028 / U+2029 bodies.
  */
 export function acceptanceRows(body: string): AcceptanceRow[] {
   const rows: AcceptanceRow[] = [];
-  for (const line of body.split("\n")) {
+  for (const line of body.split(ACCEPTANCE_LINE_BREAK)) {
     const match = ACCEPTANCE_MARKER.exec(line);
     if (!match) continue;
     const tail = line.slice(match[0].length);

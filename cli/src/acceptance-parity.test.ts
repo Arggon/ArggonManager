@@ -153,16 +153,71 @@ const CORPUS: Array<{ name: string; body: string }> = [
   { name: "mixed ticks and a placeholder", body: "- [ ]\n- [x] a\n- [ ] b\n* [ ]c\n" },
 ];
 
-/** Every corpus shape, plus its CRLF twin, so one answer covers both EOLs. */
+/**
+ * Shapes that only exist once a body is terminated by a NON-`\n` LineTerminator,
+ * i.e. the F1 false-passes. They are listed separately rather than only
+ * re-terminating the shapes above, because a uniform re-termination of a body
+ * that ends in a trailing newline cannot produce "a ticked row, then an
+ * unticked row, with nothing but the terminator between them" unless the body is
+ * written for it — and that is precisely the shape the old gate refused on.
+ */
+const TERMINATOR_SHAPES: Array<{ name: string; body: string }> = [
+  { name: "ticked then unticked separated by U+2028", body: "- [x] a\u2028- [ ] b\n" },
+  { name: "prose then unticked separated by U+2028", body: "prose\u2028- [ ] b\n" },
+  { name: "ticked then unticked separated by U+2029", body: "- [x] a\u2029- [ ] b\n" },
+  { name: "ticked then unticked separated by CR", body: "- [x] a\r- [ ] b\n" },
+  { name: "unticked then ticked separated by CR", body: "- [ ] a\r- [x] b\n" },
+  { name: "two unticked rows separated by U+2028", body: "- [ ] a\u2028- [ ] b\n" },
+  {
+    // `\v` and `\f` are whitespace but NOT LineTerminators, so `^` under `m`
+    // never anchored after them: ONE row to the gate, and it must stay one.
+    name: "vertical tab is NOT a line terminator",
+    body: "- [x] a\v- [ ] b\n",
+  },
+  {
+    name: "form feed is NOT a line terminator",
+    body: "- [x] a\f- [ ] b\n",
+  },
+];
+
+const ALL_SHAPES: Array<{ name: string; body: string }> = [...CORPUS, ...TERMINATOR_SHAPES];
+
+/**
+ * Every shape, re-terminated five ways.
+ *
+ * The re-termination is the point (review F1). A previous version built only an
+ * LF body and a CRLF twin via `replace(/\r?\n/g, …)`, which made the corpus
+ * blind to the exact class of bug this item is about: the gate is a `/…/gm`
+ * regex, so `^` anchors after EVERY LineTerminator, and CR-only, U+2028 and
+ * U+2029 bodies were never exercised at all. The fuzz compounded it by putting
+ * `\r` only at END of line — where old and new already agree — so it could not
+ * see the difference either. Both are fixed here.
+ */
+const TERMINATORS = [
+  { label: " [LF]", eol: "\n" },
+  { label: " [CRLF]", eol: "\r\n" },
+  { label: " [CR]", eol: "\r" },
+  { label: " [U+2028]", eol: "\u2028" },
+  { label: " [U+2029]", eol: "\u2029" },
+] as const;
+
+/**
+ * `ALL_SHAPES` verbatim (identity for the LF case), plus each shape
+ * re-terminated. The F1 shapes keep their own literal terminator, so they are
+ * added verbatim and then re-terminated too — every case is still decided by
+ * one answer, and the CR/U+2028/U+2029 bodies are genuinely present.
+ */
 function corpusBodies(): Array<{ name: string; body: string }> {
   const out: Array<{ name: string; body: string }> = [];
-  for (const entry of CORPUS) {
-    out.push({ ...entry, body: entry.body.replace(/\r?\n/g, "\n") });
-    out.push({
-      ...entry,
-      name: `${entry.name} [CRLF]`,
-      body: entry.body.replace(/\r?\n/g, "\r\n"),
-    });
+  for (const entry of ALL_SHAPES) {
+    out.push({ ...entry, name: `${entry.name} [as written]` });
+    for (const { label, eol } of TERMINATORS) {
+      out.push({
+        ...entry,
+        name: `${entry.name}${label}`,
+        body: entry.body.replace(/(?:\r\n|\r|\n|\u2028|\u2029)/g, eol),
+      });
+    }
   }
   return out;
 }
@@ -215,14 +270,43 @@ function tuiRows(body: string): AcceptanceRow[] {
   return tuiAcceptanceRows(body).map((row) => ({ ...row, criterion: true }));
 }
 
+/**
+ * Deterministic 32-bit PRNG for the fuzz harness (mulberry32): fixed seed, no
+ * dependency, and — unlike the raw `& 0x7fffffff` LCG it replaced — usable
+ * low-order bits, which the alphabet indexing below depends on.
+ */
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 describe("acceptance parity corpus (bug-three-acceptance-parsers-diverging)", () => {
   const cases = corpusBodies();
 
-  it("covers CRLF and LF for every shape", () => {
-    expect(cases.length).toBe(CORPUS.length * 2);
-    expect(new Set(cases.map((entry) => (entry.body.includes("\r\n") ? "crlf" : "lf"))).size).toBe(
-      2,
+  it("covers every LineTerminator for every shape, plus the shapes as written", () => {
+    // Every shape is present for all five terminators AND verbatim, because the
+    // F1 shapes only mean something with their literal separator in place.
+    expect(cases.length).toBe(ALL_SHAPES.length * (TERMINATORS.length + 1));
+    for (const { label } of TERMINATORS) {
+      const present = cases.filter((entry) => entry.name.endsWith(label));
+      expect(present.length, label).toBe(ALL_SHAPES.length);
+    }
+    expect(cases.filter((entry) => entry.name.endsWith("[as written]")).length).toBe(
+      ALL_SHAPES.length,
     );
+    // Non-vacuity: CR-only, U+2028 and U+2029 bodies really are in here, which
+    // is what a `\n`-only split in the kernel would silently mis-handle.
+    const hasEol = (eol: string): boolean =>
+      cases.some((entry) => entry.body.includes(eol) && !entry.body.includes("\n"));
+    expect(hasEol("\r")).toBe(true);
+    expect(hasEol("\u2028")).toBe(true);
+    expect(hasEol("\u2029")).toBe(true);
   });
 
   it.each(cases)("one answer per consumer: $name", ({ body }) => {
@@ -246,6 +330,51 @@ describe("acceptance parity corpus (bug-three-acceptance-parsers-diverging)", ()
     expect(gateComplete).toBe(preFixGate(body));
   });
 
+  it("the gate refuses on a body terminated by ANY LineTerminator (review F1)", () => {
+    // The blocking finding: the first version of `acceptanceRows` split on
+    // `"\n"` only, so a body separated by CR / U+2028 / U+2029 glued the
+    // following criterion onto the previous line and the gate STOPPED refusing
+    // something it used to refuse. This is the decisive assertion — it fails on
+    // the `split("\n")` implementation and passes only on the LineTerminator
+    // split, and the per-shape `preFixGate` oracle above is what makes the whole
+    // corpus prove the refusal set is unchanged.
+    const casesByName = new Map(cases.map((entry) => [entry.name, entry.body]));
+    const name = "LF unticked";
+
+    for (const separator of ["\r", "\u2028", "\u2029"]) {
+      const body = casesByName.get(`${name} [as written]`)!.replace(/\n/g, separator);
+      // Two unchecked criteria the old gate refused on...
+      expect(preFixGate(body), JSON.stringify(separator)).toBe(false);
+      // ...and the kernel must still refuse on.
+      expect(acceptanceComplete(body), JSON.stringify(separator)).toBe(false);
+      expect(acceptanceUnchecked(body), JSON.stringify(separator)).toHaveLength(2);
+      // ...and so must every consumer report.
+      expect(uncheckedFromRows(parseAcceptanceRows(body)), JSON.stringify(separator)).toBe(2);
+      expect(tuiAcceptanceRows(body), JSON.stringify(separator)).toHaveLength(2);
+    }
+
+    // The specific false-passes the reviewer transcribed, verbatim.
+    for (const body of [
+      "- [x] a\u2028- [ ] b\n",
+      "prose\u2028- [ ] b\n",
+      "- [x] a\u2029- [ ] b\n",
+      "- [x] a\r- [ ] b\n",
+    ]) {
+      expect(preFixGate(body), JSON.stringify(body)).toBe(false);
+      expect(acceptanceComplete(body), JSON.stringify(body)).toBe(false);
+      expect(acceptanceUnchecked(body), JSON.stringify(body)).toHaveLength(1);
+    }
+
+    // And the converse must NOT drift: `\v` / `\f` are whitespace but not
+    // LineTerminators, so the gate has always seen ONE row there and must
+    // continue to (splitting on them would ADD a refusal).
+    for (const body of ["- [x] a\v- [ ] b\n", "- [x] a\f- [ ] b\n"]) {
+      expect(preFixGate(body), JSON.stringify(body)).toBe(true);
+      expect(acceptanceComplete(body), JSON.stringify(body)).toBe(true);
+      expect(acceptanceUnchecked(body), JSON.stringify(body)).toHaveLength(0);
+    }
+  });
+
   it("the corpus actually catches the pre-fix divergences", () => {
     // If the corpus did not exercise these, a regression back to a hand-written
     // regex could pass every assertion above. Pin that it does — and pin that
@@ -264,7 +393,7 @@ describe("acceptance parity corpus (bug-three-acceptance-parsers-diverging)", ()
 
     // (b) `- [ ]x`: the gate always counted it; `\s+` after the box made the
     // board miss it while still seeing the ticked sibling.
-    const glued = casesByName.get("box glued to text `- [ ]x`") ?? "";
+    const glued = casesByName.get("box glued to text `- [ ]x` [LF]") ?? "";
     expect(preFixGate(glued)).toBe(false);
     expect(preFixBoard(glued)).toEqual([{ text: "y", checked: true }]);
     expect(acceptanceUnchecked(glued)).toHaveLength(1);
@@ -272,7 +401,7 @@ describe("acceptance parity corpus (bug-three-acceptance-parsers-diverging)", ()
     // (c) `-  [ ] x`: `\s+` + `\s?` made the board and the native detail block
     // count rows the gate does not — a reader reporting work remaining on an
     // item the done gate would close.
-    const twoSpaces = casesByName.get("two spaces after the bullet is NOT a row") ?? "";
+    const twoSpaces = casesByName.get("two spaces after the bullet is NOT a row [LF]") ?? "";
     expect(preFixGate(twoSpaces)).toBe(true);
     expect(preFixBoard(twoSpaces)).toHaveLength(2);
     expect(preFixPluginRows(twoSpaces)).toHaveLength(2);
@@ -318,31 +447,90 @@ describe("acceptance parity corpus (bug-three-acceptance-parsers-diverging)", ()
     expect(acceptanceUnchecked("- [ ] wrap in `- [ ]` now\n")).toHaveLength(1);
   });
 
-  it("holds on a seeded fuzz over marker/box/separator/text permutations", () => {
+  it("holds on a seeded fuzz over marker/box/separator/text/terminator permutations", () => {
+    // The previous version of this fuzz put `\r` only at END of line, where the
+    // old regex and a `\n`-only split already agree — so it could not see the
+    // F1 false-pass at all. `\r`, `\u2028` and `\u2029` now appear as SEPARATORS
+    // between two rows, which is where they decide the answer.
     const markers = ["-", "*", "  -", "\t-", "   *", "-  ", "-", "+", "1."];
     const boxes = ["[ ]", "[x]", "[X]"];
     const seps = [" ", "", "  ", "\t", " \t"];
     const texts = ["", "a", " x", "x", "\u00a0x", "  ", "a\r"];
+    const eols = ["\n", "\r\n", "\r", "\u2028", "\u2029"];
     let checked = 0;
     for (const marker of markers) {
       for (const box of boxes) {
         for (const sep of seps) {
           for (const text of texts) {
-            for (const eol of ["\n", "\r\n"]) {
+            for (const eol of eols) {
+              // A ticked row, then an UNCHECKED row, joined by the terminator:
+              // the shape the gate must refuse on for every LineTerminator.
               const line = `${marker}${sep}${box}${sep}${text}`;
-              const body = `## Acceptance${eol}${eol}${line}${eol}- [x] done${eol}`;
+              const body = `## Acceptance${eol}${eol}${line}${eol}- [ ] todo${eol}- [x] done${eol}`;
               checked += 1;
               // No refusal change, and no consumer/gate disagreement.
-              expect(acceptanceComplete(body)).toBe(preFixGate(body));
+              expect(acceptanceComplete(body), JSON.stringify(body)).toBe(preFixGate(body));
               expect(uncheckedFromRows(parseAcceptanceRows(body)) > 0).toBe(
                 !acceptanceComplete(body),
               );
+              // Same for the two-row product with the terminator in the MIDDLE
+              // and no surrounding prose.
+              const bare = `${line}${eol}- [ ] todo`;
+              expect(acceptanceComplete(bare), JSON.stringify(bare)).toBe(preFixGate(bare));
             }
           }
         }
       }
     }
-    expect(checked).toBe(markers.length * boxes.length * seps.length * texts.length * 2);
+    expect(checked).toBe(markers.length * boxes.length * seps.length * texts.length * eols.length);
+  });
+
+  it("fuzzes 200k structured bodies against the pre-fix gate (committed harness)", () => {
+    // Previously this claim lived only in an uncommitted scratch probe, so a
+    // reviewer could not re-run it (review F4). It is committed and
+    // deterministic now.
+    //
+    // The generator is ROW-BIASED on purpose. A uniform alphabet over `[`, `]`,
+    // ` ` and `-` almost never assembles a valid criterion, so a pure-noise fuzz
+    // of this shape returns "no refusals at all" and proves nothing — which is
+    // exactly what the first version of this harness did: it asserted
+    // `toBeGreaterThan(1000)` on a count that was always 0. Each body is built
+    // from line fragments, three quarters of them well-formed rows, and the
+    // non-vacuity assertion below counts REAL refusals and demands a healthy
+    // share of them.
+    const rand = mulberry32(0x5eed1234);
+    const pick = <T>(values: readonly T[]): T => values[Math.floor(rand() * values.length)];
+    const bullets = ["-", "*", "  -", "\t-", "   *", "-  ", "+", "1.", "", "  "];
+    const boxes = ["[ ]", "[x]", "[X]"];
+    const gaps = ["", " ", "  ", "\t", " \t", "\u00a0"];
+    const tails = ["a", "x", " x", "", "  ", "done", "\u00a0x", "a\r"];
+    const eols = ["\n", "\r\n", "\r", "\u2028", "\u2029"];
+    const noise = ["prose", "# H", "```", "text - [ ] x", "> quote", "`- [ ]`", "", "\v", "\f"];
+    const bodies = 200_000;
+    let refusals = 0;
+    for (let i = 0; i < bodies; i += 1) {
+      const lines = 1 + Math.floor(rand() * 4);
+      let body = "";
+      for (let k = 0; k < lines; k += 1) {
+        if (rand() < 0.25) body += pick(noise);
+        else body += pick(bullets) + pick(gaps) + pick(boxes) + pick(gaps) + pick(tails);
+        body += pick(eols);
+      }
+      const pre = preFixGate(body);
+      expect(acceptanceComplete(body), JSON.stringify(body)).toBe(pre);
+      // Parity on the same body, so a regression in EITHER direction shows.
+      expect(uncheckedFromRows(parseAcceptanceRows(body)) > 0, JSON.stringify(body)).toBe(!pre);
+      if (!pre) refusals += 1;
+    }
+    // Non-vacuity, with a number that means something: a fuzz whose gate never
+    // refuses proves nothing about refusals. The yield is low by construction —
+    // a line is a criterion only when the bullet is `-`/`*` AND exactly one
+    // character separates it from the box (1 of the 6 gaps) AND the tail starts
+    // non-blank AND the box is unticked — so ~2-3% of bodies are refused. The
+    // floor below is an absolute count (not a guessed rate) chosen to fail loudly
+    // if the generator stops producing refusals at all.
+    expect(refusals).toBeGreaterThan(2000);
+    expect(refusals / bodies).toBeGreaterThan(0.01);
   });
 });
 
