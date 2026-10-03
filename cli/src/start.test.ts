@@ -31,6 +31,7 @@ import { runInit } from "./init.js";
 import {
   linkNodeModules,
   linkedWorkspacePackages,
+  MAX_HUMAN_GATE_BIN_NAMES,
   runStart,
   startTakeoverNotes,
   unlinkNodeModulesLink,
@@ -323,10 +324,13 @@ describe("start --worktree strict gate-bin gate (task-start-gate-strict-mode)", 
     // ORDER pinned on the real runStart path (not just the composed helper):
     // the human channel clips this line head-kept at MAX_HUMAN_ERROR_CHARS, so
     // the CLI's own remediation must precede the kernel's named-bin evidence
-    // (task-cli-start-remediation-tail-clipped-on-human-channel).
-    expect(message.indexOf(`arggon start ${id} --worktree`)).toBeLessThan(
-      message.indexOf("native-gate-dep: not resolvable from the worktree"),
-    );
+    // (task-cli-start-remediation-tail-clipped-on-human-channel). Both needles
+    // presence-checked: an absent one is -1 and `-1 < n` passes vacuously (F3).
+    const attach = message.indexOf(`arggon start ${id} --worktree`);
+    const namedBin = message.indexOf("native-gate-dep: not resolvable from the worktree");
+    expect(attach, "attach needle must be present").toBeGreaterThanOrEqual(0);
+    expect(namedBin, "named-bin needle must be present").toBeGreaterThanOrEqual(0);
+    expect(attach).toBeLessThan(namedBin);
   });
 
   it("keeps the claim commit authoritative when the flag is unset (default, byte-identical)", () => {
@@ -380,21 +384,17 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
   const BRANCH = "feat/task-cli-start-remediation-tail-clipped-on-human-channel";
 
   /**
-   * The CLI's own failure wrapper at the reachable WORST case: the kernel
-   * refusal the strict gate-bin step throws, carrying the FULL `MAX_GATE_BINS`
-   * list `resolveGateBins` can report, every bin a long name resolving through
-   * PATH from a deep sibling checkout's `.bin` (~330 chars an entry) — the same
-   * fixture #597's kernel-side test builds for the native seam's 2048 clip.
-   *
-   * This is the composition the operator actually reads: `printHumanError`
-   * runs the message through `sanitizeHumanError`, which clips a whole error
-   * line HEAD-kept at `MAX_HUMAN_ERROR_CHARS` (2000), so what leads is what
-   * survives.
+   * The reachable worst case for EVERY composition on this channel: the FULL
+   * `MAX_GATE_BINS` list `resolveGateBins` can report, every bin a long name
+   * resolving through PATH from a deep sibling checkout's `.bin` (~330 chars an
+   * entry) — the same fixture #597's kernel-side test builds for the native
+   * seam's 2048 clip.
    */
-  function worstCaseGateBinRefusal(): {
-    message: string;
-    firstEntry: string;
-    lastEntry: string;
+  function worstCaseFixture(): {
+    bins: GateBinResolution[];
+    names: string[];
+    entry: (name: string) => string;
+    worktreePath: string;
   } {
     const worktreePath = join(
       "home",
@@ -435,6 +435,24 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
       source: "path",
       path: join(siblingBinDir, name),
     }));
+    const entry = (name: string): string =>
+      `${name}: resolves only via PATH from ${join(siblingBinDir, name)} (outside the worktree)`;
+    return { bins, names, entry, worktreePath };
+  }
+
+  /**
+   * The kernel refusal the strict gate-bin step throws, carrying the worst-case
+   * list, composed by the CLI's own failure wrapper — what the operator reads:
+   * `printHumanError` runs it through `sanitizeHumanError`, which clips a whole
+   * error line HEAD-kept at `MAX_HUMAN_ERROR_CHARS` (2000), so what leads is
+   * what survives.
+   */
+  function worstCaseGateBinRefusal(): {
+    message: string;
+    firstEntry: string;
+    lastEntry: string;
+  } {
+    const { bins, names, entry, worktreePath } = worstCaseFixture();
     const message = worktreeFailureMessage({
       id: ID,
       branch: BRANCH,
@@ -443,8 +461,6 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
       step: "enforcing x-tracker.strict-gate-bins",
       err: new Error(strictGateBinFailure(bins, worktreePath) ?? ""),
     });
-    const entry = (name: string): string =>
-      `${name}: resolves only via PATH from ${join(siblingBinDir, name)} (outside the worktree)`;
     return {
       message,
       firstEntry: entry(names[0]!),
@@ -481,6 +497,17 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
     const remedy = message.indexOf(`arggon start ${ID} --worktree`);
     const discard = message.indexOf("To discard it instead");
     const detail = message.indexOf("Fix: run `npm ci` in ");
+    // Every needle is present BEFORE it is compared: `indexOf` answers -1 for
+    // an absent needle, and `-1 < anything` passes, so a missing clause would
+    // make the whole ordering assertion vacuous.
+    for (const [label, index] of [
+      ["remedy", remedy],
+      ["discard", discard],
+      ["detail", detail],
+      ["first bin", message.indexOf(firstEntry)],
+    ] as const) {
+      expect(index, `${label} needle must be present`).toBeGreaterThanOrEqual(0);
+    }
     expect(remedy).toBeLessThan(discard);
     expect(discard).toBeLessThan(detail);
     expect(remedy).toBeLessThan(message.indexOf(firstEntry));
@@ -508,7 +535,10 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
     expect(clipped).toContain(`re-run \`arggon start ${ID} --worktree\``);
     expect(clipped).toContain("To discard it instead");
     expect(clipped).toContain("Fix: run `npm ci` in ");
-    // ...with the ordering still intact inside the kept window...
+    // ...with the ordering still intact inside the kept window (needles
+    // presence-checked first, or the comparison is vacuous)...
+    expect(clipped.indexOf(`arggon start ${ID} --worktree`)).toBeGreaterThanOrEqual(0);
+    expect(clipped.indexOf(firstEntry)).toBeGreaterThanOrEqual(0);
     expect(clipped.indexOf(`arggon start ${ID} --worktree`)).toBeLessThan(
       clipped.indexOf(firstEntry),
     );
@@ -518,6 +548,123 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
     // in the full message, so this cannot pass by naming nothing).
     expect(clipped).not.toContain(lastEntry);
     expect(message.slice(MAX_HUMAN_ERROR_CHARS)).toContain(lastEntry);
+  });
+
+  /**
+   * The site round-2 review found MISSING from the first sweep
+   * (`worktreeRemediation`'s `committing the claim` branch, from #517): the
+   * exact `npm ci` fix was appended AFTER the CLI's own readiness bin list,
+   * which is uncapped — so at the worst case the clip ate the only clause
+   * naming the command to run. This is the MOST COMMON start failure (the one
+   * that actually creates the worktree), and its detail is a short pre-commit
+   * hook line, so the whole composition fits once the list is bounded.
+   */
+  function worstCaseCommitGateFailure(): {
+    message: string;
+    firstEntry: string;
+    lastEntry: string;
+    names: string[];
+  } {
+    const { bins, names, entry, worktreePath } = worstCaseFixture();
+    const message = worktreeFailureMessage({
+      id: ID,
+      branch: BRANCH,
+      worktreePath,
+      createBranch: true,
+      step: "committing the claim (pre-commit gate)",
+      err: new Error("gate: deliberate failure"),
+      readiness: { hasInstall: true, gateBins: bins },
+    });
+    return {
+      message,
+      firstEntry: entry(names[0]!),
+      lastEntry: entry(names[MAX_GATE_BINS - 1]!),
+      names,
+    };
+  }
+
+  it("leads the committing-claim report with BOTH fixes, then the evidence, then the discard hint", () => {
+    const { message, firstEntry, lastEntry } = worstCaseCommitGateFailure();
+    const exactFix = message.indexOf("Exact fix for the observed resolution");
+    const readiness = message.indexOf("Readiness: the gate binaries do not resolve");
+    const discard = message.indexOf("To discard it instead");
+    const namedBin = message.indexOf(firstEntry);
+    const detail = message.indexOf("gate: deliberate failure");
+    // Presence before comparison: an absent needle is -1 and `-1 < n` always
+    // passes, which is exactly how a substring-ordering assertion goes vacuous.
+    for (const [label, index] of [
+      ["exact fix", exactFix],
+      ["readiness", readiness],
+      ["discard", discard],
+      ["first named bin", namedBin],
+      ["detail", detail],
+    ] as const) {
+      expect(index, `${label} needle must be present`).toBeGreaterThanOrEqual(0);
+    }
+
+    // The order that matters: generic fix → EXACT fix → evidence → discard
+    // hint → raw detail. Pre-fix the exact fix came LAST, past the whole list.
+    expect(message.indexOf("The pre-commit gate (or the git commit itself) failed")).toBeLessThan(
+      exactFix,
+    );
+    expect(exactFix).toBeLessThan(readiness);
+    expect(readiness).toBeLessThan(namedBin);
+    expect(namedBin).toBeLessThan(discard);
+    expect(discard).toBeLessThan(detail);
+    // Every clause is verbatim, including the exact fix's own command…
+    expect(message).toContain(
+      `Exact fix for the observed resolution: run \`npm ci\` in ${worstCaseFixture().worktreePath}, then re-run \`arggon start ${ID} --worktree\``,
+    );
+    // …and the list is BOUNDED, with the remainder counted (so this cannot pass
+    // by naming nothing: the count is derived from the fixture).
+    expect(message).toContain(
+      `and ${MAX_GATE_BINS - MAX_HUMAN_GATE_BIN_NAMES} more bins not resolving inside it.`,
+    );
+    expect(message).not.toContain(lastEntry);
+    expect([firstEntry, lastEntry]).toHaveLength(2);
+  });
+
+  it("keeps the exact fix and the discard hint inside the human clip at that worst case", () => {
+    const { message, firstEntry } = worstCaseCommitGateFailure();
+    const clipped = sanitizeHumanError(message);
+    // With the list bounded the WHOLE composition fits, so the operator loses
+    // nothing at all here — the exact fix, the evidence head, the discard hint
+    // and the raw detail all arrive.
+    expect(clipped).toContain("Exact fix for the observed resolution");
+    expect(clipped).toContain("To discard it instead");
+    expect(clipped).toContain(firstEntry);
+    expect(clipped).toContain("gate: deliberate failure");
+    // …and it fits because it is BOUNDED, not because the clip is generous:
+    // without the cap the same message was over the cap and the exact fix sat
+    // past it (~3201), clipped away entirely. Nothing was elided here, so the
+    // sanitized line is the whole message — one extra character per newline,
+    // which the sanitizer escapes (`\n` renders as two).
+    expect(message.length).toBeLessThanOrEqual(MAX_HUMAN_ERROR_CHARS);
+    const newlines = message.split("\n").length - 1;
+    expect(clipped).toHaveLength(message.length + newlines);
+    expect(clipped).not.toContain("…");
+  });
+
+  it("keeps the exact fix at the SAME index whatever the evidence list holds", () => {
+    // The structural guarantee behind the reorder, independent of any fixture
+    // length: the fix's position is a function of the remediation clauses
+    // alone, so no bin list can push it past the head-kept clip. Pre-fix this
+    // was false by construction — the fix trailed the list, so its index grew
+    // with every reported bin until the clip ate it.
+    const { bins, worktreePath } = worstCaseFixture();
+    const compose = (gateBins: GateBinResolution[]): string =>
+      worktreeFailureMessage({
+        id: ID,
+        branch: BRANCH,
+        worktreePath,
+        createBranch: true,
+        step: "committing the claim (pre-commit gate)",
+        err: new Error("gate: deliberate failure"),
+        readiness: { hasInstall: true, gateBins },
+      });
+    const fix = "Exact fix for the observed resolution";
+    expect(compose(bins).indexOf(fix)).toBeGreaterThanOrEqual(0);
+    expect(compose(bins.slice(0, 1)).indexOf(fix)).toBe(compose(bins.slice(0, 3)).indexOf(fix));
   });
 });
 
