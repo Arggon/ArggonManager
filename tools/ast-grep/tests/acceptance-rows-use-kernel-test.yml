@@ -1,0 +1,27 @@
+id: acceptance-rows-use-kernel
+valid:
+  - |
+    import { acceptanceBody, acceptanceRows } from "@arggondev/lib";
+    const rows = acceptanceRows(acceptanceBody(item));
+  - |
+    // A markdown LINK is not a checkbox: its class holds other characters.
+    const href = /\[([^\]]+)\]\(([^)]+)\)/g.exec(text);
+  - |
+    // A plain char class over a different alphabet stays untouched.
+    const words = /[^aeiou\W]/gi.exec(text);
+  - |
+    // A quantifier group inside the class breaks the task-box shape.
+    const maybe = /\[(x)?\]/.exec(line);
+invalid:
+  - |
+    const BOARD_ACCEPTANCE_ROW = /^\s*[-*]\s+\[([ xX])\]\s?(.*)$/;
+  - |
+    const match = /^[ \t]*[-*] \[( |x|X)\]/.exec(line);
+  - |
+    if (/^-\s+\[x\]\s+(.+)$/.test(line)) emit(line);
+  - |
+    const criteria = [...body.matchAll(/^[ \t]*[-*] \[( |x|X)\][ \t]*[^\s]/gm)];
+  - |
+    const box = /^\s*[-*]\s+\[[ ]\]/;
+  - |
+    const ticked = /\[xX\]/;

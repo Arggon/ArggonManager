@@ -116,6 +116,49 @@ describe("spec analyze: ambiguity scan", () => {
     expect(result.ambiguity.map((f) => f.kind)).toContain("no-acceptance");
   });
 
+  it("decides 'is this Acceptance section testable' with the kernel's rows", () => {
+    // Review F6: narrowing `spec.ts` off its own `CHECKBOX_PATTERN`
+    // (`/^\s*[-*]\s+\[[ xX]\]/`) to the kernel's `acceptanceRows` was untested.
+    // The old pattern accepted `-  [ ] x` (two spaces after the bullet) as a
+    // checklist; the kernel does not, because the done gate does not. This
+    // finding is ADVISORY — it never gates a status flip — so the narrowing
+    // changes no refusal, and these cases pin that directly.
+    const checklist = (acceptance: string): string =>
+      `# Spec: t (analyzed-001)\n\n## Purpose\n\nwhy\n\n## Synopsis\n\nOn failure: exit 1.\n\n## Acceptance\n\n${acceptance}\n`;
+
+    // A two-space box is NOT a row to the kernel, so the section still reads as
+    // untestable — the narrowing FIXED this, it did not regress it.
+    const twoSpaces = makeRepo();
+    writeSpec(
+      twoSpaces,
+      "spec-twospace-001.md",
+      fm({ spec_id: "twospace-001" }),
+      checklist("-  [ ] x\n-  [x] y\n"),
+    );
+    expect(runSpecAnalyze({ cwd: twoSpaces }).ambiguity.map((f) => f.kind)).toContain(
+      "untestable-acceptance",
+    );
+
+    // The forms that ARE rows keep the section testable.
+    for (const [id, acceptance] of [
+      ["canon-001", "- [ ] x\n"],
+      ["glued-001", "- [ ]x\n"],
+      ["bare-001", "- [ ]\n"],
+      ["star-001", "* [ ] x\n"],
+      ["indent-001", "  - [ ] x\n"],
+      // The old pattern split the section on `/\r?\n/`, so it was already
+      // CR-safe; these pin that the narrowing did not lose that.
+      ["crlf-001", "- [ ] x\r\n"],
+    ] as const) {
+      const dir = makeRepo();
+      writeSpec(dir, `spec-${id}.md`, fm({ spec_id: id }), checklist(acceptance));
+      expect(
+        runSpecAnalyze({ cwd: dir }).ambiguity.map((f) => f.kind),
+        id,
+      ).not.toContain("untestable-acceptance");
+    }
+  });
+
   it("accepts Spanish section names (Aceptación) for the acceptance checks", () => {
     const dir = makeRepo();
     writeSpec(

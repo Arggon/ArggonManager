@@ -628,13 +628,22 @@ ${"y".repeat(MAX_DETAIL_COMMENT_BYTES + 512)}`,
     expect(clipped.truncated).toBe(true);
   });
 
-  it("parses read-only acceptance rows from the prose", () => {
+  it("parses read-only acceptance rows from the canonical body", () => {
+    // Deferral to the kernel's one row parser
+    // (bug-three-acceptance-parsers-diverging): `- [] no` is not a row, and the
+    // placeholder/criterion distinction is the kernel's, not this module's.
     expect(
       parseAcceptanceRows("# T\n\n- [x] done row\n* [ ] open row\n- [X] upper\n- [] no\nplain\n"),
     ).toEqual([
-      { text: "done row", checked: true },
-      { text: "open row", checked: false },
-      { text: "upper", checked: true },
+      { text: "done row", checked: true, criterion: true },
+      { text: "open row", checked: false, criterion: true },
+      { text: "upper", checked: true, criterion: true },
+    ]);
+    // CRLF: the old `.`-based per-line regex read ZERO rows here while the done
+    // gate still refused the flip.
+    expect(parseAcceptanceRows("- [x] done row\r\n- [ ] open row\r\n")).toEqual([
+      { text: "done row", checked: true, criterion: true },
+      { text: "open row", checked: false, criterion: true },
     ]);
   });
 
@@ -654,9 +663,14 @@ ${"y".repeat(MAX_DETAIL_COMMENT_BYTES + 512)}`,
     expect(body.detail.prose).toContain('<img src=x onerror="alert(1)">');
     expect(body.detail.prose_truncated).toBe(false);
     expect(body.detail.acceptance).toEqual([
-      { text: "done row", checked: true },
-      { text: "open row", checked: false },
+      { text: "done row", checked: true, criterion: true },
+      { text: "open row", checked: false, criterion: true },
     ]);
+    // The gate's own verdict rides next to the byte-bounded row list, so a
+    // clipped list can never read as "nothing unchecked"
+    // (bug-three-acceptance-parsers-diverging).
+    expect(body.detail.acceptance_complete).toBe(false);
+    expect(body.detail.acceptance_truncated).toBe(false);
     expect(body.detail.dependencies).toEqual([
       { id: "task-dep-open", status: "todo", terminal: false },
       { id: "task-dep-terminal", status: "cancelled", terminal: true },

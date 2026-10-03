@@ -1,16 +1,12 @@
 ---
 type: task
-status: in_progress
+status: todo
 id: task-cli-start-remediation-tail-clipped-on-human-channel
 title: "CLI channel: `startNotAttempted`/worktreeRemediation appends the remedy AFTER the kernel detail, so MAX_HUMAN_ERROR_CHARS head-clip still eats it at worst case"
-assignee: Arggon
-branch: feat/task-cli-start-remediation-tail-clipped-on-human-channel
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [cli, native-seam]
 created: "2026-10-02"
-updated: "2026-10-03"
-claimed_at: "2026-10-03T02:49:57.042Z"
-worktree_path: /home/arggon/Projects/ArggonManager-task-cli-start-remediation-tail-clipped-on-human-channel
+updated: "2026-10-02"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-cli-start-remediation-tail-clipped-on-human-channel.md
@@ -342,6 +338,7 @@ cwd for probes 1–2 and 4: /home/arggon/Projects/ArggonManager-task-cli-start-r
 3. **Gates on the amended head.** `npm run build && npm test && npm run lint` plus a green `cli` job. Expected: 122 files / 2280+ tests, lint clean, `check:plugin` no drift. The branch will move, so the earlier green run does not carry.
 4. **F4 numbers from an observed run.** `git stash push -- cli/src/start.ts && npx vitest run cli/src/start.test.ts -t "refuses the claim commit when the flag is set"; git stash pop` and paste the raw failure into the item. Expected: the attach re-run index strictly greater than the named-bin index (I compute ~537 vs ~356 for a 40-char `$TMPDIR` path), never a 104-char gap.
 
+
 ### 2026-10-03 @Arggon
 ## Round 3 — the bound is derived, and the bound is no longer lossy
 
@@ -396,3 +393,55 @@ The gap is **104 at every path length for this composition**, not 183 — so bot
 ### handoff 2026-10-03 @Arggon — next: Re-review+merge PR #608: bound now budget-derived (7/8 typical, 2/8 worst), readiness array on the failure envelope, cli green
 - branch: feat/task-cli-start-remediation-tail-clipped-on-human-channel
 - open questions: Is failEnvelope's new optional payload acceptable surface-wise, or should the readiness receipt be CLI-only?; F4: my measurement contradicts the review's 183 — accept the measured 104 table?
+
+### 2026-10-03 @Reviewer (round 3)
+verdict: approve (the review findings are closed and verified; merge is still gated on one green `cli` run — the latest head `b0b9f93d` is red)
+
+Read `88cb4984..HEAD` (the budget refactor, the `--json` payload, the new tests, the docs rows and the bundle line), the item's round-3 evidence, and the CI log of run 37097542576. My numbers are string arithmetic on the committed fixtures (no project imports), so they are independent of the probes.
+
+#### 1. The budget cannot starve a mandatory clause — verified, with the two residual edges named
+
+The reservation is sound and I can show it arithmetically. Composed length is `lead + remedy + discardClause + detail + 4 separators`, and `mandatory` counts exactly those four separators, so `composed = mandatory + readiness.length`; with `budget = MAX_HUMAN_ERROR_CHARS − mandatory` and a fill that respects `budget`, `composed ≤ MAX` by construction. Two things I checked rather than assumed:
+
+- The separator accounting inside the fill is **off by up to 2 chars**: the comparison is `used + entry.length > budget`, but the entry about to be pushed also costs `'; '` when it is not the first. The bound is `used ≤ budget + 2` (only the last push can overshoot, because the next comparison runs on the inflated `used`), and the residue lands in `detail` — the LAST clause — never in a remedy. Your typical fixture lands 20 chars under budget, so it does not bite there. Nit below.
+- The `≥1 when there is evidence` rule deliberately overrides the budget for the first entry. With the reserve in place that is safe in the ordinary case, and I confirmed the general bound: the discard clause ends at `mandatory − detail − 1 + readiness`, so as long as the reserved block itself fits the line, every actionable clause survives whole **whatever** the fill does — including a single entry far larger than the whole remainder. It only stops holding when the RESERVED block alone exceeds 2000, which needs a ~700+ char absolute path (your own `ONE entry cannot fit` test sits there: `worktreePath` ≈ 1250 chars, so `mandatory` alone is over the line, and the assertions pass because the exact-fix phrase starts at ~1815 < 2000, not because the reserve absorbed anything). Both edges are pre-existing inputs, not introduced here; the reserve is what makes the common cases safe.
+
+#### 2. `failEnvelope`'s `payload` is genuinely optional and additive — verified
+
+`lib/src/json.ts` adds one optional field and one spread, `...(opts.payload ?? {})`, placed BEFORE `error`: nothing removed, nothing retyped, `ok: false` and every existing failure envelope byte-identical when no payload is passed (`{} `spread adds no keys), and `error` cannot be shadowed by a payload key. Additivity holds under `schemaVersion: 1`, and the `readiness` row plus the `json-output.md` start paragraph now document the field and say why it exists. The end-to-end wire test (`cli/src/worktree.test.ts:594`) checks the real spawned `--json` output: message raw and unelided, `readiness.gateBins` complete with `source: "missing"`, `hasInstall: false`. MCP forwards the parsed envelope verbatim (`spawnedOutcome` → `{ ok: false, envelope, exitCode }`), so the payload rides through unchanged; the native/plugin path never passes `payload` (the two bundle call sites at `:8711`/`:9179` pass command/code/message only, and `startFailure` merges its own pre-existing payload mechanism), so native behavior is unchanged.
+
+#### 3. The `≥1` rule never implies a single cause — verified
+
+When one name fits and seven do not, the marker still rides the clause: `readinessOverflow` is called with `broken.length − shown.length`, so the line reads `… — tsx: …; and 7 more bins not resolving inside it.` The count is reserved for the FULL overflow before the loop runs (the worst-case marker), so the count is never the thing that gets cut. `hasReadinessEvidence` also gates the exact fix on evidence existing, so a fix never points at nothing.
+
+#### 4. The per-step scoping is right, and it is pinned — verified
+
+`reports the readiness evidence on the claim-commit step ONLY` pins claim-commit (clause present) against push / draft-PR / read-back (no `Readiness:`, no `Exact fix`) — the leak your multi-bin smoke probe caught. Losing the clause on a push failure is **right**, not merely acceptable: a push failure's cause and remedy are remote access and the manual `git push -u`, so the gate-bin observation was noise in the message; and it is not lost from the machine surface, because the readiness snapshot still rides `readiness` on every post-worktree failure (`cli.ts` forwards it whenever the wrapper threw it). Strict-gate and fresh-install steps correctly keep the kernel's own uncapped list instead of a duplicate — which is exactly what the new `convention.md` bullet says.
+
+#### 5. F4 — my round-2 claim was wrong; retracting it precisely
+
+You are right about the mechanism and I was wrong about the number. What IS path-independent is the gap, because the worktree path appears twice in the pre-fix composition — that part of my finding was right. But I measured the wrong pair: I computed the distance from the named bin to the END of the remediation clause instead of to the `arggon start <id> --worktree` needle inside it, which is why I got 183 and declared the reported pairs impossible. Derived properly, the strict-gate composition's gap is `bin.length + 2 + remPrefix.length` = `49 + 2 + 66` = **117**, id-independent and path-independent — and I get (471, 354) at a 39-char path, (473, 356) at 40, (519, 402) at 63, all gap 117. So the `+64` shift you measured is real and my "structurally impossible" verdict is withdrawn. One residual, for honesty: 104 (your figure) is not 117 either, so the recorded pairs are still not fully explained by one composition — but the ORDER claim, which is what the item actually asserts, is now pinned by an assertion rather than a quoted number, and the numbers are historical. Nothing to do beyond dropping the pair from the item if you prefer.
+
+#### 6. Bundle — verified
+
+`git diff --numstat` on `opencode/plugins/arggon/index.bundle.ts` is `1 0`: a single added line, `...(opts.payload ?? {}),` inside the inlined `failEnvelope` — 8 spaces + 24 chars + newline = exactly the +33 bytes (457609 → 457642). Nothing else in the bundle moved, and the plugin's own call sites pass no payload, so the delta is inert on the native seam.
+
+#### Headline numbers reproduced independently
+
+- pathological (~317 chars/entry): **2 of 8** named, total **1795** ≤ 2000, nothing elided, exact fix @584, readiness @834, discard @1579 — byte-identical to the old constant-2 form, as claimed.
+- ordinary checkout (~117 chars/entry): **7 of 8** named, total **1980** ≤ 2000, nothing elided — versus 2 under the constant. My round-2 prediction was 6; 7 is better.
+- mixed flavors (`missing missing path missing path path path path`): all eight flavors are visible under the budget; the constant-2 form showed only the two leading `missing`. My round-2 failure mode #2 is closed.
+
+#### Non-blocking nits (no gate attached)
+
+1. `gateBinFailureReport`'s comparison should include the `'; '` it is about to add (`used + entry.length + (shown.length > 0 ? 2 : 0)`), so the invariant is exact rather than "budget + 2 that happens to land in `detail`".
+2. `docs/convention.md`'s readiness bullet ends with "while every actionable clause always survives whole". True whenever the RESERVED block fits the line (i.e. except a ~700+ char absolute path or a ~900+ char raw gate output). Worth one clause of precision, since this sentence is the citation a future site will read before adding a list.
+3. `failEnvelope`'s `payload` type allows a future caller to shadow `ok` / `schemaVersion` / `conventionVersion` / `command` (`error` is safe — the spread precedes it). A reserved-key filter or a `payload` namespace would close it; one caller today, so advisory.
+4. For `bug-cli-spawn-suites-exit-1-flake`: the missing export name varies per occurrence (`priorityRank`, `numberField`, now `MAX_CLAIM_WRITE_NAMES`) — always a half-written `lib/dist` module, never an assertion failure. Useful signature for whoever fixes the writer.
+
+## Probes needed
+
+1. **Green `cli` run on the final head.** `gh run rerun --job 111130448518` (or `npm run build && npm test` in the worktree). This is the only thing between the review and merge. Note the premise I was given ("CI green on the merged head") is stale: `gh pr checks 608` on head `b0b9f93d` shows `cli` **fail** (run 37097542576) — `cli/src/cli.test.ts` → `SpawnHarnessError … child-boot-failed` with `kernel artifact drift … another suite lane rebuilt lib/dist or dist in place` and `SyntaxError: './worktree.js' does not provide an export named 'MAX_CLAIM_WRITE_NAMES'`; 1 failed file, 2288 passed. Nothing in this diff touches `lib/src/worktree.ts`, and the drift detector names the writer itself, so it is the tracked flake class — but green CI is necessary, so land one green run on the final head before merging.
+2. **Real-CLI probe of the budget fill (≥3 broken bins, pre-commit-gate step).** Disposable fixture with 6+ bin-bearing devDependencies installed nowhere, failing `pre-commit` hook; run `arggon start <id> --worktree`, read the human stderr line, and capture `--json`. Expected: the readiness clause names as many bins as fit in that checkout's entry shape and counts the rest (`; and N more bins not resolving inside it.`), every actionable clause whole, and `--json` carrying BOTH the bounded message and the complete `readiness.gateBins`. This is the executed evidence for the behavior my round-2 verdict asked for.
+3. **Deep-path probe (edge, optional).** A sibling `.bin` path of ~700+ chars: expected — the reserved block itself exceeds the line, so the trailing discard/detail tail is elided while the generic fix and the exact fix's opening survive. Confirms the nit-2 wording before it ships.
+4. **F4 raw output (optional).** `git stash push -- cli/src/start.ts && npx vitest run cli/src/start.test.ts -t "refuses the claim commit when the flag is set"; git stash pop` and paste the raw failure, if you want the item's numbers observed rather than reconstructed. My derivation says the pre-fix gap is 117 at any path length (471/354 at a 39-char `$TMPDIR` path).
