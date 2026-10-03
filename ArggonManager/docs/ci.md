@@ -139,21 +139,41 @@ step re-runs the branch's own `init` (a no-op when the seam is current) and
 fails loudly if `dist/cli.js` is missing, rather than silently falling back to
 the pinned release — that silent fall-back _is_ the bug.
 
-**What the branch-local comparison gives up, and what compensates.** In the
-seam's own repo, `tasks-validate` no longer proves that the _pinned release_
-reproduces the committed seam. Two assertions keep the release protection:
+**What the branch-local comparison gives up.** In the seam's own repo,
+`tasks-validate` no longer proves that the _pinned release_ reproduces the
+committed seam. That is the price of the decision recorded in `release.md`
+§One release story ("the price paid is one weaker claim"), and it is the ceiling
+of what the remaining checks claim — read them as what they are:
 
-- the **pinned-lag assertion** inside the drift step: no committed `x-generated`
-  entry may carry an `arggonVersion` stamp NEWER than `ARGGON_VERSION`. A newer
-  stamp means the pinned install would rewrite committed content — the #527
-  outage class — so the gate reports the lag and its two values, then
-  prescribes the only remedy that works: **bump the pin** once that version is
-  released. Re-running the pinned `init` is not the fix; it is what deletes the
-  newer content. This repo pins the same rule as a test
-  (`cli/src/ci-seam-pin.test.ts`), so neither copy can rot silently; for adopters
-  the workflow assertion is the only gate, which is why it lives there;
+- the **pinned-lag assertion** inside the drift step is a **version-skew proxy,
+  not byte-equality**. It fires when a committed `x-generated` `arggonVersion`
+  stamp is NEWER than `ARGGON_VERSION` — the #527 class, where the pinned install
+  would rewrite committed content — and prescribes the only remedy that works:
+  bump the pin once that version is released. Re-running the pinned `init` is
+  not the fix; it is what deletes the newer content. It is **blind in exactly the
+  case this gate change unblocks**: a feature PR that moves templates and
+  regenerates the seam with **no version bump** leaves every stamp at the pin, so
+  the seam has postdated the release while the stamps say nothing. Nothing in
+  `tasks-validate` detects that on a branch. It is not meant to: that PR is the
+  one the branch-local comparison exists to let through, and its seam is
+  reproducible from its own source, which is the generator the gate uses;
 - `arggon validate` / `doctor` / `list` still run through the **pinned** bin, so
-  the release can always read the tracker (the adopter-shaped check).
+  the release can always read the tracker (the adopter-shaped check). That is a
+  read gate, not a seam gate.
+
+**Where the rule of record lives.** The drift gate's rule is the workflow
+template, [`templates/docs/github/workflows/arggon.yml`](../../templates/docs/github/workflows/arggon.yml):
+it is what adopters vendor and what the parity test in
+`cli/src/headless-ci.test.ts` holds `.github/workflows/arggon.yml` to (same rule,
+same generator predicate, `uses:` SHA pins excepted). The pin-lag rule has a
+second implementation, the `pinLagsSeam()` predicate in
+`cli/src/ci-seam-pin.test.ts` — the repo-side guard that runs in the `cli` job.
+The two are deliberately **not** the same predicate today: the test adds a
+`pin !== pkgVersion` conjunct the shell copy lacks, so the release window
+(`pin == stamps`, `package.json` already bumped) stays green in the test. Treat
+that as known, tracked skew
+(`bug-ci-seam-pin-shell-vs-test-copy-divergence`), not as one rule with two
+spellings; only the workflow copy decides `tasks-validate`.
 
 The pin is a literal on purpose and stays one: deriving it from `package.json`
 would install the bumped version between the release runbook's step-1 bump and

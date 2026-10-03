@@ -1,13 +1,22 @@
 /**
  * Seam-pin guard (task-ci-seam-pin-tracks-release).
  *
- * `.github/workflows/arggon.yml` pins `ARGGON_VERSION` as a literal: the
- * registry install (`npm install -g "arggon-manager@$ARGGON_VERSION"`) and
- * the drift gate compare the committed seam against that release. The #527
- * incident: the seam was regenerated with 0.4.1 while the pin still said
- * 0.4.0 — `tasks-validate` went red on main and every open PR until the pin
- * was moved by hand (the release runbook's post-release re-pin, Gotchas:
- * "Re-pin the seam check").
+ * `.github/workflows/arggon.yml` pins `ARGGON_VERSION` as a literal and uses
+ * it two ways: the registry install
+ * (`npm install -g "arggon-manager@$ARGGON_VERSION"`), and the drift gate's
+ * **pinned-lag assertion** — no committed `x-generated` `arggonVersion` stamp
+ * may be newer than the pin.
+ *
+ * Since bug-seam-drift-gate-blocks-new-generated-seam-content the byte
+ * comparison is NOT against the pin in this repo: the drift gate regenerates
+ * with the checkout's OWN build when the checkout is the seam's source (so a
+ * feature PR that adds generated content can go green), and with the pinned
+ * release everywhere else (every adopter — their only generator). What changed
+ * for the pin is the ASSERTION, not the install: the #527 incident (the seam
+ * was regenerated with 0.4.1 while the pin still said 0.4.0) is now caught by
+ * the stamp comparison in the drift step instead of by a dirty byte diff, and
+ * the remedy is the same manual re-pin (release runbook Gotchas: "Re-pin the
+ * seam check").
  *
  * This test pins the invariant that keeps the drift gate green: the literal
  * pin must never LAG both:
@@ -40,8 +49,20 @@
  *   template-less patch re-pin           V+1   V+1           V            green (pin == pkg)
  *   #527: seam regenerated, pin stale    V     V             V+1          RED — bump the pin
  *
- * The opposite drift — the pin moved without regenerating the seam — stays
- * policed by the workflow's own drift gate at CI time.
+ * The opposite drift — the pin moved without regenerating the seam — is not
+ * this predicate's business either (the pin ahead of the stamps is the
+ * documented template-less-patch case above). In this repo the byte comparison
+ * belongs to the branch-local path: the drift gate regenerates with this
+ * checkout's own build and requires a clean tree, which catches a pin that
+ * moved without a seam regen only insofar as the SEAM disagrees with the
+ * SOURCE, not with the pin.
+ *
+ * Two copies of the pin-lag rule exist and they are NOT identical: the shell
+ * one in the workflow decides `tasks-validate`, this predicate is the repo-side
+ * guard in the `cli` job, and the extra `pin !== pkgVersion` conjunct below is
+ * what keeps the release window green here. Known skew, tracked as
+ * `bug-ci-seam-pin-shell-vs-test-copy-divergence` — see
+ * `ArggonManager/docs/ci.md` §Where the rule of record lives.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
