@@ -287,3 +287,7 @@ A Behavioral change whose copy obligation is met by a pointer is the intended de
 **Delivery.** Merged `origin/main` (6 behind; the round-2 verdict was in the item file). Item-file conflict resolved as a **union**: main's frontmatter, the ticked acceptance list, and every `###` block from both sides — filing note, both worker comments, both handoffs, and both reviewer verdicts with the `## Probes needed` block intact. Frontmatter verified after the merge (`status: in_progress`, `assignee`, `branch`, `claimed_at`, `worktree_path` all present). `git diff origin/main...HEAD` is still exactly the three intended files. Acceptance box 2 (spec/plan 009) remains reserved for the coordinator.
 
 Left `in_progress` — completion is the coordinator's call after merge.
+
+### handoff 2026-10-03 @Arggon (session: ses_efe310c5effeaOs8Nra70sfiUu) — next: Coordinator merges PR #618 (record-only round done: impact class restated Behavioral with ADR 0016 in the PR body and an item comment), then flips the item to done.
+- branch: fix/bug-engineering-doc-stale-adr-statuses
+- open questions: Commit messages still say Advisory — unfixable without a forbidden force-push; PR body + comment are authoritative. Non-blocking reviewer note left unapplied on purpose: expect(linkFrom).toBeGreaterT…
