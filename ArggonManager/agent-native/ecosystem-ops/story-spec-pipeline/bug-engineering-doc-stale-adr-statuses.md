@@ -253,3 +253,37 @@ cwd `/home/arggon/Projects/ArggonManager-bug-engineering-doc-stale-adr-statuses`
 4. **Not a probe:** the impact-class correction is a record edit (PR description + item comment), no commit, no gate re-run.
 
 Unverified by me: the worker's three probe re-runs, five drift simulations and end-to-end carrier checks (their expected-vs-observed messages and sha256 reverts are recorded on the item at :168-206; I did not reproduce them), the prettier-convergence claim, and the `cli` gate on the amended head.
+
+### 2026-10-03 @Arggon
+### 2026-10-03 @Arggon
+Round 2 addressed — record only. Commit 040f6276 (merge of `origin/main`); no code change, no doc prose change.
+
+**Methodology impact class: Behavioral** (`ArggonManager/docs/agents.md:473`/`:476`). Restated in the PR description and here, which is what `:473` requires of both places.
+
+**The reclassification, and the correction behind it.** The reviewer's reading is right and my earlier argument answered a different question. `agents.md:476` triggers Behavioral when "agents must re-learn something: **a rule**, a gate, a command contract or a pipeline step", and `engineering.md:193` is a rule authors must follow — a carrier "never restates that ADR's status".
+
+It also does not merely document existing practice. The prior duty (`engineering.md:71` "update the doc **in the same PR**", `:212` "Docs/ADR updated in the same PR when contracts change") required authors to keep a restatement **accurate** — which means hand-editing the status word on every acceptance. The new rule forbids **having the field**. That is precisely why this PR deletes `(Proposed)` instead of correcting it to `Accepted`: the change replaces one obligation with a different one, so an agent who complied with the old duty must now stop doing what the old duty asked for. Rule change → Behavioral.
+
+**What I got wrong, stated plainly:** I argued *compliance* ("the Behavioral obligations are already met"), which shows the change is safe — useful, but it answers "do we owe a re-sync", not "what class is this". I cited `engineering.md:71`/`:212` as if they already required this rule; they require the opposite handling of the same field. The evidence was good and the inference was wrong, which is a worse failure than weak evidence.
+
+**Adopter-upgrade channel: ADR 0016.** `agents.md:476` requires a Behavioral change to reference it ([ADR 0016](./adr/0016-adopter-upgrade-channel.md)), and this change carries that reference. What an adopting repo's agents must re-learn: in a methodology carrier an ADR is **linked, never described** — the status lives in the ADR's own `- Status:` line and in the ADR index, and a carrier must not carry a copy. Adopters get it through the channel because `engineering.md` is materialized into their tree by `arggon init` (`cli/src/docs.ts:521` in `TIER2_DESTS`, asserted by `cli/src/init.test.ts:112`), so the rule arrives in the file their agents already read.
+
+**The copy-sync obligation: already discharged, by delegation.** `agents.md:476` also requires keeping `skills/arggon-cli/` ↔ `.agents/skills/arggon-cli/` in sync and byte-equal. That is met, structurally rather than by exception — four links in the chain, each verified by reading:
+1. **No copy to update.** `skills/arggon-cli/references/methodology.md:61` points at §ADR process ("§ADR process — 4-digit id, kebab-case title, Status/Date/Deciders + Context / …") instead of reproducing it, so the skill never carried the rule this PR changes.
+2. **`skills:sync` is a no-diff.** `npm run skills:sync` synced 7 bundled files and left the branch untouched.
+3. **The generated copy is pinned byte-equal.** `.agents/skills/arggon-cli/` is a marker-prefixed generated copy, held byte-equal to `skills/arggon-cli/` by `cli/src/skill-copy.test.ts` inside `npm test`, so it cannot drift silently between releases.
+4. **Nothing was hand-copied.** The carrier change lands only in `engineering.md`; every other surface that could have needed a matching edit was verified rather than edited — `agents.md` and `convention.md` are now pinned clean by this suite, and the skill delegates.
+
+A Behavioral change whose copy obligation is met by a pointer is the intended design of that obligation, not a waiver of it: the point of keeping copies in sync is that an adopter never reads a stale or contradictory copy, and delegation plus a byte-parity gate is a stronger guarantee than a manual copy.
+
+**Commit messages carry the superseded classification.** The round-1 and round-2 commits both say "Advisory", and rewriting published history is forbidden here (no force-push), so they stand. The authoritative record is the PR description and this comment. Flagging it rather than leaving a reader to trip over the commit log.
+
+**The `cli` lane is NOT pending — it has run and passed.** `gh pr checks 618`: `cli` **pass** (5m46s), `tasks-validate` **pass** (28s), `ui-smoke` **pass** (2m8s). Green on the code-bearing head `aa86f434` **and** on `f052588f`, which adds only two tracker-comment commits and touches no code or doc prose. Reporting the lane I actually observed, not a substitute for it.
+
+**Local run on the final head** `040f6276` (after merging `origin/main`), `npm run build` before `npm test`: `npm test` 127 files / 2593 tests pass · `npm run lint` 0 · `npm run arggon -- validate` ok (0 warnings) · `npm run check:plugin` clean (bundle byte-identical) · `npm run test:structure` 5 passed · `npm run lint:structure` clean · prettier converged (pass-2 byte-identical to pass-3). Smoke exempt: docs + one additive test, no CLI behavior change.
+
+**Nothing code or prose was touched.** `git diff aa86f434..HEAD -- cli/src/adr-status-doc-contract.test.ts ArggonManager/docs/engineering.md` is **empty** — byte-identical to the head the reviewer approved. Preserved as instructed: the delete-don't-correct decision, `STATUS_CARRIERS`/`LINK_CARRIERS`, the coverage-parity test, `:193`'s coverage clause, §Related's index pointer, the scope note, and both sibling doc-contract tests. The reviewer's non-blocking hardening note (`expect(linkFrom).toBeGreaterThan(from)` in the coverage-parity test) is **not** applied — it was raised alongside "no code change implied; I will not re-review code", so it is recorded here rather than acted on. It is a good suggestion for whoever next edits that test.
+
+**Delivery.** Merged `origin/main` (6 behind; the round-2 verdict was in the item file). Item-file conflict resolved as a **union**: main's frontmatter, the ticked acceptance list, and every `###` block from both sides — filing note, both worker comments, both handoffs, and both reviewer verdicts with the `## Probes needed` block intact. Frontmatter verified after the merge (`status: in_progress`, `assignee`, `branch`, `claimed_at`, `worktree_path` all present). `git diff origin/main...HEAD` is still exactly the three intended files. Acceptance box 2 (spec/plan 009) remains reserved for the coordinator.
+
+Left `in_progress` — completion is the coordinator's call after merge.
