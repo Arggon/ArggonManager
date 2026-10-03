@@ -7,6 +7,7 @@ parent: story-spec-pipeline
 labels: [spec-pipeline, docs]
 created: "2026-10-03"
 updated: "2026-10-03"
+depends_on: [bug-spec-analyze-does-not-detect-duplicate-doc-numbers]
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/task-spec-analyze-naming-and-skill-mirror.md
