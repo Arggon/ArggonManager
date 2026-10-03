@@ -13,7 +13,6 @@ claimed_at: "2026-10-02T23:58:06.586Z"
 depends_on: [task-adapter-selection-flags, task-capability-matrix]
 worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-goal-mode
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-zcode-adapter/task-zcode-goal-mode.md
   Leaves live only under a story. id is the filename stem: task-zcode-goal-mode.
@@ -1177,3 +1176,79 @@ For the coordinator/prover in `/home/arggon/Projects/ArggonManager-task-zcode-go
 
 <<<THEIRS>>>
 What remains is the same defect B1 was filed for, arriving through the input instead of the parser: the gate's verdict is now authoritative but is read from `shown.prose` while the gate reads `item.body`, which disagrees on **21 of the 280 items in this tracker** — every item whose acceptance checklist was filed as a comment, the shape `arggon create` produces by design. Fix line 526, correct the two comments that describe the call as taking `body`, add one comment-borne case to the corpus, and extend the follow-up item's acceptance to name this case. Then squash-merge — no rebase, no force-push.
+
+### 2026-10-03 @Arggon
+## @Arggon — pass 3: the kernel owns the grammar now (PR #611 merged); four claims corrected
+
+`bug-three-acceptance-parsers-diverging` (PR #611) is on main, so this adapter no longer has a
+"second parser" story to tell. Corrected by grep, not from a list (a claim naming the wrong owner
+is how this class started).
+
+**The four stale claims — resolved, with what the code now does:**
+
+1. **"there are TWO parsers, not one"** → there is ONE. `cli/src/goal-mode.ts` reads
+   `acceptanceRows` / `acceptanceUnchecked` over `acceptanceBody(item)`: the objective, the
+   verification contract and the `done` flip's refusal set are the same rows, from the same
+   functions, over the same bytes. The board's `parseAcceptanceRows` import is gone.
+2. **`cli/src/board.ts` "CRLF-blind"** → the kernel walks the whole ECMAScript **LineTerminator**
+   set (`ACCEPTANCE_LINE_BREAK`), so CRLF and U+2028/U+2029 bodies need no special case
+   (`docs/convention.md` §Acceptance rows, PR #613).
+3. **`normalizeEol` "not cosmetic"** → **NOT NEEDED, removed.** The kernel's marker is CRLF-safe and
+   `acceptanceBody` deliberately does not normalize (adding a second representation "for no gain"),
+   so the normalization step and its import are gone rather than kept with a new justification.
+4. **`UNRENDERABLE` (reader/gate disagreement)** → **unreachable with one grammar; removed**, with
+   `goal.renderable` from the envelope and the docs. Two shapes remain: a goal, or an explicit
+   "DEFINE THE GOAL FIRST".
+
+Also removed: the input cap `MAX_GOAL_PROSE_BYTES` — capping a reader's bytes is exactly what made
+a lost criterion read as "everything inlined" (round-1 finding 3). The bound is now on the ROWS
+(240 B objective, 200 B/line, ≤ 8 inlined, the rest counted in `verificationOmitted`, any
+clipping/deferral setting `truncated`), which is the kernel's own guidance for a consumer that
+renders rows.
+
+**Where the claims shipped, all corrected:** module header, `deriveGoal` doc, `gateUnchecked` field
+doc, call-site comment, both test headers, `README.md`, `docs/agents.md` §ZCode,
+`docs/json-output.md` §goal, `skills/arggon-cli/references/{json-contract,orchestration}.md`, the
+ZCode command doc, the goal template, and this item's `## Notes` (the dated verdicts are history and
+were left untouched). The canonical-body invariant is now stated where a reader hits it and points at
+the kernel accessor that owns it; the live hazard is the INPUT, not the grammar.
+
+**Tests re-run against the merged kernel:** corpus cases that assumed the old two-parser world were
+rewritten — `- [ ]x` is now rendered as the one-character criterion `x` (convention.md says it IS a
+row) instead of the old "READ THE ITEM BODY FIRST" shape; the two prose-clip tests were replaced by
+row-cap tests; new cases pin the shapes the kernel decides — `-  [ ] x` and a tab before the box are
+NOT rows (so nothing opens a goal), and U+2028/U+2029 bodies parse like LF. `deriveAsRun`'s doc now
+says why it must take the whole body (that shortcut is what hid the round-2 defect).
+`cli/src/adapter-selection.test.ts`'s `doctor --agents` snapshot counted the seam's files: 19 → 21
+(this PR's two new files); that one-line snapshot change is the only other edit.
+
+**Probe evidence, refreshed against the merged kernel** (built `dist/cli.js`, `--json`, fresh temp
+tree per case; full transcript in the PR body):
+
+```
+1   unchecked boxes        -> objective "first criterion", verification both, gateUnchecked true
+2   nothing unchecked      -> DEFINE THE GOAL FIRST, and the gate then ALLOWS the flip
+3   CRLF item              -> gate UPDATE_FAILED, goal hasGoal true, objective "crlf criterion"
+3b  comment-filed checklist-> gate UPDATE_FAILED, goal objective "criterion filed in a comment"
+3c  -  [ ] x / -\t[ ] x    -> gate allows the flip, goal hasGoal false (same verdict)
+3d  - [ ]x / - [ ] x       -> both rows: objective "x", verification ["x","x"]
+3e  U+2028-separated body  -> gate UPDATE_FAILED, goal objective "second line row"
+4-7 refusals               -> GOAL_FOREIGN_CLAIM (root AND subdir, conventionVersion 5),
+                               GOAL_IDENTITY_UNKNOWN, GOAL_UNCLAIMED, GOAL_FAILED
+8   5000-char criterion    -> objective 238 B, lines <= 200 B, contract 5203 B <= 12288 B cap,
+                               boundaries intact
+```
+
+**Gates** (build BEFORE test, per the pack-parity gate): `npm run build` ok;
+`npm test` 127 files / 2631 passed; `npm run lint` clean; `npm run arggon -- validate` ok (v5);
+`npm run check:plugin` byte-identical; `npm run test:structure` 5 ast-grep tests passed (incl. the
+new `acceptance-rows-use-kernel` rule); `npm run lint:structure` green.
+
+**Delivery:** `origin/main` merged into this published branch (item file resolved as a UNION — every
+`###` comment block from both sides, main's frontmatter; no stashing used). The push was a
+fast-forward `38db079d..954559b2`; **no force-push, none attempted.** The PR is now marked **ready
+for review**; the coordinator squash-merges and flips.
+
+Unchanged on purpose: boundaries still appended from CLI constants; still no MCP tool; the
+15 pre-existing stamp mismatches on main remain stated-not-fixed (`arggon adopt --ack` is a human
+step). Spec/plan `status` stays `proposed`; this item stays `in_progress`.
