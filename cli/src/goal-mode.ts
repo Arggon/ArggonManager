@@ -65,6 +65,12 @@ import {
   type KernelFailureEnvelope,
   type KernelSuccessEnvelope,
 } from "@arggondev/lib";
+// The board renderer's row parser. Deliberately NOT moved into `@arggondev/lib`
+// here: whether lib grows a row parser — and which parser wins — is the design
+// decision `bug-three-acceptance-parsers-diverging` owns, and guessing it here
+// would pre-empt that item (and risk a fourth parser). Until it lands, this
+// adapter reads text through the board's parser and takes every VERDICT from the
+// kernel's `acceptanceComplete`, with the parity corpus pinning the two together.
 import { parseAcceptanceRows } from "./board.js";
 // The CLI's single EOL helper (docs.ts). Required, not cosmetic: the frontmatter
 // parser tolerates CRLF and the board's row regex does not (`.` never matches
@@ -89,16 +95,25 @@ export const MAX_GOAL_VERIFICATION_LINES = 8;
 /**
  * How much of the item's prose is even PARSED for criteria: the derivation
  * reads the acceptance checklist, not the item, so a 10 MB body is clipped
- * before the scan instead of being walked line by line.
+ * before the scan instead of being walked line by line. A clipped read also
+ * marks the contract `truncated` — criteria may exist past the cut.
  */
 export const MAX_GOAL_PROSE_BYTES = 32 * 1024;
 /**
  * Budget for the TEMPLATE text before slot filling — an adopter-inflated or
  * tampered copy is clipped here, so the rendered contract stays bounded even
- * when the file it renders from is not.
+ * when the file it renders from is not. Clipping happens BEFORE the slots are
+ * filled, so an adopter template over this budget can lose its `{{...}}`
+ * placeholders; the structured `goal.*` fields still carry the values.
  */
 export const MAX_GOAL_TEMPLATE_BYTES = 8 * 1024;
-/** Hard cap on the whole rendered contract (ADR 0006 context budget). */
+/**
+ * Hard cap on the whole rendered contract (ADR 0006 context budget). SOFT in one
+ * corner: the appended boundary block is never clipped, so if that block alone
+ * ever grew past ~11,262 B the 1 KiB floor for the filled template would push
+ * the contract past this constant. Measured block: 1,974 B (the envelope test's
+ * byte cap catches growth), i.e. ~9.3 KB of headroom.
+ */
 export const MAX_GOAL_CONTRACT_BYTES = 12 * 1024;
 
 /** Marker appended to clipped text (3 bytes in UTF-8), inside the budget. */
@@ -113,7 +128,7 @@ const ELLIPSIS_BYTES = Buffer.byteLength(ELLIPSIS, "utf8");
  */
 export const GOAL_BOUNDARIES: readonly string[] = [
   "One goal, one CLAIMED item: this contract covers exactly this item; it never becomes a second goal for a sibling item.",
-  "One worktree per item: every command, edit, build and commit runs inside the item's recorded worktree, on its branch.",
+  "One worktree per item: every command, edit, build and commit runs inside the item's recorded worktree, on its branch. An item that records no worktree at all (no `start --worktree`) is scoped to the repo root you are standing in — the boundary is the item's own scope, never a sibling's.",
   "Never another item's worktree: no sibling checkout, and no worktree whose claim belongs to another identity — `arggon goal` refuses both.",
   "State in git: the claim, the branch and the checklist travel in the tracker; a goal that lives only in the session is not a goal.",
   "Never steal, never reopen: a claim held by another assignee is a refusal, not an invitation (`--force`/`--steal` are human-only, and a `done`/`cancelled` item stays closed).",
@@ -509,11 +524,15 @@ export function runGoal(opts: GoalOptions): GoalResult {
   // predicate a `done` flip is refused by); the row parser only supplies text,
   // and its CRLF blindness is neutralized by normalizing the prose first.
   const gateUnchecked = !acceptanceComplete(shown.prose);
-  const rows = parseAcceptanceRows(normalizeEol(clip(shown.prose, MAX_GOAL_PROSE_BYTES).text));
+  const prose = clip(shown.prose, MAX_GOAL_PROSE_BYTES);
+  const rows = parseAcceptanceRows(normalizeEol(prose.text));
   const derived = deriveGoal(rows, gateUnchecked);
   const worktreePath = item.worktreePath ?? root;
   const goal: GoalContract = {
     ...derived,
+    // Criteria lost to the prose clip must not read as "everything inlined"
+    // (round-1 finding 3): a clipped read is a truncated contract.
+    truncated: derived.truncated || prose.clipped,
     gateUnchecked,
     boundaries: [...GOAL_BOUNDARIES],
     refusals: [...GOAL_REFUSALS],

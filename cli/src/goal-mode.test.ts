@@ -317,7 +317,39 @@ describe("runGoal (rendered contract from a real item)", () => {
     expect(result.goal.hasGoal).toBe(true);
     expect(result.goal.renderable).toBe(false);
     expect(result.goal.objective).toMatch(/READ THE ITEM BODY FIRST/);
+    // Round-1 finding 3: a clipped read must not read as "everything inlined".
+    expect(result.goal.truncated).toBe(true);
     expect(Buffer.byteLength(result.contract, "utf8")).toBeLessThanOrEqual(MAX_GOAL_CONTRACT_BYTES);
+  });
+
+  it("marks the contract truncated when only the filler past the budget was cut", () => {
+    const { dir, id } = treeWithTask("- [ ] first criterion", { assignee: "Arggon" });
+    const path = runShow({ cwd: dir, id }).path;
+    const raw = readFileSync(path, "utf8");
+    const unit = "filler line\n";
+    const filler = unit.repeat(
+      Math.ceil((MAX_GOAL_PROSE_BYTES * 1.2) / Buffer.byteLength(unit, "utf8")),
+    );
+    // Criteria stay INSIDE the budget (the objective is still rendered) but the
+    // read WAS clipped, so the contract must say so.
+    writeFileSync(path, `${raw}\n${filler}`, "utf8");
+    const result = runGoal({ cwd: dir, id, login: "Arggon" });
+    expect(result.goal.objective).toBe("first criterion");
+    expect(result.goal.renderable).toBe(true);
+    expect(result.goal.truncated).toBe(true);
+    expect(result.contract).toContain("Some checklist text was clipped or deferred");
+  });
+
+  it("names the no-worktree fallback the boundary states (repo root, not a sibling's)", () => {
+    const { dir, id } = treeWithTask("- [ ] one goal", { assignee: "Arggon" });
+    // No worktree_path recorded: rendering is allowed here and the scope is the
+    // repo root — the boundary text must say exactly that.
+    const result = runGoal({ cwd: dir, id, login: "Arggon" });
+    expect(result.goal.worktree.recorded).toBe(false);
+    expect(result.goal.worktree.path).toBe(result.root);
+    expect(result.goal.boundaries.join("\n")).toMatch(
+      /records no worktree at all[\s\S]*scoped to the repo root you are standing in/,
+    );
   });
 
   it("clips a long criterion line and reports the contract as truncated", () => {
