@@ -42,7 +42,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { MAX_MISSING_DEPENDENCIES, parseFrontmatter, runCreate, runUpdate } from "@arggondev/lib";
+import { MAX_GATE_BINS, MAX_MISSING_DEPENDENCIES, parseFrontmatter, runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "../../../cli/src/init.js";
 import { tickAcceptance, tickAllAcceptance } from "../../../test/acceptance.js";
 import {
@@ -1845,6 +1845,88 @@ describe("worktree domain tools (W4)", () => {
     });
   });
 
+  it("keeps the npm ci remedy and the preparation log inside the clipped fresh-worktree refusal when the named-bin list is at its worst case (bug-native-refusal-advice-clipped-by-head-clip)", async () => {
+    const dir = seedGitTree();
+    const devDependencies: Record<string, string> = {};
+    const names: string[] = [];
+    for (let index = 0; index < MAX_GATE_BINS; index += 1) {
+      const name = `worktree-gate-binary-number-${index}-with-a-very-long-name-for-the-clip`;
+      devDependencies[name] = "1.0.0";
+      names.push(name);
+    }
+    addNativeManifest(dir, { name: "fixture", devDependencies });
+    // The FULL MAX_GATE_BINS list (every gate-bin name the kernel can report;
+    // every other test here names one bin, which can never trip the 2048-char
+    // head clip) of PATH-masked shims under a deep sibling. Each entry costs
+    // ~270 chars (long name + the deep sibling path), so this is the reachable
+    // worst case — the acceptance's 10 long paths is the write gate's
+    // `MAX_CLAIM_WRITE_NAMES` cap, not a bin cap — and it overruns the cap by
+    // several entries. `startFailure` clips the composed message at
+    // MAX_NATIVE_ERROR_CHARS = 2048 and keeps the HEAD, so advice APPENDED
+    // after the kernel refusal — or the remedy the refusal itself tails — is
+    // exactly what the clip eats. The remedies must therefore lead.
+    const siblingBinDir = join(
+      dirname(dir),
+      "deeply",
+      "nested",
+      "module",
+      "path",
+      "number",
+      "with",
+      "a",
+      "long",
+      "sibling",
+      "checkout",
+      "node_modules",
+      ".bin",
+    );
+    mkdirSync(siblingBinDir, { recursive: true });
+    for (const name of names) {
+      writeFileSync(join(siblingBinDir, name), "#!/bin/sh\nexit 0\n", "utf8");
+      chmodSync(join(siblingBinDir, name), 0o755);
+    }
+    setNativePreCommitHook(dir, "#!/bin/sh\nexit 1\n");
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const savedPath = process.env.PATH ?? "";
+    process.env.PATH = `${siblingBinDir}:${savedPath}`;
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    } finally {
+      process.env.PATH = savedPath;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    const payload = typed.envelope;
+    const claimCommit = payload.claimCommit as Record<string, unknown>;
+    expect(claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+      reason: "fresh-worktree install gate refused",
+    });
+    const message = String((payload.error as { message?: unknown }).message);
+    const sorted = [...names].sort();
+    const firstEntry = `${sorted[0]}: resolves only via PATH from ${join(siblingBinDir, sorted[0])}`;
+    // The actionable advice survives the clip: the prep log and the `npm ci`
+    // remedy come FIRST (with the native worktree-kept/attach re-run ahead of
+    // the kernel refusal entirely), so the head-clip keeps them.
+    expect(message).toContain("The worktree was kept at");
+    expect(message).toContain("npm ci");
+    expect(message).toContain("Preparation ran:");
+    const firstNamedIndex = message.indexOf(firstEntry);
+    expect(firstNamedIndex).toBeGreaterThan(-1);
+    expect(message.indexOf("The worktree was kept at")).toBeLessThan(firstNamedIndex);
+    expect(message.indexOf("npm ci")).toBeLessThan(firstNamedIndex);
+    expect(message.indexOf("Preparation ran:")).toBeLessThan(firstNamedIndex);
+    // Negative control: the message is pinned at the cap and the LAST named
+    // entry is gone — the test cannot pass on a merely longer message.
+    expect(message.length).toBe(2048);
+    expect(message).not.toContain(sorted[sorted.length - 1]);
+  });
+
   /**
    * Arm `x-tracker.strict-gate-bins` (task-start-gate-strict-mode) on the
    * seeded tree. Committed: a dirty tracker tree would trip start's stale
@@ -1958,6 +2040,86 @@ describe("worktree domain tools (W4)", () => {
     ]);
   });
 
+  it("keeps the named bins and the attach re-run inside the clipped strict gate-bin refusal when the named-bin list is at its worst case (bug-native-refusal-advice-clipped-by-head-clip)", async () => {
+    const dir = seedGitTree();
+    const devDependencies: Record<string, string> = {};
+    const names: string[] = [];
+    for (let index = 0; index < MAX_GATE_BINS; index += 1) {
+      const name = `worktree-gate-binary-number-${index}-with-a-very-long-name-for-the-clip`;
+      devDependencies[name] = "1.0.0";
+      names.push(name);
+    }
+    addNativeManifest(dir, { name: "fixture", devDependencies });
+    armStrictGateBins(dir);
+    setNativePreCommitHook(dir, "#!/bin/sh\nexit 1\n");
+    // Same worst-case shape as the fresh-worktree refusal's test: the full
+    // MAX_GATE_BINS list of PATH-masked shims under a deep sibling, so
+    // `MAX_NATIVE_ERROR_CHARS` (2048) clips the composed message HEAD-first and
+    // only the leading advice and the first named bins survive.
+    const siblingBinDir = join(
+      dirname(dir),
+      "deeply",
+      "nested",
+      "module",
+      "path",
+      "number",
+      "with",
+      "a",
+      "long",
+      "sibling",
+      "checkout",
+      "node_modules",
+      ".bin",
+    );
+    mkdirSync(siblingBinDir, { recursive: true });
+    for (const name of names) {
+      writeFileSync(join(siblingBinDir, name), "#!/bin/sh\nexit 0\n", "utf8");
+      chmodSync(join(siblingBinDir, name), 0o755);
+    }
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const savedPath = process.env.PATH ?? "";
+    process.env.PATH = `${siblingBinDir}:${savedPath}`;
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    } finally {
+      process.env.PATH = savedPath;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    const payload = typed.envelope;
+    const claimCommit = payload.claimCommit as Record<string, unknown>;
+    expect(claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+      reason: "strict gate-bin gate refused",
+    });
+    const message = String((payload.error as { message?: unknown }).message);
+    const sorted = [...names].sort();
+    const firstEntry = `${sorted[0]}: resolves only via PATH from ${join(siblingBinDir, sorted[0])}`;
+    // The actionable advice survives the clip: the attach re-run FIRST, then
+    // the named bins (the evidence the clip starts eating last).
+    expect(message).toContain("The worktree was kept at");
+    expect(message).toContain("it attaches to the existing worktree and retries the claim commit");
+    const firstNamedIndex = message.indexOf(firstEntry);
+    expect(firstNamedIndex).toBeGreaterThan(-1);
+    expect(message.indexOf("it attaches to the existing worktree and retries the claim commit")).toBeLessThan(
+      firstNamedIndex,
+    );
+    // The kernel refusal's OWN remedy must survive too
+    // (task-strictgatebinfailure-tail-clipped-by-head-clip): it used to trail
+    // the named list, so at this worst case the head-clip ate the only fix and
+    // left the diagnosis alone. It now leads, inside the kept head window.
+    expect(message).toContain("npm ci");
+    expect(message.indexOf("npm ci")).toBeLessThan(firstNamedIndex);
+    // Negative control: pinned at the cap, last named entry gone.
+    expect(message.length).toBe(2048);
+    expect(message).not.toContain(sorted[sorted.length - 1]);
+  });
+
   it("claims normally when strict-gate-bins is armed and the bin resolves from the worktree (task-start-gate-strict-mode)", async () => {
     // Strict mode never invents a violation: a worktree-resolved gate bin
     // commits exactly as it does with the flag unset.
@@ -2003,6 +2165,44 @@ describe("worktree domain tools (W4)", () => {
       worktreePath,
       ["rev-parse", "--absolute-git-dir"],
     ).trim();
+  }
+
+  /** A tracked write inside the claimed worktree, after the stamp (the F12 signature). */
+  function foreignWrite(worktreePath: string): void {
+    const itemFile = join(
+      worktreePath,
+      "ArggonManager",
+      "launch-mvp",
+      "auth",
+      "story-login",
+      "task-rate-limit.md",
+    );
+    writeFileSync(itemFile, readFileSync(itemFile, "utf8") + "\n<!-- foreign edit -->\n", "utf8");
+    const when = new Date(Date.now() + 60_000);
+    utimesSync(itemFile, when, when);
+  }
+
+  /** The claim stamp file as the kernel wrote it. */
+  function readStamp(dir: string, worktreePath: string): Record<string, unknown> {
+    return JSON.parse(
+      readFileSync(join(worktreeGitDir(dir, worktreePath), "arggon-claim.json"), "utf8"),
+    ) as Record<string, unknown>;
+  }
+
+  /**
+   * Claim the seeded item and return the worktree path — the state every
+   * single-writer/take-over test starts from (one stamped owner, no newer
+   * writes yet).
+   */
+  async function startAndStamp(
+    defs: ArgonToolDefinition[],
+    sessionID: string,
+  ): Promise<string> {
+    const first = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID },
+    );
+    return String((first.output as { worktreePath?: unknown }).worktreePath);
   }
 
   it("stamps the worktree with the calling session and warns (report-only) when a foreign session attaches over newer writes (task-single-writer-worktree-enforcement)", async () => {
@@ -2122,6 +2322,331 @@ describe("worktree domain tools (W4)", () => {
     const claimed = itemData(dir, "task-rate-limit", worktreePath);
     expect(claimed.assignee).toBe("smoke");
     expect(readFileSync(itemFile, "utf8")).toContain("<!-- foreign edit -->");
+    // The refusal names the take-over hatch, NOT a plain re-run: a retry
+    // cannot succeed while the fired detection stands (the anti-unlock rule
+    // keeps the previous stamp, so every retry re-detects).
+    expect(message).toContain("A plain re-run cannot clear this");
+    expect(message).toContain("takeOverWorktree: true");
+    expect(message).toContain("confirming no live writer");
+    expect(message).not.toContain("assignee: \"smoke\" }) —");
+  });
+
+  it("keeps both remedies inside the clipped refusal message when the dirty-path list is at its worst case (task-native-start-take-over-input review finding: the clip ate the advice)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    armStrictWorktreeWrites(dir);
+    // The kernel names up to 10 dirty paths, and `startFailure` clips the
+    // composed message HEAD-first at 2048 chars. Ten ~60-char paths are the
+    // case where advice APPENDED after the refusal disappears: one short file
+    // (every other test here) can never see the clip, which is exactly how the
+    // ordering defect survived review.
+    const paths: string[] = [];
+    for (let index = 0; index < 10; index += 1) {
+      const name = `deeply/nested/module/path/number-${index}/with-a-long-file-name-here.md`;
+      const file = join(worktreePath, name);
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, `dirty ${index}\n`, "utf8");
+      git(worktreePath, ["add", name]);
+      paths.push(name);
+    }
+    for (const name of paths) {
+      const file = join(worktreePath, name);
+      const when = new Date(Date.now() + 60_000);
+      utimesSync(file, when, when);
+    }
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute(
+        { id: "task-rate-limit", assignee: "smoke" },
+        { sessionID: "ses_b" },
+      );
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const message = String(((caught as ArgonToolError).envelope.error as { message?: unknown }).message);
+    // Both remedies survive the clip.
+    expect(message).toContain("takeOverWorktree: true");
+    expect(message).toContain("arggon-claim.json");
+    expect(message).toContain("confirming no live writer");
+    // The kernel's own diagnosis survives too: it leads the message now, so the
+    // stamped owner and the file count are never what gets clipped.
+    expect(message).toContain("x-tracker.strict-worktree-writes is set");
+    expect(message).toContain("ses_a");
+    expect(message).toContain("10 tracked files were modified after that claim");
+    // ORDER is the pinned contract, not the prose: every actionable clause
+    // precedes the named-file list, which is the only thing allowed to clip.
+    const firstFile = message.indexOf(paths[0]);
+    expect(firstFile).toBeGreaterThan(-1);
+    for (const clause of [
+      "takeOverWorktree: true",
+      "arggon-claim.json",
+      "A plain re-run cannot clear this",
+    ]) {
+      expect(message.indexOf(clause)).toBeLessThan(firstFile);
+    }
+    // The clip really did bite (otherwise this test would pass vacuously on a
+    // message that simply got longer).
+    expect(message.length).toBeLessThanOrEqual(2048);
+    expect(message).not.toContain(paths[paths.length - 1]);
+  });
+
+  it("takes over a presumed-dead stamped owner on the native seam: the claim lands and the stamp carries the chain (task-strict-attach-dead-owner-hatch)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    // One stamped owner (ses_a) whose session is presumed dead, then a
+    // foreign tracked write inside its window — the F12 signature.
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    const previous = readStamp(dir, worktreePath);
+    foreignWrite(worktreePath);
+    // The gate is ARMED: without the take-over input this attach refuses.
+    armStrictWorktreeWrites(dir);
+
+    const taken = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke", takeOverWorktree: true },
+      { sessionID: "ses_b" },
+    );
+    const output = taken.output as Record<string, unknown>;
+    expect(output.worktreeCreated).toBe(false);
+    // The armed strict gate is resolved BY the kernel's take-over: the fired
+    // evidence moved out of `foreignWrites`, so the unchanged gate never fires.
+    expect(output.claimCommitted).toBe(true);
+    const preparation = output.preparation as {
+      claim?: {
+        stamped: boolean;
+        foreignWrites?: unknown;
+        takeOver?: {
+          at: string;
+          by: string;
+          replacedIdentity: string;
+          replacedClaimedAt: string;
+          replaced: Record<string, unknown>;
+          files: string[];
+          total: number;
+        };
+      };
+    };
+    expect(preparation.claim?.foreignWrites).toBeUndefined();
+    const takeOver = preparation.claim?.takeOver;
+    expect(takeOver?.by).toBe("ses_b");
+    expect(takeOver?.replacedIdentity).toBe("ses_a");
+    expect(takeOver?.replacedClaimedAt).toBe(previous.claimedAt);
+    expect(Date.parse(String(takeOver?.at))).not.toBeNaN();
+    // The replaced stamp is reported in FULL, and the evidence the detection
+    // saw moved here (never dropped — the bounded mapping is a whitelist).
+    expect(takeOver?.replaced).toEqual({
+      identity: "ses_a",
+      item: "task-rate-limit",
+      branch: "feat/task-rate-limit",
+      claimedAt: previous.claimedAt,
+      assignee: "smoke",
+      surface: "native",
+    });
+    expect(takeOver?.total).toBe(1);
+    expect(takeOver?.files).toEqual([
+      "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md",
+    ]);
+    // The worktree is re-stamped with the new identity, and the chain is the
+    // persisted audit trail of who replaced whose dead claim.
+    const after = readStamp(dir, worktreePath);
+    expect(after.identity).toBe("ses_b");
+    expect(after.item).toBe("task-rate-limit");
+    expect(after.takeovers).toEqual([
+      {
+        at: takeOver?.at,
+        by: "ses_b",
+        replacedIdentity: "ses_a",
+        replacedClaimedAt: previous.claimedAt,
+      },
+    ]);
+    // The item's copy in the worktree really is claimed by the taker.
+    expect(itemData(dir, "task-rate-limit", worktreePath)).toMatchObject({
+      status: "in_progress",
+      assignee: "smoke",
+    });
+  });
+
+  it("keeps the take-over byte-identical when no detection fired (default identity, task-strict-attach-dead-owner-hatch)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    // A clean attach by the SAME owner: nothing to take over from, so the flag
+    // must change NOTHING — not even a chain entry in the stamp.
+    await startAndStamp(defs, "ses_a");
+    const worktreePath = join(dirname(dir), `${basename(dir)}-task-rate-limit`);
+    const before = readStamp(dir, worktreePath);
+
+    const retry = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke", takeOverWorktree: true },
+      { sessionID: "ses_a" },
+    );
+    const preparation = (retry.output as Record<string, unknown>).preparation as {
+      claim?: Record<string, unknown>;
+    };
+    expect(preparation.claim).toEqual({ stamped: true });
+    // Same identity, refreshed claim time only: no `takeovers` key anywhere.
+    const after = readStamp(dir, worktreePath);
+    expect(after.identity).toBe("ses_a");
+    expect(after.takeovers).toBeUndefined();
+    expect(after.claimedAt).not.toBe(before.claimedAt);
+  });
+
+  it("keeps the take-over a no-op on a fired detection without the input, and never silently ignores the input (task-strict-attach-dead-owner-hatch)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    foreignWrite(worktreePath);
+    const before = readStamp(dir, worktreePath);
+
+    // No input: the default is byte-identical to the CLI's — the detection
+    // still rides `foreignWrites` and the previous stamp is left alone.
+    const plain = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_b" },
+    );
+    const claim = (plain.output as Record<string, unknown>).preparation as {
+      claim?: { stamped: boolean; foreignWrites?: { owner: string }; takeOver?: unknown };
+    };
+    expect(claim.claim?.stamped).toBe(true);
+    expect(claim.claim?.takeOver).toBeUndefined();
+    expect(claim.claim?.foreignWrites?.owner).toBe("ses_a");
+    expect(readStamp(dir, worktreePath)).toEqual(before);
+
+    // The take-over input WITHOUT a worktree is rejected rather than ignored:
+    // a silently dropped flag is how a recovery step gets believed to have run.
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({
+        id: "task-rate-limit",
+        assignee: "smoke",
+        worktree: false,
+        takeOverWorktree: true,
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    const message = String((typed.envelope.error as { message?: unknown }).message);
+    expect(message).toContain("takeOverWorktree requires worktree");
+  });
+
+  it("bounds the take-over evidence: an over-cap named-file list and the replaced stamp's chain both fold into `truncated` (task-strict-attach-dead-owner-hatch)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    // Twelve tracked writes in the stamped owner's window: the kernel names at
+    // most 10, so `total > files.length` and the count must not read as the
+    // whole set.
+    for (let index = 0; index < 12; index += 1) {
+      const file = join(worktreePath, `dirty-${String(index).padStart(2, "0")}.md`);
+      writeFileSync(file, `dirty ${index}\n`, "utf8");
+      git(worktreePath, ["add", `dirty-${String(index).padStart(2, "0")}.md`]);
+    }
+    const stampPath = join(worktreeGitDir(dir, worktreePath), "arggon-claim.json");
+    // An attacker-shaped stamp: a huge free-text identity and a chain far
+    // above the kernel's own 5-entry cap, read back out of the git dir.
+    const hostile = JSON.parse(readFileSync(stampPath, "utf8")) as Record<string, unknown>;
+    hostile.identity = "x".repeat(5_000);
+    hostile.takeovers = Array.from({ length: 40 }, (_unused, index) => ({
+      at: `2020-01-0${(index % 9) + 1}T00:00:00.000Z`,
+      by: `taker-${index}`,
+      replacedIdentity: `owner-${index}`,
+      replacedClaimedAt: "2019-01-01T00:00:00.000Z",
+    }));
+    writeFileSync(stampPath, `${JSON.stringify(hostile)}\n`, "utf8");
+
+    const taken = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke", takeOverWorktree: true },
+      { sessionID: "ses_b" },
+    );
+    const preparation = (taken.output as Record<string, unknown>).preparation as {
+      claim?: {
+        takeOver?: {
+          replacedIdentity: string;
+          replaced: {
+            identity: string;
+            takeovers?: Array<{ by: string }>;
+          };
+          files: string[];
+          total: number;
+        };
+      };
+      truncated?: boolean;
+    };
+    const takeOver = preparation.claim?.takeOver;
+    expect(takeOver?.total).toBeGreaterThan(takeOver?.files.length ?? 0);
+    expect(takeOver?.files.length).toBeLessThanOrEqual(32);
+    // Free text is bounded, and the replaced stamp's chain is capped by the
+    // mapping's own list cap rather than passed through wholesale.
+    expect(String(takeOver?.replacedIdentity).length).toBeLessThanOrEqual(200);
+    expect(String(takeOver?.replaced.identity).length).toBeLessThanOrEqual(200);
+    expect(takeOver?.replaced.takeovers?.length).toBeLessThanOrEqual(32);
+    // A capped list is never passed off as the whole set.
+    expect(preparation.truncated).toBe(true);
+  });
+
+  it("folds CHARACTER clipping of the take-over's free text into `truncated`, not just the list caps (task-native-start-take-over-input review finding)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    // Exactly ONE dirty path, and it is over `MAX_NATIVE_PREPARATION_VALUE_CHARS`
+    // (200): the list cap and `total > files.length` cannot fire here, so the
+    // only honest signal that the value was shortened is `truncated` itself.
+    const longPath = `deep/${"segment-".repeat(28)}end.md`;
+    expect(longPath.length).toBeGreaterThan(200);
+    const longFile = join(worktreePath, longPath);
+    mkdirSync(dirname(longFile), { recursive: true });
+    writeFileSync(longFile, "dirty\n", "utf8");
+    git(worktreePath, ["add", longPath]);
+    const when = new Date(Date.now() + 60_000);
+    utimesSync(longFile, when, when);
+    // A replaced identity over the same per-value cap, and a chain the kernel's
+    // own reader accepts (5 entries) so the length-cap branch stays out of it.
+    const stampPath = join(worktreeGitDir(dir, worktreePath), "arggon-claim.json");
+    const hostile = JSON.parse(readFileSync(stampPath, "utf8")) as Record<string, unknown>;
+    hostile.identity = "y".repeat(600);
+    hostile.branch = "z".repeat(600);
+    hostile.takeovers = Array.from({ length: 5 }, (_unused, index) => ({
+      at: `2020-01-0${index + 1}T00:00:00.000Z`,
+      by: `taker-${index}`,
+      replacedIdentity: `owner-${index}`,
+      replacedClaimedAt: "2019-01-01T00:00:00.000Z",
+    }));
+    writeFileSync(stampPath, `${JSON.stringify(hostile)}\n`, "utf8");
+
+    const taken = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke", takeOverWorktree: true },
+      { sessionID: "ses_b" },
+    );
+    const preparation = (taken.output as Record<string, unknown>).preparation as {
+      claim?: {
+        takeOver?: {
+          replaced: { identity: string; branch: string };
+          files: string[];
+          total: number;
+        };
+      };
+      truncated?: boolean;
+    };
+    const takeOver = preparation.claim?.takeOver;
+    // Nothing was DROPPED here: one path named, the count honest. Only the
+    // characters were clipped.
+    expect(takeOver?.total).toBe(1);
+    expect(takeOver?.files).toHaveLength(1);
+    expect(String(takeOver?.files[0]).length).toBeLessThanOrEqual(200);
+    expect(String(takeOver?.replaced.identity).length).toBeLessThanOrEqual(200);
+    expect(String(takeOver?.replaced.branch).length).toBeLessThanOrEqual(200);
+    // …and that is exactly why the receipt must SAY so.
+    expect(preparation.truncated).toBe(true);
   });
 
   it("start refuses to steal a claim and removes the worktree it just created", async () => {
@@ -3183,6 +3708,331 @@ describe("worktree domain tools (W4)", () => {
     }
     expect(caught).toBeInstanceOf(ArgonToolError);
     expect((caught as ArgonToolError).code).toBe("CLEANUP_FAILED");
+  });
+});
+
+/**
+ * Native release of a dropped claim (bug-unclaim-leaves-worktree-record-without-reaper):
+ * the inverse of `start`, the other arm of the worktree domain, sharing the CLI's
+ * kernel rule (`classifyReleaseEntry`) and reporting in its own action family.
+ * `update` cannot release (it is frontmatter-only, and it is the same call that
+ * clears the record), so the native `update` envelope must NAME this path — that
+ * is the parity under test, together with the refusal that protects a live
+ * writer.
+ */
+describe("native release of a dropped claim (bug-unclaim-leaves-worktree-record-without-reaper)", () => {
+  /** A tracked write inside the claimed worktree, newer than the stamp. */
+  function foreignWriteIn(worktreePath: string): void {
+    const itemFile = join(
+      worktreePath,
+      "ArggonManager",
+      "launch-mvp",
+      "auth",
+      "story-login",
+      "task-rate-limit.md",
+    );
+    writeFileSync(itemFile, `${readFileSync(itemFile, "utf8")}\n<!-- foreign edit -->\n`, "utf8");
+    const when = new Date(Date.now() + 60_000);
+    utimesSync(itemFile, when, when);
+  }
+
+  /** Claim with a worktree and merge the claim so the canonical copy sees it. */
+  async function claimedAndMerged(
+    dir: string,
+  ): Promise<{ worktreePath: string; defs: ArgonToolDefinition[]; calls: ReturnType<typeof fakeDomain>["calls"] }> {
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const started = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_a" },
+    );
+    const worktreePath = String((started.output as { worktreePath?: unknown }).worktreePath);
+    git(dir, ["merge", "--no-ff", "feat/task-rate-limit", "-m", "Merge claim (stubbed)"]);
+    return { worktreePath, defs, calls };
+  }
+
+  it("release removes the worktree through the domain, reaps the stamp, clears the record", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await claimedAndMerged(dir);
+    const stamp = join(
+      gitOut(worktreePath, ["rev-parse", "--absolute-git-dir"]).trim(),
+      "arggon-claim.json",
+    );
+    expect(existsSync(stamp)).toBe(true);
+
+    // The unclaim goes through the same native `update` any agent would call;
+    // it must report the footprint and name the release tool.
+    const unclaimed = await tool(defs, "update").execute(
+      { id: "task-rate-limit", status: "todo" },
+      { sessionID: "ses_a" },
+    );
+    const footprint = (unclaimed.output as Record<string, unknown>).claimFootprint as
+      | Record<string, unknown>
+      | undefined;
+    expect(footprint).toMatchObject({
+      worktreePath: resolve(worktreePath),
+      release: { native: 'tools.arggon.cleanup({ release: "task-rate-limit" })' },
+    });
+
+    const output = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    const envelope = output.output as Record<string, unknown>;
+    expect(envelope.failures).toEqual([]);
+    expect(envelope.release).toMatchObject({
+      id: "task-rate-limit",
+      releasable: true,
+      branch: "feat/task-rate-limit",
+    });
+    // The stamp step comes AFTER the observed removal (M2 parity): a failed
+    // removal must leave the single-writer evidence standing. This fixture's
+    // domain removal is a real `git worktree remove`, which takes the worktree's
+    // git dir with it, so the stamp is reported as gone WITH the worktree; the
+    // explicit reap (`reaped arggon-claim.json stamp`) is the domain path that
+    // leaves the admin dir behind.
+    expect(envelope.released).toEqual([
+      { id: "task-rate-limit", action: `removed worktree ${worktreePath}` },
+      { id: "task-rate-limit", action: "arggon-claim.json stamp gone with the worktree" },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    // Domain removal (never a bare git call in the plugin path), and the
+    // unforced policy: only the take-over hatch forces.
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: false },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+    expect(existsSync(stamp)).toBe(false);
+    expect(gitOut(dir, ["worktree", "list"]).includes("task-rate-limit")).toBe(false);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+    // A distinct family, never mixed into prune's.
+    expect(envelope.pruned).toEqual([]);
+    expect(envelope.candidates).toEqual([]);
+  });
+
+  it("refuses to release a worktree another live session holds, and takes over only when armed", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await claimedAndMerged(dir);
+    await tool(defs, "update").execute(
+      { id: "task-rate-limit", status: "todo" },
+      { sessionID: "ses_a" },
+    );
+    // A different session's tracked write after the stamp: the F12 signature of
+    // a live writer, which a release must never rob.
+    foreignWriteIn(worktreePath);
+
+    const refused = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_b" },
+    );
+    const envelope = refused.output as Record<string, unknown>;
+    expect((envelope.release as Record<string, unknown>).releasable).toBe(false);
+    expect(String((envelope.release as Record<string, unknown>).reason)).toContain(
+      "refusing to release the worktree",
+    );
+    expect(envelope.failures).toHaveLength(1);
+    expect(calls.remove).toEqual([]);
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+
+    // The audited hatch for a presumed-dead owner releases it (and forces the
+    // removal, since the dead owner's uncommitted work is the point).
+    const taken = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit", take_over_worktree: true },
+      { sessionID: "ses_b" },
+    );
+    expect((taken.output as Record<string, unknown>).failures).toEqual([]);
+    expect((taken.output as Record<string, unknown>).release).toMatchObject({
+      takeOver: { replacedIdentity: "ses_a" },
+    });
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: true },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+  });
+
+  it("refuses a release under a live claim, and refuses release together with prune", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs } = await claimedAndMerged(dir);
+
+    const refused = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    expect(String((refused.output.release as Record<string, unknown>).reason)).toContain(
+      "still claimed by smoke",
+    );
+    expect(existsSync(worktreePath)).toBe(true);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "cleanup").execute({ release: "task-rate-limit", prune: true });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    expect((caught as ArgonToolError).code).toBe("CLEANUP_FAILED");
+    expect(String((caught as ArgonToolError).envelope.error.message)).toContain(
+      "either release or prune",
+    );
+  });
+
+  // --- review round 2 ---------------------------------------------------
+  // m6: the still-claimed refusal is unconditional on both surfaces — a
+  // re-claimed item has a live owner and nothing durable records an override.
+  it("m6: take_over_worktree does not bypass the still-claimed refusal", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await claimedAndMerged(dir);
+
+    const refused = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit", take_over_worktree: true },
+      { sessionID: "ses_a" },
+    );
+    expect((refused.output.release as Record<string, unknown>).releasable).toBe(false);
+    expect(String((refused.output.release as Record<string, unknown>).reason)).toContain(
+      "not overridable",
+    );
+    expect(calls.remove).toEqual([]);
+    expect(existsSync(worktreePath)).toBe(true);
+  });
+
+  // m5: the hatch authorizes a release; without one it is a typed refusal, never
+  // a silent no-op (`start` already refuses takeOverWorktree without worktree).
+  it("m5: take_over_worktree without release fails typed", async () => {
+    const dir = seedGitTree();
+    const { defs } = await completedWorktree(dir);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "cleanup").execute({ take_over_worktree: true });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    expect((caught as ArgonToolError).code).toBe("CLEANUP_FAILED");
+    expect(String((caught as ArgonToolError).envelope.error.message)).toContain(
+      "take_over_worktree requires release",
+    );
+  });
+
+  // M2: a dirty worktree is refused during classification, so nothing is
+  // reaped — the claim stamp (the single-writer evidence) and the env file
+  // survive the refused release. Reaping them before the removal is what
+  // disarmed every later attempt.
+  it("M2: a dirty worktree is refused with its stamp + env intact; only the hatch forces it", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await claimedAndMerged(dir);
+    await tool(defs, "update").execute(
+      { id: "task-rate-limit", status: "todo" },
+      { sessionID: "ses_a" },
+    );
+    const stamp = join(
+      gitOut(worktreePath, ["rev-parse", "--absolute-git-dir"]).trim(),
+      "arggon-claim.json",
+    );
+    foreignWriteIn(worktreePath);
+
+    const refused = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    const release = refused.output.release as Record<string, unknown>;
+    expect(release.releasable).toBe(false);
+    expect(String(release.reason)).toContain("uncommitted or untracked file");
+    expect(release.blockingTotal).toBeGreaterThan(0);
+    expect(calls.remove).toEqual([]);
+    // The evidence and the env contract both survive: nothing was reaped.
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(existsSync(stamp)).toBe(true);
+    expect(existsSync(join(worktreePath, ".arggon.env"))).toBe(true);
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+
+    const forced = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit", take_over_worktree: true },
+      { sessionID: "ses_a" },
+    );
+    expect((forced.output as Record<string, unknown>).failures).toEqual([]);
+    expect(String((forced.output.release as Record<string, unknown>).action)).toContain(
+      "forced past its uncommitted content",
+    );
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: true },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+    expect(existsSync(stamp)).toBe(false);
+  });
+
+  // M3: the release owns its tracker commit and reports it. Committing inside
+  // the release and then letting the run-level commit stage the same path
+  // reported `skipped: "nothing to commit"` for a commit it had just made.
+  it("M3: the native release reports its own commit (never a skipped nothing-to-commit)", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs } = await claimedAndMerged(dir);
+    await tool(defs, "update").execute(
+      { id: "task-rate-limit", status: "todo" },
+      { sessionID: "ses_a" },
+    );
+
+    const output = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    const envelope = output.output as Record<string, unknown>;
+    expect(envelope.commit).toMatchObject({ message: "chore(tasks): released task-rate-limit" });
+    expect((envelope.commit as Record<string, unknown>).hash).toEqual(expect.any(String));
+    expect((envelope.commit as Record<string, unknown>).skipped).toBeUndefined();
+    // The commit really happened: the cleared record is committed on main.
+    expect(gitOut(dir, ["log", "-1", "--format=%s"])).toContain("chore(tasks): released");
+    expect(gitOut(dir, ["status", "--porcelain", "ArggonManager"])).toBe("");
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+    expect(existsSync(worktreePath)).toBe(false);
+  });
+
+  // M3 parity: the release envelope must match `cleanup --release --json` on the
+  // same fixture shape (the prune arm's twin at the list-mode parity test).
+  // Only the commit hash differs — two trees, two commits — so it is normalized.
+  it("M3: the release envelope is identical to `cleanup --release <id> --json` (CLI parity)", async () => {
+    const nativeDir = seedGitTree("arggon-relparity-a-");
+    const cliDir = seedGitTree("arggon-relparity-b-");
+    const build = async (dir: string) => {
+      const { domain } = fakeDomain(dir);
+      const defs = worktreeDefinitions(dir, domain);
+      await tool(defs, "start").execute(
+        { id: "task-rate-limit", assignee: "smoke" },
+        { sessionID: "ses_a" },
+      );
+      git(dir, ["merge", "--no-ff", "feat/task-rate-limit", "-m", "Merge claim (stubbed)"]);
+      await tool(defs, "update").execute(
+        { id: "task-rate-limit", status: "todo" },
+        { sessionID: "ses_a" },
+      );
+      return defs;
+    };
+    const nativeDefs = await build(nativeDir);
+    await build(cliDir); // the CLI twin: driven through the spawned CLI below
+    // The CLI resolves its own identity (the fixture's git user.name); both
+    // surfaces run unclaimed with a clean worktree, so the single-writer gate is
+    // not involved on either side.
+    const cliProc = runCli(["cleanup", "--release", "task-rate-limit", "--json", "--no-gh"], cliDir);
+    expect(cliProc.status, cliProc.stderr).toBe(0);
+
+    const native = await tool(nativeDefs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    const normalize = (envelope: Record<string, unknown>, dir: string): unknown => {
+      const copy = JSON.parse(
+        JSON.stringify(envelope).split(dir).join("<ROOT>"),
+      ) as Record<string, unknown>;
+      const commit = copy.commit as Record<string, unknown> | undefined;
+      if (commit !== undefined) delete commit.hash; // two trees, two hashes
+      return copy;
+    };
+    expect(normalize(native.output as Record<string, unknown>, nativeDir)).toEqual(
+      normalize(JSON.parse(cliProc.stdout) as Record<string, unknown>, cliDir),
+    );
   });
 });
 

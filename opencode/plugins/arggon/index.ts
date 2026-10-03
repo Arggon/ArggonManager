@@ -2228,14 +2228,64 @@ type NativeClaimWriteReport = {
 }
 
 /**
+ * One persisted take-over chain entry (`WorktreeClaimTakeoverRecord`): who took
+ * a worktree over, when, and which stamp it replaced. Deliberately narrow (four
+ * fields) so the chain in the stamp file cannot grow with a chatty history.
+ */
+type NativeClaimTakeoverRecord = {
+  at: string
+  by: string
+  replacedIdentity: string
+  replacedClaimedAt: string
+}
+
+/**
+ * The replaced ownership stamp (`WorktreeClaimStamp`), reported in full on a
+ * take-over so the audit trail names the presumed-dead owner, their item and
+ * branch — not just an opaque id.
+ */
+type NativeClaimStamp = {
+  identity: string
+  item: string
+  branch: string
+  claimedAt: string
+  assignee?: string
+  surface?: string
+  takeovers?: NativeClaimTakeoverRecord[]
+}
+
+/**
+ * A deliberate take-over of a presumed-dead stamped owner
+ * (task-strict-attach-dead-owner-hatch), structurally the kernel's
+ * `WorktreeClaimTakeover`. The kernel moves the fired evidence OUT of
+ * `foreignWrites` into this field, so exactly one of the two is ever present
+ * and an authorized take-over resolves the armed strict gate unchanged. The
+ * evidence is MOVED, never dropped — this mapping is a whitelist, so a field
+ * missing here would make the take-over resolve the gate AND vanish from the
+ * tool result.
+ */
+type NativeClaimTakeover = {
+  at: string
+  by: string
+  replacedIdentity: string
+  replacedClaimedAt: string
+  replaced: NativeClaimStamp
+  files: string[]
+  total: number
+}
+
+/**
  * The claim-stamp receipt (task-single-writer-worktree-enforcement),
  * structurally the kernel's `WorktreeClaimReceipt`: `stamped` reports the
  * rolling ownership stamp; a fired `foreignWrites` report is a WARNING by
- * default and an attach refusal under `x-tracker.strict-worktree-writes`.
+ * default and an attach refusal under `x-tracker.strict-worktree-writes`;
+ * `takeOver` is the authorized replacement of a presumed-dead stamp
+ * (task-strict-attach-dead-owner-hatch), reported instead of `foreignWrites`.
  */
 type NativeClaimReceipt = {
   stamped: boolean
   foreignWrites?: NativeClaimWriteReport
+  takeOver?: NativeClaimTakeover
   warning?: string
 }
 
@@ -2336,6 +2386,7 @@ function boundedPreparation(input: {
     (input.gateBins?.length ?? 0) > gateBins.length ||
     (claim?.foreignWrites !== undefined &&
       claim.foreignWrites.total > claim.foreignWrites.files.length) ||
+    (claim !== undefined && claimTakeoverTruncated(claim, input.claim)) ||
     built.some((name, index) => name !== input.builtWorkspaces[index]) ||
     linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
     missing.some((name, index) => name !== input.missingDependencies[index]) ||
@@ -2367,6 +2418,16 @@ function boundedPreparation(input: {
  * Bound one claim-stamp receipt fragment: only the free-text fields (`owner`,
  * `claimedAt`, each `files` entry, `warning`) are re-bounded; `stamped` and
  * `total` are honest counts the kernel owns.
+ *
+ * `takeOver` (task-strict-attach-dead-owner-hatch) is PROJECTED with the same
+ * bounds, never dropped: it carries the fired evidence the kernel moved out of
+ * `foreignWrites`, so dropping it here would resolve the armed strict gate AND
+ * lose the audit record of who replaced whose dead claim. `replaced` is a stamp
+ * read out of the worktree's git dir, so it is attacker-shaped like every other
+ * free-text surface here — each of its strings is re-bounded and its nested
+ * `takeovers` chain is capped, with the kernel's own `MAX_CLAIM_TAKEOVERS` cap
+ * (5) below this function's list cap as the reason nothing is left to re-slice
+ * beyond the fold below.
  */
 function boundedClaimReceipt(input: NativeClaimReceipt): NativeClaimReceipt {
   const bounded: NativeClaimReceipt = { stamped: input.stamped }
@@ -2383,10 +2444,111 @@ function boundedClaimReceipt(input: NativeClaimReceipt): NativeClaimReceipt {
       total: input.foreignWrites.total,
     }
   }
+  if (input.takeOver !== undefined) {
+    bounded.takeOver = boundedClaimTakeover(input.takeOver)
+  }
   if (input.warning !== undefined) {
     bounded.warning = boundedNativeText(input.warning, MAX_NATIVE_PREPARATION_VALUE_CHARS)
   }
   return bounded
+}
+
+/** Bound one take-over receipt: free text and the replaced stamp's strings. */
+function boundedClaimTakeover(input: NativeClaimTakeover): NativeClaimTakeover {
+  return {
+    at: boundedNativeText(input.at, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+    by: boundedNativeText(input.by, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+    replacedIdentity: boundedNativeText(input.replacedIdentity, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+    replacedClaimedAt: boundedNativeText(
+      input.replacedClaimedAt,
+      MAX_NATIVE_PREPARATION_VALUE_CHARS,
+    ),
+    replaced: boundedClaimStamp(input.replaced),
+    files: input.files
+      .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+      .map((file) => boundedNativeText(file, MAX_NATIVE_PREPARATION_VALUE_CHARS)),
+    total: input.total,
+  }
+}
+
+/** Bound one replaced ownership stamp: every string re-bounded, chain capped. */
+function boundedClaimStamp(input: NativeClaimStamp): NativeClaimStamp {
+  const bounded: NativeClaimStamp = {
+    identity: boundedNativeText(input.identity, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+    item: boundedNativeText(input.item, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+    branch: boundedNativeText(input.branch, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+    claimedAt: boundedNativeText(input.claimedAt, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+  }
+  if (input.assignee !== undefined) {
+    bounded.assignee = boundedNativeText(input.assignee, MAX_NATIVE_PREPARATION_VALUE_CHARS)
+  }
+  if (input.surface !== undefined) {
+    bounded.surface = boundedNativeText(input.surface, MAX_NATIVE_PREPARATION_VALUE_CHARS)
+  }
+  if (input.takeovers !== undefined) {
+    bounded.takeovers = input.takeovers
+      .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+      .map((entry) => ({
+        at: boundedNativeText(entry.at, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+        by: boundedNativeText(entry.by, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+        replacedIdentity: boundedNativeText(
+          entry.replacedIdentity,
+          MAX_NATIVE_PREPARATION_VALUE_CHARS,
+        ),
+        replacedClaimedAt: boundedNativeText(
+          entry.replacedClaimedAt,
+          MAX_NATIVE_PREPARATION_VALUE_CHARS,
+        ),
+      }))
+  }
+  return bounded
+}
+
+/**
+ * True when bounding shortened the take-over's evidence: an over-cap named-file
+ * list, a string clipped at `MAX_NATIVE_PREPARATION_VALUE_CHARS`, or an over-cap
+ * chain inside the replaced stamp.
+ *
+ * The length fold is the honest "you are not seeing all of it" signal (the
+ * kernel owns both counts, so this never re-derives the evidence). The string
+ * fold is the same discipline the `built`/`linked`/`missingDependencies`
+ * projections already apply: a path or identity silently shortened to 200 chars
+ * and then reported as if it were the whole value is exactly the failure this
+ * flag exists to name — and a dirty tracked path over 200 chars is ordinary in
+ * any deep repo.
+ *
+ * The chain-cap term below is defense in depth: the kernel's stamp reader
+ * already caps `takeovers` at `MAX_CLAIM_TAKEOVERS` (5) before this mapper
+ * ever sees it, so through the kernel it cannot fire. It stays because the
+ * input is a file in the worktree's git dir, and an unreachable-but-harmless
+ * branch is cheaper than a silent assumption.
+ */
+function claimTakeoverTruncated(
+  bounded: NativeClaimReceipt,
+  input: NativeClaimReceipt | undefined,
+): boolean {
+  if (input === undefined) return true
+  const takeOver = bounded.takeOver
+  const source = input.takeOver
+  if (takeOver === undefined || source === undefined) return false
+  const replaced = source.replaced
+  const clipped =
+    takeOver.at !== source.at ||
+    takeOver.by !== source.by ||
+    takeOver.replacedIdentity !== source.replacedIdentity ||
+    takeOver.replacedClaimedAt !== source.replacedClaimedAt ||
+    takeOver.replaced.identity !== replaced.identity ||
+    takeOver.replaced.item !== replaced.item ||
+    takeOver.replaced.branch !== replaced.branch ||
+    takeOver.replaced.claimedAt !== replaced.claimedAt ||
+    takeOver.replaced.assignee !== replaced.assignee ||
+    takeOver.replaced.surface !== replaced.surface ||
+    takeOver.files.some((file, index) => file !== source.files[index])
+  return (
+    clipped ||
+    takeOver.total > takeOver.files.length ||
+    (replaced.takeovers?.length ?? 0) > (takeOver.replaced.takeovers?.length ?? 0)
+  )
 }
 
 /**
@@ -3242,6 +3404,13 @@ async function nativeStartBody(
   const claimIdentity = sessionToken(tool?.sessionID) ?? assignee
 
   const wantWorktree = input.worktree !== false
+  // Deliberate take-over of a presumed-dead stamped owner
+  // (task-strict-attach-dead-owner-hatch), the CLI's `--take-over-worktree`:
+  // forwarded to the kernel claim request so an attach whose single-writer
+  // detection fired re-stamps the worktree and records a dated take-over.
+  // Default OFF, and then nothing changes; the kernel only records a take-over
+  // when a detection FIRES, so a clean attach is a no-op, not a re-stamp.
+  const takeOverWorktree = input.takeOverWorktree === true
   // `worktree: false` is an explicit branch-only mode. Do not attach to (or
   // prepare) a stale `worktree_path` left by an earlier run; the canonical
   // checkout is the target and the result must report no worktree for this
@@ -3263,6 +3432,18 @@ async function nativeStartBody(
     extra: Record<string, unknown> = {},
   ): { ok: false; envelope: Record<string, unknown> } =>
     startNotAttempted(kernel, message, version, context(extra), reason)
+
+  // The take-over is worktree-scoped (same rule and same reason as the CLI):
+  // without a worktree there is no claim stamp to take over, and a silently
+  // ignored input is exactly how a recovery step gets believed to have
+  // happened. Refused before any branch or claim mutation.
+  if (takeOverWorktree && !wantWorktree) {
+    return failBeforeClaim(
+      "takeOverWorktree requires worktree (it takes over a claimed worktree's ownership " +
+        "stamp; a plain start writes no stamp)",
+      "invalid input",
+    )
+  }
 
   if (wantWorktree) {
     const canonical = primaryRoot
@@ -3423,6 +3604,13 @@ async function nativeStartBody(
             itemId: id,
             branch,
             surface: "native",
+            // Deliberate take-over (task-strict-attach-dead-owner-hatch): only
+            // recorded when a detection FIRES, so passing the flag on a clean
+            // attach is a no-op rather than a re-stamp. The kernel moves the
+            // fired evidence out of `foreignWrites` into `claim.takeOver`, so
+            // the strict gate below — unchanged — treats the authorized
+            // replacement as resolved and no surface change is needed here.
+            ...(takeOverWorktree ? { takeOver: true } : {}),
           },
         }),
       )
@@ -3466,11 +3654,22 @@ async function nativeStartBody(
         ? kernel.strictGateBinFailure(progress.preparation?.gateBins ?? [], worktreePath)
         : null
     if (strictRefusal !== null) {
+      // ORDER IS LOAD-BEARING, same contract the strict worktree-write gate
+      // below documents: `startFailure` clips the composed message HEAD-first
+      // at MAX_NATIVE_ERROR_CHARS (2048), and the worst case is the named-bin
+      // list at its MAX_GATE_BINS cap (~270 chars an entry). Advice APPENDED
+      // after the kernel refusal is then the first thing the clip eats — and it
+      // used to vanish whole, leaving only bin names with no way forward. So
+      // every remedy goes FIRST (the worktree-kept note + the attach re-run)
+      // and the kernel refusal closes the message: its lead sentence and the
+      // first named bins survive the clip, exactly the ordering #579 landed
+      // for strict worktree-write gate.
       return failBeforeClaim(
-        `${strictRefusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
+        `The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
           "Then re-run " +
           `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
-          "it attaches to the existing worktree and retries the claim commit.",
+          "it attaches to the existing worktree and retries the claim commit. " +
+          strictRefusal,
         "strict gate-bin gate refused",
       )
     }
@@ -3484,6 +3683,11 @@ async function nativeStartBody(
   // documented report-only behavior byte-identical: the detection rides the
   // preparation receipt (`claim.foreignWrites`) and the claim commit remains
   // authoritative.
+  //
+  // A `takeOverWorktree` run (task-strict-attach-dead-owner-hatch) is NOT here:
+  // the kernel reports the fired evidence as `claim.takeOver` instead of
+  // `claim.foreignWrites`, so this gate — unchanged — treats the authorized
+  // replacement of a presumed-dead stamp as resolved.
   if (worktreePath !== undefined) {
     const foreignWrites = progress.preparation?.claim?.foreignWrites
     const strictWriteRefusal =
@@ -3492,11 +3696,36 @@ async function nativeStartBody(
         ? kernel.strictWorktreeWriteFailure(foreignWrites)
         : null
     if (strictWriteRefusal !== null) {
+      // A plain re-run CANNOT succeed here: the anti-unlock rule keeps the
+      // previous stamp, so every retry re-detects against the SAME evidence
+      // (task-single-writer-worktree-enforcement). Advertising one would be a
+      // retry that cannot succeed. Name the designed hatch instead, plus the
+      // manual recovery the CLI's refusal also names — the caller must confirm
+      // the stamped session is dead first.
+      //
+      // ORDER IS LOAD-BEARING, not style. `startFailure` clips the composed
+      // message at MAX_NATIVE_ERROR_CHARS (2048) HEAD-first, and the kernel
+      // refusal ENDS with its own tail — up to 10 named dirty paths, ~57
+      // chars each in this very repo. Advice APPENDED after it is the first
+      // thing the clip eats, so the remedies used to vanish exactly when the
+      // evidence was long enough to matter. Every remedy therefore goes FIRST
+      // and the kernel refusal — its lead sentence naming the stamped owner,
+      // the claim time and the file count — closes the message, exactly the
+      // ordering #573's round 2 applied on the CLI for this same reason. The
+      // path list is evidence to scroll back for, never the instruction to act
+      // on.
+      const recovery =
+        "A plain re-run cannot clear this: the fired detection is unchanged while the previous " +
+        "stamp stands. The worktree was kept at " +
+        `${worktreePath} (nothing was rolled back). If the stamped session is really dead, take ` +
+        "the worktree over explicitly with " +
+        `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)}, takeOverWorktree: true }) — ` +
+        "it records a dated take-over naming the replaced owner (the same hatch as " +
+        "`arggon start --worktree --take-over-worktree`). Otherwise, with a live writer, do NOT " +
+        "take over; remove the stamp by hand after confirming no live writer: " +
+        `rm "$(git -C ${worktreePath} rev-parse --absolute-git-dir)/arggon-claim.json". `
       return failBeforeClaim(
-        `${strictWriteRefusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
-          "Then re-run " +
-          `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
-          "it attaches to the existing worktree and retries the claim commit.",
+        `${recovery}${strictWriteRefusal}`,
         "strict worktree-write gate refused",
       )
     }
@@ -3518,11 +3747,22 @@ async function nativeStartBody(
       progress.preparation?.steps ?? [],
     )
     if (refusal !== null) {
+      // ORDER IS LOAD-BEARING, same contract the strict worktree-write gate
+      // above documents: `startFailure` clips the composed message HEAD-first
+      // at MAX_NATIVE_ERROR_CHARS (2048), and the worst case is the named-bin
+      // list at full length (`freshWorktreeInstallRefusal` puts that list —
+      // evidence, not instruction — last, so only it clipped). Advice
+      // APPENDED after the kernel refusal is the first thing the clip eats,
+      // so every remedy goes FIRST (the worktree-kept note + the attach
+      // re-run) and the kernel refusal — its lead sentence, the preparation
+      // log and the `npm ci` fix — tells the rest, exactly the ordering #579
+      // landed for strict worktree-write gate.
       return failBeforeClaim(
-        `${refusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
+        `The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
           "Then re-run " +
           `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
-          "it attaches to the existing worktree and retries the claim commit.",
+          "it attaches to the existing worktree and retries the claim commit. " +
+          refusal,
         "fresh-worktree install gate refused",
       )
     }
@@ -3795,11 +4035,28 @@ function nativeComposeDown(project: string, cwd: string): Promise<void> {
  * and preserves both the branch and the record.
  * Skips (non-terminal item, unmerged branch, missing/foreign path) are
  * reported, never touched.
+ *
+ * `release: <id>` takes the OTHER arm of the worktree domain: the inverse of
+ * `start` for a claim that was dropped (bug-unclaim-leaves-worktree-record-
+ * without-reaper). It classifies ONE item with the shared release rule
+ * (`classifyReleaseEntry`, the same one the CLI uses), removes the worktree
+ * through the domain, deletes its branch, reaps the start-created env file and
+ * the claim stamp, and clears the record — reported as its own `release` /
+ * `released` action family, never mixed into `pruned`. Refused with the same
+ * evidence and remedy order the CLI reports: unconditionally while the item is
+ * still claimed (a re-claimed item has a live owner; the hatch does not bypass
+ * it), and for a stamp held by another identity whose window shows a live writer
+ * or for removal-blocking content. `take_over_worktree` is the audited hatch for
+ * a presumed-dead stamped owner — the mirror of `start`'s, and the only thing
+ * that forces the removal; without a `release` it is refused (m5). The identity
+ * is the calling session — exactly what `start` stamped — so the ordinary path
+ * is never refused.
  */
 async function nativeCleanup(
   kernel: ArgonKernel,
   input: Record<string, unknown>,
   options: ArgonToolOptions,
+  tool?: ArgonToolCallContext,
 ): Promise<{ ok: boolean; envelope: Record<string, unknown> }> {
   let root: string
   try {
@@ -3825,6 +4082,30 @@ async function nativeCleanup(
     .filter((item) => (item.worktreePath ?? null) !== null)
     .sort((a, b) => a.id.localeCompare(b.id))
 
+  const releaseId = asString(input.release)
+  if (releaseId !== undefined && input.prune === true) {
+    // Same refusal as the CLI: two reapers (an abandoned claim vs finished
+    // work), never one item in one run.
+    return worktreeFail(
+      kernel,
+      "cleanup",
+      "CLEANUP_FAILED",
+      "pass either release or prune, not both",
+      version,
+    )
+  }
+  if (releaseId === undefined && input.take_over_worktree === true) {
+    // The hatch authorizes a release; without one it is a silent no-op (m5).
+    // `start` already refuses its twin without `worktree`, and so does this.
+    return worktreeFail(
+      kernel,
+      "cleanup",
+      "CLEANUP_FAILED",
+      "take_over_worktree requires release (it authorizes a release of a worktree whose stamped owner is presumed dead)",
+      version,
+    )
+  }
+
   const inventory = await domainWorktrees(options)
   const runner = {
     ...git,
@@ -3833,9 +4114,14 @@ async function nativeCleanup(
     worktreeList: (cwd: string): string[] =>
       inventory.length > 0 ? inventory : git.worktreeList(cwd),
   }
-  const entries = tracked.map((item) =>
-    kernel.classifyCleanupEntry(item, root, base, runner, { noGh: input.no_gh === true }),
-  )
+  // A release run classifies ONE item (the named one): the survey path stays
+  // out of it, so `candidates` keeps meaning "prunable work".
+  const entries =
+    releaseId === undefined
+      ? tracked.map((item) =>
+          kernel.classifyCleanupEntry(item, root, base, runner, { noGh: input.no_gh === true }),
+        )
+      : []
 
   const pruned: Array<Record<string, unknown>> = []
   const failures: string[] = []
@@ -3976,10 +4262,34 @@ async function nativeCleanup(
     }
   }
 
+  // The release arm (bug-unclaim-leaves-worktree-record-without-reaper): the
+  // inverse of `start --worktree` for a dropped claim. It shares the Compose
+  // declaration and the cleared-record commit with prune and NOTHING else —
+  // different premise, different safety, different action family.
+  const release =
+    releaseId === undefined
+      ? undefined
+      : await nativeRelease(kernel, {
+          id: releaseId,
+          root,
+          byId,
+          git,
+          runner,
+          input,
+          options,
+          sessionID: tool?.sessionID,
+          compose,
+          isComposeUnavailable: () => composeUnavailable,
+          failures,
+        })
+
   // One tracker commit for every cleared record (surgical staging; the kernel
-  // resolves `x-tracker.auto-commit`), exactly like `cleanup --prune`.
-  let commit: unknown
-  if (clearedPaths.length > 0) {
+  // resolves `x-tracker.auto-commit`), exactly like `cleanup --prune` — and the
+  // release's OWN commit wins when it has one (review M3: letting the run-level
+  // commit re-stage the path the release already committed reported
+  // `skipped: "nothing to commit"` for a commit it had just made). CLI parity.
+  let commit: unknown = release?.commit
+  if (commit === undefined && clearedPaths.length > 0) {
     commit = kernel.commitTrackerMutation(root, clearedPaths, {
       message: kernel.trackerCommitMessage("pruned", clearedIds),
       commit: kernel.resolveAutoCommit(
@@ -3997,12 +4307,207 @@ async function nativeCleanup(
         base,
         candidates: entries,
         pruned,
+        ...(release !== undefined ? { release: release.entry, released: release.actions } : {}),
         failures,
         ...(compose !== undefined ? { compose } : {}),
         ...(commit !== undefined ? { commit: kernel.commitPayload(commit as never) } : {}),
       },
       version,
     ),
+  }
+}
+
+/** What `nativeRelease` needs from the run it hangs off. */
+type NativeReleaseRun = {
+  id: string
+  root: string
+  byId: ReturnType<ArgonKernel["itemsById"]>
+  git: ReturnType<ArgonKernel["defaultCleanupGit"]>
+  runner: CleanupGitShape
+  input: Record<string, unknown>
+  options: ArgonToolOptions
+  /** The calling session id — the identity `start` stamped (sessionToken-form). */
+  sessionID?: unknown
+  compose: { declared: string; dockerUnavailable?: boolean } | undefined
+  isComposeUnavailable: () => boolean
+  failures: string[]
+}
+
+/** The `CleanupGit` shape the native runner supplies (git plus the domain list). */
+type CleanupGitShape = ReturnType<ArgonKernel["defaultCleanupGit"]>
+
+/**
+ * Native release of one item's claim footprint
+ * (bug-unclaim-leaves-worktree-record-without-reaper) — the CLI twin of
+ * `cli/src/cleanup.ts`'s `releaseClaimedWorktree`, step for step: same kernel
+ * classification (`classifyReleaseEntry`), same Compose-first ordering, same
+ * ownership-scoped reaping (install link, start-shaped env file, claim stamp),
+ * same observed domain removal, same force branch delete, same record clear and
+ * same both-surfaces failure reporting. The identity is the calling session —
+ * what `start` stamped — with the item's assignee as the fallback when the
+ * runtime supplies no session id.
+ */
+async function nativeRelease(
+  kernel: ArgonKernel,
+  run: NativeReleaseRun,
+): Promise<{
+  entry: Record<string, unknown>
+  actions: Array<Record<string, unknown>>
+  /** The cleared-record commit this run owns (review M3) — never re-committed by the caller. */
+  commit?: unknown
+}> {
+  const { id, root, byId, git, runner, input, options, failures } = run
+  const actions: Array<Record<string, unknown>> = []
+  const refuse = (reason: string, entry: Record<string, unknown>) => {
+    // Clamped like every sibling failure path (m9): the refusals embed paths and
+    // the envelope is a machine surface.
+    const message = boundedNativeText(reason, MAX_NATIVE_DETAIL_CHARS)
+    failures.push(`${id}: ${message}`)
+    actions.push({ id, action: "failed", error: message })
+    return { entry: { ...entry, reason: message }, actions }
+  }
+  const item = byId.get(id)
+  if (item === undefined) {
+    const reason = `id '${id}' not found under the tracker`
+    return refuse(reason, {
+      id,
+      status: "unknown",
+      branch: null,
+      path: "",
+      releasable: false,
+      reason,
+      action: null,
+    })
+  }
+  const identity = sessionToken(run.sessionID) ?? asString(item.assignee) ?? ""
+  const classified = kernel.classifyReleaseEntry(item, root, runner, {
+    identity,
+    ...(input.take_over_worktree === true ? { takeOver: true } : {}),
+  })
+  const entry = classified as unknown as Record<string, unknown>
+  if (classified.releasable !== true) {
+    return refuse(asString(classified.reason) ?? "release refused", entry)
+  }
+  const path = classified.path
+  // Every git call below runs from the canonical (main) worktree: `git worktree
+  // list` puts it first, and the native root is the SESSION's location — which
+  // is the worktree being released whenever the claiming session works in it.
+  const gitRoot = resolve(git.worktreeList(root)[0] ?? root)
+  // The record outlives the removal exactly when this run's tracker copy is not
+  // the worktree being released (a claim made through `start` is recorded in
+  // THAT worktree copy, so releasing it disposes the record with the directory —
+  // nothing to write, and no commit could outlive the removal).
+  const recordHome = resolve(root) !== resolve(path)
+
+  try {
+    if (classified.action !== "clear stale worktree_path record (path missing on disk)") {
+      // Compose first (ADR 0019 layer 2, exploration 017 F8); an absent docker
+      // CLI degrades the run report-only, exactly as in the prune loop.
+      if (run.compose !== undefined && !run.isComposeUnavailable()) {
+        const project = kernel.worktreeComposeProject(run.compose.declared, basename(path))
+        try {
+          await nativeComposeDown(project, root)
+          actions.push({ id, action: `reaped compose project ${project}` })
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException | null)?.code !== "ENOENT") throw error
+          run.compose.dockerUnavailable = true
+        }
+      }
+      // CLI parity: the start-created install link and the start-shaped env
+      // file are untracked and block the removal; ownership-scoped removal only
+      // (never a real directory, never an adopter's own file). The env contract
+      // has to go BEFORE the removal or git refuses the worktree.
+      kernel.unlinkNodeModulesLink(gitRoot, path)
+      if (gitRoot !== resolve(root)) kernel.unlinkNodeModulesLink(root, path)
+      kernel.unlinkWorktreeEnv(path)
+      // Did this worktree carry a claim stamp? Read BEFORE the removal:
+      // `git worktree remove` takes the worktree's git dir (and the stamp in it)
+      // with it, so only the post-removal reap below matters for a DOMAIN
+      // removal (it never touches `.git/worktrees/<name>`). CLI parity.
+      const hadStamp = kernel.readWorktreeClaimStamp(path) !== null
+      // Uncommitted work is never discarded silently. The classification already
+      // refused removal-blocking content unless the take-over hatch was armed
+      // (the dirty gate, CLI parity), so forcing here is exactly the caller's
+      // "that owner is dead and that work is disposable" — the only case.
+      // Uncommitted work is never discarded silently. The classification already
+      // refused removal-blocking content unless the take-over hatch was armed
+      // (the dirty gate, CLI parity), so forcing here is exactly the caller's
+      // "that owner is dead and that work is disposable" — the only case.
+      const removal = await removeWorktreeObserved(options, path, gitRoot, {
+        force: input.take_over_worktree === true,
+      })
+      if (!removal.removed) {
+        const message = boundedNativeText(removal.errors.join("; "), MAX_NATIVE_DETAIL_CHARS)
+        failures.push(`${id}: ${message}`)
+        actions.push({ id, action: "failed", error: message, leftoverPath: path })
+        return { entry, actions }
+      }
+      actions.push({ id, action: `removed worktree ${path}` })
+      // AFTER the observed removal, never before (CLI parity): the claim stamp is
+      // the single-writer evidence, and a failed removal must leave it standing.
+      // A domain removal never touches the git dir, so the stamp is reaped
+      // explicitly here — an OBSERVABLE step, not an accident of git's
+      // bookkeeping.
+      // Both outcomes are reported, because both are the invariant "no stamp
+      // survives a release": either this run removed the file, or the removal
+      // took it with the worktree.
+      if (kernel.unlinkWorktreeClaimStamp(path)) {
+        actions.push({ id, action: "reaped arggon-claim.json stamp" })
+      } else if (hadStamp) {
+        actions.push({ id, action: "arggon-claim.json stamp gone with the worktree" })
+      }
+      if (classified.branch !== null && git.branchExists(gitRoot, classified.branch)) {
+        try {
+          // Force, never the safe delete: an abandoned claim's branch is by
+          // definition not provably merged (that is prune's eligibility), and
+          // the release is already an explicit, refusal-gated discard.
+          git.deleteBranchForce(gitRoot, classified.branch)
+          actions.push({ id, action: `deleted branch ${classified.branch}` })
+        } catch (error) {
+          const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)
+          failures.push(`${id}: ${message}`)
+          actions.push({
+            id,
+            action: "failed",
+            error: message,
+            leftoverBranch: classified.branch,
+          })
+        }
+      }
+    }
+    if (recordHome) {
+      // The record outlives the removal here: cleared AFTER the worktree is
+      // observably gone (prune's invariant), in ONE tracker commit — which this
+      // run OWNS and RETURNS (review M3: committing here and then letting the
+      // run-level commit stage the same path reported `skipped: "nothing to
+      // commit"` for a commit it had just made).
+      const cleared = kernel.updateOperation({
+        cwd: root,
+        id,
+        worktreePath: "",
+        commit: false,
+        agent: true,
+      })
+      if (!cleared.ok) throw new Error(kernelError(cleared.envelope))
+      actions.push({ id, action: "cleared worktree_path" })
+      const commit = kernel.commitTrackerMutation(root, [item.filePath], {
+        message: kernel.trackerCommitMessage("released", [id]),
+        commit: kernel.resolveAutoCommit(
+          input.no_commit === true ? false : undefined,
+          kernel.readAutoCommitConfig(root),
+        ),
+      })
+      return { entry, actions, commit }
+    }
+    // The record lived inside the removed copy: disposed with it, nothing to
+    // write (a commit here could not outlive the removal).
+    actions.push({ id, action: "disposed worktree_path record with the worktree" })
+    return { entry, actions }
+  } catch (error) {
+    const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)
+    failures.push(`${id}: ${message}`)
+    actions.push({ id, action: "failed", error: message })
+    return { entry, actions }
   }
 }
 
@@ -4035,6 +4540,11 @@ const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
         branch: { type: "string" },
         worktree: BOOLEAN,
         push: BOOLEAN,
+        takeOverWorktree: {
+          type: "boolean",
+          description:
+            "Take over a presumed-dead stamped owner (CLI --take-over-worktree). Default OFF; requires worktree; acts only when the single-writer detection fired.",
+        },
       },
       required: ["id"],
       additionalProperties: false,
@@ -4066,11 +4576,13 @@ const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
   {
     name: "cleanup",
     description:
-      "List (prune: true removes) worktrees of done/cancelled items whose branches are merged; clears worktree_path.",
+      "List (prune: true removes) worktrees of done/cancelled items whose branches are merged; clears worktree_path. release: <id> instead releases one dropped claim (inverse of start).",
     input: {
       type: "object",
       properties: {
         prune: BOOLEAN,
+        release: ID,
+        take_over_worktree: BOOLEAN,
         no_gh: {
           type: "boolean",
           description: "Ancestry-only (skip the squash-merged PR lookup).",
@@ -4080,8 +4592,10 @@ const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
       additionalProperties: false,
     },
     output: OBJECT,
-    run: (kernel, input, options) =>
-      guarded(kernel, "cleanup", "CLEANUP_FAILED", () => nativeCleanup(kernel, input, options)),
+    run: (kernel, input, options, tool) =>
+      guarded(kernel, "cleanup", "CLEANUP_FAILED", () =>
+        nativeCleanup(kernel, input, options, tool),
+      ),
   },
 ]
 

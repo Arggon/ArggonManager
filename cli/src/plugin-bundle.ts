@@ -31,11 +31,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 
-/** Plugin entry (package-root relative, posix). */
-export const PLUGIN_SOURCE = "opencode/plugins/arggon/index.ts";
-
-/** Committed single-file bundle `arggon init` vendors (package-root relative). */
-export const PLUGIN_BUNDLE = "opencode/plugins/arggon/index.bundle.ts";
+// The two seam paths live in an import-free module so dependency-light
+// consumers (doctor) can name them without pulling in the TypeScript compiler
+// API this module imports — see plugin-paths.ts for the packed-install failure
+// that motivated it.
+import { PLUGIN_BUNDLE, PLUGIN_SOURCE } from "./plugin-paths.js";
+export { PLUGIN_BUNDLE, PLUGIN_SOURCE };
 
 /** Kernel entry inlined into the bundle (package-root relative, posix). */
 export const KERNEL_ENTRY = "lib/src/index.ts";

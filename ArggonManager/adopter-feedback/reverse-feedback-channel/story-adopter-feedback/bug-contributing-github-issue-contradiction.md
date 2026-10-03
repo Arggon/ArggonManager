@@ -1,15 +1,16 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-contributing-github-issue-contradiction
 title: "CONTRIBUTING.md contradicts itself on GitHub issues (line 13 'not used' vs line 269 'open an issue')"
+assignee: Arggon
+branch: fix/bug-contributing-github-issue-contradiction
 parent: story-adopter-feedback
 labels: [docs]
 priority: p2
 created: "2026-10-02"
 updated: "2026-10-02"
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/bug-contributing-github-issue-contradiction.md
   Leaves live only under a story. id is the filename stem: bug-contributing-github-issue-contradiction.
@@ -19,63 +20,33 @@ updated: "2026-10-02"
 
 # CONTRIBUTING.md contradicts itself on GitHub issues (line 13 'not used' vs line 269 'open an issue')
 
-# CONTRIBUTING.md contradicts itself on GitHub issues (line 13 'not used' vs line 269 'open an issue')
-
 ## Context
 
-`CONTRIBUTING.md` states the issue-tracking doctrine twice, in two incompatible
-ways (read 2026-10-02):
-
-- **Line 13**, under `## Issues and PRs`:
-
-  > "Prefer a **work item in the tracker** (`arggon create task|bug`) for anything
-  > beyond a typo — the tree is the issue tracker; GitHub issues are not used
-  > (see `ArggonManager/docs/agents.md` §0)."
-
-- **Line 269**, under `## Propose schema / convention changes`:
-  > "1. Open an issue describing the change and why (agents + humans must share
-  > one rule)."
-
-Line 13 is authoritative (`docs/agents.md` §0 says the same, and the repo's own
-history shows it: 21 GitHub issues, all closed, all 2026-09-03 → 2026-09-11 —
-the pre-tracker era). Line 269 is pre-tracker residue that was never swept when
-the tracker moved in-tree.
-
-**Why it matters beyond tidiness.** This is exactly the finding class
-[`docs/labs/adversarial-audit.md`](../../../../docs/labs/adversarial-audit.md) §2
-exists to catch — "a sentence written as a promise that a later change silently
-falsified". A human or agent reading §Propose schema / convention changes is
-instructed to do the thing the doc says never happens. It is also load-bearing
-for the reverse-feedback-channel decision tracked in
-[`task-explore-adopter-feedback-channel`](task-explore-adopter-feedback-channel.md):
-the repo cannot simultaneously assert "GitHub issues are not used" and ship a
-doctrine for routing friction to GitHub.
-
-`agents.md` §0 itself is unambiguous ("Do **not** open new GitHub issues"), so
-the fix is confined to `CONTRIBUTING.md`. Note the parity requirement: if the
-line-269 fix changes any **generated** doc statement, it is a **behavioral**
-methodology-carrier change per `docs/agents.md` §Changing the methodology itself
-and must state its impact class in the PR description and as an item comment.
+`CONTRIBUTING.md` line 13 stated "GitHub issues are not used" while line 269 told contributors to "Open an issue describing the change". `README.md`'s Contributing section had the same stale instruction.
 
 ## Acceptance
 
-- [ ] `CONTRIBUTING.md:269` no longer instructs the reader to open a GitHub issue; it points at the tracker instead, consistent with line 13 and `docs/agents.md` §0
-- [ ] `grep -n -i "open an issue\|github issue" CONTRIBUTING.md` shows no remaining contradiction — every remaining hit agrees with the "tracker is the issue tracker" doctrine
-- [ ] The wording preserves the section's intent (schema/convention changes need
-      a written rationale shared by humans and agents) without inventing a new
-      intake rule
-- [ ] If the edit changes any generated template or statement in `templates/` or `skills/`, the impact class is stated in the PR description and as a comment on this item, and `npm run skills:sync` + the parity tests are green
-- [ ] Prettier clean (`npx prettier --check CONTRIBUTING.md`) — the repo has a
-      history of formatter-glued Markdown spans (`bug-formatter-glues-markdown-spaces`)
+- [x] `CONTRIBUTING.md` states the tracker-not-GitHub-issues policy (AGENTS.md / `ArggonManager/docs/agents.md` §0) exactly once and contains no "open an issue" instruction
+- [x] No stale "open an issue" instruction remains in `README.md`, `SUPPORT.md`, or `templates/`
+- [x] `arggon validate` passes
 
 ## Notes
 
-Scope is intentionally one file. This item does **not** touch `docs/agents.md`
-§0 (already correct) and does **not** decide the reverse-channel doctrine — that
-is
-[`task-explore-adopter-feedback-channel`](task-explore-adopter-feedback-channel.md)
-and
-[`exploration-adopter-feedback-channel-018`](../../../../docs/explorations/exploration-adopter-feedback-channel-018.md).
-It is filed independently because it is unambiguous and cheap, and because the
-repo's own `adversarial-audit.md` demands a finding without a repro be treated as
-a hunch — this one has line numbers.
+### 2026-10-02 @ses_f01eedccdffeKqUprfvF4gBa9M
+verdict: approve
+
+Evidence (read from branch fix/bug-contributing-github-issue-contradiction @ 5b576f39, PR #594, merge-base ecedac02):
+- Scope is exactly 3 files per GitHub's three-dot diff: CONTRIBUTING.md, README.md, this item. No unrelated changes in the PR (the extra-file noise in a local two-dot diff is only because the branch predates other merges; merge-state is MERGEABLE/BEHIND, no conflicting overlap with main's todo-status version of this item).
+- CONTRIBUTING.md:269 "Open an issue…" replaced with tracker work item (arggon create task … --parent <story-id>); README.md Contributing section likewise replaced with "Create a work item in the tracker (arggon create task)".
+- Line 13 policy statement intact and singular: grep -c "GitHub issues are not used" CONTRIBUTING.md = 1.
+- No "open an issue" instruction remains in CONTRIBUTING.md, README.md, SUPPORT.md, or templates/ (only remaining mentions are negated "Do not open GitHub issues" lines, which are the correct policy).
+- Item acceptance checklist fully ticked with a dated evidence note in Notes (gates: arggon validate ok, npm run lint + lint:structure clean per the note; I did not re-run gates myself).
+- Item frontmatter still in_progress on the branch — expected; coordinator flips to done on merge.
+
+No blocking findings. OK to merge PR #594 and mark the item done.
+### 2026-10-02 @Arggon
+Fixed: CONTRIBUTING.md line 269 and README.md Contributing section no longer tell contributors to open an issue; both now route to in-tree work items (arggon create task). Policy stated exactly once in CONTRIBUTING.md (line 13). Grep sweep of README/SUPPORT/templates/docs found no other stale 'open an issue' instruction. Gates: arggon validate ok, npm run lint + lint:structure clean. PR #594.
+
+### handoff 2026-10-02 @Arggon — next: Review PR #594; coordinator merges and flips the item to done. No further worker action needed.
+- branch: fix/bug-contributing-github-issue-contradiction
+- open questions: None.

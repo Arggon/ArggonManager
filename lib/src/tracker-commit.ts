@@ -75,6 +75,8 @@ export type TrackerCommitVerb =
   | "commented"
   | "adopted"
   | "pruned"
+  /** A dropped claim's worktree released (bug-unclaim-leaves-worktree-record-without-reaper). */
+  | "released"
   | "done"
   | "updated"
   | "claimed"

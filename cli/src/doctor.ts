@@ -8,6 +8,8 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, type Dirent } from "node:fs";
+import { stampGeneratedContent } from "./docs.js";
+import { PLUGIN_BUNDLE } from "./plugin-paths.js";
 import { join, relative, sep } from "node:path";
 import {
   findTrackerLocation,
@@ -29,6 +31,11 @@ import {
 } from "./docs.js";
 
 import { measureBudget, formatBudgetLines, type BudgetResult } from "./measure.js";
+import {
+  formatMatrixLines,
+  readCapabilityMatrix,
+  type CapabilityMatrix,
+} from "./capability-matrix.js";
 
 // The sanitizer implementation moved to sanitize.ts (bug-cli-error-output-injection
 // F1) so the CLI error channel shares it; re-exported for existing consumers.
@@ -134,6 +141,33 @@ export type DoctorOpenCode = {
     /** True when one of the name lists hit MAX_OPENCODE_NAMES and was cut. */
     truncated: boolean;
   };
+  /**
+   * The generated plugin copy the OpenCode seam actually LOADS
+   * (bug-generated-seam-bytes-predate-050). `.opencode/plugins/arggon/index.ts`
+   * is a generated, gitignored copy of the committed bundle: after a release it
+   * can lag by a whole version, and nothing in CI notices because the committed
+   * artifact is what is drift-gated. The session's native `tools.arggon.*`
+   * surface is whatever those bytes say — the catalog it loaded is whatever was
+   * on disk at session start.
+   */
+  plugin: {
+    /** A vendored plugin copy exists on disk. */
+    present: boolean;
+    /**
+     * A local `opencode/plugins/arggon/index.bundle.ts` exists to compare
+     * against. In a plain adopter tree `init` vendors from the INSTALLED
+     * package, so freshness there is the package manager's business — reported
+     * as "unverified", never as stale.
+     */
+    comparable: boolean;
+    /** Byte-identical to the committed bundle plus its provenance marker (only meaningful when comparable). */
+    current: boolean;
+    /** The CLI skill's frontmatter `version:` vs the root package version. */
+    skillVersion: string | null;
+    skillVersionMatches: boolean;
+    /** Remediation the operator runs, or null when nothing is stale. */
+    hint: string | null;
+  };
   mcp: {
     /** A present OpenCode config registers `mcp.servers.arggon`. */
     native: boolean;
@@ -168,6 +202,86 @@ export const MAX_OPENCODE_V1_KEYS_PER_FILE = 20;
 export const OPENCODE_MCP_HINT =
   'optional: the native arggon tools do not need MCP — keep "mcp.servers.arggon" only for ' +
   "non-OpenCode clients that use `arggon mcp`";
+
+/**
+ * Is the generated plugin copy the seam loads current, and does the CLI skill's
+ * frontmatter version match the release?
+ *
+ * bug-generated-seam-bytes-predate-050: `.opencode/plugins/arggon/index.ts` is
+ * `arggon init`'s byte-for-byte copy of the committed bundle plus a provenance
+ * marker line, and it is gitignored — so a release can merge while the copy on
+ * an adopter's (or this repo's) machine stays a version behind, silently: the
+ * live `tools.arggon.*` surface has none of the new capabilities. Comparing
+ * CONTENT (not timestamps, which git does not track for ignored files) is the
+ * only honest check.
+ */
+function readPluginFreshness(root: string): {
+  present: boolean;
+  comparable: boolean;
+  current: boolean;
+  skillVersion: string | null;
+  skillVersionMatches: boolean;
+  hint: string | null;
+} {
+  const vendored = join(root, ".opencode", "plugins", "arggon", "index.ts");
+  const present = existsSync(vendored);
+  // Comparable only where this repo carries the artifact itself: in a plain
+  // adopter tree `init` vendors from the INSTALLED package, so there is no local
+  // bundle to compare against and freshness is the package manager's business —
+  // report "unverified", never "stale".
+  const bundlePath = join(root, "opencode", "plugins", "arggon", "index.bundle.ts");
+  const comparable = existsSync(bundlePath);
+  let current = false;
+  if (present && comparable) {
+    try {
+      const marker = stampGeneratedContent(
+        vendored,
+        PLUGIN_BUNDLE,
+        readFileSync(bundlePath, "utf8"),
+      );
+      current = readFileSync(vendored, "utf8") === marker;
+    } catch {
+      current = false;
+    }
+  }
+  let skillVersion: string | null = null;
+  let skillVersionMatches = true;
+  try {
+    const skill = readFileSync(join(root, ".agents", "skills", "arggon-cli", "SKILL.md"), "utf8");
+    skillVersion = /^version:\s*(.+)$/m.exec(skill)?.[1]?.trim() ?? null;
+  } catch {
+    skillVersion = null;
+  }
+  // Drift is only meaningful where a release is in play: `init` writes no root
+  // package.json, so an adopter tree has nothing to compare the skill against.
+  if (skillVersion !== null && existsSync(join(root, "package.json"))) {
+    try {
+      const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+        version?: string;
+      };
+      skillVersionMatches = skillVersion === pkg.version;
+    } catch {
+      skillVersionMatches = true;
+    }
+  }
+  const hint =
+    present && comparable && !current
+      ? OPENCODE_PLUGIN_STALE_HINT
+      : !skillVersionMatches
+        ? OPENCODE_SKILL_VERSION_HINT
+        : null;
+  return { present, comparable, current, skillVersion, skillVersionMatches, hint };
+}
+
+export const OPENCODE_PLUGIN_STALE_HINT =
+  "the vendored plugin copy predates the committed bundle — regenerate it before relying on new " +
+  "native capabilities (`arggon init` on a tree with no adopter-modified seam, or `npm test`, " +
+  "which rewrites the copy) and restart the session: the catalog it loaded is whatever was on " +
+  "disk at start";
+
+export const OPENCODE_SKILL_VERSION_HINT =
+  "the CLI skill's frontmatter version does not match the package version — run `arggon init` " +
+  "(or `npm test`, which rewrites the generated skill copy) so the bundled copy matches";
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -362,6 +476,7 @@ export function detectOpenCode(root: string): DoctorOpenCode {
       skills: skills.names,
       truncated: agents.truncated || commands.truncated || skills.truncated,
     },
+    plugin: readPluginFreshness(root),
     mcp: {
       native,
       mcpJson,
@@ -406,6 +521,17 @@ export type DoctorResult = {
    * vs `.mcp.json`-only MCP registration. Report-only, bounded.
    */
   opencode: DoctorOpenCode;
+  /**
+   * Capability-matrix state (additive, task-capability-matrix; spec S3,
+   * ADR 0020): the committed `adapters/capability-matrix.json` — declared
+   * invariants, agents, row/gap counts and the bounded gap detail. DATA only:
+   * the matrix carries no rule logic and nothing here gates anything (report-
+   * only, never blocking; the kernel stays the enforcement of record). Present
+   * on initialized and non-initialized reports alike — both probe the same tree
+   * root (the cwd when there is no tracker) and report the absence with its
+   * reason rather than dropping the field.
+   */
+  matrix: CapabilityMatrix;
   /**
    * Context-budget measurement (additive, task-adr0006-remeasure): present
    * only when `doctor --budget` is passed. Measures the ADR 0006 agent-facing
@@ -512,6 +638,10 @@ export function runDoctor(opts: {
       // No tasks/ tree, so cwd is the best root for the OpenCode probe — the
       // same directory gitState probes (task-opencode-v2-doctor).
       opencode: detectOpenCode(opts.cwd),
+      // Same reasoning for the matrix probe: no tree, so no matrix — the
+      // reader is tree-only and reports the absence instead of reaching for a
+      // package copy (that fallback broke pack/checkout envelope parity).
+      matrix: readCapabilityMatrix({ root: opts.cwd }),
     };
   }
 
@@ -628,6 +758,10 @@ export function runDoctor(opts: {
     },
     git: gitState(root),
     opencode: detectOpenCode(root),
+    // The tree's own committed matrix when it carries one (this repo does);
+    // otherwise an honest absence. Tree-only by construction, never a package
+    // fallback: an additive field must depend only on the examined tree.
+    matrix: readCapabilityMatrix({ root }),
   };
 }
 
@@ -667,6 +801,13 @@ function formatOpenCodeLines(opencode: DoctorOpenCode): string[] {
   const parts = [
     opencode.configs.length > 0 ? `config ${opencode.configs.join(", ")}` : "no config",
     seam > 0 ? `seam ${seam} artifact(s)` : "no seam artifacts",
+    !opencode.plugin.present
+      ? "no vendored plugin"
+      : !opencode.plugin.comparable
+        ? "vendored plugin unverified"
+        : opencode.plugin.current
+          ? "vendored plugin current"
+          : "vendored plugin STALE",
     opencode.artifacts.skills.length > 0
       ? `${opencode.artifacts.skills.length} bundled skill(s)`
       : "no bundled skills",
@@ -687,6 +828,7 @@ function formatOpenCodeLines(opencode: DoctorOpenCode): string[] {
     );
   }
   if (opencode.mcp.hint) lines.push(`  hint: ${opencode.mcp.hint}`);
+  if (opencode.plugin.hint) lines.push(`  hint: ${opencode.plugin.hint}`);
   return lines;
 }
 
@@ -697,6 +839,9 @@ export function formatDoctorReport(result: DoctorResult): string {
       "arggon doctor: not initialized (no tracker .convention.yml found — ArggonManager/ or legacy tasks/) — run `arggon init`",
     ];
     if (hasOpenCodeSignal(result.opencode)) lines.push(...formatOpenCodeLines(result.opencode));
+    // The matrix describes the examined tree, so it prints on both report
+    // shapes — whenever it is readable, or why it is not.
+    lines.push(...formatMatrixLines(result.matrix));
     if (result.budget) lines.push(...formatBudgetLines(result.budget));
     return `${lines.join("\n")}\n`;
   }
@@ -715,6 +860,8 @@ export function formatDoctorReport(result: DoctorResult): string {
       : []),
     `  git: ${formatGitLine(result.git)}`,
     ...formatOpenCodeLines(result.opencode),
+    // Gap rows are advisory (spec S3, ADR 0020): printed, never blocking.
+    ...formatMatrixLines(result.matrix),
   ];
   if (result.budget) {
     lines.push(...formatBudgetLines(result.budget));

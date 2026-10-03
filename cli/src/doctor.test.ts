@@ -720,6 +720,69 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(report).not.toContain("hint:");
   });
 
+  it("reports the generated plugin copy as stale when it predates the bundle (bug-generated-seam-bytes-predate-050)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    // A fresh init writes the copy from the INSTALLED package, so there is no
+    // local bundle to compare: "unverified", never a false stale.
+    const adopter = runDoctor({ cwd: dir });
+    expect(adopter.opencode.plugin.present).toBe(true);
+    expect(adopter.opencode.plugin.comparable).toBe(false);
+    expect(adopter.opencode.plugin.hint).toBeNull();
+    expect(formatDoctorReport(adopter)).toContain("vendored plugin unverified");
+
+    // This repo shape: the artifact lives in-tree, so freshness IS comparable.
+    mkdirSync(join(dir, "opencode", "plugins", "arggon"), { recursive: true });
+    writeFileSync(
+      join(dir, "opencode", "plugins", "arggon", "index.bundle.ts"),
+      "// ArggonManager plugin bundle — GENERATED\n// build 1\n",
+      "utf8",
+    );
+    writeFileSync(
+      join(dir, ".opencode", "plugins", "arggon", "index.ts"),
+      '// arggon:generated template="opencode/plugins/arggon/index.bundle.ts"\n// ArggonManager plugin bundle — GENERATED\n// build 1\n',
+      "utf8",
+    );
+    const fresh = runDoctor({ cwd: dir });
+    expect(fresh.opencode.plugin.comparable).toBe(true);
+    expect(fresh.opencode.plugin.current).toBe(true);
+    expect(fresh.opencode.plugin.hint).toBeNull();
+    expect(formatDoctorReport(fresh)).toContain("vendored plugin current");
+
+    // An older release's bytes: the copy is a generated, gitignored artifact, so
+    // nothing in git notices it — content comparison is the only honest check.
+    const vendored = join(dir, ".opencode", "plugins", "arggon", "index.ts");
+    writeFileSync(
+      vendored,
+      `// arggon:generated template="opencode/plugins/arggon/index.bundle.ts"\n// from 0.4.x\n`,
+      "utf8",
+    );
+    const stale = runDoctor({ cwd: dir });
+    expect(stale.opencode.plugin.current).toBe(false);
+    expect(stale.opencode.plugin.hint).toContain("predates the committed bundle");
+    expect(formatDoctorReport(stale)).toContain("vendored plugin STALE");
+    expect(formatDoctorReport(stale)).toContain("hint: the vendored plugin copy predates");
+  });
+
+  it("reports the CLI skill frontmatter version against the package version", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    // The scratch tree has no package.json (init writes none): write one so the
+    // comparison has a release to compare against, then read it back.
+    const pkg = { version: "9.9.9" };
+    writeFileSync(join(dir, "package.json"), JSON.stringify(pkg), "utf8");
+    const skillPath = join(dir, ".agents", "skills", "arggon-cli", "SKILL.md");
+    const skill = readFileSync(skillPath, "utf8");
+    writeFileSync(skillPath, skill.replace(/^version:.*$/m, "version: 0.0.1"), "utf8");
+    const drifted = runDoctor({ cwd: dir });
+    expect(drifted.opencode.plugin.skillVersion).toBe("0.0.1");
+    expect(drifted.opencode.plugin.skillVersionMatches).toBe(false);
+    expect(drifted.opencode.plugin.hint).toContain("frontmatter version does not match");
+    // Matching versions are silent again (the common case must stay quiet).
+    writeFileSync(skillPath, skill.replace(/^version:.*$/m, `version: ${pkg.version}`), "utf8");
+    expect(runDoctor({ cwd: dir }).opencode.plugin.hint).toBeNull();
+  });
+
   it("reads a hand-edited JSONC seam config (comments + trailing commas) and flags the optional MCP stanza", () => {
     const dir = tempDir();
     bareTree(dir);

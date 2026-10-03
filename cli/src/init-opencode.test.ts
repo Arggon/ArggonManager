@@ -272,6 +272,115 @@ describe("opencode seam: fresh init", () => {
     }
   });
 
+  it("the coordinator contract claims through native start BEFORE dispatch (task-coordinator-claims-through-native-start)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    // Whitespace-flattened so the pins survive any re-wrap of the prose: the
+    // contract is a prompt, its wording is not formatting.
+    const coordinator = readFileSync(
+      join(dir, ".opencode/agents/arggon-coordinator.md"),
+      "utf8",
+    ).replace(/\s+/g, " ");
+    // The claim duty exists at all — this is the step the template used to
+    // omit entirely, which left coordinators hand-rolling worktrees on items
+    // that stayed `todo`/unclaimed.
+    expect(coordinator).toContain("**Claim before dispatch.**");
+    // …through the NATIVE start with the worktree flag, not the headless CLI
+    // and not a bare `update --status in_progress` (that claims no worktree).
+    expect(coordinator).toMatch(
+      /tools\.arggon\.start\(\{\s*id,\s*assignee:[^}]*worktree: true\s*\}\)/,
+    );
+    expect(coordinator).not.toMatch(/arggon start <id>/);
+    // ORDERING: the claim duty precedes the worker-launch duty, so a
+    // coordinator that reads the duties top-down claims first.
+    expect(coordinator.indexOf("**Claim before dispatch.**")).toBeLessThan(
+      coordinator.indexOf("**One worker per item, one worktree per worker.**"),
+    );
+    // The worktree path in the launch prompt is the item's RECORDED path.
+    expect(coordinator).toContain("worktree_path` on the item");
+    expect(coordinator).toContain("as recorded on the item");
+    // Prohibitions: no hand-rolled worktree, no worker-first claim, no idle
+    // claim — each phrased so a regex cannot pass on a negated quote.
+    expect(coordinator).toContain("Never hand-roll `git worktree add` for a claim");
+    expect(coordinator).toContain("never dispatch a worker as the first claimant");
+    expect(coordinator).toContain("never claim an item you are not dispatching");
+    // A start refusal is evidence, not a retry (native refusal semantics).
+    expect(coordinator).toContain("refusal is evidence, not a retry");
+    // Router, not a second carrier: the full contract stays in the playbook.
+    expect(coordinator).toContain("`ArggonManager/docs/agents.md` §Orchestration");
+    // Pre-existing duty drift the same review caught: background children
+    // outlive a headless run, and the prover role #583 shipped must be both
+    // mentioned (duty 4) and dispatchable (allow-list, per docs/agents.md).
+    expect(coordinator).toContain("Launch them **foreground**");
+    expect(coordinator).not.toContain("foreground or background");
+    expect(coordinator).toContain("arggon-prover");
+    expect(coordinator).toMatch(/action: subagent\s+resource: arggon-prover\s+effect: allow/);
+  });
+
+  it("the docs carrier keeps the claim duty the coordinator template summarizes", () => {
+    // task-coordinator-claims-through-native-start: the template is a summary,
+    // `ArggonManager/docs/agents.md` §Orchestration carries the rules. The two
+    // must not drift into contradicting each other (the template used to omit
+    // the claim entirely, the playbook used to assign it to the worker).
+    const flat = readFileSync(join(repoRoot, "ArggonManager/docs/agents.md"), "utf8").replace(
+      /\s+/g,
+      " ",
+    );
+    expect(flat).toContain(
+      "**Claim before dispatch (task-coordinator-claims-through-native-start):**",
+    );
+    expect(flat).toContain("tools.arggon.start({ id, assignee, worktree: true })");
+    expect(flat).not.toContain("each worker claims its item");
+    expect(flat).not.toContain("Claim **your** item (`in_progress` + assignee)");
+  });
+
+  it("no other carrier tells an agent to claim without a worktree, or to hand-roll one", () => {
+    // task-coordinator-claims-through-native-start (review round 2): the claim
+    // duty lives in four carriers, and the LAST-loaded ones used to say the
+    // opposite. A contract fix in one carrier while the others still say
+    // "claim your item" / "git worktree add" manufactures the next drift — the
+    // skill reference and AGENTS.md are read BEFORE the first tool call.
+    const flat = (rel: string): string =>
+      readFileSync(join(repoRoot, ...rel.split("/")), "utf8").replace(/\s+/g, " ");
+    const nativeClaim = /tools\.arggon\.start\(\{\s*id,\s*assignee:[^}]*worktree: true\s*\}\)/;
+
+    // 1. the skill reference both agent templates load first
+    const skill = flat("skills/arggon-cli/references/orchestration.md");
+    expect(skill).toContain("**Claim before dispatch:**");
+    expect(skill).toContain("worktree: true");
+    expect(skill).not.toContain("Claim **your** item (`in_progress` + assignee)");
+    // 2. the worker contract: dispatched means already-claimed, never re-claim
+    const worker = flat("templates/docs/opencode/agents/arggon-worker.md");
+    expect(worker).toContain("Your item is **already claimed**");
+    expect(worker).toContain("never re-claim");
+    expect(worker).toContain("`ArggonManager/docs/agents.md` §Orchestration");
+    expect(worker).not.toContain("Claim your item (`tools.arggon.update`");
+    // 3. the ZCode coordinator router (MCP spelling, same duty)
+    const zcode = flat("templates/docs/zcode/arggon/agents/arggon-coordinator.md");
+    expect(zcode).toContain("**Claim before dispatch.**");
+    expect(zcode).toContain("worktree: true");
+    expect(zcode).not.toContain("Claim **your** item");
+    // 3b. the ZCode worker contract (the fifth carrier the review's list missed)
+    const zcodeWorker = flat("templates/docs/zcode/arggon/agents/arggon-worker.md");
+    expect(zcodeWorker).toContain("Your item is **already claimed**");
+    expect(zcodeWorker).toContain("never re-claim");
+    expect(zcodeWorker).not.toContain("Claim your item (`arggon_update`");
+    // The agent DESCRIPTION is a carrier too — "claims exactly one item" is what
+    // told a reader the worker is the claimant.
+    expect(worker).not.toContain("claims exactly one item");
+    expect(zcodeWorker).not.toContain("claims exactly one item");
+    // 4. this repo's own AGENTS.md — the bare-update claim bullet and the
+    // hand-rolled `git worktree add` bullet are what every session here loads.
+    const agents = flat("AGENTS.md");
+    expect(agents).toMatch(nativeClaim);
+    expect(agents).toContain("worktree_path");
+    // The INSTRUCTION is gone, not the string: the replacement still names
+    // `git worktree add` in order to forbid it.
+    expect(agents).not.toContain("git worktree add ../<repo>-<item-id>");
+    expect(agents).not.toContain("create one per item with");
+    expect(agents).not.toContain("--status in_progress --assignee");
+  });
+
   it("the generated seam carries the minimal shell gates without breaking ordinary sessions (W4)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });

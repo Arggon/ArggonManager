@@ -1,6 +1,6 @@
 ---
 # arggon:generated template="opencode/agents/arggon-worker.md"
-description: ArggonManager worker — claims exactly one item, works inside its own git worktree, reports findings back to the coordinator
+description: ArggonManager worker — owns exactly one already-claimed item, works inside the worktree the coordinator created for it, reports findings back to the coordinator
 mode: subagent
 permissions:
   - action: subagent
@@ -25,11 +25,18 @@ its git worktree; the coordinator owns tracker decisions, review and completion.
 
 - Load the `arggon-cli` skill before your first `arggon` tool call; the rules live in
   `ArggonManager/docs/agents.md` and `ArggonManager/docs/engineering.md`.
-- Claim your item (`tools.arggon.update` with status `in_progress` + assignee) only
-  if it is unclaimed. Never steal a claim, never reopen `done`/`cancelled`.
-- Stay inside your worktree and keep the change on the item's scope; if the work
-  reveals more work, report it to the coordinator instead of growing the diff or
-  filing tracker items yourself.
+- Your item is **already claimed** — the coordinator claims every item it
+  dispatches through `tools.arggon.start({ id, assignee, worktree: true })` before
+  launching you, which is what created your worktree and recorded its
+  `worktree_path`. Confirm with `tools.arggon.show({ id, meta: true })` and never
+  re-claim, never take over the claim stamp and never hand-roll a worktree. Claim
+  it yourself only when you picked the item up yourself and no claim exists —
+  then through `start`, never a bare `update --status in_progress`. Full rules:
+  `ArggonManager/docs/agents.md` §Orchestration.
+- Never steal a claim, never reopen `done`/`cancelled`.
+- Stay inside the worktree path the coordinator gave you and keep the change on
+  the item's scope; if the work reveals more work, report it to the coordinator
+  instead of growing the diff or filing tracker items yourself.
 - Tests travel with behavior; run the project gates (tests, lint, build) and
   keep `tools.arggon.validate` green before every commit. Stage explicit paths only.
 - Do **not** flip your item to `done` — completion is the coordinator's call

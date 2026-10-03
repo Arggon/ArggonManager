@@ -908,6 +908,18 @@ export function strictGateBinViolations(gateBins: GateBinResolution[]): GateBinR
  * caller (CLI or native start) wraps it with its own flow context and the
  * attach re-run guidance. The same violations feed the report-only receipt's
  * `ready` clause — strict mode changes the CONSEQUENCE, never the observation.
+ *
+ * ORDERING is load-bearing (task-strictgatebinfailure-tail-clipped-by-head-clip):
+ * the `npm ci` remedy LEADS and the named-bin list trails, because both the
+ * human and the native channel compose this text with more and clip a
+ * composite error head-kept (`startFailure` at MAX_NATIVE_ERROR_CHARS = 2048,
+ * which keeps the HEAD), and the reachable worst case is the named list at its
+ * MAX_GATE_BINS cap with long sibling paths (~270 chars an entry). With the
+ * remedy last it was exactly what the clip ate — the agent got the diagnosis
+ * and no way forward. Same ordering #573's round 2 landed for
+ * strictWorktreeWriteFailure and #579/#595 applied on the native seam; the
+ * named list is evidence to scroll back for, never the instruction. Only the
+ * clause order moved: every clause is verbatim, none added or dropped.
  */
 export function strictGateBinFailure(
   gateBins: GateBinResolution[],
@@ -925,9 +937,9 @@ export function strictGateBinFailure(
     })
     .join("; ");
   return (
+    `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install. ` +
     `x-tracker.strict-gate-bins is set: refusing the claim commit — gate binaries do not ` +
-    `resolve inside the worktree: ${named}. ` +
-    `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install.`
+    `resolve inside the worktree: ${named}.`
   );
 }
 
@@ -941,6 +953,15 @@ export function strictGateBinFailure(
  * the worker. The refusal names the offending bins (same observation strict
  * mode uses — the flag changes the consequence, never the observation), the
  * preparation log that produced the state, and the exact fix.
+ *
+ * ORDERING is load-bearing (bug-native-refusal-advice-clipped-by-head-clip):
+ * the named-bin list goes LAST, because the human and native channels clip a
+ * composite error head-kept, and a worst-case named list would otherwise push
+ * the remedies — the only actionable part — off the clipped tail (the native
+ * seam also composes its own advice ahead of this kernel text, and both are
+ * clipped head-first at MAX_NATIVE_ERROR_CHARS). Every remedy therefore
+ * leads; the bin list is evidence to scroll back for, never the instruction.
+ * Same ordering #573's round 2 landed for strictWorktreeWriteFailure.
  *
  * Default-on for fresh worktrees — no flag required: a start that created the
  * worktree vouches for its install, and must not hand the worker a broken one.
@@ -973,11 +994,11 @@ export function freshWorktreeInstallRefusal(
           .join(", ")}.`
       : "";
   return (
-    `refusing the claim commit — a fresh worktree must leave a gate-usable install, and ` +
-    `these gate binaries do not resolve inside it: ${named}.${prep} ` +
+    `refusing the claim commit — a fresh worktree must leave a gate-usable install.${prep} ` +
     `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install ` +
     `(or \`npm install\` in the primary checkout if its install is stale or missing), ` +
-    `then re-run start --worktree to attach.`
+    `then re-run start --worktree to attach. ` +
+    `These gate binaries do not resolve inside it: ${named}.`
   );
 }
 
@@ -1503,7 +1524,16 @@ function defaultAbsoluteGitDir(cwd: string): string | undefined {
   return out;
 }
 
-function defaultWorktreeStatus(cwd: string): string | undefined {
+/**
+ * Read-only `git status --porcelain` probe (injectable for tests).
+ *
+ * Exported (not just a `WorktreeStatusRunner` default) so the release rule can
+ * ask a second question of the SAME read — does this worktree block its own
+ * removal? (bug-unclaim-leaves-worktree-record-without-reaper review M2) —
+ * instead of probing the worktree twice per classification. Raw output, never
+ * trimmed: the leading status columns are positional.
+ */
+export function defaultWorktreeStatus(cwd: string): string | undefined {
   const result = spawnSync("git", ["status", "--porcelain"], {
     cwd,
     encoding: "utf8",
@@ -1596,6 +1626,32 @@ function parseTakeoverChain(value: unknown): WorktreeClaimTakeoverRecord[] {
     entries.push({ at, by, replacedIdentity, replacedClaimedAt });
   }
   return entries.slice(-MAX_CLAIM_TAKEOVERS);
+}
+
+/**
+ * Remove a worktree's claim stamp (best-effort; never throws), returning true
+ * only when a stamp file was actually removed. The release path
+ * (bug-unclaim-leaves-worktree-record-without-reaper) calls it explicitly so
+ * reaping the stamp does not depend on git's worktree-removal internals
+ * (a domain-based removal never touches `.git/worktrees/<name>`) and so the
+ * step is OBSERVABLE in the action list instead of being an accident of the
+ * removal. Ownership is the stamp's own file and nothing else — never a
+ * symlinked git dir, never the work tree. An absent stamp (pre-feature
+ * worktrees, an already-released one) is a benign `false`.
+ */
+export function unlinkWorktreeClaimStamp(
+  worktreePath: string,
+  deps: { gitDir?: GitDirRunner } = {},
+): boolean {
+  const path = claimStampPath(worktreePath, deps);
+  if (path === undefined) return false;
+  try {
+    if (lstatSync(path).isSymbolicLink()) return false; // never follow or remove a link
+    rmSync(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
