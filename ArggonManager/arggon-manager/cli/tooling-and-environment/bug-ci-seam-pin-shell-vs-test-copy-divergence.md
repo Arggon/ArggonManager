@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-ci-seam-pin-shell-vs-test-copy-divergence
 title: "Re-scoped: the TEMPLATE-vs-COMMITTED copy divergence is CLOSED by PR #607 (parity test); what remains is only the `pin !== pkgVersion` conjunct — and the shell copy is the STRICTER predicate, so pasting it in may be wrong"
+assignee: Arggon
+branch: fix/bug-ci-seam-pin-shell-vs-test-copy-divergence
 parent: tooling-and-environment
 labels: [ci, seam]
 created: "2026-10-03"
 updated: "2026-10-03"
+claimed_at: "2026-10-03T12:47:56.606Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-ci-seam-pin-shell-vs-test-copy-divergence
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-ci-seam-pin-shell-vs-test-copy-divergence.md
