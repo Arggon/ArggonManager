@@ -26,3 +26,16 @@ updated: "2026-10-03"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-03 @ses_f02ab5836ffeOAxmisboIwWE4x
+Found by the reviewer of PR #611 (bug-three-acceptance-parsers-diverging), 2026-10-03, as its one non-blocking ask — filed rather than fixed there, because the PR's scope is the kernel and this is the doc an author reads BEFORE writing a parser.
+
+**The framing is what hid the bug.** `docs/convention.md:139` describes acceptance-box parsing as handling "LF and CRLF". True — and it is precisely the sentence that made every implementation (five consumers, six grammars) believe it had the terminator set covered. The done gate's regex anchors after every JS LineTerminator (`\n`, `\r`, `u2028`, `u2029`); a refactor to a `\n`-only split therefore looked behavior-preserving and silently turned refusals into `done` flips.
+
+The reviewer verified the cost of the *wrong* fix as well: including `\v`/`\f` in the boundary flips 6.5% of cases from ALLOW to REFUSE — a false refusal wedging a legitimate done flip. So the doc must name both what IS a terminator and what is deliberately NOT, because the symmetric mistake is just as damaging as the original.
+
+Acceptance:
+- [ ] `convention.md` names the full LineTerminator set the gate anchors on, and states explicitly that VT (`\v`) and FF (`\f`) are NOT line terminators for this purpose
+- [ ] The doc states which body every consumer must be handed (the canonical body) — the #605 trap — so an author cannot pre-filter before calling the predicate
+- [ ] Cross-reference the single kernel predicate by name, so the doc points at one implementation rather than describing a grammar to reimplement
+- [ ] Keep it to what an author needs BEFORE writing a parser; the implementation detail belongs in the predicate's own doc comment
