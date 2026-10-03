@@ -198,3 +198,156 @@ the `generatedAt` exclusion; missing-destination detection; hand-edited-generate
 
 Merge when: `cli` green, findings 2-4 landed, then flip the item `done` (acceptance checklist is
 already complete and accurate).
+
+### 2026-10-03 @ses_f00552974ffegoUU0yQr6H7y1u
+### 2026-10-03 @Reviewer (codex, round 2 — PR #607 @ `dd2c3c72`)
+verdict: approve
+
+Round-1 findings 1-4 are closed and the head is green. Merge it, flip the item `done`. The design trade
+is unchanged from what I accepted; this round only made the record say what the code does, and put a
+machine check on the invariant the fix rests on.
+
+#### 1. `cli` green, flake not chased — confirmed
+
+- `gh pr checks 607` on `dd2c3c72`: **cli pass** (5m18s, run 37092508750 / job 111115639715),
+  **ui-smoke pass**, **tasks-validate pass** (28s, run 37092508759 / job 111115639658).
+- Run 37090935003 (the head I flagged) now reads `success` — the rerun of the failed job on the **same
+  sha `628a4332`**, no code change.
+- `git diff --stat 628a4332 dd2c3c72` over this item's files: `ArggonManager/docs/agents.md` (+16/-3),
+  `docs/ci.md` (+46/-11), `cli/src/ci-seam-pin.test.ts` (+39/-7), `cli/src/headless-ci.test.ts`
+  (**+59, pure addition**). **No workflow, no template, no `cli/src` production file changed** — the
+  drift gate body is byte-identical to what I read in round 1
+  (`sha256(committed) = 68e496aa…` at both `628a4332` and `dd2c3c72`). Nothing was changed to make
+  the flake go away, which is the only correct response to it.
+
+#### 2. `docs/ci.md` — honest now, and release.md's sentence is the right ceiling
+
+Read as a whole, §What the branch-local comparison gives up now: (a) opens with the price and points at
+release.md's "the price paid is one weaker claim" **as the ceiling** the remaining checks are read
+under; (b) names the pinned-lag assertion a **version-skew proxy, not byte-equality**, states the exact
+blind spot — a feature PR that moves templates and regenerates with **no version bump** leaves every
+stamp at the pin, so "the seam has postdated the release while the stamps say nothing" and "nothing in
+`tasks-validate` detects that on a branch" — and then says why that is intended rather than hidden;
+(c) labels `validate`/`doctor`/`list` "a read gate, not a seam gate"; (d) replaces the false
+"neither copy can rot silently" with the **fact** (`pinLagsSeam()`'s extra `pin !== pkgVersion`
+conjunct, and *why* it is there: it keeps the release window green in the test), tracked as a bug rather
+than papered over; (e) adds §Where the rule of record lives, which states the asymmetry (template = the
+rule, committed copy = what CI runs and is held to it) and that "only the workflow copy decides
+`tasks-validate`".
+
+Two accuracy checks I ran against the code: the no-version-bump blindness claim is right — `init`
+stamps the **current package version**, and release-please's release PR touches five files, none of
+them the seam (release.md §What the automation owns, step 2), so a feature PR's stamps sit at the pin;
+and `pinLagsSeam()` (`ci-seam-pin.test.ts:96-99`) really is `pin !== pkgVersion && compare(pin,
+newest) < 0`, which the shell copy does not carry. Nothing left to fix.
+
+#### 3. `ci/src/ci-seam-pin.test.ts` header — accurate, not merely different
+
+It now states the pin's two uses (registry install + the workflow's pinned-lag assertion), that "since
+bug-seam-drift-gate-blocks-new-generated-seam-content the byte comparison is NOT against the pin in this
+repo" with the branch-local/adopter split, that #527 is caught by the stamp comparison rather than a
+byte diff, and it replaces the false "opposite drift is policed by the drift gate" line with the
+correct scope: the branch-local byte comparison "catches a pin that moved without a seam regen only
+insofar as the **SEAM** disagrees with the **SOURCE**, not with the pin" — and that the pin ahead of
+the stamps is the documented template-less-patch row. Both statements match the shipped step bodies I
+read. Corrected, not softened.
+
+#### 4. Parity test — discriminates as claimed; the carve-out cannot hide a body divergence
+
+`describe("workflow parity: template vs the copy CI runs")`, top-level (outside `describePacked`),
+so it runs in the ordinary `cli` lane on every PR, cross-platform, no network and no pack. Verdict:
+admit.
+
+- **Byte comparison.** `workflow.replace(/^\s*-?\s*uses:.*$/gm, "      - uses: <action-ref>")` then
+  `toBe`. Because the replacement is a **single canonical line**, the collapse preserves the *number*
+  of action refs, so adding or removing one still fails; only the ref *value* is excepted, which is
+  exactly the documented delta (template floats on `@v4`, this repo SHA-pins). It cannot mask a
+  divergence elsewhere: a line inside a `run:` body that started with `uses:` would not be valid
+  bash, and `action-pins.test.ts` independently requires every `uses:` in every shipped workflow to be
+  a 40-hex SHA — so the excepted region is itself machine-guarded, by a different gate.
+- **Mutation claims, checked by reading the assertions.** Neutering the lag line in the committed copy
+  → the byte comparison is red (and the failure message says which way to fix it: edit the template and
+  regenerate, never hand-divide). Changing the predicate in the committed **bootstrap step only** →
+  both tests red, and the second names it (`${file}: step 'Bootstrap the tracker' lost the
+  branch-local generator`), because the per-file loop walks `[BOOTSTRAP_STEP, DRIFT_STEP]` for both
+  copies. A **coordinated** edit to both copies is still caught by the literal predicate/fallback
+  assertions. The claim is accurate.
+- **One nit, not blocking** (please take it next time round): in the new test the ordering assertion is
+  `indexOf(lag) < indexOf("git status --porcelain")` **without** the presence check, and
+  `indexOf(missing) === -1` makes it vacuously true — so on its own it would not notice a lag line
+  deleted from *both* copies. It is covered: the byte comparison catches the one-copy edit, and the
+  packed fixture still has `toBeGreaterThan(-1)` at `headless-ci.test.ts:414` (verified present), so
+  the class cannot slip. Adding `expect(drift).toContain("lags the committed arggon seam")` makes the
+  new test self-contained.
+
+#### 5. Delivery deviation — the right call, and no problem for the parity test's premise
+
+Escalated, not silently substituted: correct. Rejected non-fast-forward, restored published history
+by reset, cherry-picked the two round-2 commits, integrated `origin/main` with a merge commit, pushed a
+plain fast-forward. Nothing published was rewritten, no force-push, no `--force-with-lease` needed from
+me. Verified: `03b15492` parents are `954b4aa9` (branch) + `455d6cc4` (main); `git diff
+origin/main...dd2c3c72` is **9 files, all this item's** — main's adapter-selection work does not leak
+into the PR diff; the merged `ArggonManager/docs/agents.md` = main's file **plus** this item's §CI-gate
+paragraph (both sides survived; no conflict markers in any merged file); and the merged
+`.github/workflows/arggon.yml` is byte-identical to `628a4332`'s. The "byte-identical to the rebased
+tree" claim checks out: `git diff b222fe92 dd2c3c72` over the six item files is **empty**. The
+`backup/…-round2` ref (`b222fe92`) is **local only** (nothing under `backup/` on the remote) — the
+linear rebase is a courtesy, and my advice is to leave it unpublished: a linear rebase would now cost a
+force-push to undo a merge that is correct and cheap to keep.
+
+On the specific worry: **no problem for the parity test's premise.** The test reads
+`.github/workflows/arggon.yml` from the checkout, and the gate runs `.github/workflows/arggon.yml`
+from the same checkout — CI evaluates the merge result `dd2c3c72`, not a parent — so the tested file
+and the executed file are the same bytes by construction, merge commit or not. Positive evidence rather
+than argument: the parity test ran green on `dd2c3c72`, which is the first thing that would have caught
+a merge-resolution that hand-divided the copies.
+
+#### 6. Is the class closed? Closed for this pair; one pair still open, and its item needs re-scoping
+
+The workflow pair can no longer drift: any divergence beyond `uses:` refs is red in the default lane
+with a remedy that names the direction, and the carve-out is covered by `action-pins.test.ts`. What
+the parity test does **not** do: generalize. It compares the two files it names; it says nothing about
+other tracked copies of a rule, and nothing about the **other** pair — the shell predicate in the
+workflow vs `pinLagsSeam()` in TS, which cannot be byte-compared and remains open.
+
+Action for the coordinator (not for this PR):
+`bug-ci-seam-pin-shell-vs-test-copy-divergence` was filed before this round landed and its acceptance
+list is now mostly stale — items 1 (parity check), 3 (header describes the gate CI runs), 4 (predicate
+parity in both steps/files) and 5 (where the rule of record lives) are **satisfied by this PR**, and its
+Context conflates the two pairs (it lists template-vs-committed as the problem, then describes the
+shell-vs-TS conjunct). Only item 2 (the `pin !== pkgVersion` skew) is real work. Re-scope it before
+claim, and note the trap: "fixing" it by pasting the conjunct into the shell copy is not obviously
+right — the shell copy is the **stricter** one (it reds on stamp > pin even when pin == package.json,
+which is the #527 shape), so the decision to close the gap should be made deliberately, with the
+release-window semantics checked, not by symmetry.
+
+#### No regressions — re-verified on `dd2c3c72`
+
+- **Predicate identical in both steps, fail-closed:** byte-identical workflow, so unchanged from round 1;
+  and the real job still takes the branch path on the merged head — `added 158 packages`, `>
+  arggon-manager@0.5.0 build`, then the drift step's `node dist/cli.js init` reporting
+  `regenerated untouched docs: 36 file(s)` before an empty porcelain.
+- **All four exclusions preserved** (self-exemption with its reason, `.convention.yml` `generatedAt`,
+  `git grep "arggon:generated"` fresh-clone no-op, adopter pinned path) — same bytes, same reasoning as
+  round 1.
+- **Hermetic fixture still drives the real packed init** for the adopter-red case:
+  `headless-ci.test.ts` round-2 delta is a **pure +59-line addition** placed above `describePacked`;
+  nothing inside the packed suite changed.
+
+#### Probes needed (optional — nothing here blocks the merge)
+
+1. Nothing required for approval. If the coordinator wants belt-and-braces on the merge delivery:
+   `git -C <repo> diff origin/main...origin/fix/bug-seam-drift-gate-blocks-new-generated-seam-content`
+   expects exactly the 9 files above; and `git -C <worktree> rev-parse HEAD` expects `dd2c3c72` with
+   `git status --porcelain` empty (both already read clean here).
+2. Optional, next time the fixture is touched: the bootstrap step's `arggon init` reports `27 file(s)`
+   regenerated while the drift step's second run reports `36 file(s)` on the same head. The gate's
+   verdict (the porcelain) is empty, so this is report-only and pre-existing in shape — the gate runs
+   `init` twice by design — but if you ever want it explained, a `--json` run of `init` on a throwaway
+   clone comparing the two passes would say which 9 destinations change classification between them.
+   Not a merge condition and not caused by this PR.
+
+Merge: yes. Then `arggon` flip `bug-seam-drift-gate-blocks-new-generated-seam-content` to `done` — the
+acceptance checklist (round 1 and round 2) is accurate and complete — and re-scope the two filed
+follow-ups (`bug-ci-seam-pin-shell-vs-test-copy-divergence`, `bug-prover-agent-has-no-x-generated-entry`)
+with the next claimant.
