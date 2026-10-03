@@ -14,10 +14,13 @@ checklist edit — the checklist in git is the only source of truth, this file
 is only the shape.
 
 Whether any work remains is NOT this file's call and not the loop's: it comes from
-the kernel's done gate (the predicate that refuses `arggon update --status done`
-while a criterion is unchecked), so the objective below can never say "nothing
-left" on an item the gate still refuses to close. Read it as authoritative and
-re-run `arggon goal {{ITEM_ID}}` whenever it disagrees with your read.
+the kernel's one acceptance grammar — the same rows, read from the same canonical
+item body, that refuse `arggon update --status done` while a criterion is
+unchecked (which lines count as a criterion is documented in
+`ArggonManager/docs/convention.md` §Acceptance rows). So the objective below can
+never say "nothing left" on an item the gate still refuses to close. Read it as
+authoritative and re-run `arggon goal {{ITEM_ID}}` whenever it disagrees with your
+read.
 
 ## Objective (exactly one)
 

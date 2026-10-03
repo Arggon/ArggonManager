@@ -19,9 +19,10 @@ Start a ZCode Goal Mode loop on $ARGUMENTS, following the ArggonManager rules.
    route around it.
 4. Feed the rendered contract to Goal Mode as the loop's objective and
    verification contract. One goal per claimed item: the objective is the item's
-   next unchecked acceptance criterion (the contract reports the DONE GATE's own
-   verdict, so if it says the checklist is satisfied there is nothing to loop
-   on), the contract carries the boundaries, and never start a second goal for a
+   next unchecked acceptance criterion, read from the kernel's one acceptance
+   grammar over the item's canonical body — the same rows `done` is gated on, so
+   if the contract says the checklist is satisfied there is nothing to loop on —
+   the contract carries the boundaries, and never start a second goal for a
    sibling item, never enter another item's worktree, and never loop while a
    reviewer dispatch is in flight (that window is read-only).
 5. Report the item id, the objective line and the worktree path when the loop

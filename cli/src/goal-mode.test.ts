@@ -6,18 +6,24 @@
  *
  * Two properties carry this command, and both are asserted here:
  *
- *  1. **The goal never inverts the done gate.** `acceptanceComplete` (the
- *     kernel predicate a `done` flip is refused by) decides whether work
- *     remains; the row parser only supplies text. The PARITY CORPUS walks the
- *     shapes where the two line regexes historically disagreed (CRLF, `- [ ]x`
- *     with no space, `*` bullets, indentation, empty boxes, tabs) and asserts
- *     `goal.hasGoal === !acceptanceComplete(body)` for every one of them.
+ *  1. **The goal never disagrees with the done gate.** Since
+ *     `bug-three-acceptance-parsers-diverging` the KERNEL owns the one acceptance
+ *     grammar (`acceptanceRows` / `acceptanceCriteria` / `acceptanceUnchecked` /
+ *     `acceptanceComplete`) and the one canonical input (`acceptanceBody`), and
+ *     this adapter reads verdict AND text through it. The PARITY CORPUS below
+ *     pins that on the shapes which used to disagree — CRLF, `- [ ]x`, `- [ ] x`,
+ *     `-  [ ] x` (NOT a row), `*` bullets, indentation, tabs, empty boxes, and a
+ *     checklist that lives only in a COMMENT section — asserting
+ *     `hasGoal === !acceptanceComplete(body)` and
+ *     `hasGoal === (acceptanceUnchecked(body).length > 0)` on every one.
  *  2. **The refusals hold on real trees** (init + claim + a recorded
  *     `worktree_path`), not mocks, and every documented code is asserted —
  *     a refusal that is not asserted is a refusal that can rot.
  *
- * `bug-three-acceptance-parsers-diverging` owns unifying the parsers; until it
- * lands, this corpus is what keeps the adapter honest.
+ * Grammar parity itself is `cli/src/acceptance-parity.test.ts` (the kernel's own
+ * corpus, over all consumers). What is left for THIS file is the adapter's own
+ * question: does the command feed the kernel the canonical body, and does the
+ * rendered contract stay bounded?
  */
 import {
   mkdtempSync as _mkdtempSync,
@@ -29,15 +35,22 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { acceptanceComplete, runComment, runCreate, runShow, runUpdate } from "@arggondev/lib";
+import {
+  acceptanceComplete,
+  acceptanceRows,
+  acceptanceUnchecked,
+  runComment,
+  runCreate,
+  runShow,
+  runUpdate,
+  type AcceptanceRow,
+} from "@arggondev/lib";
 import { runInit } from "./init.js";
-import { parseAcceptanceRows } from "./board.js";
-import { normalizeEol } from "./docs.js";
 import {
   GOAL_TEMPLATE_REL,
   MAX_GOAL_CONTRACT_BYTES,
-  MAX_GOAL_PROSE_BYTES,
   MAX_GOAL_TEMPLATE_BYTES,
+  MAX_GOAL_VERIFICATION_LINES,
   deriveGoal,
   goalOperation,
   runGoal,
@@ -112,13 +125,14 @@ function treeWithTask(
 }
 
 /**
- * The derivation as `runGoal` performs it, for the pure corpus matrix. It takes
- * the WHOLE item body (what the done gate reads) — passing a trimmed/filtered
- * body here would test a different question, which is exactly how the round-2
- * defect survived: the verdict was the right predicate on the wrong input.
+ * The derivation as `runGoal` performs it, for the pure corpus matrix: the
+ * kernel's rows and the kernel's unchecked criteria, both read from the WHOLE
+ * body (`acceptanceBody`). Passing a trimmed/filtered body here would test a
+ * different question, which is exactly how the round-2 defect survived — the
+ * verdict was the right predicate on the wrong input.
  */
 function deriveAsRun(body: string): ReturnType<typeof deriveGoal> {
-  return deriveGoal(parseAcceptanceRows(normalizeEol(body)), !acceptanceComplete(body));
+  return deriveGoal(acceptanceRows(body), acceptanceUnchecked(body));
 }
 
 /** One `arggon comment` section, as `runComment` appends it. */
@@ -128,7 +142,7 @@ function comment(text: string, date = "2026-10-02"): string {
 
 // ---------------------------------------------------------------------------
 
-describe("parity corpus: the goal never inverts the done gate", () => {
+describe("parity corpus: the goal never disagrees with the done gate", () => {
   const body = (checklist: string): string =>
     `# Item\n\n## Context\n\nx\n\n## Acceptance\n\n${checklist}\n\n## Notes\n`;
 
@@ -136,7 +150,6 @@ describe("parity corpus: the goal never inverts the done gate", () => {
     name: string;
     checklist: string;
     gateUnchecked: boolean;
-    renderable?: boolean;
     objective?: RegExp;
   }> = [
     {
@@ -188,27 +201,39 @@ describe("parity corpus: the goal never inverts the done gate", () => {
       gateUnchecked: true,
       objective: /tabbed criterion/,
     },
-    // The two shapes that used to DIVERGE. `acceptanceComplete` counts both
-    // (`[^\s]` needs no space after the box), the board row regex needs
-    // `\s+` — so without the gate-authoritative verdict the goal used to claim
-    // "nothing to do" while the done gate refused to close the item.
+    // The shapes that used to DIVERGE between the six pre-unification grammars.
+    // `ArggonManager/docs/convention.md` §Acceptance rows is the authority: a box
+    // glued to its text and a one-character tail are both ROWS; two spaces after
+    // the bullet is NOT a row (the gate's historical one-space shape, kept so
+    // unification added no refusal).
     {
-      name: "no space after the box (row regex misses it)",
+      name: "box glued to its text `- [ ]x` (decided: IS a row)",
       checklist: "- [ ]x",
       gateUnchecked: true,
-      objective: /READ THE ITEM BODY FIRST/,
-      renderable: false,
+      objective: /^x$/,
     },
     {
-      name: "one-space single char (both see it)",
+      name: "one-space single char `- [ ] x` (decided: IS a row)",
       checklist: "- [ ] x",
       gateUnchecked: true,
       objective: /^x$/,
     },
+    {
+      name: "two spaces after the bullet `-  [ ] x` (decided: NOT a row)",
+      checklist: "-  [ ] x\n-  [x] y",
+      gateUnchecked: false,
+      objective: /DEFINE THE GOAL FIRST/,
+    },
+    {
+      name: "tab between bullet and box (NOT a row: exactly one space)",
+      checklist: "-\t[ ] x\n-\t[x] y",
+      gateUnchecked: false,
+      objective: /DEFINE THE GOAL FIRST/,
+    },
     // The ONLY boxes live in an `arggon comment` section — a first-class shape
     // here (`create` has no `--body` flag; `bug-empty-template-checkbox` is the
     // stale empty box that shape leaves behind). The gate reads the whole body,
-    // so a verdict taken on the prose alone (comments stripped) would invert.
+    // so a verdict taken on a reader's prose would invert.
     {
       name: "checklist filed as a comment (the round-2 input-layer inversion)",
       checklist: "- [ ]" + comment("- [ ] criterion filed in a comment"),
@@ -230,11 +255,10 @@ describe("parity corpus: the goal never inverts the done gate", () => {
       expect(gateUnchecked, "corpus expectation for the done gate").toBe(testCase.gateUnchecked);
       const goal = deriveAsRun(source);
       expect(goal.hasGoal, "goal must agree with the gate").toBe(gateUnchecked);
-      if (testCase.renderable !== undefined) {
-        expect(goal.renderable).toBe(testCase.renderable);
-      }
-      // Text is only ever rendered for work the gate found — never the inverse.
-      if (goal.renderable) expect(gateUnchecked).toBe(true);
+      // The same answer, computed the way `runGoal` computes it.
+      expect(goal.hasGoal, "goal must agree with the kernel's unchecked criteria").toBe(
+        acceptanceUnchecked(source).length > 0,
+      );
       if (testCase.objective) expect(goal.objective).toMatch(testCase.objective);
       // The inverse must never be reported: a goal that claims work while the
       // gate is satisfied would send an agent after a criterion that does not
@@ -243,45 +267,55 @@ describe("parity corpus: the goal never inverts the done gate", () => {
     });
   }
 
-  it("the comment-filed case bites: a comment-stripped input inverts the gate (round 2)", () => {
+  it("a comment-stripped input would invert — which is why the canonical body is read", () => {
     const source = body(`- [ ]${comment("- [ ] criterion filed in a comment")}`);
     // The gate reads the whole body and refuses to close…
     expect(acceptanceComplete(source)).toBe(false);
-    // …while the round-2 build took its verdict from the comment-stripped prose:
+    expect(acceptanceUnchecked(source)).toHaveLength(1);
+    // …while the bounded prose (body minus comments) sees nothing: the round-2
+    // defect, and the reason `runGoal` calls `acceptanceBody(item)` rather than
+    // handing a reader's string to the kernel.
     const proseOnly = source.slice(0, source.indexOf("### 2026-"));
-    const round2 = deriveGoal(
-      parseAcceptanceRows(normalizeEol(proseOnly)),
-      !acceptanceComplete(proseOnly),
-    );
-    expect(round2.hasGoal, "the defect this pins").toBe(false);
-    // One canonical body for the predicate AND the text (what ships now):
+    expect(acceptanceUnchecked(proseOnly)).toEqual([]);
+    // What ships: one canonical body for the predicate AND the text.
     expect(deriveAsRun(source).hasGoal).toBe(true);
+    expect(deriveAsRun(source).objective).toBe("criterion filed in a comment");
   });
 
-  it("CRLF: gate and contract agree (the round-1 inversion)", () => {
+  it("CRLF: the kernel reads it, so the contract agrees with the gate (round 1)", () => {
     const lf = body("- [ ] crlf criterion\n- [x] done one");
     const crlf = lf.replaceAll("\n", "\r\n");
-    // The frontmatter parser tolerates CRLF, the done gate reads it...
+    // The frontmatter parser tolerates CRLF and the kernel's row scan splits on
+    // the whole LineTerminator set, so a CRLF body needs NO normalization: the
+    // rows come out identical to the LF body.
     expect(acceptanceComplete(crlf)).toBe(false);
-    // ...and the raw row regex alone sees NOTHING (`.` never matches `\r`).
-    expect(parseAcceptanceRows(crlf.split("\n").join("\r\n"))).toEqual([]);
-    // Normalizing first (docs.ts `normalizeEol`) is what makes the rows usable.
-    expect(parseAcceptanceRows(normalizeEol(crlf)).length).toBe(2);
+    expect(acceptanceRows(crlf)).toEqual(acceptanceRows(lf));
+    expect(acceptanceUnchecked(crlf)).toHaveLength(1);
     const goal = deriveAsRun(crlf);
     expect(goal.hasGoal).toBe(true);
-    expect(goal.renderable).toBe(true);
     expect(goal.objective).toBe("crlf criterion");
   });
 
-  it("stays bounded on a tampered oversized item (clipped lines, counted overflow)", () => {
+  it("a U+2028/U+2029-separated body parses like LF (the kernel's line-break set)", () => {
+    // `\n`-only splitting glued the rest of the row onto the previous line and the
+    // gate's refusal became invisible (PR #611 review F1) — the kernel owns the
+    // set now, so this is a property of `acceptanceRows`, pinned here because this
+    // adapter must not reintroduce a `\n` split of its own.
+    const source = "- [x] a\u2028- [ ] b\n";
+    expect(acceptanceUnchecked(source)).toHaveLength(1);
+    expect(deriveAsRun(source).objective).toBe("b");
+  });
+
+  it("stays bounded on a tampered oversized item (clipped rows, counted overflow)", () => {
     const huge = "x".repeat(200_000);
-    const rows = Array.from({ length: 40 }, (_, i) => ({
+    const rows: AcceptanceRow[] = Array.from({ length: 40 }, (_, i) => ({
       text: `${i}: ${huge}`,
       checked: false,
+      criterion: true,
     }));
-    const goal = deriveGoal(rows, true);
-    expect(goal.verification).toHaveLength(8);
-    expect(goal.verificationOmitted).toBe(32);
+    const goal = deriveGoal(rows, rows);
+    expect(goal.verification).toHaveLength(MAX_GOAL_VERIFICATION_LINES);
+    expect(goal.verificationOmitted).toBe(40 - MAX_GOAL_VERIFICATION_LINES);
     expect(goal.truncated).toBe(true);
     for (const line of goal.verification) {
       expect(Buffer.byteLength(line, "utf8")).toBeLessThanOrEqual(200);
@@ -289,14 +323,20 @@ describe("parity corpus: the goal never inverts the done gate", () => {
     expect(Buffer.byteLength(goal.objective, "utf8")).toBeLessThanOrEqual(240);
   });
 
-  it("reports the no-goal and unrenderable shapes explicitly, never an empty goal", () => {
-    const done = deriveGoal([{ text: "all ticked", checked: true }], false);
+  it("has exactly two shapes — a goal, or an explicit define-the-goal-first", () => {
+    const done = deriveGoal(acceptanceRows(body("- [x] all ticked")), []);
+    expect(done.hasGoal).toBe(false);
     expect(done.objective).toMatch(/DEFINE THE GOAL FIRST/);
     expect(done.verification[0]).toMatch(/cannot start until/);
-    const unreadable = deriveGoal([], true);
-    expect(unreadable.hasGoal).toBe(true);
-    expect(unreadable.renderable).toBe(false);
-    expect(unreadable.objective).toMatch(/READ THE ITEM BODY FIRST/);
+    // The third shape an earlier revision carried ("unrenderable", for a
+    // reader/gate disagreement) died with the unification: the kernel is the only
+    // parser, so "rows exist but none could be read" is unrepresentable.
+    const open = deriveGoal(
+      acceptanceRows(body("- [ ] a criterion")),
+      acceptanceUnchecked(body("- [ ] a criterion")),
+    );
+    expect(open.hasGoal).toBe(true);
+    expect(open.objective).not.toMatch(/READ THE ITEM BODY FIRST/);
   });
 });
 
@@ -334,51 +374,37 @@ describe("runGoal (rendered contract from a real item)", () => {
     // ...and the goal therefore offers work, with readable text.
     const result = runGoal({ cwd: dir, id, login: "Arggon" });
     expect(result.goal.hasGoal).toBe(true);
-    expect(result.goal.renderable).toBe(true);
     expect(result.goal.objective).toBe("crlf criterion");
   });
 
-  it("clips the prose read at its budget, and the clip cannot invert the gate", () => {
-    const { dir, id } = treeWithTask("- [ ] beyond the budget", { assignee: "Arggon" });
-    // Move the whole checklist past MAX_GOAL_PROSE_BYTES of filler: the read is
-    // clipped, so no criterion row is parsed — and the contract must still say
-    // "work remains" (the gate's verdict), never "define the goal first".
-    const path = runShow({ cwd: dir, id }).path;
-    const raw = readFileSync(path, "utf8");
-    const sep = raw.indexOf(FRONTMATTER_END) + FRONTMATTER_END.length;
-    const head = raw.slice(0, sep);
-    const tail = raw.slice(sep);
-    const unit = "filler line\n";
-    const filler = unit.repeat(
-      Math.ceil((MAX_GOAL_PROSE_BYTES * 1.2) / Buffer.byteLength(unit, "utf8")),
-    );
-    writeFileSync(path, `${head}\n${filler}\n${tail}`, "utf8");
+  it("counts the criteria past the inline cap instead of dropping them silently", () => {
+    // The body is NOT clipped (the kernel reads all of it, and capping the INPUT
+    // is what used to make a lost criterion look like "everything inlined"); the
+    // bound is on the rendered ROWS, as the kernel documents for consumers.
+    const many = Array.from({ length: 30 }, (_, i) => `- [ ] criterion ${i}`).join("\n");
+    const { dir, id } = treeWithTask(many, { assignee: "Arggon" });
     const result = runGoal({ cwd: dir, id, login: "Arggon" });
-    expect(result.goal.gateUnchecked).toBe(true);
-    expect(result.goal.hasGoal).toBe(true);
-    expect(result.goal.renderable).toBe(false);
-    expect(result.goal.objective).toMatch(/READ THE ITEM BODY FIRST/);
-    // Round-1 finding 3: a clipped read must not read as "everything inlined".
+    expect(result.goal.objective).toBe("criterion 0");
+    expect(result.goal.verification).toHaveLength(MAX_GOAL_VERIFICATION_LINES);
+    expect(result.goal.verificationOmitted).toBe(30 - MAX_GOAL_VERIFICATION_LINES);
     expect(result.goal.truncated).toBe(true);
+    expect(result.contract).toContain("Some checklist text was clipped or deferred");
     expect(Buffer.byteLength(result.contract, "utf8")).toBeLessThanOrEqual(MAX_GOAL_CONTRACT_BYTES);
   });
 
-  it("marks the contract truncated when only the filler past the budget was cut", () => {
-    const { dir, id } = treeWithTask("- [ ] first criterion", { assignee: "Arggon" });
+  it("still renders a criterion that sits far down a huge body", () => {
+    const { dir, id } = treeWithTask("- [ ] buried criterion", { assignee: "Arggon" });
     const path = runShow({ cwd: dir, id }).path;
     const raw = readFileSync(path, "utf8");
+    const sep = raw.indexOf(FRONTMATTER_END) + FRONTMATTER_END.length;
     const unit = "filler line\n";
-    const filler = unit.repeat(
-      Math.ceil((MAX_GOAL_PROSE_BYTES * 1.2) / Buffer.byteLength(unit, "utf8")),
-    );
-    // Criteria stay INSIDE the budget (the objective is still rendered) but the
-    // read WAS clipped, so the contract must say so.
-    writeFileSync(path, `${raw}\n${filler}`, "utf8");
+    const filler = unit.repeat(Math.ceil((512 * 1024) / Buffer.byteLength(unit, "utf8")));
+    writeFileSync(path, `${raw.slice(0, sep)}\n${filler}\n${raw.slice(sep)}`, "utf8");
     const result = runGoal({ cwd: dir, id, login: "Arggon" });
-    expect(result.goal.objective).toBe("first criterion");
-    expect(result.goal.renderable).toBe(true);
-    expect(result.goal.truncated).toBe(true);
-    expect(result.contract).toContain("Some checklist text was clipped or deferred");
+    // No input cap, so a criterion past any old budget is still found.
+    expect(result.goal.gateUnchecked).toBe(true);
+    expect(result.goal.objective).toBe("buried criterion");
+    expect(Buffer.byteLength(result.contract, "utf8")).toBeLessThanOrEqual(MAX_GOAL_CONTRACT_BYTES);
   });
 
   it("names the no-worktree fallback the boundary states (repo root, not a sibling's)", () => {
@@ -608,7 +634,6 @@ describe("goalOperation (json envelope)", () => {
     expect(goal.verification).toEqual(["one goal", "two goals"]);
     expect(goal.boundaries.length).toBeGreaterThan(3);
     expect(goal.gateUnchecked).toBe(true);
-    expect(goal.renderable).toBe(true);
     expect(goal.identity).toBe("Arggon");
     expect(Buffer.byteLength(goal.contract, "utf8")).toBeLessThanOrEqual(MAX_GOAL_CONTRACT_BYTES);
   });

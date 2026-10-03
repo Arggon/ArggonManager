@@ -12,29 +12,25 @@
  * Shape (the generated plugin file `templates/goal-mode.md` holds only the
  * shape):
  *
- *   1. ONE objective = the item's first UNCHECKED acceptance criterion. WHICH
- *      criteria exist is decided by the KERNEL's done-gate predicate
- *      `acceptanceComplete` (lib/src/items.ts) — the same call the `done` flip
- *      is refused by, on the SAME canonical input (`item.body`, comment
- *      sections included; a reader that trims or filters first has changed the
- *      question), so a goal can never tell an agent "nothing left to do" while
- *      the gate refuses to close the item. The criterion TEXT comes from
- *      the board renderer's row parser (cli/src/board.ts), normalized to LF
- *      first (its regex is CRLF-blind, `.` never matches `\r`) and filtered
- *      through no rule of its own beyond "has text" (the gate's own rule: a box
- *      with no text after it is a scaffold placeholder, not a criterion). Those
- *      are TWO parsers, not one: they can still disagree, so the disagreement is
- *      handled, never hidden — when the gate says work remains but no criterion
- *      text could be read, the contract says exactly that instead of inventing
- *      an empty goal (see UNRENDERABLE below). One kernel predicate owning
- *      unification is `bug-three-acceptance-parsers-diverging`; until that
- *      lands, the parity corpus in cli/src/goal-mode.test.ts is what keeps this
- *      adapter honest.
- *   2. Verification = the same unchecked criteria as the contract the loop must
+ *   1. ONE objective = the item's first UNCHECKED acceptance criterion, read from
+ *      the KERNEL's one acceptance grammar. Since
+ *      `bug-three-acceptance-parsers-diverging` (PR #611) the kernel owns the
+ *      only row parser in the tree — `acceptanceRows` / `acceptanceCriteria` /
+ *      `acceptanceUnchecked` / `acceptanceComplete`, plus `acceptanceBody` for the
+ *      one canonical input — and this adapter defers to it for BOTH the verdict
+ *      and the text. There is no second parser left to disagree: the objective,
+ *      the verification contract and the done flip's refusal set are the SAME
+ *      rows, computed by the SAME functions, over the SAME bytes.
+ *      `acceptanceBody(item)` is that input, verbatim: a checklist filed as an
+ *      `arggon comment` (first-class here — `create` has no `--body` flag) is
+ *      inside it, while a reader's bounded `prose` is not, and passing one of
+ *      those to a predicate changes the question.
+ *      Bounded on the ROWS, as the kernel documents: byte-clipped lines, a fixed
+ *      number inlined, the rest counted, so a tampered or oversized item cannot
+ *      produce an unbounded contract.
+ *   2. Verification = the unchecked criteria as the contract the loop must
  *      satisfy, because every one of them must hold before the item can flip to
- *      `done` (ADR 0015 done gate). Bounded: N lines, each clipped, overflow
- *      counted, so a tampered or oversized item can never produce an unbounded
- *      contract.
+ *      `done` (ADR 0015 done gate).
  *   3. Boundaries + refusals are appended by THIS module from constants, never
  *      read from the template file, so an adopter editing their generated copy
  *      cannot drop the one-item/one-worktree rules or route around the reviewer
@@ -53,7 +49,9 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import {
-  acceptanceComplete,
+  acceptanceBody,
+  acceptanceRows,
+  acceptanceUnchecked,
   failEnvelope,
   findTasksDir,
   readConventionVersion,
@@ -62,24 +60,12 @@ import {
   runShow,
   successEnvelope,
   toContractWorkItem,
+  type AcceptanceRow,
   type CommandOutcome,
   type ContractWorkItem,
   type KernelFailureEnvelope,
   type KernelSuccessEnvelope,
 } from "@arggondev/lib";
-// The board renderer's row parser. Deliberately NOT moved into `@arggondev/lib`
-// here: whether lib grows a row parser — and which parser wins — is the design
-// decision `bug-three-acceptance-parsers-diverging` owns, and guessing it here
-// would pre-empt that item (and risk a fourth parser). Until it lands, this
-// adapter reads text through the board's parser and takes every VERDICT from the
-// kernel's `acceptanceComplete`, with the parity corpus pinning the two together.
-import { parseAcceptanceRows } from "./board.js";
-// The CLI's single EOL helper (docs.ts). Required, not cosmetic: the frontmatter
-// parser tolerates CRLF and the board's row regex does not (`.` never matches
-// `\r`), so a CRLF item read without normalizing yields ZERO criteria — which is
-// exactly how this adapter used to tell an agent "nothing left to do" on an item
-// the done gate still refused to close.
-import { normalizeEol } from "./docs.js";
 import { bundledTemplatesDir } from "./package-assets.js";
 
 /** Generated destination of the goal-mode template (the ZCode plugin seam). */
@@ -94,13 +80,6 @@ export const MAX_GOAL_OBJECTIVE_BYTES = 240;
 export const MAX_GOAL_VERIFICATION_BYTES = 200;
 /** How many criteria the contract inlines before it defers to the item. */
 export const MAX_GOAL_VERIFICATION_LINES = 8;
-/**
- * How much of the item's prose is even PARSED for criteria: the derivation
- * reads the acceptance checklist, not the item, so a 10 MB body is clipped
- * before the scan instead of being walked line by line. A clipped read also
- * marks the contract `truncated` — criteria may exist past the cut.
- */
-export const MAX_GOAL_PROSE_BYTES = 32 * 1024;
 /**
  * Budget for the TEMPLATE text before slot filling — an adopter-inflated or
  * tampered copy is clipped here, so the rendered contract stays bounded even
@@ -180,23 +159,17 @@ export type GoalContract = {
   verificationOmitted: number;
   /** False when the DONE GATE is satisfied (nothing left to satisfy). */
   hasGoal: boolean;
-  /**
-   * False when no criterion text could be read while the gate says work remains
-   * (the two parsers disagree — `bug-three-acceptance-parsers-diverging`). The
-   * contract then says so instead of inventing a goal.
-   */
-  renderable: boolean;
   boundaries: string[];
   refusals: string[];
   /** True when any line was clipped or any criterion deferred to the item. */
   truncated: boolean;
-  /** Acceptance-checklist arithmetic behind the contract. */
+  /** Acceptance-row arithmetic behind the contract. */
   checklist: { total: number; unchecked: number; checked: number };
   /**
-   * The DONE GATE's verdict, verbatim: `!acceptanceComplete(item.body)` — the
-   * same predicate AND the same canonical input the `done` flip is refused by
-   * (comment sections included). The goal never disagrees with it; that is the
-   * load-bearing invariant.
+   * The DONE GATE's verdict: `acceptanceUnchecked(acceptanceBody(item)).length > 0`,
+   * which is exactly `!acceptanceComplete(acceptanceBody(item))` — the same rows
+   * and the same canonical input the `done` flip is refused by. Computed from
+   * the kernel, so the goal cannot disagree with it by construction.
    */
   gateUnchecked: boolean;
   /** Where the loop may run, and whether the item recorded a worktree. */
@@ -247,73 +220,54 @@ function clip(text: string, maxBytes: number): { text: string; clipped: boolean 
   return { text: `${out.trimEnd()}${ELLIPSIS}`, clipped: true };
 }
 
-/** Collapse a checklist line to one bounded line (no newlines, no box marker). */
+/**
+ * Display-only normalization of a criterion's text: rows come from the kernel
+ * already trimmed and single-line (it splits on the LineTerminator set), so this
+ * only collapses interior whitespace runs for a readable contract line. It
+ * decides nothing — no row is created, dropped or reclassified here.
+ */
 function oneLine(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
 /**
- * The derivation, pure: criterion rows + the DONE GATE's verdict → objective +
- * verification.
+ * The derivation, pure: the kernel's rows → objective + verification.
  *
- * `hasUncheckedCriterion` is `!acceptanceComplete(item.body)` — the kernel
- * predicate the `done` flip is refused by, on the same canonical body (comments
- * included) — so the goal's "is there work left" answer can never contradict the
- * gate's. The rows only supply TEXT, parsed from that same body. Three shapes,
- * and no fourth:
+ * `rows` and `unchecked` are BOTH the kernel's, read from the same canonical
+ * body (`acceptanceRows(acceptanceBody(item))` / `acceptanceUnchecked(...)`), so
+ * "is there work left" and "what is left" cannot disagree — and neither can the
+ * `done` flip's refusal set, which is the same `acceptanceUnchecked`. Two shapes:
  *
- *   - work remains and a criterion line was read → one objective (the first
- *     unchecked one) + the unchecked criteria as the verification contract;
- *   - the gate says nothing remains → "DEFINE THE GOAL FIRST", never an empty
- *     goal (a body with no criteria at all has no contract to satisfy);
- *   - the gate says work remains but no criterion text could be read (the two
- *     parsers disagree — see the module header and
- *     `bug-three-acceptance-parsers-diverging`) → `UNRENDERABLE`: the contract
- *     says an unchecked criterion exists and refuses to invent its text. This is
- *     the case that used to invert: a CRLF item used to render "define the goal
- *     first" while the done gate refused to close it.
+ *   - work remains → one objective (the first unchecked criterion) + the
+ *     unchecked criteria as the verification contract;
+ *   - nothing remains → "DEFINE THE GOAL FIRST", never an empty goal (a body with
+ *     no criteria has no contract to satisfy).
+ *
+ * There is deliberately no third shape. An earlier revision kept an "unrenderable"
+ * branch for the case where the verdict and the text came from two parsers that
+ * disagreed; `bug-three-acceptance-parsers-diverging` removed that class by making
+ * the kernel the only parser, so the branch is gone with the class.
+ *
+ * Bounded on the ROWS (the kernel's own guidance for a consumer that renders
+ * them): byte-clipped lines, a fixed number inlined, the rest counted.
  */
 export function deriveGoal(
-  rows: Array<{ text: string; checked: boolean }>,
-  hasUncheckedCriterion: boolean,
+  rows: AcceptanceRow[],
+  unchecked: AcceptanceRow[],
 ): Pick<
   GoalContract,
-  | "objective"
-  | "verification"
-  | "verificationOmitted"
-  | "hasGoal"
-  | "renderable"
-  | "truncated"
-  | "checklist"
+  "objective" | "verification" | "verificationOmitted" | "hasGoal" | "truncated" | "checklist"
 > {
   const total = rows.length;
   const checked = rows.filter((row) => row.checked).length;
-  const live = rows
-    .filter((row) => !row.checked)
-    .map((row) => oneLine(row.text))
-    .filter((text) => text.length > 0);
-
-  if (!hasUncheckedCriterion) {
-    return {
-      hasGoal: false,
-      renderable: false,
-      objective: NO_GOAL_OBJECTIVE,
-      verification: [
-        "No verification contract: this goal cannot start until the item carries at least one unchecked acceptance criterion.",
-      ],
-      verificationOmitted: 0,
-      truncated: false,
-      checklist: { total, unchecked: 0, checked },
-    };
-  }
+  const live = unchecked.map((row) => oneLine(row.text));
 
   if (live.length === 0) {
     return {
-      hasGoal: true,
-      renderable: false,
-      objective: UNRENDERABLE_OBJECTIVE,
+      hasGoal: false,
+      objective: NO_GOAL_OBJECTIVE,
       verification: [
-        "No criterion text could be read from the checklist (the kernel's done gate still sees unchecked work), so read the item body before planning: `arggon show <id> --body`.",
+        "No verification contract: this goal cannot start until the item carries at least one unchecked acceptance criterion.",
       ],
       verificationOmitted: 0,
       truncated: false,
@@ -327,7 +281,6 @@ export function deriveGoal(
   const verificationOmitted = live.length - inlined.length;
   return {
     hasGoal: true,
-    renderable: true,
     objective: objective.text,
     verification: verification.map((line) => line.text),
     verificationOmitted,
@@ -344,20 +297,10 @@ const NO_GOAL_OBJECTIVE =
   "on. Either the work is finished — merge the PR and let the coordinator flip the item — or " +
   "write the criterion into the item's Acceptance section (arggon comment) before starting a goal.";
 
-/** Objective for "unchecked work exists but its text was not readable". */
-const UNRENDERABLE_OBJECTIVE =
-  "READ THE ITEM BODY FIRST: the done gate refuses to close this item (an unchecked " +
-  "acceptance criterion exists), but no criterion line could be read from the checklist — the " +
-  "kernel predicate and the checklist reader disagree on this body. Do NOT treat the item as " +
-  "finished; read `arggon show <id> --body` and plan from what it says.";
-
 /** The checklist tail note: what the inlined lines do and do not cover. */
 function checklistNote(goal: GoalContract): string {
   if (!goal.hasGoal) {
     return "The done gate is satisfied for this item, so there is nothing to verify yet.";
-  }
-  if (!goal.renderable) {
-    return "The checklist text could not be read; the goal verdict still comes from the done gate, never from a parser.";
   }
   if (goal.truncated) {
     return "Some checklist text was clipped or deferred: read `arggon show <id> --body` before calling the goal met.";
@@ -525,26 +468,25 @@ export function runGoal(opts: GoalOptions): GoalResult {
   assertWorktree(root, item);
 
   const template = loadGoalTemplate(root, opts.templatesDir);
-  // **One canonical body, every predicate.** `item.body` — the WHOLE body,
-  // comment sections included — is exactly what the done gate reads
-  // (`lib/src/update.ts:526`, `!acceptanceComplete(item.body)`), so the gate's
-  // verdict here is taken on the same input. A reader that trims or filters
-  // before calling has changed the question: `shown.prose` (body minus
-  // comments) is what makes a checklist filed as an `arggon comment` —
-  // first-class here, since `create` has no `--body` flag and
-  // `bug-empty-template-checkbox` exists for exactly that case — vanish from
-  // the goal while the gate still refuses to close the item. Both the verdict
-  // and the criterion text therefore read `item.body`.
-  const gateUnchecked = !acceptanceComplete(item.body);
-  const prose = clip(item.body, MAX_GOAL_PROSE_BYTES);
-  const rows = parseAcceptanceRows(normalizeEol(prose.text));
-  const derived = deriveGoal(rows, gateUnchecked);
+  // **One canonical body, one kernel parser.** `acceptanceBody(item)` is the
+  // item's whole body (comment sections included) — the input the done gate reads
+  // — and the kernel owns the only acceptance grammar in the tree since
+  // `bug-three-acceptance-parsers-diverging`. Both the verdict and the criterion
+  // text come from it, so they cannot disagree with each other or with the gate.
+  //
+  // Do NOT hand a reader's string to these: a bounded `prose` (body minus
+  // comments) makes a checklist filed as an `arggon comment` — first-class here,
+  // since `create` has no `--body` flag — vanish from the goal while the gate
+  // still refuses to close the item. That inversion is what this call site exists
+  // to prevent.
+  const body = acceptanceBody(item);
+  const rows = acceptanceRows(body);
+  const unchecked = acceptanceUnchecked(body);
+  const gateUnchecked = unchecked.length > 0; // === !acceptanceComplete(body)
+  const derived = deriveGoal(rows, unchecked);
   const worktreePath = item.worktreePath ?? root;
   const goal: GoalContract = {
     ...derived,
-    // Criteria lost to the prose clip must not read as "everything inlined"
-    // (round-1 finding 3): a clipped read is a truncated contract.
-    truncated: derived.truncated || prose.clipped,
     gateUnchecked,
     boundaries: [...GOAL_BOUNDARIES],
     refusals: [...GOAL_REFUSALS],
