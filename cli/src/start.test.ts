@@ -720,6 +720,31 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
     expect(sanitizeHumanError(message)).toContain("Exact fix for the observed resolution");
   });
 
+  it("reports the readiness evidence on the claim-commit step ONLY", () => {
+    // Caught by the multi-bin smoke probe: this wrapper takes a readiness
+    // snapshot for every step (the gate ran in all of them), so appending the
+    // clause unconditionally grew a push failure a bin list it has nothing to
+    // do with. The evidence belongs to the step whose gate produced it.
+    const { bins, worktreePath } = worstCaseFixture();
+    const compose = (step: string): string =>
+      worktreeFailureMessage({
+        id: ID,
+        branch: BRANCH,
+        worktreePath,
+        createBranch: true,
+        step,
+        err: new Error("git push failed: no upstream"),
+        readiness: { hasInstall: true, gateBins: bins },
+      });
+    expect(compose("committing the claim (pre-commit gate)")).toContain(
+      "Readiness: the gate binaries do not resolve",
+    );
+    for (const step of ["pushing the branch", "opening the draft PR", "reading back the item"]) {
+      expect(compose(step), step).not.toContain("Readiness:");
+      expect(compose(step), step).not.toContain("Exact fix for the observed resolution");
+    }
+  });
+
   it("carries the UNBOUNDED readiness observation on the failure a start throws", () => {
     // The human message bounds the bin NAMES to what the clip can show, so
     // without this the hidden ones are unreachable from every CLI surface:

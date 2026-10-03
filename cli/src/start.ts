@@ -962,10 +962,17 @@ export function worktreeFailureMessage(input: {
     1 +
     detail.length +
     1;
+  // The readiness evidence belongs to the claim-commit step only: on a push or
+  // draft-PR failure "gate binaries do not resolve" is noise, and this wrapper
+  // takes a readiness snapshot for EVERY step (bug-start-worktree-npm-ci-claim
+  // wants it reported wherever the gate ran). Same condition the exact fix hangs
+  // off — a smoke probe caught the leak when a push failure grew a bin list.
   const readiness =
-    input.readiness === undefined
-      ? ""
-      : (gateBinFailureReport(input.readiness, MAX_HUMAN_ERROR_CHARS - mandatory) ?? "");
+    input.step.startsWith("committing the claim") &&
+    input.readiness !== undefined &&
+    hasReadinessEvidence(input.readiness)
+      ? (gateBinFailureReport(input.readiness, MAX_HUMAN_ERROR_CHARS - mandatory) ?? "")
+      : "";
   return [
     lead,
     `${remedy}${readiness === "" ? "" : ` ${readiness}`}`,
