@@ -1,16 +1,12 @@
 ---
 type: bug
-status: in_progress
+status: todo
 id: bug-seam-drift-gate-blocks-new-generated-seam-content
 title: "`tasks-validate` drift gate installs the PINNED released arggon and diffs the committed seam, so any PR adding new generated seam content (e.g. the ZCode goal-mode template) fails until a release + ARGGON_VERSION re-pin"
-assignee: Arggon
-branch: fix/bug-seam-drift-gate-blocks-new-generated-seam-content
 parent: tooling-and-environment
 labels: [ci, release]
 created: "2026-10-03"
 updated: "2026-10-03"
-claimed_at: "2026-10-03T02:11:11.966Z"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-seam-drift-gate-blocks-new-generated-seam-content
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-seam-drift-gate-blocks-new-generated-seam-content.md
@@ -100,6 +96,7 @@ Acceptance:
 - [ ] One coherent release story covering this AND the version guard that refused #600 — one root cause, one decision
 - [ ] Decide and record: 'cut a release first' (an explicit, documented cost on every seam-touching PR) vs 'make the gate branch-aware' (no cost, weaker drift detection)
 - [ ] `templates/docs/github/workflows/arggon.yml` stays byte-consistent with the committed workflow — the gate exempts itself deliberately; do not break that exemption while fixing this
+
 
 ### 2026-10-03 @Arggon
 ## Evidence — both directions, real build, shipped step bodies (PR #607)
@@ -271,3 +268,144 @@ Gates on `03b15492` (origin/main 455d6cc4 merged): `npm run build`,
 ### handoff 2026-10-03 @Arggon — next: Merge PR #607 (round-2 fixes pushed as fast-forward 03b15492; decide rebase-vs-merge per the comment), then flip this item done
 - branch: fix/bug-seam-drift-gate-blocks-new-generated-seam-content
 - open questions: Linear rebase instead of the merge commit (needs force-with-lease, unauthorized)? Accept the recorded weaker claim (version-skew proxy, blind on unbumped feature PRs)?
+
+### 2026-10-03 @ses_f00552974ffegoUU0yQr6H7y1u
+
+### 2026-10-03 @Reviewer (codex, reviewing PR #607)
+verdict: request-changes (head red on a pre-existing flake + the durable record overstates the compensation)
+
+**No redesign asked for.** The branch-aware trade itself is accepted: I verified the adopter-facing
+protection is untouched, the drift that matters day-to-day (committed seam vs. the repo's own
+templates) is preserved, and the gate now fails closed instead of silently answering the wrong
+question. The three asks below are a green head and ~15 lines of record/test. This PR should not
+re-open the design.
+
+#### Blocking
+
+1. **The PR head is red.** `gh pr checks 607` on `628a4332`: `tasks-validate` pass (28 s),
+   `ui-smoke` pass, **`cli` FAIL** (run 37090935003, job 111110931552,
+   `SpawnHarnessError … does not provide an export named 'runSync'` from `lib/dist/operations.js`).
+   Failure class is the known artifact-drift flake (`bug-cli-spawn-suites-exit-1-flake`): another
+   suite lane rebuilt `lib/dist` in place mid-spawn. **It is not caused by this diff** — main
+   reproduces the identical class on `f382ff10` (run 37090397049, `does not provide an export named
+   'trackerNonItemDirs'`), and the earlier push `220bfa6b` was fully green. Green CI is necessary,
+   so: re-run `cli` to green (or push) before merge. No code change needed for this one.
+
+2. **`docs/ci.md` overstates what compensates for the weakening — the durable record of this trade
+   must be exact.** Two sentences are wrong as written:
+   - "Two assertions keep the release protection" — the pinned-lag assertion is a **version-skew
+     proxy, not a byte-equality proof**. It fires only when a committed `arggonVersion` stamp is
+     newer than the pin. In this repo a feature PR changes templates and regenerates the seam
+     *without* a version bump (release.md step 2: release-please touches five files, none of them the
+     seam), so the stamps stay at the pin and the assertion is silent — in exactly the case this
+     item exists to unblock. State the residual class plainly: *committed seam == branch templates
+     AND != pinned-release templates, with pin == stamps, is unenforced.*
+   - "This repo pins the same rule as a test (`cli/src/ci-seam-pin.test.ts`), so neither copy can
+     rot silently" — they are **not the same rule**. `pinLagsSeam()` (ci-seam-pin.test.ts:96-99) is
+     `pin !== pkgVersion && compareVersions(pin, newest) < 0`; the shell copy has no
+     `pin !== pkgVersion` conjunct, reads a different state-path candidate list, and the TS guard
+     only ever reads `.github/workflows/arggon.yml` + `ArggonManager/.convention.yml`. Two
+     independent copies; neither polices the other's text.
+   The first paragraph ("no longer proves that the _pinned release_ reproduces the committed seam")
+   and release.md's "the price paid is one weaker claim, stated plainly" are honest — keep them, and
+   let the compensation paragraph match them.
+
+3. **`cli/src/ci-seam-pin.test.ts` now describes a gate that no longer exists for this repo**
+   (comment-only, but it is the record of the pin's rule): lines 5-6 ("the drift gate compare the
+   committed seam against that release") and 43-44 ("the opposite drift — the pin moved without
+   regenerating the seam — stays policed by the workflow's own drift gate at CI time"). Both still
+   hold for adopters and false for the seam's own repo, whose generator is now the branch build.
+
+4. **Nothing machine-checks the invariant this fix rests on: the two workflow copies.**
+   `headless-ci.test.ts` parses `templates/docs/github/workflows/arggon.yml` (line 163,
+   `steps = workflowRunSteps(readFileSync(WORKFLOW_TEMPLATE, …))`) — the file CI never runs — while
+   CI runs `.github/workflows/arggon.yml`. Today they differ only in the two `uses:` pin lines
+   (I diffed both copies at the head: that is the whole delta), but a future one-sided edit would put
+   untested shell in the executed copy and leave the tested copy green — the exact
+   "green because the other copy was tested" hole. Acceptance #5 was verified by hand only. Add the
+   ~10-line parity assertion (normalize the two `uses:` lines, compare the rest) next to the
+   existing predicate assertion; it also machine-checks the shared predicate instead of asserting it
+   as text in one copy.
+
+#### Verified by reading (no rework implied)
+
+- **The predicate cannot misfire toward green.** Both steps carry the byte-identical condition
+  (`.github/workflows/arggon.yml:64` and `:118`), no env hand-off (so no drift between steps), and
+  the misclassification direction is fail-closed: a repo wrongly read as an adopter gets the pinned
+  init and a direction-honest red, never a silent pass. Real CI confirms the predicate is TRUE for
+  this repo — job 111110931337 log shows `added 158 packages`, `> arggon-manager@0.5.0 build`,
+  `postbuild → build:plugin`, then the drift step's `node dist/cli.js init` printing
+  `regenerated untouched docs: 36 file(s)`. `dist/` is gitignored, so the build cannot dirty the
+  diff.
+- **Shell is safe under the runner's shell.** The log confirms `shell: /usr/bin/bash -e {0}` — no
+  `pipefail`, so the `git show | grep | grep | sort -V | tail -1` substitution exits 0 on a state
+  file with no stamps and the `-n "$newest"` guard skips cleanly. `git grep` only sees tracked
+  files, so a fresh clone's untracked init output still no-ops green. The two-candidate state-path
+  loop cannot crash on the second miss (`git cat-file -e … 2>/dev/null` inside `if`).
+- **The exclusions survived, all four.** Self-exemption `:(exclude).github/workflows/arggon.yml`
+  with its reason in-body; `.convention.yml` `generatedAt` exclusion; the `git grep
+  "arggon:generated"` activation key; fresh-clone no-op. Template edits are covered by the
+  destination exclusion — `templates/docs/github/workflows/arggon.yml` is a source, never a
+  destination (`cli/src/docs.ts:305` maps `github/workflows/arggon.yml` → `.github/workflows/arggon.yml`).
+- **No new red-on-release window.** The generator's version can only reach the seam through
+  `ArggonManager/.convention.yml`, which is excluded from the diff; `git grep 0.5.0` over
+  `.mcp.json`/`.opencode`/`opencode.jsonc`/`ArggonManager/docs` finds it nowhere else. So the
+  release PR (pkg V+1, stamps V, pin V) and the re-pin PR (all V+1) both stay green, and the #527
+  shape (stamps > pin) goes red. Committed stamps on main are `{0.3.0, 0.4.0, 0.4.1, 0.5.0}`;
+  `sort -V` picks 0.5.0 = the pin.
+- **Coverage is unchanged in the `modified[]` bucket.** I recomputed every committed
+  `x-generated` checksum against disk: 16 of 57 entries mismatch, and the real job reports
+  `kept adopter-modified docs: 20 file(s)`. Those files are invisible to the drift gate in the old
+  and the new form alike (init protects them), so the branch-local comparison governs the same 36
+  regenerated files the pinned one did. Pre-existing, not widened here.
+- **The hermetic fixture is faithful where it matters.** `checksumOf` is imported from
+  `./docs.js` for the fixture's state file, and the stub's `sha256:<hex>` matches
+  `cli/src/docs.ts:541`; the regenerate-on-matching-checksum rule is the real one (docs.ts:574), and
+  the *adopter* red case drives the **real packed `arggon init`** against a real template, not the
+  stub — so direction 1 is not self-agreed. The stub only carries the branch-local direction, the
+  docstring says so, and the real build round trip is documented in `docs/ci.md` §Reproduce.
+  `runStep` uses `bash -e -c` on bodies de-indented verbatim from the shipped file, and injects
+  `ARGGON_VERSION` (plus a non-vacuous `binVersion` assertion) — the runner's shape.
+- **Scope call on the prover gap was right.** `.opencode/agents/arggon-prover.md` has no
+  `x-generated` entry (verified: `/arggon-prover/.test(state)` → false; only coordinator/reviewer/
+  worker are stamped), it predates this change, the branch does not widen it, and the coordinator
+  filed `bug-prover-agent-has-no-x-generated-entry` on main. Correctly reported, not silently grown.
+
+#### Minor (file as follow-ups, do not block)
+
+5. The predicate greps the **whole** `package.json`, not the top-level `name`, so an adopter with
+   `cli/src/cli.ts` plus any `"name": "arggon-manager"` occurrence (workspace/override entry) takes
+   the branch path and hard-fails on `npm ci`. Fail-closed, so low; `node -p "require('./package.json').name"`
+   (or an anchored grep) would be exact — and note no test pins that *this* repo classifies as the
+   seam source, so a rename would be invisible while main's seam still matches 0.5.0 byte-for-byte.
+6. The branch path's `npm run build` triggers `postbuild → build:plugin`, which writes the **tracked**
+   `opencode/plugins/arggon/index.bundle.ts`. A stale bundle would now surface as a seam-drift red
+   whose remedy ("re-run `node dist/cli.js init`") cannot fix it. `check:plugin` owns that truth;
+   worth one line in ci.md or an exclusion.
+7. `tasks/.convention.yml` (the legacy candidate) has no hermetic coverage of the lag assertion.
+8. ADR 0018's amendment is dated 2026-10-02; the item was created 2026-10-03.
+
+#### Answering the coordinator's question — what protection is GONE and not restored
+
+"GONE: *an installed `ARGGON_VERSION` reproduces this repo's committed seam bytes.*" The lag
+assertion does not restore it (see finding 2); it restores only the version-skew slice. Also gone,
+for this repo only: the claim that a pin moved without a seam regen is caught at CI time (finding 3).
+"KEPT, unchanged: every adopter/fork byte-comparison; the fresh-clone no-op; the self-exemption;
+the `generatedAt` exclusion; missing-destination detection; hand-edited-generated-file detection."
+
+#### Probes needed (executor: arggon-prover)
+
+1. `gh run view --job 111110931552` → `gh run rerun 37090935003 --failed` (repo root, any cwd):
+   expect `cli` conclusion `success` on the same head `628a4332`. A second red with the same
+   `SpawnHarnessError`/half-written-`lib/dist` signature means the flake needs its own item
+   (`bug-cli-spawn-suites-exit-1-flake` is already open) — it still does not block this merge, but it
+   must be filed before merge rather than after.
+2. Only if finding 4's parity test is declined: extract the `run:` bodies from the **committed**
+   `.github/workflows/arggon.yml` (not the template) with `workflowRunSteps` and run them
+   `bash -e` in a throwaway clone of the head with `ARGGON_VERSION=0.5.0`; expect exit 0 at head,
+   exit 1 with `this checkout's own build` after moving one template, exit 1 with
+   `dist/cli.js is missing` after `rm dist/cli.js`. This is what CI actually executes;
+   today the answer is implied by the two-copy diff, and the parity test would make it explicit.
+
+Merge when: `cli` green, findings 2-4 landed, then flip the item `done` (acceptance checklist is
+already complete and accurate).
