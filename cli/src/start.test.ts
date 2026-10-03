@@ -16,7 +16,17 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { basename, join, relative, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { buildLocalWorkspaces, pointWorkspaceAtLocal, runCreate, runUpdate } from "@arggondev/lib";
+import {
+  buildLocalWorkspaces,
+  MAX_GATE_BINS,
+  MAX_HUMAN_ERROR_CHARS,
+  pointWorkspaceAtLocal,
+  runCreate,
+  runUpdate,
+  sanitizeHumanError,
+  strictGateBinFailure,
+  type GateBinResolution,
+} from "@arggondev/lib";
 import { runInit } from "./init.js";
 import {
   linkNodeModules,
@@ -24,6 +34,7 @@ import {
   runStart,
   startTakeoverNotes,
   unlinkNodeModulesLink,
+  worktreeFailureMessage,
   type StartGit,
 } from "./start.js";
 
@@ -309,6 +320,13 @@ describe("start --worktree strict gate-bin gate (task-start-gate-strict-mode)", 
     expect(git.calls.some((c) => c.op === "commit")).toBe(false);
     expect(message).toContain("the worktree was kept");
     expect(message).toContain(`arggon start ${id} --worktree`);
+    // ORDER pinned on the real runStart path (not just the composed helper):
+    // the human channel clips this line head-kept at MAX_HUMAN_ERROR_CHARS, so
+    // the CLI's own remediation must precede the kernel's named-bin evidence
+    // (task-cli-start-remediation-tail-clipped-on-human-channel).
+    expect(message.indexOf(`arggon start ${id} --worktree`)).toBeLessThan(
+      message.indexOf("native-gate-dep: not resolvable from the worktree"),
+    );
   });
 
   it("keeps the claim commit authoritative when the flag is unset (default, byte-identical)", () => {
@@ -354,6 +372,152 @@ describe("start --worktree strict gate-bin gate (task-start-gate-strict-mode)", 
         path: join(worktreePath, "node_modules", ".bin", "native-gate-dep"),
       },
     ]);
+  });
+});
+
+describe("worktree failure composition vs the human head-clip (task-cli-start-remediation-tail-clipped-on-human-channel)", () => {
+  const ID = "task-cli-start-remediation-tail-clipped-on-human-channel";
+  const BRANCH = "feat/task-cli-start-remediation-tail-clipped-on-human-channel";
+
+  /**
+   * The CLI's own failure wrapper at the reachable WORST case: the kernel
+   * refusal the strict gate-bin step throws, carrying the FULL `MAX_GATE_BINS`
+   * list `resolveGateBins` can report, every bin a long name resolving through
+   * PATH from a deep sibling checkout's `.bin` (~330 chars an entry) — the same
+   * fixture #597's kernel-side test builds for the native seam's 2048 clip.
+   *
+   * This is the composition the operator actually reads: `printHumanError`
+   * runs the message through `sanitizeHumanError`, which clips a whole error
+   * line HEAD-kept at `MAX_HUMAN_ERROR_CHARS` (2000), so what leads is what
+   * survives.
+   */
+  function worstCaseGateBinRefusal(): {
+    message: string;
+    firstEntry: string;
+    lastEntry: string;
+  } {
+    const worktreePath = join(
+      "home",
+      "dev",
+      "projects",
+      "ArggonManager-task-cli-start-remediation",
+    );
+    const siblingBinDir = join(
+      "home",
+      "dev",
+      "projects",
+      "a",
+      "very",
+      "deeply",
+      "nested",
+      "module",
+      "resolution",
+      "path",
+      "with",
+      "plenty",
+      "of",
+      "long",
+      "segment",
+      "names",
+      "in",
+      "a",
+      "sibling",
+      "checkout",
+      "node_modules",
+      ".bin",
+    );
+    const names = Array.from(
+      { length: MAX_GATE_BINS },
+      (_, index) => `worktree-gate-binary-number-${index}-with-a-very-long-name-for-the-clip`,
+    );
+    const bins: GateBinResolution[] = names.map((name) => ({
+      name,
+      source: "path",
+      path: join(siblingBinDir, name),
+    }));
+    const message = worktreeFailureMessage({
+      id: ID,
+      branch: BRANCH,
+      worktreePath,
+      createBranch: true,
+      step: "enforcing x-tracker.strict-gate-bins",
+      err: new Error(strictGateBinFailure(bins, worktreePath) ?? ""),
+    });
+    const entry = (name: string): string =>
+      `${name}: resolves only via PATH from ${join(siblingBinDir, name)} (outside the worktree)`;
+    return {
+      message,
+      firstEntry: entry(names[0]!),
+      lastEntry: entry(names[MAX_GATE_BINS - 1]!),
+    };
+  }
+
+  it("puts the attach/discard remediation BEFORE the kernel detail, every clause verbatim", () => {
+    const { message, firstEntry, lastEntry } = worstCaseGateBinRefusal();
+
+    // Only the ORDER moved: the kept-worktree note, the step-specific
+    // remediation, the discard hint and the whole kernel detail are all
+    // present, unreworded.
+    expect(message).toContain("start failed while enforcing x-tracker.strict-gate-bins;");
+    expect(message).toContain("the worktree was kept at ");
+    expect(message).toContain("(nothing was rolled back)");
+    expect(message).toContain(
+      `Fix the reported cause in the worktree, then re-run \`arggon start ${ID} --worktree\``,
+    );
+    expect(message).toContain("To discard it instead: `git worktree remove --force ");
+    expect(message).toContain(`&& git branch -D ${BRANCH}\`.`);
+    // The kernel refusal keeps its own remedy FIRST (the #597 shape) and its
+    // whole named list trails.
+    expect(message).toContain("Fix: run `npm ci` in ");
+    expect(message).toContain(
+      "x-tracker.strict-gate-bins is set: refusing the claim commit — gate binaries do not resolve inside the worktree:",
+    );
+    expect(message).toContain(firstEntry);
+    expect(message.endsWith(`${lastEntry}.`)).toBe(true);
+
+    // ORDER pinned: the CLI's own remediation and the kernel's `npm ci` fix
+    // both precede the FIRST named bin — not merely the last one. With the
+    // remediation trailing (the pre-fix composition) the clip below ate it.
+    const remedy = message.indexOf(`arggon start ${ID} --worktree`);
+    const discard = message.indexOf("To discard it instead");
+    const detail = message.indexOf("Fix: run `npm ci` in ");
+    expect(remedy).toBeLessThan(discard);
+    expect(discard).toBeLessThan(detail);
+    expect(remedy).toBeLessThan(message.indexOf(firstEntry));
+    expect(detail).toBeLessThan(message.indexOf(firstEntry));
+  });
+
+  it("keeps the remediation inside the MAX_HUMAN_ERROR_CHARS head-clip at the worst case", () => {
+    const { message, firstEntry, lastEntry } = worstCaseGateBinRefusal();
+
+    // The clip really bites here — otherwise the ordering above would pass on
+    // any message. Use the REAL human sanitizer (not a mirrored copy): the
+    // operator reads `printHumanError`, i.e. this exact call.
+    expect(message.length).toBeGreaterThan(MAX_HUMAN_ERROR_CHARS);
+    const clipped = sanitizeHumanError(message);
+    // Negative control: pinned AT THE CAP. `clipHumanValue` keeps the head and
+    // appends its elision mark (`MAX_HUMAN_ERROR_CHARS + 1` raw chars); the
+    // sanitizer then escapes, so each newline inside the kept window costs one
+    // more character (`\n` renders as two). A trailing remedy could not
+    // survive this window at all.
+    const escaped = message.slice(0, MAX_HUMAN_ERROR_CHARS).split("\n").length - 1;
+    expect(clipped).toHaveLength(MAX_HUMAN_ERROR_CHARS + 1 + escaped);
+    expect(clipped.endsWith("…")).toBe(true);
+
+    // The remediation survives the clip...
+    expect(clipped).toContain(`re-run \`arggon start ${ID} --worktree\``);
+    expect(clipped).toContain("To discard it instead");
+    expect(clipped).toContain("Fix: run `npm ci` in ");
+    // ...with the ordering still intact inside the kept window...
+    expect(clipped.indexOf(`arggon start ${ID} --worktree`)).toBeLessThan(
+      clipped.indexOf(firstEntry),
+    );
+    // ...and so does the head of the evidence.
+    expect(clipped).toContain(firstEntry);
+    // Negative control: the TAIL named bin is what the clip ate (it is present
+    // in the full message, so this cannot pass by naming nothing).
+    expect(clipped).not.toContain(lastEntry);
+    expect(message.slice(MAX_HUMAN_ERROR_CHARS)).toContain(lastEntry);
   });
 });
 

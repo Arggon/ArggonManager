@@ -734,7 +734,12 @@ describe("CLI --json", () => {
     expect(body.ok).toBe(false);
     expect(body.command).toBe("start");
     expect(body.error).toMatchObject({ code: "START_FAILED" });
-    expect(String((body.error as { message: string }).message)).toMatch(/gh auth status/);
+    const message = String((body.error as { message: string }).message);
+    expect(message).toMatch(/gh auth status/);
+    // ORDER pinned (task-cli-start-remediation-tail-clipped-on-human-channel):
+    // the actionable hint LEADS and gh's raw stderr trails, because the human
+    // line is clipped head-kept at MAX_HUMAN_ERROR_CHARS.
+    expect(message.indexOf("gh auth status")).toBeLessThan(message.indexOf("auth required"));
   });
 
   it("arggon start never forces a taken claim", () => {

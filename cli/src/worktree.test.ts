@@ -554,6 +554,12 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     expect(message).toContain(expectedPath);
     expect(message).toContain("attaches");
     expect(message).toMatch(/kept/);
+    // ORDER pinned (task-cli-start-remediation-tail-clipped-on-human-channel):
+    // the `commitFile` identity hint LEADS and git's raw commit output trails,
+    // because this whole line is clipped head-kept at MAX_HUMAN_ERROR_CHARS.
+    expect(message.indexOf("if this is an identity error")).toBeLessThan(
+      message.indexOf("gate: deliberate failure"),
+    );
     // ...and nothing was rolled back: worktree, branch and the uncommitted
     // claim all survive for inspection.
     expect(existsSync(expectedPath)).toBe(true);
@@ -1003,6 +1009,13 @@ describe("post-start shell variant (task-post-start-env)", () => {
     expect(result.postStart?.error).toContain("boom");
     expect(result.postStart?.error).toContain("hooks inherit the environment of the process");
     expect(result.postStart?.error).toContain('x-worktree.post-start-shell: "login"');
+    // ORDER pinned: the hint LEADS and the hook's raw output trails — this
+    // string is printed through `sanitizeHumanError` (head-kept at
+    // MAX_HUMAN_ERROR_CHARS) and a hook's stderr tail is unbounded
+    // (task-cli-start-remediation-tail-clipped-on-human-channel).
+    expect(result.postStart?.error?.indexOf("hint: hooks inherit")).toBeLessThan(
+      result.postStart?.error?.indexOf("post-start failed:") ?? -1,
+    );
     // Failure is still non-fatal: the start itself succeeded.
     expect(result.worktreeCreated).toBe(true);
   });
