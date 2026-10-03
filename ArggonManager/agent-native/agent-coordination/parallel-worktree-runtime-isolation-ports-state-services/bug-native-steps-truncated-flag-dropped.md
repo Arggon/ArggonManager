@@ -1,12 +1,14 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-native-steps-truncated-flag-dropped
 title: "Native `preparation.steps` silently shortens past MAX_PREP_STEPS: the kernel sets `stepsTruncated` but `boundedPreparation` folds only its own 32-name cap, so the flag never fires on the native seam (the CLI keeps it)"
+assignee: Arggon
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [native-seam, json-contract]
 created: "2026-10-03"
 updated: "2026-10-03"
+claimed_at: "2026-10-03T11:57:05.659Z"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-native-steps-truncated-flag-dropped.md
