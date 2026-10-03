@@ -1,12 +1,14 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-agents-md-says-nine-mcp-tools
 title: "`docs/agents.md:410` says `arggon mcp` exposes NINE tools; shipped is FIFTEEN — and `agents.md:586` contradicts its own line 410"
+assignee: Arggon
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [docs, mcp]
 created: "2026-10-03"
 updated: "2026-10-03"
+claimed_at: "2026-10-03T12:21:43.631Z"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-agents-md-says-nine-mcp-tools.md
