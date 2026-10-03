@@ -31,6 +31,10 @@ import {
 } from "@arggondev/lib";
 import { arggonVersion, checksumOf, GENERATED_DOC_COUNT } from "./docs.js";
 import { runDoctor } from "./doctor.js";
+// Ordering assertions go through assertOrder, never a bare `indexOf`
+// comparison: `-1 < n` makes a renamed clause pass as if it were still
+// ordered (bug-vacuous-substring-ordering-assertions).
+import { assertOrder } from "../../test/assert-order.js";
 
 import { runInit } from "./init.js";
 import { tickAcceptance } from "../../test/acceptance.js";
@@ -478,11 +482,10 @@ describe("composeAdoptTaskBody (task-adopt-corpus-body-injection)", () => {
     ];
     const body = composeAdoptTaskBody(corpora);
     expect(body).toContain("3 spec corpora");
-    const detectedAt = body.indexOf("## Spec corpus — detected");
-    expect(detectedAt).toBeGreaterThan(-1);
-    expect(body.indexOf("`openspec`")).toBeGreaterThan(detectedAt);
-    expect(body.indexOf("`adr`")).toBeGreaterThan(body.indexOf("`openspec`"));
-    expect(body.indexOf("`rfc`")).toBeGreaterThan(body.indexOf("`adr`"));
+    // detected heading, then the corpora in import order. assertOrder pins all
+    // four clauses present; the three bare `indexOf` comparisons it replaces
+    // each passed vacuously (`-1 < n`) if their needle stopped matching.
+    assertOrder(body, "## Spec corpus — detected", "`openspec`", "`adr`", "`rfc`");
     expect(body).toContain("5 file(s)");
     expect(body).toContain("1 file(s)");
   });

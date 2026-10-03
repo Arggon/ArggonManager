@@ -59,6 +59,10 @@ import { CONVENTION_VERSION } from "@arggondev/lib";
 import { checksumOf } from "./docs.js";
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
 import { runCli } from "./test-spawn.js";
+// Ordering assertions go through assertOrder, never a bare `indexOf`
+// comparison: `-1 < n` makes a renamed clause pass as if it were still
+// ordered (bug-vacuous-substring-ordering-assertions).
+import { assertOrder } from "../../test/assert-order.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const WORKFLOW_TEMPLATE = join(root, "templates/docs/github/workflows/arggon.yml");
@@ -205,10 +209,9 @@ describe("workflow parity: template vs the copy CI runs", () => {
         "node dist/cli.js init --no-commit",
       );
       // The pinned-lag assertion owns the lag case: it has to precede the diff it
-      // would otherwise be reported as.
-      expect(drift.indexOf("lags the committed arggon seam")).toBeLessThan(
-        drift.indexOf("git status --porcelain"),
-      );
+      // would otherwise be reported as — and both clauses must be PRESENT, which
+      // the bare `indexOf` comparison it replaces could not say.
+      assertOrder(drift, "lags the committed arggon seam", "git status --porcelain");
     }
   });
 });
@@ -411,10 +414,7 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     expect(bootstrap).toContain("npm run build");
     expect(bootstrap).toContain("node dist/cli.js init --no-commit");
     expect(drift).toContain("node dist/cli.js init --no-commit");
-    expect(drift.indexOf("lags the committed arggon seam")).toBeGreaterThan(-1);
-    expect(drift.indexOf("lags the committed arggon seam")).toBeLessThan(
-      drift.indexOf("git status --porcelain"),
-    );
+    assertOrder(drift, "lags the committed arggon seam", "git status --porcelain");
     // The recipe is an init-vendored artifact: it must ship in the tarball
     // (the installed package is what `init` reads its templates from).
     const recipe = "templates/docs/github/workflows/arggon.yml";

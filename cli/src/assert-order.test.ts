@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertOrder } from "../../test/assert-order.js";
+import { assertOrder, type OrderNeedle } from "../../test/assert-order.js";
 
 /**
  * The contract of `assertOrder` (bug-vacuous-substring-ordering-assertions).
@@ -104,10 +104,19 @@ describe("assertOrder (bug-vacuous-substring-ordering-assertions)", () => {
       ).toThrow(/needle #3 is ABSENT/);
     });
 
-    it("requires the flag to be explicit — `optional: false` is required behaviour", () => {
-      expect(() => assertOrder(message, { text: "and 1 more", optional: false }, "npm ci")).toThrow(
-        /ABSENT/,
-      );
+    it("refuses an `optional: false` spelling at the TYPE level", () => {
+      // `optional?: true` is deliberate: the only way to grant optionality is
+      // the affirmative flag, and there is no object form that LOOKS like an
+      // opt-in while quietly meaning required. Required is the bare string.
+      const text = "and 1 more";
+      // @ts-expect-error `optional: false` is not expressible — use a bare string.
+      const denied: OrderNeedle = { text, optional: false };
+      expect(denied).toEqual({ text, optional: false });
+      // …and at runtime it still means required, so a cast cannot smuggle the
+      // same vacuity back in either.
+      expect(() =>
+        assertOrder(message, "npm ci", denied as OrderNeedle, "git: wrote 3 files"),
+      ).toThrow(/needle #2 is ABSENT/);
     });
   });
 });
