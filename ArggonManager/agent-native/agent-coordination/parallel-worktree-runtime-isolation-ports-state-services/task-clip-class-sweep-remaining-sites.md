@@ -47,3 +47,16 @@ Acceptance:
 - [ ] The three kernel `gh auth status` wrappers fixed, each with the bound that actually applies to its surface
 - [ ] A test or grep-able rule pins the ORDER convention so a future site cannot reintroduce it silently — the same outcome the seam-pin parity work aims at
 - [ ] Depends on PR #608 for the board file, not for the kernel wrappers
+
+### 2026-10-03 @ses_f02ab5836ffeOAxmisboIwWE4x
+Round-2 review of PR #608 (task-cli-start-remediation-tail-clipped-on-human-channel) found a site in the SAME class that was never enumerated, 2026-10-03. Updating this item's scope with the reviewer's own arithmetic, because it changes what "the class" means.
+
+**New site, not in the original deferral list.** `worktreeRemediation`'s `committing the claim` branch (`cli/src/start.ts:762-767`, added by #517) still appends `Exact fix: run \`npm ci\` in <worktree>` AFTER an **uncapped** readiness bin list. On the committed worst-case fixture the reviewer's arithmetic puts the exact fix at ~3201 in a 3687-char message — so it clips away entirely (index -1), and the discard hint goes with it. #573, #579, #595, #597 and #608 each reordered a site and never touched this one.
+
+That is the sharpest evidence yet for why this item is a class sweep rather than another one-line reorder: five PRs found five sites, and the sixth was not found by any of them. The `committing the claim` branch is on the most common start path — the one that actually creates the worktree.
+
+**Also from that review, folding into the eventual fix:**
+- `docs/convention.md:544` and `docs/json-output.md:475` still document the post-start error with the hint TRAILING, while PR #608 ships it leading. Carrier drift in the same PR — must travel with it.
+- One ordering assertion in `worktree.test.ts:557` is **vacuous**: it searches lowercase `"if this is an identity error"`, which the new capitalized message no longer contains, so `indexOf` returns -1 and `-1 < positive` always passes. The reorder is real but that test pins nothing. Worth checking for the same pattern wherever a reworded message is asserted by substring.
+- The four sites previously deferred (`cli/src/board.ts:141`, `lib/src/get-open-prs.ts:67`, `import-issues.ts:187`, `cleanup.ts:259`) are **provably not clip-reachable** — stderr is `ignore`d there, so `err.message` is a bounded argv echo. Recorded so nobody re-audits them; they are NOT part of this class after all.
+- The pre-fix numbers quoted in the item (`459 < 355`) do not reproduce (~537 vs ~355). The qualitative claim holds by construction; the recorded evidence should say so rather than keep a number that does not reproduce.
