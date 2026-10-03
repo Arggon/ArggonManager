@@ -394,3 +394,7 @@ file this PR owns. The linear rebase, if you prefer it, is yours to force-push.
 
 Item stays `in_progress`; spec/plan `status` stays `proposed` (S5 also covers
 `task-zcode-automations`).
+
+### handoff 2026-10-03 @Arggon — next: re-review PR #605 at b369506c: B1/B2/B3/B4 + all non-blocking addressed; probe evidence in the body
+- branch: feat/task-zcode-goal-mode
+- open questions: want the linear rebase (force-push, yours)?; three agent copies need adopt --ack (human step); parser unification left to bug-three-acceptance-parsers-diverging
