@@ -83,3 +83,57 @@ One judgment call for the reviewer: I kept the 6.5% and 21/280 numbers OUT of th
 - What an adopter's agent gets is strictly better prose for a rule that already applies: "name the four LineTerminators, and VT/FF are not among them" replaces a sentence whose incompleteness is what let a `\n`-only split look behavior-preserving.
 
 Reading it the other way — if the coordinator considers a schema-doc correction that prevents a future behavioral divergence to be Behavioral — then the skill re-sync is still not required (no skill file carries the acceptance grammar), but the ADR 0016 reference and the byte-equal copy would be. I read it as Advisory and am flagging the alternative rather than silently picking it.
+
+### 2026-10-03 @Arggon
+Round 2 on #613: **F1 and F2 addressed, F4 and F5 fixed, F3 reported not fixed.** Impact class: see the comment above (Advisory) and the PR body.
+
+## F2 — the gates claim was false; withdrawn and replaced with evidence
+
+What I wrote last round: "`npm test` not run: no test added or touched, and **no test reads this doc's content (verified by grep)**". The reviewer is right and the claim is **withdrawn**. `cli/src/prose-format.test.ts` refutes it: `proseDocs()` (:70-79) keeps every tracked markdown under `ArggonManager/docs/` — `ArggonManager/docs/convention.md` included — and two of its three tests read this file's bytes and run `prettier.format` over them (rule 1, glued tokens, :161-181; rule 2, code-span source text, :183-209). The third (rule 3, `REPAIRED_FILES`) does **not** include this file. My grep enumerated which tests mention the *path* and I never checked which read *content* — that is exactly how a false claim survived a "verified by grep" label. The conclusion (`npm test` not required for a docs-only diff) survives, but on different grounds:
+
+**Why the change is safe, correctly stated.** `prettier.format(source) == source` for the committed bytes: `prettier --write` is what wrote them, and re-running is a no-op — pass-2 ≡ pass-3 byte-identical, and `git status` is clean after three further `--write` passes, which is the proof that the committed bytes are a fixed point. At a fixed point rule 2 compares the code-span slices of the file against themselves, so the new spans (`\n`, `\r`, `\v`, `\f`, `\s`, `\p{Zs}`, `- [x] a\v- [ ] b`, `- [ ]\u00a0x`, the U+2000–U+200A range) cannot be reported as rewritten, and rule 1's glue diff is empty by construction. **And I ran it, so the argument is evidence, not just argument:** `npx vitest run cli/src/prose-format.test.ts` → **3 passed**.
+
+One honesty note about that argument, so nobody later hardens it into the wrong rule: the test's own header (:31-33) says rule 2 is deliberately **not** `prettier --check`, because "these docs are not byte-clean (prettier re-pads tables) and need not become so; the invariant is that formatting cannot change what a code span says". So the fixed point is a *sufficient* condition for these two rules on this file, not the rule's contract. The ongoing protection is that a future non-fixed-point edit which mangles a code span gets caught by rule 2 — the corpus is watched by path, forever.
+
+## Full gate record (all on the pushed tree — proven identical, see below)
+
+| Gate | Result |
+| --- | --- |
+| `npm run build` | ok (tsc ×3, plugin bundle rebuilt) |
+| `npm test` | **124 files, 2555 tests passed** |
+| `npx vitest run cli/src/prose-format.test.ts` | **3 passed** (F2's counterexample, run on the new table) |
+| `npm run lint` | clean, no output |
+| `npm run arggon -- validate` | `arggon validate: ok (0 warning(s), convention v5)` |
+| `npm run check:plugin` | bundle rebuilt byte-identical (tree clean after) |
+| `npm run test:structure` | `4 passed; 0 failed` — this is what actually runs `acceptance-rows-use-kernel`, the guard the new text delegates to |
+| `npm run lint:structure` | clean, no findings |
+| prettier convergence | `--write` ×3, pass-2 ≡ pass-3, tree clean after → committed bytes are a fixed point |
+
+No test was added or modified, but `npm test` is run anyway now that the refuting test is known.
+
+## F4 — fixed: the bolded rule no longer conflates row with criterion
+
+`:124` said "a checkbox line **is an acceptance row when — and only when** — it matches the marker followed by at least one non-whitespace character". The kernel keeps two facts apart: `acceptanceRows` returns **every** marker match, and the non-whitespace tail is the separate `AcceptanceRow.criterion` flag — so the bare `- [ ]` is a row with `criterion: false` that renderers still show (the doc's own table row: Row? yes / Gates? **no**). An author implementing the old sentence dropped the placeholder row. Now:
+
+> **A checkbox line is an acceptance ROW when — and only when — it starts with the marker `^[ \t]*[-*] \[( |x|X)\]`; it GATES the `done` flip when — and only when — at least one non-whitespace character follows the box.** Two facts, deliberately not one … so the bare box `- [ ]` is still a row that renderers show, while only a text-bearing row is a criterion.
+
+The reviewer called this pre-existing since #611; I fixed it in place because this PR already edits that sentence and the fix is one clause. No table row changed — it was already right.
+
+## F5 — fixed: the ambiguous phrase is named
+
+"`\u00a0` and the other Unicode spaces" read as "the `\s` class", which contradicted the VT/FF cell's "do not widen the set by analogy with `\s`" two rows above (U+2028/U+2029 are inside `\s` **and** are separators). Replaced with the exact class — **the `\p{Zs}` spaces (U+0020, U+00A0, U+1680, U+2000–U+200A, U+202F, U+205F, U+3000) and U+FEFF** — plus the mechanism (`- [ ]\u00a0x` is a row whose text trims to `x` and still does not gate, because only space and tab are consumed after the box). I verified the enumeration instead of trusting my memory: iterating `/\s/` and `/\p{Zs}/u` over the BMP gives `\s` = {0009 000A 000B 000C 000D 0020 00A0 1680 2000–200A 2028 2029 202F 205F 3000 FEFF}, `\p{Zs}` = {0020 00A0 1680 2000–200A 202F 205F 3000}, so the row's list is exactly `\s` minus the four LineTerminators, minus VT/FF, minus tab. The VT/FF cell now also says "the LineTerminators inside JS's `\s` are exactly the four rows above", which removes the contradiction at the source.
+
+## F3 — reported, NOT fixed (per the coordinator's call), so it is not mistaken for coverage that exists
+
+Recorded here because the doc sentence propagates a claim the suite cannot back: "a consumer that already calls the right parser still needs `cli/src/acceptance-parity.test.ts`, which asserts each consumer reads `acceptanceBody(item)`". The reviewer's own probe is the correction — for `parseAcceptanceRows` and `tuiAcceptanceRows` the **test** hands them `acceptanceBody(item)` itself (`acceptance-parity.test.ts:615-622`, `:736-740`), so it cannot catch a shipped call site that passes clipped prose; only the native consumer is asserted through its own wiring (`boardItemDetail` → `opencode/plugins/arggon/board.ts:436`, `task-comment-only` fixture, :681-706); and `cli/src/board.ts` `detailPayloadOf` (serve + static route, :810/:819) is guarded by `board-serve.test.ts:630-680`, whose fixture keeps the checklist in the **body**, so reverting that call to `bounded.prose` would still pass. Net: the parity suite pins gate/consumer **agreement**; wiring a consumer to the canonical body is a **per-call-site duty**, and no suite currently holds that line for two of the three consumers. The wording is inherited from `tools/ast-grep/README.md:213-224`, so this PR propagates rather than invents it, and the doc's normative input invariant stands on its own. Suggested replacement if the coordinator wants it: "the parity suite pins gate/consumer agreement; wiring a consumer to the canonical body is a per-call-site duty". Left as-is pending that call — this is a follow-up-shaped gap, not a blocker for a docs PR.
+
+## Process note: rebasing an already-published branch
+
+I rebased onto `origin/main` as instructed, then found the branch was **already published** (tip `78d22366`), so the rebased history is not pushable without a force — and force-push is denied by the repo's own rules. Rather than force, I reset to the published tip and **merged** `origin/main` (`05ef1aa2`), then re-applied the F4/F5 commit on top (`8567d450`). Verification that this is equivalent and not a different change:
+
+- `origin/main` moved 12 commits (#609 merged as #614); its diff since my base touches **neither** of my two files (`git diff --name-only d160623f origin/main` → 6 files, no overlap), so the union resolves with no conflict and nothing needed manual union-merging.
+- `ArggonManager/docs/convention.md` blob: `01c850c…` before and after — byte-identical.
+- Full tree: `25bd149…` before and after — **identical**, so every gate above ran on exactly the tree that is now pushed.
+- Diff vs `origin/main` is unchanged: 2 files, +52/−9. Pushed fast-forward `78d22366..8567d450`; no force.
+
+open questions for the coordinator: (1) F3 wording — apply the suggested replacement, or file it as a follow-up under `story-spec-pipeline` (the gap it describes is a real coverage hole in `cli/src/board.ts`'s detail payload and belongs to a test item, not to this doc PR)? (2) The F3 finding is arguably a new bug (a shipped call site could regress to clipped prose with every suite green) — should that be `arggon create bug` rather than a comment here?
