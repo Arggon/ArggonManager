@@ -505,6 +505,31 @@ View selection: default is compact — frontmatter + the body's last 3 comments;
 
 Failures use `error.code: "SHOW_FAILED"` (unknown id, missing a tracker, unreadable items).
 
+### `goal`
+
+Renders the ZCode **goal-mode contract** for one claimed item, derived from that item's acceptance checklist (spec methodology-adapters-017 §S5, `task-zcode-goal-mode`; human rules in [agents.md §ZCode](./agents.md)). Pure read — never writes, no lock, no tracker commit, exit 0 on success.
+
+| Field                      | Type             | Notes                                                                                                     |
+| -------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------- |
+| `item`                     | `WorkItem`       | The claimed item's frontmatter fields (contract shape)                                                    |
+| `path`                     | `string`         | Absolute path of the item file                                                                            |
+| `goal.objective`           | `string`         | The single goal: the first UNCHECKED acceptance criterion, byte-clipped (240 B)                           |
+| `goal.verification`        | `string[]`       | Every unchecked criterion as the contract the loop must satisfy, byte-clipped (200 B each, max 8 inlined) |
+| `goal.verificationOmitted` | `number`         | Unchecked criteria NOT inlined (deferred to the item, never pasted)                                       |
+| `goal.hasGoal`             | `boolean`        | False when the item carries no unchecked criterion (the "define the goal first" contract)                 |
+| `goal.boundaries`          | `string[]`       | The hard boundaries, appended to the contract from the CLI constants                                      |
+| `goal.refusals`            | `string[]`       | The refusal cases the loop must stop on                                                                   |
+| `goal.truncated`           | `boolean`        | True when any line was clipped or any criterion deferred                                                  |
+| `goal.checklist`           | `object`         | `{ total, unchecked, checked }` — the acceptance arithmetic behind the contract                           |
+| `goal.worktree`            | `object`         | `{ path, recorded }` — the only checkout the goal may run in                                              |
+| `goal.template`            | `string`         | `"adopter"` when the generated template copy was used, `"package"` for the packaged fallback              |
+| `goal.identity`            | `string \| null` | Caller login resolved from the environment; `null` when unresolved (the contract says so)                 |
+| `goal.contract`            | `string`         | The rendered contract itself — the same text the human (non-`--json`) view prints, byte-capped (12 KiB)   |
+
+Bounded by construction: the objective and each verification line are clipped, at most 8 criteria are inlined, and both the item text and the template copy are capped before rendering — a tampered or oversized item (or template) cannot produce an unbounded contract. There is no MCP tool for this command: it mutates nothing, so the kernel's tool surface is unchanged.
+
+Failures are refusals, each with its own code and exit 1: `GOAL_ITEM_CLOSED` (a `done`/`cancelled` item is never reopened), `GOAL_UNCLAIMED` (one goal per claimed item — claim it with `arggon start`), `GOAL_FOREIGN_CLAIM` (claimed by another identity), `GOAL_WORKTREE_MISMATCH` (this checkout is not the item's recorded `worktree_path` — a goal never spans worktrees), `GOAL_WORKTREE_MISSING` (the recorded worktree no longer exists), `GOAL_TEMPLATE_UNAVAILABLE` (neither the generated nor the packaged template exists) and `GOAL_FAILED` (unknown id, no tracker). There is no override flag.
+
 ### `report`
 
 | Field                 | Type                  | Notes                                                                                                   |

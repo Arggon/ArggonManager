@@ -336,6 +336,17 @@ arggon show task-rate-limit --body
 
 Shared kernel (`@arggondev/lib`, [ADR 0013](ArggonManager/docs/adr/0013-lib-package-split.md)): `lib/src/paths.ts`, `frontmatter.ts`, `ids.ts`, `status.ts`, `items.ts`, `relations.ts`, `dates.ts`.
 
+### `arggon goal`
+
+Renders the **goal-mode contract** for ONE claimed item — the objective, the verification contract, the plan→execute→verify loop and the hard boundaries — derived from that item's acceptance checklist in git (pure read; no lock, no commit). It is the ZCode Goal Mode adapter (spec methodology-adapters-017 §S5): `arggon init` generates the template at `.zcode-marketplace/arggon/templates/goal-mode.md` (same provenance + never-overwrite rules as the rest of the seam) and `arggon goal` instantiates it — your copy of the template wins when present, the packaged one is the fallback. The objective is the item's first **unchecked** acceptance criterion (an empty `- [ ]` box is a scaffold placeholder, exactly as the done gate reads it) and the verification contract is every unchecked criterion; an item with no unchecked criterion yields an explicit "define the goal first" contract, never an empty goal. Bounded output: byte-clipped lines, at most 8 inlined criteria, counted overflow, and a tampered item or an inflated template copy cannot produce an unbounded contract.
+
+**One goal per claimed item, one worktree per item.** `arggon goal` refuses — no override flag, refusal codes in the envelope — a `done`/`cancelled` item (`GOAL_ITEM_CLOSED`), an unclaimed item (`GOAL_UNCLAIMED`; claim it with `arggon start <id>`, which creates the worktree), an item claimed by **another identity** (`GOAL_FOREIGN_CLAIM`), and any run from a checkout that is not the item's recorded `worktree_path` or where that worktree no longer exists (`GOAL_WORKTREE_MISMATCH` / `GOAL_WORKTREE_MISSING`). Pointing a goal at another session's worktree is a refusal, not a mode. The boundaries and refusals are appended by the CLI, not read from the template file, so editing the template cannot drop them — and they name the dispatch-scoped reviewer backstop (read-only while a reviewer is in flight) and the kernel as the enforcement of record. Flags: `--json` (envelope `{ item, path, goal: { objective, verification, boundaries, refusals, truncated, hasGoal, checklist, worktree, template, identity, contract } }`; failures `GOAL_FAILED` + the refusal codes above).
+
+```bash
+arggon goal task-rate-limit            # the rendered contract (paste into Goal Mode)
+arggon goal task-rate-limit --json     # the structured view + the same contract text
+```
+
 ### `arggon validate`
 
 Checks tracker frontmatter and tree integrity (schema, parents, naming, claim/blocked rules). Uses the shared items soft-scan (`walkTasksTree` / `softTryLoadItem`) so broken YAML still reports a file path. Exits non-zero when there are errors; warnings alone stay exit 0. Suitable for CI before commit.

@@ -81,3 +81,9 @@ is merged, `arggon cleanup` lists stale worktrees and `--prune` removes them.
 The claim, branch, PR and validate rules apply to subagents **unchanged**: same
 commands, same gates, same never-list. The kernel enforces the rules; neither
 role forks them.
+
+One goal per claimed item: `arggon goal <id>` (rendered from inside the item's
+worktree) turns the item's acceptance checklist into the goal-mode contract an
+agent loop runs on — objective, verification, boundaries. It refuses a foreign
+claim, a closed item and any checkout that is not the item's recorded
+`worktree_path` (no override flag), and a goal never spans worktrees or items.
