@@ -2951,12 +2951,13 @@ function itemsById(items) {
 }
 const ACCEPTANCE_MARKER = /^[ \t]*[-*] \[( |x|X)\][ \t]*/;
 const ACCEPTANCE_TEXT = /^\S/;
+const ACCEPTANCE_LINE_BREAK = /[\n\r\u2028\u2029]/;
 function acceptanceBody(source) {
     return source.body;
 }
 function acceptanceRows(body) {
     const rows = [];
-    for (const line of body.split("\n")) {
+    for (const line of body.split(ACCEPTANCE_LINE_BREAK)) {
         const match = ACCEPTANCE_MARKER.exec(line);
         if (!match)
             continue;
