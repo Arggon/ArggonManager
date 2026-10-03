@@ -5,10 +5,14 @@
  * `--status done` flip. Three consumers also answer a question about the same
  * checklist: the board drawer (`parseAcceptanceRows`), the CLI detail pane
  * (`tuiAcceptanceRows`) and the native detail block
- * (`opencode/plugins/arggon/board.ts`). They used to carry three different
- * regexes between them plus a fourth in the plugin, and they disagreed in BOTH
- * directions on reachable shapes — the worst case being the inversion: the
- * gate refuses while a consumer reports "nothing unchecked".
+ * (`opencode/plugins/arggon/board.ts`).
+ *
+ * The item was filed against THREE parsers; there were SIX grammars in the tree
+ * before this fix — the gate, plus `cli/src/board.ts`, `cli/src/tui.ts`,
+ * `opencode/plugins/arggon/board.ts`, `cli/src/spec.ts` and the ZCode goal
+ * contract on PR #605 — and the consumers disagreed with the gate in BOTH
+ * directions on reachable shapes. The worst case is the inversion: the gate
+ * refuses while a consumer reports "nothing unchecked".
  *
  * This suite is the guard, and it is deliberately over a CORPUS rather than a
  * fixture. A corpus makes the class unfixable-by-luck: every shape below is

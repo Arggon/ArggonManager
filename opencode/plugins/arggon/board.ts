@@ -409,17 +409,19 @@ export type BoardItemDetail = {
   error: string | null;
 };
 
-/** `- [ ] text` / `- [x] text` markdown checklist row (kernel acceptance shape). */
-// There is deliberately NO regex here. The acceptance grammar belongs to the
-// kernel (`acceptanceRows` / `acceptanceCriteria` in lib/src/items.ts), beside
-// the DONE GATE that refuses the `--status done` flip
-// (bug-three-acceptance-parsers-diverging). This module used to carry its own
-// `/^\s*[-*]\s+\[([ xX])\]\s?(.*)$/`, which (a) is CRLF-blind — `.` never
-// matches `\r`, so a CRLF item rendered as "no acceptance rows" while the gate
-// still refused — and (b) accepted `-  [ ] text` (two spaces) as a row while the
-// gate does not, so the panel's count could read "0/2 acceptance" on an item the
-// gate considered finished. Both are the same defect class as the board drawer;
-// there is now one parser and one canonical body.
+// There is deliberately NO acceptance regex in this module. The grammar belongs
+// to the kernel (`acceptanceRows` / `acceptanceCriteria` in lib/src/items.ts),
+// beside the DONE GATE that refuses the `--status done` flip
+// (bug-three-acceptance-parsers-diverging).
+//
+// This module used to carry `/^\s*[-*]\s+\[([ xX])\]\s?(.*)$/`, and it was wrong
+// in two ways. `\s+` then `\s?` accepted rows the gate does not — `-  [ ] text`
+// (two spaces) counted, so the panel could print "0/2 acceptance" on an item the
+// gate considered finished. And it ran over `runShow`'s prose, which EXCLUDES
+// comment sections, so a checklist filed as a comment (`create` has no `--body`
+// flag, so that is the default path) counted 0/0 while the gate blocked. It was
+// NOT CRLF-blind — this module split on `/\r?\n/` and `trimEnd()`; the CRLF
+// blindness lived in `cli/src/board.ts`, which split on `"\n"` alone.
 
 /**
  * Acceptance rows of the WHOLE canonical body, rendered for the panel
