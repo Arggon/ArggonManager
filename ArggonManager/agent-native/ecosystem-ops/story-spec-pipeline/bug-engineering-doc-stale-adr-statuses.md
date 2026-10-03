@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-engineering-doc-stale-adr-statuses
 title: "`docs/engineering.md:230` and spec/plan 009 still describe ADRs 0003/0010 as `Proposed`; 0002/0003/0004 were Accepted in their files by c0cdd60b"
+assignee: Arggon
+branch: fix/bug-engineering-doc-stale-adr-statuses
 parent: story-spec-pipeline
 labels: [docs, adr]
 created: "2026-10-03"
 updated: "2026-10-03"
+claimed_at: "2026-10-03T12:47:53.140Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-engineering-doc-stale-adr-statuses
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-engineering-doc-stale-adr-statuses.md
