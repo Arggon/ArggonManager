@@ -206,3 +206,7 @@ Each half now fails on its own, so neither can be narrowed away silently.
 **Gates** (after `npm run build`): `npm test` 127 files / 2593 tests pass · `npm run lint` 0 · `npm run arggon -- validate` ok (0 warnings) · `npm run check:plugin` clean · `npm run test:structure` 5 passed · `npm run lint:structure` clean · prettier converged (pass-2 byte-identical to pass-3 on both changed files) · pre-commit gate ran validate. Smoke exempt: docs + one additive test, no CLI behavior change. Pushed fast-forward; no force.
 
 Left `in_progress` — completion is the coordinator's call after merge.
+
+### handoff 2026-10-03 @Arggon (session: ses_efe310c5effeaOs8Nra70sfiUu) — next: Coordinator re-reviews PR #618 (aa86f434) for F1/F2/F3 and merges; then flip the item to done. Box 2 (spec/plan 009) still theirs to decide.
+- branch: fix/bug-engineering-doc-stale-adr-statuses
+- open questions: Impact class still argued Advisory while the reviewer reads :193 as a new authoring rule (Behavioral); nothing to sync either way. LINK_CARRIERS widens when bug-convention-md-links-nonexistent-adr-00…
