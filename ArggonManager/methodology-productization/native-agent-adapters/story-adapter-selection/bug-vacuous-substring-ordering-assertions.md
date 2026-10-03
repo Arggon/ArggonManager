@@ -12,7 +12,6 @@ updated: "2026-10-03"
 claimed_at: "2026-10-03T10:45:06.471Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-vacuous-substring-ordering-assertions
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-adapter-selection/bug-vacuous-substring-ordering-assertions.md
   Leaves live only under a story. id is the filename stem: bug-vacuous-substring-ordering-assertions.
@@ -257,3 +256,42 @@ See evidence item 5b below. The *mechanism* and the *scene* are reproduced; the 
 ## Recommendation
 
 **No-merge until F1 lands.** F1 is a ~4-line constraint fix plus two rule-test fixtures and two doc sentences; everything else in this PR is verified correct, in scope, and merge-ready. F2-F5 are cheap and worth folding into the same push but none of them needs to hold the merge on its own.
+
+### 2026-10-03 @Arggon
+### Review round 2 — F1 (blocking) fixed; F2–F5 folded in
+
+**F1 — the numeric-literal exemption is now exactly as narrow as its justification.** I reproduced the reviewer's table independently before touching anything; it is correct. The first cut justified the exemption with "`-1 > 0` / `-1 >= 0` fail loudly" but implemented *not any numeric literal*, so `-1 < 38`, `-1 <= -1` and `-1 >= -1` — all **true** — were exempt *and* vacuous. The gate flagged the same claim with a variable RHS and waved it through with a literal RHS.
+
+Exemption is now the comparator/argument pairs whose comparison is false for `-1`:
+- `toBeGreaterThan(n)` → `n >= -1`
+- `toBeGreaterThanOrEqual(n)` → `n >= 0`
+- `toBeLessThan(n)` / `toBeLessThanOrEqual(n)` → **fire on every literal** (they are sound only at `n <= -1` / `n <= -2`, i.e. assertions that can never hold)
+
+**Proof it is right, not just narrower:** I generated all 4 matchers × 6 literals (`-2 -1 -0.5 0 1 38`) = 24 probe assertions, scanned them with the shipped rule, and compared fire/no-fire against the real evaluation of `-1 <op> n`.
+
+- fires on **17 of 24**;
+- **every vacuous combination is among those 17** — zero vacuous forms remain exempt;
+- the 5 sound combinations it also fires on are impossible or exotic (`toBeLessThan(-1)` can never hold; `-0.5` margins) — over-approximating in the safe direction;
+- `lint:structure` exit 0 → **no live file trips the tightened constraint**, so this is not churn on a correct existing guard.
+
+**What each new fixture kills:**
+
+| fixture | kills |
+| --- | --- |
+| `toBeLessThan(38)` | `-1 < 38` true — vacuous, was exempt |
+| `toBeLessThanOrEqual(-1)` | `-1 <= -1` true — vacuous, was exempt |
+| `toBeLessThanOrEqual(0)` | `-1 <= 0` true — vacuous, was exempt |
+| `toBeGreaterThanOrEqual(-1)` | `-1 >= -1` true — vacuous, was exempt, and one keystroke from the **sound** `toBeGreaterThanOrEqual(0)` guard #608 used |
+| `toBeGreaterThan(-0.5)` | negative literals other than `-1`; `-1 > -0.5` is true |
+
+The previously-sound `valid` fixtures (`toBeGreaterThan(0)`, `toBeGreaterThan(-1)`, `toBeGreaterThanOrEqual(0)`/`(1)`) still pass — narrowed, not dropped.
+
+**F2 — `assertOrder` no longer a no-op when every needle is optional.** Hole confirmed first. **Decision: at least two needles must be REQUIRED** — an order is a claim about two things, and optional clauses may refine a required order but never constitute one. The floor is checked against the **call**, not the **data**, deliberately: the reviewer's "at least one clause present" alternative would make the guarantee depend on the message a run happens to produce, so the same assertion could pass on one input and throw on another. Two *required* needles make it a static property readable in the source. Four new tests, including the original hole reproduced through the real helper.
+
+**F3 — the count was wrong, corrected everywhere.** It is **23** vacuous-capable ordering assertions + **6** subsumed presence anchors → **19** `assertOrder` call sites across **8** test files, not "22 across 7". Two independent errors: `adopt.test.ts` was missing from the file list, and chains were counted per assertion rather than per call. Fixed in all four places; the per-file table now states its **counting rule** (an *ordering assertion* has a non-literal matcher argument; a *presence anchor* has a literal one) so the total is checkable — which is also what exposed that `headless-ci.test.ts:414` (`indexOf(...) > -1`) is an anchor, not an ordering assertion. Also recorded the one conversion that is deliberately **stricter** than what it replaced (`lib/src/worktree.test.ts:799`).
+
+**F4** — `CONTRIBUTING.md`'s guard summary now names the third boundary. **F5** — the A/B caption now says *same mechanism and same scene, not the same syntax*: #608 shipped the variable form, which the rule deliberately cannot match. Also completed the "reviewed and deliberately left" list with the sound variable-form siblings.
+
+**Gates** after `git merge origin/main`: `build` (the `@ts-expect-error` still holds) → `test` (125 files, 2570 passed) → `lint` → `arggon validate` (ok) → `check:plugin` → `test:structure` (5 rules, 38 assertions) → `lint:structure` (0). All green.
+
+**Merge note.** The item file conflicted (main carries the earlier handoff and the reviewer's verdict; this branch carries its own evidence). Resolved as a **union** — nothing discarded — and pushed by merge, never force-pushed.
