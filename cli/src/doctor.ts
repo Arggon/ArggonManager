@@ -496,20 +496,51 @@ export function detectOpenCode(root: string): DoctorOpenCode {
 /**
  * Per-adapter-file state (`doctor --agents`, spec §S2,
  * task-adapter-selection-flags). Exactly one status per destination, decided
- * from what is already on disk plus the shipped templates — never a verdict
- * and never a gate:
+ * from what is already on disk plus the shipped templates — never a verdict and
+ * never a gate. Every status names what `arggon init` would DO with the file,
+ * because a status is only useful if it maps onto a real operator action: no
+ * label may promise a protection or a refresh init does not provide.
  *
- *  - `present` — on disk and byte-equal to the current template render.
- *  - `adopter-edited` — the recorded `x-generated` checksum does not match the
- *    file: a hand edit landed. `arggon init` will skip it (never overwrite), so
- *    this is a healthy, expected state — reported, never acted on.
- *  - `stale` — untouched by the adopter (checksum matches) but the current
- *    template render differs: upstream moved and `arggon init` would refresh it.
+ * The vocabulary mirrors the `docs` block in this same payload
+ * (`docs.acknowledged` / `docs.acknowledgedDrifted`), so one envelope never says
+ * `present` for a file the other half calls acknowledged:
+ *
+ *  - `present` — on disk and byte-equal to the CURRENT template render: exactly
+ *    what an untouched re-run would leave there.
+ *  - `acknowledged` — on disk and byte-equal to the **acked baseline**
+ *    (`arggon adopt --ack`, bug-ack-baseline-regen-loss): sanctioned content.
+ *    `arggon adopt --ack` acks EVERY state entry, so this is the normal state of
+ *    a fully-adopted tree, not an edge case. Init never regenerates it.
+ *  - `acknowledged-drifted` — acknowledged, but the bytes have since diverged
+ *    from the acked baseline (bug-ack-drift-promise): a hand edit landed AFTER
+ *    the ack. Still adopter-owned and never regenerated; the edit is what the
+ *    operator may want to re-ack (`arggon adopt --ack`) or revert.
+ *  - `adopter-edited` — a hand edit landed on an ordinary generated file (the
+ *    recorded checksum differs), or the file is on disk with **no provenance
+ *    state at all** (docs.ts treats exactly that case as adopter-modified, since
+ *    a pre-provenance file is not arggon's to rewrite). Init skips it by
+ *    default; `--backup` archives it and regenerates.
+ *  - `stale` — state-backed and untouched (the checksum matches), but the
+ *    current template render differs: upstream moved and `arggon init` WOULD
+ *    refresh it. Requires a state entry, because without one init refuses to
+ *    touch the file — reporting `stale` there would send an operator to a
+ *    command that cannot work.
  *  - `missing` — tracked by the seam but absent from the tree.
  *  - `unverified` — the render cannot be produced (template/bundle absent, or
  *    the project name is unrecoverable): "cannot decide", never a failure.
+ *
+ * "The template moved on" is deliberately NOT one of these: it is orthogonal to
+ * the local state and is already carried, for every one of these files, by
+ * `docs.outdated` / `docs.outdatedDocs` in this same payload.
  */
-export type AdapterFileStatus = "present" | "stale" | "adopter-edited" | "missing" | "unverified";
+export type AdapterFileStatus =
+  | "present"
+  | "acknowledged"
+  | "acknowledged-drifted"
+  | "adopter-edited"
+  | "stale"
+  | "missing"
+  | "unverified";
 
 /** One adapter destination and its state. */
 export type AdapterFileState = {
@@ -565,10 +596,9 @@ export type DoctorAdapters = {
 /**
  * Classify one adapter destination (`doctor --agents`). Pure read: one
  * `existsSync`, one read when present, one re-render from the CURRENT templates
- * (the same resolution + placeholder path init uses). Order matters — an
- * adopter-edited file is reported as such even when the template also moved,
- * because the two demand different operator actions and only the adopter's own
- * edit blocks regeneration.
+ * (the same resolution + placeholder path init uses). Order matters — each
+ * branch mirrors one of init's own decisions, in init's own precedence, so a
+ * status never names an action init would not take.
  *
  * Two order-sensitive cases, both read off what init actually DOES with the
  * destination rather than off the checksum alone:
@@ -578,15 +608,19 @@ export type DoctorAdapters = {
  *    bundle on a provenance mismatch (bug-stale-vendored-plugin-copy): init
  *    deliberately does not degrade it to modified-skip, because the shared
  *    checksum cannot describe this checkout. So a present copy is `present`
- *    whatever its recorded checksum says — calling it `adopter-edited` ("yours,
- *    never overwritten") would advertise a protection init does not give it.
+ *    whatever its recorded checksum says — calling it `adopter-edited` would
+ *    advertise a protection init does not give it.
  *    Nothing is lost: this report's `opencode` block already carries the richer
  *    derived-artifact verdict for the plugin copy (`vendored plugin current` /
  *    `STALE` / `unverified`).
  *  - An **acknowledged** entry is the adopter's sanctioned baseline, which init
- *    never regenerates; so it is decided before the render compare, and an acked
- *    file matching its baseline reads `present` even when the current template
- *    has moved on (`stale` would imply "init would refresh it", which is false).
+ *    never regenerates. It is decided by its OWN recorded checksum — the acked
+ *    baseline is the thing init compares against — and reads `acknowledged` or
+ *    `acknowledged-drifted`, never `present` (folding it in claimed "byte-equal
+ *    to the current render" for a file this same envelope's `docs` block calls
+ *    acknowledged), never `stale` (init would not refresh it) and never
+ *    `adopter-edited` (no hand edit happened, and `arggon adopt --ack` is the
+ *    sanctioned, reversible way to take one).
  */
 function classifyAdapterFile(opts: {
   root: string;
@@ -612,12 +646,23 @@ function classifyAdapterFile(opts: {
   // adopter edit. See the docstring.
   if (isBundledPluginDest(dest)) return { path: dest, status: "present" };
   // Acknowledged baseline: the adopter sanctioned these bytes and init will
-  // never regenerate them, so a match is `present` whatever the template says.
-  if (state?.acknowledged) return { path: dest, status: "present" };
+  // never regenerate them, so the acked checksum decides — and it decides on its
+  // OWN terms (`acknowledged` vs `acknowledged-drifted`), never as `present`
+  // and never as `stale`.
+  if (state?.acknowledged) {
+    const drifted = Boolean(state.checksum) && !checksumMatches(state.checksum!, disk);
+    return { path: dest, status: drifted ? "acknowledged-drifted" : "acknowledged" };
+  }
+  // A present file with NO state entry is ADOPTER-OWNED, not stale: docs.ts
+  // classifies "on disk with no provenance state" as adopter-modified and skips
+  // it, so `stale` (which promises "init would refresh it") would send the
+  // operator to a command that cannot work. This is the pre-init adopter tree —
+  // a repo carrying its own `.opencode/agents/…` before arggon ever saw it.
+  if (!state?.checksum) return { path: dest, status: "adopter-edited" };
   // Checksum divergence on an ordinary generated destination IS the adopter's
   // own edit, and it wins over the render compare: the edit — not an upstream
   // move — is what blocks regeneration.
-  if (state?.checksum && !checksumMatches(state.checksum, disk)) {
+  if (!checksumMatches(state.checksum, disk)) {
     return { path: dest, status: "adopter-edited" };
   }
   const render = renderGeneratedDoc({ templatesDir, root, template, dest, projectName });
@@ -668,11 +713,15 @@ export function runAdapterReport(opts: {
 
   const agents: AdapterAgentReport[] = AGENT_IDS.map((agent) => {
     const files: AdapterFileState[] = [];
+    // One counter per status, so a NEW status can never be silently dropped
+    // from `counts` (the object is the report's honest total).
     const counts = {
       total: 0,
       present: 0,
-      stale: 0,
+      acknowledged: 0,
+      "acknowledged-drifted": 0,
       "adopter-edited": 0,
+      stale: 0,
       missing: 0,
       unverified: 0,
     } as Record<AdapterFileStatus | "total", number>;
@@ -1116,10 +1165,15 @@ function formatOpenCodeLines(opencode: DoctorOpenCode): string[] {
  * gap-row total, followed by an indented `gap:` line per matrix gap row. Report
  * wording is explicit — nothing here is a failure, and the matrix says so.
  *
- * `adopter-edited` is called out as a healthy state rather than a problem: it
- * is the never-overwrite contract holding, and the only operator action it ever
- * implies is "your edit is yours". Display-sanitized like every other doctor
- * value (the notes are matrix data, i.e. repo-controlled).
+ * Every bucket carries its OWN operator consequence, because that is the whole
+ * value of the status: `present` is what an untouched re-run leaves,
+ * `acknowledged` is never regenerated, `acknowledged-drifted` is a hand edit
+ * after the ack, `adopter-edited` is skipped unless `--backup` archives it, and
+ * only `stale` is one `arggon init` actually refreshes. No label promises a
+ * protection or a refresh init does not provide.
+ *
+ * Display-sanitized like every other doctor value (the notes are matrix data,
+ * i.e. repo-controlled).
  */
 export function formatAdapterLines(adapters: DoctorAdapters): string[] {
   const detected = adapters.agents.filter((a) => a.detected).map((a) => a.agent);
@@ -1130,8 +1184,11 @@ export function formatAdapterLines(adapters: DoctorAdapters): string[] {
   for (const agent of adapters.agents) {
     const c = agent.counts;
     lines.push(
-      `  agent ${agent.agent}: ${c.total} file(s) — ${c.present} present, ${c.stale} stale, ` +
-        `${c["adopter-edited"]} adopter-edited (yours, never overwritten), ${c.missing} missing, ` +
+      `  agent ${agent.agent}: ${c.total} file(s) — ${c.present} present, ` +
+        `${c.acknowledged} acknowledged (yours, never regenerated), ` +
+        `${c["acknowledged-drifted"]} acknowledged-drifted (hand edit after the ack), ` +
+        `${c["adopter-edited"]} adopter-edited (yours; init skips it unless --backup), ` +
+        `${c.stale} stale (arggon init would refresh it), ${c.missing} missing, ` +
         `${c.unverified} unverified; ${agent.gaps.total} capability gap(s)` +
         `${agent.detected ? "" : " — not detected in this tree"}`,
     );

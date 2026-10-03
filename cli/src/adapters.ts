@@ -256,8 +256,24 @@ export type AdapterArtifact = {
   agent: AgentId;
   /** Destination path (posix, relative to the tree root). */
   path: string;
-  /** `written` when this run created or refreshed the file; `skipped` otherwise. */
-  outcome: "written" | "skipped";
+  /**
+   * What this run did with the destination, and each value answers to the
+   * reason beside it:
+   *
+   *  - `written` — created, or refreshed from the current template (the file is
+   *    now byte-equal to the render).
+   *  - `replaced` — `init --backup` on an adopter-edited file: the ORIGINAL was
+   *    archived to `backup/<date>/<dest>` and the destination was regenerated.
+   *    It is a write, not a skip — `skipped` used to contradict its own reason
+   *    ("archived … then regenerated") — but it is not `written` either, since
+   *    the previous content was deliberately displaced rather than refreshed in
+   *    place. The archive path is in the reason.
+   *  - `skipped` — no write at all: not selected, an adopter OpenCode config
+   *    occupying the destination, an acknowledged or adopter-modified baseline
+   *    left alone, a name-bearing write refused, or a bundled source absent from
+   *    this install.
+   */
+  outcome: "written" | "replaced" | "skipped";
   /** Why — the plan's own decision reason, or the deselection reason. */
   reason: string;
 };
@@ -275,6 +291,11 @@ export type AdapterSelectionReport = {
   artifacts: AdapterArtifact[];
   /** A row was cut from `artifacts` (`counts` still counts them all). */
   truncated: boolean;
-  /** Honest totals over ALL adapter destinations, not the capped list. */
-  counts: { total: number; written: number; skipped: number };
+  /**
+   * Honest totals over ALL adapter destinations, not the capped list.
+   * `total = written + replaced + skipped`: a `replaced` destination (archived
+   * then regenerated under `--backup`) counts as a write, and folding it into
+   * `skipped` is what made a run contradict its own per-row reasons.
+   */
+  counts: { total: number; written: number; replaced: number; skipped: number };
 };

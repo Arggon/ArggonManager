@@ -40,6 +40,7 @@ import {
   resolveProjectName,
   TIER2_DESTS,
   type DocsPlan,
+  type DocsPlanEntry,
 } from "./docs.js";
 import {
   agentForTemplate,
@@ -393,15 +394,40 @@ function listBundledTemplates(): string[] {
 }
 
 /**
+ * The `adapters` outcome for one doc-plan decision. Split out so the mapping is
+ * stated once, in one place, with the reason each value can carry: `written` is
+ * "the file is now the render", `replaced` is "the original was archived and the
+ * destination regenerated" (`--backup` only), and `skipped` is "nothing was
+ * written at all". A decision that ever gains a writing meaning must be added
+ * here rather than defaulting into `skipped` and contradicting its own reason.
+ */
+function outcomeForDecision(decision: DocsPlanEntry["decision"]): AdapterArtifact["outcome"] {
+  if (decision === "created" || decision === "updated") return "written";
+  if (decision === "modified-backup") return "replaced";
+  return "skipped";
+}
+
+/**
  * Per-artifact adapter report (spec §S2, task-adapter-selection-flags) built
- * from the ONE doc plan, so `--dry-run` and the real run classify identically:
- * a destination the plan wrote (created/updated) is `written`, every other plan
- * decision is `skipped` carrying that decision's own reason, and a destination
- * the plan never considered at all (a bundled artifact whose source is absent
- * from this install) is reported as skipped with an explicit reason rather than
- * vanishing. Agent ids come from the plan entries themselves, so a destination
- * is attributed by the same classifier the generator used — never re-derived
- * from a second list that could drift.
+ * from the ONE doc plan, so `--dry-run` and the real run classify identically.
+ * Each plan decision maps to exactly one outcome, and the outcome answers to the
+ * reason beside it:
+ *
+ *   - `created` / `updated` -> `written` (the file is now the render).
+ *   - `modified-backup` -> `replaced`: `--backup` ARCHIVED the original and
+ *     regenerated the destination. Counting it as `skipped` made the report
+ *     contradict its own reason text ("archived … then regenerated") about a
+ *     write that actually happened; calling it `written` would hide that the
+ *     previous content was deliberately displaced. The archive path is in the
+ *     reason, so the operator can find the displaced original.
+ *   - every other decision -> `skipped`, carrying that decision's own reason.
+ *   - a destination the plan never considered (a bundled artifact whose source is
+ *     absent from this install) -> `skipped` with an explicit reason, rather than
+ *     vanishing.
+ *
+ * Agent ids come from the plan entries themselves, so a destination is attributed
+ * by the same classifier the generator used — never re-derived from a second list
+ * that could drift.
  *
  * Rows are capped (`MAX_ADAPTER_ARTIFACTS`); `counts` totals every destination,
  * so a cut is visible instead of silently shrinking the numbers.
@@ -414,6 +440,7 @@ function adapterReport(
   const byDest = new Map(plan.entries.map((e) => [e.dest, e] as const));
   const rows: AdapterArtifact[] = [];
   let written = 0;
+  let replaced = 0;
   let skipped = 0;
   for (const { dest, template } of currentGeneratedTemplates({ layout })) {
     const agent = agentForTemplate(template);
@@ -429,22 +456,20 @@ function adapterReport(
       });
       continue;
     }
-    const isWritten = entry.decision === "created" || entry.decision === "updated";
-    if (isWritten) written++;
+    const outcome = outcomeForDecision(entry.decision);
+    if (outcome === "written") written++;
+    else if (outcome === "replaced") replaced++;
     else skipped++;
-    rows.push({
-      agent,
-      path: dest,
-      outcome: isWritten ? "written" : "skipped",
-      reason: entry.reason,
-    });
+    rows.push({ agent, path: dest, outcome, reason: entry.reason });
   }
   return {
     scope: "generate",
     selection,
     artifacts: rows.slice(0, MAX_ADAPTER_ARTIFACTS),
     truncated: rows.length > MAX_ADAPTER_ARTIFACTS,
-    counts: { total: written + skipped, written, skipped },
+    // Every destination lands in exactly one bucket, so the three sum to the
+    // total and a `replaced` file is never hidden inside `skipped`.
+    counts: { total: written + replaced + skipped, written, replaced, skipped },
   };
 }
 
@@ -976,7 +1001,9 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
         selection: plan.adapters,
         artifacts: [],
         truncated: false,
-        counts: { total: 0, written: 0, skipped: 0 },
+        // A proposal sweep writes no adapter file at all: every count is 0,
+        // which is why `scope` carries `propose`.
+        counts: { total: 0, written: 0, replaced: 0, skipped: 0 },
       },
       warning,
     };
@@ -1042,16 +1069,21 @@ export function runInit(opts: InitOptions): InitResult {
     const conventionPath =
       trackerAt(root)?.conventionPath ?? conventionPathForLayout(root, "arggon-manager");
     if (!existsSync(conventionPath)) throw new Error(NOT_INITIALIZED_PROPOSE_ERROR);
-    const proposals = planProposals(root, Boolean(opts.full), opts.now, opts.proposeWholeFile);
-    applyProposals(root, proposals, opts.now);
-    // Selection is resolved even in propose mode so `--agents`+`--propose` is
-    // reported the same way; `scope: "propose"` says the sweep wrote no adapter
-    // file (proposals are doc side files, listed in `proposals[]`).
+    // Resolve (and thereby VALIDATE) the adapter selection BEFORE any write.
+    // `applyProposals` writes `.proposed-*` side files and can `rmSync` a
+    // leftover on `absorbed`, so resolving after it meant an unknown agent name
+    // was refused with the side files already on disk — the opposite of the
+    // documented "refused before anything is written". Selection is resolved
+    // here even in propose mode so `--agents`+`--propose` is reported the same
+    // way; `scope: "propose"` says the sweep wrote no adapter file (proposals
+    // are doc side files, listed in `proposals[]`).
     const selection = resolveAgentSelection({
       root,
       ...(opts.agents !== undefined ? { agents: opts.agents } : {}),
       ...(opts.noAgents !== undefined ? { noAgents: opts.noAgents } : {}),
     });
+    const proposals = planProposals(root, Boolean(opts.full), opts.now, opts.proposeWholeFile);
+    applyProposals(root, proposals, opts.now);
     return {
       root,
       alreadyInitialized: true,
@@ -1069,7 +1101,9 @@ export function runInit(opts: InitOptions): InitResult {
         selection,
         artifacts: [],
         truncated: false,
-        counts: { total: 0, written: 0, skipped: 0 },
+        // A proposal sweep writes no adapter file at all: every count is 0,
+        // which is why `scope` carries `propose`.
+        counts: { total: 0, written: 0, replaced: 0, skipped: 0 },
       },
       warning: isGitRepo(root) ? undefined : NOT_A_REPO_WARNING,
     };

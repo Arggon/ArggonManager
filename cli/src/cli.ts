@@ -169,6 +169,20 @@ program
     console.log(message);
   });
 
+/**
+ * Which adapter-selection tokens this invocation actually carried, recorded from
+ * commander's per-token option events.
+ *
+ * `--agents <list>` and `--no-agents` collapse onto ONE `opts.agents` key, so the
+ * parsed options alone cannot tell "the operator passed `--no-agents`" from "the
+ * operator passed `--agents x` AND `--no-agents`, and the second one won" — the
+ * difference between an intended selection and a silently discarded one. The two
+ * events keep their own names (`option:agents` / `option:no-agents`), so this set
+ * is what makes the documented mutual exclusion enforceable at the CLI. Reset per
+ * invocation; the CLI parses one command per process.
+ */
+let agentTokensSeen = new Set<"agents" | "no-agents">();
+
 program
   .command("init")
   .description(
@@ -218,6 +232,10 @@ program
     "docs + CLI only: materialize no adapter seam (adapters are enhances; nothing on disk is deleted)",
   )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  // Both selection tokens are recorded under their own event names, because the
+  // parsed option they share cannot represent "both were passed".
+  .on("option:agents", () => agentTokensSeen.add("agents"))
+  .on("option:no-agents", () => agentTokensSeen.add("no-agents"))
   .action(
     (
       dir: string,
@@ -252,6 +270,21 @@ program
             : opts.agents === false
               ? { noAgents: true }
               : {};
+        // BOTH tokens in ONE invocation are unrecoverable from `opts` alone:
+        // they share the key, so commander keeps the LAST one and silently drops
+        // the other (`--agents opencode --no-agents` ran as `--no-agents`, and
+        // the reverse ran as `--agents opencode`). `opts.agents` therefore
+        // decides a selection the operator never asked for. The option EVENTS
+        // still fire per token and under their own names, so the collision is
+        // detected here and refused — the registry's "does not combine" error
+        // was documented and unreachable from the CLI until this check.
+        const tokens = agentTokensSeen;
+        agentTokensSeen = new Set<"agents" | "no-agents">();
+        if (tokens.has("agents") && tokens.has("no-agents")) {
+          throw new Error(
+            "init --no-agents does not combine with --agents (one suppresses adapter generation, the other selects it)",
+          );
+        }
         if (opts.dryRun) {
           const result = dryRunInit({
             dir,
@@ -2948,18 +2981,21 @@ function printInitDryRun(result: InitDryRunResult): void {
 
 /**
  * Human summary of the adapter selection (spec §S2,
- * task-adapter-selection-flags): one line naming the mode and the selected
- * seams, and — only when the selection actually left something behind — one
- * line per unselected agent with its file count. Silent on the default
- * full-seam run, so a plain `arggon init` output does not grow; the per-file
- * detail lives in `--json` (`adapters.artifacts`).
+ * task-adapter-selection-flags): ONE line naming the mode, the selected seams and
+ * the three outcome counts, then — only when the selection actually left an
+ * agent behind — one line per such agent with its file count. The summary line is
+ * printed on EVERY init run, including the default full-seam one: it is how an
+ * operator learns which seams were materialized at all, and the flagless default
+ * is exactly the run whose selection nobody named. Per-file detail lives in
+ * `--json` (`adapters.artifacts`).
  */
 function printInitAdapters(adapters: AdapterSelectionReport): void {
   const { selection, counts, scope, artifacts } = adapters;
   const selected = selection.selected.length > 0 ? selection.selected.join(", ") : "none";
   console.log(
     `  - agent adapters (${selection.mode}): ${selected} — ${counts.written} written, ` +
-      `${counts.skipped} skipped (docs + CLI alone are always complete)`,
+      `${counts.replaced} replaced (archived first, --backup), ${counts.skipped} skipped ` +
+      "(docs + CLI alone are always complete)",
   );
   // In propose mode no adapter file is written at all, so the counts say so and
   // the deselected-agent detail would be noise.
