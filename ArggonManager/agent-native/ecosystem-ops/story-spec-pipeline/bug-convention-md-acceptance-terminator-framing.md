@@ -71,3 +71,15 @@ One judgment call for the reviewer: I kept the 6.5% and 21/280 numbers OUT of th
 ### handoff 2026-10-03 @Arggon — next: Review and merge PR #613 (docs-only, convention.md §Acceptance rows); item is ready to close once merged
 - branch: fix/bug-convention-md-acceptance-terminator-framing
 - open questions: Should the 6.5% VT/FF ALLOW->REFUSE measurement surface in convention.md, or stay in bug-three-acceptance-parsers-diverging? Worker kept it out as decaying; is the ':124' symbol-list de-duplication i…
+
+### 2026-10-03 @Arggon
+**Methodology impact class: ADVISORY** — the required surface `docs/agents.md` §Changing the methodology itself (:473-478) demands from a PR touching a carrier (`ArggonManager/docs/convention.md` is one of the four). Also stated in the PR description, so both required surfaces carry it.
+
+**Why Advisory, not Behavioral.** Behavioral means "agents must re-learn something — a rule, a gate, a command contract, a pipeline step". Nothing here qualifies:
+
+- No rule, gate, command contract or pipeline step changed. The diff is one documentation file plus this item file; no TS, no JSON contract, no fixture.
+- The behavior this PR documents **already shipped and was already correct**: `ACCEPTANCE_LINE_BREAK = /[\n\r\u2028\u2029]/` (`lib/src/items.ts:359`), consumed by `body.split(...)` in `acceptanceRows` (:436), landed in #611 and is pinned by `cli/src/acceptance-parity.test.ts`. The terminator set, and the deliberate exclusion of VT/FF, are not new facts to an adopter — they are facts an adopter's agent could only previously find by reading TypeScript.
+- Therefore no ADR 0016 reference is owed, and consequently the Behavioral-class obligation to keep `skills/arggon-cli/` ↔ `.agents/skills/arggon-cli/` byte-equal in the same PR is **not** owed here. Nothing was re-synced because nothing in the skill needed to change: the sweep found no skill statement this edit makes false (`references/pitfalls.md`'s done-gate prose is about waivers and the cascade, and never states a terminator set).
+- What an adopter's agent gets is strictly better prose for a rule that already applies: "name the four LineTerminators, and VT/FF are not among them" replaces a sentence whose incompleteness is what let a `\n`-only split look behavior-preserving.
+
+Reading it the other way — if the coordinator considers a schema-doc correction that prevents a future behavioral divergence to be Behavioral — then the skill re-sync is still not required (no skill file carries the acceptance grammar), but the ADR 0016 reference and the byte-equal copy would be. I read it as Advisory and am flagging the alternative rather than silently picking it.
