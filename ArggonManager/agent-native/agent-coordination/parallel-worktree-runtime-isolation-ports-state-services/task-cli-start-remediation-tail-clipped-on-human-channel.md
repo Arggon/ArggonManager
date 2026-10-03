@@ -29,9 +29,38 @@ Found by the reviewer of PR #597 (task-strictgatebinfailure-tail-clipped-by-head
 
 ## Acceptance
 
-- [ ] The CLI failure composition puts the actionable remediation (worktreeRemediation + attach/discard hint) BEFORE the kernel detail, keeping every existing clause verbatim — matching the shape PRs #573/#579/#595 landed
-- [ ] A test at the full MAX_GATE_BINS worst case asserts the remedy survives the MAX_HUMAN_ERROR_CHARS=2000 head-clip, with ordering pinned (remedy index precedes the first named bin)
-- [ ] Negative control: message at the cap and the last named bin absent
-- [ ] Every CLI error path that appends a remedy after kernel detail is swept for the same violation — this must be a class fix, not a single call site
+- [x] The CLI failure composition puts the actionable remediation (worktreeRemediation + attach/discard hint) BEFORE the kernel detail, keeping every existing clause verbatim — matching the shape PRs #573/#579/#595 landed
+- [x] A test at the full MAX_GATE_BINS worst case asserts the remedy survives the MAX_HUMAN_ERROR_CHARS=2000 head-clip, with ordering pinned (remedy index precedes the first named bin)
+- [x] Negative control: message at the cap and the last named bin absent
+- [x] Every CLI error path that appends a remedy after kernel detail is swept for the same violation — this must be a class fix, not a single call site
 
 ## Notes
+
+### Class sweep — the full surface, closed or explicitly deferred
+
+The defect class: a human-channel CLI error whose ONLY actionable clause is composed AFTER an unbounded detail, so the head-kept `MAX_HUMAN_ERROR_CHARS` (2000) clip eats the fix and the reader keeps only the diagnosis.
+
+**Fixed in `cli/src/start.ts` (4 sites, the whole CLI start channel):**
+
+| site | before | after |
+| --- | --- | --- |
+| `worktreeFailureMessage` | kernel detail, then `worktreeRemediation(...)` + the `To discard it instead` hint | kept-worktree note -> remediation -> discard hint -> kernel detail |
+| `gh()` | ``gh <args> failed: <stderr> (check `gh auth status`)`` | ``Check `gh auth status`. gh <args> failed: <stderr>`` |
+| `commitFile()` | ``<git commit detail> (if this is an identity error, set `git config user.name` / `git config user.email`)`` | ``If this is an identity error, set `git config user.name` / `git config user.email`. <git commit detail>`` |
+| `runPostStart()`'s `failure()` | ``post-start failed: <cmd> -> <stderr tail> (hint: hooks inherit ...)`` | ``(hint: hooks inherit ...) post-start failed: <cmd> -> <stderr tail>`` |
+
+Only clause ORDER moved — every clause is verbatim, none added or dropped. `worktreeFailureMessage` is the single funnel every worktree-start refusal passes through, so the one reorder also covers `strictWorktreeWriteFailure`, `strictGateBinFailure` and `freshWorktreeInstallRefusal` (each of which keeps its own remedy-first internal order from #573/#597).
+
+**Swept, already compliant (deliberately not changed):**
+
+- `assertStartableTree` — cause first, evidence list last, no trailing remedy.
+- `git()` — detail only, no trailing advice at all.
+- The plain (non-worktree) start flow — composes no remedy, so there is nothing to reorder.
+- `cli/src/cleanup.ts` refusals — clamped at `MAX_ENVELOPE_DETAIL_CHARS` (500) on a machine surface before any advice could be clipped.
+- `cli/src/mcp-server.ts` `spawnedOutcome` — the raw stderr is already the LAST clause, and `clipTail` keeps the tail.
+
+**Swept, same shape, DEFERRED to the coordinator (out of this item's files):**
+
+- `cli/src/board.ts:141` — ``GitHub overlay unavailable: <gh detail> (or run plain `arggon board` for the offline snapshot)``: the identical ordering violation, but `cli/src/board.ts` + `cli/src/board.test.ts` are owned by the concurrently worked `bug-three-acceptance-parsers-diverging`, so this fix must not touch them. Worth one small follow-up.
+- `lib/src/get-open-prs.ts:67`, `lib/src/import-issues.ts:187`, `lib/src/cleanup.ts:259` — the ``gh <args> failed (<stderr>; check `gh auth status`)`` kernel wrappers: same shape (unbounded gh stderr, then the auth hint), one line each, kernel-side. Reported rather than fixed here to keep this diff on the CLI start channel.
+- `cli/src/branch.ts:127`, `lib/src/comment.ts:236-239`, `lib/src/show.ts:184`, `cli/src/layout-migrate.ts:83` — advice after a BOUNDED short clause (a branch name, a filename); no realistic clip exposure.
