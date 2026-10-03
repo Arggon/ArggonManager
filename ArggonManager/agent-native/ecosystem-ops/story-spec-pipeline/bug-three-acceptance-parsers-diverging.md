@@ -2,7 +2,7 @@
 type: bug
 status: in_progress
 id: bug-three-acceptance-parsers-diverging
-title: "Three different acceptance-box parsers with no parity test, and they ALREADY diverge (CRLF, `- [ ] x`): the done gate refuses, the board and goal-mode report \"no unchecked box\""
+title: 'Three different acceptance-box parsers with no parity test, and they ALREADY diverge (CRLF, `- [ ] x`): the done gate refuses, the board and goal-mode report "no unchecked box"'
 assignee: Arggon
 branch: fix/bug-three-acceptance-parsers-diverging
 parent: story-spec-pipeline
@@ -12,6 +12,7 @@ updated: "2026-10-03"
 claimed_at: "2026-10-03T02:49:53.379Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-three-acceptance-parsers-diverging
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-three-acceptance-parsers-diverging.md
   Leaves live only under a story. id is the filename stem: bug-three-acceptance-parsers-diverging.
@@ -27,16 +28,17 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-three-acceptance-parsers-
 
 ## Acceptance
 
-- [ ] ONE predicate in `lib/src/items.ts` decides what an acceptance row is, and all three call sites use it; any parser that cannot be unified defers to the kernel explicitly and says so in a comment
-- [ ] A parity test asserts the three agree across a corpus of shapes: LF and CRLF, empty boxes, ticked/unticked, bare markers, indented markers, and text containing the literal `- [ ]` inside a code span
-- [ ] The CRLF case specifically: the done gate refuses, and the board and goal contract ALSO report the unchecked boxes (no "nothing unchecked" while the gate blocks)
-- [ ] The `- [ ] x` case has one decided answer, documented in `docs/convention.md` so an author knows which form is a row
-- [ ] PR #605's prose that calls the board's parser "the kernel's own" is corrected everywhere it shipped (five places including docs) — a claim naming the wrong owner is how the next agent re-introduces this
-- [ ] No behavior change to the done gate's refusals beyond making the other two agree with it
+- [x] ONE predicate in `lib/src/items.ts` decides what an acceptance row is, and all three call sites use it; any parser that cannot be unified defers to the kernel explicitly and says so in a comment
+- [x] A parity test asserts the three agree across a corpus of shapes: LF and CRLF, empty boxes, ticked/unticked, bare markers, indented markers, and text containing the literal `- [ ]` inside a code span
+- [x] The CRLF case specifically: the done gate refuses, and the board and goal contract ALSO report the unchecked boxes (no "nothing unchecked" while the gate blocks)
+- [x] The `- [ ] x` case has one decided answer, documented in `docs/convention.md` so an author knows which form is a row
+- [x] PR #605's prose that calls the board's parser "the kernel's own" is corrected everywhere it shipped (five places including docs) — a claim naming the wrong owner is how the next agent re-introduces this
+- [x] No behavior change to the done gate's refusals beyond making the other two agree with it
 
 ## Notes
 
 ### 2026-10-03 @ses_f02ab5836ffeOAxmisboIwWE4x
+
 Found by the reviewer of PR #605 (task-zcode-goal-mode), 2026-10-03, while checking a load-bearing claim. **This is a done-gate correctness defect, not a code-duplication nit.**
 
 There are now THREE acceptance-box parsers, in three places, with no parity test between any two of them:
@@ -57,6 +59,7 @@ The fix is one predicate in `lib/src/items.ts` used by all three (the kernel is 
 Also required: the prose in PR #605 that calls the board's parser "the kernel's own" must be corrected wherever it shipped (the claim appears in five places including shipped docs) — a claim that names the wrong owner is how the next agent re-introduces the bug.
 
 ### 2026-10-03 @ses_f02ab5836ffeOAxmisboIwWE4x
+
 Coordinator update after the round-2 review of PR #605 (2026-10-03) — **the class defect is confirmed with measured reachability, and there is a second, sharper instance of it.**
 
 The goal-mode fix closed the wrong-input question at the PREDICATE layer (it now calls the done gate's `acceptanceComplete` and publishes its verdict verbatim as `goal.gateUnchecked`), but the review found the INPUT differs: `acceptanceComplete(item.body)` (the gate, `lib/src/update.ts:526`) versus `acceptanceComplete(shown.prose)` (the goal, `cli/src/goal-mode.ts:526`), where `shown.prose` excludes comment sections.
@@ -66,25 +69,27 @@ That is not hypothetical. **21 of 280 items in this tracker with comments disagr
 This sharpens the acceptance for this bug beyond parser unification: the SAME BODY must be presented to every consumer. If a reader trims, normalizes or filters the body before calling a predicate, it has changed the question being asked — and here it produces a false "you are finished".
 
 Add to this item's scope:
+
 - (a) one kernel predicate over one canonical body, with readers forbidden to pre-filter (LF normalization is fine if applied identically to what the gate sees; comment stripping is NOT)
 - (b) an explicit test over the LIVE corpus: assert every item with comments yields the same verdict from the gate and from any consumer, so a 21/280 disagreement can never reappear silently
 - (c) the PR #605 one-line fix (pass `shown.item.body`, already in scope at `goal-mode.ts:509`) lands in that PR; this item owns the general guarantee
 
 ### 2026-10-03 @Arggon
+
 ## Worker evidence — `fix/bug-three-acceptance-parsers-diverging` (8 commits, pushed, rebased on origin/main)
 
 ### Scope correction: there were SIX grammars, not three
 
 The item names three. Counting what actually shipped on `origin/main` before this branch:
 
-| # | site | rule | disagreed with the gate? |
-|---|------|------|--------------------------|
-| 1 | `lib/src/items.ts` `acceptanceComplete` | `^[ \t]*[-*] \[( \|x\|X)\][ \t]*[^\s]` | reference |
-| 2 | `cli/src/board.ts` `parseAcceptanceRows` | `/^\s*[-*]\s+\[([ xX])\]\s+(.*)$/` over `split("\n")` | **yes** — CRLF-blind, glued box, two-space box |
-| 3 | `cli/src/tui.ts` `tuiAcceptanceRows` | `/^[ \t]*[-*] \[( \|x\|X)\]/` | no (agreed by luck) |
-| 4 | `opencode/plugins/arggon/board.ts` `BOARD_ACCEPTANCE_ROW` | `/^\s*[-*]\s+\[([ xX])\]\s?(.*)$/` over `runShow` prose | **yes** — two-space box, comment-stripped input |
-| 5 | `cli/src/spec.ts` `CHECKBOX_PATTERN` | `/^\s*[-*]\s+\[[ xX]\]/` | **yes** — two-space box (advisory `warn`, no gate) |
-| 6 | `cli/src/goal-mode.ts` (PR #605, unmerged) | inherited #2 | **yes** — inherited CRLF blindness |
+| #   | site                                                      | rule                                                    | disagreed with the gate?                           |
+| --- | --------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------- |
+| 1   | `lib/src/items.ts` `acceptanceComplete`                   | `^[ \t]*[-*] \[( \|x\|X)\][ \t]*[^\s]`                  | reference                                          |
+| 2   | `cli/src/board.ts` `parseAcceptanceRows`                  | `/^\s*[-*]\s+\[([ xX])\]\s+(.*)$/` over `split("\n")`   | **yes** — CRLF-blind, glued box, two-space box     |
+| 3   | `cli/src/tui.ts` `tuiAcceptanceRows`                      | `/^[ \t]*[-*] \[( \|x\|X)\]/`                           | no (agreed by luck)                                |
+| 4   | `opencode/plugins/arggon/board.ts` `BOARD_ACCEPTANCE_ROW` | `/^\s*[-*]\s+\[([ xX])\]\s?(.*)$/` over `runShow` prose | **yes** — two-space box, comment-stripped input    |
+| 5   | `cli/src/spec.ts` `CHECKBOX_PATTERN`                      | `/^\s*[-*]\s+\[[ xX]\]/`                                | **yes** — two-space box (advisory `warn`, no gate) |
+| 6   | `cli/src/goal-mode.ts` (PR #605, unmerged)                | inherited #2                                            | **yes** — inherited CRLF blindness                 |
 
 **CRLF correction:** the coordinator's `.`-vs-`\r` claim is real but belongs to `cli/src/board.ts` only. The native panel split on `/\r?\n/` and `trimEnd()`, so it was CRLF-safe; its two defects were `\s+`+`\s?` and the comment-stripped input. My own first comment got this wrong and commit `40df5cb8` corrects it — the point of the item is that a claim naming the wrong owner re-introduces the bug.
 
@@ -98,7 +103,7 @@ DISAGREEMENTS with the done gate (gate blocks, consumer says "nothing left"):
 gate refusal-set changes: 0
 ```
 
-**0 CRLF bodies exist in this tracker today**, so the CRLF defect is proven by the corpus, not by the live tree; it stays reachable for any adopter checkout (the frontmatter parser explicitly tolerates `\r\n`). The comment-stripping defect *is* instantiated: 281 items, 24–27 of them disagreeing, which is the coordinator's 21/280.
+**0 CRLF bodies exist in this tracker today**, so the CRLF defect is proven by the corpus, not by the live tree; it stays reachable for any adopter checkout (the frontmatter parser explicitly tolerates `\r\n`). The comment-stripping defect _is_ instantiated: 281 items, 24–27 of them disagreeing, which is the coordinator's 21/280.
 
 ### Acceptance 6 — no refusal change, proven twice
 
@@ -147,5 +152,6 @@ verdict agreement: gate blocks=true board=true pane=true panel=true
 2. **`describe.sequential` in `cli/src/headless-ci.test.ts:150` does not typecheck against the installed vitest 5.0.0** (`SuiteAPI` has no `sequential`), which fails `npm run build`'s `tsconfig.typecheck.json` pass. Pre-existing, not mine, not fixed here.
 
 ### handoff 2026-10-03 @Arggon — next: Review + open the PR for fix/bug-three-acceptance-parsers-diverging (pushed, 9 commits, all gates green); then re-check PR #605's goal-mode header after this merges.
+
 - branch: fix/bug-three-acceptance-parsers-diverging
 - open questions: #605's 'TWO parsers / CRLF-blind board / normalizeEol required / UNRENDERABLE' prose becomes false once this merges - who updates it? Also pre-existing: describe.sequential vs vitest 5.0.0 types brea…
