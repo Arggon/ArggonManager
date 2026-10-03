@@ -138,3 +138,60 @@ Disclosed for the reviewer: on an earlier full run, `cli/src/prose-format.test.t
 - **Box 4 (depends on PR #607 landing).** Verified, not assumed: `gh pr view 607` → MERGED at 2026-10-03T03:37:40Z, and `git show origin/main:cli/src/headless-ci.test.ts` contains the `workflow parity: template vs the copy CI runs` block. My branch merged `origin/main` in (20 commits, no force-push; the merge touched none of my three files) and all gates pass on the merged tree.
 
 Left `in_progress` for the coordinator: merge + done is your call. Nothing here needs a follow-up item — the residual scope notes (byte equality against the pin, pin ahead of the stamps) are deliberate and documented in `docs/ci.md`, not gaps.
+
+### 2026-10-03 @Arggon
+verdict: approve
+
+**Review of PR #621 (`fix/bug-ci-seam-pin-shell-vs-test-copy-divergence`) against `ArggonManager/docs/engineering.md`.** Read-only review; no gates re-run. Every claim below was checked against code, not against the PR narrative.
+
+## The crux holds (verified independently)
+
+The stamping mechanism is exactly as claimed. `cli/src/docs.ts:580` `arggonVersion()` reads `resolve(packageRoot(), "package.json")`, and `cli/src/package-assets.ts:14` `packageRoot()` resolves to **the running CLI's own root** (`dist/..` built, `cli/src/../..` under tsx) — not the target repo. So a committed stamp records the version of whatever `arggon` binary wrote the bytes, while the test's `pkgVersion` (`ci-seam-pin.test.ts:102`) is the *branch's* `package.json`. Two different files: the reachability story does not rest on a hypothetical.
+
+The disagreement cell is real and is exactly one: shell = `[ -n "$newest" ] && newest > pin`; TS (pre-fix) = `pin != pkg && pin < newest`. TS's red set is a strict subset, confirming the re-scope's "shell is stricter". They differ only on `newest > pin && pin == pkgVersion`.
+
+## Reason (1) "it bought nothing" is supported — and the evidence is stronger than claimed
+
+The row the conjunct was believed to protect is the **release window** (`pin == stamps`, `package.json` already bumped). It never needed it: that row is decided by the `pin < newest` half alone (`0.5.0 < 0.5.0` is false), with or without the conjunct.
+
+**The corroborating find:** the pre-existing verdict table was *self-contradictory* about this. On `main` its #527 row read `pin V · package.json V · stamps V+1 → RED`, but the predicate it documented returns **green** whenever `pin == pkgVersion` — and the accompanying unit test asserted a *different* input (`pinLagsSeam("0.4.0","0.4.1",["0.4.1"])`, i.e. `pkg = V+1`). The documented rule of record disagreed with its own implementation, and the conjunct was papering over the discrepancy. This PR splits that row into two (`V+1` → the row the test actually asserted; `V` → the row that was mislabelled and is now correctly RED). That doc repair is the most valuable single change here and it was made quietly rather than claimed.
+
+## Reason (3) is correct, and it is load-bearing in the right place
+
+The template is what every adopter's runner becomes: `headless-ci.test.ts:475` asserts the vendored `.github/workflows/arggon.yml` is byte-equal to `WORKFLOW_TEMPLATE` plus the marker. So a conjunct added to the template ships to every adopter, whose `package.json` version is unrelated to arggon releases — `pin == pkg` is an ordinary coincidence there, so the pasted conjunct would switch the #527 gate off for exactly those repos. The argument is recorded in **three** durable places, not only the PR body: the `pinLagsSeam` file header (`:77-83`), `ArggonManager/docs/ci.md` §Where the rule of record lives, and — best of all — as a *test*: `headless-ci.test.ts` direction 3b builds a fixture whose `package.json` version **equals** `ARGGON_VERSION` with a newer stamp and asserts the step still goes RED. Pasting `pin != pkg` into the clause turns that fixture green by construction, so the prohibition is now machine-enforced rather than argued.
+
+## Nothing new goes red anywhere
+
+Worth stating because it is the strongest structural argument for this shape: **the shell clause is byte-identical to `main`** (both copies, sha256 `68e496aa…` / `e6afe753…`, unchanged). The change can only turn the `cli` job green→red, and only on inputs where `tasks-validate` already fails. So the fix is monotone — no new CI redness is introduced, and the divergence it removes is precisely "the local guard was quieter than the gate that decides merges".
+
+## Parity structure is the right one (review point 4)
+
+`extractLagClause` (`ci-seam-pin.test.ts:156`) really extracts: it scans the workflow text for the `if [ -n "$newest" ]` line, folds `\`-continuations, **throws** when the shape is absent or unparsable, and the executed text is anchored three ways — the `LAG_CLAUSE` constant (`:115`), byte-equality of both copies, and `bash` execution of the extracted text. The corpus is bidirectional (6 green / 3 red), so the test cannot pass by both sides collapsing to one answer. `shellLagFires` throws on non-zero status, so a missing `bash`/`sort` fails loudly instead of passing vacuously — and `null !== 0` covers ENOENT. This is the "don't check two copies independently" failure class answered structurally, not by convention.
+
+## Mutations (review point 5)
+
+Each is real and fails for the stated reason, checked by reading the mutation targets:
+
+- **(a)** pre-fix predicate re-added → disagrees on the disagreement row only, per hand-derivation of all nine rows. **One numerical correction:** the run as executed used an 8-row corpus (the empty-stamps row was omitted, because pre-fix `reduce` has no seed and throws on `[]`), so it was **7 of 8** agreeing, not "8 of 9". Against the shipped 9-row corpus the pre-fix predicate would give 1 mismatch + 1 throw. The substantive claim — *exactly one* input disagrees, and it is the disagreement input — is unaffected, but please restate the counts if that line is quoted; an imprecise evidence line is the exact habit this PR exists to remove.
+- **(b)** conjunct pasted into the committed copy → `expect(committed).toBe(template)` fails naming the file (confirmed by reading the assertion), and the pre-existing `never derives it` guard fires because the mutant contains `DERIVE_PIN` verbatim. Both real.
+- **(c)** direction 3b flipped to `toBe(0)` → fails with the shell's own lag message. Real, though it is the weakest of the four in discriminating power: it proves the fixture fires, not that the `pkg == pin` coincidence matters. That link is established by reading `seedSeam(coincident, true, { pkgVersion: binVersion, … })` against `runStep`'s `ARGGON_VERSION = binVersion`. Optionally: paste the conjunct into the **template** (not the committed copy) and show direction 3b flipping green — that would close the loop on the adopter argument by mutation rather than by construction.
+- **(d)** reverted → green. CI corroborates: `cli` 4m40s, `ui-smoke` 2m09s, `tasks-validate` 28s, all pass.
+
+## Box 2: ticking a false-conditional box is the honest call
+
+In logic the requirement is **vacuously satisfied**, so `[x]` is the accurate representation; leaving it `[ ]` would assert "unmet", which is false. The decisive part is what the worker did *not* do: it did not rewrite the acceptance text to make the box self-satisfying. Given this repo's recorded history of acceptance-box grammars lying in both directions (`tools/ast-grep/rules/acceptance-rows-use-kernel.yml` — including a renderer reporting "nothing unchecked" on an item the gate refused to close), the disclosure-plus-decider-call pattern is the right one. **Caveat for the convention, not this PR:** "vacuous satisfaction counts as met" is now load-bearing precedent and is worth stating explicitly in `docs/convention.md` if it recurs, so the next worker does not have to re-derive it.
+
+## Flake disclosure is fair, and independently corroborated (review point 7)
+
+`vitest.config.ts` sets a suite-wide `testTimeout` of 30000 and the code-span test declares no override; measured alone the file takes ~42 s. The budget is therefore at or under the cost — **zero headroom**, exactly as `bug-prose-format-codespan-test-times-out-under-full-suite` records. That item was filed from PR #620, a *different* worker hitting the *same* lane, so "main is also affected" is corroborated by an independent witness rather than asserted. The `0.4 %` framing is fair and correctly argued: a 1.9 KB growth in one of 350 files / ~430 KB cannot move a 30 s budget, and the sibling test doing half the work passed under the same load. Correctly disclosed rather than papered over — and correctly *not* fixed here.
+
+## Advisory impact class: confirmed (review point 8)
+
+Neither workflow copy changed — `git diff origin/main...HEAD -- .github/workflows templates/` is **empty**, and both copies hash-match `main`. No skill, `.agents/skills/`, `agents.md`, `engineering.md` or `convention.md` change, so no `npm run skills:sync` is required. The adopter seam is byte-unchanged: this PR cannot have introduced a one-sided seam edit, because it edited no seam file.
+
+## Non-blocking notes for the coordinator
+
+1. **Round-1 acceptance boxes are still unticked** (5 boxes, `bug-…md:49-53`) while round-2's four are ticked. That is the honest choice — the worker did not do that work in this PR — but the done-gate will refuse `done` until someone decides, and the decision is a coordinator call, not a reviewer's.
+2. **Out of scope, pre-existing, worth a note elsewhere:** in the cell, `tasks-validate`'s prescribed remedy is "bump `ARGGON_VERSION`". For a *feature branch* in the seam's own repo the better move is regenerate-with-the-branch-build or rebase, since the pin is a repo-wide literal. That is a property of the unchanged shell clause (correct advice for adopters, suboptimal in-repo), not something this PR introduced. If you want it recorded, it belongs in the drift-gate's known-ceiling section, not this decision.
+
+No blocking findings. Recommendation: **merge**, then close the item on the coordinator's call.
