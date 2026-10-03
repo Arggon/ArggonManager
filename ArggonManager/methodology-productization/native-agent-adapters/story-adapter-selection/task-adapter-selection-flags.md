@@ -151,3 +151,7 @@ That last probe also corrected my own fixture: I had planned to strip a state en
 The rebased tree is preserved verbatim as `backup/rebased-round1` (tag `rebased-round1-tip`) if you want it: its `cli/`, `templates/`, `skills/`, `README.md` and `ArggonManager/docs/` content is **byte-identical** to the published branch — only the base differs — so nothing about the fixes depends on it. The 13 stale commits are all `chore(tasks):` item-file commits touching none of this PR's files, so the review diff is unaffected. Per the repo's merge guidance this PR should **merge, not squash** (it carries tracker auto-commits).
 
 Also noted for the record: `npm run build` must precede `npm test` — the pack-parity gate compares the packed bin against `dist`, so a stale `dist` shows up as a spurious `headless-ci` envelope mismatch. It cost me one false alarm; not a code defect.
+
+### handoff 2026-10-03 @Arggon — next: Coordinator: re-review PR #606 (round-1 fixes pushed); decide merge-not-squash, then flip the item.
+- branch: feat/task-adapter-selection-flags
+- open questions: Branch deliberately NOT rebased (push refused, no force-push): rebased tree preserved at backup/rebased-round1, byte-identical content. Force-push it or merge as-is?
