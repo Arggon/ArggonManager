@@ -13,7 +13,6 @@ claimed_at: "2026-10-02T23:58:06.586Z"
 depends_on: [task-adapter-selection-flags, task-capability-matrix]
 worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-goal-mode
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-zcode-adapter/task-zcode-goal-mode.md
   Leaves live only under a story. id is the filename stem: task-zcode-goal-mode.
@@ -312,3 +311,86 @@ Gates: `npm run build`, `npm test` (120 files, 2249 passed), `npm run lint`,
 evidence (expected vs observed, through the built `dist/cli.js`, `--json`) is in
 the PR #605 body. Spec/plan `status` stays `proposed` (S5's box also covers
 `task-zcode-automations`); this item stays `in_progress`.
+
+### 2026-10-03 @Arggon
+## @Arggon — round-1 response shipped (PR #605 updated to b369506c)
+
+**Impact class: Behavioral** (docs/agents.md §Changing the methodology itself; carriers
+`docs/agents.md` + `skills/arggon-cli/**`), with the ADR 0016 adopter-upgrade channel: the
+change ships in the generated seam + the CLI, the skill and its `.agents/` copy are byte-equal
+in this PR, and every doc statement it falsifies was updated here.
+
+### B1 — claim withdrawn, gate made authoritative
+
+`parseAcceptanceRows` is the board renderer's parser, not the kernel's; the gate's predicate is
+`acceptanceComplete`. `arggon goal` now asks `acceptanceComplete` whether work remains and
+publishes that verdict as `goal.gateUnchecked`; the row parser supplies text only, over
+LF-normalized prose; a disagreement renders an explicit "READ THE ITEM BODY FIRST" shape
+(`renderable: false`) instead of an invented goal. Unification is owned by
+`bug-three-acceptance-parsers-diverging` — named in the code and the docs, and the reason the
+parser is NOT moved into the kernel in this PR (that is that item's design decision; moving it
+here risks a fourth parser). Corrected in all five+ places it shipped (module header,
+`deriveGoal` docstring, test header, README, agents.md §ZCode, json-output.md, skill
+references, ZCode command doc, goal template, item Notes).
+
+Parity corpus in `cli/src/goal-mode.test.ts` pins `hasGoal === !acceptanceComplete` over CRLF,
+`-  [ ] x`, `- [ ]x`, `- [ ] x`, `*`, indentation, tabs, empty boxes and `X`.
+
+### B2 — unresolvable identity refuses
+
+`GOAL_IDENTITY_UNKNOWN` (new): without knowing who is asking, the lease invariant cannot be
+enforced, so nothing renders. Order is by most specific cause (closed item → identity → claim →
+checkout), so a closed item is never reported with an environment remedy. Both directions
+tested.
+
+### B3 — the checked-in `.zcode-marketplace/` was regenerated
+
+Through the real pipeline (`arggon init`, `--no-commit`): the two JSON descriptions plus the new
+`commands/arggon-goal.md` and `templates/goal-mode.md`, with refreshed checksums in
+`.convention.yml`. Every checked-in copy verified byte-identical to its template modulo the
+generated marker (19 tracked + 2 new). No CI gate covers this class, so it is stated in the PR
+body too. NOT actioned (human step): three agent copies + four `.opencode/**` copies stay
+`modified` from pre-existing checksum drift (recorded `sha256:bce74f…` vs on-disk
+`sha256:5b749f…` for `agents/arggon-worker.md`) — the sanctioned remedy is `arggon adopt --ack`.
+
+### B4 — stated (Behavioral + ADR 0016).
+
+### Non-blocking — all closed
+
+1 codes asserted for all eight refusals (incl. `GOAL_TEMPLATE_UNAVAILABLE` via a new
+`templatesDir` injection point and `GOAL_FAILED`); 2+3 the bounded prose read is tested both
+ways AND the clip's `clipped` flag now folds into `truncated`; 4 subdirectory invocations report
+the real `conventionVersion` (5, was 0); 5 the boundary text now names the no-worktree fallback
+(repo root, never a sibling's); 6 the soft cap is documented (measured block 1,974 B, ~9.3 KB
+headroom); 8 clip-before-fill ordering documented. 7 deferred on purpose — see B1.
+
+### Probe evidence (built `dist/cli.js`, `--json`, fresh temp tree per case)
+
+Expected → observed, full transcript in the PR body:
+- unchecked boxes → objective `first criterion`, verification both, `hasGoal/renderable/
+  gateUnchecked` all true;
+- nothing unchecked → `DEFINE THE GOAL FIRST`, and the gate then allows the flip (`ok: true`);
+- **CRLF item → gate refuses the flip (`UPDATE_FAILED`) while the goal says work remains with
+  readable text — they agree** (round 1 had them inverted);
+- foreign claim → `GOAL_FOREIGN_CLAIM` with `conventionVersion: 5`, from the root AND from
+  `sub/dir/`;
+- unresolvable identity → `GOAL_IDENTITY_UNKNOWN`; unclaimed → `GOAL_UNCLAIMED`; unknown id →
+  `GOAL_FAILED`;
+- 5000-char criterion → objective 238 B, lines ≤ 200 B, contract 5,046 B ≤ 12,288 B cap,
+  boundaries intact.
+
+Gates: `npm run build`; `npm test` 120 files / 2251 passed; `npm run lint` clean;
+`npm run arggon -- validate` ok (v5); `npm run check:plugin` byte-identical; CI's
+`lint:structure` + `test:structure` green; the verdict's own probe list
+(`goal-mode + init-zcode + done-gate + cascade`) → 4 files / 89 tests passed.
+
+### History: no force-push
+
+A rebase onto origin/main was prepared and verified (the item-file conflict resolved by keeping
+BOTH records — this verdict plus my evidence/handoff/round-1 response). Publishing it would need
+a force-push, which is refused; instead the published history is intact and the round-2 commits
+sit on top (fast-forward `505f8c3e..b369506c`), content-identical to the rebased tip for every
+file this PR owns. The linear rebase, if you prefer it, is yours to force-push.
+
+Item stays `in_progress`; spec/plan `status` stays `proposed` (S5 also covers
+`task-zcode-automations`).
