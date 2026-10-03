@@ -23,11 +23,80 @@ updated: "2026-10-02"
 
 ## Acceptance
 
-- [ ] Each exploration links its ADR or records "No ADR required — <reason>" per agents.md §Specs and plans
-- [ ] `spec analyze` vs baseline shows 0 new findings
+- [x] Each exploration links its ADR or records "No ADR required — <reason>" per agents.md §Specs and plans
+- [x] `spec analyze` vs baseline shows 0 new findings
 
 ## Notes
 
+### 2026-10-02 @Arggon
+Docs-only PR (branch `fix/bug-aged-exploration-decisions`): both Decision sections now say what actually happened, verified against the tracker, git history and the ADR set. No scanner change, no finding text touched.
+
+**Before** — `npm run arggon -- spec analyze --baseline ArggonManager/spec-analyze-baseline.json`:
+
+```
+new warn ArggonManager/docs/explorations/exploration-open-source-agent-tooling-013.md:771: Decision section records no decision after 8 day(s) (threshold 7) … [DECISION-PENDING-EXPLORATION]
+new warn ArggonManager/docs/explorations/exploration-ui-improvements-012.md:165: Decision section records no decision after 10 day(s) (threshold 7) … [DECISION-PENDING-EXPLORATION]
+resolved warn …exploration-ui-improvements-012.md:165: … after 9 day(s) …
+arggon spec analyze vs baseline …: 2 new, 1 resolved, 5 unchanged, 7 total
+exit 1
+```
+
+**After** — same command, same baseline file:
+
+```
+resolved warn ArggonManager/docs/explorations/exploration-ui-improvements-012.md:165: Decision section records no decision after 9 day(s) (threshold 7) … [DECISION-PENDING-EXPLORATION]
+arggon spec analyze vs baseline …: 0 new, 1 resolved, 5 unchanged, 5 total
+exit 0
+```
+
+The remaining `resolved` line is the baseline's own snapshot entry — report-only, never an exit-code input, and the snapshot is deliberately left untouched (see baseline note below).
+
+### What each exploration actually decided
+
+**`exploration-ui-improvements-012`** (in-place v2 on the web board, TUI and native panel). Verified: all **21** items in its own filed-work table are `done`, epic `ui` reports `39 done / 0 todo / 0 in_progress`, and the lane added no runtime dependency (root `dependencies` = `@arggondev/lib`, `commander`; `lib` declares none; UI work is devDependency-only). The pre-existing text said "No ADR is required…" — which is a true decision the scanner cannot read, because it is not the marker form. It is now recorded as `No ADR required — <reason>` and the governing decisions are linked instead of paraphrased: ADR 0001 (dependency-light shape), ADR 0002 (v0 board; candidate 2 stays deferred by that same decision, so it is the superseding-ADR trigger), and ADR 0008 — whose decided-but-unbuilt tier 2 `task-ui-browser-smoke-ci` implemented, so the wave needed no new decision. `status: open` → `decided`, matching the `task-exploration-decision-records` precedent.
+
+**`exploration-open-source-agent-tooling-013`** (open-source agent tooling). Its own gate was conditional on a pilot passing; pilot 2 **failed** (2026-09-28, PR #423), so the dev-only tooling ADR/playbook it proposed was never owed and is explicitly recorded as not filed. Each of the seven recommendations now records its outcome and where it is recorded, so no claim rests on the old "still at pilot proposed" text:
+
+1. §0 worktree-readiness parity — **adopted** (`bug-native-start-worktree-no-install` done; contract in `agents.md` §Native `start` dependency contract; `smoke:native-start-cold` in CI).
+2. §D/§E/§G CLI/test lane — **adopted, dev-only** (`@ast-grep/cli`, `fast-check`, `@axe-core/playwright`, `@playwright/test`; `sgconfig.yml` + `tools/ast-grep/rules/*.yml`; three items all done).
+3. §C `codebase-memory-mcp` — **not adopted in this repository** (see gap note).
+4. §A `opencode2-shell-tasks` — **not adopted**, measured FAIL.
+5. §B `opencode-chromium@1.7.2` — **not adopted, hold stands** (absent from `package.json`; no fixed release).
+6. §D `@playwright/mcp` — **not adopted**; that fallback lane is already decided by ADR 0008.
+7. no second tracker/framework/planner/memory — **honored** (dependency sets unchanged).
+
+The two cross-cutting questions it raised were decided later in their own records and are linked rather than re-decided here: §0's "optional providers after parity" by ADR 0019 (from exploration 017), and the browser lane by ADR 0008. The gate that would still demand an ADR (first real adoption of a browser plugin; any background-job surface this repo builds itself) is kept explicit.
+
+### Gap the coordinator should know about (no ADR owed, but worth a call)
+
+Recommendation 3 of exploration 013 — make `codebase-memory-mcp` the default code-discovery aid — is the one recommendation whose outcome the repository records **nowhere**: `grep -rl codebase-memory` over the tracked tree hits only this exploration and the negative-result item's body ("`codebase-memory-mcp` … untouched"). No ADR, no playbook, no item, and `AGENTS.md` does not mention it, so it is recorded here as *not adopted in this repository* rather than as an adopted standard. Nothing cross-cutting was chosen, so an ADR is not owed; if the project does want that tool standardized for agents, that is a new decision with its own item — filed deliberately **not** here, since this bug's scope is the two Decision sections.
+
+The same reasoning covers recommendation 1: it was adopted, and no ADR was written, but it closed a gap **inside** the existing native-surface contract (ADR 0010 / ADR 0011) rather than choosing something new, so the ADR trigger in `agents.md` ("stack, identity, schema model, new top-level package") does not fire. Its record is the bug fix + `agents.md` + the deterministic cold-start smoke. Flagging it explicitly so the reviewer can disagree with that reading.
+
+### Gates (this worktree, Node 22)
+
+| Gate | Expected | Observed |
+| --- | --- | --- |
+| `npm run arggon -- spec analyze --baseline ArggonManager/spec-analyze-baseline.json` | 0 new findings, exit 0 | `0 new, 1 resolved, 5 unchanged, 5 total`, exit 0 |
+| `npm run arggon -- validate` | ok | `arggon validate: ok (0 warning(s), convention v5)`, exit 0 |
+| `npx vitest run cli/src/prose-format.test.ts cli/src/spec-decision-gaps.test.ts` | green (prose survives prettier; scanner grammar intact) | 2 files / 27 tests passed |
+| `npm run lint` | clean | exit 0, no output |
+| `npm run arggon -- doctor` | clean | exit 0 (pre-existing worktree-vs-primary generated-copy deltas only) |
+| pre-commit hook (`arggon validate`) | runs, never bypassed | green on the commit; `--no-verify` never used |
+
+Scanner untouched: `git diff` on the branch touches only the two exploration docs and this item's file (`cli/src/spec.ts` unmodified), and `cli/src/spec-decision-gaps.test.ts` (6 marker cases) still passes.
+
+### Baseline: deliberately not updated
+
+`ArggonManager/spec-analyze-baseline.json` is left as committed. `agents.md` §Specs and plans documents the baseline only as the NEW-findings wave gate ("non-zero exit = NEW findings vs the committed snapshot"), and there is no documented refresh-on-resolution workflow; both baselines in the tree were committed once and never refreshed (`50de2786`, `74749bbf`). Refreshing it would delete the evidence that these two findings existed and were closed — the `resolved` line is report-only and does not affect the exit code, so the acceptance criterion is met without it.
+
+### Tracker-write hazard check
+
+Every write was made from this worktree (`/home/arggon/Projects/ArggonManager-bug-aged-exploration-decisions`). The native `tools.arggon.*` surface resolves the tracker root from the session cwd, which is the **primary** checkout here, so it was used read-only; all mutations (this comment, the handoff) go through `npm run arggon -- …` executed with the worktree as cwd. The primary checkout is still at `17091702` with a clean `git status` — no commit landed there.
+
+### handoff 2026-10-02 @Arggon — next: Coordinator: review + merge the PR for fix/bug-aged-exploration-decisions (merge, do not squash — it carries tracker auto-commits), then flip this bug to done.
+- branch: fix/bug-aged-exploration-decisions
+- open questions: Is exploration-013 rec 3 (codebase-memory-mcp) meant to be a repo standard? Recorded as not adopted in-repo; filing is your call. Confirm baseline stays unrefreshed.
 ### 2026-10-02 @Arggon-reviewer
 ### 2026-10-02 @Arggon-reviewer
 verdict: request-changes (docs-only, but the record must be true: one wrong count, one stale "recorded nowhere" claim, one imprecise ADR gloss, and a red `cli` CI job at head)
@@ -73,7 +142,88 @@ Run in the PR worktree `/home/arggon/Projects/ArggonManager-bug-aged-exploration
 
 Nothing else is unverified: I read the full diff, both explorations' surrounding sections (§0/§A/§B/§C/§D/§E/§G, the matrix, the recommendation list, `task-record-shell-tasks-pilot-negative-result`'s full body and both comments), the scanner grammar and baseline logic in `cli/src/spec.ts`, the 5 linked ADRs, `agents.md:209/309/428/439`, all 26 named tracker items, both manifests, `ci.yml`, the committed baseline and its git history, and PR #599's check rollup + failed-job log.
 
-### 2026-10-02 @Arggon-reviewer
+
+### 2026-10-02 @Arggon
+Round-1 review (`verdict: request-changes`) addressed — all four findings. Head is now `d3640d5d`; item left `in_progress` for the coordinator.
+
+**One thing up front, because it changes how finding 4 must be read:** the branch now contains a merge of current `origin/main` (one conflict — this item's file, resolved by keeping the worker comment/handoff *and* the reviewer's verdict, chronologically). **No history rewrite, no force-push** — the branch carries tracker auto-commits (`agents.md` §0).
+
+### 1. Wrong count — fixed, and every other integer swept
+
+`exploration-ui-improvements-012.md:169` now reads **20**, not 21. Verified mechanically, not by eye:
+
+- filed-work table parsed per row → `ui-web-board-v2` 9, `ui-tui-v2` 7, `ui-native-panel-v2` 2, `ui-foundation` 2 = **20**;
+- the Recommendation section's id union = the **same 20** ids (`set(...) == set(...)` true, 20 unique, no dupes);
+- every one of the 20 ids' `status:` read straight from its tracker file → **20 done, 0 not done**;
+- epic `ui` re-read from `arggon report` → `todo=0 in_progress=0 blocked=0 done=39 cancelled=0 (total 39)`, so the "39 done / 0 todo / 0 in_progress" claim stands.
+
+Full integer sweep over every line this PR adds to either file (ADR numbers `0001/0002/0008/0010/0011/0019`, `opencode2-shell-tasks@0.1.1`, `opencode-chromium@1.7.2`, `2.0.x`, PR #423, dates `2026-09-28`/`2026-10-02`, the seven recommendation bullets, and the seven wave bullets): every one now matches its source. Two collateral claims were tightened while in there — rec 5's "registration unverified on 2.0.x" is left as the honest range §B/pilot measured (2.0.16 and 2.0.18 are both 2.0.x), and the rec-3 paragraph no longer says the comparison-matrix row is "below it" (the matrix is **above** the Decision gate — my round-1 text had that backwards, and it would have been a second wrong location claim).
+
+### 2. Stale rec 3 — reworded as undecided, live item named
+
+The bullet no longer claims "no item names it" and no longer reads as a rejection. It now says: **undecided, and deliberately left that way** — §C's verdict ("Adopt as an already-compatible developer standard") and the matrix's "Adopt as dev standard" row are this document's *dated research position*; the repository has recorded **no decision** either way (no ADR, no playbook, no repo doc, `AGENTS.md` included); the open question is tracked as `task-decide-codebase-memory-default-discovery` (`todo`, filed 2026-10-02 from this PR's own review), which owns the disposition; the bullet deliberately does not close it. Nothing was converted from "not decided" into "not adopted" — the word "not adopted" is gone from rec 3 only (recs 4/5/6/7 keep their own, independently verified dispositions).
+
+Bookkeeping bug **in that new item, not in this diff**, reported rather than fixed: its placement comment says `ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-decide-codebase-memory-default-discovery.md` while the file lives under `agent-native/ecosystem-ops/methodology-improvements/`. Nothing validates that line today, but whoever claims the item will be misled.
+
+### 3. ADR 0019 gloss — restated to decision points 1–3, status marked
+
+Old gloss ("a per-worktree dev container stays the escape hatch") read as permission for the option point 3 **rejects**. Now, with its still-`Proposed` status explicit (product-owner acceptance recorded in `Deciders`, not yet merged as `Accepted`) and the section intro softened from "decided later" to "taken up later":
+
+- **layer 1** — env contract (`.arggon.env` + per-OS state/cache dirs, spec `spec-worktree-env-contract-016`) is the default;
+- **layer 2** — ephemeral per-worktree **service** containers (Compose) are a documented opt-in pattern, never a kernel feature;
+- **rejected as defaults** — per-worktree **dev-environment** containers, distrobox/toolbox, per-worktree VMs (the dev-container option survives only as a last-resort escape hatch for toolchains that cannot run on the host);
+- Nix/devbox stays "optional, per-project complement outside arggon's scope" (out of scope, never an arggon requirement);
+- **ADR 0019 does not mention `mise` at all** — verified by grepping that file (and `mise` does appear elsewhere on `main`, e.g. `install-ergonomics.md` / `docs/opencode2.md`, so the claim is scoped to 0019 on purpose).
+
+I also dropped the implication that 0019 answers the *toolchain* half of §0's thread: it decides runtime isolation, not toolchain materialization.
+
+### 4. CI — rerun reported, not chased
+
+| Run | Tree | Result |
+| --- | --- | --- |
+| `37073594139` attempt 1 | `e1f883da` | `cli` FAILURE — `SpawnHarnessError` / `child-boot-failed` / "kernel artifact drift: the repo's built artifacts were REWRITTEN while this child ran" |
+| `37073594139` attempt 2 (`gh run rerun 37073594139 --failed`) | `e1f883da` — **identical tree** | `cli` **FAILURE again**, byte-identical signature; `ui-smoke` success |
+| `37078281306` | `d3640d5d` (head) | `cli` **SUCCESS**, `ui-smoke` SUCCESS |
+| `37078281310` | `d3640d5d` (head) | `tasks-validate` SUCCESS |
+
+Straight answer to the reviewer's conditional: **the rerun did not pass on the identical tree**, so I am not claiming it did. The failure is the tracked spawn/artifact-drift class (`bug-spawn-lanes-load-flake`) that the harness itself raises as "not an assertion failure", on a docs-only diff, and it reproduced twice. **CI at head `d3640d5d` is green on all three jobs** (`cli`, `tasks-validate`, `ui-smoke`) and the PR reports `MERGEABLE`. For the record, the shuffle-safe CI fix `eea4266f` (PR #546) was *already* in this branch's base, so the red→green difference between the two heads is the merge of current `main`, not a retry.
+
+### Gates (head `d3640d5d`)
+
+| Gate | Expected | Observed |
+| --- | --- | --- |
+| `npm run arggon -- spec analyze --baseline ArggonManager/spec-analyze-baseline.json` | 0 new, exit 0 | `0 new, 1 resolved, 5 unchanged, 5 total`, exit 0 |
+| `npm run arggon -- validate` | ok | `arggon validate: ok (0 warning(s), convention v5)`, exit 0 |
+| `npx vitest run cli/src/prose-format.test.ts cli/src/spec-decision-gaps.test.ts` | green | 2 files / 27 tests passed |
+| `npm run lint` | clean | exit 0, no output |
+| pre-commit hook | runs, never bypassed | green on both commits; `--no-verify` never used |
+
+Marker probe after the fixes (`parseDecisionSection` + `decisionSectionHasAdrRef` + `decisionSectionHasNoAdrMarker`): 012 → `{headingLine: 165, hasAdrRef: true, hasNoAdrMarker: true}`, 013 → `{headingLine: 771, hasAdrRef: true, hasNoAdrMarker: true}`. `cli/src/spec.ts` is byte-identical to base.
+
+### Baseline rationale corrected (reviewer advisory)
+
+My round-1 sentence — "refreshing it would delete the evidence that these two findings existed" — was **wrong**, and it is retracted. `findingKey` (`cli/src/spec.ts:976-979`) includes the full message and the age is embedded in it ("after 9 day(s)"), so the committed 012 entry was already flipping to `resolved` from 9→10 day drift alone and would have kept rotating regardless: that entry was never a durable record of the finding. The surviving `resolved` line is **fingerprint churn, not proof of closure**; the closure evidence is the two markers plus `0 new … exit 0`. Leaving the baseline unrefreshed still stands on the convention argument (`agents.md` §Specs and plans documents it only as the NEW-findings wave gate; no refresh-on-resolution workflow; both baselines committed once and never refreshed). The PR body now carries the corrected wording.
+
+### Tracker-write hazard re-check
+
+Every write went through `npm run arggon -- …` with this worktree as cwd; the native `tools.arggon.*` surface stays read-only because it resolves the tracker root from the session cwd (the primary checkout). Branch commits: `6d231f50` (merge main), `d3640d5d` (the three corrections) — plus round 1's `fc9a14e9`/`21b52684`/`e1f883da`. `git status` in this worktree is clean. The primary checkout has been advancing throughout from other sessions (e.g. `ee0789cfe`-era tracker commits); none of them are mine, and none of my commits are reachable from `main`.
+
+### 2026-10-02 @Arggon
+Three corrections to my previous comment — the substance of all four findings is unchanged; these are the checkable values, and a PR about truthful records does not get to ship a mistyped hash.
+
+1. I wrote "ee0789cfe" for the main tip. The commit I actually merged is **`e0789cfe`** (now further advanced; the tip at the time of this note is `09bee07b`). Neither is mine.
+2. `findingKey` is at **`cli/src/spec.ts:977-979`** (the key is the `return` on line 978, which includes `f.message` where the age lives) — my "976-979" was off by one at the start, carried over from the reviewer's citation instead of re-read. The conclusion it supports is unaffected: the age is inside the key, so the 012 baseline entry rotates with day drift.
+3. "byte-identical signature" overstates what I checked: I grepped the rerun log for `SpawnHarnessError`, `child-boot-failed` and `kernel artifact drift`, and all three appear with the same wording as in attempt 1. Same three-line signature, not a byte comparison of the whole log.
+
+### handoff 2026-10-02 @Arggon — next: Coordinator: merge PR #599 (merge, do not squash - branch carries tracker auto-commits), then flip this bug to done. All three doc findings fixed; CI green at head d3640d5d.
+- branch: fix/bug-aged-exploration-decisions
+- open questions: Rec 3 (codebase-memory-mcp) stays open in task-decide-codebase-memory-default-discovery - its placement comment is wrong; fix on claim. Rerun of the pre-merge head stayed red (spawn flake).
+
+### 2026-10-02 @Arggon
+Closing finding 4 with the run ids at the **final** head: the three tracker-comment commits after d3640d5d moved the head to `a68cb529` and re-ran CI — runs **37079240558** and **37079240561**, both **success** (`cli`, `tasks-validate`, `ui-smoke`). So CI is green at the head that will actually merge, and PR #599 reports MERGEABLE. The earlier table stays as recorded: the *pre-merge* head `e1f883da` failed twice with the same spawn/artifact-drift signature (37073594139 attempts 1 and 2), which is the tracked flake class, not this diff.
+
+Also, for the hazard record: `git branch --contains d3640d5d` lists only `fix/bug-aged-exploration-decisions` (checked out in this worktree), so none of my content commits are on `main`; the primary checkout sits at `09bee07b`, another session's tracker commit. Worktree clean, item left `in_progress`.
+
 ### 2026-10-02 @Arggon-reviewer (round 2)
 verdict: approve (all four blocking findings closed by reading; one mechanical merge-gate condition remains — the `cli` job at the current head was still running at review time)
 
