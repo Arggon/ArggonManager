@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 import {
   LEGACY_TRACKER_DIR_NAME,
+  MAX_HUMAN_ERROR_CHARS,
   TRACKER_DIR_NAME,
   findTasksDir,
   freshWorktreeInstallRefusal,
@@ -705,26 +706,37 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
   });
 }
 
+/** The fixed lead-in of the readiness clause; entry text follows it. */
+const READINESS_LEAD = "Readiness: the gate binaries do not resolve inside the worktree — ";
+
+/** The overflow marker: how many bins the budget could not fit, never a silent drop. */
+function readinessOverflow(extra: number): string {
+  return extra > 0 ? `; and ${extra} more bin${extra === 1 ? "" : "s"} not resolving inside it.` : ".";
+}
+
+/** The bins whose resolution keeps the worktree off its own install. */
+function foreignGateBins(gateBins: GateBinResolution[]): GateBinResolution[] {
+  return gateBins.filter((bin) => bin.source !== "worktree");
+}
+
+/** One bin's evidence, verbatim per flavor (bug-start-worktree-npm-ci-claim). */
+function gateBinEntry(bin: GateBinResolution): string {
+  if (bin.source === "missing") return `${bin.name}: not resolvable from the worktree`;
+  if (bin.source === "path") {
+    return `${bin.name}: resolves only via PATH from ${bin.path} (outside the worktree)`;
+  }
+  return `${bin.name}: resolves from ${bin.path}, above the worktree`;
+}
+
 /**
- * How many gate binaries the human readiness report NAMES.
- *
- * Bounded like every other list this repo prints for a human (`MAX_GATE_BINS`
- * = 8 on the kernel side, `MAX_CLAIM_WRITE_NAMES` = 10 for stamped files,
- * `assertStartableTree`'s `.slice(0, 10)`), but SMALLER on purpose: this list
- * is not the message's tail. It sits between two actionable clauses —
- * `worktreeRemediation`'s exact `npm ci` fix, and the `To discard it instead`
- * hint the caller appends after it — and each entry carries an absolute path
- * (~330 chars in a deep checkout), so the full list (~2600 chars at the
- * MAX_GATE_BINS cap) pushed the discard hint clean off the head-kept
- * `MAX_HUMAN_ERROR_CHARS` window
- * (task-cli-start-remediation-tail-clipped-on-human-channel). Two, not one,
- * because at three the discard hint's tail was still cut: the guarantee this
- * cap buys is that every ACTIONABLE clause survives the clip WHOLE, not merely
- * that its first words do. The remainder is COUNTED, never silently dropped;
- * `--json` consumers read the same message text, which is why the marker names
- * the count.
+ * Whether the readiness observation has anything to report — the condition the
+ * exact `npm ci` fix hangs off (a fix with nothing to point at would be noise).
  */
-export const MAX_HUMAN_GATE_BIN_NAMES = 2;
+export function hasReadinessEvidence(
+  readiness: { hasInstall: boolean; gateBins: GateBinResolution[] } | undefined,
+): boolean {
+  return readiness !== undefined && (!readiness.hasInstall || foreignGateBins(readiness.gateBins).length > 0);
+}
 
 /**
  * Human sentence for a failure report, naming which node_modules the gate
@@ -735,49 +747,64 @@ export const MAX_HUMAN_GATE_BIN_NAMES = 2;
  * the invoking PATH — silently masking the broken worktree install. Null when
  * the observed resolution is unremarkable (every reported bin resolves from
  * the worktree, or nothing was probed and an install exists).
+ *
+ * The list is BUDGET-DRIVEN, not capped by a constant
+ * (task-cli-start-remediation-tail-clipped-on-human-channel): `budget` is what
+ * the caller measured as left over after reserving every mandatory clause
+ * (kept-worktree note, generic fix, exact fix, attach re-run, discard hint,
+ * raw detail) against `MAX_HUMAN_ERROR_CHARS`, so the fill takes as many names
+ * as ACTUALLY fit and counts the rest. A fixed cap is the wrong trade twice
+ * over: on deep-sibling-path entries it is generous enough to let the discard
+ * hint get cut, and in an ordinary checkout it silently hides names that would
+ * have fitted (measured: 6 of 8 at ~124 chars an entry, 2 of 8 at the ~330-char
+ * pathological shape). One name is always included when there is evidence —
+ * the whole point of the sentence is to name a bin — and the budget can never
+ * reach a mandatory clause, because they are reserved first and never measured
+ * against it.
  */
-function gateBinFailureReport(input: {
-  hasInstall: boolean;
-  gateBins: GateBinResolution[];
-}): string | null {
-  const broken = input.gateBins.filter((bin) => bin.source !== "worktree");
+export function gateBinFailureReport(
+  input: { hasInstall: boolean; gateBins: GateBinResolution[] },
+  budget: number,
+): string | null {
+  const broken = foreignGateBins(input.gateBins);
   if (broken.length === 0) {
     return input.hasInstall
       ? null
       : "Readiness: the worktree has no node_modules of its own (nothing resolved, so no gate binary could be probed).";
   }
-  const shown = broken.slice(0, MAX_HUMAN_GATE_BIN_NAMES);
+  // Reserve the marker for the FULL overflow first, so the count is never the
+  // thing that pushes the clause past the budget.
+  const marker = readinessOverflow(broken.length);
+  let used = READINESS_LEAD.length + marker.length;
+  const shown: string[] = [];
+  for (const bin of broken) {
+    const entry = gateBinEntry(bin);
+    // At least one name, whatever the budget: an evidence sentence that names
+    // nothing answers no question.
+    if (shown.length > 0 && used + entry.length > budget) break;
+    shown.push(entry);
+    used += entry.length + (shown.length > 1 ? "; ".length : 0);
+  }
   const extra = broken.length - shown.length;
-  const named = shown
-    .map((bin) => {
-      if (bin.source === "missing") return `${bin.name}: not resolvable from the worktree`;
-      if (bin.source === "path") {
-        return `${bin.name}: resolves only via PATH from ${bin.path} (outside the worktree)`;
-      }
-      return `${bin.name}: resolves from ${bin.path}, above the worktree`;
-    })
-    .join("; ");
-  const more =
-    extra > 0 ? `; and ${extra} more bin${extra === 1 ? "" : "s"} not resolving inside it` : "";
-  return `Readiness: the gate binaries do not resolve inside the worktree — ${named}${more}.`;
+  return `${READINESS_LEAD}${shown.join("; ")}${readinessOverflow(extra)}`;
 }
 
 /**
  * Step-specific remediation for a failure that kept the worktree. Returns the
- * complete "what to do next" sentence for the step: most steps are fixed and
- * retried by the attach re-run, but a failed push is NOT retried by attach
- * (attach only lands a pending claim commit — review F3), so the branch must be
- * pushed manually there.
+ * complete "what to do next" sentences for the step — REMEDY ONLY, never the
+ * evidence: the readiness list is appended by `worktreeFailureMessage`, which
+ * is the only place that knows how much room is left after every mandatory
+ * clause. Most steps are fixed and retried by the attach re-run, but a failed
+ * push is NOT retried by attach (attach only lands a pending claim commit —
+ * review F3), so the branch must be pushed manually there.
  *
  * ORDERING is load-bearing (task-cli-start-remediation-tail-clipped-on-human-channel):
- * the `committing the claim` branch's EXACT fix leads and the readiness evidence
- * trails, for the same head-kept `MAX_HUMAN_ERROR_CHARS` contract every other
- * remedy on this channel keeps. It used to append the exact fix after the
- * readiness bin list, so at the reachable worst case (the full
- * `MAX_GATE_BINS` report, long absolute paths) the clip ate the only clause
- * that named the command to run. This branch is the MOST COMMON start failure
- * — the one that actually creates the worktree — so it is the worst place to
- * leave the class open.
+ * the `committing the claim` branch's EXACT fix leads, for the same head-kept
+ * `MAX_HUMAN_ERROR_CHARS` contract every other remedy on this channel keeps. It
+ * used to append the exact fix AFTER the readiness bin list, so at the
+ * reachable worst case the clip ate the only clause that named the command to
+ * run. This branch is the MOST COMMON start failure — the one that actually
+ * creates the worktree — so it is the worst place to leave the class open.
  */
 function worktreeRemediation(input: {
   step: string;
@@ -788,19 +815,14 @@ function worktreeRemediation(input: {
 }): string {
   const attach = `re-run \`arggon start ${input.id} --worktree\` — it attaches to the existing worktree`;
   if (input.step.startsWith("committing the claim")) {
-    const observed =
-      input.readiness === undefined ? "" : (gateBinFailureReport(input.readiness) ?? "");
-    const installFix =
-      input.readiness !== undefined && observed !== ""
-        ? ` Exact fix for the observed resolution: run \`npm ci\` in ${input.worktreePath ?? "the worktree"}, then ${attach}.`
-        : "";
+    const installFix = hasReadinessEvidence(input.readiness)
+      ? ` Exact fix for the observed resolution: run \`npm ci\` in ${input.worktreePath ?? "the worktree"}, then ${attach}.`
+      : "";
     return (
       "The pre-commit gate (or the git commit itself) failed inside the worktree — fix the " +
       "reported cause there (install dependencies, or link the primary checkout's node_modules: " +
       "`ln -s <primary>/node_modules <worktree>/node_modules`; start does this itself when the " +
-      // Both remedy clauses, then the evidence: the exact fix used to trail the
-      // readiness list and the 2000-char head-clip ate it whole.
-      `primary has one), then ${attach}.${installFix}${observed === "" ? "" : ` ${observed}`}`
+      `primary has one), then ${attach}.${installFix}`
     );
   }
   if (input.step.startsWith("pushing")) {
@@ -847,6 +869,33 @@ export function startTakeoverNotes(claim: WorktreeClaimReceipt | undefined): str
   return notes;
 }
 
+/** The readiness observation a worktree failure reports, in full (never bounded). */
+export type StartFailureReadiness = {
+  hasInstall: boolean;
+  gateBins: GateBinResolution[];
+};
+
+/**
+ * Non-enumerable carrier for the readiness observation on the composed failure.
+ *
+ * The human message bounds the bin NAMES to what fits the clip
+ * (task-cli-start-remediation-tail-clipped-on-human-channel), which would
+ * otherwise leave them reachable from nowhere on the failure path: `gateBins`
+ * rides the SUCCESS envelope only, so a failure's `error.message` was the only
+ * place they existed. The `missingDependencies` / `missingDependenciesTotal`
+ * precedent is cap + count + an array a machine can still enumerate — so the
+ * array rides along here and the `--json` failure envelope forwards it. Hidden
+ * by `defineProperty` so it never appears in a serialized error either.
+ */
+const READINESS = Symbol("arggon.start.readiness");
+
+/** The readiness evidence a start failure carries, or undefined when it has none. */
+export function startFailureReadiness(err: unknown): StartFailureReadiness | undefined {
+  return err !== null && typeof err === "object" && READINESS in err
+    ? (err as { [READINESS]?: StartFailureReadiness })[READINESS]
+    : undefined;
+}
+
 /**
  * Failure report for a start that already created (or attached) the worktree.
  * The worktree is NEVER rolled back (bug-start-worktree-node-modules): the
@@ -865,6 +914,13 @@ export function startTakeoverNotes(claim: WorktreeClaimReceipt | undefined): str
  * themselves keep (`strictGateBinFailure`, #597) and the native seam composes
  * (#579/#595): remedies lead, evidence trails, on both channels. Only the clause
  * ORDER moved — every clause is verbatim, none added or dropped.
+ *
+ * The one clause that is BOUNDED is the readiness evidence, and it is bounded by
+ * budget rather than by a constant: everything above is reserved first, and
+ * `gateBinFailureReport` then takes as many bin names as actually fit, counting
+ * the rest (`task-cli-start-remediation-tail-clipped-on-human-channel`). The full
+ * uncapped observation is still enumerable from a machine surface — see
+ * {@link startFailureReadiness}.
  */
 export function worktreeFailureMessage(input: {
   id: string;
@@ -879,19 +935,43 @@ export function worktreeFailureMessage(input: {
   const discard = input.createBranch
     ? `git worktree remove --force ${input.worktreePath} && git branch -D ${input.branch}`
     : `git worktree remove --force ${input.worktreePath}`;
-  return (
+  const lead =
     `start failed while ${input.step}; the worktree was kept at ${input.worktreePath} ` +
-    `(nothing was rolled back).\n` +
-    `${worktreeRemediation({
-      step: input.step,
-      id: input.id,
-      branch: input.branch,
-      worktreePath: input.worktreePath,
-      readiness: input.readiness,
-    })} ` +
-    `To discard it instead: \`${discard}\`.\n` +
-    `${detail}`
-  );
+    `(nothing was rolled back).`;
+  const discardClause = `To discard it instead: \`${discard}\`.`;
+  const remedy = worktreeRemediation({
+    step: input.step,
+    id: input.id,
+    branch: input.branch,
+    worktreePath: input.worktreePath,
+    readiness: input.readiness,
+  });
+  // Reserve EVERY mandatory clause first — the step, the kept path, the generic
+  // fix, the exact fix, the attach re-run, the discard hint and the raw detail —
+  // and hand only what is left to the readiness evidence. They are never
+  // measured against the budget, which is what keeps the invariant ("every
+  // actionable clause survives WHOLE") true at any bin-list length. The leading
+  // space between remedy and evidence is reserved too, so the clause can never
+  // push the following discard clause over the line.
+  const mandatory =
+    lead.length +
+    1 +
+    remedy.length +
+    1 +
+    discardClause.length +
+    1 +
+    detail.length +
+    1;
+  const readiness =
+    input.readiness === undefined
+      ? ""
+      : (gateBinFailureReport(input.readiness, MAX_HUMAN_ERROR_CHARS - mandatory) ?? "");
+  return [
+    lead,
+    `${remedy}${readiness === "" ? "" : ` ${readiness}`}`,
+    discardClause,
+    detail,
+  ].join("\n");
 }
 
 type WorktreeStartInput = {
@@ -1236,19 +1316,16 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     // The readiness snapshot is a FRESH read of the failed state, so the
     // report names the resolution the gate actually saw
     // (bug-start-worktree-npm-ci-claim).
-    throw new Error(
-      worktreeFailureMessage({
-        id,
-        branch: name,
-        worktreePath,
-        createBranch,
-        step,
-        err,
-        readiness: {
-          hasInstall: existsSync(join(worktreePath, "node_modules")),
-          gateBins: inspectGateBinResolution(worktreePath, root),
-        },
-      }),
+    const readiness: StartFailureReadiness = {
+      hasInstall: existsSync(join(worktreePath, "node_modules")),
+      gateBins: inspectGateBinResolution(worktreePath, root),
+    };
+    const failure = new Error(
+      worktreeFailureMessage({ id, branch: name, worktreePath, createBranch, step, err, readiness }),
     );
+    // Carried, not embedded: the message bounds the names, this keeps them
+    // enumerable for a machine consumer of the failure envelope.
+    Object.defineProperty(failure, READINESS, { value: readiness, enumerable: false });
+    throw failure;
   }
 }
