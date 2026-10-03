@@ -143,3 +143,7 @@ Both halves are here:
 
 The doc conflict on rebase was resolved as a UNION (their tables plus all three
 doc additions), not by picking a side.
+
+### handoff 2026-10-03 @Arggon — next: Review + merge PR #617; then decide on the reported CLI-side mirror and the kernel refusal-prose finding
+- branch: fix/bug-native-steps-truncated-flag-dropped
+- open questions: note: this item's first comment+handoff was recorded from the primary checkout and landed on local main (cd9e85d0); this one rides the item branch; CLI mirror follow-up (cli/src/start.ts, cli/src/cli…
