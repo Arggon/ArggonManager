@@ -10,6 +10,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runList, toContractWorkItem, type ContractWorkItem as WorkItem } from "@arggondev/lib";
+// Ordering assertions go through assertOrder, never a bare `indexOf`
+// comparison: `-1 < n` makes a renamed clause pass as if it were still
+// ordered (bug-vacuous-substring-ordering-assertions).
+import { assertOrder } from "../../test/assert-order.js";
 
 import { renderBoardHtml } from "./board.js";
 
@@ -1176,7 +1180,7 @@ describe("runTuiBoard sort + lens keys (task-tui-sort-ready-lens)", () => {
     const frames = text.split("\x1b[H\x1b[2J");
     const last = frames[frames.length - 1] ?? "";
     expect(last).toContain("> T task-p0 p0");
-    expect(last.indexOf("task-p0")).toBeLessThan(last.indexOf("task-rate-limit"));
+    assertOrder(last, "task-p0", "task-rate-limit");
     expect(last).not.toContain("bug-login-500");
     expect(last).not.toContain("epic-a");
     expect(last).not.toContain("story-login");

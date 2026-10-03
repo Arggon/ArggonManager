@@ -12,6 +12,10 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 import { findOpenCodeConfig, generatedYamlMarker, stampGeneratedContent } from "./docs.js";
+// Ordering assertions go through assertOrder, never a bare `indexOf`
+// comparison: `-1 < n` makes a renamed clause pass as if it were still
+// ordered (bug-vacuous-substring-ordering-assertions).
+import { assertOrder } from "../../test/assert-order.js";
 import { runInit } from "./init.js";
 import { readConventionConfig } from "@arggondev/lib";
 import { runCli as runCliBase } from "./test-spawn.js";
@@ -293,8 +297,10 @@ describe("opencode seam: fresh init", () => {
     expect(coordinator).not.toMatch(/arggon start <id>/);
     // ORDERING: the claim duty precedes the worker-launch duty, so a
     // coordinator that reads the duties top-down claims first.
-    expect(coordinator.indexOf("**Claim before dispatch.**")).toBeLessThan(
-      coordinator.indexOf("**One worker per item, one worktree per worker.**"),
+    assertOrder(
+      coordinator,
+      "**Claim before dispatch.**",
+      "**One worker per item, one worktree per worker.**",
     );
     // The worktree path in the launch prompt is the item's RECORDED path.
     expect(coordinator).toContain("worktree_path` on the item");

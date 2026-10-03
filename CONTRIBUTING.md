@@ -106,6 +106,17 @@ What the guard does and does not claim:
   Deliberate, computed, or destructured indirection is outside structural scope
   and is not claimed to be covered; plugin schema/parity tests remain
   authoritative for those shapes.
+- **The ordering rule is scoped to test files** (`**/*.test.ts(x)`,
+  `**/*.spec.ts(x)`): a positional comparison of an `indexOf` result inside
+  `expect(...)` is rejected, because `indexOf` answers `-1` for an absent
+  substring and `-1` sorts before every real index, so the assertion would pass
+  on a clause that is not in the message at all. Use `assertOrder` from
+  `test/assert-order.ts`, which requires each clause to be present before it
+  compares positions. A numeric literal on the right is exempt only where the
+  comparison genuinely fails on `-1` (`toBeGreaterThan(n >= -1)`,
+  `toBeGreaterThanOrEqual(n >= 0)`). `indexOf` used as a **parser** asserts
+  nothing and is untouched, and an index carried in an intermediate variable is
+  outside structural reach.
 
 These rules are not comprehensive semantic enforcement. Rule scope, the exact
 structural limitations, production exceptions, content/path decisions, and

@@ -33,6 +33,10 @@ import {
   type BoardSummary,
 } from "./board.js";
 import type { BoardDetailPayload, BoardGithub, PrInfo } from "./board.js";
+// Ordering assertions go through assertOrder, never a bare `indexOf`
+// comparison: `-1 < n` makes a renamed clause pass as if it were still
+// ordered (bug-vacuous-substring-ordering-assertions).
+import { assertOrder } from "../../test/assert-order.js";
 import {
   findTasksDir,
   loadItems,
@@ -159,7 +163,7 @@ describe("renderBoardHtml", () => {
       ],
       { generatedAt: GENERATED_AT },
     );
-    expect(html.indexOf("task-a")).toBeLessThan(html.indexOf("task-b"));
+    assertOrder(html, "task-a", "task-b");
   });
 
   it("renders a branch badge when set and none otherwise", () => {
@@ -1583,10 +1587,11 @@ describe("renderBoardHtml --group-by story (task-board-dependency-visuals)", () 
     // story-a 0/2 (two todo cards), story-b 1/2 (done task-z counts, done card + todo).
     expect(html).toContain('⚑ story-a <span class="completion">0/2</span>');
     expect(html).toContain('⚑ story-b <span class="completion">1/2</span>');
-    expect(html.indexOf("⚑ story-a")).toBeLessThan(html.indexOf("⚑ story-b"));
     expect(html).toContain('<div class="mgroup-head none">no story</div>');
-    // "no story" renders last within its column.
-    expect(html.indexOf("no story")).toBeGreaterThan(html.indexOf("⚑ story-b"));
+    // Both story heads first, "no story" last within its column — one ordered
+    // chain, with every clause pinned PRESENT by assertOrder (the two bare
+    // `indexOf` comparisons it replaces passed vacuously on an absent needle).
+    assertOrder(html, "⚑ story-a", "⚑ story-b", "no story");
     // task-c's card sits under the no-story header; task-d is in done.
     expect(html).toContain('data-id="task-c"');
   });

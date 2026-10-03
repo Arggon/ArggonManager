@@ -53,6 +53,10 @@ import {
 } from "@arggondev/lib";
 import { runInit } from "../../../cli/src/init.js";
 import { tickAcceptance, tickAllAcceptance } from "../../../test/acceptance.js";
+// Ordering assertions go through assertOrder, never a bare `indexOf`
+// comparison: `-1 < n` makes a renamed clause pass as if it were still
+// ordered (bug-vacuous-substring-ordering-assertions).
+import { assertOrder } from "../../../test/assert-order.js";
 import {
   ARGON_TOOL_NAMESPACE,
   ARGON_TOOL_NAMESPACE_DESCRIPTION,
@@ -2051,11 +2055,13 @@ describe("worktree domain tools (W4)", () => {
     expect(message).toContain("The worktree was kept at");
     expect(message).toContain("npm ci");
     expect(message).toContain("Preparation ran:");
-    const firstNamedIndex = message.indexOf(firstEntry);
-    expect(firstNamedIndex).toBeGreaterThan(-1);
-    expect(message.indexOf("The worktree was kept at")).toBeLessThan(firstNamedIndex);
-    expect(message.indexOf("npm ci")).toBeLessThan(firstNamedIndex);
-    expect(message.indexOf("Preparation ran:")).toBeLessThan(firstNamedIndex);
+    // Each clause must lead the first named bin AND be present: the three bare
+    // `indexOf` comparisons this replaces compared -1 when a clause stopped
+    // matching, which passes against any positive index
+    // (bug-vacuous-substring-ordering-assertions).
+    assertOrder(message, "The worktree was kept at", firstEntry);
+    assertOrder(message, "npm ci", firstEntry);
+    assertOrder(message, "Preparation ran:", firstEntry);
     // Negative control: the message is pinned at the cap and the LAST named
     // entry is gone — the test cannot pass on a merely longer message.
     expect(message.length).toBe(2048);
@@ -2239,17 +2245,13 @@ describe("worktree domain tools (W4)", () => {
     // the named bins (the evidence the clip starts eating last).
     expect(message).toContain("The worktree was kept at");
     expect(message).toContain("it attaches to the existing worktree and retries the claim commit");
-    const firstNamedIndex = message.indexOf(firstEntry);
-    expect(firstNamedIndex).toBeGreaterThan(-1);
-    expect(message.indexOf("it attaches to the existing worktree and retries the claim commit")).toBeLessThan(
-      firstNamedIndex,
-    );
+    assertOrder(message, "it attaches to the existing worktree and retries the claim commit", firstEntry);
     // The kernel refusal's OWN remedy must survive too
     // (task-strictgatebinfailure-tail-clipped-by-head-clip): it used to trail
     // the named list, so at this worst case the head-clip ate the only fix and
     // left the diagnosis alone. It now leads, inside the kept head window.
     expect(message).toContain("npm ci");
-    expect(message.indexOf("npm ci")).toBeLessThan(firstNamedIndex);
+    assertOrder(message, "npm ci", firstEntry);
     // Negative control: pinned at the cap, last named entry gone.
     expect(message.length).toBe(2048);
     expect(message).not.toContain(sorted[sorted.length - 1]);
@@ -2514,14 +2516,14 @@ describe("worktree domain tools (W4)", () => {
     expect(message).toContain("10 tracked files were modified after that claim");
     // ORDER is the pinned contract, not the prose: every actionable clause
     // precedes the named-file list, which is the only thing allowed to clip.
-    const firstFile = message.indexOf(paths[0]);
-    expect(firstFile).toBeGreaterThan(-1);
     for (const clause of [
       "takeOverWorktree: true",
       "arggon-claim.json",
       "A plain re-run cannot clear this",
     ]) {
-      expect(message.indexOf(clause)).toBeLessThan(firstFile);
+      // Every clause is REQUIRED here: a silently-renamed clause used to
+      // answer -1 and pass as "ordered before the list".
+      assertOrder(message, clause, paths[0]);
     }
     // The clip really did bite (otherwise this test would pass vacuously on a
     // message that simply got longer).
