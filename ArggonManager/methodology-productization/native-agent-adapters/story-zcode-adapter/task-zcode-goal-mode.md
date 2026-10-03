@@ -398,3 +398,74 @@ Item stays `in_progress`; spec/plan `status` stays `proposed` (S5 also covers
 ### handoff 2026-10-03 @Arggon — next: re-review PR #605 at b369506c: B1/B2/B3/B4 + all non-blocking addressed; probe evidence in the body
 - branch: feat/task-zcode-goal-mode
 - open questions: want the linear rebase (force-push, yours)?; three agent copies need adopt --ack (human step); parser unification left to bug-three-acceptance-parsers-diverging
+
+### 2026-10-03 @Arggon
+## @Arggon — round-2 finding fixed: the gate verdict now reads the canonical body (PR #605 @ 5c367a10)
+
+One blocking finding survived, and it was the input, not the predicate:
+
+```
+lib/src/update.ts:526    !acceptanceComplete(item.body)      // done gate
+cli/src/goal-mode.ts     !acceptanceComplete(shown.prose)    // goal  <-- comment sections stripped
+```
+
+`shown.prose` drops comment sections, and a checklist filed as an `arggon comment` is a
+first-class shape here (`create` has no `--body` flag; `bug-empty-template-checkbox` is the stale
+empty box that shape leaves behind). Per the reviewer's measurement (21 of 280 commented items
+disagree), a goal could say "nothing left to do" on an item the gate still refused to close.
+
+**Fix:** both the verdict and the criterion text now read `item.body` — the same canonical input
+`update.ts:526` reads. The invariant is stated where a future reader hits it ("one canonical
+body, every predicate — a reader that trims or filters before calling has changed the question"):
+module header, `deriveGoal` doc, the `gateUnchecked` field doc, and an inline comment at the call
+site naming `update.ts:526` plus the comment-filed shape.
+
+**Tests (three added, and the corpus helper's contract made explicit):**
+1. corpus case — the ONLY boxes live in a comment section (`gateUnchecked: true`, objective read
+   from the comment);
+2. its twin — checked-in-a-comment only ⇒ gate satisfied, "DEFINE THE GOAL FIRST";
+3. a regression test that pins the defect itself: a comment-stripped input still yields
+   `hasGoal: false` while `acceptanceComplete(full body)` is false — i.e. the round-2 build's
+   inversion, asserted rather than described;
+4. end-to-end: a real `arggon comment` is appended and gate/goal agreement is asserted.
+
+`deriveAsRun` was passing the full body by construction — that is exactly why the corpus never
+saw this; its doc comment now says so. Verified the e2e test bites: with the two reverted lines,
+1 failed / 40 passed; with the fix, 41 passed.
+
+### Probe (built `dist/cli.js`, `--json`) — before/after on the same fixture
+
+```
+before (round-2 build):  gate {'ok': False, 'error': 'UPDATE_FAILED'}
+                         goal {"objective": "DEFINE THE GOAL FIRST: …", "hasGoal": false,
+                               "gateUnchecked": false, "checklist": {"total": 0, …}}
+after:                  gate {'ok': False, 'error': 'UPDATE_FAILED'}
+                         goal {"objective": "criterion filed in a comment", "hasGoal": true,
+                               "renderable": true, "gateUnchecked": true,
+                               "checklist": {"total": 1, "unchecked": 1, "checked": 0}}
+```
+
+### PR body corrected
+
+The stamp drift is **15** mismatches, not the 7 I first reported — main already carries the same
+15; this PR adds two `x-generated` entries (`.zcode-marketplace/arggon/commands/arggon-goal.md`,
+`.zcode-marketplace/arggon/templates/goal-mode.md`) plus refreshed checksums for the two JSON
+destinations, and all four match their committed bytes byte-for-byte. The three agent copies I
+cited first are inside that pre-existing 15 (recorded `bce74f…` vs on-disk `5b749f…` for
+`arggon-worker.md`, stamps predating the hand-synced #589 change). Nothing introduced, nothing
+worsened; CI excludes `.convention.yml` by design, so the drift is ungated — stated, not fixed.
+The re-baseline (`arggon adopt --ack`) is a human step and was not run.
+
+### Merge
+
+Acting on the reviewer's ruling: **squash-merge**, no force-push needed and none attempted (the
+push was a fast-forward `61e80edb..5c367a10`). The conflicting state is confined to the item
+file and both sides are additive. The coordinator performs the squash and the flip.
+
+### Gates (build BEFORE test, per the pack-parity gate)
+
+`npm run build` → ok; `npm test` → 120 files, 2255 passed; `npm run lint` → clean;
+`npm run arggon -- validate` → ok (0 warnings, convention v5); `npm run check:plugin` →
+byte-identical. Parser unification deliberately untouched (`bug-three-acceptance-parsers-diverging`).
+
+Item stays `in_progress`; spec/plan `status` stays `proposed`.
