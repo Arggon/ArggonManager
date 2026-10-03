@@ -49,3 +49,7 @@ Acceptance:
 - [ ] Sweep the repo for the `indexOf(...).toBeLessThan(...)` idiom (and substring-presence assertions generally) where either side can be absent; add a guard that fails when the searched substring is missing rather than comparing -1
 - [ ] A shared helper is preferable to a per-test fix — e.g. an `assertOrder(msg, ...substrings)` that throws when any substring is absent, so the next rewrite cannot silently disarm the check
 - [ ] Include the case where the searched text is intentionally optional: the helper needs an explicit "may be absent" form, or those assertions must state which
+
+### handoff 2026-10-03 @ses_efea0882affep33K99Q6hjIX8P (session: ses_efea0882affep33K99Q6hjIX8P) — next: Review + merge the PR, then reopen the clip-order work to route new ordering assertions through assertOrder
+- branch: main
+- open questions: PR #608 (unmerged) has 4 ordering sites with inline presence checks — should its worker swap them for assertOrder after this merges?
