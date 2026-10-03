@@ -61,3 +61,24 @@ Acceptance:
 - [ ] If they legitimately differ, the parity test must permit that specific difference EXPLICITLY (a named exception), not by a general carve-out, and `docs/ci.md` §Where the rule of record lives must state the difference
 - [ ] `docs/ci.md` continues to point here for this fact (the false "neither copy can rot silently" claim was replaced by this fact)
 - [ ] Depends on PR #607 landing
+
+### 2026-10-03 @Arggon
+Coordinator record at merge for `bug-ci-seam-pin-shell-vs-test-copy-divergence`, 2026-10-03, after `verdict: approve` with no blocking findings.
+
+**The finding underneath the decision, which the reviewer found rather than the worker.** The pre-existing verdict table on `main` was **self-contradictory**: its #527 row documented `pin V · pkg V · stamps V+1 → RED`, but the predicate it described returns *green* when `pin == pkg`, and the unit test asserted a **different input** (`pkg = V+1`) from the row it claimed to document. So the documented rule of record disagreed with its own implementation, and the extra conjunct was papering over that gap. The PR splits the row correctly. That doc repair is the most valuable change here and it was made quietly rather than claimed — the worker reported "it bought nothing", which was true but undersold why.
+
+**Reachability was verified, not assumed.** `arggonVersion()` (`cli/src/docs.ts:580`) reads `packageRoot()`, which resolves to the **running CLI's own root** (`cli/src/package-assets.ts:14`) — not the target repo. Stamps therefore record the executing binary's version while the test's `pkgVersion` is the branch's `package.json`. Two different files, so the disagreement cell is reachable in reality.
+
+**Two evidence corrections from the reviewer, both recorded here rather than quietly dropped:**
+1. Mutation (a) ran an **8-row** corpus (the empty-stamps row was omitted because the pre-fix `reduce` throws on `[]`), so the result was **7 of 8**, not "8 of 9" as the PR body said. The substantive claim — exactly one input disagrees — is unaffected, but the number was wrong and imprecise evidence lines are the exact habit this item exists to remove.
+2. `vitest.config.ts` sets a suite-wide 30 s `testTimeout` and `prose-format.test.ts` costs ~42 s alone — zero headroom, which is now the filed `bug-prose-format-codespan-test-times-out-under-full-suite`. The reviewer's "main is also affected" claim is independently corroborated by a different worker hitting the same lane on PR #620, and the 0.4 % framing was judged fair.
+
+**Precedent set on acceptance boxes — worth naming because it will recur.** Box 2's requirement ("if they legitimately differ, permit that difference as a named exception") is **vacuously satisfied**: they no longer differ, so no exception is needed. The worker ticked it and recorded why, rather than rewriting the acceptance text so the box would self-satisfy — leaving it `[ ]` would assert "unmet", which is false. **Vacuous satisfaction counts as met, and the honesty requirement is that the reason is recorded.** If this recurs in another item, this belongs in `docs/convention.md` as a rule rather than being re-litigated each time.
+
+**Round-1's five acceptance boxes are NOT ticked, deliberately.** That work was delivered by merged PR #607, not by this PR. Ticking them here would credit this branch with someone else's implementation. The done gate will refuse until they are ticked or waived with a recorded reason; the coordinator owns that decision.
+
+**Two non-blocking notes carried forward:**
+- The disagreement cell's documented remedy is "bump the pin", which is suboptimal for a feature branch in-repo but is correct for adopters. It is a pre-existing property of the unchanged shell clause, and belongs in the drift-gate's ceiling section — **not** in this decision. Do not widen this item to fix it.
+- The reviewer disclosed that its own `tools.arggon.show` resolved the tracker from its process cwd — the **primary** checkout — so its first read showed `main`'s pre-merge copy with all boxes unticked, and it re-read from the worktree to confirm. Anyone reviewing this wave must route reads through the worktree or they will review stale tracker state.
+
+**Merge safety**: both workflow copies hash-match `main`, so this change is monotone — it can only make the `cli` job red where `tasks-validate` already fails.
