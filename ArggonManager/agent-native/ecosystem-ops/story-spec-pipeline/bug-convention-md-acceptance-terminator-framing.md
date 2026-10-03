@@ -137,3 +137,7 @@ I rebased onto `origin/main` as instructed, then found the branch was **already 
 - Diff vs `origin/main` is unchanged: 2 files, +52/−9. Pushed fast-forward `78d22366..8567d450`; no force.
 
 open questions for the coordinator: (1) F3 wording — apply the suggested replacement, or file it as a follow-up under `story-spec-pipeline` (the gap it describes is a real coverage hole in `cli/src/board.ts`'s detail payload and belongs to a test item, not to this doc PR)? (2) The F3 finding is arguably a new bug (a shipped call site could regress to clipped prose with every suite green) — should that be `arggon create bug` rather than a comment here?
+
+### handoff 2026-10-03 @Arggon — next: Re-review #613 round 2: impact class Advisory stated on both required surfaces, F2 gates claim corrected with prose-format 3/3 + full suite 2555 green, F4/F5 fixed; then merge
+- branch: fix/bug-convention-md-acceptance-terminator-framing
+- open questions: F3: apply the 'per-call-site duty' wording, or file the cli/src/board.ts detailPayload clipped-prose coverage hole as a bug under story-spec-pipeline? Branch merges origin/main (rebase of a published…
