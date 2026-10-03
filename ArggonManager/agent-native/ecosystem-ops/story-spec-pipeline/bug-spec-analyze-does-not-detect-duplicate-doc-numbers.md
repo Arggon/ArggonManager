@@ -25,11 +25,11 @@ claimed_at: "2026-10-03T02:17:29.711Z"
 
 ## Acceptance
 
-- [ ] A number collision is detected: at minimum for ADR, exploration, spec and plan directories, given the same numeric stem under two different slugs
-- [ ] Report-only first (consistent with `spec analyze`'s contract): a clear finding naming both files, never an edit; a blocking gate only if it proves low-noise, same rule as C2 in exploration-014
-- [ ] The finding survives a merge — i.e. it is a whole-directory scan, not a per-file uniqueness check keyed on `kind:docId` (read `spec.ts:280-297` for the current approach and its limit)
-- [ ] A fixture with a duplicate-number pair asserts the finding (the repo convention is one failing fixture per layout rule)
-- [ ] `docs/agents.md` / the spec pipeline section documents the collision rule, so an author numbering a doc picks the next FREE number rather than assuming the last one is taken
+- [x] A number collision is detected: at minimum for ADR, exploration, spec and plan directories, given the same numeric stem under two different slugs
+- [x] Report-only first (consistent with `spec analyze`'s contract): a clear finding naming both files, never an edit; a blocking gate only if it proves low-noise, same rule as C2 in exploration-014
+- [x] The finding survives a merge — i.e. it is a whole-directory scan, not a per-file uniqueness check keyed on `kind:docId` (read `spec.ts:280-297` for the current approach and its limit)
+- [x] A fixture with a duplicate-number pair asserts the finding (the repo convention is one failing fixture per layout rule)
+- [x] `docs/agents.md` / the spec pipeline section documents the collision rule, so an author numbering a doc picks the next FREE number rather than assuming the last one is taken
 
 ## Notes
 
