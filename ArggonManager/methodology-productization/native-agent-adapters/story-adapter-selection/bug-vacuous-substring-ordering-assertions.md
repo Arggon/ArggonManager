@@ -66,3 +66,80 @@ Acceptance (as delivered — the canonical, ticked list is in ## Acceptance abov
 - [x] Swept the repo for the `indexOf(...).toBeLessThan(...)` idiom (and substring-presence assertions generally) where either side can be absent; the guard fails on a missing substring instead of comparing -1
 - [x] Shared helper `assertOrder(haystack, ...needles)` in `test/assert-order.ts` throws when any required substring is absent, so the next rewrite cannot silently disarm the check
 - [x] The "may be absent" case has an explicit form (`{ text, optional: true }`), and every call site states required vs optional by which spelling it uses
+
+### 2026-10-03 @Arggon
+**22 sites converted across 7 test files**, all through one shared helper.
+
+| file | sites |
+| --- | --- |
+| `lib/src/worktree.test.ts` | 5 (`:796` `:799` merged into one chain; `:1323`; `:1346` `:1347` `:1348`) |
+| `opencode/plugins/arggon/tools.test.ts` | 6 (`:1921-1923`, `:2109`, `:2117`, `:2389` loop) |
+| `cli/src/board.test.ts` | 3 (`:162`; `:1586` + `:1589` merged into one chain) |
+| `cli/src/adopt.test.ts` | 3 (`:483-485` merged into one chain) |
+| `cli/src/init.test.ts` | 1 (`:691`) |
+| `cli/src/init-opencode.test.ts` | 1 (`:296`) |
+| `cli/src/tui.test.ts` | 1 (`:1179`) |
+| `cli/src/headless-ci.test.ts` | 2 (`:209`, `:415`; `:414`'s manual `toBeGreaterThan(-1)` folded in) |
+
+Sweep query (post-sweep it returns only the deliberate regression proof in `cli/src/assert-order.test.ts` plus `indexOf`-as-parser sites):
+
+```
+rg --pcre2 'expect\((?:(?!\)\s*\.toBe)[\s\S]){0,160}?\.indexOf\(' -g '*.test.ts' -g '*.test.tsx'
+```
+
+**Deliverables**
+- `test/assert-order.ts` — `assertOrder(haystack, ...needles)`, beside the existing shared helpers (`test/acceptance.ts`, `test/property-runner.ts`). Presence is a precondition of the comparison. Optionality is `{ text, optional: true }`; the type is `optional?: true`, so `optional: false` does not compile and there is no spelling that looks like an opt-in while meaning required.
+- `cli/src/assert-order.test.ts` — 11 cases pinning both properties, including red-on-reversal, the `-1 < n` vacuity, equal-index, single-needle, subject truncation, and four optional-needle cases.
+- `tools/ast-grep/rules/ordering-assertions-use-assert-order.yml` + its suite + README section — the structural gate, because a per-site conversion does not stop the next clause arriving in the same shape.
+
+**Note on the reported line.** `cli/src/worktree.test.ts:557` does not exist on `origin/main`: PR #608 added the assertion together with the reworded message, on branch `feat/task-cli-start-remediation-tail-clipped-on-human-channel` (still unmerged). That worker already presence-checked its own four sites inline, so that instance is repaired there — I did not duplicate it. The class fix covers it either way: the rule fires on the idiom wherever it appears.
+
+## Red-on-reversal proof
+
+**A — ordering reversed in the product message** (`lib/src/worktree.ts` `strictGateBinFailure`: remedy moved after the diagnosis and the named list):
+
+```
+FAIL lib/src/worktree.test.ts > … > puts the npm ci remedy BEFORE the named-bin list …
+Error: assertOrder: needles #1 and #2 are out of order.
+  #1: "npm ci" at index 2675
+  #2: "x-tracker.strict-gate-bins is set" at index 0
+  subject: x-tracker.strict-gate-bins is set: refusing the claim commit — … (2768 chars total)
+ Tests  1 failed | 68 passed (69)
+```
+
+**B — clause reworded in the product message** (`confirm no live writer` → `confirm there is no live writer`):
+
+```
+Error: assertOrder: needle #1 is ABSENT from the subject, so the ordering around it could
+not be asserted (a bare indexOf comparison would have passed vacuously against -1).
+  needle: "confirm no live writer"
+  If this clause is genuinely optional here, say so explicitly:
+  { text: "confirm no live writer", optional: true }.
+```
+
+**C — the decisive A/B on identical bytes.** With the reword applied AND the site carrying no neighbouring `toContain` (exactly the PR #608 scene — the identity hint was the only new clause and nobody added a presence assertion for it):
+
+- bare idiom as it shipped → `Tests  1 passed` — **green on a clause that is not in the message at all**;
+- `assertOrder` on the same armed bytes → `FAIL … needle #1 is ABSENT`.
+
+Same subject, same rename; the only difference is whether presence is a precondition.
+
+**D — the structural gate.** Reintroducing the idiom behind the helper's back in `cli/src/tui.test.ts`:
+
+```
+cli/src/tui.test.ts:1183:5: error[ordering-assertions-use-assert-order]: Ordering assertions must
+go through assertOrder (test/assert-order.ts), not a bare `expect(text.indexOf(needle))…`
+npm run lint:structure exit code = 1        (0 after revert)
+```
+
+**E — the helper's own suite** asserts the defect in-suite: `expect(message.indexOf("if this is an identity error")).toBeLessThan(...)` is *demonstrated* to be green on the reworded message, next to the `assertOrder` call that rejects it. That is why `cli/src/assert-order.test.ts` is the one file the rule ignores.
+
+All mutations were reverted; `git status` is clean.
+
+## Gates
+
+`npm run build` → `npm test` (125 files, 2566 passed) → `npm run lint` (0) → `npm run arggon -- validate` (ok, 0 warnings) → `npm run check:plugin` (0) → `npm run test:structure` (5 rules pass) → `npm run lint:structure` (0). All run after `git rebase origin/main`.
+
+## Shared-file note
+
+`test/assert-order.ts` is new and inside the shared test-helper directory (next to `test/acceptance.ts` / `test/property-runner.ts`), as the item asked for a shared helper. It adds no exports to any existing helper module and edits no other item's test file. `opencode/plugins/arggon/tools.test.ts` is touched (import + 4 assertion blocks) — no other worker owns it, but flagging it since it lives in the native plugin package.
