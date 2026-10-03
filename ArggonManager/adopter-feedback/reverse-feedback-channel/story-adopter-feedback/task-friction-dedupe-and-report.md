@@ -22,7 +22,7 @@ depends_on: [task-friction-capture-command]
 
 ## Context
 
-Plan task T3 for [spec-friction-capture-017](../../../docs/specs/spec-friction-capture-017.md).
+Plan task T3 for [spec-friction-capture-018](../../../docs/specs/spec-friction-capture-018.md).
 
 This is the piece the maintainer actually reads, so it is optimized for
 **signal per unit of attention**, not volume: one row per fingerprint, sorted
@@ -51,4 +51,7 @@ either side learning a repo name.
 - [ ] Rotation drops surface as `dropped: N` in the next report.
 - [ ] Every optional signal the report could not compute (`optedOut`, `dropped`, `skippedVersions`, the `reporters` basis) is stated in the output, never omitted silently.
 - [ ] Every non-happy path names its `reason` and the remediation.
-- [ ] Rotation past 5000 lines drops the oldest (test; shared with `task-friction-capture-command`).
+- [ ] A log that has been rotated by the writer surfaces `dropped: N` here. Rotation
+      itself (the 5000-line cap and the drop) is **owned by
+      `task-friction-capture-command`** and tested there — this task only renders
+      the counter (reviewer N6b); it does not re-own or re-test the cap.

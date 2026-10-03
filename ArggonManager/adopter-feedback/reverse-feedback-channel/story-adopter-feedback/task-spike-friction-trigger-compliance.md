@@ -7,7 +7,8 @@ parent: story-adopter-feedback
 labels: [method, research]
 priority: p2
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-03"
+depends_on: [task-friction-trigger-carrier]
 ---
 
 <!--
@@ -23,7 +24,7 @@ updated: "2026-10-02"
 
 A **spike, not a task**: it builds nothing and implements nothing. It answers the
 one open question
-[exploration-adopter-feedback-channel-018](../../../docs/explorations/exploration-adopter-feedback-channel-018.md)
+[exploration-adopter-feedback-channel-019](../../../docs/explorations/exploration-adopter-feedback-channel-019.md)
 deliberately refused to guess at, and it **gates stage 2**.
 
 The question: do adopters run the command? The evidence says instruction-only
@@ -34,7 +35,7 @@ defaulted off, the skill was absent from the host's skill-discovery inventory,
 and the `REFERENCES.md` index the managed `AGENTS.md` told agents to scan was
 never deposited. But that is evidence about a **skill reference**. It says
 nothing about a command embedded in the agent files the adopter already loads —
-which is exactly the change ADR 0020 makes and exactly what stage 1 ships.
+which is exactly the change ADR 0021 makes and exactly what stage 1 ships.
 
 So the spike measures the thing stage 1 actually changed.
 
@@ -42,6 +43,10 @@ Two real adopters exist on this machine: `../ArggonStores` and this repo.
 
 ## Acceptance
 
+- [ ] `depends_on: [task-friction-trigger-carrier]` is present, so this spike is not
+      claimable before the trigger it measures exists (reviewer N2: the ADR makes it
+      the gate on stage 2 **and** tier C, yet it was claimable while `arggon friction`
+      did not exist).
 - [ ] A pass/fail criterion is written **before** any observation is collected (the `deftai` post-mortem failed partly because "silent" was indistinguishable from "absent").
 - [ ] At least one non-maintainer adopter repo is observed end to end: `arggon friction` invoked, or demonstrably not, with the transcript kept.
 - [ ] `arggon doctor --json`'s `friction.triggerPresent` is recorded for each observed repo, so "the trigger was never seen" is distinguishable from "the trigger was seen and ignored".

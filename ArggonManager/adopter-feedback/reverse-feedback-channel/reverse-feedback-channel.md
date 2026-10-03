@@ -16,8 +16,6 @@ updated: "2026-10-02"
 
 # Reverse feedback channel
 
-# Reverse feedback channel
-
 ## Context
 
 The umbrella for turning adopter-side friction into work ArggonManager actually
@@ -27,8 +25,17 @@ letting public automation read an agent's output as instructions.
 ## Acceptance
 
 - [x] A validated, evidence-backed design exists
-      ([`exploration-adopter-feedback-channel-018`](../docs/explorations/exploration-adopter-feedback-channel-018.md))
+      ([`exploration-adopter-feedback-channel-019`](../docs/explorations/exploration-adopter-feedback-channel-019.md))
 - [ ] An ADR settles the cross-cutting decision and the spec passes
       `arggon spec analyze` with no NEW findings
+
+**Left unticked on purpose** (reviewer N3): the two halves land at different
+times, and splitting them would contradict the ADR's own status line. The spec
+gate is already met —
+[`spec-friction-capture-018`](../docs/specs/spec-friction-capture-018.md) passes
+`arggon spec analyze` with zero NEW findings. The word **settles** waits on
+acceptance: ADR 0021 ships `Proposed` and flips to `Accepted` on merge (or in an
+explicit accept commit), per `docs/engineering.md` §ADR process. Ticking this box
+before that would assert an acceptance that has not happened.
 
 ## Notes

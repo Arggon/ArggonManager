@@ -22,12 +22,12 @@ depends_on: [task-friction-capture-command]
 
 ## Context
 
-Plan task T2 for [spec-friction-capture-017](../../../docs/specs/spec-friction-capture-017.md).
+Plan task T2 for [spec-friction-capture-018](../../../docs/specs/spec-friction-capture-018.md).
 
 Redaction runs in the **capture** path, not the render path, so no unredacted
 byte ever exists on disk to leak from a later bug or a later `--report` bug. The
 pixel-leak-class argument in
-[exploration-adopter-feedback-channel-018](../../../docs/explorations/exploration-adopter-feedback-channel-018.md)
+[exploration-adopter-feedback-channel-019](../../../docs/explorations/exploration-adopter-feedback-channel-019.md)
 is structural (redact before render; whitelist capture), not incident-proven —
 so the property has to come from the data flow, not from careful rendering.
 

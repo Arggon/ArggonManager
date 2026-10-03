@@ -13,14 +13,13 @@ updated: "2026-10-02"
 claimed_at: "2026-10-02T14:18:08.885Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-explore-adopter-feedback-channel
 ---
+
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-explore-adopter-feedback-channel.md
   Leaves live only under a story. id is the filename stem: task-explore-adopter-feedback-channel.
   CLI `arggon create task explore-adopter-feedback-channel` adds the task- prefix (do not pass it twice).
   parent MUST be the story id. Omit assignee when unassigned. Omit blocked_reason unless status is blocked.
 -->
-
-# Exploration: reverse feedback channel from adopter repos (friction capture, dedupe, human-gated publish)
 
 # Exploration: reverse feedback channel from adopter repos (friction capture, dedupe, human-gated publish)
 
@@ -53,7 +52,7 @@ key is not speculative value here.
 **The proposal under evaluation was an instruction for agents to open a GitHub
 issue on friction.** Validated against code, docs and dated external precedent;
 recorded in
-[`exploration-adopter-feedback-channel-018`](../../../docs/explorations/exploration-adopter-feedback-channel-018.md).
+[`exploration-adopter-feedback-channel-019`](../../../docs/explorations/exploration-adopter-feedback-channel-019.md).
 
 Verdict, on evidence: the **instinct is right and load-bearing** (the reverse
 channel is genuinely missing) but the **mechanism is refuted** by a named
@@ -123,19 +122,19 @@ before the spec exists and `arggon spec analyze` reports no NEW findings.**
 - [x] Phase 5 done: 2–3 approaches with trade-offs; the user's original proposal
       is evaluated as Approach 1 and **refuted on cited evidence**, with three
       named alternatives and the converged external architecture recorded
-- [x] Artifact written: [`exploration-adopter-feedback-channel-018`](../../../docs/explorations/exploration-adopter-feedback-channel-018.md),
+- [x] Artifact written: [`exploration-adopter-feedback-channel-019`](../../../docs/explorations/exploration-adopter-feedback-channel-019.md),
       including an explicit "evidence gaps" section
 - [x] `arggon validate` green; exploration ids/links resolve
 - [x] **ADR written** settling the cross-cutting parts: the methodology-carrier
       change (**behavioral** impact class per `docs/agents.md` §Changing the
       methodology itself), opt-out semantics, and the explicit non-goal of
-      automatic publication — [ADR 0020](../../../docs/adr/0020-adopter-friction-channel.md)
+      automatic publication — [ADR 0021](../../../docs/adr/0021-adopter-friction-channel.md)
 - [x] **Spec + plan written** from the edge-case table, then a clean
       `spec analyze` run — the gate that releases implementation tasks —
-      [spec-friction-capture-017](../../../docs/specs/spec-friction-capture-017.md)
+      [spec-friction-capture-018](../../../docs/specs/spec-friction-capture-018.md)
       (all 13 hunted dimensions mapped one-to-one onto its acceptance criteria)
       and
-      [plan-friction-capture-017](../../../docs/plans/plan-friction-capture-017.md);
+      [plan-friction-capture-018](../../../docs/plans/plan-friction-capture-018.md);
       `spec analyze` holds at the same **7 pre-existing findings**, zero NEW
 
 ## Recommendation (coordinator decision)
@@ -143,7 +142,7 @@ before the spec exists and `arggon spec analyze` reports no NEW findings.**
 **Needs a spec — written, not filed for approval.** The reverse channel is real
 and the exploration's verdict stands: the _instinct_ (adopters should be able to
 send friction back) is load-bearing, the _mechanism_ (agent-opened GitHub
-issues) is refuted by a named incident. What lands is stage 1 of ADR 0020:
+issues) is refuted by a named incident. What lands is stage 1 of ADR 0021:
 
 `arggon friction` → local bounded log **outside** the tracker → stable-fields-only
 fingerprint → redacted report → human-gated tier-A/tier-B output.
@@ -155,7 +154,7 @@ Two things the coordinator should know that were **not** in the prior research:
    this block "the channel is not live" is invisible — the same failure ADR 0016
    already had to fix for docs. It is the `deftai` maxim ("a disabled capability
    nobody can see is absent") applied to a mechanism this repo already owns.
-2. **The evals harness is ruled out as the capture vehicle** (ADR 0020 §5) and
+2. **The evals harness is ruled out as the capture vehicle** (ADR 0021 §5) and
    kept as a stage-2 _producer_. `skills/arggon-cli/evals/` runs against
    `dist/cli.js` in a synthetic temp fixture it creates itself, scores pass/fail
    into stdout for a maintainer to read, and never touches an adopter — putting
@@ -178,6 +177,26 @@ nine items filed here, so the links this exploration chain depends on resolve.
 **Still broken, deliberately not touched** (outside this item's scope — they are
 other items' bodies): `bug-contributing-github-issue-contradiction.md` and
 `bug-prettier-glues-split-inline-code-span.md`.
+
+## Renumber map (2026-10-03)
+
+The coordinator resolved the reviewer's B1 collision by renumbering **this
+branch's** artifacts — the collision was the coordinator's, having written and
+accepted its own ADR 0020 before dispatching this worker, which independently
+wrote another. Renumbering main's side would have touched an **accepted** ADR
+plus four artifacts that already reference it.
+
+| Was                                                        | Now                                                                                                                                  |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `adr/0020-adopter-friction-channel.md`                     | [`adr/0021-adopter-friction-channel.md`](../../../docs/adr/0021-adopter-friction-channel.md)                                         |
+| `specs/spec-friction-capture-017.md`                       | [`specs/spec-friction-capture-018.md`](../../../docs/specs/spec-friction-capture-018.md)                                             |
+| `plans/plan-friction-capture-017.md`                       | [`plans/plan-friction-capture-018.md`](../../../docs/plans/plan-friction-capture-018.md)                                             |
+| `explorations/exploration-adopter-feedback-channel-018.md` | [`explorations/exploration-adopter-feedback-channel-019.md`](../../../docs/explorations/exploration-adopter-feedback-channel-019.md) |
+
+**The comment history below is deliberately verbatim.** A comment records what was
+said on a date, so the older blocks still read "ADR 0020" and cite the old
+filenames — including the reviewer's B1 evidence table, which editing would
+_falsify_. This table is the map.
 
 ## Notes
 
@@ -212,24 +231,25 @@ Gates green: `validate` ok (0 warnings, v5); `spec validate` ok (30 docs); `spec
 Next per the ADR 0017 gate: an ADR (settling the carrier change's behavioral impact class, opt-out semantics, and the explicit non-goal of automatic publication), then the spec carrying the 13 hunted edge-case dimensions as acceptance criteria. No implementation task claimed before `spec analyze` reports no NEW findings.
 
 ### 2026-10-02 @ses_f01435336ffeYS4KAJmBnNqG2k
+
 **Recommendation: needs a spec — ADR 0020 + spec-friction-capture-017 + plan written. Nothing implemented. Coordinator decides.**
 
 The exploration's Phases 0–5 were already on this item (`exploration-adopter-feedback-channel-018`), so this session closed the **artifact gate** it was waiting on: the ADR, the spec, the plan, and the implementation chain.
 
 ## What landed
 
-| Artifact | What it settles |
-| --- | --- |
-| [ADR 0020](../../../docs/adr/0020-adopter-friction-channel.md) | carrier change is **behavioral**; opt-out gates capture but never discoverability; automatic publication is a **hard non-goal**; the evals harness is ruled out as the capture vehicle |
-| [spec-friction-capture-017](../../../docs/specs/spec-friction-capture-017.md) | all 13 hunted edge-case dimensions → 13 mapped acceptance criteria + non-goals |
-| [plan-friction-capture-017](../../../docs/plans/plan-friction-capture-017.md) | T1–T6 with ordering and the spike list |
-| 6 tasks + 3 spikes | filed under `story-adopter-feedback`, chained |
+| Artifact                                                                      | What it settles                                                                                                                                                                        |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ADR 0020](../../../docs/adr/0020-adopter-friction-channel.md)                | carrier change is **behavioral**; opt-out gates capture but never discoverability; automatic publication is a **hard non-goal**; the evals harness is ruled out as the capture vehicle |
+| [spec-friction-capture-017](../../../docs/specs/spec-friction-capture-017.md) | all 13 hunted edge-case dimensions → 13 mapped acceptance criteria + non-goals                                                                                                         |
+| [plan-friction-capture-017](../../../docs/plans/plan-friction-capture-017.md) | T1–T6 with ordering and the spike list                                                                                                                                                 |
+| 6 tasks + 3 spikes                                                            | filed under `story-adopter-feedback`, chained                                                                                                                                          |
 
 ## Two things the prior research had not settled
 
-**1. `doctor` gains a `friction` staleness block (ADR 0020 §2).** This is the finding I would most want a second opinion on. An adopter that has acked its generated docs receives the trigger only as an ADR 0016 `init --propose` side file — so without a doctor signal, "the channel is not live here" is **invisible**. That is precisely the failure ADR 0016 already had to fix for docs via the `outdated` bucket, and it is the `deftai` maxim (*"a disabled capability nobody can see is absent"*) applied to a mechanism this repo already owns. Cheap (compare a stamped marker), and it is what separates "the trigger was never seen" from "the trigger was seen and ignored" in the compliance spike. If the coordinator thinks this is scope creep, it is the piece to cut — everything else stands without it, but the channel then inherits the exact blind spot that sank the original proposal.
+**1. `doctor` gains a `friction` staleness block (ADR 0020 §2).** This is the finding I would most want a second opinion on. An adopter that has acked its generated docs receives the trigger only as an ADR 0016 `init --propose` side file — so without a doctor signal, "the channel is not live here" is **invisible**. That is precisely the failure ADR 0016 already had to fix for docs via the `outdated` bucket, and it is the `deftai` maxim (_"a disabled capability nobody can see is absent"_) applied to a mechanism this repo already owns. Cheap (compare a stamped marker), and it is what separates "the trigger was never seen" from "the trigger was seen and ignored" in the compliance spike. If the coordinator thinks this is scope creep, it is the piece to cut — everything else stands without it, but the channel then inherits the exact blind spot that sank the original proposal.
 
-**2. The evals harness is the wrong vehicle, but the right producer (ADR 0020 §5).** `skills/arggon-cli/evals/` answers "can an agent reading only `SKILL.md` derive and run the right command" — it runs against `dist/cli.js` in a **synthetic temp fixture it creates itself**, scores pass/fail into stdout for a maintainer to read, and **never touches an adopter repo**. Reusing it as the channel would put capture back inside one machine's local test loop: the exact blind spot `telemetry-mining.md` already documents, and its FAIL line is not a record. What it *is* good for: an eval FAIL is machine-derived, so its fingerprint fields (eval id, predicate, expected, observed, command shape) are stable structured values rather than LLM-authored prose — which is the Sentry hazard the whole dedupe design turns on. Kept as a stage-2 producer that appends one record per failed case; it must never auto-file.
+**2. The evals harness is the wrong vehicle, but the right producer (ADR 0020 §5).** `skills/arggon-cli/evals/` answers "can an agent reading only `SKILL.md` derive and run the right command" — it runs against `dist/cli.js` in a **synthetic temp fixture it creates itself**, scores pass/fail into stdout for a maintainer to read, and **never touches an adopter repo**. Reusing it as the channel would put capture back inside one machine's local test loop: the exact blind spot `telemetry-mining.md` already documents, and its FAIL line is not a record. What it _is_ good for: an eval FAIL is machine-derived, so its fingerprint fields (eval id, predicate, expected, observed, command shape) are stable structured values rather than LLM-authored prose — which is the Sentry hazard the whole dedupe design turns on. Kept as a stage-2 producer that appends one record per failed case; it must never auto-file.
 
 ## Filed (none claimable until the ADR/spec decision lands — ADR 0017 gate)
 
@@ -256,5 +276,129 @@ Every tracker mutation ran from inside the worktree (`/home/arggon/Projects/Argg
 Item bodies in this story linked docs with a four-level `..` prefix that resolves one directory **above** the tracker root (correct depth: three). Fixed in this item and in all nine items filed here, so the exploration chain's links resolve. Still broken and deliberately untouched (other items' bodies): `bug-contributing-github-issue-contradiction.md`, `bug-prettier-glues-split-inline-code-span.md`.
 
 ### handoff 2026-10-02 @ses_f01435336ffeYS4KAJmBnNqG2k (session: ses_f01435336ffeYS4KAJmBnNqG2k) — next: Coordinator: review ADR 0020 + spec-friction-capture-017, then merge PR (open). On acceptance, release task-friction-capture-command (T1) as the first claimable implementation task.
+
 - branch: feat/task-explore-adopter-feedback-channel
 - open questions: Is doctor.friction scope creep (cuttable, channel loses its visibility)? Issues vs Discussions for tier B (spike)? Broken 4-level doc links in the two sibling bug-* bodies: fix here or leave to their…
+
+### 2026-10-02 @Reviewer
+
+verdict: request-changes (ADR/spec/plan numbering collides with already-merged main; a `done` item is rewritten; ADR ships `Accepted` pre-merge)
+
+Reviewed PR #586 (`feat/task-explore-adopter-feedback-channel`, 18 files, +1830/-12) by reading the branch against `origin/main`. No gates run — execution evidence requested at the end.
+
+**Bottom line: the thinking is good and I want this merged. The blockers are all mechanical (renumber, rebase, one status line, one README row).** The exploration is the strongest artifact in this story: the refutation of the original proposal rests on a named dated incident rather than taste, it self-corrects an overstated privacy claim, it records its own evidence gaps, and its 13-row edge-case table resolves every hunted dimension into a spec AC, an explicit non-goal, or a spike with nothing left "unknown".
+
+---
+
+## Blocking findings
+
+**B1 — Every artifact identifier in this PR collides with main. Four of them.**
+
+| Artifact    | this PR                                                          | already on `origin/main`                                                                                                               |
+| ----------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| ADR         | `0020-adopter-friction-channel.md` (`172af2fb`, **19:36 -0300**) | `0020-methodology-first-productization.md` (`448b31dc`, **13:06**) — later flipped to `Accepted` by `ecedac02` "docs: accept ADR 0020" |
+| exploration | `exploration-adopter-feedback-channel-018.md`                    | `exploration-methodology-productization-018.md` (`448b31dc`)                                                                           |
+| spec        | `spec-friction-capture-017.md`                                   | `spec-methodology-adapters-017.md` (`448b31dc`)                                                                                        |
+| plan        | `plan-friction-capture-017.md`                                   | `plan-methodology-adapters-017.md` (`448b31dc`)                                                                                        |
+
+This is not an unavoidable concurrent-PR race: the branch last merged main at 11:35 and wrote its own ADR 0020 **~6h later**, by which time main had already filed _and accepted_ an ADR 0020. After merge the repo holds **two Accepted ADRs numbered 0020**, two explorations ending `-018`, and two spec/plan pairs ending `-017`. Every "ADR 0020" reference then means two things — including `docs/engineering.md:3`, which declares the methodology carrier "per [ADR 0020](./adr/0020-methodology-first-productization.md)".
+
+`engineering.md:171` requires "a 4-digit monotonic number", and the repo has already paid for this class twice with the right remedy: ADR 0016 (`a03fb3b5 docs: renumber ADR 0014-adopter-upgrade-channel to 0016`, plus a `Numbering note`) and ADR 0019 (`6825f680 … + ADR 0019/spec-plan 016 renumber`, with a `Numbering note` naming the collision). Follow that precedent: renumber to the next free id (0021 / 019 / 018), update all cross-references (exploration, spec, plan, 6 tasks, 3 spikes, this item body), and carry the same one-line `Numbering note`.
+
+Note this is **invisible to the tooling**, which is why review must catch it: `cli/src/spec.ts:280-297` keys uniqueness on `kind:docId`, so `friction-capture-017` vs `methodology-adapters-017` does not trip `SPEC_DUPLICATE_ID`, and git merges the four files without a conflict (different filenames).
+
+**B2 — This PR rewrites a `done` item.**
+The diff includes `bug-contributing-github-issue-contradiction.md` (+55/-…). On `main` that item was fixed and closed after this branch base: `3693ac29` claim → `d506894b docs: fix CONTRIBUTING.md contradiction` (PR #594) → `8ba5947a chore(tasks): done bug-contributing-github-issue-contradiction` (`41cdda87` pruned it). Main now carries `status: done`, `assignee: Arggon`, `branch: fix/bug-contributing-github-issue-contradiction`, a fully ticked checklist, the fix evidence note, and a `verdict: approve` from the #594 review. **This branch copy has `status: todo`, no assignee/branch, and replaces that record with five unticked boxes.**
+
+So the merge either conflicts on that file, or — worse, if resolved by taking this side — **reopens a done item, strips its claim record, and deletes a reviewer approve verdict**, which `AGENTS.md` and `docs/agents.md` §5 forbid. Fix: rebase onto `origin/main` and **drop this hunk entirely**. The item is closed; the branch context/acceptance is redundant, and the `CONTRIBUTING.md:13 vs :269` contradiction it documents no longer exists.
+
+**B3 — ADR ships `Status: Accepted` before merge.**
+`engineering.md:191`: "Proposed in a PR → Accepted when merged (or explicitly recorded)". Main own ADR 0020 landed **Proposed** (`448b31dc`) and was accepted in a **separate follow-up commit** (`ecedac02`, "docs: accept ADR 0020") — that is the "explicitly recorded" path, and ADR 0016 carries a `Status note` for its own late flip. Meanwhile the item is still `in_progress` and the epic acceptance leaves "An ADR settles the cross-cutting decision" **unticked** (see N3), so nothing on this PR records the maintainer acceptance of _this_ ADR. Land it as `Proposed` and let the merge (or an explicit accept commit) flip it.
+
+**B4 — the new ADR is not indexed.**
+`ArggonManager/docs/adr/README.md` indexes 0001–0019 and this PR adds no row. That is the exact defect tracked as `task-adr-readme-index-missing-adr-0020` ("Every ADR file in the directory has an index row (sweep the whole dir, not just 0020)"), filed while reviewing PR #598. Add the row in the renumbering commit.
+
+---
+
+## Non-blocking findings
+
+**N1 — the `doctor` `friction` block is owned by two tasks.** `task-friction-surface-parity-and-docs` (T5) claims `doctor --json` gains `friction: { triggerPresent, triggerVersion, current, files }`; `task-friction-trigger-carrier` (T6) claims `doctor --json` reports `triggerPresent`/`triggerVersion` "(with task-friction-surface-parity-and-docs)". Same deliverable, two owners, not disclosed — and it is the exact piece under review. Give it one owner.
+
+**N2 — the compliance spike is unrunnable _and_ claimable.** ADR 0020 §1 Stage 2 ("reached only after the compliance spike measures real trigger firing") and the spike own AC (`doctor --json` `friction.triggerPresent` is recorded) require the trigger to exist — i.e. T6 — yet `task-spike-friction-trigger-compliance` carries **no `depends_on`**, so it is claimable today, before `arggon friction` even exists. Its sibling spike (`volume-threshold`) _does_ declare `depends_on`, so this is an omission. Minimum fix: `depends_on: [task-friction-trigger-carrier]`.
+
+**N3 — internal inconsistency across containers.** `story-adopter-feedback` ticks "[x] The decision is recorded as an ADR (carrier change is **behavioral**)"; the epic `reverse-feedback-channel` leaves "[ ] An ADR settles the cross-cutting decision and the spec passes `arggon spec analyze` with no NEW findings" unticked; the ADR itself claims `Accepted`. All three land in one PR. Reconcile: either tick the epic box (the worker claims the analyze gate is met) or split it into "ADR written" / "ADR accepted", so the epic does not contradict the ADR own status.
+
+**N4 — duplicated H1 in all 10 touched items.** Each file now carries the create-template H1 _and_ a second one the worker appended (`adopter-feedback.md`, `reverse-feedback-channel.md`, `story-adopter-feedback.md`, `task-explore-adopter-feedback-channel.md`, and the 9 leaves). In the story the two H1s even disagree: `# Adopter friction channel: capture, dedupe, human-gated publish` (template) vs `# Adopter feedback channel: friction capture, dedupe, human-gated publish` (added). Delete the added H1s.
+
+**N5 — the item body "still broken, deliberately not touched" note is stale on both items it names.** `368809d5` ("fix 4-level doc link prefix in two adopter-feedback items") fixed `bug-prettier-glues-split-inline-code-span.md` on main, and `bug-contributing-github-issue-contradiction.md` was rewritten by the #594 fix and no longer contains a 4-level link. The PR documents as broken two things main already fixed/closed.
+
+**N6 — minor spec/exploration inconsistencies.** (a) The exploration concurrency row resolves with "`O_EXCL`-style create"; the spec and T1 specify `O_APPEND` on an existing append-only log — pick one (the AC, "two concurrent writers… non-interleaved lines", is the real gate and is testable). (b) Rotation past 5000 lines appears in both `task-friction-capture-command` and `task-friction-dedupe-and-report`; the dedupe copy says "(test; shared with …)", which is honest, but pick an owner.
+
+---
+
+## Scope calls (coordinator decides; my recommendation)
+
+**4a · `doctor` gains a `friction` block — keep it, but re-justify it and re-own it (one task).**
+The ADR stated reason is weaker than it reads. `cli/src/doctor.ts:649-692` iterates `config.generated`, re-renders the **current** template and reports `outdated` for _every_ local state — untouched, modified, **acked** and acked-drifted — with the paths in `outdatedDocs` (`doctor.ts:74-77`) and a human hint pointing at `arggon init --dry-run` (`doctor.ts:856-861`). And the generated agent files _are_ in that map: `cli/src/init-opencode.test.ts:413-414` asserts `config.generated[".opencode/agents/arggon-coordinator.md"].template === "docs/opencode/agents/arggon-coordinator.md"`. So merely editing `templates/docs/opencode/agents/arggon-worker.md` already makes the trigger absence show up as an outdated managed doc. **"the channel is not live here" is not invisible today.**
+
+What the dedicated block uniquely buys is narrower and still real: (i) per-file `triggerVersion`, so "trigger present at 0.5.0" is distinguishable from "current is 0.6.0"; (ii) separating _trigger absent_ from generic template drift — exactly the observable the compliance spike needs to tell "never seen" from "seen and ignored". Rewrite §2 to rest on those two, not on invisibility. If you want the minimal stage 1, the cuttable part is `triggerVersion`/`files`, not the block.
+
+**4b · stopping at tier B — defensible, keep the boundary.**
+`docs/agents.md:24` ("GitHub is for **PRs only**") and `:36` ("Do **not** open new GitHub issues") stay intact because tiers A/B never require `gh`, never write to GitHub, and the agent job ends at printing a prefilled URL a **human** opens; the spec Opt-out/Non-goals sections forbid any auto-submit path, and ADR 0020 §4 keeps the canonical record in-tree (`arggon create`), so no second record is born. The dedupe value is not lost either: stage 1 stable-fields fingerprint is what collapses this repo 10 known repeats, and what stage 1 gives up is only _upstream_ pre-search — the genuinely "automatic" part, correctly gated on measured volume + compliance. One thing to record rather than leave implicit: local-only dedupe cannot see an issue a human already filed upstream, so a re-filed class will be re-emitted. That belongs in the spec Limits criterion.
+
+**4c · trigger-carrier last — right instinct, wrong slot, and the current graph is harmful.**
+The stated rationale ("an agent file naming a command that does not exist yet is worse than no trigger") is satisfied as soon as **T1** lands the capture command — nothing in the trigger text needs T4/T5. But ADR 0020 makes the compliance spike gate stage 2 _and_ tier C, and that spike measures whether an embedded trigger fires. Todays ordering therefore delays the single most decision-relevant measurement until the entire chain (incl. skill copy + evals + README/convention docs) is done, while N2 leaves the spike claimable in the meantime. Minimum fix: the `depends_on` edge. Better: split T6 — trigger block right after T1, skill/evals/parity docs after T5.
+
+---
+
+## What I verified by reading
+
+- **Exploration protocol compliance** (`skills/arggon-cli/references/exploration.md`): Phase 0 classification (greenfield, one-way ratchet); Phase 1 read-only stance; Phase 2 grounding in code/carriers/ADRs/labs/live `gh`+git data; Phase 3 all 8 frontier rounds logged in dependency order, and the one genuine unknown routes to a spike not a guess; Phase 4 **all 12 template dimensions present plus `adopter trust`, every row resolved** — mapped 1:1 into 13 spec ACs (13 hunted → 13 mapped + 3 extra: surfaces parity, carrier discipline, gates) or into non-goals, nothing "unknown"; Phase 5 three approaches + three set-aside, trade-offs, recommendation, artifact order, self-review; `Evidence gaps` section present and honest. Structure matches `templates/exploration-project.md`.
+- **ADR does not silently overrule ADR 0016 or 0018.** Verified `agents.md:24,36` (§0), `:462-467` (impact-class rule, quoted accurately by ADR 0020 §2), `:579-586` (§Self-improvement loop holds only the two maintainer-side labs protocols — no existing channel to duplicate). ADR 0020 §2 defers to the ADR 0016 propose channel ("never by overwrite"); §3 `ARGGON_NO_FRICTION` mirrors ADR 0018 `ARGGON_NO_UPDATE_CHECK` opt-out and its "no phone-home beyond our own packument" line is consistent with ADR 0018 §3; §4 tier-C/CI rules do not contradict ADR 0018 "on CI the registry GET never runs" posture. Neither ADR is amended or contradicted — both would only gain a cross-reference.
+- **Spec/plan structure** against `cli/src/spec.ts`: `spec_id`/`title`/`status: proposed`/`created` present; `## Purpose`/`## Synopsis`/`## Acceptance` all present (the validator three required sections, `spec.ts:157-176`); plan carries `plan_id`/`title`/`status`/`created`/`spec` with a resolvable `spec` path; ACs are verifiable and several are genuine discriminators (fixture A: one class ×3 with differing prose → one row `count: 3` fails if the fingerprint reads `narrative`; fixture B: near-identical prose, different `errorCode` → two rows fails if it over-merges).
+- **ADR 0017 gate honored**: the ADR precedes the spec precedes the plan precedes the tasks in protocol order; all 6 implementation tasks and 3 spikes are `status: todo`, unclaimed, with no `branch`/`claimed_at` — no implementation task claimed before the spec exists.
+- **Impact class honest**: the PR touches no carrier (`docs/agents.md`, `docs/engineering.md`, `docs/convention.md`, `skills/arggon-cli/**` are all absent from the diff), so **advisory** here with **behavioral** correctly deferred to T6 is right.
+- **`x-friction` follows the established extension policy**: `convention.md:457-458, 471, 494, 514` ("unknown nested keys ignored; a scalar is a parse error") — T4 AC mirrors the existing `x-views`/`x-playbooks`/`x-tracker`/`x-import` contract, and T6 correctly schedules the `convention.md` doc.
+- **State-dir claim grounded**: `ARGGON_STATE_DIR` exists (`lib/src/worktree.ts:1037`) and the per-OS state base is real (`lib/src/worktree.ts:1092-1103`: `XDG_STATE_HOME`/`~/.local/state`, `~/Library/Application Support`, `%LOCALAPPDATA%`).
+- **Task hygiene**: all 9 leaves sit directly under `story-adopter-feedback` (confirmed via `arggon list --parent`; convention v5 forbids level-skipping); no duplicate of existing work — checked `story-self-improvement`/`task-telemetry-mining` (done, maintainer-side, explicitly untouched) and §Self-improvement loop; priorities `p1/p2/p3` consistent with the plan ordering. **Untestable acceptance: none found.** The two hygiene defects are N1 and N6(b), both ownership, not testability.
+- **Smoke gate**: exempt — `engineering.md:94,140`, "docs-only PRs are exempt"; this diff is 18 `.md` files, zero runtime code. No probe evidence owed for behavior.
+
+## Unverified (claims I could not check by reading)
+
+`arggon validate` 0 warnings; `spec validate` 32 docs / 0 warnings; `spec analyze` 7 pre-existing findings and zero NEW across 19 specs; `npm run lint`; `prettier --check`; the primary-checkout-clean claim. The 32-doc figure is _arithmetically consistent_ with the branch (19 specs + 13 plans, after removing main methodology-adapters pair that post-dates the branch base), which is a point in the worker favour — but consistency is not evidence.
+
+## Probes needed
+
+1. `cd /home/arggon/Projects/ArggonManager && git merge-base origin/main origin/feat/task-explore-adopter-feedback-channel` → expect a base older than `448b31dc`; confirms how far behind the branch is. (I could run git plumbing except `merge-tree`, which permissions blocked.)
+2. `cd /home/arggon/Projects/ArggonManager && git merge-tree $(git merge-base origin/main origin/feat/task-explore-adopter-feedback-channel) origin/main origin/feat/task-explore-adopter-feedback-channel` → expected: exactly one textual conflict, in `bug-contributing-github-issue-contradiction.md`; expected _not_ to appear: any conflict or duplicate notice for the four colliding identifiers. That is the proof B1 is silent and B2 is real. A different conflict set changes the fix list.
+3. `cd /home/arggon/Projects/ArggonManager-task-explore-adopter-feedback-channel && npm run arggon -- spec validate` → expected: ok, 0 errors, 32 docs. After merging main, expected: ok, **34 docs** with **no** `SPEC_DUPLICATE_ID` — i.e. the validator passes on a repo holding two ADR-0020s, two `-018` explorations and two `-017` spec/plan pairs. That negative result is what makes B1 a review responsibility rather than a tooling catch.
+4. `… && npm run arggon -- spec analyze` → expected: 7 findings, all pre-existing, zero NEW. Any NEW finding blocks the ADR 0017 gate and must be triaged before T1 is released.
+5. `… && npm run arggon -- validate` and `npx prettier --check` over the 18 changed files → expected: clean.
+6. After the renumber + rebase: re-run 3–5 and `git log --oneline -1 -- <bug-contributing…>` to confirm the branch no longer edits that item.
+
+## Recommendation
+
+**No merge as-is.** Fix B1–B4 (renumber all four identifiers to the next free ids with a `Numbering note`, rebase onto `origin/main` and drop the `done`-item hunk, ship the ADR as `Proposed`, add the README row), fold in N1–N6, then re-request review — the content should not need another architecture pass. Scope calls 4b and 4c stand as recommended; 4a stands with the §2 re-justification. Release `task-friction-capture-command` (T1) only after the renumber lands and probe 4 reports zero NEW findings; add `depends_on: [task-friction-trigger-carrier]` to the compliance spike before it becomes claimable.
+
+### 2026-10-03 @ses_f02ab5836ffeOAxmisboIwWE4x
+
+Coordinator decision on the reviewer's B1 (4 number collisions) — **the WORKER'S side renumbers, not mine.**
+
+The collision is real and the root cause was mine: I wrote ADR 0020 (methodology-first productization) and accepted it on main before dispatching this worker, which independently wrote its own ADR 0020. Same for exploration `-018` and spec/plan `-017`.
+
+Renumbering `origin/main`'s side would mean touching an ACCEPTED ADR and four artifacts that already reference it (the carriers from PR #592, README, `task-methodology-carriers`, the spec/plan pair). Renumbering the branch's side touches one PR that has not merged. So:
+
+- ADR `0020-adopter-friction-channel.md` → `0021-adopter-friction-channel.md`
+- `spec-friction-capture-017.md` → `spec-friction-capture-018.md`, `plan-friction-capture-017.md` → `plan-friction-capture-018.md`
+- `exploration-adopter-feedback-channel-018.md` → `exploration-adopter-feedback-channel-019.md`
+- every internal reference: frontmatter `spec:`/`planTask:`, the exploration's Decision link to its ADR, the spec's link back, the plan's link back, any cross-reference in the item body and the 6 tasks + 3 spikes
+
+Also required before this merges, from the reviewer's remaining findings:
+
+- **B2** the PR rewrites a `done` item: `bug-contributing-github-issue-contradiction.md` was fixed and closed on main after this branch's base, and the branch's copy is `status: todo` with unticked boxes. Rebase onto main and take main's copy for that file (it is NOT this PR's item).
+- **B3** the ADR ships `Status: Accepted` pre-merge, against `engineering.md` §ADR process and the repo's own two-step precedent → ship it `Proposed`.
+- **B4** add the new ADR's row to `docs/adr/README.md`. Note the parallel finding already filed as `task-adr-readme-index-missing-adr-0020` (now merged) added a PARITY TEST that asserts every ADR file has exactly one index row — so the new ADR must be indexed in this same PR or that test fails.
+
+And the two scope calls the reviewer ruled on, which you should carry into the ADR: keep the `doctor` `friction` block but re-justify it on the grounds that actually hold (per-file `triggerVersion` plus separating "trigger absent" from generic template drift — `doctor.ts` already re-renders templates for acked entries too, so `outdated` alone does not give it) and stop claiming it is claimed by both T5 and T6; and name in the spec that local fingerprint dedupe cannot see an already-filed upstream issue, which is the honest boundary of stopping at tier B.
+
+`bug-spec-analyze-does-not-detect-duplicate-doc-numbers` has MERGED, so `arggon spec validate` / `spec analyze` will now catch any residual collision — use them as the check rather than by eye.

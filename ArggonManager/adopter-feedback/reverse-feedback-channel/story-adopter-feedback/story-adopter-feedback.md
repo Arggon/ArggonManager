@@ -16,8 +16,6 @@ updated: "2026-10-02"
 
 # Adopter friction channel: capture, dedupe, human-gated publish
 
-# Adopter feedback channel: friction capture, dedupe, human-gated publish
-
 ## Context
 
 ArggonManager's only work channel points **inward** (product → adopter). Nothing
@@ -51,11 +49,11 @@ agent write to GitHub.
       convergent designs are small-project, not proven at scale
 - [x] The decision is recorded as an ADR (carrier change is **behavioral**) and the
       hunted edge cases become spec acceptance criteria —
-      [ADR 0020](../../../docs/adr/0020-adopter-friction-channel.md) and
-      [spec-friction-capture-017](../../../docs/specs/spec-friction-capture-017.md)
+      [ADR 0021](../../../docs/adr/0021-adopter-friction-channel.md) and
+      [spec-friction-capture-018](../../../docs/specs/spec-friction-capture-018.md)
       (13 hunted dimensions → 13 mapped criteria, plus non-goals and surface/carrier
       discipline), with the plan at
-      [plan-friction-capture-017](../../../docs/plans/plan-friction-capture-017.md)
+      [plan-friction-capture-018](../../../docs/plans/plan-friction-capture-018.md)
 
 ## Notes
 

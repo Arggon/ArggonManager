@@ -1,15 +1,15 @@
 ---
-spec_id: friction-capture-017
+spec_id: friction-capture-018
 title: Adopter friction capture, dedupe and redacted report
 status: proposed
 created: 2026-10-02
 ---
 
-# Spec: Adopter friction capture, dedupe and redacted report (friction-capture-017)
+# Spec: Adopter friction capture, dedupe and redacted report (friction-capture-018)
 
-Implements **stage 1** of [ADR 0020](../adr/0020-adopter-friction-channel.md)
+Implements **stage 1** of [ADR 0021](../adr/0021-adopter-friction-channel.md)
 (decision recorded in
-[exploration-adopter-feedback-channel-018](../explorations/exploration-adopter-feedback-channel-018.md)):
+[exploration-adopter-feedback-channel-019](../explorations/exploration-adopter-feedback-channel-019.md)):
 a local, bounded, structured friction record with a stable-fields-only
 fingerprint and a **redacted** report a human acts on — with a generated-agent
 trigger so the channel is discoverable, and a `doctor` block so its absence is
@@ -151,7 +151,7 @@ Tier `c` (`gh`, upstream pre-search, comment-on-existing) is **not in this spec*
 nested key is ignored per the extension policy) and `ARGGON_NO_FRICTION=1`
 (per invocation). Opting out writes nothing and renders an empty report with
 `optedOut: true`. It **does not** remove the trigger from the generated agent
-files and does not hide the command — per ADR 0020 §3.
+files and does not hide the command — per ADR 0021 §3.
 
 ### The trigger and its visibility
 
@@ -226,6 +226,16 @@ criterion, a non-goal below, or a spike.
       rotation-bounded: at 5000 lines the oldest are dropped on write and the
       drop is reported by the next `--report` (`dropped: N`). Maintainer
       attention is the scarce resource, so ordering is by count.
+- [ ] **Limits of local-only dedupe — the honest boundary of stopping at tier B** —
+      fingerprint dedupe is **local**: it collapses repeats inside one log and
+      nothing else. It cannot see an issue a human already filed upstream, so a
+      class that is already in the maintainer's tracker is re-emitted as a "new"
+      local class and the human may file it twice. This is a **deferred
+      capability, not a postponed one** — upstream pre-search needs the network
+      plus `gh`, which _is_ tier C, gated on
+      `task-spike-friction-trigger-compliance` (ADR 0021 §1 Stage 2). Stage 1
+      therefore ships a report honest about its own blindness: it states that
+      dedupe scope is local-only and never implies upstream coverage.
 - [ ] **Time / locale** — `ts` is ISO-8601 UTC from the kernel clock; no code
       parses a locale or non-ISO timestamp; a narrative containing RTL or CJK
       text round-trips verbatim through capture, redaction and report without
@@ -278,10 +288,13 @@ criterion, a non-goal below, or a spike.
 ## Non-goals
 
 - **No automatic publication.** No tier auto-submits; the agent never opens an
-  issue, a human does. (ADR 0020 §4.)
+  issue, a human does. (ADR 0021 §4.)
 - **No tier C** — `gh`-mediated upstream pre-search, comment-on-existing, or any
   `--yes`. Deferred to stage 2, gated on
-  `spike-friction-trigger-compliance`.
+  `task-spike-friction-trigger-compliance`. Consequently **stage 1 cannot detect
+  that a friction class already exists upstream** — see the local-only-dedupe
+  limits criterion above; that blindness is the concrete cost of the boundary,
+  not an oversight.
 - **No rolling issue per fingerprint** and no unattended aggregation
   (`ripple/xrpl-wasm-stdlib#311` pattern) — a maintainer-side automation,
   forbidden by the ADR.
@@ -294,5 +307,5 @@ criterion, a non-goal below, or a spike.
 - **No change to the in-tree-tracker doctrine** (`docs/agents.md` §0 stands) and
   no change to the labs protocols, which keep filing through `arggon create`.
 - **Not the evals harness.** `skills/arggon-cli/evals/` stays a skill-completeness
-  harness; an eval FAIL becomes a stage-2 _producer_, not a channel (ADR 0020
+  harness; an eval FAIL becomes a stage-2 _producer_, not a channel (ADR 0021
   §5).

@@ -26,3 +26,4 @@ Files: `NNNN-short-title.md` (four-digit number, kebab title).
 | [0018](./0018-update-delivery-and-distribution-channel.md) | Update delivery and distribution channel (release pipeline, update channel, skew, tarballs)                    | Accepted                               |
 | [0019](./0019-worktree-runtime-isolation.md)               | Worktree runtime isolation: environment contract by default, ephemeral service containers as an opt-in pattern | Proposed                               |
 | [0020](./0020-methodology-first-productization.md)         | Methodology-first productization with per-agent native adapters                                                | Accepted                               |
+| [0021](./0021-adopter-friction-channel.md)                 | Adopter friction channel: local capture, stable-fields dedupe, human-gated publish                             | Proposed                               |

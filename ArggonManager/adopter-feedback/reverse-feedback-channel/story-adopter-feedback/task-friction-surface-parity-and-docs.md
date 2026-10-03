@@ -22,20 +22,23 @@ depends_on: [task-friction-tier-b-url-and-optout]
 
 ## Context
 
-Plan task T5 for [spec-friction-capture-017](../../../docs/specs/spec-friction-capture-017.md).
+Plan task T5 for [spec-friction-capture-018](../../../docs/specs/spec-friction-capture-018.md).
 
 `docs/agents.md` §MCP keeps the CLI, the native tool surface and the MCP tool in
 parity, and `cli/src/mcp-parity.test.ts` is the enforcement. A new command that
 ships on one surface only is a convention violation, not a shortcut.
 
-`doctor --json` also grows the additive `friction` block — the ADR 0020 §2
-ruling that makes the channel's absence visible rather than silent.
+**Ownership (reviewer N1):** the additive `doctor --json` `friction` block is
+owned **solely** by `task-friction-trigger-carrier` (T6), not by this task. This
+task owns CLI/native/MCP parity for `arggon friction` itself and the
+`docs/json-output.md` rows for it; T6 owns the block's semantics and tests. The
+`doctor.friction` row in `json-output.md` is written here, but the code and its
+acceptance criteria are T6's — one owner, one claim.
 
 ## Acceptance
 
 - [ ] `tools.arggon.friction` and the `arggon_friction` MCP tool take the same arguments and emit the same envelope fields as CLI `--json`.
 - [ ] `cli/src/mcp-parity.test.ts` green.
-- [ ] `doctor --json` gains `friction: { triggerPresent, triggerVersion, current, files }`; no `schemaVersion` bump.
-- [ ] `doctor --json` on a repo whose managed agent files lack the trigger reports `triggerPresent: false` with the current version (test).
-- [ ] `ArggonManager/docs/json-output.md` documents `friction` and `doctor.friction` in this same PR.
+- [ ] `ArggonManager/docs/json-output.md` documents the `friction` command surface **and** the additive `doctor.friction` block in this same PR (the block's code and tests are T6's; the doc row is this task's, so the two land together).
+- [ ] No `schemaVersion` bump is introduced by either surface (asserted in both tasks).
 - [ ] Every error path carries a typed `error.code` (`FRICTION_FAILED`) with the documented `reason` values: `no-observation`, `log-unwritable`, and the report/clear conflict.

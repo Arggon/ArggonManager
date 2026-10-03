@@ -15,8 +15,6 @@ updated: "2026-10-02"
 
 # Adopter feedback: the reverse channel from adopting repos
 
-# Adopter feedback: the reverse channel from adopting repos
-
 ## Context
 
 Every channel ArggonManager has is one-directional. This initiative owns making the

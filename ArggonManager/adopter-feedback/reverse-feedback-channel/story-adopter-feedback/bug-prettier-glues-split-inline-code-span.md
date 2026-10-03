@@ -19,12 +19,10 @@ updated: "2026-10-02"
 
 # prettier is non-idempotent on Markdown: a multi-word inline code span near the wrap boundary gets split and its continuation glued to column 0
 
-# prettier is non-idempotent on Markdown: a multi-word inline code span near the wrap boundary gets split and its continuation glued to column 0
-
 ## Context
 
 Found while authoring
-[`exploration-adopter-feedback-channel-018`](../../../docs/explorations/exploration-adopter-feedback-channel-018.md)
+[`exploration-adopter-feedback-channel-019`](../../../docs/explorations/exploration-adopter-feedback-channel-019.md)
 (2026-10-02; repo has prettier 3.9.6, `.prettierrc.json` = `printWidth: 100`,
 `proseWrap` unset). A **continuation list item** whose text contains a
 multi-word inline code span near the wrap boundary makes prettier

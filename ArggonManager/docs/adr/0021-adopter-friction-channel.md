@@ -1,9 +1,13 @@
-# 0020 Adopter friction channel
+# 0021 Adopter friction channel
 
-- Status: Accepted
+- Status: Proposed
+
+> Numbering note (2026-10-03): originally filed as `0020-adopter-friction-channel.md` in collision with `0020-methodology-first-productization.md` (landed earlier on main, PR #592, accepted in `ecedac02`). Renumbered to the next free id on the coordinator's decision; the branch's side renumbers rather than main's, because renumbering main would touch an **accepted** ADR plus four artifacts that already reference it. Decision content unchanged. Same precedent as ADR 0016 and ADR 0019.
+> Status note (2026-10-03): shipped **Proposed**, per `docs/engineering.md` §ADR process ("Proposed in a PR → Accepted when merged (or explicitly recorded)") and this repo's two-step precedent — main's ADR 0020 landed `Proposed` and was accepted in a separate follow-up commit. Flip to `Accepted` on merge or in an explicit accept commit.
+
 - Date: 2026-10-02
 - Deciders: Gonzalo Arganaraz
-- Input: [exploration-adopter-feedback-channel-018](../explorations/exploration-adopter-feedback-channel-018.md) (2026-10-02)
+- Input: [exploration-adopter-feedback-channel-019](../explorations/exploration-adopter-feedback-channel-019.md) (2026-10-02)
 
 ## Context
 
@@ -87,13 +91,27 @@ Two consequences are settled here rather than left to implementation:
   place is absent. `templates/docs/opencode/agents/arggon-worker.md` already
   tells the worker to report work it finds; the new text is the carve-out for
   friction in _ArggonManager itself_, which is not adoptable work.
-- **`arggon doctor` grows a `friction` staleness block.** This is the direct
-  application of "a disabled capability nobody can see is absent". An adopter
-  that has acked its generated docs receives the trigger only as a proposal, so
-  the trigger's absence is otherwise invisible — exactly the failure ADR 0016
-  already had to fix for docs via the `outdated` bucket. `doctor` reports whether
-  the on-disk generated agent files carry the current trigger version, so an
-  adopter (and CI) can see the channel is not live without comparing renders.
+- **`arggon doctor` grows a narrow `friction` block — for two specific reasons,
+  not for visibility.** Visibility is _already_ covered, and an earlier draft of
+  this ADR overstated it. `cli/src/doctor.ts` re-renders the current template for
+  every entry in `config.generated` and reports `outdated` for **every local
+  state — untouched, modified, acked and acked-drifted** (the
+  `Object.entries(config.generated)` walk that fills `outdatedDocs`), and the
+  generated OpenCode agent files are in that map (`.opencode/agents/arggon-worker.md`
+  → template `docs/opencode/agents/arggon-worker.md`, asserted in
+  `cli/src/init-opencode.test.ts`). So editing the worker template already makes
+  "the trigger is not here yet" show up as an outdated managed doc.
+  **`outdated` does not retire this block; it simply is not the argument for it.**
+  What the block uniquely buys is:
+  1. **a per-file `triggerVersion`**, so "the trigger is present at 0.5.0" stays
+     distinguishable from "the current template is 0.6.0" — one boolean against a
+     template that also moves for unrelated reasons cannot say which;
+  2. **separating _trigger absent_ from generic template drift** — the observable
+     the compliance spike needs to tell "never seen" from "seen and ignored",
+     which is the distinction that decides whether stage 2 is worth building.
+
+  If stage 1 has to be minimal, the cuttable part is `triggerVersion` and
+  `files`, **not** the block.
 
 ### 3. Opt-out gates capture, never discoverability
 
