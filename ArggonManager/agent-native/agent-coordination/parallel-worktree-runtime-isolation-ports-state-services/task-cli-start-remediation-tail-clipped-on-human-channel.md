@@ -341,3 +341,54 @@ cwd for probes 1–2 and 4: /home/arggon/Projects/ArggonManager-task-cli-start-r
 2. **Same probe after the change.** Expected: as many names as fit inside 2000 (≥ the current 2; ~6 in a typical checkout), the remainder counted, and every actionable clause — kept-worktree note, generic fix, exact `npm ci` fix, discard hint — present and whole; `--json error.message` unelided. Also re-run the pathological deep-sibling-path variant: expected 2 names with the full clauses whole (your current worst case must not regress).
 3. **Gates on the amended head.** `npm run build && npm test && npm run lint` plus a green `cli` job. Expected: 122 files / 2280+ tests, lint clean, `check:plugin` no drift. The branch will move, so the earlier green run does not carry.
 4. **F4 numbers from an observed run.** `git stash push -- cli/src/start.ts && npx vitest run cli/src/start.test.ts -t "refuses the claim commit when the flag is set"; git stash pop` and paste the raw failure into the item. Expected: the attach re-run index strictly greater than the named-bin index (I compute ~537 vs ~356 for a 40-char `$TMPDIR` path), never a 104-char gap.
+
+### 2026-10-03 @Arggon
+## Round 3 — the bound is derived, and the bound is no longer lossy
+
+Branch merged `origin/main` (PR was DIRTY against the coordinator's concurrent commits; item-body conflict resolved as a UNION — this branch's blocks and both verdict blocks all kept). Item left `in_progress`.
+
+### The constant is gone; the budget replaces it
+
+`worktreeRemediation` returns **remedy only**. `worktreeFailureMessage` composes every mandatory clause — kept-worktree note, generic fix, exact fix, attach re-run, discard hint, raw detail — reserves their lengths plus the separator against `MAX_HUMAN_ERROR_CHARS`, and hands the remainder to `gateBinFailureReport(readiness, budget)`, which fills names until they stop fitting and counts the rest. At least one name whenever there is evidence; the budget can never reach a mandatory clause, because those are reserved first.
+
+**Measured on this item's own fixtures (8 broken bins), both shapes as asked:**
+
+| entry shape | chars/entry | budget fills | constant-2 showed | composed length |
+| --- | --- | --- | --- | --- |
+| deep sibling path (pathological) | ~317 | **2 of 8** | 2 (identical) | 1795, nothing elided |
+| ordinary checkout (`…/ArggonManager-main/node_modules/.bin`) | ~117 | **7 of 8** | 2 (five hidden that fitted) | 1980, nothing elided |
+
+### The three failure modes, on the real built CLI, same 8-bin fixture, before vs after
+
+| | constant-2 form | budget form |
+| --- | --- | --- |
+| names in `error.message` | 2 (`ast-grep`, `c8`) | 7 + `and 1 more bin not resolving inside it` |
+| flavors visible | `missing missing` | `missing missing path missing path path path` |
+| all 8 enumerable from a CLI surface | **no** — no `readiness` field | yes — `readiness.gateBins` = all 8 with sources |
+
+The flavor row is failure mode #2 exactly: under the constant the two visible entries were both `missing`, so a reader concludes "nothing resolves here" and never sees that five bins resolve from a sibling `.bin` on PATH — a different diagnosis, a different first action.
+
+I verified the envelope claim before relying on it: the `start` failure path did carry only `{command, message, code, conventionVersion}` (`cli/src/cli.ts`, both `failJson` calls), and `gateBins` rides the success envelope only — so the hidden names were genuinely unreachable. Hence the third piece of the `missingDependencies` / `missingDependenciesTotal` precedent: **`failEnvelope` now takes an optional additive `payload`** (the reason `successEnvelope` already did), and `start` forwards `readiness: { hasInstall, gateBins }` with the COMPLETE observation. The bound is now a human-channel bound only.
+
+### F4 residual — settled by measurement, and the reviewer's arithmetic does not reproduce either
+
+Claim under test: the gap between the quoted indices is invariant at 183, so no `$TMPDIR` yields the 104 the evidence shows. Measured on the exact composition that test builds (one `missing` bin, step `enforcing x-tracker.strict-gate-bins`, id `task-rate-limit`), sweeping `$TMPDIR`:
+
+| `$TMPDIR` | path length | attach index | named-bin index | gap |
+| --- | --- | --- | --- | --- |
+| `/tmp` | 40 | 459 | 355 | **104** |
+| `/tmp/x` | 42 | 463 | 359 | **104** |
+| `/tmp/a-longer-tmpdir-prefix` | 63 | 505 | 401 | **104** |
+
+The gap is **104 at every path length for this composition**, not 183 — so both quoted numbers were real measurements of a single run, and both move together (+1 path char moves each index by 2, the path appearing twice). 183 does appear in the POST-fix composition of the same fixture (attach 203, named bin 622), which is plausibly what was measured. Nothing was dropped because nothing was unreproducible; the load-bearing claim remains a pinned assertion, not a quoted number.
+
+### Also in this round
+
+- The tautological `expect([firstEntry, lastEntry]).toHaveLength(2)` is deleted; the overflow count is derived from the fixture (`names.filter(...)`) so it cannot pass by naming nothing.
+- A mandatory clause cannot be eaten: an entry long enough to blow the whole budget (1200-char path segment) still yields a report with the generic fix, exact fix, attach re-run and discard hint intact. Min-1 rule pinned at budget 0.
+- Docs: `docs/convention.md` gains the bound stated **in words** (it is data-dependent), plus reconciliation of the "names each offending bin" promise — the two kernel refusals are NOT bounded (their remedy is inside the message, the evidence is its tail); `docs/json-output.md` gains the `readiness` row.
+- **One defect the probe found that reading did not:** the wrapper takes a readiness snapshot for EVERY step, so appending the clause unconditionally grew a *push* failure a `Readiness: the gate binaries do not resolve …` list and its exact fix. Now scoped to the committing-claim step and pinned per step.
+
+### Gates (build BEFORE test)
+
+`npm run build` (bundle regenerated, 457609 → 457642 bytes — `lib/src/json.ts` is inlined into the plugin; not hand-edited) · `npm test` **122 files / 2289 tests** · `npm run lint` · `npm run arggon -- validate` ok · `npm run check:plugin` no drift · `npm run test:structure` 3 passed · `npm run lint:structure` clean. CI on the merged head: `cli` pass 5m2s (run 37097168986, job 111129346900), `tasks-validate` pass, `ui-smoke` pass.
