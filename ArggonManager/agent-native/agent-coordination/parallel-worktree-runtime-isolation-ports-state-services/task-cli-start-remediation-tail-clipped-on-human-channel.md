@@ -64,3 +64,57 @@ Only clause ORDER moved — every clause is verbatim, none added or dropped. `wo
 - `cli/src/board.ts:141` — ``GitHub overlay unavailable: <gh detail> (or run plain `arggon board` for the offline snapshot)``: the identical ordering violation, but `cli/src/board.ts` + `cli/src/board.test.ts` are owned by the concurrently worked `bug-three-acceptance-parsers-diverging`, so this fix must not touch them. Worth one small follow-up.
 - `lib/src/get-open-prs.ts:67`, `lib/src/import-issues.ts:187`, `lib/src/cleanup.ts:259` — the ``gh <args> failed (<stderr>; check `gh auth status`)`` kernel wrappers: same shape (unbounded gh stderr, then the auth hint), one line each, kernel-side. Reported rather than fixed here to keep this diff on the CLI start channel.
 - `cli/src/branch.ts:127`, `lib/src/comment.ts:236-239`, `lib/src/show.ts:184`, `cli/src/layout-migrate.ts:83` — advice after a BOUNDED short clause (a branch name, a filename); no realistic clip exposure.
+
+### 2026-10-03 @Arggon
+## Evidence — PR #608 (`feat/task-cli-start-remediation-tail-clipped-on-human-channel`)
+
+### Pre-fix failure is real, on the real `runStart` path
+
+`git stash push -- cli/src/start.ts` (tests kept), then:
+
+```
+$ npx vitest run cli/src/start.test.ts -t "refuses the claim commit when the flag is set"
+AssertionError: expected 459 to be less than 355
+ ❯ cli/src/start.test.ts:327  expect(message.indexOf(`arggon start ${id} --worktree`))
+```
+The attach re-run sat at index 459, the kernel's named bin at 355 — the remedy trailed the evidence, exactly the defect.
+
+### Observed pre-fix text at the MAX_GATE_BINS worst case
+
+Composed through the real `sanitizeHumanError` (what `printHumanError` calls), full 8-bin list with long sibling paths:
+
+```
+full length: 3309
+clipped length: 2002 (cap 2000)
+remedy idx in clipped: -1      <-- `re-run arggon start <id> --worktree` GONE
+discard idx in clipped: -1     <-- `To discard it instead: …` GONE
+first bin idx in clipped: 392
+last bin absent from clip: true
+
+start failed while enforcing x-tracker.strict-gate-bins; the worktree was kept at
+home/dev/projects/ArggonManager-task-cli-start-remediation (nothing was rolled back).
+Fix: run `npm ci` in ... for a worktree-local install. x-tracker.strict-gate-bins is set:
+refusing the claim commit — gate binaries do not resolve inside the worktree:
+worktree-gate-binary-number-0-...: resolves only via PATH from .../node_modules/.bin/…
+```
+
+Diagnosis, no fix — at the cap, with three of the eight named bins already gone. Post-fix the same probe keeps `re-run arggon start …`, `To discard it instead` and `Fix: run npm ci` inside the kept window.
+
+### Gates (worktree cwd, build BEFORE test)
+
+```
+$ npm run build          # ok — bundle rebuilt byte-identical (CLI-only change)
+$ npm test               # Test Files 122 passed (122) · Tests 2277 passed (2277)
+$ npm run lint           # clean
+$ npm run arggon -- validate
+arggon validate: ok (0 warning(s), convention v5)
+$ npm run check:plugin   # build:plugin + git diff --exit-code — no drift
+```
+
+`git status` after `npm run build` shows only the four intended source/test files — `opencode/plugins/arggon/index.bundle.ts` is NOT among them, confirming the CLI-only change leaves the generated bundle untouched (proved, not assumed). No template or skill file touched, so the seam needed no regeneration.
+
+### Class sweep
+
+Four sites in `cli/src/start.ts` fixed together: `worktreeFailureMessage` (the named defect; the single funnel for `strictWorktreeWriteFailure`, `strictGateBinFailure`, `freshWorktreeInstallRefusal`), `gh()`, `commitFile()`, `runPostStart()`'s failure report. Full swept list — compliant sites and the three deferred siblings (`cli/src/board.ts:141` owned by the concurrent `bug-three-acceptance-parsers-diverging`; the kernel-side `gh auth status` wrappers in `lib/src/get-open-prs.ts:67`, `lib/src/import-issues.ts:187`, `lib/src/cleanup.ts:259`) — is recorded in the item's Notes section.
+
+Item left `in_progress` for coordinator review.
