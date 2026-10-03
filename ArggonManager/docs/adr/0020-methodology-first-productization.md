@@ -4,7 +4,7 @@
 - Date: 2026-10-02
 - Deciders: Gonzalo Arganaraz
 - Input: [exploration-methodology-productization-018](../explorations/exploration-methodology-productization-018.md) (2026-10-02)
-- Amendment (2026-10-02): this record's Claude Code **inventory** is corrected
+- Amendment (2026-10-02, PR #610): this record's Claude Code **inventory** is corrected
   against shipped code — it understated the seam. An `arggon init` tree already
   hands a Claude Code client two destinations: the `CLAUDE.md` → `@AGENTS.md`
   pointer **and** the generated `.mcp.json` registering `arggon mcp`. That client
@@ -36,7 +36,7 @@ The frontier interview settled three maintainer constraints: keep everything
 in this repo (no fork), target OpenCode V2 + ZCode first, and validate via
 exploration + ADR + spec + plan with tasks filed.
 
-> Amendment (2026-10-02): the clause "Claude Code has only a `CLAUDE.md`
+> Amendment (2026-10-02, PR #610): the clause "Claude Code has only a `CLAUDE.md`
 > pointer" describes the adapter-bundle work this record planned; it
 > understated what an `arggon init` tree already ships. `.mcp.json` is an
 > `arggon init` destination of the **`claude` seam** — `DOC_PATH_MAP["mcp-json"]`
@@ -87,8 +87,8 @@ Claude Code gap perpetual).
 - Claude Code adapter is a follow-on story with the same bar; today it
   remains docs + `CLAUDE.md`.
 
-  > Amendment (2026-10-02): "today it remains docs + `CLAUDE.md`" is right about
-  > the **bundle** and wrong about the **surface**. Shipped today: the
+  > Amendment (2026-10-02, PR #610): "today it remains docs + `CLAUDE.md`" is
+  > right about the **bundle** and wrong about the **surface**. Shipped today: the
   > `CLAUDE.md` → `@AGENTS.md` shim (`templates/docs/CLAUDE.md`) plus the
   > generated `.mcp.json` registration of `arggon mcp`. The claude seam owns
   > exactly those two destinations — the `claude` entry of `AGENT_TEMPLATES` in
