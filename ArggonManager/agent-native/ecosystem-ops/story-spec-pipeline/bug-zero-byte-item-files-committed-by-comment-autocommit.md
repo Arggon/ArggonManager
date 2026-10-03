@@ -2,7 +2,7 @@
 type: bug
 status: todo
 id: bug-zero-byte-item-files-committed-by-comment-autocommit
-title: "Four item files were committed on main as 0-byte blobs by their own 'chore(tasks): commented' auto-commit — a zero-byte item silently un-claims it and drops its acceptance history"
+title: "Four item files are 0 bytes on main — the emptying commits are NOT all tracker auto-commits (2 are squash-merged PR commits) and three were already empty in the parent, so the corruption travels between worktrees"
 parent: story-spec-pipeline
 labels: [tracker-schema, cli]
 created: "2026-10-03"
