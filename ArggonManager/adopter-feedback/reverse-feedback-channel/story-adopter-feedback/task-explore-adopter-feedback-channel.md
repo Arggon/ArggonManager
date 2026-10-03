@@ -495,3 +495,7 @@ The one exception: link **targets** in the two files main owns were updated so n
 `build` ✅ · `test` ✅ **122 files / 2275 tests** · `lint` ✅ clean · `check:plugin` ✅ · `validate` ✅ ok (0 warnings, convention v5) · `spec validate` ✅ ok (34 docs, **5 warnings — all the pre-existing duplicates above**) · `spec analyze --baseline` ✅ **5 new, 1 resolved, 5 unchanged** — all 5 new are the known duplicates, **zero name my artifacts** · prettier ✅ clean **and idempotent**.
 
 **Tracker-write check:** every mutation ran via `npm run arggon -- …` with the worktree as cwd; all three of this round's commits are on `origin/feat/task-explore-adopter-feedback-channel`; the primary checkout is on `main` and its unpushed commits belong to another session (`bug-prover-agent`), not to me.
+
+### handoff 2026-10-03 @ses_f01435336ffeYS4KAJmBnNqG2k (session: ses_f01435336ffeYS4KAJmBnNqG2k) — next: Re-review PR #586: B1-B4 + N1-N6 + scope calls 4a/4b are in; 4 gates green, residual collisions are the known 5. Coordinator merges and flips ADR 0021 to Accepted.
+- branch: feat/task-explore-adopter-feedback-channel
+- open questions: Agree that dated comment history stays verbatim (renumber map in body instead)? File prettier indent-growth as distinct from bug-prettier-glues-split-inline-code-span? Cut doctor.friction to triggerV…
