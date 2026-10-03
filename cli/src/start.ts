@@ -706,6 +706,27 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
 }
 
 /**
+ * How many gate binaries the human readiness report NAMES.
+ *
+ * Bounded like every other list this repo prints for a human (`MAX_GATE_BINS`
+ * = 8 on the kernel side, `MAX_CLAIM_WRITE_NAMES` = 10 for stamped files,
+ * `assertStartableTree`'s `.slice(0, 10)`), but SMALLER on purpose: this list
+ * is not the message's tail. It sits between two actionable clauses —
+ * `worktreeRemediation`'s exact `npm ci` fix, and the `To discard it instead`
+ * hint the caller appends after it — and each entry carries an absolute path
+ * (~330 chars in a deep checkout), so the full list (~2600 chars at the
+ * MAX_GATE_BINS cap) pushed the discard hint clean off the head-kept
+ * `MAX_HUMAN_ERROR_CHARS` window
+ * (task-cli-start-remediation-tail-clipped-on-human-channel). Two, not one,
+ * because at three the discard hint's tail was still cut: the guarantee this
+ * cap buys is that every ACTIONABLE clause survives the clip WHOLE, not merely
+ * that its first words do. The remainder is COUNTED, never silently dropped;
+ * `--json` consumers read the same message text, which is why the marker names
+ * the count.
+ */
+export const MAX_HUMAN_GATE_BIN_NAMES = 2;
+
+/**
  * Human sentence for a failure report, naming which node_modules the gate
  * binaries actually resolve from (bug-start-worktree-npm-ci-claim). The two
  * observed flavors of a cold-worktree claim-commit failure: no worktree
@@ -725,7 +746,9 @@ function gateBinFailureReport(input: {
       ? null
       : "Readiness: the worktree has no node_modules of its own (nothing resolved, so no gate binary could be probed).";
   }
-  const named = broken
+  const shown = broken.slice(0, MAX_HUMAN_GATE_BIN_NAMES);
+  const extra = broken.length - shown.length;
+  const named = shown
     .map((bin) => {
       if (bin.source === "missing") return `${bin.name}: not resolvable from the worktree`;
       if (bin.source === "path") {
@@ -734,7 +757,9 @@ function gateBinFailureReport(input: {
       return `${bin.name}: resolves from ${bin.path}, above the worktree`;
     })
     .join("; ");
-  return `Readiness: the gate binaries do not resolve inside the worktree — ${named}.`;
+  const more =
+    extra > 0 ? `; and ${extra} more bin${extra === 1 ? "" : "s"} not resolving inside it` : "";
+  return `Readiness: the gate binaries do not resolve inside the worktree — ${named}${more}.`;
 }
 
 /**
@@ -743,6 +768,16 @@ function gateBinFailureReport(input: {
  * retried by the attach re-run, but a failed push is NOT retried by attach
  * (attach only lands a pending claim commit — review F3), so the branch must be
  * pushed manually there.
+ *
+ * ORDERING is load-bearing (task-cli-start-remediation-tail-clipped-on-human-channel):
+ * the `committing the claim` branch's EXACT fix leads and the readiness evidence
+ * trails, for the same head-kept `MAX_HUMAN_ERROR_CHARS` contract every other
+ * remedy on this channel keeps. It used to append the exact fix after the
+ * readiness bin list, so at the reachable worst case (the full
+ * `MAX_GATE_BINS` report, long absolute paths) the clip ate the only clause
+ * that named the command to run. This branch is the MOST COMMON start failure
+ * — the one that actually creates the worktree — so it is the worst place to
+ * leave the class open.
  */
 function worktreeRemediation(input: {
   step: string;
@@ -763,7 +798,9 @@ function worktreeRemediation(input: {
       "The pre-commit gate (or the git commit itself) failed inside the worktree — fix the " +
       "reported cause there (install dependencies, or link the primary checkout's node_modules: " +
       "`ln -s <primary>/node_modules <worktree>/node_modules`; start does this itself when the " +
-      `primary has one), then ${attach}.${observed === "" ? "" : ` ${observed}`}${installFix}`
+      // Both remedy clauses, then the evidence: the exact fix used to trail the
+      // readiness list and the 2000-char head-clip ate it whole.
+      `primary has one), then ${attach}.${installFix}${observed === "" ? "" : ` ${observed}`}`
     );
   }
   if (input.step.startsWith("pushing")) {
