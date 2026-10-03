@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-spec-analyze-does-not-detect-duplicate-doc-numbers
 title: "`arggon spec analyze` / `validate` cannot detect two documents sharing one number (ADR 0020 x2, exploration -018 x2, spec/plan -017 x2) — git merges them silently"
 assignee: Arggon
@@ -8,7 +8,6 @@ parent: story-spec-pipeline
 labels: [spec-pipeline, adr]
 created: "2026-10-02"
 updated: "2026-10-03"
-claimed_at: "2026-10-03T02:17:29.711Z"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-spec-analyze-does-not-detect-duplicate-doc-numbers.md
