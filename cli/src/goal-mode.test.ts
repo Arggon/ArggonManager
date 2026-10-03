@@ -29,7 +29,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { acceptanceComplete, runCreate, runShow, runUpdate } from "@arggondev/lib";
+import { acceptanceComplete, runComment, runCreate, runShow, runUpdate } from "@arggondev/lib";
 import { runInit } from "./init.js";
 import { parseAcceptanceRows } from "./board.js";
 import { normalizeEol } from "./docs.js";
@@ -111,9 +111,19 @@ function treeWithTask(
   return { dir, id };
 }
 
-/** The derivation as `runGoal` performs it, for the pure corpus matrix. */
+/**
+ * The derivation as `runGoal` performs it, for the pure corpus matrix. It takes
+ * the WHOLE item body (what the done gate reads) — passing a trimmed/filtered
+ * body here would test a different question, which is exactly how the round-2
+ * defect survived: the verdict was the right predicate on the wrong input.
+ */
 function deriveAsRun(body: string): ReturnType<typeof deriveGoal> {
   return deriveGoal(parseAcceptanceRows(normalizeEol(body)), !acceptanceComplete(body));
+}
+
+/** One `arggon comment` section, as `runComment` appends it. */
+function comment(text: string, date = "2026-10-02"): string {
+  return `\n### ${date} @someone\n${text}\n`;
 }
 
 // ---------------------------------------------------------------------------
@@ -195,6 +205,22 @@ describe("parity corpus: the goal never inverts the done gate", () => {
       gateUnchecked: true,
       objective: /^x$/,
     },
+    // The ONLY boxes live in an `arggon comment` section — a first-class shape
+    // here (`create` has no `--body` flag; `bug-empty-template-checkbox` is the
+    // stale empty box that shape leaves behind). The gate reads the whole body,
+    // so a verdict taken on the prose alone (comments stripped) would invert.
+    {
+      name: "checklist filed as a comment (the round-2 input-layer inversion)",
+      checklist: "- [ ]" + comment("- [ ] criterion filed in a comment"),
+      gateUnchecked: true,
+      objective: /criterion filed in a comment/,
+    },
+    {
+      name: "checked-in-a-comment only (gate satisfied, nothing to loop on)",
+      checklist: "- [ ]" + comment("- [x] shipped, filed in a comment"),
+      gateUnchecked: false,
+      objective: /DEFINE THE GOAL FIRST/,
+    },
   ];
 
   for (const testCase of cases) {
@@ -216,6 +242,21 @@ describe("parity corpus: the goal never inverts the done gate", () => {
       if (!gateUnchecked) expect(goal.hasGoal).toBe(false);
     });
   }
+
+  it("the comment-filed case bites: a comment-stripped input inverts the gate (round 2)", () => {
+    const source = body(`- [ ]${comment("- [ ] criterion filed in a comment")}`);
+    // The gate reads the whole body and refuses to close…
+    expect(acceptanceComplete(source)).toBe(false);
+    // …while the round-2 build took its verdict from the comment-stripped prose:
+    const proseOnly = source.slice(0, source.indexOf("### 2026-"));
+    const round2 = deriveGoal(
+      parseAcceptanceRows(normalizeEol(proseOnly)),
+      !acceptanceComplete(proseOnly),
+    );
+    expect(round2.hasGoal, "the defect this pins").toBe(false);
+    // One canonical body for the predicate AND the text (what ships now):
+    expect(deriveAsRun(source).hasGoal).toBe(true);
+  });
 
   it("CRLF: gate and contract agree (the round-1 inversion)", () => {
     const lf = body("- [ ] crlf criterion\n- [x] done one");
@@ -364,6 +405,28 @@ describe("runGoal (rendered contract from a real item)", () => {
     }
     expect(result.goal.objective.endsWith("…")).toBe(true);
     expect(result.contract).toContain("Some checklist text was clipped or deferred");
+  });
+
+  it("agrees with the done gate when the checklist is filed as a comment, end to end", () => {
+    // `arggon create` has no `--body` flag, so a checklist filed as an
+    // `arggon comment` is a first-class shape (bug-empty-template-checkbox is
+    // the stale empty box it leaves). The done gate reads the whole body; the
+    // goal must read the same one, or the contract claims "nothing left" while
+    // the gate refuses to close.
+    const { dir, id } = treeWithTask("- [ ]", { assignee: "Arggon" });
+    runComment({
+      cwd: dir,
+      id,
+      text: "- [ ] criterion filed in a comment",
+      author: "Arggon",
+      now: NOW,
+    });
+    const item = runShow({ cwd: dir, id }).item;
+    expect(acceptanceComplete(item.body), "gate: unchecked work remains").toBe(false);
+    const result = runGoal({ cwd: dir, id, login: "Arggon" });
+    expect(result.goal.gateUnchecked).toBe(true);
+    expect(result.goal.hasGoal).toBe(true);
+    expect(result.goal.objective).toBe("criterion filed in a comment");
   });
 
   it("states the one-item / one-worktree boundaries in the rendered contract", () => {

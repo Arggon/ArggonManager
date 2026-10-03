@@ -15,8 +15,10 @@
  *   1. ONE objective = the item's first UNCHECKED acceptance criterion. WHICH
  *      criteria exist is decided by the KERNEL's done-gate predicate
  *      `acceptanceComplete` (lib/src/items.ts) — the same call the `done` flip
- *      is refused by, so a goal can never tell an agent "nothing left to do"
- *      while the gate refuses to close the item. The criterion TEXT comes from
+ *      is refused by, on the SAME canonical input (`item.body`, comment
+ *      sections included; a reader that trims or filters first has changed the
+ *      question), so a goal can never tell an agent "nothing left to do" while
+ *      the gate refuses to close the item. The criterion TEXT comes from
  *      the board renderer's row parser (cli/src/board.ts), normalized to LF
  *      first (its regex is CRLF-blind, `.` never matches `\r`) and filtered
  *      through no rule of its own beyond "has text" (the gate's own rule: a box
@@ -191,8 +193,10 @@ export type GoalContract = {
   /** Acceptance-checklist arithmetic behind the contract. */
   checklist: { total: number; unchecked: number; checked: number };
   /**
-   * The DONE GATE's verdict, verbatim: `!acceptanceComplete(item body)`. The
-   * goal never disagrees with it — this is the load-bearing invariant.
+   * The DONE GATE's verdict, verbatim: `!acceptanceComplete(item.body)` — the
+   * same predicate AND the same canonical input the `done` flip is refused by
+   * (comment sections included). The goal never disagrees with it; that is the
+   * load-bearing invariant.
    */
   gateUnchecked: boolean;
   /** Where the loop may run, and whether the item recorded a worktree. */
@@ -252,10 +256,11 @@ function oneLine(text: string): string {
  * The derivation, pure: criterion rows + the DONE GATE's verdict → objective +
  * verification.
  *
- * `hasUncheckedCriterion` is `!acceptanceComplete(body)` — the kernel predicate
- * the `done` flip is refused by — so the goal's "is there work left" answer can
- * never contradict the gate's. The rows only supply TEXT. Three shapes, and no
- * fourth:
+ * `hasUncheckedCriterion` is `!acceptanceComplete(item.body)` — the kernel
+ * predicate the `done` flip is refused by, on the same canonical body (comments
+ * included) — so the goal's "is there work left" answer can never contradict the
+ * gate's. The rows only supply TEXT, parsed from that same body. Three shapes,
+ * and no fourth:
  *
  *   - work remains and a criterion line was read → one objective (the first
  *     unchecked one) + the unchecked criteria as the verification contract;
@@ -520,11 +525,18 @@ export function runGoal(opts: GoalOptions): GoalResult {
   assertWorktree(root, item);
 
   const template = loadGoalTemplate(root, opts.templatesDir);
-  // The DONE GATE decides whether work remains (`acceptanceComplete` is the
-  // predicate a `done` flip is refused by); the row parser only supplies text,
-  // and its CRLF blindness is neutralized by normalizing the prose first.
-  const gateUnchecked = !acceptanceComplete(shown.prose);
-  const prose = clip(shown.prose, MAX_GOAL_PROSE_BYTES);
+  // **One canonical body, every predicate.** `item.body` — the WHOLE body,
+  // comment sections included — is exactly what the done gate reads
+  // (`lib/src/update.ts:526`, `!acceptanceComplete(item.body)`), so the gate's
+  // verdict here is taken on the same input. A reader that trims or filters
+  // before calling has changed the question: `shown.prose` (body minus
+  // comments) is what makes a checklist filed as an `arggon comment` —
+  // first-class here, since `create` has no `--body` flag and
+  // `bug-empty-template-checkbox` exists for exactly that case — vanish from
+  // the goal while the gate still refuses to close the item. Both the verdict
+  // and the criterion text therefore read `item.body`.
+  const gateUnchecked = !acceptanceComplete(item.body);
+  const prose = clip(item.body, MAX_GOAL_PROSE_BYTES);
   const rows = parseAcceptanceRows(normalizeEol(prose.text));
   const derived = deriveGoal(rows, gateUnchecked);
   const worktreePath = item.worktreePath ?? root;
