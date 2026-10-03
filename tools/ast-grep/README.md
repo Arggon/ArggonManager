@@ -218,7 +218,7 @@ Deliberately outside its scope:
 
 - A box spelled with a quantifier inside the class (`\[(x)?\]`) is not
   recognised.
-- It matches syntax, not meaning: a regex that merely *mentions* a box (a
+- It matches syntax, not meaning: a regex that merely _mentions_ a box (a
   sanitizer, a test oracle) is flagged too. That is why `lib/src/**` (the
   grammar's owner) and `**/*.test.ts` (where the parity suite keeps the
   PRE-FIX parsers as oracles) are excluded — the guard is for production
