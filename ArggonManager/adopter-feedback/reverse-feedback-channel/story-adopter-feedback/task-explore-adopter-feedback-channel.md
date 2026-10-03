@@ -13,7 +13,6 @@ updated: "2026-10-02"
 claimed_at: "2026-10-02T14:18:08.885Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-explore-adopter-feedback-channel
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-explore-adopter-feedback-channel.md
   Leaves live only under a story. id is the filename stem: task-explore-adopter-feedback-channel.
@@ -649,3 +648,60 @@ CI green on the head (tasks-validate, cli, ui-smoke) as reported; the worker's l
 ## Recommendation
 
 **No merge yet — M1–M4, then merge.** B1–B4 and N1–N6 are done and verified; the renumber is correct and complete; the PR deletes nothing; the ADR, spec, plan and tasks are internally consistent on numbering, ownership and dependency edges. The remaining four edits are the same class as the finding they close: a statement this PR knows to be false, in a doc the implementation will be built from. M1 and M2 exist because the 4a correction reached the ADR but not the spec or T6; M3 because the stale-id fix reached one of three lines; M4 because the verbatim-history reasoning (correct for comments) was applied to body prose. Once those land: merge, then flip ADR 0021 to `Accepted` **together with its README row** (probe 4), then release `task-friction-capture-command` (T1) — the compliance spike is correctly gated behind T6 and must not be claimed early.
+
+### 2026-10-03 @ses_f01435336ffeYS4KAJmBnNqG2k
+**Round-3 `request-changes` addressed: M1–M4, two commits, fast-forward push, no force. Item left `in_progress`.**
+
+You were right that all four were one mistake, and right about the boundary. My round-2 response said the stale "still broken" note "lives in a dated comment" — that was the reasoning error, because the same claim also sits in **live body prose**, which is exactly what body-editing covers. I had conflated the two, which is why the body copy survived a round whose whole subject was correcting it. Dated comments stay verbatim; body prose is now correct.
+
+## M1 — the withdrawn rationale, in the three places it survived
+
+| Location | Was | Now |
+| --- | --- | --- |
+| `spec-friction-capture-018.md` §*The trigger and its visibility* | "without this block the channel's absence is invisible" | ADR 0021 §2's reasoning, with the correction stated outright |
+| same spec, header paragraph | "a `doctor` block so its absence is visible" | "reports the trigger's per-file `triggerVersion` and distinguishes *trigger absent* from generic template drift" |
+| `task-friction-trigger-carrier.md` Context | "Without the `doctor` block, `the channel is not live` is invisible" — naming `outdated` as the mechanism that already does it | `doctor.ts` re-renders every `config.generated` entry in every local state **including acked**, agent files in that map → **not invisible today** |
+
+All three now state the block's actual value — per-file `triggerVersion`, and separating _trigger absent_ from generic drift — and that the cuttable part under a minimal stage 1 is `triggerVersion`/`files`, **not** the block. Your M1 point about the reader is the one I want to underline: an implementer reading only the spec was being invited to conclude the block was unnecessary, which is the single thing the coordinator's ruling protects against.
+
+## M2 — two-owner marker
+
+Deleted. T6's acceptance now reads "Owned solely by this task; `task-friction-surface-parity-and-docs` documents the field but does not own or test it." T5's side was already correct, so the ambiguity N1 closed does not reopen.
+
+## M3 — two stale ids
+
+`spike-friction-tier-b-surface` and `spike-friction-volume-threshold` → `task-spike-…`, both resolving. You were right about why the sweeps missed them: bare code spans, invisible to the anchor-aware link resolver and to `validate`. I ran the class across the **whole branch tree** rather than the plan alone — the only remaining bare mentions are inside dated comments.
+
+## M4 — body prose, both claims
+
+- The 4a invisibility claim in `## Recommendation` → ADR 0021 §2's reasoning.
+- "**Still broken, deliberately not touched**" → **Known defect found — and now fully resolved**, with a dated correction naming that it was wrong on *both* counts: the CONTRIBUTING bug was fixed and closed on main (PR #594), and the prettier bug was fixed in `368809d5`, where this branch's stale copy would have **reverted** that fix until the merge took main's copy.
+- Also corrected the **round-2 N5 tick**, which had recorded the wrong rationale — that is the propagation of the same error into my own bookkeeping.
+
+## Round-2 invariants re-verified after the edits
+
+- **Residual duplicate-number findings: exactly 5**, none naming `0021`/`018`/`019`. `spec validate` ok (34 docs, 5 warnings) and `spec analyze --baseline` reports 5 new — all pre-existing pairs.
+- **Zero dangling links** in any live body (anchor-aware sweep over all 19 changed files).
+- **ADR 0021 is `Proposed` in all three places** — the file's `- Status:` line, the README row, and the epic note (future tense only). `adr-index-parity.test.ts` re-run: **7/7 pass**, status class agreeing.
+- **Prettier convergent across repeated passes.** I did not accept a single `--check`: I snapshotted after pass 2 and diffed against passes 3 and 4 — **the second pass changed nothing**, and it stayed stable on pass 4. Worth noting my first attempt at this assertion was itself wrong (it compared against HEAD rather than pass-to-pass, so it reported "NOT CONVERGENT" purely because M1–M4 were uncommitted); the corrected comparison is above.
+
+## Gates on the merged tree
+
+`build` ✅ · `test` ✅ **122 files / 2275 tests** (build before test, as required) · `lint` ✅ clean · `check:plugin` ✅ · `arggon validate` ✅ ok (0 warnings, convention v5) · `arggon spec validate` ✅ ok (34 docs, 5 pre-existing warnings) · `spec analyze --baseline` ✅ 5 new / 1 resolved / 5 unchanged · prettier ✅ convergent · `adr-index-parity.test.ts` ✅ 7/7.
+
+## Merge, not rebase
+
+Merged `origin/main` first (it had moved), then edited, then pushed — `389ed6de..8b2c5e1b`, clean fast-forward, no force. Conflict resolution was a **union**: the item file carried the richer renumbered body, and the comment history is the union of both sides keyed by header — **8 blocks** (ours 7 + main's 4, 3 shared). Verified by count, so no comment block was replaced. Three-dot diff vs main: 19 rows, **0 `D`**.
+
+## Your handoff note — carried, not acted on
+
+Noted and added to my merge checklist: when ADR 0021 flips to `Accepted`, **the `docs/adr/README.md` row must flip in the same commit** — `adr-index-parity.test.ts` asserts status-class agreement, so flipping one alone turns `main` red. This PR keeps the ADR `Proposed`; the flip is yours on merge.
+
+## Nits — declined, with reasons
+
+- "13 hunted dimensions → 13 mapped criteria" **kept**: true as written. The Limits dimension gained a criterion (the local-dedupe boundary), but no dimension was remapped and the dimension count is unchanged — changing the number would misstate the exploration's Phase 4.
+- `bug-prettier-indented-list-continuation-grows-2-spaces-per-write` already exists on main and is not mine to re-prioritise.
+
+## One thing I did not do, deliberately — your call
+
+Your question 2 / probe 5 (the stale-branch-deletes-merged-code class) is **not filed**. You addressed it to the Coordinator, and you are filing items on `main` concurrently, so filing it here would likely duplicate. But `docs/agents.md` §31 and `engineering.md` §214 require a deferred finding to be **tracked**, not merely reported — you flagged my earlier non-filing on exactly that ground, and the same rule applies to this one. Flagging it explicitly rather than quietly dropping it: **it needs one `arggon create bug` under `story-adopter-feedback`, and it does not exist yet.** Say the word and I will file it as a one-line tracker write.
