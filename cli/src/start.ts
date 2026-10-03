@@ -226,8 +226,10 @@ export type PostStartResult = {
   /** False when the command exited non-zero or could not be spawned. */
   ok: boolean;
   /**
-   * Human-readable failure report (`post-start failed: <cmd> → <stderr tail>`);
-   * absent on success. Failure is never fatal to the start itself.
+   * Human-readable failure report (`(hint: …) post-start failed: <cmd> → <stderr
+   * tail>`); absent on success. Failure is never fatal to the start itself. The
+   * hint LEADS — the human channel clips this line head-kept
+   * (task-cli-start-remediation-tail-clipped-on-human-channel).
    */
   error?: string;
 };
@@ -302,8 +304,13 @@ function gh(args: string[], cwd: string): string {
       throw new Error(`gh not found (install gh and run \`gh auth login\` for draft PRs)`);
     }
     const message = err instanceof Error ? err.message : String(err);
+    // ORDERING is load-bearing (task-cli-start-remediation-tail-clipped-on-human-channel),
+    // same contract `worktreeFailureMessage` documents: the human channel clips
+    // a whole error line head-kept at MAX_HUMAN_ERROR_CHARS (2000) and gh's
+    // stderr is unbounded, so the one actionable clause leads and the raw tool
+    // text trails. Only the clause ORDER moved.
     throw new Error(
-      `gh ${args.join(" ")} failed${stderr ? `: ${stderr}` : ` (${message})`} (check \`gh auth status\`)`,
+      `Check \`gh auth status\`. gh ${args.join(" ")} failed${stderr ? `: ${stderr}` : ` (${message})`}`,
     );
   }
 }
@@ -359,8 +366,11 @@ export function defaultStartGit(): StartGit {
         git(["commit", "-m", message], cwd);
       } catch (err) {
         const detail = err instanceof Error ? err.message : String(err);
+        // Same head-kept clip contract as the gh wrapper above: the identity
+        // hint is the only actionable clause, so it leads and git's unbounded
+        // commit output trails.
         throw new Error(
-          `${detail} (if this is an identity error, set \`git config user.name\` / \`git config user.email\`)`,
+          `If this is an identity error, set \`git config user.name\` / \`git config user.email\`. ${detail}`,
         );
       }
     },
@@ -427,11 +437,16 @@ function outputTail(output: string): string {
 }
 
 /**
- * Actionable hint appended to every post-start failure report
- * (task-post-start-env): the hook inherits the invoking arggon process
- * environment, so tools installed outside that PATH (rustup's ~/.cargo/bin,
- * mise/asdf shims) fail with "command not found" even though they work in an
- * interactive shell.
+ * Actionable hint for every post-start failure report (task-post-start-env):
+ * the hook inherits the invoking arggon process environment, so tools installed
+ * outside that PATH (rustup's ~/.cargo/bin, mise/asdf shims) fail with
+ * "command not found" even though they work in an interactive shell.
+ *
+ * ORDERING is load-bearing (task-cli-start-remediation-tail-clipped-on-human-channel),
+ * same contract `worktreeFailureMessage` documents: the hint LEADS and the
+ * hook's raw output trails, because this string is printed through
+ * `sanitizeHumanError` (the human channel's head-kept MAX_HUMAN_ERROR_CHARS
+ * clip) and a hook's stderr tail is unbounded.
  */
 const POST_START_FAILURE_HINT =
   "(hint: hooks inherit the environment of the process that ran arggon — " +
@@ -455,7 +470,10 @@ export function runPostStart(
   const failure = (detail: string): PostStartResult => ({
     command,
     ok: false,
-    error: `post-start failed: ${command} → ${detail} ${POST_START_FAILURE_HINT}`,
+    // Hint FIRST, hook output last — the human channel clips this whole line
+    // head-kept at MAX_HUMAN_ERROR_CHARS and the stderr tail is unbounded
+    // (task-cli-start-remediation-tail-clipped-on-human-channel).
+    error: `${POST_START_FAILURE_HINT} post-start failed: ${command} → ${detail}`,
   });
   let result: ReturnType<typeof spawnSync>;
   try {
@@ -797,8 +815,21 @@ export function startTakeoverNotes(claim: WorktreeClaimReceipt | undefined): str
  * The worktree is NEVER rolled back (bug-start-worktree-node-modules): the
  * diagnostic context survives, and the message names the failing step, the
  * kept path, the remediation, and the attach re-run.
+ *
+ * ORDERING is load-bearing (task-cli-start-remediation-tail-clipped-on-human-channel):
+ * the actionable remediation — `worktreeRemediation` plus the discard hint —
+ * comes BEFORE the kernel detail, because the human channel clips a whole
+ * error line head-kept at `MAX_HUMAN_ERROR_CHARS` (2000) and the reachable
+ * worst case is a kernel refusal carrying its evidence list (the full
+ * `MAX_GATE_BINS` = 8 named bins, ~330 chars an entry; `strictWorktreeWriteFailure`'s
+ * ten named dirty paths; `freshWorktreeInstallRefusal`'s bin list). With this
+ * wrapper's own remedy last it was exactly what the clip ate — the operator got
+ * the diagnosis and no way forward. Same contract the kernel refusals
+ * themselves keep (`strictGateBinFailure`, #597) and the native seam composes
+ * (#579/#595): remedies lead, evidence trails, on both channels. Only the clause
+ * ORDER moved — every clause is verbatim, none added or dropped.
  */
-function worktreeFailureMessage(input: {
+export function worktreeFailureMessage(input: {
   id: string;
   branch: string;
   worktreePath: string;
@@ -814,7 +845,6 @@ function worktreeFailureMessage(input: {
   return (
     `start failed while ${input.step}; the worktree was kept at ${input.worktreePath} ` +
     `(nothing was rolled back).\n` +
-    `${detail}\n` +
     `${worktreeRemediation({
       step: input.step,
       id: input.id,
@@ -822,7 +852,8 @@ function worktreeFailureMessage(input: {
       worktreePath: input.worktreePath,
       readiness: input.readiness,
     })} ` +
-    `To discard it instead: \`${discard}\`.`
+    `To discard it instead: \`${discard}\`.\n` +
+    `${detail}`
   );
 }
 
