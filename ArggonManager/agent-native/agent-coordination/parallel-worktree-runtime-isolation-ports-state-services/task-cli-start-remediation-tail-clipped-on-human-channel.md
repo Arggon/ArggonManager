@@ -237,3 +237,7 @@ Every actionable clause leads; all evidence trails. `--json` keeps the full raw 
 **Gates** (build BEFORE test): `npm run build` (bundle byte-identical) · `npm test` 122 files / 2280 tests · `npm run lint` · `npm run arggon -- validate` ok · `npm run check:plugin` no drift · `npm run test:structure` 3 passed · `npm run lint:structure` clean.
 
 **Acceptance #4** stays ticked but is annotated: round 1 ticked it at four sites and was wrong. It is re-ticked only now that the fifth site is fixed and the four non-reachable deferrals are corrected — with a note that a future site needs the `indexOf` presence-guard idiom, not another one-line reorder.
+
+### handoff 2026-10-03 @Arggon — next: Re-review+merge PR #608: F1 fifth site fixed, docs+tests repaired, cli job green (run 37094336430)
+- branch: feat/task-cli-start-remediation-tail-clipped-on-human-channel
+- open questions: Acceptance #4 is ticked with an annotation saying round 1 got it wrong — re-tick or leave?; MAX_HUMAN_GATE_BIN_NAMES=2 is my bound choice (3 still cut the discard hint) — sanity-check that trade-off?
