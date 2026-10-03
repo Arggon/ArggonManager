@@ -15,15 +15,18 @@
  * suite does not "fix the number" — it removes the surface:
  *
  *   1. NO RESTATEMENT. A carrier may link to an ADR; it may not say what status
- *      that ADR is in. The rule is checked over the LABEL REGION of each ADR
- *      reference — the prose between the previous list delimiter and the link's
- *      target, so it covers a status written before the link AND one written
- *      inside the link's own text. The defect's shape is the first:
- *      `milestone field (Proposed): [ADR 0003](…)` puts the status before the
- *      link, so a link-text-only scan would pass vacuously over the very
- *      sentence it exists to catch. The lifecycle vocabulary in §ADR process
- *      (`Proposed in a PR → Accepted on merge`) is prose about the PROCESS and
- *      carries no ADR reference, so it is not a status claim and does not fire.
+ *      that ADR is in. The rule is checked over each reference's REGION — the
+ *      prose before the link, the link's own text, and the clause after it — so
+ *      all three places a status is naturally written are read: `milestone field
+ *      (Proposed): [ADR 0003](…)` (the defect's own shape, before the link),
+ *      `[ADR 0003 (Proposed)](…)` (inside the link text) and `[ADR 0003](…)
+ *      (Proposed)` (after it). A scan of the link text alone would pass
+ *      vacuously over the very sentence it exists to catch, and a scan of the
+ *      preceding prose alone misses the trailing form. The clause after a link
+ *      stops at a sentence/comma/list boundary, so a long prose line's later
+ *      sentences are not read as claims about the ADR. The lifecycle vocabulary
+ *      in §ADR process (`Proposed in a PR → Accepted on merge`) carries no ADR
+ *      reference, so it is prose about the PROCESS and does not fire.
  *   2. LINKS RESOLVE, AND THE NUMBER IS THE FILENAME'S. Every `./adr/NNNN-…`
  *      reference in the carrier must point at a real ADR file whose name
  *      carries the same number — so renaming or renumbering an ADR (0015 was
@@ -37,17 +40,28 @@
  * `adr-index-parity.test.ts` takes over the index).
  *
  * Premise guards matter here more than usual: after this suite landed the real
- * carrier is CLEAN, so rule 1's `problems` array is legitimately empty and an
+ * carriers are CLEAN, so rule 1's `problems` array is legitimately empty and an
  * ordinary assertion on it would prove nothing about the scanner. The first
- * test therefore runs the scanner over synthetic carrier text — including the
- * exact pre-fix sentence from this bug — and asserts it finds what it must.
+ * test therefore runs the scanner over synthetic carrier text — the exact
+ * pre-fix sentence, and each of the three shapes a status can take around a
+ * link — and asserts it finds what it must and ignores what it must not.
  *
- * Scope: the carrier this item owns (`engineering.md`). `agents.md` and
- * `convention.md` are listed in `CARRIERS` and are clean today, but
- * `convention.md` links to `./adr/0015-done-gate.md`, a file that no longer
- * exists, so rule 2 would fail on it — repairing that link is a separate item
- * (reported on bug-engineering-doc-stale-adr-statuses) and adding these two
- * names to the list is then a one-line change.
+ * The §ADR process sentence in `engineering.md` NAMES the carriers each rule
+ * covers, which makes the doc and the two constants the same fact stated twice.
+ * One test reads the sentence back out of the doc and asserts it names exactly
+ * the carriers the rules iterate, so neither side can narrow alone: the failure
+ * mode this suite exists to prevent is a document claiming coverage the code
+ * does not have, and that failure is in the code's own file header as much as in
+ * the prose.
+ *
+ * Scope: rule 1 covers all three methodology carriers (`STATUS_CARRIERS`).
+ * Rule 2 covers `engineering.md` only (`LINK_CARRIERS`), because
+ * `convention.md:124` links to `./adr/0015-done-gate.md`, a file that no longer
+ * exists — a dead link owned by
+ * `ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-convention-md-links-nonexistent-adr-0015.md`,
+ * and the reason both constants are separate. ADRs, plans, specs, explorations
+ * and tracker items are deliberately NOT pinned: they are dated records of what
+ * was true when written, and this repo supersedes rather than rewrites them.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -59,11 +73,28 @@ const docsDir = join(repoRoot, "ArggonManager/docs");
 const adrDir = join(docsDir, "adr");
 
 /**
- * Methodology carriers whose ADR references are pinned. A carrier is a place a
- * status is tempted into; see the Scope note above for why this list is one
- * entry today.
+ * Rule 1's carriers: every methodology carrier, because a carrier is a place a
+ * status is tempted into and this rule is the whole point. `engineering.md`,
+ * `agents.md` and `convention.md` are all clean on the field today, so the three
+ * cost nothing.
  */
-const CARRIERS: readonly string[] = ["ArggonManager/docs/engineering.md"];
+const STATUS_CARRIERS: readonly string[] = [
+  "ArggonManager/docs/engineering.md",
+  "ArggonManager/docs/agents.md",
+  "ArggonManager/docs/convention.md",
+];
+
+/**
+ * Rule 2's carriers: narrower, deliberately. `convention.md:124` links
+ * `./adr/0015-done-gate.md`, which does not exist (the file is
+ * `0015-done-gate-acceptance-waiver.md`), so rule 2 would fail on it today.
+ * That dead link is
+ * `ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-convention-md-links-nonexistent-adr-0015.md`;
+ * adding `convention.md` here is a one-line change once it lands. Rule 2 is not
+ * split per-carrier anywhere else — a status restated in a carrier this list
+ * omits is still caught by rule 1.
+ */
+const LINK_CARRIERS: readonly string[] = ["ArggonManager/docs/engineering.md"];
 
 /** `./adr/0003-milestone-field.md` — the ADR index link `./adr/README.md` is not one. */
 const ADR_LINK = /\(\.\/adr\/(\d{4})-([a-z0-9-]+)\.md\)/g;
@@ -76,10 +107,27 @@ const ADR_LINK = /\(\.\/adr\/(\d{4})-([a-z0-9-]+)\.md\)/g;
  */
 const LABEL_DELIMITERS = /[·|\n]/;
 
+/**
+ * Where the TRAILING window of a reference stops: the first of a sentence end, a
+ * comma, a list delimiter or a line break. Without this the window would run to
+ * the end of the line, and a long prose line would drag unrelated text into a
+ * status check — `agents.md:473` continues for hundreds of characters past its
+ * ADR links, so a window that wide would report prose that has nothing to do
+ * with any ADR's status. A status for a specific ADR is written as a short
+ * appositive right after its link — `(Proposed)`, `— superseded by 0011` — so one
+ * clause is the whole shape worth reading.
+ */
+const TAIL_STOPS = /[·|,\n]|\.\s/;
+
 interface CarrierReference {
   /** `0003` */
   number: string;
-  /** Prose before the link, plus the link's own text; the target is stripped. */
+  /**
+   * The reference's region on both sides of its link: prose before it, the
+   * link's own text, and the clause after it. The link target is stripped. This
+   * is where a status of THAT ADR would be written, which is why all three
+   * shapes are read and all three are pinned in the premise test.
+   */
   label: string;
   /** The `./adr/…` target as written. */
   target: string;
@@ -112,21 +160,32 @@ function adrFiles(): string[] {
 }
 
 /**
- * Every ADR reference in `source`, in order, with the label region a status
- * claim would be written into. Pure over its input so the premise test can run
- * it over synthetic text.
+ * Every ADR reference in `source`, in order, with the region a status claim
+ * about THAT ADR would be written into — on either side of its link. Pure over
+ * its input so the premise test can run it over synthetic text.
  */
 function adrReferences(source: string): CarrierReference[] {
   const references: CarrierReference[] = [];
   for (const line of source.split("\n")) {
-    let from = 0;
-    for (const match of line.matchAll(ADR_LINK)) {
+    const matches = [...line.matchAll(ADR_LINK)];
+    for (const [index, match] of matches.entries()) {
       const at = match.index!;
-      // The label is what a reader reads as this ADR's description, so it is
-      // the only place a status of THAT ADR could be stated.
-      const label = line.slice(from, at).split(LABEL_DELIMITERS).pop() ?? "";
-      references.push({ number: match[1]!, label, target: `./adr/${match[1]}-${match[2]}.md` });
-      from = at + match[0].length;
+      const end = at + match[0].length;
+      const from = index === 0 ? 0 : matches[index - 1]!.index! + matches[index - 1]![0].length;
+      // Before the link: prose plus the link's own text (`[ADR 0003 (Proposed)]`),
+      // narrowed to the segment nearest the link — a status is written about the
+      // ADR it is next to, not about the previous list item.
+      const head = line.slice(from, at).split(LABEL_DELIMITERS).pop() ?? "";
+      // After the link: one clause, stopping at the next ADR reference, a list
+      // delimiter or a sentence/comma boundary. Reading no trailing text at all is
+      // the hole a restatement written `… [ADR 0003](…) (Proposed)` slips through.
+      const until = matches[index + 1]?.index ?? line.length;
+      const tail = line.slice(end, until).split(TAIL_STOPS)[0] ?? "";
+      references.push({
+        number: match[1]!,
+        label: `${head} ${tail}`.trim(),
+        target: `./adr/${match[1]}-${match[2]}.md`,
+      });
     }
   }
   return references;
@@ -151,6 +210,39 @@ function declaredStatus(file: string): string {
     /^-\s*\*{0,2}Status\*{0,2}:\s*(.+)$/m,
   );
   return line?.[1]?.trim() ?? "(no - Status: line)";
+}
+
+/**
+ * The §ADR process coverage statement about this very suite, read back out of
+ * the doc: `Coverage: status restatement in <carriers>; link resolution in
+ * <carriers>.` The doc naming the carriers it covers and the two constants
+ * naming the carriers the suite covers are the SAME fact stated twice, so one of
+ * them drifting has to fail a test — otherwise the sentence goes back to
+ * claiming coverage the suite does not have, which is the shape of the defect
+ * this suite exists to prevent (and of the defect this PR originally wrote). The
+ * delimiters are ASCII on purpose: the sentence is prose, and a parse that
+ * depended on an em dash or a curly quote would fail for reasons no reader could
+ * act on.
+ */
+const COVERAGE_CLAIM = "**Coverage: status restatement in ";
+const LINK_COVERAGE_CLAIM = "; link resolution in ";
+
+/** The one paragraph in `file` containing `anchor`; more or fewer fails. */
+function paragraphWith(file: string, anchor: string): string {
+  const found = read(file)
+    .split(/\n[ \t]*\n/)
+    .filter((paragraph) => paragraph.includes(anchor));
+  expect(
+    found.length,
+    `${file}: expected exactly one paragraph containing "${anchor}", found ${found.length} — ` +
+      "keep this suite's anchor together with the sentence it pins",
+  ).toBe(1);
+  return found[0]!;
+}
+
+/** Backticked `.md` filenames in `clause`, as paths this suite would use. */
+function carriersNamedIn(clause: string): string[] {
+  return [...clause.matchAll(/`([^`]*\.md)`/g)].map((match) => `ArggonManager/docs/${match[1]}`);
 }
 
 describe("the carrier pins ADR references to the ADR files", () => {
@@ -182,6 +274,36 @@ describe("the carrier pins ADR references to the ADR files", () => {
     ).toEqual([]);
     // An ADR index link is not an ADR reference at all.
     expect(adrReferences("the [ADR index](./adr/README.md) is the register")).toEqual([]);
+
+    // A status can be written on either side of the link, or inside its text.
+    // All three shapes must be pinned HERE, not only in a drift simulation: a
+    // scanner narrowed to one shape leaves the rule below passing over a carrier
+    // the same PR cleaned, so a lost half of the region is invisible unless an
+    // assertion names it.
+    const one = (line: string) => statedStatuses(adrReferences(line)[0]!.label);
+    expect(one("- x: milestone (Proposed): [ADR 0003](./adr/0003-milestone-field.md)")).toEqual([
+      "Proposed",
+    ]);
+    expect(one("- x: [ADR 0003 (Proposed)](./adr/0003-milestone-field.md)")).toEqual(["Proposed"]);
+    expect(one("- x: [ADR 0003](./adr/0003-milestone-field.md) (Proposed)")).toEqual(["Proposed"]);
+    // …and the clause AFTER a link stops where unrelated prose begins, so a long
+    // line's later sentences are not read as claims about the ADR.
+    expect(
+      one(
+        "- x: [ADR 0011](./adr/0011-native-first-architecture.md) is the contract, and " +
+          "a change is accepted only once it is explicitly recorded.",
+      ),
+    ).toEqual([]);
+    // A status belonging to a DIFFERENT ADR's clause is not this ADR's claim:
+    // the `·` separates the list items, so ADR 0001 does not inherit 0003's word.
+    expect(
+      statedStatuses(
+        adrReferences(
+          "- a: [ADR 0001](./adr/0001-cli-stack.md) · b (Proposed): " +
+            "[ADR 0003](./adr/0003-milestone-field.md)",
+        )[0]!.label,
+      ),
+    ).toEqual([]);
   });
 
   it("reads a non-empty ADR directory whose files all declare a status (premise)", () => {
@@ -190,7 +312,23 @@ describe("the carrier pins ADR references to the ADR files", () => {
     expect(files.filter((file) => declaredStatus(file) === "(no - Status: line)")).toEqual([]);
   });
 
-  it.each(CARRIERS)("%s states no status for any ADR it links to", (carrier) => {
+  it("covers exactly the carriers the §ADR process sentence says it covers", () => {
+    const paragraph = paragraphWith("ArggonManager/docs/engineering.md", COVERAGE_CLAIM);
+    const from = paragraph.indexOf(COVERAGE_CLAIM) + COVERAGE_CLAIM.length;
+    const linkFrom = paragraph.indexOf(LINK_COVERAGE_CLAIM);
+    expect(
+      carriersNamedIn(paragraph.slice(from, linkFrom)).sort(),
+      "rule 1: doc vs constant",
+    ).toEqual([...STATUS_CARRIERS].sort());
+    expect(
+      carriersNamedIn(
+        paragraph.slice(linkFrom + LINK_COVERAGE_CLAIM.length, paragraph.length),
+      ).sort(),
+      "rule 2: doc vs constant",
+    ).toEqual([...LINK_CARRIERS].sort());
+  });
+
+  it.each(STATUS_CARRIERS)("%s states no status for any ADR it links to", (carrier) => {
     const files = new Set(adrFiles());
     const problems: string[] = [];
     let references = 0;
@@ -212,7 +350,7 @@ describe("the carrier pins ADR references to the ADR files", () => {
     expect(problems).toEqual([]);
   });
 
-  it.each(CARRIERS)("%s links only to ADRs that exist, by their own filename", (carrier) => {
+  it.each(LINK_CARRIERS)("%s links only to ADRs that exist, by their own filename", (carrier) => {
     const files = new Set(adrFiles());
     const problems: string[] = [];
     for (const reference of adrReferences(read(carrier))) {
