@@ -85,6 +85,7 @@ const TIER1_DOCS = [
   ".zcode-marketplace/arggon/commands/arggon-board.md",
   ".zcode-marketplace/arggon/commands/arggon-done.md",
   ".zcode-marketplace/arggon/commands/arggon-explore.md",
+  ".zcode-marketplace/arggon/commands/arggon-goal.md",
   ".zcode-marketplace/arggon/commands/arggon-handoff.md",
   ".zcode-marketplace/arggon/commands/arggon-next.md",
   ".zcode-marketplace/arggon/commands/arggon-playbook.md",
@@ -94,6 +95,8 @@ const TIER1_DOCS = [
   ".zcode-marketplace/arggon/commands/arggon-status.md",
   ".zcode-marketplace/arggon/hooks/gate.mjs",
   ".zcode-marketplace/arggon/hooks/hooks.json",
+  // task-zcode-goal-mode: the goal-mode contract template is tier-1 too.
+  ".zcode-marketplace/arggon/templates/goal-mode.md",
   ".zcode-marketplace/marketplace.json",
   "AGENTS.md",
   "ArggonManager/docs/tracking.md",

@@ -60,6 +60,7 @@ import {
 
 import { runStart, startTakeoverNotes } from "./start.js";
 import { runCleanup } from "./cleanup.js";
+import { goalOperation, runGoal } from "./goal-mode.js";
 
 import { runDoctor, formatDoctorReport, measureBudgetForDoctor } from "./doctor.js";
 
@@ -889,6 +890,29 @@ program
       }
     },
   );
+
+program
+  .command("goal")
+  .description(
+    "Render the goal-mode contract for one claimed item (objective + verification + boundaries) from its acceptance checklist",
+  )
+  .argument("<id>", "work item id — must be claimed by you, and you must be inside its worktree")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((id: string, opts: { json?: boolean }) => {
+    if (jsonEnabled(opts)) {
+      const outcome = goalOperation({ cwd: process.cwd(), id });
+      emitJson(outcome.envelope);
+      process.exitCode = outcome.exitCode;
+      return;
+    }
+    try {
+      console.log(runGoal({ cwd: process.cwd(), id }).contract.trimEnd());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      printHumanError("arggon goal", message);
+      process.exitCode = 1;
+    }
+  });
 
 program
   .command("report")

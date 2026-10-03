@@ -538,6 +538,32 @@ View selection: default is compact — frontmatter + the body's last 3 comments;
 
 Failures use `error.code: "SHOW_FAILED"` (unknown id, missing a tracker, unreadable items).
 
+### `goal`
+
+Renders the ZCode **goal-mode contract** for one claimed item, derived from that item's acceptance checklist (spec methodology-adapters-017 §S5, `task-zcode-goal-mode`; human rules in [agents.md §ZCode](./agents.md)). Pure read — never writes, no lock, no tracker commit, exit 0 on success.
+
+| Field                      | Type       | Notes                                                                                                                 |
+| -------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------- |
+| `item`                     | `WorkItem` | The claimed item's frontmatter fields (contract shape)                                                                |
+| `path`                     | `string`   | Absolute path of the item file                                                                                        |
+| `goal.objective`           | `string`   | The single goal: the first UNCHECKED acceptance criterion, byte-clipped (240 B)                                       |
+| `goal.verification`        | `string[]` | Every unchecked criterion as the contract the loop must satisfy, byte-clipped (200 B each, max 8 inlined)             |
+| `goal.verificationOmitted` | `number`   | Unchecked criteria NOT inlined (deferred to the item, never pasted)                                                   |
+| `goal.gateUnchecked`       | `boolean`  | `acceptanceUnchecked(acceptanceBody(item)).length > 0` — the `done` flip’s refusal set, from the kernel’s one grammar |
+| `goal.hasGoal`             | `boolean`  | `gateUnchecked`: false ⇒ the "define the goal first" contract; true ⇒ a goal exists                                   |
+| `goal.boundaries`          | `string[]` | The hard boundaries, appended to the contract from the CLI constants                                                  |
+| `goal.refusals`            | `string[]` | The refusal cases the loop must stop on                                                                               |
+| `goal.truncated`           | `boolean`  | True when any line was clipped or any criterion deferred                                                              |
+| `goal.checklist`           | `object`   | `{ total, unchecked, checked }` — the acceptance-row arithmetic behind the contract                                   |
+| `goal.worktree`            | `object`   | `{ path, recorded }` — the only checkout the goal may run in                                                          |
+| `goal.template`            | `string`   | `"adopter"` when the generated template copy was used, `"package"` for the packaged fallback                          |
+| `goal.identity`            | `string`   | The caller login that holds the claim — always present: an unresolvable identity refuses (`GOAL_IDENTITY_UNKNOWN`)    |
+| `goal.contract`            | `string`   | The rendered contract itself — the same text the human (non-`--json`) view prints, byte-capped (12 KiB)               |
+
+**One kernel grammar answers this.** Since `bug-three-acceptance-parsers-diverging` (PR #611) the acceptance rows come from `@arggondev/lib` alone (`acceptanceRows` / `acceptanceUnchecked` / `acceptanceComplete`, with `acceptanceBody` as the one canonical input), and this payload is assembled from it: `goal.gateUnchecked === acceptanceUnchecked(acceptanceBody(item)).length > 0`, which is exactly the `done` flip’s refusal set, and `goal.verification` is those same rows. The payload therefore cannot claim “nothing left” on an item the gate refuses to close, and cannot render a criterion the gate does not see. Which lines count as a row is documented in [convention.md §Acceptance rows](./convention.md); the kernel’s parity corpus is `cli/src/acceptance-parity.test.ts`. Bounded by construction: the objective and each verification line are clipped, at most 8 criteria are inlined (the rest are counted in `verificationOmitted`, and any clipping or deferral sets `truncated`), and the template copy is clipped before rendering — a tampered or oversized item (or template) cannot produce an unbounded contract. The template is clipped BEFORE its slots are filled, so an adopter copy over 8 KiB can lose its `{{...}}` placeholders while the structured `goal.*` fields still carry the values. `goal.worktree.recorded: false` means the item records no worktree at all: the goal is then scoped to the repo root it was rendered in. There is no `renderable` field and no “could not read the text” shape: with one grammar there is no reader/gate disagreement left to report. There is no MCP tool for this command: it mutates nothing, so the kernel’s tool surface is unchanged.
+
+Failures are refusals, each with its own code and exit 1: `GOAL_IDENTITY_UNKNOWN` (the caller identity could not be resolved, so the claim holder cannot be proven — nothing renders; an unproven identity never gets a goal), `GOAL_ITEM_CLOSED` (a `done`/`cancelled` item is never reopened), `GOAL_UNCLAIMED` (one goal per claimed item — claim it with `arggon start`), `GOAL_FOREIGN_CLAIM` (claimed by another identity), `GOAL_WORKTREE_MISMATCH` (this checkout is not the item's recorded `worktree_path` — a goal never spans worktrees), `GOAL_WORKTREE_MISSING` (the recorded worktree no longer exists), `GOAL_TEMPLATE_UNAVAILABLE` (neither the generated nor the packaged template exists) and `GOAL_FAILED` (unknown id, no tracker). There is no override flag. A refusal envelope still reports the tree's real `conventionVersion` — resolved from the tracker root, so a subdirectory invocation does not degrade to the default `0`.
+
 ### `report`
 
 | Field                 | Type                  | Notes                                                                                                   |
