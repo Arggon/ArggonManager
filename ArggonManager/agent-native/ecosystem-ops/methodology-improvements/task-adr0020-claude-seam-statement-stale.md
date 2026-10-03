@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr0020-claude-seam-statement-stale
 title: "ADR 0020 now understates the Claude Code seam: `.mcp.json` → `arggon mcp` delivers 15 tools/envelopes, so \"remains docs + CLAUDE.md\" is no longer accurate"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: [adr, docs]
 created: "2026-10-03"
 updated: "2026-10-03"
-claimed_at: "2026-10-03T02:50:04.107Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr0020-claude-seam-statement-stale
 ---
 <!--
