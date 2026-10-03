@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
   TRACKER_DIR_NAME,
+  acceptanceRows,
   docsDirForRoot,
   findTasksDir,
   readConventionVersion,
@@ -530,7 +531,17 @@ const VAGUE_TERMS = [
 const VAGUE_PATTERN = new RegExp(`\\b(${VAGUE_TERMS.join("|")})\\b`, "i");
 const TODO_PATTERN = /\b(TODO|TBD|FIXME)\b/;
 const ERROR_PATH_PATTERN = /\b(error|errors|failure|fail|fails|failing)\b/i;
-const CHECKBOX_PATTERN = /^\s*[-*]\s+\[[ xX]\]/;
+/**
+ * Acceptance rows of a SPEC section — the kernel's, not a local regex.
+ *
+ * `arggon spec audit` asks whether an Acceptance section carries anything
+ * testable. That is the same "what is an acceptance row" question the DONE GATE
+ * asks, so it defers to the kernel rather than carrying a sixth grammar
+ * (bug-three-acceptance-parsers-diverging; the guard is the
+ * `acceptance-rows-use-kernel` structural rule). This finding is ADVISORY — it
+ * never gates a status flip — so deferring here changes no refusal.
+ */
+const hasAcceptanceRows = (section: string): boolean => acceptanceRows(section).length > 0;
 const SPEC_ID_CITATION_PATTERN = /\bspec-[a-z0-9]+(?:-[a-z0-9]+)*-\d{3}\b/g;
 
 function finding(
@@ -601,8 +612,7 @@ function ambiguityFindings(rel: string, raw: string): SpecFinding[] {
     const start = (headings[acceptanceIdx]!.index ?? 0) + headings[acceptanceIdx]![0].length;
     const next = headings[acceptanceIdx + 1]?.index ?? body.length;
     const section = body.slice(start, next);
-    const hasChecklist = section.split(/\r?\n/).some((l) => CHECKBOX_PATTERN.test(l));
-    if (!hasChecklist) {
+    if (!hasAcceptanceRows(section)) {
       findings.push(
         finding(
           rel,

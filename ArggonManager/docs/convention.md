@@ -119,6 +119,27 @@ CLI create examples:
 
 Note: a container's acceptance-aware cascade guard is any unticked checkbox that carries text — a checkbox line with no text after the box is a scaffold placeholder, not a criterion (bug-empty-template-checkbox): the kernel ignores it, and `arggon create` no longer scaffolds one under `## Acceptance`.
 
+### Acceptance rows (the one grammar)
+
+**A checkbox line is an acceptance row when — and only when — it matches `^[ \t]*[-*] \[( |x|X)\]` followed by at least one non-whitespace character.** That is the DONE GATE's rule ([ADR 0015](./adr/0015-done-gate.md)) and it is the rule the board drawer, the detail pane, the native panel and the ZCode goal contract all read, because the kernel is the only place it exists (`acceptanceRows` / `acceptanceCriteria` / `acceptanceComplete`, `lib/src/items.ts`). Decided and documented by `bug-three-acceptance-parsers-diverging`, because three renderers and the gate used to carry three grammars between them and disagreed on the shapes below.
+
+| Line                                                   | Row?    | Gates the `done` flip? | Why                                                                                                                                                                               |
+| ------------------------------------------------------ | ------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `- [ ] criterion` / `- [x] criterion`                  | yes     | yes when unticked      | The canonical form.                                                                                                                                                               |
+| `* [ ] criterion`                                      | yes     | yes when unticked      | `*` is an equally standard bullet.                                                                                                                                                |
+| `  - [ ] criterion` (space or tab indent)              | yes     | yes when unticked      | Indentation is tolerated; nesting is not meaningful here.                                                                                                                         |
+| **`- [ ] x`** (marker, then trailing content)          | **yes** | **yes when unticked**  | **Decided: it IS a row.** The text after the box is the criterion — `x` is simply a one-character criterion.                                                                      |
+| **`- [ ]x`** (box glued to its text)                   | **yes** | **yes when unticked**  | **Decided: it IS a row.** Whether the space is there changes nothing about the intent, and the gate has always counted it.                                                        |
+| `- [ ]` (nothing after the box)                        | yes     | **no**                 | A scaffold placeholder, not a criterion (`bug-empty-template-checkbox`).                                                                                                          |
+| **`-  [ ] x`** (two spaces after the bullet)           | **no**  | **no**                 | **Decided: not a row.** Exactly one space separates the bullet from the box; two spaces is a different (non-list) construct. Kept as-is so unifying the parsers added no refusal. |
+| `+ [ ] x`, `1. [ ] x`, `> - [ ] x`, `text - [ ] x`     | no      | no                     | Not a list item whose line starts with the marker.                                                                                                                                |
+| ``Use `- [ ] text` `` (the literal inside a code span) | no      | no                     | The marker is not at the start of the line. Prose may show the literal box freely.                                                                                                |
+| ``- [ ] wrap it in `- [ ]` when you mean it``          | yes     | yes when unticked      | The row's own text may contain the literal; the marker at line start decides.                                                                                                     |
+
+Both LF and CRLF bodies parse identically — the frontmatter parser tolerates `\r\n`, so the acceptance grammar must too.
+
+**One body, one question.** A consumer of these rows must read the item's **whole** body (`acceptanceBody(item)`, comment sections included), never a reader's prose. `arggon show`'s `prose`, the board drawer's clipped prose and a bounded comment tail are for _rendering_; handing one to an acceptance predicate asks a different question, and on a checklist filed as a comment — the default shape, since `create` has no `--body` flag — the answer flips from "criteria remain" to "nothing left to do" while the gate still refuses the flip.
+
 ---
 
 ## Frontmatter schema (v0)
