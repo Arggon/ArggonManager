@@ -47,3 +47,9 @@ Acceptance:
 - [ ] Impact class stated per `docs/agents.md` §Changing the methodology
 
 Depends on PR #618 only if that PR's check is widened to read `explorations/**` — otherwise independent.
+
+### 2026-10-03 @Arggon
+Fifth instance, added by the round-1 reviewer of PR #618 (2026-10-03): `README.md:177` also restates a fact that drifted. Not assigned to any worker yet — the reviewer read it while sweeping every ADR reference across all four carriers and found the carriers clean on the ADR-status field, so this one lives outside the carrier set.
+
+Add to the acceptance list:
+- [ ] `README.md:177` — identify the claim, check it against its authority, and apply the same delete-don't-correct decision PR #618 made. `README.md` also turned out to be a silent restatement surface on a DIFFERENT class (PR #615 found the nine-tool MCP list there with NO count word at all, so it had drifted invisibly), which is worth noting when deciding whether README gets a doc-contract check of its own.
