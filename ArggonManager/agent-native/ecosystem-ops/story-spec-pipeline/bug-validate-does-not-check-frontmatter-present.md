@@ -109,3 +109,7 @@ Coordinator: this warrants its own item — a zero-byte item file silently un-cl
 ## Methodology impact: Behavioral
 
 A previously-ok tree now errors — the intended effect. Reasoning: a validator that checks the CONTENT of a structure without checking that the structure EXISTS accepts the worst shape it can see. Same class the repo already knows elsewhere (the seam drift gate checks for a committed provenance marker before comparing; the seam parity test exists because two copies were checked independently). Blast radius bounded to item positions, pinned by the `non-item-markdown` control. `npm run skills:sync` run in-PR: no drift (no CLI surface changed).
+
+### handoff 2026-10-03 @ses_efe3043b8ffed48yGgAx3qryzL (session: ses_efe3043b8ffed48yGgAx3qryzL) — next: Coordinator: review PR #619 and merge; tick the acceptance boxes, then set status done.
+- branch: fix/bug-validate-does-not-check-frontmatter-present
+- open questions: Item needs a decision: file a new bug for the WRITER regression that emptied 4 item files to 0 bytes (their own chore(tasks): commented commits; not reproduced, not fixed here); the 2nd commit in the…
