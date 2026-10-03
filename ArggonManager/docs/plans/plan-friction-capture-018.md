@@ -86,8 +86,8 @@ exist yet — an agent file naming a missing command is worse than no trigger.
 
 - `task-spike-friction-trigger-compliance` — does an embedded trigger fire more
   reliably than the `deftai` skill did? Gates stage 2 and tier C.
-- `spike-friction-tier-b-surface` — Issues vs Discussions for the prefilled URL.
-- `spike-friction-volume-threshold` — what volume would justify stage 3
+- `task-spike-friction-tier-b-surface` — Issues vs Discussions for the prefilled URL.
+- `task-spike-friction-volume-threshold` — what volume would justify stage 3
   automation, if ever. Depends on the compliance spike.
 
 ## Out of scope for this plan

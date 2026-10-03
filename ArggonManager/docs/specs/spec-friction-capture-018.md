@@ -12,8 +12,9 @@ Implements **stage 1** of [ADR 0021](../adr/0021-adopter-friction-channel.md)
 [exploration-adopter-feedback-channel-019](../explorations/exploration-adopter-feedback-channel-019.md)):
 a local, bounded, structured friction record with a stable-fields-only
 fingerprint and a **redacted** report a human acts on — with a generated-agent
-trigger so the channel is discoverable, and a `doctor` block so its absence is
-visible.
+trigger so the channel is discoverable, and a `doctor` block that reports the
+trigger's per-file `triggerVersion` and distinguishes _trigger absent_ from
+generic template drift.
 
 ## Purpose
 
@@ -174,10 +175,25 @@ managed agent file carries the block and at which `triggerVersion`:
 "friction": { "triggerPresent": true, "triggerVersion": "0.5.0", "current": "0.5.0", "files": 2 }
 ```
 
-This is the direct application of "a disabled capability nobody can see is
-absent": an adopter that has acked its generated docs receives the trigger only
-as an ADR 0016 proposal, so without this block the channel's absence is
-invisible. Documented in `ArggonManager/docs/json-output.md` in the same PR.
+**Why a dedicated block, and not the existing `outdated` bucket** (ADR 0021 §2).
+Visibility is already covered: `doctor.ts` re-renders the current template for
+every `config.generated` entry in every local state — untouched, modified,
+**acked** and acked-drifted — and the generated agent files are in that map, so
+editing the worker template alone already surfaces a missing trigger as an
+outdated managed doc. An earlier draft of this spec claimed the opposite (that
+"without this block the channel's absence is invisible"); that was wrong and the
+ADR now says so. What the block uniquely buys is narrower and still real:
+
+1. **a per-file `triggerVersion`**, so "the trigger is present at 0.5.0" stays
+   distinguishable from "the current template is 0.6.0" — one boolean against a
+   template that also moves for unrelated reasons cannot say which; and
+2. **separating _trigger absent_ from generic template drift**, which is the
+   observable `task-spike-friction-trigger-compliance` needs to tell "never seen"
+   from "seen and ignored".
+
+If stage 1 has to be minimal, the cuttable part is `triggerVersion` and `files` —
+**not** the block. Documented in `ArggonManager/docs/json-output.md` in the same
+PR.
 
 ### Degradation
 
