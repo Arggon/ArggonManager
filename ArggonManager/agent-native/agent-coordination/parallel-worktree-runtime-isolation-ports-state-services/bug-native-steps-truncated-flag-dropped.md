@@ -20,7 +20,31 @@ updated: "2026-10-03"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+The kernel records every preparation decision in a bounded log, caps it at
+`MAX_PREP_STEPS = 16`, and SAYS so when it drops entries
+(`lib/src/worktree.ts:2061-2068`, emitted at `:2119`). The native
+`boundedPreparation` projected that log but re-derived its truncation flag from
+**its own** 32-name list cap (`opencode/plugins/arggon/index.ts`) — a cap ABOVE
+the kernel's, so the comparison could never fire, and the kernel's own decision
+was dropped on the way out. A start with more than 16 preparation decisions (one
+build decision per workspace package is the easy way there) therefore reached the
+agent as a 16-entry `steps` list with no flag: shortened, presented as complete.
+
+Reproduce on the pre-fix seam (`d0921ade^`): a worktree fixture whose primary
+install links 16 workspace packages, `tools.arggon.start({ id, assignee })`, then
+read `output.preparation` — `steps.length === 16`, `stepsTruncated === undefined`,
+`truncated` undefined too (nothing else in that receipt is capped).
+
+**Correction to the finding below.** The premise "the CLI keeps it" is wrong:
+the CLI drops the kernel's flag the same way. `cli/src/start.ts` assigns
+`prepSteps = prepared.steps` and carries no `stepsTruncated`, and
+`cli/src/cli.ts` forwards only `prepSteps` (verified by reading both; there is no
+`stepsTruncated` anywhere under `cli/`). So this is not two surfaces disagreeing —
+it is one kernel flag that NEITHER surface reports. The CLI-side mirror is a
+one-field follow-up in files another worker owns, so it is reported to the
+coordinator rather than fixed here; parity is therefore asserted on what both
+surfaces do carry (the log, entry for entry, on twin fixtures) plus the kernel
+receipt itself for the flag.
 
 ## Acceptance
 
@@ -45,7 +69,6 @@ The CLI keeps the flag, so the two surfaces disagree on the same kernel event. T
 The honest fix is for the projection to trust the kernel's own flag rather than re-derive it — the kernel already decided; re-deriving is where the divergence came from.
 
 Acceptance:
-- [x] Sweep `boundedPreparation` (and any sibling native projection) for other kernel-set flags it recomputes instead of mirroring — the class, not this one field
 
 ### 2026-10-03 @ses_efea0d706ffetL52TK6OrsCWQd
 PR #617 — `fix/bug-native-steps-truncated-flag-dropped`, rebased onto origin/main (#609 merged mid-flight; the opencode2.md conflict was resolved as a UNION). All gates green: build → test (124 files / 2557) → lint → validate (ok, 0 warnings) → **check:plugin byte-identical** → test:structure → lint:structure.
@@ -276,3 +299,77 @@ accurate and is honoured by how parity is asserted, the doc contract is still
 bidirectional with the eighth scenario as the required reverse-direction witness, the
 incident record is complete on the branch, and the bundle is CI-gated byte-identical.
 Follow-ups: push the primary's `main` so the two filed items survive.
+
+### 2026-10-03 — fixed on `fix/bug-native-steps-truncated-flag-dropped`
+
+**The fix.** `boundedPreparation` mirrors the kernel's decision
+(`const kernelDroppedSteps = input.stepsTruncated === true`), emits
+`stepsTruncated: true` only when the kernel set it, and folds it into the shared
+`truncated` — additive on top of the named flag, never a replacement for it. The
+32-name slice stays (defense in depth; the kernel's cap is 16), and the
+per-string bounds on each entry stay (a `pkg` name is read out of a `package.json`
+in the worktree, so it is attacker-shaped even though the count is not).
+
+#### §Sweep — is the class closed on this seam?
+
+Every kernel-owned field of `WorktreeDependencyPreparation` and its fragments,
+against what the native projection does with it:
+
+| kernel field | native projection | verdict |
+| --- | --- | --- |
+| `ready`, `install`, `linkedNodeModules`, `manifestCoverage` | passed through | honest |
+| `builtWorkspaces`, `linkedWorkspaces` | 32-name cap, fold into `truncated` | kernel does NOT cap these — a genuine native-only bound, and `truncated` is the honest signal |
+| `missingDependencies` + `missingDependenciesTotal` | total mirrored, capped list folded | honest (kernel cap 10 < 32) |
+| `gateBins` | mapped entry by entry, no re-slice | honest (kernel cap 8 < 32) |
+| `steps` | mapped entry by entry, per-string bounds re-applied | honest list (kernel cap 16 < 32) |
+| `stepsTruncated` | **dropped; a 32-vs-16 comparison re-derived instead** | **the one instance — fixed** |
+| `env` (`WorktreeEnvReceipt`) | projected; only `path`/`seededDotenv`/`warning`/`keys` re-bounded, `written`/`gitignored` passed | honest (kernel owns the six-key set) |
+| `claim` (`WorktreeClaimReceipt` → `foreignWrites`/`takeOver` → `replaced` → `takeovers`) | projected, both `total`s exact and folded, every string re-bounded | honest (kernel caps 10 / 5, both < 32) |
+
+Sibling projections outside `boundedPreparation`: `boundedCommitPayload` reproduces
+the kernel's `CommitPayload` union exactly (`{hash, message, ignored?}` /
+`{skipped, ignored?}`) and reads `TrackerCommitResult.committed` instead of
+deriving it; `boundedEnvReceipt`/`boundedClaimReceipt`/`boundedClaimStamp`/
+`boundedNames` are the fragments above; `boundedEnvelopeJson` bounds an error
+string for display and is not a projection. **So: one instance of the class on
+this seam, and it is closed.** `lib/src/worktree.ts` also has no other
+set-flag/capped-count pair to mirror (a source sweep for `?: true` / `Truncated`
+returns `stepsTruncated` alone).
+
+Two adjacent findings, reported rather than fixed (outside this item's scope):
+
+1. **The CLI drops the same kernel flag** — a one-field mirror
+   (`cli/src/start.ts` → `StartResult`, `cli/src/cli.ts` envelope, plus a
+   `json-output.md` row). Belongs to the worker holding those files.
+2. **`freshWorktreeInstallRefusal` quotes the capped log as if it were whole**
+   (`lib/src/worktree.ts:990-995`, "Preparation ran: …"): a refusal message over
+   a truncated log never says entries were dropped, so both surfaces inherit a
+   prose version of this defect.
+
+#### The #609 union landed here (its doc-contract gate needed one more scenario)
+
+PR #609 (which filed this bug) merged **while this item was being worked** — its
+per-field table and `opencode/plugins/arggon/opencode2-doc-contract.test.ts` are
+on main now, so the union is this branch's job rather than a note for its author.
+Both halves are here:
+
+- the `preparation.stepsTruncated?` row in the field table (`boolean`, kernel
+  `MAX_PREP_STEPS` (16)), the mention in the `start` row, and the explanation
+  appended to the paragraph that introduces the table (so the suite's
+  prose-discoverability check sees it);
+- **an eighth scenario in that suite**, because the suite reads rows against real
+  runs in both directions: without a run that overflows the kernel's log cap the
+  new row is reported as a field no run ever carried. Measured, not guessed — with
+  the row alone the suite fails
+  `these rows document a field no real run ever carried: [ 'preparation.stepsTruncated' ]`;
+  with the scenario (a second fixture whose primary install links
+  `MAX_PREP_STEPS` workspace packages, then `observe("preparation", …)`) all five
+  tests pass against this fix, and killing the mirror fails scenario 8 by name
+  (`the kernel's decision is mirrored: expected undefined to be true`).
+
+The doc conflict on rebase was resolved as a UNION (their tables plus all three
+doc additions), not by picking a side.
+
+### handoff 2026-10-03 @Arggon — next: Review + merge PR #617; then decide on the reported CLI-side mirror and the kernel refusal-prose finding
+- branch: fix/bug-native-steps-truncated-flag-dropped
+- open questions: note: this item's first comment+handoff was recorded from the primary checkout and landed on local main (cd9e85d0); this one rides the item branch; CLI mirror follow-up (cli/src/start.ts, cli/src/cli…
