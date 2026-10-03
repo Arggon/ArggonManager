@@ -76,6 +76,23 @@ Operational duties accepted:
   > instead enforced by `cli/src/ci-seam-pin.test.ts`, which fails when the
   > pin lags the root `package.json` version or the newest `arggonVersion`
   > stamp. See task-ci-seam-pin-tracks-release for the full decision record.
+  > Amendment (2026-10-02, bug-seam-drift-gate-blocks-new-generated-seam-content):
+  > the drift gate itself is now **branch-aware**. It compared the committed
+  > seam against what the PINNED RELEASE generates, so any PR that legitimately
+  > added generated content (PR #605) went red — with a message that inverted
+  > the direction and a remedy (re-run the pinned init) that could not work,
+  > since the pinned init is what deletes the newer content. The gate now
+  > compares against the generator that owns the seam: the checkout's own build
+  > when the repo IS the seam's source, the pinned release for every adopter and
+  > fork. What the pinned comparison gave this repo is replaced by an explicit
+  > **pinned-lag assertion** (no committed `arggonVersion` stamp may be newer
+  > than `ARGGON_VERSION`), which is also the only gate an adopter has. Neither
+  > the literal pin nor the version guard changes: `cli/version-guard.mjs` still
+  > demands a release for a publish-relevant change after the tag (the
+  > shipped-package axis), while the seam bytes are repo-owned and need none.
+  > Decision record and the both-ways probe:
+  > `ArggonManager/docs/ci.md` §Which generator the gate compares against, and
+  > `release.md` §One release story.
 
 ### 2. Skew hardening: exact kernel pin, bumped in lockstep
 

@@ -506,7 +506,18 @@ npm run arggon -- validate
 Add a job to your workflow (mirrors the workflow `arggon init` writes to
 `.github/workflows/arggon.yml`; full recipe and install variants in
 [`ArggonManager/docs/ci.md`](./ci.md)). The bin is the packaged `arggon`
-headless CLI — no model, no MCP, no OpenCode session:
+headless CLI — no model, no MCP, no OpenCode session.
+
+That snippet is the minimum (bootstrap + validate). The full recipe also ships
+a **seam drift gate**, and it is **branch-aware**: it compares the committed
+seam against the generator that owns it — this checkout's own build when the
+repo IS the seam's source (so a PR that legitimately changes generated content
+can go green without waiting for a release), the pinned `ARGGON_VERSION`
+release everywhere else — plus a pinned-lag assertion so a pin can never sit
+behind the seam it must reproduce. Copy the workflow `arggon init` writes
+rather than hand-rolling the gate, and read
+[`docs/ci.md`](./ci.md) §Which generator the gate compares against before
+changing either half.
 
 ```yaml
 tasks-validate:
