@@ -558,7 +558,6 @@ describe("acceptance parity over the LIVE tracker (bug-three-acceptance-parsers-
     // Must be zero. Anything else means a consumer answered a different
     // question than the gate did.
     expect(disagreements).toEqual([]);
-    // eslint-disable-next-line no-console
     console.log(
       `[acceptance-parity] live: ${items.length} items, ${gated} blocked by the gate, ` +
         `${commentStripped} would disagree if a reader stripped comment sections`,
@@ -582,7 +581,6 @@ describe("acceptance parity over the LIVE tracker (bug-three-acceptance-parsers-
     // items are filed. The assertion is that the SHAPE exists, so the guard
     // above is proving something.
     expect(commentOnly.length).toBeGreaterThanOrEqual(0);
-    // eslint-disable-next-line no-console
     console.log(
       `[acceptance-parity] live tracker: ${items.length} items, ${gatedCount(items)} blocked, ` +
         `${commentOnly.length} with comment-only criteria`,
