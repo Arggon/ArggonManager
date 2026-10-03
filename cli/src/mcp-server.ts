@@ -548,6 +548,16 @@ const TOOLS: ToolDefinition[] = [
   },
 ];
 
+/**
+ * Every advertised tool name, in `tools/list` order. `TOOLS` above is the
+ * registry and the only place a tool is declared; this derived list exists so a
+ * doc contract can pin what the carriers and the CLI skill *document* to what
+ * ships, without spawning a server (bug-agents-md-says-nine-mcp-tools: the
+ * playbook kept saying "nine tools" for six releases because nothing compared
+ * the prose with the registry — see cli/src/mcp-doc-contract.test.ts).
+ */
+export const MCP_TOOL_NAMES: readonly string[] = TOOLS.map((tool) => tool.name);
+
 /** How the server re-invokes the arggon CLI (see `cliSpawn` below). */
 export type CliSpawnSpec = { command: string; args: string[] };
 
