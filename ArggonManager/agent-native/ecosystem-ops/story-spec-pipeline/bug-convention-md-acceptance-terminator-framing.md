@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-convention-md-acceptance-terminator-framing
 title: "`docs/convention.md:139` frames acceptance-box parsing as \"LF and CRLF\" — the exact framing that hid the U+2028/U+2029 done-gate false-pass in PR #611"
 assignee: Arggon
@@ -8,7 +8,6 @@ parent: story-spec-pipeline
 labels: [docs, done-gate]
 created: "2026-10-03"
 updated: "2026-10-03"
-claimed_at: "2026-10-03T11:56:44.018Z"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-convention-md-acceptance-terminator-framing.md
