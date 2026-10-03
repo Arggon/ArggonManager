@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-three-acceptance-parsers-diverging
 title: "Three different acceptance-box parsers with no parity test, and they ALREADY diverge (CRLF, `- [ ] x`): the done gate refuses, the board and goal-mode report \"no unchecked box\""
+assignee: Arggon
+branch: fix/bug-three-acceptance-parsers-diverging
 parent: story-spec-pipeline
 labels: [tracker-schema, done-gate]
 created: "2026-10-03"
 updated: "2026-10-03"
+claimed_at: "2026-10-03T02:49:53.379Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-three-acceptance-parsers-diverging
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-three-acceptance-parsers-diverging.md
