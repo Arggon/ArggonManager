@@ -39,9 +39,13 @@
  * the owner's own attach (env left byte-identical → `warning`), a foreign
  * attach (`foreignWrites`), the audited take-over, a SECOND take-over (so the
  * replaced stamp carries a persisted `takeovers` chain), an over-cap detection
- * (`truncated`), and an unwritable stamp (`claim.warning`). Arrays are the one
- * documented granularity the walker treats as terminal: a `string[]`/`object[]`
- * cell describes its entries, so entries are not walked as paths.
+ * (`truncated`), and an unwritable stamp (`claim.warning`). A second fixture
+ * then overflows the preparation log itself, so the kernel's own
+ * `MAX_PREP_STEPS` cap and the mirrored `stepsTruncated` are observed on a real
+ * run (bug-native-steps-truncated-flag-dropped) — without it the documented row
+ * would read as a field no run ever carried. Arrays are the one documented
+ * granularity the walker treats as terminal: a `string[]`/`object[]` cell
+ * describes its entries, so entries are not walked as paths.
  */
 import { spawnSync } from "node:child_process";
 import {
@@ -50,6 +54,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
@@ -211,6 +216,32 @@ function observe(path: string, value: unknown): void {
   }
 }
 
+/**
+ * Link `count` committed workspace packages into the primary's install, so the
+ * kernel's preparation log records one build decision per package
+ * (bug-native-steps-truncated-flag-dropped). Discovery goes through install
+ * symlinks that resolve into the checkout, so the packages must be committed
+ * AND the links (uncommitted) present. Each package declares no entry file and
+ * no `build` script: the decision is still recorded (`no-build-script`) without
+ * a build ever running, so the log overflows on the package COUNT.
+ */
+function addWorkspacePackages(dir: string, count: number): void {
+  const scope = join(dir, "node_modules", "@scope");
+  mkdirSync(scope, { recursive: true });
+  for (let index = 0; index < count; index += 1) {
+    const pkgDir = join(dir, "packages", `pkg-${index}`);
+    mkdirSync(pkgDir, { recursive: true });
+    writeFileSync(
+      join(pkgDir, "package.json"),
+      `${JSON.stringify({ name: `@scope/pkg-${index}`, version: "1.0.0", private: true }, null, 2)}\n`,
+      "utf8",
+    );
+    symlinkSync(pkgDir, join(scope, `pkg-${index}`), "dir");
+  }
+  git(dir, ["add", "packages"]);
+  git(dir, ["commit", "-qm", "test: workspace packages"]);
+}
+
 /** A tracked write inside the claimed worktree, after the stamp (the F12 signature). */
 function foreignWrite(worktreePath: string): void {
   const itemFile = join(
@@ -293,8 +324,29 @@ beforeAll(async () => {
   //    directory where the stamp file belongs makes the write fail on any path.
   const stampPath = join(worktreeGitDir(worktreePath), "arggon-claim.json");
   rmSync(stampPath, { force: true });
-  mkdirSync(stampPath, { recursive: true });
+  mkdirSync(stampPath, { force: true });
   await run({}, "ses_c");
+  // 8. Over-cap PREPARATION LOG (bug-native-steps-truncated-flag-dropped): a
+  //    second fixture whose primary install links MAX_PREP_STEPS workspace
+  //    packages, so more preparation decisions than the kernel's own log cap
+  //    exist and the mirrored `stepsTruncated` is observed on a real run.
+  const logDir = seed();
+  addWorkspacePackages(logDir, MAX_PREP_STEPS);
+  const logDefs = argonToolDefinitions(kernel, {
+    cwd: logDir,
+    templatesDir: pluginTemplatesDir(),
+    worktree: { projectID: "project-id", canonical: logDir, domain: fakeDomain(logDir) },
+  });
+  const logOutput = (await tool(logDefs, "start").execute(
+    { id: "task-rate-limit", assignee: "smoke" },
+    { sessionID: "ses_e" },
+  )).output as Record<string, unknown>;
+  const logPreparation = isPlainObject(logOutput.preparation) ? logOutput.preparation : {};
+  const logSteps = Array.isArray(logPreparation.steps) ? logPreparation.steps : [];
+  expect(logSteps, "the kernel's own cap bounds the log").toHaveLength(MAX_PREP_STEPS);
+  expect(logPreparation.stepsTruncated, "the kernel's decision is mirrored").toBe(true);
+  expect(logPreparation.truncated, "the mirrored flag also folds into `truncated`").toBe(true);
+  observe("preparation", logPreparation);
 }, 300_000);
 
 // ---------------------------------------------------------------------------

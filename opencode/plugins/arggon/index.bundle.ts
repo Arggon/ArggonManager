@@ -9258,9 +9258,11 @@ function boundedPreparation(input) {
         }
         return bounded;
     });
+    const kernelDroppedSteps = input.stepsTruncated === true;
     const env = input.env === undefined ? undefined : boundedEnvReceipt(input.env);
     const claim = input.claim === undefined ? undefined : boundedClaimReceipt(input.claim);
-    const truncated = input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
+    const truncated = kernelDroppedSteps ||
+        input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
         input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
         (input.steps?.length ?? 0) > steps.length ||
         input.missingDependenciesTotal > input.missingDependencies.length ||
@@ -9286,6 +9288,7 @@ function boundedPreparation(input) {
         missingDependenciesTotal: input.missingDependenciesTotal,
         gateBins,
         ...(steps.length > 0 ? { steps } : {}),
+        ...(kernelDroppedSteps ? { stepsTruncated: true } : {}),
         ...(env !== undefined ? { env } : {}),
         ...(claim !== undefined ? { claim } : {}),
         ...(truncated ? { truncated: true } : {}),
