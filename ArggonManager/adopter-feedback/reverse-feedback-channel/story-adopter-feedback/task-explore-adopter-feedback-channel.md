@@ -144,3 +144,24 @@ The stated rationale ("an agent file naming a command that does not exist yet is
 ## Recommendation
 
 **No merge as-is.** Fix B1–B4 (renumber all four identifiers to the next free ids with a `Numbering note`, rebase onto `origin/main` and drop the `done`-item hunk, ship the ADR as `Proposed`, add the README row), fold in N1–N6, then re-request review — the content should not need another architecture pass. Scope calls 4b and 4c stand as recommended; 4a stands with the §2 re-justification. Release `task-friction-capture-command` (T1) only after the renumber lands and probe 4 reports zero NEW findings; add `depends_on: [task-friction-trigger-carrier]` to the compliance spike before it becomes claimable.
+
+### 2026-10-03 @ses_f02ab5836ffeOAxmisboIwWE4x
+Coordinator decision on the reviewer's B1 (4 number collisions) — **the WORKER'S side renumbers, not mine.**
+
+The collision is real and the root cause was mine: I wrote ADR 0020 (methodology-first productization) and accepted it on main before dispatching this worker, which independently wrote its own ADR 0020. Same for exploration `-018` and spec/plan `-017`.
+
+Renumbering `origin/main`'s side would mean touching an ACCEPTED ADR and four artifacts that already reference it (the carriers from PR #592, README, `task-methodology-carriers`, the spec/plan pair). Renumbering the branch's side touches one PR that has not merged. So:
+
+- ADR `0020-adopter-friction-channel.md` → `0021-adopter-friction-channel.md`
+- `spec-friction-capture-017.md` → `spec-friction-capture-018.md`, `plan-friction-capture-017.md` → `plan-friction-capture-018.md`
+- `exploration-adopter-feedback-channel-018.md` → `exploration-adopter-feedback-channel-019.md`
+- every internal reference: frontmatter `spec:`/`planTask:`, the exploration's Decision link to its ADR, the spec's link back, the plan's link back, any cross-reference in the item body and the 6 tasks + 3 spikes
+
+Also required before this merges, from the reviewer's remaining findings:
+- **B2** the PR rewrites a `done` item: `bug-contributing-github-issue-contradiction.md` was fixed and closed on main after this branch's base, and the branch's copy is `status: todo` with unticked boxes. Rebase onto main and take main's copy for that file (it is NOT this PR's item).
+- **B3** the ADR ships `Status: Accepted` pre-merge, against `engineering.md` §ADR process and the repo's own two-step precedent → ship it `Proposed`.
+- **B4** add the new ADR's row to `docs/adr/README.md`. Note the parallel finding already filed as `task-adr-readme-index-missing-adr-0020` (now merged) added a PARITY TEST that asserts every ADR file has exactly one index row — so the new ADR must be indexed in this same PR or that test fails.
+
+And the two scope calls the reviewer ruled on, which you should carry into the ADR: keep the `doctor` `friction` block but re-justify it on the grounds that actually hold (per-file `triggerVersion` plus separating "trigger absent" from generic template drift — `doctor.ts` already re-renders templates for acked entries too, so `outdated` alone does not give it) and stop claiming it is claimed by both T5 and T6; and name in the spec that local fingerprint dedupe cannot see an already-filed upstream issue, which is the honest boundary of stopping at tier B.
+
+`bug-spec-analyze-does-not-detect-duplicate-doc-numbers` has MERGED, so `arggon spec validate` / `spec analyze` will now catch any residual collision — use them as the check rather than by eye.
