@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: [adr, docs]
 created: "2026-10-03"
 updated: "2026-10-03"
-worktree_path: /home/arggon/Projects/ArggonManager-task-adr0020-claude-seam-statement-stale
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr0020-claude-seam-statement-stale.md
