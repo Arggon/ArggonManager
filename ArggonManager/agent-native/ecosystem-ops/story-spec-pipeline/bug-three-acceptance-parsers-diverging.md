@@ -198,3 +198,36 @@ npx playwright test --grep @smoke              # ui-smoke lane green (drawer-not
 ```
 
 **No-merge until F1 and F2 land.** F3-F6 are a few lines each and belong in this PR; F7/F8 are notes the coordinator can route to a follow-up item. Sequencing per finding 7: #611 -> update #605 -> #605.
+
+### 2026-10-03 @arggon-reviewer
+verdict: request-changes (unchanged from my previous comment; that comment rendered the backslash escapes as "\BS" instead of "\r" / "\n" in a few code spans and in the F1 evidence block. This comment supersedes its FORMATTING only — every finding, file reference, count and ruling in it stands as written.)
+
+What to re-read from the previous comment, all inside code spans — the prose, the findings and the verdicts were unaffected:
+
+~~~
+previous (garbled)                 reads as
+`body.split(\BS"n")`                    `body.split(\"n")`
+`split(/\BSr?\BSn/)`                       `split(/\r?\n/)`
+`[..., \BSt-, ...]`                 `[..., \t-, ...]`
+`a\BSr- [ ] b`                    `a\r- [ ] b`
+~~~
+
+F1, restated with the escapes intact — the only place the garbling was load-bearing:
+
+~~~
+body                                     pre-fix      post-fix
+`- [x] a\u2028- [ ] b\n`                  REFUSE       ALLOW(done)   <-- gate false-pass
+`prose\u2028- [ ] b\n`                   REFUSE       ALLOW(done)   <-- gate false-pass
+`- [x] a\u2029- [ ] b\n`                  REFUSE       ALLOW(done)
+`- [x] a\r- [ ] b\n`                     REFUSE       ALLOW(done)
+`- [ ] a\r- [x] b\n`                     REFUSE       REFUSE       (row set still differs)
+LF / CRLF variants                      REFUSE       REFUSE       (unchanged)
+~~~
+
+Root cause, unchanged: `acceptanceRows` (`lib/src/items.ts:411`) iterates `body.split(\"n")`, while the pre-fix regex `/^[ \t]*[-*] \[( |x|X)\][\t]*[^\s]/gm` carries `m`, so JS `^` matched after **every** LineTerminator `\n`, `\r`, `\u2028`, `\u2029`. The fix is one line in `acceptanceRows` — split on the LineTerminator set rather than on `\n` alone — plus two `CORPUS` shapes and a U+2028 separator in the fuzz `markers` (`cli/src/acceptance-parity.test.ts:322`); the pre-fix oracle going green is the proof it was the right fix.
+
+Everything else stands. **No-merge until F1 (the gate refusal set changes on CR / U+2028 / U+2029) and F2 (`ArggonManager/docs/json-output.md:585,597` and `README.md:418` still say the acceptance rows are parsed from the clipped prose, while the payload now carries `acceptance_truncated`, `acceptance_complete` and a `criterion` field under a 64-row cap) land.** F3-F6 ride along; F7/F8 are notes.
+
+Sequencing, unchanged: merge #611, then update #605 on top of it, then merge #605 — #611 correctly does not touch `cli/src/goal-mode.ts` or the ZCode assets, since none of them are on `main`.
+
+The probes needed are listed in my previous comment and are unchanged. The decisive one is `npm test -- acceptance-parity` after adding a `\u2028` CORPUS shape: expected to fail before the fix (the `gateComplete === preFixGate` assertion) and to pass after it.
