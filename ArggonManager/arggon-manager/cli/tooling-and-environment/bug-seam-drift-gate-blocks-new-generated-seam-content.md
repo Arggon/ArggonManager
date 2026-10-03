@@ -188,3 +188,82 @@ right branch.
 ### handoff 2026-10-03 @Arggon — next: Review PR #607 (tasks-validate pass 36s on 220bfa6b); merge when cli+ui-smoke are green, then flip this item done
 - branch: fix/bug-seam-drift-gate-blocks-new-generated-seam-content
 - open questions: Accept the recorded weakening? (repo CI no longer proves the PINNED release reproduces the seam); file a follow-up for the unprovenanced .opencode/agents/arggon-prover.md dest?
+
+### 2026-10-03 @Arggon
+## Round 2 — review asks closed (PR #607)
+
+**1. The red `cli` lane was the known artifact-drift flake, not this diff.**
+`gh run rerun 37090935003 --failed` → **run 37090935003, attempt 2: `cli` = success**
+(ui-smoke was already `success` on attempt 1). Same head `628a4332`, no code change
+for it — matching the coordinator's reproduction on `f382ff10` and the green
+`220bfa6b`. New head `03b15492` runs the lane again from scratch (below).
+
+**2. `ArggonManager/docs/ci.md` no longer overstates the compensation.** The
+"Two assertions keep the release protection" framing is gone. The section now
+says what the code does:
+
+- the pinned-lag assertion is a **version-skew proxy, not byte-equality**, and is
+  **blind in exactly the case this item unblocks** — a feature PR that moves
+  templates and regenerates the seam with **no version bump** leaves every stamp
+  at the pin, so the seam has postdated the release while the stamps say nothing,
+  and nothing in `tasks-validate` detects that on a branch;
+- `validate`/`doctor`/`list` through the pinned bin are a **read gate, not a seam
+  gate**;
+- the false "neither copy can rot silently" claim is removed and replaced with the
+  fact: `pinLagsSeam()` carries a `pin !== pkgVersion` conjunct the shell copy
+  lacks (that conjunct is what keeps the release window green in the test), filed
+  as `bug-ci-seam-pin-shell-vs-test-copy-divergence` rather than papered over.
+
+The ceiling is now the same sentence `release.md` §One release story already uses
+("the price paid is one weaker claim"), with a new **§Where the rule of record
+lives**: the workflow TEMPLATE is the rule (it is what adopters vendor), the
+committed copy is what CI runs and is held to it by the new parity test; the TS
+predicate is the repo-side guard in the `cli` job; only the shell copy decides
+`tasks-validate`.
+
+**3. `cli/src/ci-seam-pin.test.ts`'s header now describes the gate that runs
+here** (comment-only): the pin's two uses (registry install + the workflow's
+pinned-lag assertion), the branch-local byte comparison, and a note that the
+"opposite drift" line no longer applies to the pin — the pin ahead of the stamps
+is the documented template-less-patch case, and byte drift belongs to the
+branch-local path.
+
+**4. The two-copy invariant is machine-checked** — `cli/src/headless-ci.test.ts`,
+new top-level `describe("workflow parity: template vs the copy CI runs")`:
+
+- byte comparison of the two workflow files with `uses:` action refs collapsed to
+  a placeholder (the only documented difference: the template floats on `@v4`,
+  this repo SHA-pins them);
+- the branch-aware generator predicate, the pinned-release fallback and the
+  lag-before-diff ordering asserted in **both steps of both copies**, so a
+  regression names the file and the step instead of printing two workflows.
+
+Discrimination proven by mutation, not assumed: neutering the lag line in the
+committed copy → `× carries one rule` red with the divergence message; changing
+the predicate in the committed **bootstrap step only** → **both** parity tests red,
+one of them naming `step 'Bootstrap the tracker …' lost the branch-local
+generator`. Workflow restored after each.
+
+**Push mechanics (no force-push).** The branch was already published at
+`628a4332`, so the rebase could not fast-forward:
+
+    ! [rejected] fix/bug-seam-drift-gate-... -> fix/bug-seam-drift-gate-... (non-fast-forward)
+    hint: Updates were rejected because the tip of your current branch is behind its remote counterpart.
+
+I did not force-push. Published history was restored (`git reset --hard
+origin/<branch>`, back to `628a4332`) and the two round-2 commits were
+re-applied by cherry-pick onto it — verified byte-identical to the rebased tree
+for every file this item touches — then `origin/main` was integrated with a
+**merge commit** instead of a rebase, so the push is a plain fast-forward
+(`628a4332..03b15492`) and nothing published was rewritten. The linear rebase is
+preserved at `backup/bug-seam-drift-gate-blocks-new-generated-seam-content-round2`
+(b222fe92) if you prefer it; that would need
+`git push --force-with-lease origin backup/…-round2:fix/bug-seam-drift-gate-blocks-new-generated-seam-content`,
+which I am not authorized to run. Flagging the deviation from the literal
+"rebase onto origin/main" wording so it is your call, not a silent substitution —
+the precedent (`task-adapter-selection-flags`) recommended a merge commit for the
+same situation.
+
+Gates on `03b15492` (origin/main 455d6cc4 merged): `npm run build`,
+`npm test` (2278 passed / 122 files), `npm run lint`,
+`npm run arggon -- validate`, `npm run check:plugin`.
