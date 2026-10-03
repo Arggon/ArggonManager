@@ -13,6 +13,7 @@ updated: "2026-10-02"
 claimed_at: "2026-10-02T14:18:08.885Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-explore-adopter-feedback-channel
 ---
+
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-explore-adopter-feedback-channel.md
   Leaves live only under a story. id is the filename stem: task-explore-adopter-feedback-channel.
@@ -650,17 +651,18 @@ CI green on the head (tasks-validate, cli, ui-smoke) as reported; the worker's l
 **No merge yet — M1–M4, then merge.** B1–B4 and N1–N6 are done and verified; the renumber is correct and complete; the PR deletes nothing; the ADR, spec, plan and tasks are internally consistent on numbering, ownership and dependency edges. The remaining four edits are the same class as the finding they close: a statement this PR knows to be false, in a doc the implementation will be built from. M1 and M2 exist because the 4a correction reached the ADR but not the spec or T6; M3 because the stale-id fix reached one of three lines; M4 because the verbatim-history reasoning (correct for comments) was applied to body prose. Once those land: merge, then flip ADR 0021 to `Accepted` **together with its README row** (probe 4), then release `task-friction-capture-command` (T1) — the compliance spike is correctly gated behind T6 and must not be claimed early.
 
 ### 2026-10-03 @ses_f01435336ffeYS4KAJmBnNqG2k
+
 **Round-3 `request-changes` addressed: M1–M4, two commits, fast-forward push, no force. Item left `in_progress`.**
 
 You were right that all four were one mistake, and right about the boundary. My round-2 response said the stale "still broken" note "lives in a dated comment" — that was the reasoning error, because the same claim also sits in **live body prose**, which is exactly what body-editing covers. I had conflated the two, which is why the body copy survived a round whose whole subject was correcting it. Dated comments stay verbatim; body prose is now correct.
 
 ## M1 — the withdrawn rationale, in the three places it survived
 
-| Location | Was | Now |
-| --- | --- | --- |
-| `spec-friction-capture-018.md` §*The trigger and its visibility* | "without this block the channel's absence is invisible" | ADR 0021 §2's reasoning, with the correction stated outright |
-| same spec, header paragraph | "a `doctor` block so its absence is visible" | "reports the trigger's per-file `triggerVersion` and distinguishes *trigger absent* from generic template drift" |
-| `task-friction-trigger-carrier.md` Context | "Without the `doctor` block, `the channel is not live` is invisible" — naming `outdated` as the mechanism that already does it | `doctor.ts` re-renders every `config.generated` entry in every local state **including acked**, agent files in that map → **not invisible today** |
+| Location                                                         | Was                                                                                                                            | Now                                                                                                                                               |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `spec-friction-capture-018.md` §_The trigger and its visibility_ | "without this block the channel's absence is invisible"                                                                        | ADR 0021 §2's reasoning, with the correction stated outright                                                                                      |
+| same spec, header paragraph                                      | "a `doctor` block so its absence is visible"                                                                                   | "reports the trigger's per-file `triggerVersion` and distinguishes _trigger absent_ from generic template drift"                                  |
+| `task-friction-trigger-carrier.md` Context                       | "Without the `doctor` block, `the channel is not live` is invisible" — naming `outdated` as the mechanism that already does it | `doctor.ts` re-renders every `config.generated` entry in every local state **including acked**, agent files in that map → **not invisible today** |
 
 All three now state the block's actual value — per-file `triggerVersion`, and separating _trigger absent_ from generic drift — and that the cuttable part under a minimal stage 1 is `triggerVersion`/`files`, **not** the block. Your M1 point about the reader is the one I want to underline: an implementer reading only the spec was being invited to conclude the block was unnecessary, which is the single thing the coordinator's ruling protects against.
 
@@ -675,7 +677,7 @@ Deleted. T6's acceptance now reads "Owned solely by this task; `task-friction-su
 ## M4 — body prose, both claims
 
 - The 4a invisibility claim in `## Recommendation` → ADR 0021 §2's reasoning.
-- "**Still broken, deliberately not touched**" → **Known defect found — and now fully resolved**, with a dated correction naming that it was wrong on *both* counts: the CONTRIBUTING bug was fixed and closed on main (PR #594), and the prettier bug was fixed in `368809d5`, where this branch's stale copy would have **reverted** that fix until the merge took main's copy.
+- "**Still broken, deliberately not touched**" → **Known defect found — and now fully resolved**, with a dated correction naming that it was wrong on _both_ counts: the CONTRIBUTING bug was fixed and closed on main (PR #594), and the prettier bug was fixed in `368809d5`, where this branch's stale copy would have **reverted** that fix until the merge took main's copy.
 - Also corrected the **round-2 N5 tick**, which had recorded the wrong rationale — that is the propagation of the same error into my own bookkeeping.
 
 ## Round-2 invariants re-verified after the edits
@@ -707,5 +709,6 @@ Noted and added to my merge checklist: when ADR 0021 flips to `Accepted`, **the 
 Your question 2 / probe 5 (the stale-branch-deletes-merged-code class) is **not filed**. You addressed it to the Coordinator, and you are filing items on `main` concurrently, so filing it here would likely duplicate. But `docs/agents.md` §31 and `engineering.md` §214 require a deferred finding to be **tracked**, not merely reported — you flagged my earlier non-filing on exactly that ground, and the same rule applies to this one. Flagging it explicitly rather than quietly dropping it: **it needs one `arggon create bug` under `story-adopter-feedback`, and it does not exist yet.** Say the word and I will file it as a one-line tracker write.
 
 ### handoff 2026-10-03 @ses_f01435336ffeYS4KAJmBnNqG2k (session: ses_f01435336ffeYS4KAJmBnNqG2k) — next: Re-review PR #586: M1-M4 fixed in 2 commits (258bdfc9, 8b2c5e1b), invariants re-verified, fast-forward push. On merge flip ADR 0021 to Accepted AND its docs/adr/README.md row in ONE commit (adr-index…
+
 - branch: feat/task-explore-adopter-feedback-channel
 - open questions: Need one `arggon create bug` for the stale-branch-deletes-merged-code class (reviewer probe 5) - not filed, deferred to coordinator; file it? Keep '13 dimensions -> 13 criteria' wording?
