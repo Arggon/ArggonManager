@@ -557,9 +557,15 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     // ORDER pinned (task-cli-start-remediation-tail-clipped-on-human-channel):
     // the `commitFile` identity hint LEADS and git's raw commit output trails,
     // because this whole line is clipped head-kept at MAX_HUMAN_ERROR_CHARS.
-    expect(message.indexOf("if this is an identity error")).toBeLessThan(
-      message.indexOf("gate: deliberate failure"),
-    );
+    // The needle is the message's OWN capitalization: a lowercase one is
+    // absent, `indexOf` answers -1, and `-1 < n` passes unconditionally — the
+    // review's F3 vacuity shape. Both needles are presence-checked for the
+    // same reason.
+    const hint = message.indexOf("If this is an identity error");
+    const gateOutput = message.indexOf("gate: deliberate failure");
+    expect(hint, "identity hint needle must be present").toBeGreaterThanOrEqual(0);
+    expect(gateOutput, "gate output needle must be present").toBeGreaterThanOrEqual(0);
+    expect(hint).toBeLessThan(gateOutput);
     // ...and nothing was rolled back: worktree, branch and the uncommitted
     // claim all survive for inspection.
     expect(existsSync(expectedPath)).toBe(true);
@@ -1012,10 +1018,14 @@ describe("post-start shell variant (task-post-start-env)", () => {
     // ORDER pinned: the hint LEADS and the hook's raw output trails — this
     // string is printed through `sanitizeHumanError` (head-kept at
     // MAX_HUMAN_ERROR_CHARS) and a hook's stderr tail is unbounded
-    // (task-cli-start-remediation-tail-clipped-on-human-channel).
-    expect(result.postStart?.error?.indexOf("hint: hooks inherit")).toBeLessThan(
-      result.postStart?.error?.indexOf("post-start failed:") ?? -1,
-    );
+    // (task-cli-start-remediation-tail-clipped-on-human-channel). Both needles
+    // presence-checked: an absent one is -1 and would pass vacuously (F3).
+    const report = result.postStart?.error ?? "";
+    const hint = report.indexOf("hint: hooks inherit");
+    const hookOutput = report.indexOf("post-start failed:");
+    expect(hint, "hint needle must be present").toBeGreaterThanOrEqual(0);
+    expect(hookOutput, "hook output needle must be present").toBeGreaterThanOrEqual(0);
+    expect(hint).toBeLessThan(hookOutput);
     // Failure is still non-fatal: the start itself succeeded.
     expect(result.worktreeCreated).toBe(true);
   });

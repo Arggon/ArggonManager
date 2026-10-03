@@ -738,8 +738,14 @@ describe("CLI --json", () => {
     expect(message).toMatch(/gh auth status/);
     // ORDER pinned (task-cli-start-remediation-tail-clipped-on-human-channel):
     // the actionable hint LEADS and gh's raw stderr trails, because the human
-    // line is clipped head-kept at MAX_HUMAN_ERROR_CHARS.
-    expect(message.indexOf("gh auth status")).toBeLessThan(message.indexOf("auth required"));
+    // line is clipped head-kept at MAX_HUMAN_ERROR_CHARS. Both needles
+    // presence-checked: an absent one is -1 and `-1 < n` passes vacuously (F3).
+    const hint = message.indexOf("gh auth status");
+    const stderr = message.indexOf("auth required");
+    expect(message).toContain("auth required"); // the stub's stderr really arrived
+    expect(hint, "gh hint needle must be present").toBeGreaterThanOrEqual(0);
+    expect(stderr, "gh stderr needle must be present").toBeGreaterThanOrEqual(0);
+    expect(hint).toBeLessThan(stderr);
   });
 
   it("arggon start never forces a taken claim", () => {
