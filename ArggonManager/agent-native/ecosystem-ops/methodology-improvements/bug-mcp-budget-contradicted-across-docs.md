@@ -23,6 +23,9 @@ updated: "2026-10-03"
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] One source of truth for the MCP bound and its baseline: \`cli/src/measure.ts\` owns both, and README + \`docs/json-output.md\` are corrected to match (or the docs cite it and stop restating the number)
+- [ ] Decide whether the MCP bound becomes a CI gate like its two siblings, or stays advisory with that status stated explicitly in the docs — a bound nobody checks is a wish
+- [ ] The \`npx arggon doctor --budget\` output and \`npm run context:report\` agree on the figure and the owner (same lesson as the baseline-date mismatch: every surface that prints a number must print the right one)
+- [ ] A test asserts the documented figure equals \`measure.ts\`'s constant, so the docs cannot drift from the code again
 
 ## Notes
