@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-vacuous-substring-ordering-assertions
 title: "Ordering assertions using `indexOf(substring) < index` pass vacuously when the substring is absent (-1 < anything) — one such assertion is live in `cli/src/worktree.test.ts:557` after PR #608 reworded the message"
+assignee: Arggon
+branch: fix/bug-vacuous-substring-ordering-assertions
 parent: story-adapter-selection
 labels: [tests]
 created: "2026-10-03"
 updated: "2026-10-03"
+claimed_at: "2026-10-03T10:45:06.471Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-vacuous-substring-ordering-assertions
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-adapter-selection/bug-vacuous-substring-ordering-assertions.md
