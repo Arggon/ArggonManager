@@ -104,3 +104,7 @@ feat/task-zcode-goal-mode).
   (`agents.md`, `opencode2.md`, `json-contract.md`) and `mcp-parity`.
 - Spec §S5 acceptance box also covers the automation templates (`task-zcode-automations`),
   so spec/plan `status` stays `proposed` and this box is not ticked.
+
+### handoff 2026-10-03 @Arggon — next: review PR #605 (draft): goal-mode template + `arggon goal`; decide whether an MCP wrapper is wanted instead of the headless bin
+- branch: feat/task-zcode-goal-mode
+- open questions: MCP wrapper for goal? would touch the fifteen-tool surface docs; goal template location (plugin templates/ dir) unverified against live ZCode
