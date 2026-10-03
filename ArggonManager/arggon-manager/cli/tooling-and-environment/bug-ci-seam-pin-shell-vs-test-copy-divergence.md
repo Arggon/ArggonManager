@@ -65,3 +65,56 @@ Acceptance:
 - [ ] If they legitimately differ, the parity test must permit that specific difference EXPLICITLY (a named exception), not by a general carve-out, and `docs/ci.md` §Where the rule of record lives must state the difference
 - [ ] `docs/ci.md` continues to point here for this fact (the false "neither copy can rot silently" claim was replaced by this fact)
 - [ ] Depends on PR #607 landing
+
+### 2026-10-03 @Arggon
+**Decision: the shell clause is the rule of record; the TS-only `pin !== pkgVersion` conjunct is removed (not pasted into the shell copy).** PR #621.
+
+## The two predicates
+
+- shell (both workflow copies, the drift step): fires iff `[ -n "$newest" ] && max(newest, ARGGON_VERSION) != ARGGON_VERSION`, i.e. **newest stamp > pin**. Inputs: the pin and the committed stamps. It never reads `package.json`.
+- TS (`pinLagsSeam()`): `pin !== pkgVersion && pin < newest`. Red set is a strict **subset** of the shell's — so the shell is the stricter predicate, as the re-scope said.
+
+## The disagreement input exists, and it is one cell
+
+They differ exactly on `newest > pin && pin == pkgVersion`: a committed stamp newer than the pin while `package.json` equals the pin. On it **the shell FIRES and the old predicate returned green** — i.e. the #527 outage class (the pinned init really would rewrite committed content) went unflagged by the guard that exists to flag it. Reachable whenever a contributor's installed `arggon` is newer than their branch's `package.json` (`arggonVersion()` stamps with the INSTALLED package version) and they run `arggon init`. No such input exists on the six documented release-flow rows — which is itself the finding: the conjunct bought nothing there.
+
+## Why not paste it into the shell copy (the trap)
+
+The clause runs in every adopter's repo, and an adopter's `package.json` version is unrelated to arggon releases. Pasted in, any adopter whose version coincides with the pin literal gets the #527 gate **switched off** and ships the outage silently. So the shell copy had to stay strict, and the conjunct had to go.
+
+## Mutation evidence (all reverted; branch is green)
+
+| Mutation | Observed |
+| --- | --- |
+| pre-fix predicate (conjunct restored, from git HEAD) + the new parity gate | RED on **exactly one** row: `#527 with the release bump landed (pin == package.json, seam newer)` — expected false to be true. 8/9 corpus rows agree, so the conjunct bought nothing in the release flow and cost the #527 signal. |
+| conjunct pasted into `.github/workflows/arggon.yml` only (the finding's suggested fix) | RED twice: the clause-parity assertion naming the committed file, plus the pre-existing `never derives it` guard (`node -p "require('./package.json').version"` is banned). |
+| headless-ci direction 3b flipped to expect green | RED: `ARGGON_VERSION (0.5.0) lags the committed arggon seam (99.0.0)`, expected 1 to be +0. |
+| reverted | GREEN: 126 files / 2590 tests. |
+
+Raw shell on the extracted clause:
+
+```text
+pin=0.5.0  package.json=0.5.0  stamps=[0.5.0] -> green
+pin=0.5.0  package.json=0.6.0  stamps=[0.5.0] -> green
+pin=0.5.0  package.json=0.6.0  stamps=[0.5.1] -> FIRES
+pin=0.5.0  package.json=0.5.0  stamps=[0.5.1] -> FIRES   <- the disagreement input
+```
+
+## What closes it
+
+1. `pinLagsSeam(pin, stamps)` is now the plain transcription of the clause; the removed conjunct's counter-case is named in the file header and as its own verdict-table row, so it cannot come back as "obviously also true".
+2. A parity block **executes the clause** — lifted out of BOTH workflow copies, never remembered, so a restructure fails loudly instead of silently ceasing to be compared — against the predicate over a corpus (every release-flow state + the disagreement row), and asserts both copies carry the same clause and the same `sort -V` newest-stamp derivation.
+3. `headless-ci.test.ts` direction 3b drives the step body end to end on the same triple from the shell side: a repo whose `package.json` version equals the pin still goes RED.
+4. `ArggonManager/docs/ci.md` §Where the rule of record lives states the resolved split plus an explicit "What the rule does not read: `package.json`" scope, and still points here as provenance. The false "neither copy can rot silently" claim stays gone.
+
+No workflow copy changed — the whole fix is on the TS side, which is exactly why the gate stays strict.
+
+## Methodology impact class: **Advisory**
+
+`templates/docs/**` is byte-unchanged (no adopter's seam or CI gate moves) and `skills/arggon-cli/`, `.agents/skills/`, `docs/agents.md`, `docs/engineering.md`, `docs/convention.md` are untouched, so no `npm run skills:sync` is required. What changed is wording/scope in a product doc plus two test files: no rule, gate, command contract or pipeline step changed for any agent, human or adopter.
+
+## Gates
+
+build → test (126 files / 2590 tests) → lint → validate (ok, 0 warnings) → check:plugin (no diff) → test:structure (5 passed) → lint:structure (clean). Prettier converged (pass-2 == pass-3) on all three touched files. `origin/main` merged in (no force-push); merge touched none of my three files.
+
+Disclosed for the reviewer: on an earlier full run, `cli/src/prose-format.test.ts` > "prettier never rewrites a code span's source text" hit vitest's 30 s `testTimeout`. Load-margin flake, not this change — corpus is 350 md files / ~430 KB and this grows one by 1.9 KB (0.4 %); the sibling test in the same file (half the work) passed under the same load, the file passes standalone in 42 s, and both a pristine `origin/main` tree and this branch go green on re-run.
