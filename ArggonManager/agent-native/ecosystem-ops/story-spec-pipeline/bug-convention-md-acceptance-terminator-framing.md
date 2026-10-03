@@ -67,3 +67,7 @@ PR #613 — docs-only, one file (`ArggonManager/docs/convention.md`, §Acceptanc
 - smoke exempt (docs-only). Based on `origin/main` (`d160623f`) — already current, so no rebase; no force-push.
 
 One judgment call for the reviewer: I kept the 6.5% and 21/280 numbers OUT of the doc and kept item ids IN, on the grounds that a schema doc should carry the durable rule and the decaying measurements belong to the item. Say the word if you want either number surfaced.
+
+### handoff 2026-10-03 @Arggon — next: Review and merge PR #613 (docs-only, convention.md §Acceptance rows); item is ready to close once merged
+- branch: fix/bug-convention-md-acceptance-terminator-framing
+- open questions: Should the 6.5% VT/FF ALLOW->REFUSE measurement surface in convention.md, or stay in bug-three-acceptance-parsers-diverging? Worker kept it out as decaying; is the ':124' symbol-list de-duplication i…
