@@ -7,6 +7,7 @@ parent: methodology-improvements
 labels: [tests, docs]
 created: "2026-10-03"
 updated: "2026-10-03"
+depends_on: [task-opencode2-payload-contract-preparation-fields]
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-opencode2-doc-contract-pins-optionality.md
