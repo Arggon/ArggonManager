@@ -81,3 +81,7 @@ Expected vs observed (drift simulated, then reverted): restoring the nine-tool s
 Gates (after `npm run build`, on the rebased tree): `npm test` 125 files / 2569 tests pass, `npm run lint` 0, `npm run check:plugin` clean (bundle byte-identical), `npm run arggon -- validate` ok (0 warnings), `npm run test:structure` 4 passed, `npm run lint:structure` clean, `npm run skills:sync` synced 7 files with no diff. Rebased onto `origin/main` (was 11 behind), no force-push.
 
 Left `in_progress` — completion is the coordinator's call after merge.
+
+### handoff 2026-10-03 @ses_efea13a3fffefqFSMqOrGrzc22 (session: ses_efea13a3fffefqFSMqOrGrzc22) — next: Coordinator reviews PR #615 against the review bar, then merges and flips bug-agents-md-says-nine-mcp-tools to done (checklist already ticked).
+- branch: fix/bug-agents-md-says-nine-mcp-tools
+- open questions: Acceptance box 3 ticked without a skill edit (the skill was already correct); README.md:619 and json-output.md:14 fixed as the same fact — flag if the coordinator wants those split into their own ite…
