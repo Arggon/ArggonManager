@@ -353,6 +353,9 @@ program
             git: result.git,
             // OpenCode integration state (task-opencode-v2-doctor, additive).
             opencode: result.opencode,
+            // Capability-matrix state (task-capability-matrix, additive;
+            // report-only — gap rows are advisory, never blocking).
+            matrix: result.matrix,
             ...(result.budget ? { budget: result.budget } : {}),
             ...(result.budgetError !== undefined ? { budgetError: result.budgetError } : {}),
           },
