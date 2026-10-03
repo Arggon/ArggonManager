@@ -81,3 +81,7 @@ Siblings outside `boundedPreparation`: `boundedCommitPayload` reproduces the ker
 **Docs.** `docs/opencode2.md`: the `start` row, the new `preparation.stepsTruncated?` row (`boolean`, kernel `MAX_PREP_STEPS` (16)), and the explanation appended to the paragraph that introduces the field table. `docs/json-output.md` unchanged — no CLI field changed, so there is nothing to document there yet (see finding 1).
 
 Branch pushed without force; item stays `in_progress`.
+
+### handoff 2026-10-03 @ses_efea0d706ffetL52TK6OrsCWQd (session: ses_efea0d706ffetL52TK6OrsCWQd) — next: Review + merge PR #617 (fix branch already pushed); then decide on the reported CLI-side mirror (cli/src/start.ts + cli/src/cli.ts) and the kernel refusal-prose finding
+- branch: main
+- open questions: CLI start drops the same kernel flag (cli/src/start.ts/cli.ts, owned by the clip worker) — file that follow-up?; freshWorktreeInstallRefusal quotes a capped log without saying entries dropped — kerne…
