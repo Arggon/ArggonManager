@@ -120,21 +120,26 @@ Two adjacent findings, reported rather than fixed (outside this item's scope):
    a truncated log never says entries were dropped, so both surfaces inherit a
    prose version of this defect.
 
-#### Union with PR #609 (its doc-contract gate needs one more scenario)
+#### The #609 union landed here (its doc-contract gate needed one more scenario)
 
-`docs/opencode2.md` now carries the field in the `start` row and a paragraph. When
-#609's per-field table lands, the row it needs is:
+PR #609 (which filed this bug) merged **while this item was being worked** — its
+per-field table and `opencode/plugins/arggon/opencode2-doc-contract.test.ts` are
+on main now, so the union is this branch's job rather than a note for its author.
+Both halves are here:
 
-```
-| `preparation.stepsTruncated?` | `boolean` | kernel `MAX_PREP_STEPS` (16) | Present only when the kernel's own log hit that cap and dropped entries — MIRRORED, never re-derived (bug-native-steps-truncated-flag-dropped); a shortened `steps` is therefore never handed over as the whole log. It also folds into `preparation.truncated`. |
-```
+- the `preparation.stepsTruncated?` row in the field table (`boolean`, kernel
+  `MAX_PREP_STEPS` (16)), the mention in the `start` row, and the explanation
+  appended to the paragraph that introduces the table (so the suite's
+  prose-discoverability check sees it);
+- **an eighth scenario in that suite**, because the suite reads rows against real
+  runs in both directions: without a run that overflows the kernel's log cap the
+  new row is reported as a field no run ever carried. Measured, not guessed — with
+  the row alone the suite fails
+  `these rows document a field no real run ever carried: [ 'preparation.stepsTruncated' ]`;
+  with the scenario (a second fixture whose primary install links
+  `MAX_PREP_STEPS` workspace packages, then `observe("preparation", …)`) all five
+  tests pass against this fix, and killing the mirror fails scenario 8 by name
+  (`the kernel's decision is mirrored: expected undefined to be true`).
 
-**and one more scenario in that suite's `beforeAll`** — without it the row is
-reported phantom. Measured, not guessed: with the row alone, #609's
-`opencode2-doc-contract.test.ts` fails
-`these rows document a field no real run ever carried: [ 'preparation.stepsTruncated' ]`;
-adding an eighth scenario (a second fixture whose primary install links
-`MAX_PREP_STEPS` workspace packages, then `observe("preparation", …)` on that
-run) makes all five of its tests pass against this fix. The scenario's fixture
-builder is already written in `tools.test.ts`
-(`addPrepLogWorkspacePackages`) and can be lifted verbatim.
+The doc conflict on rebase was resolved as a UNION (their tables plus all three
+doc additions), not by picking a side.
