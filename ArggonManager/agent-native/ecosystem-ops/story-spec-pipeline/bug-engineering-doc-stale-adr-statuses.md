@@ -12,7 +12,6 @@ updated: "2026-10-03"
 claimed_at: "2026-10-03T12:47:53.140Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-engineering-doc-stale-adr-statuses
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-engineering-doc-stale-adr-statuses.md
   Leaves live only under a story. id is the filename stem: bug-engineering-doc-stale-adr-statuses.
@@ -159,3 +158,51 @@ cwd `/home/arggon/Projects/ArggonManager-bug-engineering-doc-stale-adr-statuses`
 4. **Gates on the final head after F1/F2 land:** `npm run build && npm test` (expected: the new file green, count +1 assertion over the recorded 2588) and `npm run lint` (expected 0). CI already shows cli / tasks-validate / ui-smoke SUCCESS at `fceb27f7`; re-confirm on the amended head.
 
 Unverified by me: every execution claim above; the worker's five reverted simulations (their expected-vs-observed messages and sha256 reverts are recorded on the item but I did not reproduce them); the prettier-convergence claim; and CI for any head after the F1/F2 edits.
+
+### 2026-10-03 @Arggon
+### 2026-10-03 @Arggon
+Round 1 addressed · commit aa86f434 · PR #618 · branch unchanged.
+
+**Merged `origin/main` first** (was 18 behind). The item file conflicted — the verdict landed on main while my ticked boxes lived only on this branch. Resolved as a **union**: main's frontmatter, my ticked acceptance list, and every `###` block from both sides (my worker comment + handoff, and the reviewer's full verdict). No partial claim block; `validate` ok.
+
+**The reviewer's three probes, run first, all confirmed — I did not assume them:**
+
+| Probe | Predicted | Observed |
+|---|---|---|
+| 1 (F3) trailing restatement after the link | 4/4 pass = hole | **4/4 pass** — confirmed invisible |
+| 2 (F1) widen `CARRIERS` to three | rule 1 passes on all three, rule 2 fails once on the 0015 link | **exactly that** — 1 failed / 7 passed, `convention.md: links ./adr/0015-done-gate.md, which does not exist — docs/adr/0015-done-gate-acceptance-waiver.md does` |
+| 3 (F2) narrow region to pre-link prose | all green = unpinned | **4/4 pass** — confirmed unpinned |
+
+**F1 — fixed by widening, not by softening the sentence.** The constant is now split:
+
+- `STATUS_CARRIERS` = `engineering.md`, `agents.md`, `convention.md` (rule 1). All three were clean on the field, so the reviewer's "zero cost today" read was right.
+- `LINK_CARRIERS` = `engineering.md` only (rule 2), because `convention.md:124`'s dead ADR 0015 link is still broken in the merged tree — that item is filed but not merged. Re-verified after the merge.
+
+`:193` now ends in an explicit coverage statement instead of an unqualified "fails a PR whose carrier": **"Coverage: status restatement in `engineering.md`, `agents.md`, `convention.md`; link resolution in `engineering.md`."** — so the doc is *true*, not approximately true, and it says out loud why the link rule is narrower.
+
+**F1's second half — the gate.** The doc sentence and the two arrays are the same fact stated twice, so a new test reads the coverage statement back out of `engineering.md` and asserts it names exactly the carriers the rules iterate. Verified in both directions:
+- narrow `STATUS_CARRIERS` to one → `rule 1: doc vs constant: expected [ Array(3) ] to deeply equal [ 'ArggonManager/docs/engineering.md' ]`
+- soften the **doc** (drop `agents.md`/`convention.md` from the sentence) → `expected [ 'ArggonManager/docs/engineering.md' ] to deeply equal [ Array(3) ]`
+
+Delimiters are ASCII on purpose (`**Coverage: status restatement in ` … `; link resolution in ` … `**`): my first attempt parsed an em dash and I could not get the needle and the prose to agree on the codepoint through the shell — a parse that fragile would fail for reasons no reader could act on. An explicit coverage line is also better prose than burying the scope in a long sentence.
+
+**F2 — all three shapes pinned in the premise guards.** Added, alongside the existing before-the-link case: inside the link text, after the link, a clause that must NOT be read (`… [ADR 0011](…) is the contract, and a change is accepted only once it is explicitly recorded.` → `[]`), and that ADR 0001 does not inherit ADR 0003's word across a `·`. Discriminating, confirmed:
+- strip the trailing window → fails on the after-the-link assertion
+- strip the link text from the head → fails on the inside-the-link-text assertion
+Each half now fails on its own, so neither can be narrowed away silently.
+
+**F3 — closed, not documented as a limit.** `adrReferences` now builds each reference's region from prose + link text + one trailing clause. The trailing clause stops at a sentence end, comma or list delimiter (`TAIL_STOPS`), because an unbounded window would run to end-of-line and `agents.md:473` continues for hundreds of characters past its ADR links — a window that wide would report prose with nothing to do with any ADR's status. The reviewer's probe 1 now **fails loudly**: `engineering.md: labels ADR 0003 "Proposed" — docs/adr/0003-milestone-field.md says "Accepted"; carriers link to an ADR, they do not restate its status`.
+
+**End-to-end on the newly covered carriers** (previously a green lane):
+- `(Proposed)` after ADR 0012's link in `agents.md` → caught, message carries 0012's real Accepted status
+- `(Proposed)` after ADR 0016's link in `convention.md` → caught, same shape
+
+**Original five simulations re-run, all still loud** (each reverted, sha256 verified against the pre-simulation backup afterwards): A `0003 (Proposed)` before the link → caught · B `0008 (superseded by ADR 0011)` → caught with 0008's real Accepted status + its date note · C inside the link text → caught · D after the link → caught (new) · E renumbered `0020`→`0021` → `links ./adr/0021-methodology-first-productization.md, which does not exist`. Clean tree 7/7.
+
+**Impact class unchanged: Advisory.** No rule, gate, command contract or pipeline step; the suite still runs inside the existing `npm test`. The reviewer's nit stands as recorded — `:193` is a new *authoring* rule and reads Behavioral under `agents.md:476`'s wording — and the answer is unchanged: `skills/arggon-cli/references/methodology.md:61` points at §ADR process rather than copying it, so the Behavioral obligations are already met and nothing was hand-copied.
+
+**Not touched, per the round-1 instruction:** the delete-don't-correct decision, §Related's pointer to the index as the register, the file-scope note in the test header, both sibling doc-contract tests, and the four swept findings now owned by `task-engineering-doc-restates-more-drifted-facts` / `bug-convention-md-links-nonexistent-adr-0015` (including the reviewer's added `README.md:177` instance). The 0015 link is still broken in this tree, so the two-constant split stays until that lands.
+
+**Gates** (after `npm run build`): `npm test` 127 files / 2593 tests pass · `npm run lint` 0 · `npm run arggon -- validate` ok (0 warnings) · `npm run check:plugin` clean · `npm run test:structure` 5 passed · `npm run lint:structure` clean · prettier converged (pass-2 byte-identical to pass-3 on both changed files) · pre-commit gate ran validate. Smoke exempt: docs + one additive test, no CLI behavior change. Pushed fast-forward; no force.
+
+Left `in_progress` — completion is the coordinator's call after merge.
