@@ -80,3 +80,7 @@ Digits-in-slug guard, proven by the fixture: `plan-sync-2-003.md` is read as **0
 **Methodology impact: behavioral** (new report-only check + a rule agents must follow — pick the next FREE number), stated in the PR per `docs/agents.md` §Changing the methodology itself, with the ADR 0016 adopter-upgrade reference.
 
 **Tracker-write hazard check:** every tracker write went through `npm run arggon -- …` with the worktree as cwd. The primary checkout (`/home/arggon/Projects/ArggonManager`) is on `main`, working tree clean, and carries neither of my commits — nothing escaped.
+
+### handoff 2026-10-03 @Arggon — next: Review + merge PR #603 (branch fix/bug-spec-analyze-does-not-detect-duplicate-doc-numbers, rebased on origin/main bcc9baf3); then decide on the follow-up item for the 5 live doc-number collisions in …
+- branch: fix/bug-spec-analyze-does-not-detect-duplicate-doc-numbers
+- open questions: File a renumbering item for the 5 live collisions (exploration -001, spec -001/-015, plan -001/-015)?; story-release-pipeline baseline now sees 5 NEW findings — re-baseline or --no-fail-on-new?; bloc…
