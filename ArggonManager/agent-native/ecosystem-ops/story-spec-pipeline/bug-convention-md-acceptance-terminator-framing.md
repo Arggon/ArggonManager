@@ -141,3 +141,61 @@ open questions for the coordinator: (1) F3 wording — apply the suggested repla
 ### handoff 2026-10-03 @Arggon — next: Re-review #613 round 2: impact class Advisory stated on both required surfaces, F2 gates claim corrected with prose-format 3/3 + full suite 2555 green, F4/F5 fixed; then merge
 - branch: fix/bug-convention-md-acceptance-terminator-framing
 - open questions: F3: apply the 'per-call-site duty' wording, or file the cli/src/board.ts detailPayload clipped-prose coverage hole as a bug under story-spec-pipeline? Branch merges origin/main (rebase of a published…
+
+### 2026-10-03 @Arggon
+Round 3 on #613: **F4′ fixed — one clause, one pattern character.** Nothing else touched.
+
+## The clause, and the falsification it removes
+
+Shipped `convention.md:124` (whole line, bold part):
+
+> **A checkbox line is an acceptance ROW when — and only when — it starts with the marker `^[ \t]*[-*] \[( |x|X)\][ \t]*`; it GATES the `done` flip when — and only when — the first character after the box, after any spaces or tabs, is non-whitespace.**
+
+Two changes, exactly the ones the verdict prescribed:
+
+1. the quoted marker now carries the trailing **`[ \t]*`** it had dropped — the doc's quote is now byte-equal to `ACCEPTANCE_MARKER = /^[ \t]*[-*] \[( |x|X)\][ \t]*/` (`lib/src/items.ts:333`);
+2. "at least one non-whitespace character **follows the box**" → "**the first character after the box, after any spaces or tabs, is** non-whitespace".
+
+No caveats added, no second restatement, no hedge. Per the verdict's warning I did **not** harden it back: the clause names the position the kernel tests, and stops.
+
+## The pattern that backs it
+
+`ACCEPTANCE_TEXT = /^\S/` (`items.ts:336`) is tested on `line.slice(m[0].length)` (`items.ts:439-443`) — i.e. on the tail **after the marker has consumed its `[ \t]*`**. So the kernel's criterion is "first character of the post-marker tail is non-whitespace", which is what the new sentence says; the old sentence tested a different thing ("does any non-whitespace character exist anywhere after the box"), which is strictly weaker and false as an equivalence.
+
+Re-ran the reviewer's nine shapes with the two shipped patterns transcribed from `items.ts` (`/tmp` probe, no repo change):
+
+| line | kernel + new doc sentence | round-2 sentence |
+| --- | --- | --- |
+| `- [ ] x` | gates | gates |
+| `- [ ]x` | gates | gates |
+| `-  [ ] x` | not a row | not a row |
+| `- [ ]` | does not gate | does not gate |
+| `- [ ]  x` | gates | gates |
+| `- [ ] x` (NBSP) | does not gate | gates — **drift** |
+| `- [ ]\vx` | does not gate | gates — **drift** |
+| `- [ ]　x` (U+3000) | does not gate | gates — **drift** |
+| `- [ ]﻿x` (U+FEFF) | does not gate | gates — **drift** |
+
+**Drift vs the kernel: 4 shapes before, 0 after.** The four are exactly the ones the verdict named, and they are the shapes the `\p{Zs}` row this PR added already described ("Only space and tab are consumed after the box, so `- [ ] x` is a row whose text trims to `x` and still does not gate the flip") — so the bolded rule, that row, `items.ts:368-372` and `acceptance-parity.test.ts:439-441` now say the same thing. I confirmed the paragraph I did **not** edit was not a second copy of the falsified rule: `:150` states only row-forms (`- [ ] x`, `- [ ]x`, `-  [ ] x`), and `:120`/`:282` say "carries text", which is the display-`text` notion, not a criterion biconditional.
+
+## Gates (this round's required set)
+
+| Gate | Result |
+| --- | --- |
+| prettier convergence | `--write` ×3, **pass-2 ≡ pass-3**; re-proved **after** the code-span edit, tree clean → committed bytes are a fixed point |
+| `npm run arggon -- validate` | `arggon validate: ok (0 warning(s), convention v5)` |
+| `npm run lint` | clean, no output |
+| `npm run test:structure` | `4 passed; 0 failed` |
+| `npx vitest run cli/src/prose-format.test.ts` | **3 passed** (the lane that guards the code span I edited) |
+
+The full `npm test` (2555) is not re-run: this round changes one line of one doc file, and the previous round's full-suite result stands for the same tree plus that sentence — `prose-format`, the only suite that reads this file, is re-run above and is green. Say so if you want the full suite re-run anyway.
+
+## Merge: nothing to merge this round
+
+`git fetch origin` → `origin/main` is still `b9646fca`, and `git rev-list --count HEAD..origin/main` = **0**, so this branch already contains all of main; no merge and therefore no conflict. The verdict commit `b89a3398` and the F3 follow-up item exist in this repo only on the primary checkout's local `main` (it is not on `origin/main` yet), so I did **not** merge them in — that is the coordinator's local work to publish, and pulling unpublished commits from another worktree's branch is not mine to do.
+
+Diff vs `origin/main` after the push: still **the same two files** — `convention.md` (**+14/−3**, unchanged numstat from round 2; the fix rewrote the clause in place) and the item file (+108/−6). Two-dot and three-dot diffs return the **identical file set**, so the merge base equals main's tip and nothing main-side is dropped. Pushed fast-forward `f6d00aa8..b6f670a9`; no force.
+
+For the coordinator's merge: the anticipated conflict on the item file (verdict comment vs my round-2/round-3 comments) is still ahead — resolve as a **union** and keep every comment block.
+
+open questions: none blocking. Ready for re-review.
