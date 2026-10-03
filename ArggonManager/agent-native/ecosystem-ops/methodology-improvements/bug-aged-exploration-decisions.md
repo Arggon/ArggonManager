@@ -1,16 +1,12 @@
 ---
 type: bug
-status: in_progress
+status: todo
 id: bug-aged-exploration-decisions
 title: Aged explorations 012/013 record no Decision section link
-assignee: Arggon
-branch: fix/bug-aged-exploration-decisions
 parent: methodology-improvements
 labels: [spec-analyze]
 created: "2026-10-02"
 updated: "2026-10-02"
-claimed_at: "2026-10-02T22:27:50.993Z"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-aged-exploration-decisions
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-aged-exploration-decisions.md
@@ -146,6 +142,7 @@ Run in the PR worktree `/home/arggon/Projects/ArggonManager-bug-aged-exploration
 
 Nothing else is unverified: I read the full diff, both explorations' surrounding sections (§0/§A/§B/§C/§D/§E/§G, the matrix, the recommendation list, `task-record-shell-tasks-pilot-negative-result`'s full body and both comments), the scanner grammar and baseline logic in `cli/src/spec.ts`, the 5 linked ADRs, `agents.md:209/309/428/439`, all 26 named tracker items, both manifests, `ci.yml`, the committed baseline and its git history, and PR #599's check rollup + failed-job log.
 
+
 ### 2026-10-02 @Arggon
 Round-1 review (`verdict: request-changes`) addressed — all four findings. Head is now `d3640d5d`; item left `in_progress` for the coordinator.
 
@@ -226,3 +223,45 @@ Three corrections to my previous comment — the substance of all four findings 
 Closing finding 4 with the run ids at the **final** head: the three tracker-comment commits after d3640d5d moved the head to `a68cb529` and re-ran CI — runs **37079240558** and **37079240561**, both **success** (`cli`, `tasks-validate`, `ui-smoke`). So CI is green at the head that will actually merge, and PR #599 reports MERGEABLE. The earlier table stays as recorded: the *pre-merge* head `e1f883da` failed twice with the same spawn/artifact-drift signature (37073594139 attempts 1 and 2), which is the tracked flake class, not this diff.
 
 Also, for the hazard record: `git branch --contains d3640d5d` lists only `fix/bug-aged-exploration-decisions` (checked out in this worktree), so none of my content commits are on `main`; the primary checkout sits at `09bee07b`, another session's tracker commit. Worktree clean, item left `in_progress`.
+
+### 2026-10-02 @Arggon-reviewer (round 2)
+verdict: approve (all four blocking findings closed by reading; one mechanical merge-gate condition remains — the `cli` job at the current head was still running at review time)
+
+Re-read the branch as it stands: head `b95c6c31`, base `e0789cfe`, 3 files, +267/−13, worktree clean. Fix commit `d3640d5d` ("docs: correct three review findings"), plus tracker-comment commits `211771e0`, `a730f49d`, `a68cb529`, `b95c6c31`. I verified the fixes against their sources rather than against the worker's summary.
+
+#### 1. Wrong count — closed
+
+`exploration-ui-improvements-012.md:169` now reads **20**. My own parse at the branch head: filed-work table = **20 ids, 20 unique**, per row `ui-web-board-v2` 9, `ui-tui-v2` 7, `ui-native-panel-v2` 2, `ui-foundation` 2; the Recommendation section's id union is **the same 20** (set equality, no dupes). Spot-checked six ids live now — `task-ui-browser-smoke-ci`, `bug-tui-selection-offscreen`, `task-native-panel-refresh-filter`, `task-tui-actions-parity`, `task-ui-shared-viewmodel`, `task-board-serve-hardening` — all `done` (round 1 checked all 20 individually). `arggon report` for epic `ui` = `todo 0 / in_progress 0 / blocked 0 / done 39 / cancelled 0`, so "39 done, 0 todo, 0 in_progress" still stands.
+
+Integer sweep of both Decision sections at the branch head, each traced to source: 012 → {20 ✓, 39 ✓, ADR 0001/0002/0008 ✓, "candidate 2" ✓}. 013 → {ADR 0008/0010/0011/0019 ✓, spec `spec-worktree-env-contract-016` exists ✓, `exploration-worktree-env-isolation-017` exists ✓, 2026-09-28 + PR #423 ✓, recommendations 1–7 contiguous with no gap or dupe ✓, "layer 2"/"point 3" ✓}. Re-checked the dependency claims at the *branch* head rather than round-1 main, since main advanced: root `dependencies` = `@arggondev/lib`, `commander`; `lib` declares none; devDependencies still carry `@ast-grep/cli`, `fast-check`, `@playwright/test`, `@axe-core/playwright` — byte-identical to `origin/main`, so the main merge did not invalidate them.
+
+#### 2. Stale rec 3 — closed, and now honest in both directions
+
+The bullet reads "**undecided, and deliberately left that way**": §C's verdict and the matrix's "Adopt as dev standard" row are named as this document's *dated research position*; the repository has recorded **no decision either way** (no ADR, no playbook, no repo doc, `AGENTS.md` included); the open question is tracked as `task-decide-codebase-memory-default-discovery` (`todo`, filed 2026-10-02), "read that item for the disposition… this bullet deliberately does not close it."
+
+I verified the residual claim rather than taking it: `git grep -l codebase-memory` at the branch head returns **4 files**, and the only one under `ArggonManager/docs/` is the exploration itself — nothing in `AGENTS.md`, `CONTRIBUTING.md`, any ADR, playbook or spec names it. "Not adopted" is gone from rec 3 only; **not** replaced by anything stronger, and recs 4–7 keep their independently verified dispositions (4 measured FAIL, 5 hold stands, 6 decided by ADR 0008, 7 honored) unchanged by the diff. Also noted: `main`@`822e70b5` ("correct placement path in task-decide-codebase-memory-default-discovery") fixed the bookkeeping bug I flagged in round 1 — that follow-up item is now correctly placed.
+
+#### 3. ADR 0019 gloss — closed, and now tighter than my finding demanded
+
+The new gloss matches 0019 clause for clause: **layer 1** env contract default (`.arggon.env` + per-OS state/cache dirs, spec 016) = decision point 1; **layer 2** ephemeral per-worktree **service** containers (Compose) opt-in, never a kernel feature = point 2; **rejected as defaults** per-worktree dev-environment containers, distrobox/toolbox, per-worktree VMs = point 3. The escape-hatch clause is not an invented permission — it is 0019's own alternatives table, `:130`: "Rejected as default … **Kept as the escape hatch for toolchains that genuinely cannot run on the host**" — and the sentence now puts "rejected as default" first, which is the half the old gloss dropped. Nix/devbox as "optional, per-project complement outside arggon's scope" = `:63-64` and table `:133` ✓. "ADR 0019 does not mention `mise` at all" ✓ (`mise` appears in 013, `convention.md`, `opencode2.md`; not in 0019). The still-`Proposed` status is explicit with the acceptance attributed to the `Deciders` line ✓, the intro softened to "taken up later — partially", and the toolchain half of §0's thread is no longer implied answered.
+
+#### 4. CI — finding closed, and declining to claim the rerun was the right call
+
+Verified run by run: `37073594139` at `e1f883da` is **attempt 2 = failure** on the identical tree (`cli` only; `ui-smoke` success both attempts), so the rerun genuinely did not pass. The worker's refusal to claim it did is the correct call: the harness itself classifies the failure as `child-boot-failed` — "this is not an assertion failure" — with the artifact-drift diagnosis naming the writer, it reproduced twice on the same tree, and a docs-only diff cannot reach that code. Attributing the red→green flip to the main merge rather than to a retry also checks out: `eea4266f` (the shuffle-safe fix) is already an ancestor of **both** bases (`17091702` and `e0789cfe`), so it cannot explain the difference — the only intervening tree change is the main merge plus the three doc corrections. Green on the fixes tree: `37078281306`/`37078281310` at `d3640d5d` (`cli`, `ui-smoke`, `tasks-validate` all SUCCESS) and `37079240558`/`37079240561` at `a68cb529` (all three SUCCESS). Hazard record verified too: `git branch -a --contains d3640d5d` lists only this branch, and `origin/main` does not contain it.
+
+**Merge gate, stated plainly:** the current head is `b95c6c31` = `a68cb529` + 5 lines in this item's file, docs byte-identical. At review time `tasks-validate` (37079642072) and `ui-smoke` were SUCCESS on it and `cli` (run 37079642052) was **still in_progress**. That is the only thing left, it is not the worker's to fix, and it landed green on the docs-identical head two commits earlier — so I approve the change and leave the merge to the coordinator once that job reports green.
+
+#### 5. Retracted baseline rationale — present and correct; leaving the baseline unrefreshed is still right
+
+The retraction appears in both places that mattered: the item note ("### Baseline rationale corrected (reviewer advisory)" — the sentence "would delete the evidence that these two findings existed" "was **wrong**, and it is retracted") and the PR body, which now says `findingKey` embeds the message and the age is inside it, so the committed 012 entry "was already reporting `resolved` from 9→10 day drift alone", and calls the surviving `resolved` line "fingerprint churn, not proof of closure". That is exactly right against `cli/src/spec.ts:976-979`, and I confirmed the baseline file itself is untouched: `git diff e0789cfe..HEAD -- ArggonManager/spec-analyze-baseline.json` is empty, as are `docs/specs/`, `docs/adr/`, `docs/agents.md`, `docs/convention.md`, `docs/engineering.md` and `README.md`. Leaving it unrefreshed still stands on the convention argument: `agents.md:439` documents `--baseline` only as the NEW-findings wave gate, no refresh-on-resolution workflow exists, and both baselines were committed once and never refreshed (`50de2786`, `74749bbf`).
+
+#### 6. Detector not silenced — re-confirmed
+
+`git diff e0789cfe..HEAD -- cli/` is **empty** (`spec.ts` byte-identical, 0 diff lines), and nothing changed under `lib/`, `smoke/`, `e2e/`, `.github/`, `package.json`, `lib/package.json`. Both Decision sections satisfy the grammar at `spec.ts:744-748` — marker on a column-0 line, real em dash (U+2014), rationale present — and each also carries numbered ADR targets (`012` → 0001/0002/0008; `013` → 0008/0010/0011/0019), so either signal resolves them and neither is load-bearing silence. Section headings are still at lines 165 and 771, matching the worker's own probe. One structural corroboration for the "0 new" claim I could make without running anything: the ambiguity and consistency analyzers scan only `docs/specs` and `docs/plans` (`spec.ts:323/326/532/560`); explorations are read solely by `decisionFindings` (`:755`), so new prose in these two files cannot manufacture a new finding kind — the five surviving findings are the spec findings the committed baseline already carries.
+
+#### Probes needed (not run by me)
+
+1. `gh run view 37079642052 --json status,conclusion,jobs` in `/home/arggon/Projects/ArggonManager` — expect `cli` SUCCESS, i.e. the merge gate green at the actual merging head `b95c6c31`. Nothing else is outstanding; `ui-smoke` and `tasks-validate` already passed on it.
+2. `npm run arggon -- spec analyze --baseline ArggonManager/spec-analyze-baseline.json` in `/home/arggon/Projects/ArggonManager-bug-aged-exploration-decisions` — expect `0 new, 1 resolved, 5 unchanged, 5 total`, exit 0, on the *post-fix* tree (the worker's recorded run is from `d3640d5d`; the docs have not changed since, so this is confirmation rather than doubt).
+
+Unverified by me, and I want that on the record: I ran no gate, no smoke and no browser drive. Everything above is reading — diffs, file contents, tracker items and statuses, `arggon report`, `ci.yml`, both manifests, the committed baseline, ADR 0019 line by line, the run history and failed-job log, and the PR body. The smoke bar is exempt here: ADR 0008 records "docs-only PRs are exempt" and nothing in this diff touches board HTML, the TUI renderer or the native start path.

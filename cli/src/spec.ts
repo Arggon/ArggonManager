@@ -296,6 +296,106 @@ function checkUniqueness(infos: DocInfo[], errors: Issue[]): void {
   }
 }
 
+/**
+ * Document-number collisions (bug-spec-analyze-does-not-detect-duplicate-doc-numbers).
+ *
+ * {@link checkUniqueness} keys on the id INSIDE each file, so two documents
+ * with different slugs but the SAME number (`0020-alpha.md` +
+ * `0020-beta.md`, `spec-deps-001.md` + `spec-sync-001.md`) are invisible to
+ * it: the ids differ, so nothing fires and git merges both in silently. The
+ * shared thing is the numeric stem in the FILENAME, which only a
+ * WHOLE-DIRECTORY scan can see — so this check cannot live in the per-file
+ * pass.
+ *
+ * Report-only, on both surfaces, with one shared message:
+ * `spec analyze` emits a `duplicate-doc-number` consistency finding (exit 0
+ * with findings, like every other analyze finding) and `spec validate` emits a
+ * `DOC_NUMBER_COLLISION` warning (warnings never fail the run). A blocking gate
+ * is deliberately NOT taken here — exploration-014 C2's rule is report-only
+ * first, and a gate on a corpus with pre-existing collisions would fire on
+ * every commit until the tree is renumbered (open work, not a detection bug).
+ */
+
+export type DocNumberDir = "adr" | "explorations" | "specs" | "plans";
+
+/**
+ * Filename convention per directory, and the number it carries. The slug is
+ * matched greedily so a slug that itself contains digits
+ * (`spec-phase-2-006.md`) can never be read as the number: the number is the
+ * LAST `-NNN` before `.md`, and `adr/README.md` matches nothing. `spec new`
+ * derives its number from the same table ({@link nextDocNumber}), so the
+ * scaffolder and the detector cannot drift apart.
+ */
+const DOC_NUMBER_SOURCES: readonly { dir: DocNumberDir; label: string; pattern: RegExp }[] = [
+  { dir: "adr", label: "ADR", pattern: /^(\d{3,})(?:-[^/]*)?\.md$/ },
+  { dir: "explorations", label: "exploration", pattern: /^exploration-[a-z0-9-]+-(\d{3,})\.md$/ },
+  { dir: "specs", label: "spec", pattern: /^spec-[a-z0-9-]+-(\d{3,})\.md$/ },
+  { dir: "plans", label: "plan", pattern: /^plan-[a-z0-9-]+-(\d{3,})\.md$/ },
+];
+
+/** Analyze finding kind / `spec validate` issue code for the same rule. */
+export const DOC_NUMBER_COLLISION_KIND = "duplicate-doc-number";
+export const DOC_NUMBER_COLLISION_CODE = "DOC_NUMBER_COLLISION";
+
+/** The number a filename carries in its documented directory, as an integer. */
+export function docNumberFromFileName(dir: DocNumberDir, fileName: string): number | undefined {
+  const match = docNumberMatch(dir, fileName);
+  return match?.number;
+}
+
+/** As {@link docNumberFromFileName}, plus the digits as written in the name. */
+function docNumberMatch(
+  dir: DocNumberDir,
+  fileName: string,
+): { number: number; stem: string } | undefined {
+  const source = DOC_NUMBER_SOURCES.find((candidate) => candidate.dir === dir);
+  if (source === undefined) return undefined;
+  const match = source.pattern.exec(fileName);
+  if (match === null) return undefined;
+  const stem = match[1]!;
+  return { number: Number.parseInt(stem, 10), stem };
+}
+
+export type DocNumberCollision = {
+  dir: DocNumberDir;
+  /** Human label for the directory ("ADR", "exploration", "spec", "plan"). */
+  label: string;
+  /** The shared number as an integer — `0001` and `001` are the same number. */
+  number: number;
+  /** The digits as written in the first colliding filename. */
+  stem: string;
+  /** Posix paths relative to the repo root, sorted, two or more. */
+  files: string[];
+};
+
+/** Every number used by two or more files in the same docs directory. */
+export function docNumberCollisions(root: string): DocNumberCollision[] {
+  const docsDir = docsDirForRoot(root);
+  const collisions: DocNumberCollision[] = [];
+  for (const { dir, label } of DOC_NUMBER_SOURCES) {
+    const byNumber = new Map<number, { stem: string; files: string[] }>();
+    // listMarkdownDocs sorts by name, so `files` and `stem` are deterministic.
+    for (const abs of listMarkdownDocs(join(docsDir, dir))) {
+      const hit = docNumberMatch(dir, basename(abs));
+      if (hit === undefined) continue;
+      const bucket = byNumber.get(hit.number);
+      if (bucket === undefined)
+        byNumber.set(hit.number, { stem: hit.stem, files: [posixRel(root, abs)] });
+      else bucket.files.push(posixRel(root, abs));
+    }
+    for (const [number, bucket] of [...byNumber.entries()].sort((a, b) => a[0] - b[0])) {
+      if (bucket.files.length < 2) continue;
+      collisions.push({ dir, label, number, stem: bucket.stem, files: bucket.files });
+    }
+  }
+  return collisions;
+}
+
+/** One sentence naming the number and EVERY file that shares it. */
+function docNumberCollisionMessage(collision: DocNumberCollision): string {
+  return `${collision.label} number ${collision.stem} is shared by ${collision.files.length} documents (${collision.files.join(", ")}) — each number belongs to one document; rename all but one to the next FREE number`;
+}
+
 function resolveSingleFile(
   cwd: string,
   root: string,
@@ -329,6 +429,19 @@ export function runSpecValidate(opts: SpecValidateOptions): SpecValidateResult {
   }
 
   checkUniqueness(infos, errors);
+
+  // Corpus mode only: a number collision is a property of the whole directory,
+  // so a single `--file` cannot decide it.
+  if (opts.file === undefined) {
+    for (const collision of docNumberCollisions(root)) {
+      push(
+        warnings,
+        collision.files[0]!,
+        docNumberCollisionMessage(collision),
+        DOC_NUMBER_COLLISION_CODE,
+      );
+    }
+  }
 
   errors.sort((a, b) => a.path.localeCompare(b.path) || a.code.localeCompare(b.code));
   warnings.sort((a, b) => a.path.localeCompare(b.path) || a.code.localeCompare(b.code));
@@ -522,7 +635,10 @@ function walkMarkdownFiles(dir: string): string[] {
 
 /**
  * Consistency across the corpus: implemented specs nobody cites (no task
- * body, no plan) and plans pointing at missing spec files.
+ * body, no plan), plans pointing at missing spec files, and two documents
+ * sharing one number (a whole-directory property the per-file
+ * `spec_id`/`plan_id` check cannot see — see
+ * {@link docNumberCollisions}).
  */
 function consistencyFindings(root: string): SpecFinding[] {
   const findings: SpecFinding[] = [];
@@ -596,6 +712,17 @@ function consistencyFindings(root: string): SpecFinding[] {
         "spec-orphaned",
         "warn",
         `spec '${spec.specId}' is marked implemented but no tracker item and no plan cites it`,
+      ),
+    );
+  }
+
+  for (const collision of docNumberCollisions(root)) {
+    findings.push(
+      finding(
+        collision.files[0]!,
+        DOC_NUMBER_COLLISION_KIND,
+        "warn",
+        docNumberCollisionMessage(collision),
       ),
     );
   }
@@ -1221,13 +1348,19 @@ function renderTemplate(kind: "spec" | "plan", vars: Record<string, string>): st
   return raw.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? `{{${key}}}`);
 }
 
+/**
+ * The next FREE spec/plan number: one above the highest number in use across
+ * both directories, read through the documented filename convention
+ * ({@link DOC_NUMBER_SOURCES}) rather than a loose trailing-digits guess, so
+ * the scaffolder and the collision detector agree on what a number is.
+ */
 function nextDocNumber(root: string): number {
   let max = 0;
-  for (const dir of [join(docsDirForRoot(root), "specs"), join(docsDirForRoot(root), "plans")]) {
-    if (!existsSync(dir)) continue;
-    for (const name of readdirSync(dir)) {
-      const match = name.match(/-(\d{3,})\.md$/);
-      if (match) max = Math.max(max, Number.parseInt(match[1]!, 10));
+  const docsDir = docsDirForRoot(root);
+  for (const dir of ["specs", "plans"] as const) {
+    for (const abs of listMarkdownDocs(join(docsDir, dir))) {
+      const number = docNumberFromFileName(dir, basename(abs));
+      if (number !== undefined) max = Math.max(max, number);
     }
   }
   return max + 1;

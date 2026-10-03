@@ -15,13 +15,21 @@
   — behind a default that is byte-identical to before. `engineering.md`'s
   "Claim/concurrency model" line is why it lands here and not in
   `agents.md` alone.
+- Amendment (2026-10-02, PRs #573 and #579): decision point 4's recovery hatch
+  is no longer merely tracked in a task — it shipped. `arggon start <id>
+--worktree --take-over-worktree` (kernel-owned `WorktreeClaimRequest.takeOver`, default
+  OFF) and `tools.arggon.start({ …, takeOverWorktree: true })` are one
+  mechanism with two surface spellings, and the raw-porcelain requirement the
+  detection depends on is recorded on the same point. The status is unchanged
+  (still Proposed): this closes one decision point's open hatch, it does not
+  accept the record.
 
 ## Context
 
 The methodology's loop is one worktree per item (`start --worktree` →
 `../<repo>-<item-id>`), on every machine that installs ArggonManager (npm,
 OpenCode V2 seam, ZCode plugin) and for every adopter project shape. Worktrees
-isolate *files* but not *runtime state*: parallel runs of the same project
+isolate _files_ but not _runtime state_: parallel runs of the same project
 collide on fixed ports, shared local services and singleton state dirs. The
 product owner asked for the best approach "that consumes the fewest possible
 resources" and accepted the layered recommendation from exploration 017
@@ -78,7 +86,7 @@ be a default assumption of the loop.
    > Amendment (2026-10-02, PR #568): exploration-017 finding F12 — a CLAIMED
    > worktree was written into by a concurrent session mid-task (disclosed on
    > PR #544) — showed the ownership model was pure convention, and that this
-   > record decided runtime *isolation* without deciding *concurrency*. Two
+   > record decided runtime _isolation_ without deciding _concurrency_. Two
    > invariants are part of the decision, not implementation detail: (a) a
    > fired detection **never re-stamps** the worktree (the anti-unlock rule —
    > otherwise a refused attach makes its own retry match and claims silently
@@ -87,6 +95,43 @@ be a default assumption of the loop.
    > `rm <git-dir>/arggon-claim.json` step, and a designed take-over hatch is
    > tracked in `task-strict-attach-dead-owner-hatch`. Detection covers the
    > uncommitted window only; committed foreign work is history.
+   >
+   > Amendment (2026-10-02, PRs #573 and #579 — the hatch shipped, so (b) is a
+   > mechanism rather than a tracked item). Recovery from a dead stamped
+   > session is `arggon start <id> --worktree --take-over-worktree` (native
+   > `tools.arggon.start({ …, takeOverWorktree: true })`), kernel-owned as
+   > `WorktreeClaimRequest.takeOver` and **default OFF**. It applies ONLY to an
+   > attach whose detection FIRED, so a clean attach is a no-op instead of a
+   > re-stamp, and the take-over is never inferred from the stamp's age. With
+   > it the run re-stamps the worktree with the calling identity and records a
+   > dated take-over — the receipt's `claim.takeOver`
+   > (`preparation.claim.takeOver` natively) plus a bounded `takeovers` chain
+   > (newest 5, one entry per taker) persisted in the new stamp, so "who
+   > replaced whose dead claim" outlives the process that decided it. Invariant
+   > (a) is untouched: a take-over is its one SANCTIONED exception, taken
+   > explicitly or not at all, and the default path still never re-stamps. The
+   > armed strict gate needed no change — the fired evidence moves OUT of
+   > `claim.foreignWrites` into `claim.takeOver`, the field both surfaces'
+   > gates already read, so exactly one of the two is ever present and an
+   > authorized take-over is resolved by the existing code. The refusal's
+   > recovery order is therefore flag first, manual `rm` last: confirm no live
+   > writer → the audited take-over → remove
+   > `<git-dir>/arggon-claim.json` by hand (the escape hatch for when the flag
+   > is unreachable at all, which discards the ownership record). The same
+   > shape exists on the release arm: `cleanup --release <id>
+--take-over-worktree` (native `take_over_worktree`) is the audited hatch
+   > for a presumed-dead owner on an UNCLAIMED item, and it never bypasses the
+   > refusal while the item is still claimed.
+   >
+   > One implementation fact belongs on this record rather than only in a test:
+   > the detection's `git status --porcelain` probe must return the line
+   > **RAW**, because its leading status columns are positional. #573 replaced
+   > the CLI's trimming probe (`StartGit.statusPorcelain`) after the smoke bar
+   > caught the consequence — a trimmed line is read one character off, the
+   > per-path `stat` misses, and layer 0 silently disarms against real git (a
+   > dead-owner attach then claims under the armed flag instead of refusing).
+   > `convention.md`'s claim-stamp clause carries the requirement; the native
+   > surface passes no status override and was never affected.
 
 Explicit YAGNI: no `arggon compose` wrapper, no global port-allocation
 registry, no Docker detection/installation in the kernel, no unix-socket
@@ -122,18 +167,28 @@ requirement (an optimization where available, never the contract).
   the native tools, so a mixed CLI-start → native-attach fires exactly one
   benign warning — which is the F12 signature, i.e. the feature rather than a
   false accusation. Unifying the two identities is left open deliberately.
+- The dead-owner hatch keeps that shape too: opt-in, additive and attributable.
+  A run with the flag unset — or set on an attach where nothing fired — is
+  byte-identical to a pre-hatch receipt and adds no `takeovers` key to a stamp
+  that has never seen one, while an authorized take-over adds `claim.takeOver`
+  and at most a 5-entry chain, `schemaVersion` unchanged. Unlike a silent steal
+  it can be reconstructed after the fact (`by`, `replacedIdentity`, the replaced
+  stamp, the newer paths), at the cost that the operator must notice the dead
+  session — which is why the manual `rm` stays documented behind it rather than
+  replaced by it.
 
 ## Alternatives considered
 
-| Alternative | Verdict | Because |
-| --- | --- | --- |
-| Full dev-environment container per worktree (devcontainer/Compose with toolchain) | Rejected as default | per-worktree install + toolchain RAM; agent seams (pre-commit gate, Playwright, session hooks) must run in-container; worst on macOS/Windows where Docker is VM-backed. Kept as the escape hatch for toolchains that genuinely cannot run on the host. |
-| Distrobox/toolbox per worktree | Rejected | mounts host `$HOME` by design — preserves the state collisions it is meant to solve; `--home` overrides reduce it to a hand-rolled container without the image workflow. |
-| VM per worktree | Rejected | GB-scale RAM/disk per parallel instance; containers already share the host kernel on Linux. |
-| Nix/devbox per project | Out of scope | cheap reproducible toolchains (store dedupe), but no runtime isolation; a per-project complement, never an arggon requirement. |
-| Kernel-enforced port allocation registry | YAGNI | ports are an app convention; ephemeral binding (`:0`) already exists everywhere and is what `board --serve` does. |
-| `arggon compose` wrapper command | YAGNI | the pattern is a name and a manifest; a wrapper would duplicate Compose badly. |
-| A lockfile the CLI and native tools both honor (decision point 4's concurrency model) | Rejected | it needs a shared lock protocol plus its own dead-holder problem (a crashed holder blocks forever) for strictly less information than the stamp; the stamp is advisory and the refusal explicit. |
-| Commit-log-based concurrent-writer detection | Rejected | committed foreign work is history, not a live second writer — the F12 collision window is the uncommitted one, and scanning history would buy a log read per attach to re-report what the mtime comparison already bounds. |
-| Strict worktree-writes by default | Rejected | a crashed session would deadlock every recovery path on a non-interactive surface; advisory-first keeps the loop recoverable and arming the flag is a one-line convention change. |
-| Auto-takeover after a stale-stamp window | Deferred | a long-but-live session can be stolen silently; an explicit hatch (`task-strict-attach-dead-owner-hatch`) keeps the take-over a deliberate act. |
+| Alternative                                                                           | Verdict                              | Because                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Full dev-environment container per worktree (devcontainer/Compose with toolchain)     | Rejected as default                  | per-worktree install + toolchain RAM; agent seams (pre-commit gate, Playwright, session hooks) must run in-container; worst on macOS/Windows where Docker is VM-backed. Kept as the escape hatch for toolchains that genuinely cannot run on the host.                                                                                                                                                                   |
+| Distrobox/toolbox per worktree                                                        | Rejected                             | mounts host `$HOME` by design — preserves the state collisions it is meant to solve; `--home` overrides reduce it to a hand-rolled container without the image workflow.                                                                                                                                                                                                                                                 |
+| VM per worktree                                                                       | Rejected                             | GB-scale RAM/disk per parallel instance; containers already share the host kernel on Linux.                                                                                                                                                                                                                                                                                                                              |
+| Nix/devbox per project                                                                | Out of scope                         | cheap reproducible toolchains (store dedupe), but no runtime isolation; a per-project complement, never an arggon requirement.                                                                                                                                                                                                                                                                                           |
+| Kernel-enforced port allocation registry                                              | YAGNI                                | ports are an app convention; ephemeral binding (`:0`) already exists everywhere and is what `board --serve` does.                                                                                                                                                                                                                                                                                                        |
+| `arggon compose` wrapper command                                                      | YAGNI                                | the pattern is a name and a manifest; a wrapper would duplicate Compose badly.                                                                                                                                                                                                                                                                                                                                           |
+| A lockfile the CLI and native tools both honor (decision point 4's concurrency model) | Rejected                             | it needs a shared lock protocol plus its own dead-holder problem (a crashed holder blocks forever) for strictly less information than the stamp; the stamp is advisory and the refusal explicit.                                                                                                                                                                                                                         |
+| Commit-log-based concurrent-writer detection                                          | Rejected                             | committed foreign work is history, not a live second writer — the F12 collision window is the uncommitted one, and scanning history would buy a log read per attach to re-report what the mtime comparison already bounds.                                                                                                                                                                                               |
+| Strict worktree-writes by default                                                     | Rejected                             | a crashed session would deadlock every recovery path on a non-interactive surface; advisory-first keeps the loop recoverable and arming the flag is a one-line convention change.                                                                                                                                                                                                                                        |
+| Auto-takeover after a stale-stamp window                                              | Rejected (2026-10-02, PR #573)       | a clock-based self-unlock: age only guesses at the question the refusal actually asks ("is there a live writer?"), and it steals exactly the case the gate protects — a long-but-live session (a day-long refactor, a paused session, a lost clock) with uncommitted work, at the worst moment.                                                                                                                          |
+| Deliberate, dated take-over flag as the dead-owner recovery                           | Accepted (2026-10-02, PRs #573/#579) | the take-over has to be an act somebody takes with the detection on screen, and it has to leave a record of that judgement; the flag does both. Kernel-owned and default OFF, so one mechanism serves both surfaces (`--take-over-worktree` / `takeOverWorktree`), the fired evidence simply moves to `claim.takeOver` that both strict gates already branch on, and the manual `rm` remains the documented last resort. |
