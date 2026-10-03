@@ -111,6 +111,27 @@ and drift steps (a step cannot hand an env var to the next one without
 | Is the seam's source (`package.json` name is `arggon-manager` + `cli/src/cli.ts`)? | its own build: `npm ci` → `npm run build` → `node dist/cli.js init` | A feature PR that legitimately **adds or edits generated content** can satisfy the gate on its own branch. Judging it against the last release instead made every such PR red until a release and a re-pin — and the prescribed remedy ("run `arggon init`") could not work, because the pinned init was the thing deleting the new content (PR #605). |
 | Anything else (every adopter and fork)                                             | the pinned release: `arggon init`                                   | An adopter has no arggon source to build; the pinned install above is its only generator, and its committed seam is expected to be reproducible from exactly that release.                                                                                                                                                                             |
 
+Each direction prints its own verdict, so the failure names what disagrees and
+the remedy that works for it:
+
+```text
+# the pin sits behind the committed seam (the #527 class)
+ARGGON_VERSION (0.5.0) lags the committed arggon seam (0.9.9):
+the pinned init would REWRITE committed content — bump ARGGON_VERSION to 0.9.9
+once that version is released (release.md, 'The re-pin'). Re-running the pinned
+init is not the fix: it is what deletes the newer content.
+
+# the committed bytes disagree with the generator this repo is checked against
+the committed arggon seam does not match what this checkout's own build (node dist/cli.js) generates — regenerate it with 'npm ci && npm run build && node dist/cli.js init' and commit, or drop the template change that moved it:
+ M .mcp.json
+# ... or, in an adopter repo, the same diff against the pinned release:
+the committed arggon seam does not match what arggon-manager@0.5.0 generates — re-run 'arggon init' with arggon-manager@0.5.0 and commit the result:
+ M .mcp.json
+
+# no committed seam yet (a fresh clone): green, no-op
+no committed arggon seam yet — run 'arggon init' locally and commit the generated docs
+```
+
 The self-hosted branch **builds the checkout** (`npm ci --ignore-scripts` — no
 double build through the `prepare` lifecycle — then `npm run build`), so its
 bootstrap needs a registry round trip for dependencies and a build; the drift
