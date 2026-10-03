@@ -108,3 +108,7 @@ CLEAN: `templates/`, `.opencode/`, `.zcode-marketplace/`, `skills/`, `.agents/sk
 **Gates** (after `npm run build`): `npm test` 127 files / 2588 tests pass · `npm run lint` 0 · `npm run arggon -- validate` ok (0 warnings) · `npm run check:plugin` clean (bundle byte-identical) · `npm run test:structure` 5 passed · `npm run lint:structure` clean · prettier converged (pass-2 byte-identical to pass-3 on all 3 changed files) · pre-commit gate ran validate. Smoke exempt: docs + one additive test, no CLI behavior change.
 
 Left `in_progress` — completion is the coordinator's call after merge.
+
+### handoff 2026-10-03 @Arggon (session: ses_efe310c5effeaOs8Nra70sfiUu) — next: Coordinator reviews PR #618 and merges; then flip the item to done (3 of 4 boxes ticked; box 2 is theirs to decide on the spec/plan 009 dated-record case).
+- branch: fix/bug-engineering-doc-stale-adr-statuses
+- open questions: Box 2 (spec/plan 009, ADR 0010 Proposed) reserved for coordinator; recommend leaving both as dated history. Four other-class findings in engineering.md reported not fixed (:44 workflows list, :100 la…
