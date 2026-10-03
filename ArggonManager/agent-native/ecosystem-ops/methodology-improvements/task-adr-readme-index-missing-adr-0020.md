@@ -12,7 +12,6 @@ updated: "2026-10-02"
 claimed_at: "2026-10-02T23:58:14.217Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-readme-index-missing-adr-0020
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr-readme-index-missing-adr-0020.md
   Leaves live only under a story. id is the filename stem: task-adr-readme-index-missing-adr-0020.
@@ -77,3 +76,40 @@ editorial summaries, not copies of the headings (0018 adds
 "(release pipeline, update channel, skew, tarballs)" to a bare H1; 0002/0003
 are abbreviated). Asserting them would pin a convention the corpus does not
 follow.
+
+### 2026-10-03 @ses_f00f1670fffeKhTBf15mLOa4ks
+PR #602 — https://github.com/Arggon/ArggonManager/pull/602
+
+**Parity test: before/after.** `cli/src/adr-index-parity.test.ts` (new, 7 cases). The README was mutated three ways against the real corpus and restored after each; every mutation is caught:
+
+```
+BEFORE (drop the 0020 row — the reported bug)
+  x indexes every ADR file exactly once (no ADR ships unindexed)
+  + "0020-methodology-first-productization.md: 0 index row(s), expected exactly 1"
+
+BEFORE (restore 0002 to the pre-c0cdd60b status)
+  x mirrors each ADR's own status, qualifiers aside
+  + "0002-board-viewer-v0.md: index says \"Proposed (shipped as prototype)\" (Proposed), file says \"Accepted\" (Accepted)"
+
+BEFORE (row for an ADR that does not exist)
+  x has no row pointing at a file the directory does not contain
+  + "0021 -> ./0021-does-not-exist.md: no such file in docs/adr/"
+
+AFTER
+  Test Files  1 passed (1)
+  Tests       7 passed (7)
+```
+
+The third mutation found a defect in my own first draft: a dangling row made two extra tests throw a raw ENOENT instead of failing cleanly. Fixed by filtering unresolvable rows out of the per-row checks (the dangling-row case is already diagnosed by its own test) and re-verified above.
+
+**Statuses read from the files, not assumed.** The brief predicted "several are Proposed rather than Accepted"; verified against every `Status:` line, all six missing ADRs are `Accepted` (0008/0009 are `Accepted (2026-09-1x — adopted explicitly by product decision; …)`, indexed in the house's trimmed form `Accepted (adopted by product decision)`). 0019 is the only Proposed ADR and was already indexed correctly.
+
+**Pre-existing drift corrected (3 rows, same file).** `c0cdd60b` accepted ADRs 0002/0003/0004 in the files but left the index claiming `Proposed`; the files are authoritative, so the index was corrected. Required for the status rule to pass.
+
+**Gates.** `npm test` → 119 files / 2195 tests passed. `npm run build` ok with a byte-identical regenerated `opencode/plugins/arggon/index.bundle.ts`. `npm run lint` ok, `tsc -p tsconfig.json --noEmit` ok, `arggon validate` ok (0 warnings), `arggon spec validate` ok (32 docs), prettier clean on both files. Smoke exempt (docs + one test).
+
+One environment gotcha worth knowing: a fresh worktree fails `headless-ci.test.ts` with "run `npm run build` first" until build artifacts exist — unrelated to this change, but it will fail the next agent who runs `npm test` before `npm run build`.
+
+**Drift reported, not fixed (out of scope).** `docs/engineering.md:230` still calls ADR 0003 "Proposed" (stale since `c0cdd60b`); `specs/spec-opencode2-009.md:87` and `plans/plan-opencode2-009.md:24` call ADR 0010 Proposed, which is now Partially superseded by 0011 (probably correct as history — needs a reviewer's call).
+
+Not flipping to done; leaving that to the coordinator.
