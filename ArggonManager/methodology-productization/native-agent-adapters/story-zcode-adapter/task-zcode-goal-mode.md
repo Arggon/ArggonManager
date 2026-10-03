@@ -469,3 +469,7 @@ file and both sides are additive. The coordinator performs the squash and the fl
 byte-identical. Parser unification deliberately untouched (`bug-three-acceptance-parsers-diverging`).
 
 Item stays `in_progress`; spec/plan `status` stays `proposed`.
+
+### handoff 2026-10-03 @Arggon — next: coordinator: squash-merge PR #605 @ 5c367a10 and flip the item; no worker action left
+- branch: feat/task-zcode-goal-mode
+- open questions: adopt --ack still owed by a human for the 15 pre-existing stamp mismatches; parser unification deferred to bug-three-acceptance-parsers-diverging
