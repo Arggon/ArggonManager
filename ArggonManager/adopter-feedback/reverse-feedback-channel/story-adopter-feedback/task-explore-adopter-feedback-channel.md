@@ -149,11 +149,18 @@ fingerprint → redacted report → human-gated tier-A/tier-B output.
 
 Two things the coordinator should know that were **not** in the prior research:
 
-1. **`doctor` gains a `friction` staleness block.** An adopter that has acked its
-   generated docs receives the trigger only as an ADR 0016 proposal, so without
-   this block "the channel is not live" is invisible — the same failure ADR 0016
-   already had to fix for docs. It is the `deftai` maxim ("a disabled capability
-   nobody can see is absent") applied to a mechanism this repo already owns.
+1. **`doctor` gains a narrow `friction` block** (ADR 0021 §2) — for what the
+   `outdated` bucket cannot already do, which is narrower than this section first
+   claimed. `doctor.ts` re-renders the current template for every
+   `config.generated` entry in every local state **including acked**, and the
+   generated agent files are in that map, so a missing trigger already shows up as
+   an outdated managed doc. **"The channel is not live" is not invisible today.**
+   The block earns its place with a **per-file `triggerVersion`** (so "present at
+   0.5.0" stays distinguishable from "current is 0.6.0") and by separating
+   **_trigger absent_ from generic template drift** — the observable
+   `task-spike-friction-trigger-compliance` needs to tell "never seen" from "seen
+   and ignored". If stage 1 must be minimal, cut `triggerVersion` and `files`,
+   **not** the block.
 2. **The evals harness is ruled out as the capture vehicle** (ADR 0021 §5) and
    kept as a stage-2 _producer_. `skills/arggon-cli/evals/` runs against
    `dist/cli.js` in a synthetic temp fixture it creates itself, scores pass/fail
@@ -168,15 +175,19 @@ Implementation tasks and spikes filed under `story-adopter-feedback` (6 tasks
 chained T1→T6 per the plan, 3 spikes). Per the ADR 0017 gate, **none may be
 claimed** until the coordinator's decision on the ADR/spec lands.
 
-**Known defect found; fixed where in scope, reported where not.** Item bodies in
-this story linked docs with a four-level `..` prefix, which resolves one directory
-above the tracker root and is **broken** — the correct depth from
+**Known defect found — and now fully resolved.** Item bodies in this story linked
+docs with a four-level `..` prefix, which resolves one directory above the tracker
+root and is **broken**; the correct depth from
 `ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/`
-is three levels, reaching `ArggonManager/docs/`. Fixed in this item and in all
-nine items filed here, so the links this exploration chain depends on resolve.
-**Still broken, deliberately not touched** (outside this item's scope — they are
-other items' bodies): `bug-contributing-github-issue-contradiction.md` and
-`bug-prettier-glues-split-inline-code-span.md`.
+is three levels, reaching `ArggonManager/docs/`. Fixed in this item and in all nine
+items filed here. **Correction (2026-10-03):** an earlier revision of this section
+said the defect was "still broken, deliberately not touched" in
+`bug-contributing-github-issue-contradiction.md` and
+`bug-prettier-glues-split-inline-code-span.md`. That was wrong on both counts.
+The first was fixed and closed on main (PR #594); the second was fixed on main in
+`368809d5`, and this branch's stale copy would have **reverted** that fix until the
+merge took main's newer version. Both are correct today and neither is touched by
+this PR's logic.
 
 ## Request-changes round (2026-10-03)
 
@@ -190,11 +201,49 @@ Reviewer verdict `request-changes`; all four blockers plus N1–N6 addressed.
 - [x] **N2 the compliance spike is gated** — `depends_on: [task-friction-trigger-carrier]`, so it is not claimable before the trigger it measures exists.
 - [x] **N3 the epic contradiction is reconciled** with a note, not a premature tick.
 - [x] **N4 duplicate H1s removed** from the 5 files that had them.
-- [x] **N5 the stale "still broken" claim is corrected** — it lives in a dated comment, so it is corrected in the response comment rather than by editing history; both named items were already fixed/closed on main.
+- [x] **N5 the stale "still broken" claim** — first corrected in the response comment only, on the reasoning that the copy "lives in a dated comment". **That reasoning was wrong** and the round-2 review caught it: the same claim also sits in **live body prose**, which body-editing does cover, so it is corrected in this body too (see M4b above). The dated comment copy correctly stays verbatim.
 - [x] **N6a** the exploration's concurrency row corrected to `O_APPEND` with a dated note; **N6b** rotation owned by T1, T3 only renders the counter.
 - [x] **Scope call 4a** carried into ADR §2 — re-justified on per-file `triggerVersion` and separating _trigger absent_ from generic template drift, with the correction that `doctor.ts` already re-renders acked entries so a missing trigger is **not** invisible today.
 - [x] **Scope call 4b** carried into the spec — a new acceptance criterion names the honest boundary: local dedupe cannot see an already-filed upstream issue, so a known class is re-emitted and may be filed twice; deferred, not postponed.
 - [x] **Gates green on the merged tree**: `build`, `test` (122 files / 2275 tests), `lint`, `check:plugin`, `validate` (0 warnings, v5), `spec validate` (34 docs, 5 warnings — all pre-existing), `spec analyze` vs baseline (5 new, all pre-existing duplicates, none mine), prettier clean **and idempotent** across consecutive writes.
+
+## Round-3 review (2026-10-03)
+
+Second `request-changes` — four narrow doc-consistency edits, **no redesign**.
+B1–B4 and N1–N6 were independently re-verified closed. All four findings were the
+same underlying mistake: **a superseded rationale surviving in live prose** where the
+dated amendment correctly said it had been wrong.
+
+- [x] **M1** — the spec's §_The trigger and its visibility_, its header paragraph, and T6's
+      Context all carried the withdrawn 4a claim. All three now carry ADR 0021 §2's
+      reasoning (per-file `triggerVersion`; _trigger absent_ vs generic drift), each
+      stating the correction explicitly: `doctor.ts` re-renders every
+      `config.generated` entry in every local state **including acked** and the agent
+      files are in that map, so a missing trigger is **not** invisible today.
+- [x] **M2** — T6's acceptance no longer carries "(with
+      `task-friction-surface-parity-and-docs`)"; it states sole ownership, so the
+      ambiguity N1 closed does not reopen.
+- [x] **M3** — the two remaining bare `spike-friction-*` ids in the plan are now
+      `task-spike-…` and resolve. Swept the whole branch tree for the class: the only
+      remaining bare mentions are inside dated comments, which stay verbatim.
+- [x] **M4** — the item body's §Recommendation asserted the 4a invisibility claim and a
+      "still broken in both sibling items" note that was false. Both corrected in
+      **live body prose**, with dated corrections naming what was wrong.
+- [x] **Round-2 invariants re-verified after these edits**: residual duplicate-number
+      findings still **exactly 5**, none mine; zero dangling links in any live body;
+      ADR 0021 still `Proposed` (never `Accepted`) in file, README row and epic note;
+      prettier **convergent across repeated passes** (two-pass assertion, not a single
+      `--check`); `spec validate` / `spec analyze --baseline` clean of anything I own.
+
+**Boundary ruling respected:** dated **comments** stay verbatim (the round-1 B1 table's
+shas are the evidence that justified the renumber, so editing it would falsify the
+audit trail); the principle does **not** extend to live body prose, which is M1/M4.
+
+**Reviewer nits, declined with reasons:** the story body still says "13 hunted
+dimensions → 13 mapped criteria" — true as written (the Limits dimension carries two
+criteria but that is an addition, not a remap, and the count of dimensions is
+unchanged); `bug-prettier-indented-list-continuation-grows-2-spaces-per-write` already
+exists on main and is not mine to re-prioritise.
 
 ## Renumber map (2026-10-03)
 
@@ -504,6 +553,7 @@ The one exception: link **targets** in the two files main owns were updated so n
 - open questions: Agree that dated comment history stays verbatim (renumber map in body instead)? File prettier indent-growth as distinct from bug-prettier-glues-split-inline-code-span? Cut doctor.friction to triggerV…
 
 ### 2026-10-03 @Reviewer
+
 verdict: request-changes (narrow — B1–B4 and N1–N6 are verified closed; four small doc-consistency edits remain)
 
 Round 2, read-only. Branch: `origin/feat/task-explore-adopter-feedback-channel` (head `389ed6de`), base `origin/main`. No gates re-run.
@@ -518,12 +568,12 @@ Round 2, read-only. Branch: `origin/feat/task-explore-adopter-feedback-channel` 
 
 I re-derived the "exactly 5" claim myself by enumerating the numeric stems per directory in the branch tree, which is the same algorithm `docNumberCollisions` implements (`cli/src/spec.ts`, added in `f2e82e94` / PR #603, per-directory, report-only):
 
-| dir | colliding numbers | mine? |
-| --- | --- | --- |
-| adr | none — `0001`…`0021` all unique | 0021 unique |
-| explorations | `001` (`cheap-path-to-prod` ↔ `token-context-efficiency`) | 019 unique |
-| specs | `001` (`deps` ↔ `sync`), `015` (`release-pipeline` ↔ `update-channel`) | 018 unique |
-| plans | `001` (`deps` ↔ `sync`), `015` (`release-pipeline` ↔ `update-channel`) | 018 unique |
+| dir          | colliding numbers                                                      | mine?       |
+| ------------ | ---------------------------------------------------------------------- | ----------- |
+| adr          | none — `0001`…`0021` all unique                                        | 0021 unique |
+| explorations | `001` (`cheap-path-to-prod` ↔ `token-context-efficiency`)              | 019 unique  |
+| specs        | `001` (`deps` ↔ `sync`), `015` (`release-pipeline` ↔ `update-channel`) | 018 unique  |
+| plans        | `001` (`deps` ↔ `sync`), `015` (`release-pipeline` ↔ `update-channel`) | 018 unique  |
 
 Five pairs, exactly the five named, **none of them mine**. The claim is accurate.
 
@@ -543,12 +593,12 @@ Five pairs, exactly the five named, **none of them mine**. The claim is accurate
 
 **M1 — the superseded 4a rationale survives in the normative spec and in T6, contradicting the ADR that now denies it.** ADR §2 says, in its own words, "Visibility is _already_ covered, and an earlier draft of this ADR overstated it." Two other docs are still that draft:
 
-- `ArggonManager/docs/specs/spec-friction-capture-018.md` §*The trigger and its visibility*: "This is the direct application of \"a disabled capability nobody can see is absent\" … so **without this block the channel's absence is invisible**." The header paragraph two screens up still reads "and a `doctor` block so its absence is visible".
+- `ArggonManager/docs/specs/spec-friction-capture-018.md` §_The trigger and its visibility_: "This is the direct application of \"a disabled capability nobody can see is absent\" … so **without this block the channel's absence is invisible**." The header paragraph two screens up still reads "and a `doctor` block so its absence is visible".
 - `ArggonManager/adopter-feedback/.../task-friction-trigger-carrier.md` Context: "Without the `doctor` block, \"the channel is not live\" is invisible — the same failure ADR 0016 had to fix for docs **with the `outdated` bucket**." Self-refuting: it names `outdated` as the mechanism that already does it.
 
-`docs/agents.md:458` — "If the change made any doc statement false, that doc edit belongs in this PR" — and `engineering.md:71` (no silent doc forks). The behaviour is specified identically everywhere; only the *why* is false, and an implementer reading only the spec is invited to conclude the block is unnecessary, which is the one thing the coordinator's ruling protects against. Replace both paragraphs with ADR §2's reasoning (per-file `triggerVersion`; trigger-absent vs generic drift) and cite §2.
+`docs/agents.md:458` — "If the change made any doc statement false, that doc edit belongs in this PR" — and `engineering.md:71` (no silent doc forks). The behaviour is specified identically everywhere; only the _why_ is false, and an implementer reading only the spec is invited to conclude the block is unnecessary, which is the one thing the coordinator's ruling protects against. Replace both paragraphs with ADR §2's reasoning (per-file `triggerVersion`; trigger-absent vs generic drift) and cite §2.
 
-**M2 — T6's acceptance still carries the two-owner marker.** `task-friction-trigger-carrier.md`: "`doctor --json` reports `triggerPresent`/`triggerVersion` per managed agent file **(with `task-friction-surface-parity-and-docs`)**". T5's new text says the block is owned *solely* by T6. The parenthetical re-creates the ambiguity N1 just closed — delete it.
+**M2 — T6's acceptance still carries the two-owner marker.** `task-friction-trigger-carrier.md`: "`doctor --json` reports `triggerPresent`/`triggerVersion` per managed agent file **(with `task-friction-surface-parity-and-docs`)**". T5's new text says the block is owned _solely_ by T6. The parenthetical re-creates the ambiguity N1 just closed — delete it.
 
 **M3 — two stale item ids remain in the plan, one line below the one that was fixed.** `plan-friction-capture-018.md:89` says `spike-friction-tier-b-surface` and `:90` says `spike-friction-volume-threshold`; neither resolves (the prefix is `task-`, per each item's own placement comment). Line 87 in the same list was fixed and the response comment claims the class is fixed. These are bare code spans, which is why the anchor-aware link sweep missed them — same reason `validate` misses them.
 
@@ -564,19 +614,19 @@ Nit, take it or leave it: the story body still says "13 hunted dimensions → 13
 
 **2 · The `adapters.ts` deletion — resolved, and yes, a gate should exist, but not from this PR.** Verified: both `cli/src/adapters.ts` and `cli/src/adapter-selection.test.ts` are present in the branch tree and in `main`, and the three-dot diff has no `D` row and no row outside `ArggonManager/` — so this PR deletes nothing. The hazard the worker saw was real but was an artifact of a two-dot diff against a stale branch, not a merge this PR would have performed.
 
-That said, the class is uncovered and it is worth naming: the existing protection is `npm test`/`build`, which fails only when a deletion breaks compilation or leaves an orphan test. The **silent** shape — deleting an implementation *and* its test together — goes green, which is exactly what `D adapters.ts` + `D adapter-selection.test.ts` looked like. A cheap report-only gate would print `git diff --name-status origin/main...HEAD` deletions on every PR (the repo already ships `context:report` in that spirit) and warn when a `D` row removes a file whose paired test is also deleted. That is a behavioural change to CI, so it needs its own item and decision. **The worker did not file it**, and `docs/agents.md:31` + `engineering.md:214` require a deferred finding to be tracked, not just reported. Coordinator: that is one `arggon create bug` — no code, no round trip needed.
+That said, the class is uncovered and it is worth naming: the existing protection is `npm test`/`build`, which fails only when a deletion breaks compilation or leaves an orphan test. The **silent** shape — deleting an implementation _and_ its test together — goes green, which is exactly what `D adapters.ts` + `D adapter-selection.test.ts` looked like. A cheap report-only gate would print `git diff --name-status origin/main...HEAD` deletions on every PR (the repo already ships `context:report` in that spirit) and warn when a `D` row removes a file whose paired test is also deleted. That is a behavioural change to CI, so it needs its own item and decision. **The worker did not file it**, and `docs/agents.md:31` + `engineering.md:214` require a deferred finding to be tracked, not just reported. Coordinator: that is one `arggon create bug` — no code, no round trip needed.
 
 **3 · Prettier framing — right, and the gap is now precisely located.** Same class, two manifestations: both are prettier-3.9.6 markdown non-idempotence on continuation list items under `printWidth: 100` with `proseWrap` unset, and both surface as "the file `--write` just produced fails `--check`". Filing the second as its own bug under the same story is the right call, and the title is accurate.
 
-"A single `--check` cannot prove convergence" is **correct and worth keeping in the record**: `--check` compares committed bytes against *one* pass, so it catches "the author already committed two-pass output" but cannot detect that the one-pass output is itself unstable. Convergence needs a two-pass assertion (`prettier -w` twice, then require a clean tree).
+"A single `--check` cannot prove convergence" is **correct and worth keeping in the record**: `--check` compares committed bytes against _one_ pass, so it catches "the author already committed two-pass output" but cannot detect that the one-pass output is itself unstable. Convergence needs a two-pass assertion (`prettier -w` twice, then require a clean tree).
 
-The reason it bit twice here, which sharpens the filing: `cli/src/prose-format.test.ts` pins prose stability corpus-wide but **deliberately excludes the tracker item tree** (`ArggonManager/<initiative>/…` — "Item bodies are historical records that quote mangled formatter output as evidence"), while `npm run format` (`prettier -w .`) still writes over it. So the one subtree where both manifestations live is the one subtree with no gate, by design. A convergence assertion for that subtree is *not* trivial — it must tolerate exactly the quoted-mangled-output bodies the exclusion exists for — which is why it belongs in the filed bug's scope and not here. **Ruling: add "a two-pass convergence assertion for the tracker item subtree" as an explicit acceptance criterion on `bug-prettier-indented-list-continuation-grows-2-spaces-per-write`** (or a sibling), noting the `prose-format.test.ts` exclusion interaction. Single-line bullets are the right immediate mitigation; keep doing that.
+The reason it bit twice here, which sharpens the filing: `cli/src/prose-format.test.ts` pins prose stability corpus-wide but **deliberately excludes the tracker item tree** (`ArggonManager/<initiative>/…` — "Item bodies are historical records that quote mangled formatter output as evidence"), while `npm run format` (`prettier -w .`) still writes over it. So the one subtree where both manifestations live is the one subtree with no gate, by design. A convergence assertion for that subtree is _not_ trivial — it must tolerate exactly the quoted-mangled-output bodies the exclusion exists for — which is why it belongs in the filed bug's scope and not here. **Ruling: add "a two-pass convergence assertion for the tracker item subtree" as an explicit acceptance criterion on `bug-prettier-indented-list-continuation-grows-2-spaces-per-write`** (or a sibling), noting the `prose-format.test.ts` exclusion interaction. Single-line bullets are the right immediate mitigation; keep doing that.
 
 **Your open question — dated comments stay verbatim. Overrule refused.** All three reasons, and one boundary:
 
 - **Verbatim: yes, for every dated comment block, including my round-1 B1 table.** `docs/agents.md` §0 makes comments the handoff channel and "history, not a reopen" — an append-only log by construction, with no body-editing API for comment text. Editing would falsify: at review time the PR genuinely carried `0020-adopter-friction-channel.md`, and that table's commit shas (`448b31dc` 13:06 vs `172af2fb` 19:36) are precisely the evidence that justified the coordinator's renumber ruling. Renumber it in place and the audit trail for that ruling ceases to exist. The repo's own precedent agrees: ADR 0016 was renumbered with an **additive** `Numbering note` + `Status note`, never a rewrite — which is exactly the `## Renumber map` pattern used here.
-- **The boundary:** the same reasoning does *not* extend to live item-body prose. Body sections are current state, not dated history. That is M1 and M4 — the comment copies of the 4a claim and the "still broken" note correctly stay; the body copies must be corrected. The worker's "it lives in a dated comment" reasoning conflated the two, which is how the body copies survived a round whose whole subject was correcting them.
-- Practical consequence of the map-in-body choice: `arggon sync --json` reads this item and a future agent reads top-to-bottom, hitting the body first. A body that contradicts its own ADR is the failure mode the review bar exists to prevent; the map helps readers resolve an old *label*, but it cannot repair a body sentence that asserts something false.
+- **The boundary:** the same reasoning does _not_ extend to live item-body prose. Body sections are current state, not dated history. That is M1 and M4 — the comment copies of the 4a claim and the "still broken" note correctly stay; the body copies must be corrected. The worker's "it lives in a dated comment" reasoning conflated the two, which is how the body copies survived a round whose whole subject was correcting them.
+- Practical consequence of the map-in-body choice: `arggon sync --json` reads this item and a future agent reads top-to-bottom, hitting the body first. A body that contradicts its own ADR is the failure mode the review bar exists to prevent; the map helps readers resolve an old _label_, but it cannot repair a body sentence that asserts something false.
 
 ---
 
