@@ -190,3 +190,37 @@ reports violations but does not rewrite source.
 
 - `ast-grep test` does not evaluate a rule's `files`/`ignores` globs, so scope is
   verified by the committed fixture scan rather than by `valid:` snippets.
+
+## `acceptance-rows-use-kernel`
+
+Acceptance-checkbox rows must come from the kernel (`acceptanceRows` /
+`acceptanceCriteria` / `acceptanceUnchecked` in `lib/src/items.ts`), not from a
+regex written next to the consumer.
+
+This rule exists because of `bug-three-acceptance-parsers-diverging`: **six**
+hand-written acceptance-box grammars had shipped, five of them outside the
+kernel, and four of them disagreed with the DONE GATE on reachable shapes. The
+worst disagreement was an inversion — the gate refused a `--status done` flip
+while a renderer reported "nothing unchecked", so the tooling told an agent it
+was finished at the moment it was blocked.
+
+It fires on a regex literal whose bracket group holds only task-box characters
+(space, tab, `x`, `X`, and the `(`/`|` of an alternation), which covers every
+spelling the removed parsers used: `[ ]`, `[x]`, `[X]`, `[ xX]`, `[( |x|X)]`,
+`[x|X]`, `\[[ ]\]`, `\[[xX]?\]`. Markdown links (`\[([^\]]+)\]`) and unrelated
+character classes stay valid — the "only task-box characters" requirement is
+what keeps the false-positive rate at zero, and the rule's own test suite pins
+both directions.
+
+### Documented limitations
+
+Deliberately outside its scope:
+
+- A box spelled with a quantifier inside the class (`\[(x)?\]`) is not
+  recognised.
+- It matches syntax, not meaning: a regex that merely *mentions* a box (a
+  sanitizer, a test oracle) is flagged too. That is why `lib/src/**` (the
+  grammar's owner) and `**/*.test.ts` (where the parity suite keeps the
+  PRE-FIX parsers as oracles) are excluded — the guard is for production
+  consumers, and `cli/src/acceptance-parity.test.ts` is the exhaustive
+  backstop for the shapes this rule cannot see.

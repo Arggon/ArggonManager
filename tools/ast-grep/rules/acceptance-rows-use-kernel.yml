@@ -1,0 +1,54 @@
+id: acceptance-rows-use-kernel
+language: Tsx
+severity: error
+message: Acceptance-checkbox rows must come from the kernel (@arggondev/lib), not a local regex.
+note: |
+  Rationale: five hand-written acceptance-box parsers shipped before
+  bug-three-acceptance-parsers-diverging. Four of them disagreed with the
+  DONE GATE (`acceptanceComplete`, lib/src/items.ts) on reachable shapes, and
+  the worst case was the inversion — a renderer reporting "nothing unchecked"
+  on an item the gate refused to close. The kernel now owns the one row
+  grammar (`acceptanceRows` / `acceptanceCriteria` / `acceptanceUnchecked`) and
+  the one canonical body (`acceptanceBody`).
+
+  This is a high-confidence structural guard, not semantic data-flow analysis.
+  It fires on a regex literal whose character class holds ONLY task-box
+  characters — a mix of space, tab, `x` and `X`: the spellings of `[ ]`,
+  `[x]`, `[X]`, `[ x]`, `[ xX]`. Nothing else in a TypeScript regex looks like
+  that, which is what keeps the false-positive rate at zero (the rule's own
+  test suite pins valid and invalid spellings, and `npm run test:structure`
+  runs the rule against the whole hand-authored tree on every gate).
+
+  It matches the bracket group itself, so the group may also carry the `( )`
+  and `|` of an alternation: `[ ]`, `[x]`, `[X]`, `[ x]`, `[ xX]`, `[( |x|X)]`
+  and `[x|X]` all fire. A box written some other way — `\[[xX]?\]`,
+  `\[[\s]*x\]`, `[ ]|\[x\]` as two groups — does not. That limit is part of the
+  contract, not an oversight: the parity suite (cli/src/acceptance-parity.test.ts)
+  is the exhaustive guard; this rule is the cheap one that makes the common
+  mistake fail loudly, on the same shapes the five removed parsers used.
+
+  Scope: hand-authored TypeScript/TSX outside lib/src. Tests, fixtures, the
+  generated plugin bundle and the kernel itself are excluded — the parity suite
+  deliberately keeps the PRE-FIX parsers as oracles, and the kernel is where the
+  grammar belongs.
+files:
+  - "**/*.ts"
+  - "**/*.tsx"
+ignores:
+  - "lib/src/**"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "**/__fixtures__/**"
+  - "fixtures/**"
+  - "e2e/**"
+  - "smoke/**"
+  - "test/**"
+  - "labs/**"
+  - ".opencode/plugins/arggon/**"
+  - "opencode/plugins/arggon/index.bundle.ts"
+  - "tools/ast-grep/**"
+rule:
+  kind: regex
+  regex: '\[[()| \txX]+\\?\]'
