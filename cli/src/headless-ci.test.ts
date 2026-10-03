@@ -154,6 +154,65 @@ function normalize(raw: string, dir: string): string {
     .replace(/"hash": ?"[0-9a-f]{7,40}"/g, '"hash":"<hash>"');
 }
 
+/**
+ * The drift gate's rule of record is the TEMPLATE (it is what adopters vendor);
+ * `.github/workflows/arggon.yml` is the copy CI actually runs. They must carry
+ * the same rule, and the only documented difference is the `uses:` action refs —
+ * the template floats on `@v4`, this repo SHA-pins them
+ * (task-action-pins-hygiene). Nothing enforced that: the rest of this file
+ * parses the TEMPLATE, so a hand-divide of the two copies (a predicate edited in
+ * one, an exclusion dropped in the other) shipped unnoticed — and the reviewer of
+ * PR #607 found a real semantic divergence in the pin-lag rule because of it.
+ * `cli/src/ci-seam-pin.test.ts` is the OTHER two-copy pair (shell vs TS
+ * predicate, tracked as bug-ci-seam-pin-shell-vs-test-copy-divergence); this is
+ * the workflow pair.
+ */
+describe("workflow parity: template vs the copy CI runs", () => {
+  const COMMITTED_WORKFLOW = join(root, ".github/workflows/arggon.yml");
+  /** Collapse every action reference so the two copies compare on the RULE. */
+  const withoutActionRefs = (workflow: string): string =>
+    workflow.replace(/^\s*-?\s*uses:.*$/gm, "      - uses: <action-ref>");
+
+  it("carries one rule: identical modulo the `uses:` action refs", () => {
+    const template = withoutActionRefs(readFileSync(WORKFLOW_TEMPLATE, "utf8"));
+    const committed = withoutActionRefs(readFileSync(COMMITTED_WORKFLOW, "utf8"));
+    expect(
+      committed,
+      `${COMMITTED_WORKFLOW} diverged from ${WORKFLOW_TEMPLATE} beyond the action refs — ` +
+        `the drift gate runs the COMMITTED copy, so edit the template and regenerate ` +
+        "(never hand-divide the two)",
+    ).toBe(template);
+  });
+
+  it("both copies pick the branch-aware generator, in both steps, the same way", () => {
+    // Same predicate, same fallback, both steps, both copies — the invariant the
+    // byte comparison above implies, asserted directly so a regression names the
+    // step and the file instead of printing two workflows.
+    const predicate = `grep -q '"name":[[:space:]]*"arggon-manager"' package.json`;
+    for (const file of [WORKFLOW_TEMPLATE, COMMITTED_WORKFLOW]) {
+      const steps = workflowRunSteps(readFileSync(file, "utf8"));
+      const drift = steps.get(DRIFT_STEP)!;
+      for (const name of [BOOTSTRAP_STEP, DRIFT_STEP]) {
+        const body = steps.get(name)!;
+        expect(body, `${file}: step '${name}' lost the branch-local generator`).toContain(
+          predicate,
+        );
+        expect(body, `${file}: step '${name}' must keep the pinned-release fallback`).toContain(
+          "arggon init --no-commit",
+        );
+      }
+      expect(drift, `${file}: drift step must regenerate with the checkout's own build`).toContain(
+        "node dist/cli.js init --no-commit",
+      );
+      // The pinned-lag assertion owns the lag case: it has to precede the diff it
+      // would otherwise be reported as.
+      expect(drift.indexOf("lags the committed arggon seam")).toBeLessThan(
+        drift.indexOf("git status --porcelain"),
+      );
+    }
+  });
+});
+
 const describePacked = describe.skipIf(process.platform === "win32");
 
 describePacked("headless bootstrap + CI (packed install)", () => {
