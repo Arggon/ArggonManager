@@ -7,6 +7,7 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [cli, native-seam]
 created: "2026-10-03"
 updated: "2026-10-03"
+depends_on: [task-cli-start-remediation-tail-clipped-on-human-channel, bug-three-acceptance-parsers-diverging]
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-clip-class-sweep-remaining-sites.md
