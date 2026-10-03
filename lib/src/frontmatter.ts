@@ -4,15 +4,51 @@ export type Frontmatter = Record<string, unknown>;
 
 const FENCE = "---";
 
+/**
+ * Why a frontmatter block could not be read, as a TYPED discriminant
+ * (bug-validate-does-not-check-frontmatter-present).
+ *
+ * The three refusals used to be bare `Error`s distinguished only by their
+ * message text, so every consumer that needed to tell "there is no block at
+ * all" from "the block never closed" had to string-match a message — and the
+ * loader flattened all three into one generic `BROKEN_YAML` code. The
+ * distinction is load-bearing for `validate`: an absent block and an unclosed
+ * one are the same CLASS of corruption (the structure is not there / not
+ * complete) but they are different repairs, and both need to name the file.
+ * The code lives here, at the parser that decides, so the consumer classifies
+ * without re-sniffing the bytes.
+ */
+export type FrontmatterParseCode =
+  /** The text does not open with a `---` fence line at all. */
+  | "MISSING_FRONTMATTER"
+  /** The block opens but is never closed by a second `---` line. */
+  | "UNTERMINATED_FRONTMATTER"
+  /** A line inside the block is not a `key: value` pair. */
+  | "INVALID_FRONTMATTER_LINE";
+
+/** A structural frontmatter refusal, carrying its typed `code`. */
+export class FrontmatterParseError extends Error {
+  readonly code: FrontmatterParseCode;
+
+  constructor(code: FrontmatterParseCode, message: string) {
+    super(message);
+    this.name = "FrontmatterParseError";
+    this.code = code;
+  }
+}
+
 export function parseFrontmatter(raw: string): { data: Frontmatter; body: string } {
   const normalized = raw.replace(/^\uFEFF/, "");
   if (!normalized.startsWith(`${FENCE}\n`) && !normalized.startsWith(`${FENCE}\r\n`)) {
-    throw new Error("missing YAML frontmatter (expected file to start with ---)");
+    throw new FrontmatterParseError(
+      "MISSING_FRONTMATTER",
+      "missing YAML frontmatter (expected file to start with ---)",
+    );
   }
   const rest = normalized.slice(normalized.indexOf("\n") + 1);
   const endMatch = rest.match(/\r?\n---\r?\n?/);
   if (!endMatch || endMatch.index === undefined) {
-    throw new Error("unterminated YAML frontmatter");
+    throw new FrontmatterParseError("UNTERMINATED_FRONTMATTER", "unterminated YAML frontmatter");
   }
   const yaml = rest.slice(0, endMatch.index);
   const body = rest.slice(endMatch.index + endMatch[0].length);
@@ -21,7 +57,10 @@ export function parseFrontmatter(raw: string): { data: Frontmatter; body: string
     if (!line.trim() || line.trimStart().startsWith("#")) continue;
     const idx = line.indexOf(":");
     if (idx === -1) {
-      throw new Error(`invalid frontmatter line: ${JSON.stringify(line)}`);
+      throw new FrontmatterParseError(
+        "INVALID_FRONTMATTER_LINE",
+        `invalid frontmatter line: ${JSON.stringify(line)}`,
+      );
     }
     const key = line.slice(0, idx).trim();
     const value = line.slice(idx + 1).trim();
