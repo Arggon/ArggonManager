@@ -2,7 +2,7 @@
 type: bug
 status: in_progress
 id: bug-three-acceptance-parsers-diverging
-title: 'Three different acceptance-box parsers with no parity test, and they ALREADY diverge (CRLF, `- [ ] x`): the done gate refuses, the board and goal-mode report "no unchecked box"'
+title: "Three different acceptance-box parsers with no parity test, and they ALREADY diverge (CRLF, `- [ ] x`): the done gate refuses, the board and goal-mode report \"no unchecked box\""
 assignee: Arggon
 branch: fix/bug-three-acceptance-parsers-diverging
 parent: story-spec-pipeline
@@ -12,7 +12,6 @@ updated: "2026-10-03"
 claimed_at: "2026-10-03T02:49:53.379Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-three-acceptance-parsers-diverging
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-three-acceptance-parsers-diverging.md
   Leaves live only under a story. id is the filename stem: bug-three-acceptance-parsers-diverging.
@@ -155,3 +154,100 @@ verdict agreement: gate blocks=true board=true pane=true panel=true
 
 - branch: fix/bug-three-acceptance-parsers-diverging
 - open questions: #605's 'TWO parsers / CRLF-blind board / normalizeEol required / UNRENDERABLE' prose becomes false once this merges - who updates it? Also pre-existing: describe.sequential vs vitest 5.0.0 types brea…
+
+### 2026-10-03 @Arggon
+## Round 2 — all findings addressed (`fix/bug-three-acceptance-parsers-diverging`, 5 new commits)
+
+The reviewer was right on F1 and I am glad it caught it: **the refactor did drop refusals**, and my own evidence was blind to it for a specific, fixable reason (below).
+
+### F1 (blocking) — the gate's refusal set DID change. Root cause and fix
+
+`acceptanceRows` split on `"\n"`. The gate has always been a `/…/gm` regex, and JS `^` under `m` anchors after **every** LineTerminator — `\n`, `\r`, `\u2028`, `\u2029` — so a `\n`-only split glued the rest of a CR / U+2028 / U+2029 body onto the previous line and a criterion the gate refused on went invisible. Reproduced first, in isolation:
+
+```
+body                          pre-fix    shipped    fixed
+- [x] a<U+2028>- [ ] b\n      REFUSE     ALLOW      REFUSE
+prose<U+2028>- [ ] b\n       REFUSE     ALLOW      REFUSE
+- [x] a<U+2029>- [ ] b\n      REFUSE     ALLOW      REFUSE
+- [x] a\r- [ ] b\n            REFUSE     ALLOW      REFUSE
+- [x] a\v- [ ] b\n           ALLOW      ALLOW      ALLOW   (not a LineTerminator)
+LF / CRLF                     REFUSE     REFUSE     REFUSE
+```
+
+Fix: `ACCEPTANCE_LINE_BREAK = /[\n\r\u2028\u2029]/`. Deliberately **not** `\v` / `\f` — they are whitespace but not LineTerminators, so `^` never anchored after them; splitting on them would have ADDED a refusal. Both directions are now asserted.
+
+**Why my evidence missed it (the reviewer is right, and it was the generator, not just the cases):** `CORPUS` built CRLF twins via `replace(/\r?\n/g, …)`, and the fuzz put `\r` only at END of line — exactly where old and new already agree. Fixed at the source:
+
+- every shape is now emitted for **all five terminators plus "as written"**
+- 8 shapes exist **only** under a non-`\n` terminator (incl. the `\v`/`\f` counter-shapes that must NOT become rows)
+- the product fuzz varies the terminator and joins a ticked row to an unticked one **with it**, which is where it decides the answer
+
+### The pre-fix oracle is green again — that is the acceptance evidence
+
+The per-shape `acceptanceComplete(body) === preFixGate(body)` assertion now runs over corpus, real items and both fuzzes and passes. **Proof it is not vacuous:** reverting the one-line kernel fix turns **49 of 271** tests red, including the named `the gate refuses on a body terminated by ANY LineTerminator (review F1)` — which fails on its own when run alone. That is the decisive probe the reviewer asked for, and it is committed.
+
+### F2 (blocking) — JSON contract drift, documented
+
+`docs/json-output.md` and `README.md` no longer say "parsed from the clipped prose" / `{text, checked}`. Both now state the canonical-body input, why it changed (a bounded, comment-stripping `prose` reported "nothing unchecked" on a comment-filed checklist and on a criterion past the 8 KiB cap), and a field table for `criterion` / `acceptance_truncated` / `acceptance_complete`.
+
+**schemaVersion: NO BUMP — decided and stated in the doc.** All three are additive: nothing removed, retyped or made optional, and `text`/`checked` keep their meaning. That is precisely what the document's own rule covers ("Additive fields are OK within a `schemaVersion`; breaking changes bump `schemaVersion`"), and every prior field addition follows the same precedent. The only consumer that notices is a strict `additionalProperties: false` validator — the ordinary cost of an additive field, and noted in the doc so the decision is recorded rather than implied.
+
+### F3 — the vacuous assertion is gone
+
+`toBeGreaterThanOrEqual(0)` is true for every array including the empty one, so it asserted nothing. Replaced with a floor of **1**, plus a per-item assertion that each such item really has an unchecked criterion the gate sees and `showBoundedParts` cannot. Measured on this tracker: **25 items**.
+
+### F4 — the numbers, re-stated from the suite itself
+
+The suite now **prints its own sizes**, so every figure below is re-runnable rather than remembered (`npx vitest run cli/src/acceptance-parity.test.ts --reporter=verbose`):
+
+```
+[acceptance-parity] corpus: 43 shapes (35 base + 8 terminator-only) x 5 terminators + as-written = 258 cases
+[acceptance-parity] random fuzz: 200000 bodies, 5249 refused (2.6%)
+[acceptance-parity] live: 478 items, 81 blocked by the gate, 25 would disagree if a reader stripped comment sections
+```
+
+My previous comment said "77 shapes / 70 cases" and "1890 product cases" — both wrong — and quoted a 400k fuzz that existed only in an uncommitted scratch probe. The 200k random fuzz is **now committed, seeded (mulberry32) and re-runnable**. It is also *row-biased*, and deliberately so: the first version of that harness asserted `toBeGreaterThan(1000)` on a count that was always **0** — a pure-alphabet fuzz essentially never assembles a valid criterion. The committed version demands >2000 real refusals and >1%, so it fails loudly if the generator stops producing any.
+
+### F5 — the doc comment no longer describes the pre-fix regex
+
+It claimed `m` and `$` behaviour the shipped marker does not have — which is precisely where F1 hid. It now describes what the code does and names the LineTerminator set, with the false-pass it prevents written out, and why `\v`/`\f` are excluded.
+
+### F6 — the `spec.ts` narrowing is tested
+
+`decides 'is this Acceptance section testable' with the kernel's rows`: the two-space box the old `CHECKBOX_PATTERN` wrongly accepted **still** reads as untestable (the narrowing fixed that, it did not regress it), and the canonical / glued / bare / star / indented / CRLF forms stay testable.
+
+### F7/F8 — the rule's claim corrected to what the rule does
+
+It now says plainly that it catches a fifth **GRAMMAR** (code that recognises boxes itself) and **not** a fifth wrong **INPUT** — grammar shape says nothing about which bytes a consumer hands the kernel, so it would not have caught either bug this item actually closed; both live in code that already called the right parser. And it admits the over-approximation the reviewer measured: `\[[xX]?\]` and alternation spellings fire, and so does a regex that merely *mentions* a box, which is why `lib/src/**` and `**/*.test.ts` are excluded.
+
+### Live corpus, re-measured
+
+```
+items: 478   (bounded prose differs from the body: 284;  CRLF bodies in this tree: 0)
+BEFORE  board=27  native panel=30  cli pane=0
+AFTER   board=0   native panel=0   cli pane=0
+gate refusal-set changes: 0
+```
+
+Before/after on the two named shapes, gate and every consumer agreeing in both:
+
+```
+CRLF item       gate BLOCKS | BEFORE board [] ("nothing unchecked") | AFTER board ["first","second"], panel 1/3
+comment-only    gate BLOCKS | BEFORE board [] , panel 0/0         | AFTER board ["criterion filed as a comment"], panel 1/2
+```
+
+### Gates — all green
+
+`npm run build` → `npm test` (**123 files, 2547 passed**) → `npm run lint` → `npm run arggon -- validate` → `npm run check:plugin` → `npm run test:structure` → `npm run lint:structure`. Working tree clean.
+
+**Smoke:** `npm run smoke:tui-board` **passed** (10/10, including "the detail pane renders the seeded acceptance rows and the body"). `npx playwright test --grep @smoke` **33/33 passed** — the board-HTML change the reviewer wanted evidence for.
+
+`npm run smoke:opencode` **FAILS, but it is not this change.** I verified it rather than asserting it: a read-only checkout of clean `origin/main` in a throwaway worktree produces the **identical 47 failures** (`diff` of the two sorted FAIL sets is empty). Every failure is a "model executed/drove X" assertion — it needs a live model session, and the log shows `context7` MCP connections closing. Pre-existing/environmental.
+
+Also caught by `check:plugin` this round: the committed plugin bundle still carried the `split("\n")` scan, so the **vendored** kernel would have kept the F1 false-pass even after `lib/src` was fixed. Regenerated and committed (`7f8336b6`).
+
+### Sequencing — not acted on
+
+Per the reviewer's ruling I have **not** touched `cli/src/goal-mode.ts` or any ZCode asset; none are on `main`. After this merges, #605's goal-mode header needs its stale claims updated ("TWO parsers", the CRLF-blind claim, `normalizeEol` "not cosmetic", the now-unreachable `UNRENDERABLE` branch). `docs/json-output.md` is the one file both PRs will want — worth a union resolve.
+
+Item left `in_progress`.
