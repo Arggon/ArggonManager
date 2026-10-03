@@ -267,3 +267,7 @@ same situation.
 Gates on `03b15492` (origin/main 455d6cc4 merged): `npm run build`,
 `npm test` (2278 passed / 122 files), `npm run lint`,
 `npm run arggon -- validate`, `npm run check:plugin`.
+
+### handoff 2026-10-03 @Arggon — next: Merge PR #607 (round-2 fixes pushed as fast-forward 03b15492; decide rebase-vs-merge per the comment), then flip this item done
+- branch: fix/bug-seam-drift-gate-blocks-new-generated-seam-content
+- open questions: Linear rebase instead of the merge commit (needs force-with-lease, unauthorized)? Accept the recorded weaker claim (version-skew proxy, blind on unbumped feature PRs)?
