@@ -2,7 +2,7 @@
 type: bug
 status: in_progress
 id: bug-convention-md-acceptance-terminator-framing
-title: '`docs/convention.md:139` frames acceptance-box parsing as "LF and CRLF" — the exact framing that hid the U+2028/U+2029 done-gate false-pass in PR #611'
+title: "`docs/convention.md:139` frames acceptance-box parsing as \"LF and CRLF\" — the exact framing that hid the U+2028/U+2029 done-gate false-pass in PR #611"
 assignee: Arggon
 branch: fix/bug-convention-md-acceptance-terminator-framing
 parent: story-spec-pipeline
@@ -12,7 +12,6 @@ updated: "2026-10-03"
 claimed_at: "2026-10-03T10:44:56.312Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-convention-md-acceptance-terminator-framing
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-convention-md-acceptance-terminator-framing.md
   Leaves live only under a story. id is the filename stem: bug-convention-md-acceptance-terminator-framing.
@@ -46,3 +45,25 @@ Acceptance:
 - [x] The doc states which body every consumer must be handed (the canonical body) — the #605 trap — so an author cannot pre-filter before calling the predicate
 - [x] Cross-reference the single kernel predicate by name, so the doc points at one implementation rather than describing a grammar to reimplement
 - [x] Keep it to what an author needs BEFORE writing a parser; the implementation detail belongs in the predicate's own doc comment
+
+### 2026-10-03 @Arggon
+PR #613 — docs-only, one file (`ArggonManager/docs/convention.md`, §Acceptance rows), all four boxes ticked.
+
+**Replaced** the lone sentence "Both LF and CRLF bodies parse identically — the frontmatter parser tolerates `\r\n`, so the acceptance grammar must too" with three things, in the order an author needs them.
+
+1. **Terminator table (`convention.md:141-147`)** — read against the shipped kernel, not paraphrased: `ACCEPTANCE_LINE_BREAK = /[\n\r\u2028\u2029]/` consumed by `body.split(...)` in `acceptanceRows` (`lib/src/items.ts:359,436`), with `ACCEPTANCE_LINE_BREAK`'s own doc comment as the source for the exclusion rationale. `\n` (LF), `\r` (CR), U+2028 LINE SEPARATOR, U+2029 PARAGRAPH SEPARATOR end a row line; `\v` (VT) and `\f` (FF) are whitespace but **NOT** LineTerminators (`^` under `m` never anchored after them, so `- [x] a\v- [ ] b` is ONE row); `\u00a0` is not a break at all — it stays in the tail, where `ACCEPTANCE_TEXT` (`/^\S/`) rejects it as leading whitespace. The old CRLF claim is kept inside the `\r` row, now as a corollary rather than the whole boundary set. The failure mode is named: splitting on `"\n"` glues the rest of a CR/U+2028/U+2029 body onto the previous line, an unchecked criterion goes invisible and the blocked `done` flip goes through (F1).
+2. **One implementation, by name (`:149`)** — `acceptanceRows`, with `acceptanceCriteria` → `acceptanceUnchecked` → `acceptanceComplete` layered over it and `acceptanceBody` fixing its input. Also names the guard rails: ast-grep `acceptance-rows-use-kernel` (`tools/ast-grep/rules/`, `npm run test:structure`) catches a fifth GRAMMAR; `cli/src/acceptance-parity.test.ts` is what catches a fifth wrong INPUT — the split the ast-grep README explicitly says it cannot. De-duplicated the symbol list at `:124` to `acceptanceRows` alone so one place owns it.
+3. **Input invariant (`:151`)** — the **canonical** body, comment sections included, exactly as `acceptanceBody(item)` hands it over, and never trim / EOL-normalize / clip / filter first ("a reader that pre-processes the body has changed the question, and on reachable shapes it changes the answer"). The comment-filed-checklist case stays as the concrete instance, since `create` has no `--body` flag, so it is the default path for every new item. I cited the item, not the coordinator's 21/280 or the reviewer's 6.5%: live-tree counts decay, and both numbers live in `bug-three-acceptance-parsers-diverging`.
+4. **Which form is a row** — the settled answers are reachable from the new prose: `- [ ] x` and `- [ ]x` ARE rows (the space changes nothing; `x` is a one-character criterion), `-  [ ] x` is NOT. Verified against `ACCEPTANCE_MARKER` (`/^[ \t]*[-*] \[( |x|X)\][ \t]*/`) + `ACCEPTANCE_TEXT` — the table above them was already correct, so no table row changed.
+
+**Sweep for the same framing elsewhere** — `docs/agents.md`, `.agents/skills/arggon-cli/references/*` (incl. `pitfalls.md`'s done-gate note), `README.md`, `docs/json-output.md:599`, `docs/opencode2.md`, `tools/ast-grep/README.md`, the adopter template `templates/docs/docs/convention.md` (89 lines, carries no acceptance grammar at all): none describes acceptance-box parsing as LF/CRLF, and the ones that describe the input already say "canonical body". No second site to fix.
+
+**Gates**
+
+- `npm run arggon -- validate` → `arggon validate: ok (0 warning(s), convention v5)` (also ran in the pre-commit hook)
+- `npm run lint` → clean, no output
+- prettier: `--write` ×3, `diff pass-2 pass-3` empty (CONVERGED) — a single `--check` cannot prove convergence for the indented table continuations; `--check` green afterwards
+- `npm test` deliberately NOT run: no test added or touched, and no test reads this doc's content. The `convention.md` assertions in `init-docs`/`init`/`adopt`/`layout`/`capability-matrix` all read GENERATED adopter templates in temp dirs, not this repo's doc (verified by grep).
+- smoke exempt (docs-only). Based on `origin/main` (`d160623f`) — already current, so no rebase; no force-push.
+
+One judgment call for the reviewer: I kept the 6.5% and 21/280 numbers OUT of the doc and kept item ids IN, on the grounds that a schema doc should carry the durable rule and the decaying measurements belong to the item. Say the word if you want either number surfaced.
