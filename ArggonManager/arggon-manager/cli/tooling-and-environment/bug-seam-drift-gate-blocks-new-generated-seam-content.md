@@ -95,9 +95,6 @@ Acceptance:
 - [ ] `templates/docs/github/workflows/arggon.yml` stays byte-consistent with the committed workflow — the gate exempts itself deliberately; do not break that exemption while fixing this
 
 ### 2026-10-03 @Arggon
-MISSING
-
-### 2026-10-03 @Arggon
 ## Evidence — both directions, real build, shipped step bodies (PR #607)
 
 `tasks-validate` on the PR head `220bfa6b`: **pass (36 s)** — the branch-local
