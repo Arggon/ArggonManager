@@ -113,3 +113,7 @@ One environment gotcha worth knowing: a fresh worktree fails `headless-ci.test.t
 **Drift reported, not fixed (out of scope).** `docs/engineering.md:230` still calls ADR 0003 "Proposed" (stale since `c0cdd60b`); `specs/spec-opencode2-009.md:87` and `plans/plan-opencode2-009.md:24` call ADR 0010 Proposed, which is now Partially superseded by 0011 (probably correct as history — needs a reviewer's call).
 
 Not flipping to done; leaving that to the coordinator.
+
+### handoff 2026-10-03 @ses_f00f1670fffeKhTBf15mLOa4ks (session: ses_f00f1670fffeKhTBf15mLOa4ks) — next: Review and merge PR #602 (six index rows + adr-index-parity.test.ts); all gates green
+- branch: feat/task-adr-readme-index-missing-adr-0020
+- open questions: Should docs/engineering.md:230 ADR 0003 'Proposed' be corrected (stale since c0cdd60b)? Out of this item's scope
