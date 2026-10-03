@@ -23,6 +23,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readGeneratedState } from "@arggondev/lib";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   AGENT_IDS,
@@ -316,6 +317,36 @@ describe("doctor --agents: per-agent report", () => {
         expect(Object.keys(file)).toEqual(["path", "status"]);
       }
     }
+  });
+
+  it("never calls a re-vendored plugin copy adopter-edited (init would overwrite it)", () => {
+    // The vendored plugin artifacts are derived per checkout: init RE-VENDORS
+    // them from the committed bundle on a provenance mismatch instead of
+    // modified-skip (bug-stale-vendored-plugin-copy). Reporting `adopter-edited`
+    // ("yours, never overwritten") would advertise a protection init does not
+    // give them — a dishonesty the report cannot afford, since its whole value
+    // is mapping a status onto the right operator action.
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const vendored = ".opencode/plugins/arggon/index.ts";
+    const state = readGeneratedState(dir) as Record<string, { checksum?: string }>;
+    const recorded = state[vendored]?.checksum;
+    expect(recorded, `${vendored} carries provenance`).toBeTruthy();
+    // Corrupt the RECORDED state, leaving the bytes untouched: a mismatch init
+    // handles by re-vendoring, not by skipping. The recorded form is
+    // `sha256:<hex>`, so the whole value is replaced (asserted, or this test
+    // would silently prove nothing).
+    const convention = join(dir, "ArggonManager/.convention.yml");
+    const before = readFileSync(convention, "utf8");
+    const after = before.replace(recorded!, "sha256:" + "0".repeat(64));
+    expect(after, "the recorded checksum must actually change").not.toBe(before);
+    writeFileSync(convention, after, "utf8");
+    const entry = runDoctor({ cwd: dir, agents: true }).agents!.agents.find(
+      (a) => a.agent === "opencode",
+    )!;
+    const file = entry.files.find((f) => f.path === vendored)!;
+    expect(file.status).not.toBe("adopter-edited");
+    expect(file.status).toBe("present");
   });
 
   it("reports an adopter-edited file as adopter-edited, never as stale", () => {

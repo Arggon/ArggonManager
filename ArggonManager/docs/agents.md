@@ -19,6 +19,16 @@ Humans and agents follow the **same** rules. Work lives in git under the tracker
 
 Upgrading is non-destructive for agents too: an agent's edits to a generated doc are respected on every re-run — `arggon init` refreshes untouched docs quietly, skips modified ones (listed in the command's JSON output) rather than clobbering them, and archives the originals under `backup/<date>/` first when run with `--backup`.
 
+#### Agent seams: `arggon init --agents` / `--no-agents`
+
+`arggon init` also materializes the per-client **adapter seams** (the OpenCode config + `.opencode/agents|commands` + vendored plugin, the `.zcode-marketplace/` bundle, the `CLAUDE.md`/`.mcp.json` pair). Adapters are **enhancers**: docs + CLI alone remain a complete methodology, so an absent or failing adapter never bricks the workflow, and the kernel stays the enforcement of record ([ADR 0020](./adr/0020-methodology-first-productization.md), [spec §S2](./specs/spec-methodology-adapters-017.md)).
+
+- `arggon init --agents <opencode,zcode,claude>` materializes exactly those seams; `--no-agents` materializes none (docs + CLI only). With no flag the selection is every **detected** agent, from the tree's own markers; a tree with **no** marker at all (a fresh scaffold) selects every known agent, so the pre-flag default seams are never silently dropped from a brand-new tree — narrow an existing tree with `--agents`.
+- **Selection never deletes.** An unselected seam is simply not generated; nothing on disk is removed, and an adopter-edited generated file is still skipped rather than overwritten. Re-running with a wider `--agents` list materializes the missing seams; that is how you add an adapter later.
+- An **unknown agent name is refused by name** (`INIT_FAILED`, nothing written) — a typo must never silently install a different seam than you asked for.
+- `--json` gains an additive `adapters` block: the resolved `selection` (`mode`, `known`, `detected`, `selected`, `reason`) plus one `written`/`skipped` row per adapter destination with its reason and honest `counts`. `--dry-run` reports the identical block from the identical plan.
+- `arggon doctor --agents` is the mirror image (report-only): per agent, every adapter file as `present` / `stale` / `adopter-edited` / `missing` / `unverified`, plus that agent's capability-matrix gap rows. `adopter-edited` is a healthy state — it is your file, and it is never overwritten; gap rows stay advisory everywhere. (The derived vendored plugin copies are never `adopter-edited`: init re-vendors them, so the `opencode` line's `vendored plugin current`/`STALE` verdict is the one to read there.)
+
 ## 0. Issue tracking: the tracker (`ArggonManager/`), not GitHub issues
 
 All work — features, tasks, bugs, review follow-ups — is tracked as work items under the **tracker root** via `arggon create`, **not** as GitHub issues. GitHub is for **PRs only**.
@@ -275,7 +285,7 @@ Agents **MUST NOT** reopen `done` / `cancelled`. This is enforced, not just docu
 
 Non-trivial items are **orchestrated by default**: a coordinator agent delegates them to subagents instead of working them inline. Trivial items (one-line fixes, doc tweaks) stay inline.
 
-**OpenCode V2 is the reference implementation** ([ADR 0010](./adr/0010-opencode2-native-architecture.md)): the rules below are unchanged, but on V2 they are enforced with native primitives. `arggon init` generates the surface (`.opencode/agents/`, `.opencode/commands/`):
+**OpenCode V2 is the reference implementation** ([ADR 0010](./adr/0010-opencode2-native-architecture.md)): the rules below are unchanged, but on V2 they are enforced with native primitives. `arggon init` generates the surface (`.opencode/agents/`, `.opencode/commands/`) — one of the selectable adapter seams (§Prerequisites → Agent seams), so pass `--agents opencode` when that is the seam you want and the others are not:
 
 - **Agents**: `arggon-coordinator` (primary) plans waves, delegates, reviews and owns the tracker; `arggon-worker` (subagent) owns exactly one item; `arggon-reviewer` (subagent) reviews read-only; `arggon-prover` (subagent) runs the gates a verdict needs and returns expected-vs-observed evidence.
 - **Permissions keep the model honest**: the coordinator's `subagent` allow-list is `arggon-worker` / `arggon-reviewer` / `arggon-prover` / `explore` (any other agent is denied); workers cannot launch subagents (nesting stops at one level); the reviewer cannot edit — `edit`/`write`/`patch` are removed from its catalog while reads and shell stay available for the review.

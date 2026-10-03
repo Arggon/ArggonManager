@@ -241,12 +241,33 @@ arggon init . --propose                   # write <dest>.proposed-<version> side
 arggon adopt --ack                        # re-ack the merged docs; delete the .proposed-* files
 ```
 
+#### Choosing which agent adapters `init` materializes
+
+The per-client seams are **enhancers**: docs + CLI alone are a complete methodology, and an absent or failing adapter never bricks the workflow ([ADR 0020](ArggonManager/docs/adr/0020-methodology-first-productization.md), [spec §S2](ArggonManager/docs/specs/spec-methodology-adapters-017.md)). `init` therefore lets you choose which ones materialize — and nothing more: a deselected seam is simply never generated, and **init never deletes an adapter file it was not asked for**.
+
+```bash
+arggon init --agents opencode             # only the OpenCode seam (config + agents/commands + vendored plugin)
+arggon init --agents opencode,zcode       # two of the three seams
+arggon init --no-agents                   # docs + CLI only — no adapter seam at all
+arggon init                               # default: every agent DETECTED in this tree
+```
+
+- `--agents <list>` takes the agent ids `opencode`, `zcode`, `claude` (comma-separated, case-insensitive, duplicates collapse). An **unknown name is refused by name** with `INIT_FAILED` (`unknown agent "cursor" in --agents (known: claude, opencode, zcode)`) and nothing is written — a typo must never silently install a different seam than the operator asked for. `--agents` and `--no-agents` do not combine.
+- With no flag the selection is every **detected** agent, from the tree's own markers (OpenCode's four config shapes or `.opencode/`, `.zcode-marketplace/`, `CLAUDE.md`/`.claude` — the repo's config, never what happens to be on your PATH). A brand-new empty tree carries no marker at all, and narrowing there to nothing would silently delete the seams `init` has always shipped, so **a tree with no marker selects every known agent**; narrow an existing tree with `--agents`.
+- Each agent owns a seam: `opencode` — `opencode.jsonc`, `.opencode/agents/**`, `.opencode/commands/**` and the vendored plugin pair; `zcode` — the `.zcode-marketplace/` bundle; `claude` — the `CLAUDE.md` → `@AGENTS.md` pointer and the `.mcp.json` registration of `arggon mcp` (spec §S6 is the follow-on that adds a Claude Code bundle). The agent-agnostic artifacts — the generated docs, the templates, the CI recipe and the bundled **arggon-cli skill** — are never adapter artifacts and are generated whatever `--agents` says.
+- `--json` reports the outcome per artifact in an additive `adapters` block: the resolved `selection` (`mode`, `known`, `detected`, `selected`, and a `reason` naming the rule that fired) plus one `written`/`skipped` row per adapter destination with that destination's reason, and honest `counts`. `--dry-run` reports the identical block from the identical plan, so the preview's rows are exactly the ones the run writes. Full shape: [`docs/json-output.md`](ArggonManager/docs/json-output.md) §`init`.
+
+```bash
+arggon init --json --agents opencode | jq '.adapters | {selection: .selection.mode, counts}'
+```
+
 ### `arggon doctor`
 
 Report-only installation check (exit 0, pure read): is ArggonManager installed here, and in what shape?
 
 ```bash
 arggon doctor
+arggon doctor --agents                    # + per-agent adapter seams + their matrix gap rows
 arggon doctor --json
 arggon doctor --json --budget
 ```
@@ -254,9 +275,24 @@ arggon doctor --json --budget
 - `initialized`: whether `ArggonManager/.convention.yml` was found, plus the convention version (0-5).
 - `docs`: generated-doc provenance counts from `x-generated` — `managed` (tracked destinations), `untouched` (checksum matches), `modified` (checksum differs), `acknowledged` (sanctioned-diverged baselines from `adopt --ack`), `acknowledgedDrifted` (acknowledged docs whose current checksum differs from the acked baseline — a hand edit after the ack; informational, still adopter-owned), `stale` (template no longer generated), `missing` (tracked but absent), `outdated` (the CURRENT template render differs from the on-disk content — task-doctor-outdated-bucket, additive: upstream template improvements are not reaching the doc, regardless of local state; `docs.outdatedDocs` lists the affected destinations). Human output adds a hint line ("N doc(s) have newer templates — run `arggon init --dry-run` for the plan") when any doc is outdated. The outdated check is pure read (re-render, compare, never write) and graceful: a template that is absent or unreadable is never counted outdated (it is `stale` when no longer generated).
 - `tracker`: cheap tracker sanity — total work items and `todo` count.
+- `agents` (only with `--agents`, additive): per supported agent, the state of its adapter seam and that agent's capability-matrix gap rows — see below.
 - `budget` (only with `--budget`, task-adr0006-remeasure): re-measures the ADR 0006 agent-facing context budgets with the 2026-09-14 baseline method — a fresh `init --full` in a throwaway temp tree (always deleted), a deterministic 8-item fixture for `list --json` (compact AND `--full`) and `show --json` payload bytes, the generated AGENTS.md bytes against its <=2048 B budget, and the live MCP `tools/list` payload against its advisory <=12,288 B budget (task-schema-budget). Report-only; see `ArggonManager/docs/json-output.md` §`doctor`.
 
 Non-initialized repos report `initialized: false` with zeroed counts (no crash, still exit 0); failures use `error.code: "DOCTOR_FAILED"` only for unexpected errors.
+
+**`doctor --agents` — the per-agent adapter report** (additive; the mirror image of what `init --agents` selects, built from the same agent↔destination registry so the two can never disagree). Absent without the flag, so a plain `doctor --json` payload is unchanged:
+
+- **Per adapter file, one status:** `present` (on disk and not adopter-diverged), `adopter-edited` (the recorded `x-generated` checksum differs — a hand edit landed; a healthy state, since init skips it and never overwrites it), `stale` (untouched, but upstream moved — `init` would refresh it), `missing`, or `unverified` (the render cannot be produced: "cannot decide", never a failure). Adopter-edited wins over stale: only the adopter's own edit blocks regeneration. The derived vendored plugin copies are always `present` when they exist — init **re-vendors** those from the committed bundle rather than skipping them, so "adopter-edited" would advertise a protection they do not have; this report's `opencode` line already carries the sharper `vendored plugin current`/`STALE`/`unverified` verdict for them.
+- **Per agent, that agent's capability-matrix gap rows**, read through the same reader the `matrix` block uses (never a second parse), with the honest per-agent total — so zero gaps is never ambiguous between "no gaps" and "no matrix". Gap rows stay advisory: printed, never blocking, in every surface.
+- Still report-only: nothing is written, the exit code is unchanged, and the block prints on non-initialized trees too. Shape: [`docs/json-output.md`](ArggonManager/docs/json-output.md) §`agents` block.
+
+```text
+$ arggon init --agents opencode . && arggon doctor --agents
+  agents: opencode (adapter selection: init --agents / --no-agents; report-only)
+  agent claude: 2 file(s) — 0 present, 0 stale, 0 adopter-edited (yours, never overwritten), 2 missing, 0 unverified; 0 capability gap(s) — not detected in this tree
+  agent opencode: 18 file(s) — 18 present, 0 stale, 0 adopter-edited (yours, never overwritten), 0 missing, 0 unverified; 0 capability gap(s)
+  agent zcode: 19 file(s) — 0 present, 0 stale, 0 adopter-edited (yours, never overwritten), 19 missing, 0 unverified; 0 capability gap(s) — not detected in this tree
+```
 
 ### `arggon adopt`
 

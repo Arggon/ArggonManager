@@ -569,6 +569,24 @@ export type DoctorAdapters = {
  * adopter-edited file is reported as such even when the template also moved,
  * because the two demand different operator actions and only the adopter's own
  * edit blocks regeneration.
+ *
+ * Two order-sensitive cases, both read off what init actually DOES with the
+ * destination rather than off the checksum alone:
+ *
+ *  - A **vendored plugin artifact** (`.opencode/plugins/arggon/index.ts` and the
+ *    `tui.tsx` entry) is derived per checkout and RE-VENDORED from the committed
+ *    bundle on a provenance mismatch (bug-stale-vendored-plugin-copy): init
+ *    deliberately does not degrade it to modified-skip, because the shared
+ *    checksum cannot describe this checkout. So a present copy is `present`
+ *    whatever its recorded checksum says — calling it `adopter-edited` ("yours,
+ *    never overwritten") would advertise a protection init does not give it.
+ *    Nothing is lost: this report's `opencode` block already carries the richer
+ *    derived-artifact verdict for the plugin copy (`vendored plugin current` /
+ *    `STALE` / `unverified`).
+ *  - An **acknowledged** entry is the adopter's sanctioned baseline, which init
+ *    never regenerates; so it is decided before the render compare, and an acked
+ *    file matching its baseline reads `present` even when the current template
+ *    has moved on (`stale` would imply "init would refresh it", which is false).
  */
 function classifyAdapterFile(opts: {
   root: string;
@@ -588,14 +606,20 @@ function classifyAdapterFile(opts: {
     // Present but unreadable: on disk, and nothing can be said about its bytes.
     return { path: dest, status: "unverified" };
   }
+  // Derived vendored artifact FIRST: init re-vendors it on a provenance
+  // mismatch instead of skipping it (bug-stale-vendored-plugin-copy), so its
+  // recorded checksum never describes this checkout and is not evidence of an
+  // adopter edit. See the docstring.
+  if (isBundledPluginDest(dest)) return { path: dest, status: "present" };
+  // Acknowledged baseline: the adopter sanctioned these bytes and init will
+  // never regenerate them, so a match is `present` whatever the template says.
+  if (state?.acknowledged) return { path: dest, status: "present" };
+  // Checksum divergence on an ordinary generated destination IS the adopter's
+  // own edit, and it wins over the render compare: the edit — not an upstream
+  // move — is what blocks regeneration.
   if (state?.checksum && !checksumMatches(state.checksum, disk)) {
     return { path: dest, status: "adopter-edited" };
   }
-  if (state?.acknowledged) return { path: dest, status: "present" };
-  // A vendored plugin artifact is re-vendored from the committed bundle on a
-  // checksum mismatch (bug-stale-vendored-plugin-copy), so its bytes are
-  // derived, not adopter-owned: an upstream change is not "stale" for it.
-  if (isBundledPluginDest(dest)) return { path: dest, status: "present" };
   const render = renderGeneratedDoc({ templatesDir, root, template, dest, projectName });
   // Render refused (template/bundle absent, or the project name unrecoverable):
   // cannot decide — never reported as stale.
