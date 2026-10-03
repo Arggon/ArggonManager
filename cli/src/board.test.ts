@@ -1287,11 +1287,14 @@ describe("static export --details (task-board-static-details)", () => {
     // Prose is clipped at the documented per-item cap...
     expect(detail.prose_truncated).toBe(true);
     expect(Buffer.byteLength(detail.prose, "utf8")).toBeLessThanOrEqual(MAX_DETAIL_PROSE_BYTES);
-    // ...acceptance rows are parsed from the clipped prose...
+    // ...and the acceptance rows come from the CANONICAL body, not the clipped
+    // prose, so the prose cap cannot hide an unchecked criterion from the
+    // drawer while the done gate still refuses (bug-three-acceptance-parsers-diverging).
     expect(detail.acceptance).toEqual([
-      { text: "done row", checked: true },
-      { text: "open row", checked: false },
+      { text: "done row", checked: true, criterion: true },
+      { text: "open row", checked: false, criterion: true },
     ]);
+    expect(detail.acceptance_complete).toBe(false);
     // ...and comments are the kernel tail (last 3 of 5).
     expect(detail.comments.map((comment) => comment.text)).toEqual([
       "comment 3",

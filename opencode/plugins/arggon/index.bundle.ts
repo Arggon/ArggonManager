@@ -7651,11 +7651,14 @@ function acceptanceRenderRows(item) {
 function splitBoardDetailRows(item, prose) {
     const acceptance = acceptanceRenderRows(item);
     const body = [];
+    let proseRowsBefore = 0;
     for (const raw of prose.replace(/<!--[\s\S]*?-->/g, "").split(/\r?\n/)) {
         const row = raw.replace(/\t/g, "  ").trimEnd();
-        if ((0, lib_1.acceptanceRows)(row).length > 0)
+        if ((0, lib_1.acceptanceRows)(row).length > 0) {
+            proseRowsBefore += 1;
             continue;
-        if (body.length === 0 && acceptance.length === 0 && /^#\s+/.test(row))
+        }
+        if (body.length === 0 && proseRowsBefore === 0 && /^#\s+/.test(row))
             continue;
         if (row.trim() === "") {
             if (body.length === 0 || body[body.length - 1] === "")

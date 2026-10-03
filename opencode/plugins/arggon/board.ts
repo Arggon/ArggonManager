@@ -452,12 +452,19 @@ function splitBoardDetailRows(
 ): { acceptance: string[]; body: string[] } {
   const acceptance = acceptanceRenderRows(item);
   const body: string[] = [];
+  // Rows classified in PROSE order (hoisted acceptance rows count too): the
+  // leading-H1 skip below is about the prose's own first row, so it must not
+  // read the canonical acceptance list, which is populated before the loop.
+  let proseRowsBefore = 0;
   for (const raw of prose.replace(/<!--[\s\S]*?-->/g, "").split(/\r?\n/)) {
     const row = raw.replace(/\t/g, "  ").trimEnd();
     // Kernel predicate on a single line, so the two lists can never disagree
     // about which lines are rows.
-    if (acceptanceRows(row).length > 0) continue;
-    if (body.length === 0 && acceptance.length === 0 && /^#\s+/.test(row)) continue;
+    if (acceptanceRows(row).length > 0) {
+      proseRowsBefore += 1;
+      continue;
+    }
+    if (body.length === 0 && proseRowsBefore === 0 && /^#\s+/.test(row)) continue;
     if (row.trim() === "") {
       if (body.length === 0 || body[body.length - 1] === "") continue;
       body.push("");
