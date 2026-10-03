@@ -98,3 +98,7 @@ So the original reasoning was true of exactly three rows, not of the corpus, and
 **Left for another owner, deliberately:** `docs/engineering.md` §ADR process does not mention the index at all, and that file is owned by another worker this wave, so it was not edited. The one paragraph to add is under §ADR process → **Location & naming**.
 
 **Observed pre-existing flake, out of scope:** on one full-suite run `cli/src/prose-format.test.ts > prettier never rewrites a code span's source text` failed with `Test timed out in 30000ms`; it passes alone (~30s for that single test against a 30s per-test limit) and the suite was green on re-run. Flagging for the coordinator rather than widening this diff — it wants its own item if anyone wants the limit raised or the parse cached.
+
+### handoff 2026-10-03 @Arggon — next: Review PR #620: confirm the declared-divergence rule and the 16-mutation proof; the three ADR - Index title: lines are the only corpus edit.
+- branch: feat/task-adr-index-parity-does-not-check-titles
+- open questions: Should docs/engineering.md ADR process canonically document - Index title:? That file is owned by another worker this wave. Will PR #605's author add the declaration for ADR 0021's editorial row? Is …
