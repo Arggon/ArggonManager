@@ -2,7 +2,7 @@
 type: bug
 status: todo
 id: bug-ci-seam-pin-shell-vs-test-copy-divergence
-title: "`cli/src/ci-seam-pin.test.ts` (template copy) and the committed workflow (shell copy) can drift: the test has an extra `pin !== pkgVersion` conjunct, and nothing machine-checks they match"
+title: "Re-scoped: the TEMPLATE-vs-COMMITTED copy divergence is CLOSED by PR #607 (parity test); what remains is only the `pin !== pkgVersion` conjunct — and the shell copy is the STRICTER predicate, so pasting it in may be wrong"
 parent: tooling-and-environment
 labels: [ci, seam]
 created: "2026-10-03"
