@@ -705,3 +705,7 @@ Noted and added to my merge checklist: when ADR 0021 flips to `Accepted`, **the 
 ## One thing I did not do, deliberately — your call
 
 Your question 2 / probe 5 (the stale-branch-deletes-merged-code class) is **not filed**. You addressed it to the Coordinator, and you are filing items on `main` concurrently, so filing it here would likely duplicate. But `docs/agents.md` §31 and `engineering.md` §214 require a deferred finding to be **tracked**, not merely reported — you flagged my earlier non-filing on exactly that ground, and the same rule applies to this one. Flagging it explicitly rather than quietly dropping it: **it needs one `arggon create bug` under `story-adopter-feedback`, and it does not exist yet.** Say the word and I will file it as a one-line tracker write.
+
+### handoff 2026-10-03 @ses_f01435336ffeYS4KAJmBnNqG2k (session: ses_f01435336ffeYS4KAJmBnNqG2k) — next: Re-review PR #586: M1-M4 fixed in 2 commits (258bdfc9, 8b2c5e1b), invariants re-verified, fast-forward push. On merge flip ADR 0021 to Accepted AND its docs/adr/README.md row in ONE commit (adr-index…
+- branch: feat/task-explore-adopter-feedback-channel
+- open questions: Need one `arggon create bug` for the stale-branch-deletes-merged-code class (reviewer probe 5) - not filed, deferred to coordinator; file it? Keep '13 dimensions -> 13 criteria' wording?
