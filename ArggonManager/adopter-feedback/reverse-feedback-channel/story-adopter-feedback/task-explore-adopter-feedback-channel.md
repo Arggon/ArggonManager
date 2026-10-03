@@ -502,3 +502,100 @@ The one exception: link **targets** in the two files main owns were updated so n
 
 - branch: feat/task-explore-adopter-feedback-channel
 - open questions: Agree that dated comment history stays verbatim (renumber map in body instead)? File prettier indent-growth as distinct from bug-prettier-glues-split-inline-code-span? Cut doctor.friction to triggerV…
+
+### 2026-10-03 @Reviewer
+verdict: request-changes (narrow — B1–B4 and N1–N6 are verified closed; four small doc-consistency edits remain)
+
+Round 2, read-only. Branch: `origin/feat/task-explore-adopter-feedback-channel` (head `389ed6de`), base `origin/main`. No gates re-run.
+
+**Every round-1 blocker is closed and I verified each independently rather than accepting the claim. The exploration, ADR, spec, plan and nine leaves are all correctly renumbered, and the PR now touches zero files outside `ArggonManager/`.** What is left is four sentences of doc truth in artifacts that are about to become the implementation contract. This is the complete list — anything further belongs in a new item, not in a re-review of this PR.
+
+---
+
+## Verified closed (B1–B4, N1–N6)
+
+**B1 renumber — closed, and the residual count is right.** ADR `0021`, `spec-friction-capture-018`, `plan-friction-capture-018`, `exploration-adopter-feedback-channel-019`. `git grep` for `adr/0020-adopter-friction-channel|friction-capture-017|adopter-feedback-channel-018` over the whole branch tree returns **hits only inside dated comments** (lines 253–326 are the 2026-10-02 worker comment and my own round-1 verdict) plus the intentional `Numbering note` / `## Renumber map`. Every live reference moved: `spec_id`/`plan_id`/`exploration_id`, the plan's `spec:` frontmatter, the exploration's Decision link, the spec and plan back-links, the story body, all nine leaves, both containers.
+
+I re-derived the "exactly 5" claim myself by enumerating the numeric stems per directory in the branch tree, which is the same algorithm `docNumberCollisions` implements (`cli/src/spec.ts`, added in `f2e82e94` / PR #603, per-directory, report-only):
+
+| dir | colliding numbers | mine? |
+| --- | --- | --- |
+| adr | none — `0001`…`0021` all unique | 0021 unique |
+| explorations | `001` (`cheap-path-to-prod` ↔ `token-context-efficiency`) | 019 unique |
+| specs | `001` (`deps` ↔ `sync`), `015` (`release-pipeline` ↔ `update-channel`) | 018 unique |
+| plans | `001` (`deps` ↔ `sync`), `015` (`release-pipeline` ↔ `update-channel`) | 018 unique |
+
+Five pairs, exactly the five named, **none of them mine**. The claim is accurate.
+
+**B2 — closed, and the second instance was real.** `bug-contributing-github-issue-contradiction.md` is absent from the diff entirely. And the worker's own find is correct: `bug-prettier-glues-split-inline-code-span.md` **was** going to revert main's `368809d5` link fix — the merge took main's newer copy and the surviving 4-line diff does exactly two things (updates `-018`→`-019` on main's already-correct 3-level prefix, removes the duplicate H1). **I checked for a third instance and there is none**: the branch tree and `main` agree on every file, and the three-dot diff contains no `D` row at all.
+
+**B3 — closed.** `Status: Proposed`, with a `Status note` naming the two-step precedent. No surviving claim of `Accepted` for ADR 0021 anywhere: README row says `Proposed`, the epic note says it "ships `Proposed` and flips to `Accepted` on merge", the handoff is future-tense.
+
+**B4 — closed, and the row is correct, not merely present.** I checked it against each assertion in `cli/src/adr-index-parity.test.ts`: one row per file and same count ✓; target resolves ✓; four-digit gapless ascending with the row last ✓; row number == filename == the ADR's own `# 0021` heading ✓; **status class agrees** (`Proposed` in the row vs `Proposed` in the file) ✓.
+
+**N1–N6 — all six closed.** T5 now carries an explicit ownership paragraph disclaiming the block's code/AC and naming T6 as sole owner; the spike has a real `depends_on: [task-friction-trigger-carrier]`; the epic box stays unticked with a note; exactly one H1 per file across all 15 items (`git grep -c "^# "`); the exploration's concurrency row now reads `O_APPEND` with a dated correction; rotation is owned by T1 and T3 only renders the counter. I also confirmed the bonus fix: `spec-friction-capture-018.md:236` and ADR 0021 use the real `task-spike-…` ids.
+
+**Link sweep, mine.** I resolved every markdown link target in all 19 changed files against the branch tree. **No dangling link in any live body.** The only unresolved targets are the three old `…-017`/`0020-adopter-friction` links inside the dated 2026-10-02 comment and my own round-1 comment — covered by the verbatim ruling below.
+
+---
+
+## Must fix before merge (4 edits, all documentation consistency)
+
+**M1 — the superseded 4a rationale survives in the normative spec and in T6, contradicting the ADR that now denies it.** ADR §2 says, in its own words, "Visibility is _already_ covered, and an earlier draft of this ADR overstated it." Two other docs are still that draft:
+
+- `ArggonManager/docs/specs/spec-friction-capture-018.md` §*The trigger and its visibility*: "This is the direct application of \"a disabled capability nobody can see is absent\" … so **without this block the channel's absence is invisible**." The header paragraph two screens up still reads "and a `doctor` block so its absence is visible".
+- `ArggonManager/adopter-feedback/.../task-friction-trigger-carrier.md` Context: "Without the `doctor` block, \"the channel is not live\" is invisible — the same failure ADR 0016 had to fix for docs **with the `outdated` bucket**." Self-refuting: it names `outdated` as the mechanism that already does it.
+
+`docs/agents.md:458` — "If the change made any doc statement false, that doc edit belongs in this PR" — and `engineering.md:71` (no silent doc forks). The behaviour is specified identically everywhere; only the *why* is false, and an implementer reading only the spec is invited to conclude the block is unnecessary, which is the one thing the coordinator's ruling protects against. Replace both paragraphs with ADR §2's reasoning (per-file `triggerVersion`; trigger-absent vs generic drift) and cite §2.
+
+**M2 — T6's acceptance still carries the two-owner marker.** `task-friction-trigger-carrier.md`: "`doctor --json` reports `triggerPresent`/`triggerVersion` per managed agent file **(with `task-friction-surface-parity-and-docs`)**". T5's new text says the block is owned *solely* by T6. The parenthetical re-creates the ambiguity N1 just closed — delete it.
+
+**M3 — two stale item ids remain in the plan, one line below the one that was fixed.** `plan-friction-capture-018.md:89` says `spike-friction-tier-b-surface` and `:90` says `spike-friction-volume-threshold`; neither resolves (the prefix is `task-`, per each item's own placement comment). Line 87 in the same list was fixed and the response comment claims the class is fixed. These are bare code spans, which is why the anchor-aware link sweep missed them — same reason `validate` misses them.
+
+**M4 — the item body still asserts two things the PR itself now knows are false.** In `## Recommendation (coordinator decision)` (body prose, lines ~145–180): (a) item 1 still reads "without this block \"the channel is not live\" is invisible"; (b) "**Still broken, deliberately not touched** … `bug-contributing-github-issue-contradiction.md` and `bug-prettier-glues-split-inline-code-span.md`" — both were fixed/closed on main. The request-changes section attributes (b) to "it lives in a dated comment"; that copy does live in a comment and correctly stays, but **this copy is the live body**, which is why the correction never reached it. Same edit class as M1.
+
+Nit, take it or leave it: the story body still says "13 hunted dimensions → 13 mapped criteria"; the Limits dimension now carries two criteria, so the map is 13 + the local-dedupe boundary. `bug-prettier-indented-list-continuation-grows-2-spaces-per-write` also has no `priority`, unlike every sibling.
+
+---
+
+## Your four questions, ruled
+
+**1 · Merge instead of rebase — right call, and it was the only in-policy option.** `docs/agents.md` §0 mandates merge-don't-squash for PRs carrying tracker auto-commits precisely because rewriting them causes the divergence this repo already paid for ("vencimientos merge #1 needed a manual `rebase --onto`"). The branch carries ~12 `chore(tasks)` commits whose shas are cited as evidence in item notes; a rebase would have rewritten every one of them, destroying those citations — and the shipped permission policy **denies** the force-push outright (`templates/docs/opencode.jsonc:50-52`: `git push --force*`, `-f`, `*+*` are all `deny`). Preserving the tracker commits without a gate override is the correct trade. The honest cost, which the worker named: a merged branch has main inside it, so the review lens must be `git diff origin/main`, never the three-dot PR view. That distinction is what caught question 2's hazard.
+
+**2 · The `adapters.ts` deletion — resolved, and yes, a gate should exist, but not from this PR.** Verified: both `cli/src/adapters.ts` and `cli/src/adapter-selection.test.ts` are present in the branch tree and in `main`, and the three-dot diff has no `D` row and no row outside `ArggonManager/` — so this PR deletes nothing. The hazard the worker saw was real but was an artifact of a two-dot diff against a stale branch, not a merge this PR would have performed.
+
+That said, the class is uncovered and it is worth naming: the existing protection is `npm test`/`build`, which fails only when a deletion breaks compilation or leaves an orphan test. The **silent** shape — deleting an implementation *and* its test together — goes green, which is exactly what `D adapters.ts` + `D adapter-selection.test.ts` looked like. A cheap report-only gate would print `git diff --name-status origin/main...HEAD` deletions on every PR (the repo already ships `context:report` in that spirit) and warn when a `D` row removes a file whose paired test is also deleted. That is a behavioural change to CI, so it needs its own item and decision. **The worker did not file it**, and `docs/agents.md:31` + `engineering.md:214` require a deferred finding to be tracked, not just reported. Coordinator: that is one `arggon create bug` — no code, no round trip needed.
+
+**3 · Prettier framing — right, and the gap is now precisely located.** Same class, two manifestations: both are prettier-3.9.6 markdown non-idempotence on continuation list items under `printWidth: 100` with `proseWrap` unset, and both surface as "the file `--write` just produced fails `--check`". Filing the second as its own bug under the same story is the right call, and the title is accurate.
+
+"A single `--check` cannot prove convergence" is **correct and worth keeping in the record**: `--check` compares committed bytes against *one* pass, so it catches "the author already committed two-pass output" but cannot detect that the one-pass output is itself unstable. Convergence needs a two-pass assertion (`prettier -w` twice, then require a clean tree).
+
+The reason it bit twice here, which sharpens the filing: `cli/src/prose-format.test.ts` pins prose stability corpus-wide but **deliberately excludes the tracker item tree** (`ArggonManager/<initiative>/…` — "Item bodies are historical records that quote mangled formatter output as evidence"), while `npm run format` (`prettier -w .`) still writes over it. So the one subtree where both manifestations live is the one subtree with no gate, by design. A convergence assertion for that subtree is *not* trivial — it must tolerate exactly the quoted-mangled-output bodies the exclusion exists for — which is why it belongs in the filed bug's scope and not here. **Ruling: add "a two-pass convergence assertion for the tracker item subtree" as an explicit acceptance criterion on `bug-prettier-indented-list-continuation-grows-2-spaces-per-write`** (or a sibling), noting the `prose-format.test.ts` exclusion interaction. Single-line bullets are the right immediate mitigation; keep doing that.
+
+**Your open question — dated comments stay verbatim. Overrule refused.** All three reasons, and one boundary:
+
+- **Verbatim: yes, for every dated comment block, including my round-1 B1 table.** `docs/agents.md` §0 makes comments the handoff channel and "history, not a reopen" — an append-only log by construction, with no body-editing API for comment text. Editing would falsify: at review time the PR genuinely carried `0020-adopter-friction-channel.md`, and that table's commit shas (`448b31dc` 13:06 vs `172af2fb` 19:36) are precisely the evidence that justified the coordinator's renumber ruling. Renumber it in place and the audit trail for that ruling ceases to exist. The repo's own precedent agrees: ADR 0016 was renumbered with an **additive** `Numbering note` + `Status note`, never a rewrite — which is exactly the `## Renumber map` pattern used here.
+- **The boundary:** the same reasoning does *not* extend to live item-body prose. Body sections are current state, not dated history. That is M1 and M4 — the comment copies of the 4a claim and the "still broken" note correctly stay; the body copies must be corrected. The worker's "it lives in a dated comment" reasoning conflated the two, which is how the body copies survived a round whose whole subject was correcting them.
+- Practical consequence of the map-in-body choice: `arggon sync --json` reads this item and a future agent reads top-to-bottom, hitting the body first. A body that contradicts its own ADR is the failure mode the review bar exists to prevent; the map helps readers resolve an old *label*, but it cannot repair a body sentence that asserts something false.
+
+---
+
+## What I verified by reading (round 2)
+
+Branch tree enumerated per docs directory against `docNumberCollisions`' own algorithm; `git grep` for every old identifier across the whole tree; a full markdown-link resolution sweep over all 19 changed files; `git diff --name-status` emptiness outside `ArggonManager/`; `adapters.ts`/`adapter-selection.test.ts` present in both trees; the ADR README row checked against each assertion in `cli/src/adr-index-parity.test.ts`; `templates/docs/opencode.jsonc:50-52` for the force-push denial; `cli/src/prose-format.test.ts` for the tracker-subtree exclusion; `cli/src/spec.ts` (`f2e82e94`) for the collision detector's scope and its report-only posture; `git grep -c "^# "` for H1 counts; the ADR index parity test's status-agreement rule, which has one consequence for the merge (see probe 4).
+
+## Unverified
+
+CI green on the head (tasks-validate, cli, ui-smoke) as reported; the worker's local `build`/`test` (122 files / 2275 tests) / `lint` / `check:plugin` / `validate` / `spec validate` (34 docs, 5 warnings) / `spec analyze` (5 new = the known duplicates, 1 resolved, 5 unchanged) / prettier-converged figures; and its claim that the primary checkout's unpushed commits belong to another session. I did not re-run any of them.
+
+## Probes needed
+
+1. `cd /home/arggon/Projects/ArggonManager && git diff --name-status origin/main...origin/feat/task-explore-adopter-feedback-channel` → expected: 19 rows, all `M`/`A` under `ArggonManager/`, zero `D`. This is also the command worth wiring into CI as the report-only gate for question 2's class.
+2. After M1–M4 land: `npm run arggon -- spec validate` → expected ok, 34 docs, exactly 5 `DOC_NUMBER_COLLISION` warnings, none naming `0021`/`018`/`019`. And `npm run arggon -- spec analyze --baseline` → expected zero NEW.
+3. `npx prettier --check` on the changed files **and** the two-pass assertion (`prettier -w` twice, then `git diff --exit-code`) → expected: the second pass changes nothing. `--check` alone is not sufficient evidence for this class (ruling 3).
+4. **After the ADR 0021 status flip** — which the coordinator does on merge — `npx vitest run cli/src/adr-index-parity.test.ts` must be re-run. That test asserts the README row's status class agrees with the ADR file's own `- Status:` line, so flipping ADR 0021 to `Accepted` **without** flipping its README row turns `main` red. Flip both in one commit.
+5. `npm run arggon -- create bug "<title>" --parent story-adopter-feedback` for the stale-branch-deletes-merged-code class (question 2), with acceptance covering the report-only deletions listing. Tracker write only — no code, no worker round trip.
+
+## Recommendation
+
+**No merge yet — M1–M4, then merge.** B1–B4 and N1–N6 are done and verified; the renumber is correct and complete; the PR deletes nothing; the ADR, spec, plan and tasks are internally consistent on numbering, ownership and dependency edges. The remaining four edits are the same class as the finding they close: a statement this PR knows to be false, in a doc the implementation will be built from. M1 and M2 exist because the 4a correction reached the ADR but not the spec or T6; M3 because the stale-id fix reached one of three lines; M4 because the verbatim-history reasoning (correct for comments) was applied to body prose. Once those land: merge, then flip ADR 0021 to `Accepted` **together with its README row** (probe 4), then release `task-friction-capture-command` (T1) — the compliance spike is correctly gated behind T6 and must not be claimed early.
