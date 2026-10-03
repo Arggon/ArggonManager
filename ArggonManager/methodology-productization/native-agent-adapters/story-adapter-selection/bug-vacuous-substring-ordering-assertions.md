@@ -143,3 +143,7 @@ All mutations were reverted; `git status` is clean.
 ## Shared-file note
 
 `test/assert-order.ts` is new and inside the shared test-helper directory (next to `test/acceptance.ts` / `test/property-runner.ts`), as the item asked for a shared helper. It adds no exports to any existing helper module and edits no other item's test file. `opencode/plugins/arggon/tools.test.ts` is touched (import + 4 assertion blocks) — no other worker owns it, but flagging it since it lives in the native plugin package.
+
+### handoff 2026-10-03 @Arggon — next: Review + merge PR #616; then rebase PR #608 onto it so its four inline presence checks become assertOrder
+- branch: fix/bug-vacuous-substring-ordering-assertions
+- open questions: Should PR #608 swap its 4 inline presence checks for assertOrder, or is the inline form acceptable given the rule's documented variable-form blind spot?
