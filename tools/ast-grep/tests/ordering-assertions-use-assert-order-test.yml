@@ -1,0 +1,92 @@
+id: ordering-assertions-use-assert-order
+valid:
+  - |
+    // The sanctioned replacement: presence is a precondition of the comparison.
+    assertOrder(message, "npm ci", "x-tracker.strict-gate-bins is set", firstEntry);
+    assertOrder(message, "npm ci", { text: "and 1 more", optional: true }, lastEntry);
+  - |
+    // Presence-only assertions are never vacuous — toContain fails on an absent
+    // needle — so they stay `expect`.
+    expect(message).toContain("npm ci");
+    expect(html).toContain('<div class="mgroup-head none">no story</div>');
+  - |
+    // A hard-coded expected position is an equality, not an ordering claim: -1
+    // would not equal 38, so the assertion cannot pass vacuously.
+    expect(rendered.indexOf("324")).toBe(38);
+  - |
+    // indexOf as a PARSER is ordinary string work and is not this rule's
+    // subject: no position comparison is being asserted.
+    const end = raw.indexOf("\n---\n");
+    const body = raw.slice(0, end + 5);
+    expect(calls[0][calls[0].indexOf("--state") + 1]).toBe("merged");
+  - |
+    // An indexOf bound to a VARIABLE and compared elsewhere carries no indexOf
+    // at the comparison site. Out of structural reach by design (documented in
+    // the rule note): review plus cli/src/assert-order.test.ts cover it.
+    const firstNamedIndex = message.indexOf(firstEntry);
+    expect(firstNamedIndex).toBeGreaterThan(-1);
+    expect(remedy).toBeLessThan(firstNamedIndex);
+  - |
+    // A non-ordering matcher on an indexOf result is not a vacuous ORDER claim.
+    expect(message.indexOf("--state")).toBe(-1);
+  - |
+    // A numeric literal on the right is exempt ONLY where `-1 <op> n` is
+    // FALSE, so the clause's absence fails loudly and presence is already
+    // pinned. Both of these are exactly that.
+    expect(html.indexOf("</head>")).toBeGreaterThan(0);
+    expect(cells.indexOf(marker)).toBeGreaterThan(-1);
+    expect(hint).toBeGreaterThanOrEqual(0);
+    // A non-negative literal with toBeGreaterThanOrEqual, for completeness.
+    expect(refusal.indexOf(files[0]!)).toBeGreaterThanOrEqual(1);
+  - |
+    // Other positional comparisons stay legal; only indexOf-of-a-substring
+    // ordering is vacuous.
+    expect(items.indexOf("task-a")).toBe(0);
+invalid:
+  # The shipped defect, verbatim: a lowercase needle that stopped matching after
+  # the message was reworded, leaving `-1 < n` green.
+  - |
+    expect(message.indexOf("if this is an identity error")).toBeLessThan(
+      message.indexOf("something"),
+    );
+  # Every matcher in the family fires.
+  - |
+    expect(html.indexOf("⚑ story-a")).toBeLessThan(html.indexOf("⚑ story-b"));
+  - |
+    expect(body.indexOf("`adr`")).toBeGreaterThan(body.indexOf("`openspec`"));
+  - |
+    expect(content.indexOf("proposed")).toBeLessThanOrEqual(content.indexOf("generated"));
+  - |
+    expect(drift.indexOf("lags")).toBeGreaterThanOrEqual(drift.indexOf("diff"));
+  # The one-sided form: the anchor is a variable holding another needle's index,
+  # which is how 8 of the 23 swept assertions were written.
+  - |
+    expect(message.indexOf("npm ci")).toBeLessThan(firstNamedIndex);
+  - |
+    for (const clause of clauses) expect(message.indexOf(clause)).toBeLessThan(firstFile);
+  # A two-argument call form and an escaped needle both still fire.
+  - |
+    expect(html.indexOf('⚑ story-a', 0)).toBeLessThan(html.indexOf('⚑ story-b'));
+  # An RHS that is a bare non-literal POSITION rather than a needle: the rule
+  # cannot prove it is an index, so it treats it as one — assertOrder states the
+  # presence it is really asserting.
+  - |
+    expect(list.indexOf(id)).toBeGreaterThan(previous);
+  # A NUMERIC literal is exempt ONLY where `-1 <op> n` is false. These four are
+  # the pairs the over-broad first cut of the rule wrongly waved through:
+  - |
+    // -1 < 38 is TRUE — passes on an absent needle.
+    expect(rendered.indexOf("324")).toBeLessThan(38);
+  - |
+    // -1 <= -1 is TRUE — passes on an absent needle.
+    expect(message.indexOf("npm ci")).toBeLessThanOrEqual(-1);
+  - |
+    // -1 <= 0 is TRUE — passes on an absent needle.
+    expect(html.indexOf("</head>")).toBeLessThanOrEqual(0);
+  - |
+    // -1 >= -1 is TRUE — passes on an absent needle. One keystroke away from
+    // the SOUND `toBeGreaterThanOrEqual(0)` presence guard PR #608 used.
+    expect(hint.indexOf("If this is an identity error")).toBeGreaterThanOrEqual(-1);
+  # A negative literal other than -1: -1 > -0.5 is TRUE, so this fires too.
+  - |
+    expect(html.indexOf("</head>")).toBeGreaterThan(-0.5);
