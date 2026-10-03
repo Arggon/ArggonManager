@@ -182,43 +182,19 @@ other items' bodies): `bug-contributing-github-issue-contradiction.md` and
 
 Reviewer verdict `request-changes`; all four blockers plus N1–N6 addressed.
 
-- [x] **B1 renumbered** — ADR `0021`, spec/plan `018`, exploration `019`, every
-      internal reference, plus a `Numbering note` per the ADR 0016 / ADR 0019
-      precedent. The four new numbers are unique in their directories: verified
-      against the merged duplicate-number detector, which reports **zero**
-      findings naming any of my artifacts.
-- [x] **B2 the `done` item no longer regressed** — `bug-contributing-…` no longer
-      appears in the branch diff at all; its record is main's (`status: done`,
-      assignee, branch, ticked boxes). `bug-prettier-glues-…` needed no action:
-      main had already fixed it and the merge took main's newer copy.
-- [x] **B3 the ADR ships `Proposed`**, with a `Status note` naming the two-step
-      precedent; the epic box stays unticked until acceptance (N3).
-- [x] **B4 the ADR is indexed** in `docs/adr/README.md` — required, since PR #602's
-      parity test asserts one index row per ADR file and every row resolving.
-- [x] **N1 one owner for `doctor.friction`** — T6. T5 keeps `arggon friction`
-      surface parity and says which half it owns.
-- [x] **N2 the compliance spike is gated** — `depends_on:
-    [task-friction-trigger-carrier]`, so it is not claimable before the trigger
-      it measures exists.
+- [x] **B1 renumbered** — ADR `0021`, spec/plan `018`, exploration `019`, every internal reference, plus a `Numbering note` per the ADR 0016 / ADR 0019 precedent. The four new numbers are unique in their directories: verified against the merged duplicate-number detector, which reports **zero** findings naming any of my artifacts.
+- [x] **B2 the `done` item no longer regressed** — `bug-contributing-…` no longer appears in the branch diff at all; its record is main's (`status: done`, assignee, branch, ticked boxes). `bug-prettier-glues-…` needed no action: main had already fixed it and the merge took main's newer copy.
+- [x] **B3 the ADR ships `Proposed`**, with a `Status note` naming the two-step precedent; the epic box stays unticked until acceptance (N3).
+- [x] **B4 the ADR is indexed** in `docs/adr/README.md` — required, since PR #602's parity test asserts one index row per ADR file and every row resolving.
+- [x] **N1 one owner for `doctor.friction`** — T6. T5 keeps `arggon friction` surface parity and says which half it owns.
+- [x] **N2 the compliance spike is gated** — `depends_on: [task-friction-trigger-carrier]`, so it is not claimable before the trigger it measures exists.
 - [x] **N3 the epic contradiction is reconciled** with a note, not a premature tick.
 - [x] **N4 duplicate H1s removed** from the 5 files that had them.
-- [x] **N5 the stale "still broken" claim is corrected** — it lives in a dated
-      comment, so it is corrected in the response comment rather than by editing
-      history; both named items were already fixed/closed on main.
-- [x] **N6a** the exploration's concurrency row corrected to `O_APPEND` with a
-      dated note; **N6b** rotation owned by T1, T3 only renders the counter.
-- [x] **Scope call 4a** carried into ADR §2 — re-justified on per-file
-      `triggerVersion` and separating _trigger absent_ from generic template
-      drift, with the correction that `doctor.ts` already re-renders acked entries
-      so a missing trigger is **not** invisible today.
-- [x] **Scope call 4b** carried into the spec — a new acceptance criterion names the
-      honest boundary: local dedupe cannot see an already-filed upstream issue, so
-      a known class is re-emitted and may be filed twice; deferred, not postponed.
-- [x] **Gates green on the merged tree**: `build`, `test` (122 files / 2275 tests),
-      `lint`, `check:plugin`, `validate` (0 warnings, v5), `spec validate`
-      (34 docs, 5 warnings — all pre-existing), `spec analyze` vs baseline
-      (5 new, all pre-existing duplicates, none mine), prettier clean **and
-      idempotent** across consecutive writes.
+- [x] **N5 the stale "still broken" claim is corrected** — it lives in a dated comment, so it is corrected in the response comment rather than by editing history; both named items were already fixed/closed on main.
+- [x] **N6a** the exploration's concurrency row corrected to `O_APPEND` with a dated note; **N6b** rotation owned by T1, T3 only renders the counter.
+- [x] **Scope call 4a** carried into ADR §2 — re-justified on per-file `triggerVersion` and separating _trigger absent_ from generic template drift, with the correction that `doctor.ts` already re-renders acked entries so a missing trigger is **not** invisible today.
+- [x] **Scope call 4b** carried into the spec — a new acceptance criterion names the honest boundary: local dedupe cannot see an already-filed upstream issue, so a known class is re-emitted and may be filed twice; deferred, not postponed.
+- [x] **Gates green on the merged tree**: `build`, `test` (122 files / 2275 tests), `lint`, `check:plugin`, `validate` (0 warnings, v5), `spec validate` (34 docs, 5 warnings — all pre-existing), `spec analyze` vs baseline (5 new, all pre-existing duplicates, none mine), prettier clean **and idempotent** across consecutive writes.
 
 ## Renumber map (2026-10-03)
 
