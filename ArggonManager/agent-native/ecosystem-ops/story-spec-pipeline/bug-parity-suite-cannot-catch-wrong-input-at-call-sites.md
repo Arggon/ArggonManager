@@ -7,6 +7,7 @@ parent: story-spec-pipeline
 labels: [tests, done-gate]
 created: "2026-10-03"
 updated: "2026-10-03"
+depends_on: [bug-convention-md-acceptance-terminator-framing]
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-parity-suite-cannot-catch-wrong-input-at-call-sites.md
