@@ -179,4 +179,33 @@ literal on purpose — deriving it from `package.json` would install the bumped
 version between the release PR and the publish, before the registry has it
 (the #527 outage class). Non-divergence is enforced, not remembered:
 `cli/src/ci-seam-pin.test.ts` fails until the pin matches the regenerated
-seam — **a stale pin is a red test, not a silent outage.**
+seam — **a stale pin is a red test, not a silent outage.** `tasks-validate`
+enforces the same rule at CI time on every repo (the drift step's pinned-lag
+assertion), so an adopter whose pin lags their seam gets the bump-the-pin
+remedy instead of an unexplainable diff.
+
+## One release story: two axes (bug-seam-drift-gate-blocks-new-generated-seam-content)
+
+The "release forgotten" refusals people hit — the drift gate red on a PR that
+legitimately changed generated content (PR #605), and the version guard red on
+a `files`/packaging change after the tag (#600) — are one confusion wearing two
+hats: _does this change need a release?_ The answer is per-axis, and the axes
+are not the same:
+
+| Axis                         | Question                                                                                              | Gate                                                                                                   | Needs a release?                                                                                                          |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| **Shipped package identity** | Do the published tarballs change? (`name`/`version`/`private`/`bin`/`files`/`dependencies`/`engines`) | `cli/version-guard.mjs` in the `cli` job: shipping fields changed while `refs/tags/v<version>` exists  | **Yes** — by design; that is the "release forgotten" signal. A #600-shaped refusal is correct, not a bug to route around. |
+| **Repo-owned seam bytes**    | Do the committed generated files change?                                                              | `tasks-validate` drift gate — now **branch-local**: it compares them against this checkout's own build | **No** — a feature PR regenerates and commits its own seam and goes green.                                                |
+
+The decision this records: **make the gate branch-aware** rather than demand
+"cut a release first" for every seam-touching PR. The alternative was
+available and cheaper to write — keep the pinned comparison and tell everyone to
+release first — but it taxes every PR that touches generated content with a
+release plus a re-pin, and its prescribed remedy is impossible for the case it
+fires on (the pinned init is what deletes the newer content). The price paid is
+one weaker claim, stated plainly: in this repo `tasks-validate` no longer proves
+that the _pinned release_ reproduces the committed seam. What replaces it is the
+pinned-lag assertion (the pin may never sit behind the seam) plus the
+release-shaped `arggon validate` / `doctor` / `list`, which still run through
+the pinned bin. Full rationale and the both-ways probe:
+`ArggonManager/docs/ci.md` §Which generator the gate compares against.

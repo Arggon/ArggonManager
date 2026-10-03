@@ -31,6 +31,8 @@
 import { watch } from "node:fs";
 import {
   STATUSES,
+  acceptanceBody,
+  acceptanceCriteria,
   applyViewFilter,
   buildStatusIndex,
   canTransition,
@@ -311,7 +313,10 @@ export function loadTuiItems(cwd: string): {
   const kernelItems = sortById(loadItems(tasksDir));
   const items = kernelItems.map((item) => toContractWorkItem(item, root));
   const details = new Map<string, TuiDetailSource>(
-    kernelItems.map((item) => [item.id, { id: item.id, body: item.body }]),
+    // `acceptanceBody(item)` — the canonical body, comment sections included.
+    // The pane's `checked/total` count mirrors the done gate, and the gate
+    // reads this one (bug-three-acceptance-parsers-diverging).
+    kernelItems.map((item) => [item.id, { id: item.id, body: acceptanceBody(item) }]),
   );
   return { root, tasksDir, items, details };
 }
@@ -1503,17 +1508,14 @@ export function wrapTuiLine(text: string, width: number): string[] {
  * no text after the box is a scaffold placeholder, not a criterion
  * (bug-empty-template-checkbox) — skipped, so the `checked/total` count is
  * the same contract the done gate judges.
+ *
+ * **Defers to the kernel — this is NOT a parser**
+ * (bug-three-acceptance-parsers-diverging). The row grammar and the
+ * placeholder rule live in `lib/src/items.ts`; there is deliberately no regex
+ * below. `body` must be the canonical body (`acceptanceBody(item)`).
  */
 export function tuiAcceptanceRows(body: string): TuiAcceptanceRow[] {
-  const rows: TuiAcceptanceRow[] = [];
-  for (const line of body.split("\n")) {
-    const match = /^[ \t]*[-*] \[( |x|X)\]/.exec(line);
-    if (!match) continue;
-    const text = line.slice(match[0].length).trim();
-    if (!text) continue;
-    rows.push({ checked: match[1] !== " ", text });
-  }
-  return rows;
+  return acceptanceCriteria(body).map((row) => ({ checked: row.checked, text: row.text }));
 }
 
 /**
