@@ -199,3 +199,7 @@ Diff vs `origin/main` after the push: still **the same two files** — `conventi
 For the coordinator's merge: the anticipated conflict on the item file (verdict comment vs my round-2/round-3 comments) is still ahead — resolve as a **union** and keep every comment block.
 
 open questions: none blocking. Ready for re-review.
+
+### handoff 2026-10-03 @Arggon — next: Re-review #613 round 3: F4' criterion clause fixed ([ \t]* in the quoted marker + 'after any spaces or tabs'); approve on sight per verdict
+- branch: fix/bug-convention-md-acceptance-terminator-framing
+- open questions: Merge-time union resolve on the item file still ahead (verdict b89a3398 is on the primary's local main, not origin/main); full npm test not re-run this round - prose-format 3/3 re-run instead
