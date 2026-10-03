@@ -13,6 +13,7 @@ updated: "2026-10-02"
 claimed_at: "2026-10-02T14:18:08.885Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-explore-adopter-feedback-channel
 ---
+
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-explore-adopter-feedback-channel.md
   Leaves live only under a story. id is the filename stem: task-explore-adopter-feedback-channel.
@@ -421,28 +422,29 @@ And the two scope calls the reviewer ruled on, which you should carry into the A
 `bug-spec-analyze-does-not-detect-duplicate-doc-numbers` has MERGED, so `arggon spec validate` / `spec analyze` will now catch any residual collision — use them as the check rather than by eye.
 
 ### 2026-10-03 @ses_f01435336ffeYS4KAJmBnNqG2k
+
 **request-changes addressed: B1–B4 + N1–N6 + both scope calls. Branch pushed (no force). Item left `in_progress`.**
 
 ## Renumber map (old → new)
 
-| Old | New |
-| --- | --- |
-| `ArggonManager/docs/adr/0020-adopter-friction-channel.md` | `0021-adopter-friction-channel.md` |
-| `spec-friction-capture-017.md` | `spec-friction-capture-018.md` |
-| `plan-friction-capture-017.md` | `plan-friction-capture-018.md` |
-| `exploration-adopter-feedback-channel-018.md` | `exploration-adopter-feedback-channel-019.md` |
+| Old                                                       | New                                           |
+| --------------------------------------------------------- | --------------------------------------------- |
+| `ArggonManager/docs/adr/0020-adopter-friction-channel.md` | `0021-adopter-friction-channel.md`            |
+| `spec-friction-capture-017.md`                            | `spec-friction-capture-018.md`                |
+| `plan-friction-capture-017.md`                            | `plan-friction-capture-018.md`                |
+| `exploration-adopter-feedback-channel-018.md`             | `exploration-adopter-feedback-channel-019.md` |
 
 Every internal reference follows: `spec_id` / `plan_id` / `exploration_id`, the plan's `spec:` path, the exploration's Decision link to its ADR, the spec + plan back-links, the item body, all 9 leaves, both containers, and the epic's Acceptance links. The ADR carries a `Numbering note` per the ADR 0016 / ADR 0019 precedent.
 
 **Residual duplicate-number findings: exactly 5 — all pre-existing, none mine.**
 
-| # | Pair |
-| --- | --- |
-| 1 | `exploration-cheap-path-to-prod-001` ↔ `exploration-token-context-efficiency-001` |
-| 2 | `spec-deps-001` ↔ `spec-sync-001` |
-| 3 | `spec-release-pipeline-015` ↔ `spec-update-channel-015` |
-| 4 | `plan-deps-001` ↔ `plan-sync-001` |
-| 5 | `plan-release-pipeline-015` ↔ `plan-update-channel-015` |
+| #   | Pair                                                                              |
+| --- | --------------------------------------------------------------------------------- |
+| 1   | `exploration-cheap-path-to-prod-001` ↔ `exploration-token-context-efficiency-001` |
+| 2   | `spec-deps-001` ↔ `spec-sync-001`                                                 |
+| 3   | `spec-release-pipeline-015` ↔ `spec-update-channel-015`                           |
+| 4   | `plan-deps-001` ↔ `plan-sync-001`                                                 |
+| 5   | `plan-release-pipeline-015` ↔ `plan-update-channel-015`                           |
 
 That is precisely the five `task-renumber-colliding-doc-numbers` enumerates. **Proof that none are mine:** `spec analyze --baseline` was filtered for my four filenames and returned nothing, and each of my numbers is unique in its directory (ADR 0021 → 1 file, spec/plan 018 → 1 each, exploration 019 → 1). I did not touch the other five — they are not mine to renumber.
 
@@ -450,7 +452,7 @@ That is precisely the five `task-renumber-colliding-doc-numbers` enumerates. **P
 
 `bug-contributing-github-issue-contradiction.md` **no longer appears in the branch diff at all**; the branch copy is byte-identical to main's (`status: done`, assignee, branch, ticked boxes, fix evidence, approve verdict).
 
-**I also checked the other direction you asked about, and found one more item.** `bug-prettier-glues-split-inline-code-span.md` — my branch's copy was *older* than main's: it carried the broken four-level link prefix while main had already fixed it in `368809d5`. So my branch would have **reverted main's fix**. The merge took main's newer copy and the file is now correct. That is the second B2-class item, and it was not in the reviewer's list.
+**I also checked the other direction you asked about, and found one more item.** `bug-prettier-glues-split-inline-code-span.md` — my branch's copy was _older_ than main's: it carried the broken four-level link prefix while main had already fixed it in `368809d5`. So my branch would have **reverted main's fix**. The merge took main's newer copy and the file is now correct. That is the second B2-class item, and it was not in the reviewer's list.
 
 ## Rebase vs merge — reporting, per instruction
 
@@ -460,7 +462,7 @@ I **merged `origin/main` rather than rebasing**, so no force-push was needed and
 
 ## B3 / B4
 
-ADR ships `Status: Proposed` with a `Status note` naming the two-step precedent. The epic box stays **unticked** with a note explaining why: the spec gate is met, the word *settles* waits on acceptance, and ticking it would contradict the ADR's own status line (N3). ADR indexed in `docs/adr/README.md` — mandatory, since #602's parity test asserts one index row per ADR file.
+ADR ships `Status: Proposed` with a `Status note` naming the two-step precedent. The epic box stays **unticked** with a note explaining why: the spec gate is met, the word _settles_ waits on acceptance, and ticking it would contradict the ADR's own status line (N3). ADR indexed in `docs/adr/README.md` — mandatory, since #602's parity test asserts one index row per ADR file.
 
 ## Scope call 4a — the correction, in the ADR
 
@@ -481,7 +483,7 @@ New acceptance criterion: local fingerprint dedupe collapses repeats **inside on
 
 ## Comment history kept verbatim — deliberate, please overrule if you disagree
 
-A comment records what was said on a date, so I did **not** renumber inside the dated comments — including the reviewer's own B1 evidence table, which would be *falsified* by editing it (its "this PR" column would read as though the PR always had those names). Instead the item body gained a `## Renumber map` section stating the old→new mapping and that the older blocks intentionally still read "ADR 0020". The trade: a reader must consult the map to resolve an old label, in exchange for an unaltered record.
+A comment records what was said on a date, so I did **not** renumber inside the dated comments — including the reviewer's own B1 evidence table, which would be _falsified_ by editing it (its "this PR" column would read as though the PR always had those names). Instead the item body gained a `## Renumber map` section stating the old→new mapping and that the older blocks intentionally still read "ADR 0020". The trade: a reader must consult the map to resolve an old label, in exchange for an unaltered record.
 
 The one exception: link **targets** in the two files main owns were updated so nothing dangles after the rename — their records (status/assignee/branch/boxes) are untouched.
 
@@ -497,5 +499,6 @@ The one exception: link **targets** in the two files main owns were updated so n
 **Tracker-write check:** every mutation ran via `npm run arggon -- …` with the worktree as cwd; all three of this round's commits are on `origin/feat/task-explore-adopter-feedback-channel`; the primary checkout is on `main` and its unpushed commits belong to another session (`bug-prover-agent`), not to me.
 
 ### handoff 2026-10-03 @ses_f01435336ffeYS4KAJmBnNqG2k (session: ses_f01435336ffeYS4KAJmBnNqG2k) — next: Re-review PR #586: B1-B4 + N1-N6 + scope calls 4a/4b are in; 4 gates green, residual collisions are the known 5. Coordinator merges and flips ADR 0021 to Accepted.
+
 - branch: feat/task-explore-adopter-feedback-channel
 - open questions: Agree that dated comment history stays verbatim (renumber map in body instead)? File prettier indent-growth as distinct from bug-prettier-glues-split-inline-code-span? Cut doctor.friction to triggerV…
