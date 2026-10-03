@@ -7,6 +7,7 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [cli, native-seam, json-contract]
 created: "2026-10-03"
 updated: "2026-10-03"
+depends_on: [bug-native-steps-truncated-flag-dropped]
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-cli-surface-never-carries-steps-truncated.md
