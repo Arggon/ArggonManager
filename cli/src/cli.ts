@@ -72,6 +72,7 @@ import {
   type ProposalEntry,
 } from "./init.js";
 
+import type { AdapterSelectionReport } from "./adapters.js";
 import { runInstructions } from "./instructions.js";
 import { formatLayoutMigrateHuman, runLayoutMigrate } from "./layout-migrate.js";
 import { runMcpServer } from "./mcp-server.js";
@@ -169,6 +170,20 @@ program
     console.log(message);
   });
 
+/**
+ * Which adapter-selection tokens this invocation actually carried, recorded from
+ * commander's per-token option events.
+ *
+ * `--agents <list>` and `--no-agents` collapse onto ONE `opts.agents` key, so the
+ * parsed options alone cannot tell "the operator passed `--no-agents`" from "the
+ * operator passed `--agents x` AND `--no-agents`, and the second one won" — the
+ * difference between an intended selection and a silently discarded one. The two
+ * events keep their own names (`option:agents` / `option:no-agents`), so this set
+ * is what makes the documented mutual exclusion enforceable at the CLI. Reset per
+ * invocation; the CLI parses one command per process.
+ */
+let agentTokensSeen = new Set<"agents" | "no-agents">();
+
 program
   .command("init")
   .description(
@@ -209,7 +224,19 @@ program
     "--no-commit",
     "keep the generated docs untracked: skip the auto-commit of what init wrote (default: on; x-tracker.auto-commit: false opts out tree-wide)",
   )
+  .option(
+    "--agents <list>",
+    "materialize only these adapter seams, comma-separated (opencode, zcode, claude); default: every agent detected in the tree, or every known agent on a fresh tree with no marker (spec S2)",
+  )
+  .option(
+    "--no-agents",
+    "docs + CLI only: materialize no adapter seam (adapters are enhances; nothing on disk is deleted)",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  // Both selection tokens are recorded under their own event names, because the
+  // parsed option they share cannot represent "both were passed".
+  .on("option:agents", () => agentTokensSeen.add("agents"))
+  .on("option:no-agents", () => agentTokensSeen.add("no-agents"))
   .action(
     (
       dir: string,
@@ -221,6 +248,8 @@ program
         proposeWholeFile?: boolean;
         dryRun?: boolean;
         commit?: boolean;
+        /** `--agents <list>` (string) or commander's `--no-agents` (false). */
+        agents?: string | boolean;
         json?: boolean;
       },
     ) => {
@@ -231,6 +260,32 @@ program
             "init --propose does not combine with --backup/--force (proposals never touch originals or regenerate)",
           );
         }
+        // Commander maps `--no-agents` to `opts.agents === false` on the SAME
+        // key as `--agents <list>`; recover the two apart here so the registry
+        // (not this file) decides what an unknown name means. A string is an
+        // explicit list, `false` is the suppression flag, `undefined` is
+        // detection.
+        const agentSelection =
+          typeof opts.agents === "string"
+            ? { agents: opts.agents }
+            : opts.agents === false
+              ? { noAgents: true }
+              : {};
+        // BOTH tokens in ONE invocation are unrecoverable from `opts` alone:
+        // they share the key, so commander keeps the LAST one and silently drops
+        // the other (`--agents opencode --no-agents` ran as `--no-agents`, and
+        // the reverse ran as `--agents opencode`). `opts.agents` therefore
+        // decides a selection the operator never asked for. The option EVENTS
+        // still fire per token and under their own names, so the collision is
+        // detected here and refused — the registry's "does not combine" error
+        // was documented and unreachable from the CLI until this check.
+        const tokens = agentTokensSeen;
+        agentTokensSeen = new Set<"agents" | "no-agents">();
+        if (tokens.has("agents") && tokens.has("no-agents")) {
+          throw new Error(
+            "init --no-agents does not combine with --agents (one suppresses adapter generation, the other selects it)",
+          );
+        }
         if (opts.dryRun) {
           const result = dryRunInit({
             dir,
@@ -239,6 +294,7 @@ program
             backup: Boolean(opts.backup),
             propose: Boolean(opts.propose),
             proposeWholeFile: Boolean(opts.proposeWholeFile),
+            ...agentSelection,
           });
           if (json) {
             successJson(
@@ -255,6 +311,10 @@ program
                 restored: result.restored,
                 conventionPath: result.conventionPath,
                 ...(result.proposals ? { proposals: proposalPayload(result.proposals) } : {}),
+                // Same block a real run reports (task-adapter-selection-flags):
+                // the dry run classifies the identical plan, so these numbers
+                // are exactly what the run it previews will carry.
+                adapters: result.adapters,
                 dryRun: true,
                 plan: result.plan,
                 ...(result.warning ? { warning: result.warning } : {}),
@@ -274,6 +334,7 @@ program
           propose: Boolean(opts.propose),
           proposeWholeFile: Boolean(opts.proposeWholeFile),
           commit: opts.commit === false ? false : undefined,
+          ...agentSelection,
         });
         if (json) {
           successJson(
@@ -290,6 +351,9 @@ program
               restored: result.restored,
               conventionPath: result.conventionPath,
               ...(result.proposals ? { proposals: proposalPayload(result.proposals) } : {}),
+              // Per-artifact adapter selection outcome (task-adapter-selection-flags,
+              // additive): written/skipped per adapter destination with reasons.
+              adapters: result.adapters,
               commit: commitPayload(result.commit),
               ...(result.warning ? { warning: result.warning } : {}),
             },
@@ -330,10 +394,15 @@ program
     "also measure the ADR 0006 context-budget surfaces (fresh init --full in a deleted temp tree; live MCP tools/list; report-only)",
     false,
   )
-  .action(async (opts: { json?: boolean; budget?: boolean }) => {
+  .option(
+    "--agents",
+    "also report the per-agent adapter seams: files present/stale/adopter-edited plus that agent's capability-matrix gap rows (report-only)",
+    false,
+  )
+  .action(async (opts: { json?: boolean; budget?: boolean; agents?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runDoctor({ cwd: process.cwd() });
+      const result = runDoctor({ cwd: process.cwd(), agents: opts.agents === true });
       if (opts.budget === true) {
         // Measured after the tree report (both initialized and not): the
         // budget surfaces come from a throwaway temp tree + the live MCP
@@ -357,6 +426,9 @@ program
             // Capability-matrix state (task-capability-matrix, additive;
             // report-only — gap rows are advisory, never blocking).
             matrix: result.matrix,
+            // Per-agent adapter seams (task-adapter-selection-flags, additive,
+            // only with --agents; report-only).
+            ...(result.agents ? { agents: result.agents } : {}),
             ...(result.budget ? { budget: result.budget } : {}),
             ...(result.budgetError !== undefined ? { budgetError: result.budgetError } : {}),
           },
@@ -2931,6 +3003,42 @@ function printInitDryRun(result: InitDryRunResult): void {
   console.log("nothing was written (dry run)");
 }
 
+/**
+ * Human summary of the adapter selection (spec §S2,
+ * task-adapter-selection-flags): ONE line naming the mode, the selected seams and
+ * the three outcome counts, then — only when the selection actually left an
+ * agent behind — one line per such agent with its file count. The summary line is
+ * printed on EVERY init run, including the default full-seam one: it is how an
+ * operator learns which seams were materialized at all, and the flagless default
+ * is exactly the run whose selection nobody named. Per-file detail lives in
+ * `--json` (`adapters.artifacts`).
+ */
+function printInitAdapters(adapters: AdapterSelectionReport): void {
+  const { selection, counts, scope, artifacts } = adapters;
+  const selected = selection.selected.length > 0 ? selection.selected.join(", ") : "none";
+  console.log(
+    `  - agent adapters (${selection.mode}): ${selected} — ${counts.written} written, ` +
+      `${counts.replaced} replaced (archived first, --backup), ${counts.skipped} skipped ` +
+      "(docs + CLI alone are always complete)",
+  );
+  // In propose mode no adapter file is written at all, so the counts say so and
+  // the deselected-agent detail would be noise.
+  if (scope !== "generate") return;
+  const skipped = artifacts.filter((a) => a.outcome === "skipped");
+  const byAgent = new Map<string, number>();
+  for (const row of skipped) {
+    byAgent.set(row.agent, (byAgent.get(row.agent) ?? 0) + 1);
+  }
+  for (const [agent, n] of [...byAgent].sort()) {
+    console.log(
+      `    ${sanitizeHumanError(agent)}: ${n} file(s) left untouched — not selected ` +
+        "(nothing was deleted; `arggon init --agents " +
+        `${sanitizeHumanError(agent)}` +
+        "` materializes it)",
+    );
+  }
+}
+
 function printInitHuman(result: InitResult): void {
   // bug-init-git-doctor-blindspot: human path warns on stderr; the --json
   // envelope carries the same text as the additive `warning` field instead.
@@ -2965,6 +3073,7 @@ function printInitHuman(result: InitResult): void {
         `arggon init: kept adopter-modified docs: ${result.skipped.length} file(s) (--backup archives and regenerates)`,
       );
     }
+    printInitAdapters(result.adapters);
     const commitLine = formatCommitLine(result.commit);
     if (commitLine && result.commit?.committed) console.log(`arggon init: ${commitLine}`);
     console.log("Next: create work with `arggon create` (coming soon), or copy from templates/.");
@@ -2995,6 +3104,7 @@ function printInitHuman(result: InitResult): void {
       `  - kept adopter-modified docs (never overwritten): ${sanitizeHumanError(result.skipped.join(", "))}`,
     );
   }
+  printInitAdapters(result.adapters);
   console.log("Next:");
   console.log(
     `  1. Add an initiative under ${trackerName}/<slug>/<slug>.md (see ${trackerName}/docs/convention.md)`,

@@ -17,6 +17,10 @@ import { runInit, dryRunInit, type ProposalEntry } from "./init.js";
 import { arggonVersion, renderGeneratedDoc } from "./docs.js";
 import { readGeneratedState, updateGeneratedSection } from "@arggondev/lib";
 import { runCli } from "./test-spawn.js";
+// Ordering assertions go through assertOrder, never a bare `indexOf`
+// comparison: `-1 < n` makes a renamed clause pass as if it were still
+// ordered (bug-vacuous-substring-ordering-assertions).
+import { assertOrder } from "../../test/assert-order.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -691,9 +695,7 @@ describe("init --propose", () => {
     const content = readFileSync(proposalFile, "utf8");
     // Distinguishing header ABOVE the standard generated marker.
     expect(content).toContain(`arggon:proposed-update dest="AGENTS.md" version="${version}"`);
-    expect(content.indexOf("arggon:proposed-update")).toBeLessThan(
-      content.indexOf("arggon:generated"),
-    );
+    assertOrder(content, "arggon:proposed-update", "arggon:generated");
     expect(content).toContain("arggon adopt --ack");
     expect(p.removed).toBeGreaterThan(0);
     expect(p.added).toBeGreaterThanOrEqual(0);

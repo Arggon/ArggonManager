@@ -10,7 +10,6 @@ labels: []
 created: "2026-10-02"
 updated: "2026-10-03"
 depends_on: [task-methodology-carriers]
-worktree_path: /home/arggon/Projects/ArggonManager-task-capability-matrix
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-capability-matrix/task-capability-matrix.md

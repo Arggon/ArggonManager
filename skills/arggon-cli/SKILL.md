@@ -54,7 +54,11 @@ CI:
   never reopen `done`/`cancelled`: the kernel refuses both whatever the
   permissions say.
 - **Plugin**: vendored single-file at `.opencode/plugins/arggon/index.ts` (no
-  `node_modules` needed); `arggon init` refreshes it with provenance.
+  `node_modules` needed); `arggon init` refreshes it with provenance. It ships
+  with the **opencode adapter seam** — materialized by default, omitted by
+  `arggon init --no-agents` (or by `--agents` without `opencode`). In a tree
+  without that seam none of the native surfaces above exist: use the CLI, which
+  is always complete; `arggon doctor --agents` reports which seams are there.
 - The CLI (`npm run arggon -- …`) stays for `init`/`validate`/`doctor` and
   model-less CI; there is no MCP stanza in the generated config by default.
 

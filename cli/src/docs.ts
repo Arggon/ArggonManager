@@ -21,6 +21,12 @@ import {
   type TrackerLayout,
 } from "@arggondev/lib";
 import { bundledTemplatesDir, packageRoot } from "./package-assets.js";
+import { agentForTemplate, type AgentId, OPENCODE_CONFIG_CANDIDATES } from "./adapters.js";
+
+// The OpenCode config candidates moved to the adapter registry when
+// `--agents` needed them (task-adapter-selection-flags); re-exported here
+// because `docs.ts` has always been their home and importers must not break.
+export { OPENCODE_CONFIG_CANDIDATES };
 
 /**
  * Governing-document generator: renders master templates from `templates/docs/`
@@ -112,6 +118,16 @@ export type GenerateDocsOptions = {
    * → fresh dir-basename fallback). `null` explicitly means unrecoverable.
    */
   prevProjectName?: string | null;
+  /**
+   * Which adapter seams to materialize (spec §S2, task-adapter-selection-flags):
+   * the RESOLVED selection from `cli/src/adapters.ts` (`init --agents` /
+   * `--no-agents` / the detection default). `undefined` — the default for every
+   * non-CLI caller — means "every agent", so `generateDocs` outside init keeps
+   * its pre-flag behavior. An adapter destination whose agent is not in the
+   * list gets a `agent-not-selected` plan decision: no write, no state entry,
+   * nothing deleted.
+   */
+  agents?: readonly AgentId[];
 };
 
 export type DocsResult = {
@@ -140,6 +156,14 @@ export type DocsPlanDecision =
   | "acked-skip"
   | "present-skip"
   | "stale"
+  /**
+   * Adapter selection (spec §S2, task-adapter-selection-flags): the
+   * destination belongs to an agent seam this run did not select
+   * (`init --agents <list>` / `--no-agents`), so it is neither written nor
+   * state-mutated and nothing on disk is touched. Reported per artifact so an
+   * operator can see what the selection left alone.
+   */
+  | "agent-not-selected"
   | "project-name-unrecoverable";
 
 export type DocsPlanEntry = {
@@ -241,8 +265,13 @@ const BUNDLED_SOURCES = [...BUNDLED_SKILLS, ...BUNDLED_PLUGINS];
  * provenance mismatch re-vendors instead of modified-skip. Skill copies are
  * excluded: `.agents/skills/**` is tracked and follows the normal provenance
  * decisions.
+ *
+ * Exported for `doctor --agents` (task-adapter-selection-flags), which must
+ * classify the SAME destinations as derived artifacts rather than as
+ * adopter-owned or upstream-stale: they are re-vendored from the committed
+ * bundle on a mismatch, so neither reading would be true.
  */
-function isBundledPluginDest(dest: string): boolean {
+export function isBundledPluginDest(dest: string): boolean {
   return BUNDLED_PLUGINS.some((p) => p.dest === dest);
 }
 
@@ -455,13 +484,12 @@ function isArggonGeneratedConfig(root: string, rel: string): boolean {
  * drift. The use differs intentionally: `findOpenCodeConfig` returns the first
  * ADOPTER config (arggon's own generated config is skipped by signature), while
  * doctor reports every present file.
+ *
+ * Now DECLARED in `cli/src/adapters.ts` (task-adapter-selection-flags, spec
+ * §S2: adapter detection reads the same four candidates) and re-exported here,
+ * so `docs.ts` stays this symbol's home for every existing importer while the
+ * adapter registry can use it without an import cycle.
  */
-export const OPENCODE_CONFIG_CANDIDATES = [
-  "opencode.json",
-  "opencode.jsonc",
-  ".opencode/opencode.json",
-  ".opencode/opencode.jsonc",
-] as const;
 
 /**
  * First existing adopter OpenCode config (opencode-seam-010), posix-relative;
@@ -841,6 +869,8 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
   const now = opts.now ?? new Date();
   const version = arggonVersion();
   const generatedAt = now.toISOString();
+  // Undefined = every agent (the pre-flag default for non-CLI callers).
+  const agents = opts.agents;
   // Layout (ADR 0012): explicit caller choice (init picks the tree's layout),
   // else detected at root, else the v5 default for fresh scaffolds.
   const layout: TrackerLayout = opts.layout ?? trackerAt(opts.root)?.layout ?? "arggon-manager";
@@ -997,11 +1027,42 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
     };
   };
 
+  // Adapter selection (spec §S2, task-adapter-selection-flags): a destination
+  // whose agent seam this run does not materialize gets an explicit
+  // `agent-not-selected` decision instead of a write. It never appears in the
+  // created/updated/modified buckets and never in `skipped[]` (which means
+  // "adopter-owned content this run declined to touch") — it is reported on the
+  // additive `adapters` block and in the `--dry-run` plan, so the selection is
+  // visible without re-labeling the existing buckets.
+  const selectionLabel =
+    agents === undefined
+      ? "every agent"
+      : agents.length === 0
+        ? "--no-agents (docs + CLI only)"
+        : `--agents ${agents.join(",")}`;
+  const deselected = (template: string, dest: string): DocsPlanEntry | null => {
+    const agent = agentForTemplate(template);
+    if (agent === null) return null;
+    if (agents === undefined || agents.includes(agent)) return null;
+    return {
+      dest,
+      decision: "agent-not-selected",
+      reason:
+        `${agent} adapter not selected (${selectionLabel}) — destination left untouched; ` +
+        "init never writes nor deletes an adapter file it was not asked for",
+    };
+  };
+
   for (const rel of walkTemplates(docsSrc)) {
     // Tier membership is checked on the canonical destination so legacy trees
     // gate the same set; the written destination follows the tree's layout.
     if (!opts.full && TIER2_DESTS.has(canonicalTemplateDest(rel))) continue;
     const dest = mapTemplateDest(rel, layout);
+    const deselect = deselected(`docs/${rel}`, dest);
+    if (deselect) {
+      entries.push(deselect);
+      continue;
+    }
     // Conditional config seam (opencode-seam-010): never write an OpenCode
     // config over an adopter's existing one — report the skip with the path
     // that was detected so `init` stays transparent. findOpenCodeConfig
@@ -1038,6 +1099,11 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
   // OpenCode V2 plugin (opencode/plugins/) — from their single sources, NOT
   // template duplicates, so adopters get them by default.
   for (const bundled of bundledSources) {
+    const deselect = deselected(bundled.source, bundled.dest);
+    if (deselect) {
+      entries.push(deselect);
+      continue;
+    }
     if (!existsSync(bundled.src)) continue;
     const bundledRaw = readFileSync(bundled.src, "utf8");
     entries.push(
