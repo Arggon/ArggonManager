@@ -251,3 +251,7 @@ Also caught by `check:plugin` this round: the committed plugin bundle still carr
 Per the reviewer's ruling I have **not** touched `cli/src/goal-mode.ts` or any ZCode asset; none are on `main`. After this merges, #605's goal-mode header needs its stale claims updated ("TWO parsers", the CRLF-blind claim, `normalizeEol` "not cosmetic", the now-unreachable `UNRENDERABLE` branch). `docs/json-output.md` is the one file both PRs will want — worth a union resolve.
 
 Item left `in_progress`.
+
+### handoff 2026-10-03 @Arggon — next: Re-review #611: F1 fixed (LineTerminator split, oracle green, 49 tests red on revert), F2-F8 landed. smoke:opencode fails identically on clean origin/main (47/47) - environmental.
+- branch: fix/bug-three-acceptance-parsers-diverging
+- open questions: After #611 merges: #605's goal-mode header needs its stale claims updated. docs/json-output.md is shared by both PRs - union resolve. Unrelated pre-existing: describe.sequential vs vitest 5.0.0 types…
