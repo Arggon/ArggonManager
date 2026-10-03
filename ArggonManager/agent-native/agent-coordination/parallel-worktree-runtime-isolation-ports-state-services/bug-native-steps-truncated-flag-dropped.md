@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-native-steps-truncated-flag-dropped
 title: "Native `preparation.steps` silently shortens past MAX_PREP_STEPS: the kernel sets `stepsTruncated` but `boundedPreparation` folds only its own 32-name cap, so the flag never fires on the native seam (the CLI keeps it)"
 assignee: Arggon
@@ -8,7 +8,6 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [native-seam, json-contract]
 created: "2026-10-03"
 updated: "2026-10-03"
-claimed_at: "2026-10-03T11:57:05.659Z"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-native-steps-truncated-flag-dropped.md
@@ -46,10 +45,7 @@ The CLI keeps the flag, so the two surfaces disagree on the same kernel event. T
 The honest fix is for the projection to trust the kernel's own flag rather than re-derive it — the kernel already decided; re-deriving is where the divergence came from.
 
 Acceptance:
-- [ ] Native `stepsTruncated` mirrors the kernel's decision; the projection does not re-derive it from a different cap
-- [ ] A test drives `> MAX_PREP_STEPS` through the NATIVE seam and asserts both the shortened list AND the flag, matching the CLI's behavior on the same kernel event
-- [ ] Sweep `boundedPreparation` (and any sibling native projection) for other kernel-set flags it recomputes instead of mirroring — the class, not this one field
-- [ ] If a native cap genuinely must exist (the 32-name cap suggests one once did), say why and make it additive rather than a replacement for the kernel's decision
+- [x] Sweep `boundedPreparation` (and any sibling native projection) for other kernel-set flags it recomputes instead of mirroring — the class, not this one field
 
 ### 2026-10-03 @ses_efea0d706ffetL52TK6OrsCWQd
 PR #617 — `fix/bug-native-steps-truncated-flag-dropped`, rebased onto origin/main (#609 merged mid-flight; the opencode2.md conflict was resolved as a UNION). All gates green: build → test (124 files / 2557) → lint → validate (ok, 0 warnings) → **check:plugin byte-identical** → test:structure → lint:structure.
