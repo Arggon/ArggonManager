@@ -96,3 +96,87 @@ Acceptance:
 
 ### 2026-10-03 @Arggon
 MISSING
+
+### 2026-10-03 @Arggon
+## Evidence — both directions, real build, shipped step bodies (PR #607)
+
+`tasks-validate` on the PR head `220bfa6b`: **pass (36 s)** — the branch-local
+path (build + own `init`) runs and is green on this PR's own seam change.
+
+The probe below extracts the `run:` bodies from the workflow with the same parser
+the fixture uses and runs them verbatim (`bash -e`) in a throwaway clone, with
+`ARGGON_VERSION=0.5.0` and the released `0.5.0` bin on PATH as the pinned
+generator. Reproduce per `ArggonManager/docs/ci.md` §Reproduce the drift gate both ways.
+
+    A. NEW gate, seam current for its own generator  => expect exit=0
+    --- drift
+    --- exit=0 | dirty: M ArggonManager/.convention.yml   (state file only: the documented exclusion)
+
+    B. STALE seam (template moved, seam not regenerated)  => expect exit=1
+    the committed arggon seam does not match what this checkout's own build (node dist/cli.js) generates
+    — regenerate it with 'npm ci && npm run build && node dist/cli.js init' and commit, or drop the
+    template change that moved it:
+     M .mcp.json
+     M templates/docs/mcp-json
+    --- exit=1
+
+    C. SEAM NEWER THAN THE PIN (#605 shape), committed
+    --- NEW drift (branch-local)  --- exit=0   <-- the fix: a feature PR goes green
+    --- OLD bootstrap (pinned init, main's body)   -> rewrites the committed bytes
+    --- OLD drift (main's body)
+    the committed arggon seam predates the pinned ref — run 'arggon init' and commit:
+     M .mcp.json
+    --- exit=1                          <-- the reported failure, same commit, old gate
+
+    D. PIN LAGS THE SEAM (committed stamp 0.9.9 > ARGGON_VERSION)  => expect exit=1
+    ARGGON_VERSION (0.5.0) lags the committed arggon seam (0.9.9):
+    the pinned init would REWRITE committed content — bump ARGGON_VERSION to 0.9.9
+    once that version is released (release.md, 'The re-pin'). Re-running the pinned
+    init is not the fix: it is what deletes the newer content.
+    --- exit=1
+
+    E. missing build (dist/cli.js removed)  => expect exit=1, no silent fall-back
+    dist/cli.js is missing: run 'npm ci && npm run build' (the bootstrap step does this)
+    --- exit=1
+
+    F. the runner's own file stays exempt: edited `.github/workflows/arggon.yml`
+       (plus the state file's generatedAt churn) => exit=0
+
+Case C is the whole bug: same commit, old gate red with the inverted message, new
+gate green.
+
+Hermetic coverage (no network, no build): `cli/src/headless-ci.test.ts`
+- a seam that postdates the pin: GREEN on the branch-local path, RED on the pinned
+  path with `arggon-manager@<pin>` and the re-run remedy in the message;
+- a moved template and a hand-edited generated file: RED with the branch generator
+  named (the stub generator implements `init`'s checksum rule — regenerate when the
+  recorded checksum matches disk, keep otherwise — so the red is faithful, not
+  manufactured);
+- a committed stamp newer than `ARGGON_VERSION`: RED with the bump remedy and
+  explicitly without "re-run init"; the assertion reads the COMMITTED state, so it
+  fires for the commit, not just for a dirty tree;
+- missing `dist/cli.js`: RED; both step bodies must carry the same generator
+  predicate and the lag assertion must precede the diff (asserted as text).
+
+Gates on `220bfa6b` (rebased onto `origin/main` f382ff10): `npm run build`,
+`npm test` (2234 passed / 121 files), `npm run lint`,
+`npm run arggon -- validate`, `npm run check:plugin`.
+
+## Reported, not fixed (out of this item's scope)
+
+`.opencode/agents/arggon-prover.md` is committed but has **no `x-generated`
+entry** (added by d0aba5ef / PR #583, after v0.5.0), so `init` classifies it as
+"adopter-modified — on disk with no provenance state" and skips it: the drift gate
+cannot see it drift, and it is invisible to the pinned gate too (0.5.0 has no such
+dest). Evidence: with the pinned init it is clean, with this branch's build
+`init --dry-run` reports `modified-skip .opencode/agents/arggon-prover.md`, and
+`grep -c arggon-prover ArggonManager/.convention.yml` = 0. This is a pre-existing
+blind spot (a generated dest committed without provenance), not something this
+change introduced or widens — a seam regeneration on the next release would record
+the entry and close it. Worth its own item; I did not grow this diff.
+
+Also for the coordinator: three stash entries are sitting in the shared repo
+(`stash@{0}` "headless-ci describePacked sequential fix … found dirty in primary",
+`stash@{1}` "seam-pin worker diagnostics … made in primary", `stash@{2}` "wip-item3")
+— none are mine; their own notes say the owning session should pop them into the
+right branch.
