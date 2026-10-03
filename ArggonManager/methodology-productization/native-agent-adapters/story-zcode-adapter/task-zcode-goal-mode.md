@@ -1519,3 +1519,16 @@ Item stays `in_progress`; spec/plan `status` stays `proposed` (§S5's box also c
 ### handoff 2026-10-03 @Arggon — next: coordinator: squash-merge PR #605 (head 7cf2c62f, mergeable, gates green, tasks-validate drift gate PASS) then flip the item
 - branch: feat/task-zcode-goal-mode
 - open questions: docs/convention.md:150 overstatement left for open bug-parity-suite-cannot-catch-wrong-input-at-call-sites; 15 stamp mismatches await human arggon adopt --ack
+
+### 2026-10-03 @Arggon
+CI confirms the round-3 closeout at head `7f358df4` — the gate that was red is green, and the other two jobs agree:
+
+```
+cli              pass  5m47s   (run 37131468593)
+tasks-validate   pass  32s     (run 37131468597)   ← the seam drift gate
+ui-smoke         pass  2m11s   (run 37131468593)
+```
+
+`tasks-validate` is the job that rejected the pre-`93ec81b5` head for stale `.zcode-marketplace/` bytes; it now passes on the committed seam, matching the local run of the same step (marker present, committed stamp `0.5.0` not ahead of the pin, re-generate → clean).
+
+Branch and worktree tip are both `7f358df4e950a29425a50c301df6f271fba4cab1`, identical to `origin/feat/task-zcode-goal-mode` and to PR #605's head; the primary checkout is clean on `main` and contains none of these commits. Item stays `in_progress`; PR #605 is ready for review, and the squash-merge is the coordinator's call.
