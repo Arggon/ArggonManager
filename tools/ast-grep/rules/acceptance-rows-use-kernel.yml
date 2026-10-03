@@ -3,13 +3,22 @@ language: Tsx
 severity: error
 message: Acceptance-checkbox rows must come from the kernel (@arggondev/lib), not a local regex.
 note: |
-  Rationale: five hand-written acceptance-box parsers shipped before
-  bug-three-acceptance-parsers-diverging. Four of them disagreed with the
-  DONE GATE (`acceptanceComplete`, lib/src/items.ts) on reachable shapes, and
-  the worst case was the inversion — a renderer reporting "nothing unchecked"
-  on an item the gate refused to close. The kernel now owns the one row
-  grammar (`acceptanceRows` / `acceptanceCriteria` / `acceptanceUnchecked`) and
-  the one canonical body (`acceptanceBody`).
+  Rationale: SIX hand-written acceptance-box grammars shipped before
+  bug-three-acceptance-parsers-diverging — the gate plus five outside the
+  kernel — and four of the outside ones disagreed with the DONE GATE
+  (`acceptanceComplete`, lib/src/items.ts) on reachable shapes. The worst case
+  was the inversion: a renderer reporting "nothing unchecked" on an item the
+  gate refused to close. The kernel now owns the one row grammar
+  (`acceptanceRows` / `acceptanceCriteria` / `acceptanceUnchecked`) and the one
+  canonical body (`acceptanceBody`).
+
+  WHAT IT CATCHES: a fifth GRAMMAR — code that recognises acceptance boxes itself.
+  WHAT IT DOES NOT CATCH: a fifth wrong INPUT. Grammar shape says nothing about
+  which bytes a consumer hands the kernel, so this rule would not have caught
+  the comment-stripping or the LineTerminator bugs from the same item. Those are
+  covered by cli/src/acceptance-parity.test.ts, which asserts each consumer
+  reads `acceptanceBody(item)` and that the gate's verdict equals the pre-fix
+  regex across corpus, real items, the live tracker and a 200k fuzz.
 
   This is a high-confidence structural guard, not semantic data-flow analysis.
   It fires on a regex literal whose character class holds ONLY task-box
@@ -20,12 +29,16 @@ note: |
   runs the rule against the whole hand-authored tree on every gate).
 
   It matches the bracket group itself, so the group may also carry the `( )`
-  and `|` of an alternation: `[ ]`, `[x]`, `[X]`, `[ x]`, `[ xX]`, `[( |x|X)]`
-  and `[x|X]` all fire. A box written some other way — `\[[xX]?\]`,
-  `\[[\s]*x\]`, `[ ]|\[x\]` as two groups — does not. That limit is part of the
-  contract, not an oversight: the parity suite (cli/src/acceptance-parity.test.ts)
-  is the exhaustive guard; this rule is the cheap one that makes the common
-  mistake fail loudly, on the same shapes the five removed parsers used.
+  and `|` of an alternation: `[ ]`, `[x]`, `[X]`, `[ x]`, `[ xX]`, `[( |x|X)]`,
+  `[x|X]`, `\[[ ]\]` and `\[[xX]?\]` all fire. That is slightly BROADER than
+  "the spellings the removed parsers used" — a regex that merely MENTIONS a box
+  is flagged too — and the over-approximation is deliberate: a false positive
+  costs one `acceptanceRows(...)` call. That is also why `lib/src/**` (the
+  grammar's owner) and `**/*.test.ts` (where the parity suite keeps the PRE-FIX
+  parsers as oracles) are excluded.
+
+  Not recognised: a quantifier inside the class (`\[(x)?\]`) and a box spelled
+  through an escape class (`\[[\s]*x\]`).
 
   Scope: hand-authored TypeScript/TSX outside lib/src. Tests, fixtures, the
   generated plugin bundle and the kernel itself are excluded — the parity suite

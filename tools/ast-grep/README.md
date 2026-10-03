@@ -204,23 +204,43 @@ worst disagreement was an inversion — the gate refused a `--status done` flip
 while a renderer reported "nothing unchecked", so the tooling told an agent it
 was finished at the moment it was blocked.
 
-It fires on a regex literal whose bracket group holds only task-box characters
-(space, tab, `x`, `X`, and the `(`/`|` of an alternation), which covers every
-spelling the removed parsers used: `[ ]`, `[x]`, `[X]`, `[ xX]`, `[( |x|X)]`,
-`[x|X]`, `\[[ ]\]`, `\[[xX]?\]`. Markdown links (`\[([^\]]+)\]`) and unrelated
-character classes stay valid — the "only task-box characters" requirement is
-what keeps the false-positive rate at zero, and the rule's own test suite pins
-both directions.
+**What it catches: a fifth GRAMMAR.** It fires on a regex literal whose bracket
+group holds only task-box characters (space, tab, `x`, `X`, and the `(`/`|` of
+an alternation) — i.e. something that _recognises_ acceptance boxes itself. That
+covers every spelling the six parsers used, plus several more: `[ ]`, `[x]`,
+`[X]`, `[ x]`, `[ xX]`, `[( |x|X)]`, `[x|X]`, `\[[ ]\]`, `\[[xX]?\]`.
+
+**What it does NOT catch: a fifth wrong INPUT.** It says nothing about which
+bytes a consumer hands the kernel, so it would not have caught the two
+comment-stripping or LineTerminator bugs this item actually closed — those were
+correctness bugs in code that already called the right parser. Nothing about
+grammar shape implies anything about the input. Those are covered by
+`cli/src/acceptance-parity.test.ts`, which asserts each consumer reads
+`acceptanceBody(item)` and that the gate's verdict equals the pre-fix regex over
+the corpus, the real items, the live tracker and a 200k fuzz.
+
+The rule's coverage is also slightly BROADER than "the spellings the old parsers
+used": because it matches the bracket group itself, it fires on `\[[xX]?\]` and
+on `[ ]|\[x\]`-style alternations too, and on a regex that merely _mentions_ a
+box. That is deliberate over-approximation — a false positive costs a
+`acceptanceRows(…)` call — and it is why `lib/src/**` (the grammar's owner) and
+`**/*.test.ts` (where the parity suite keeps the pre-fix parsers as oracles) are
+excluded.
 
 ### Documented limitations
 
 Deliberately outside its scope:
 
-- A box spelled with a quantifier inside the class (`\[(x)?\]`) is not
-  recognised.
-- It matches syntax, not meaning: a regex that merely _mentions_ a box (a
-  sanitizer, a test oracle) is flagged too. That is why `lib/src/**` (the
-  grammar's owner) and `**/*.test.ts` (where the parity suite keeps the
-  PRE-FIX parsers as oracles) are excluded — the guard is for production
-  consumers, and `cli/src/acceptance-parity.test.ts` is the exhaustive
-  backstop for the shapes this rule cannot see.
+- **Wrong inputs.** The rule is about grammar, not about the bytes a consumer
+  passes to the kernel. It would not have caught either input bug this item
+  closed (a comment-stripping reader, and a `\n`-only line split) — both live in
+  code that already called the right parser. `cli/src/acceptance-parity.test.ts`
+  is what covers those, by asserting each consumer reads `acceptanceBody(item)`
+  and that the gate's verdict equals the pre-fix regex across corpus, real
+  items, the live tracker and a 200k fuzz.
+- A box spelled with a quantifier inside the class (`\[(x)?\]`) or through an
+  escape class (`\[[\s]*x\]`) is not recognised.
+- It matches syntax, not meaning: a regex that merely _mentions_ a box is
+  flagged too. That over-approximation is intentional, and it is why
+  `lib/src/**` (the grammar's owner) and `**/*.test.ts` (where the parity suite
+  keeps the PRE-FIX parsers as oracles) are excluded.

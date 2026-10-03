@@ -307,6 +307,13 @@ describe("acceptance parity corpus (bug-three-acceptance-parsers-diverging)", ()
     expect(hasEol("\r")).toBe(true);
     expect(hasEol("\u2028")).toBe(true);
     expect(hasEol("\u2029")).toBe(true);
+    // The suite's size, printed so the numbers quoted in review and on the item
+    // are re-runnable rather than remembered (review F4). Read them from here.
+    console.log(
+      `[acceptance-parity] corpus: ${ALL_SHAPES.length} shapes ` +
+        `(${CORPUS.length} base + ${TERMINATOR_SHAPES.length} terminator-only) ` +
+        `x ${TERMINATORS.length} terminators + as-written = ${cases.length} cases`,
+    );
   });
 
   it.each(cases)("one answer per consumer: $name", ({ body }) => {
@@ -531,6 +538,10 @@ describe("acceptance parity corpus (bug-three-acceptance-parsers-diverging)", ()
     // if the generator stops producing refusals at all.
     expect(refusals).toBeGreaterThan(2000);
     expect(refusals / bodies).toBeGreaterThan(0.01);
+    console.log(
+      `[acceptance-parity] random fuzz: ${bodies} bodies, ${refusals} refused ` +
+        `(${((refusals / bodies) * 100).toFixed(1)}%)`,
+    );
   });
 });
 
