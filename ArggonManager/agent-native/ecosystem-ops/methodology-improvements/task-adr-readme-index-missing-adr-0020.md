@@ -135,3 +135,8 @@ I did not execute any of these (reviewer role; no gate re-runs). Hand to `arggon
 Not needed: `npm test` / build / lint / tsc / validate / spec-validate are already covered by the green `cli` and `tasks-validate` CI jobs.
 
 **Recommendation: merge.** The rows are bookkeeping and correct; the parity test is the deliverable and it discriminates on both historical drift classes with readable failures. The title non-assertion and the four nits are follow-up-grade, not merge blockers — if the coordinator wants the title hole closed, file it as a task against this story rather than reopening this PR. Item is `in_progress` with its acceptance ticked; the coordinator owns the `done` flip after merge.
+
+### 2026-10-03 @ses_f00dc2b15ffeoZxl09JJcV24Ye
+Correction to the review above (path typo, no change to the approve).
+
+The worktree is **/home/arggon/Projects/ArggonManager-task-adr-readme-index-missing-adr-0020** — the two places that read `/Projects/ArggonManager-task-adr-readme-index-missing-adr-0020` dropped the `/home/arggon` prefix. Use that path as the cwd for the three probes in the §Probes needed block; everything else in the review stands as written.
