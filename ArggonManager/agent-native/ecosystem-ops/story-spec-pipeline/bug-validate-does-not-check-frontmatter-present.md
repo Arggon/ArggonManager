@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-validate-does-not-check-frontmatter-present
 title: "`arggon validate` reports ok on an item file whose FRONTMATTER was deleted entirely — it checks required fields when a frontmatter block exists, never that one exists"
+assignee: Arggon
+branch: fix/bug-validate-does-not-check-frontmatter-present
 parent: story-spec-pipeline
 labels: [tracker-schema, validate]
 created: "2026-10-03"
 updated: "2026-10-03"
+claimed_at: "2026-10-03T12:48:00.029Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-validate-does-not-check-frontmatter-present
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-validate-does-not-check-frontmatter-present.md
@@ -42,3 +46,83 @@ Acceptance:
 - [ ] A fixture per case, following the repo convention of one failing fixture per layout rule
 - [ ] Check the same question across the other frontmatter readers (`list`, `show`, `next`, the done gate, cascade): do they degrade safely, or does one of them write a file with no frontmatter?
 - [ ] The kernel is the owner (`@arggondev/lib`); a CI-only check is not enough, since `validate` is what the pre-commit hook and adopter CI run
+
+### 2026-10-03 @ses_efe3043b8ffed48yGgAx3qryzL
+PR #619 — kernel fix, Behavioral methodology impact (reasoning below).
+
+## What landed
+
+Fix is in the KERNEL (`@arggondev/lib`), not CI: `validate` is what the pre-commit hook and adopter CI run, so a CI-only fix leaves the real gate weak.
+
+- `lib/src/frontmatter.ts` — parse refusals are a typed `FrontmatterParseError` (MISSING_FRONTMATTER / UNTERMINATED_FRONTMATTER / INVALID_FRONTMATTER_LINE) instead of bare Errors distinguished only by message text. A malformed line inside a well-formed block still reports `BROKEN_YAML`, so that contract is unchanged.
+- `lib/src/items.ts` — a skip now carries its REASON (`no-frontmatter` | `no-type`). Readers with no layout knowledge keep skipping both exactly as before; only a caller that knows the file's expected role promotes the skip into an error.
+- `lib/src/validate.ts` — a file in a position the layout RESERVES for an item (container index `<dir>/<dir>.md`, or a `task-*`/`bug-*` leaf) must carry a block: `MISSING_FRONTMATTER`, naming the file. An unclosed block is `UNTERMINATED_FRONTMATTER`.
+- `convention.md` now states the requirement, so doc and gate agree.
+
+Scoped to item POSITIONS on purpose: a plain `.md` the layout reserves nothing for stays an ignored non-item document, so no adopter gains a requirement for a README or notes file.
+
+## Evidence: red on mutation, reverted
+
+Pre-fix baseline on this item file (expected the new codes, observed `ok`, exit 0):
+
+| shape | before | after |
+| --- | --- | --- |
+| block deleted entirely | `ok`, exit 0 | `MISSING_FRONTMATTER`, exit 1 |
+| unterminated `---` | `BROKEN_YAML` (generic) | `UNTERMINATED_FRONTMATTER` |
+| zero-byte file | `ok`, exit 0 | `MISSING_FRONTMATTER`, exit 1 |
+
+Each message names the file. Container index losing its block also caught (verified on a live story index: MISSING_FRONTMATTER + the PARENT_MISSING cascade). All reverted; validate is ok.
+
+## Fixtures: one per layout rule
+
+`missing-frontmatter/` (the live incident), `missing-frontmatter-index/`, `unterminated-frontmatter/`, `empty-item-file/`, plus `non-item-markdown/` as the pinned no-false-positive control. README table row added.
+
+## SWEEP ANSWER — do the other readers degrade safely, or does one WRITE a frontmatter-less file?
+
+**No writer does. The gap was read-side only.** Every surface run against a wiped item:
+
+- Readers (`list`, `show`, `next`, `report`, `doctor`, `board`): all degrade to "not an item". `show` refuses (`SHOW_FAILED`, id not found); the rest omit it silently. No crash, no invented item.
+- Writers (`comment`, `update --status`, `update --unassign`, `handoff`, `branch`, `priority migrate`): all refuse with `id not found under the tracker`. The wiped file was byte-UNCHANGED afterwards and remained the only frontmatter-less file — nothing created, overwritten or silently "repaired".
+- Writer census: every item-file write funnels through `stringifyFrontmatter` (`comment.ts`, `create.ts`, `priority.ts`, `update.ts` incl. the cascade and promotion rewrites), which always emits the fences.
+
+## Union-resolution workflows: checked, none relied upon
+
+**No tolerant mode** in the kernel depends on the old lenient read (grepped; the only tolerated/best-effort hits are unrelated — CRLF parsing, co-writer inode swaps, gh round-trip). Item conflicts resolve as a UNION of `###` blocks under main's frontmatter, so the normal path keeps main's block and is unaffected. What changed is exactly the case where a resolution script DROPS the block — that now fails the gate instead of passing it. No legacy `tasks/` fixture relied on the old behavior.
+
+## Separate finding — 4 item files are 0-byte on main (needs its own item)
+
+The new rule immediately surfaced real pre-existing corruption:
+
+- `.../parallel-worktree-runtime-isolation-ports-state-services/task-record-exploration-016-worktree-runtime-isolation.md`
+- `.../ecosystem-ops/ci-stability/bug-live-reload-sse-race.md`
+- `.../ecosystem-ops/ci-stability/task-derive-cli-spawn-loader.md`
+- `.../ecosystem-ops/ci-stability/task-remove-diag-listener.md`
+
+In each case the commit that emptied the file IS its own `chore(tasks): commented <id>` auto-commit. All item writers use `writeFileAtomic` (temp + rename), so an in-place truncate should be impossible — meaning this is a writer-side regression I could not reproduce, and it is NOT fixed by this PR. Content is restored byte-for-byte in a SEPARATE, droppable commit so the validator can be reviewed alone; no frontmatter/body was edited.
+
+Coordinator: this warrants its own item — a zero-byte item file silently un-claims an item and drops its acceptance history, and the writer path that caused it is still unfixed. Filing it is your call, not mine.
+
+## Gates (all green)
+
+`npm run build` BEFORE `npm test` → 2594 passed / 126 files → `npm run lint` → `npm run arggon -- validate` (ok) → `npm run check:plugin` → `npm run test:structure` (5 passed) → `npm run lint:structure`.
+
+## Methodology impact: Behavioral
+
+A previously-ok tree now errors — the intended effect. Reasoning: a validator that checks the CONTENT of a structure without checking that the structure EXISTS accepts the worst shape it can see. Same class the repo already knows elsewhere (the seam drift gate checks for a committed provenance marker before comparing; the seam parity test exists because two copies were checked independently). Blast radius bounded to item positions, pinned by the `non-item-markdown` control. `npm run skills:sync` run in-PR: no drift (no CLI surface changed).
+
+### handoff 2026-10-03 @ses_efe3043b8ffed48yGgAx3qryzL (session: ses_efe3043b8ffed48yGgAx3qryzL) — next: Coordinator: review PR #619 and merge; tick the acceptance boxes, then set status done.
+- branch: fix/bug-validate-does-not-check-frontmatter-present
+- open questions: Item needs a decision: file a new bug for the WRITER regression that emptied 4 item files to 0 bytes (their own chore(tasks): commented commits; not reproduced, not fixed here); the 2nd commit in the…
+
+### 2026-10-03 @ses_efe3043b8ffed48yGgAx3qryzL
+### Acceptance ticked with evidence (PR #619)
+
+Original checklist, each box now met — evidence inline, full commands in the PR body.
+
+- [x] **An item file with NO frontmatter block is a validate ERROR, naming the file** — `MISSING_FRONTMATTER`, verified red on mutation: expected the code, observed `arggon validate: ok (0 warning(s))` exit 0 before the fix, `error ArggonManager/.../bug-validate-does-not-check-frontmatter-present.md: missing required YAML frontmatter: … [MISSING_FRONTMATTER]` exit 1 after. Also covers a zero-byte file (same shape: no block at all).
+- [x] **Same for an unterminated (unclosed `---`) block** — now `UNTERMINATED_FRONTMATTER`, its own typed code instead of the generic `BROKEN_YAML`. Note honestly: this shape was ALREADY an error before the fix (as `BROKEN_YAML`), so it needed a distinct code, not a new rule — the item's "likely read as body prose too" turned out to be wrong for the unclosed case. The missing-frontmatter case was the real hole.
+- [x] **A fixture per case, following the repo convention of one failing fixture per layout rule** — `missing-frontmatter/`, `missing-frontmatter-index/`, `unterminated-frontmatter/`, `empty-item-file/`, plus `non-item-markdown/` as the pinned no-false-positive control (the rule must not fire on a plain `.md` in a non-item position). README table updated; `cli/src/validate.test.ts` asserts each code and path.
+- [x] **Check the other frontmatter readers (`list`, `show`, `next`, done gate, cascade)** — done, answer in the sweep comment above: every reader degrades safely to "not an item", and NO writer emits a frontmatter-less file (all writes funnel through `stringifyFrontmatter`; every write surface refuses the wiped id and leaves the file byte-unchanged). Also checked specifically: there is no tolerant mode relying on the old lenient read, so the union-resolution workflows are unaffected.
+- [x] **The kernel is the owner (`@arggondev/lib`); a CI-only check is not enough** — the rule ships in `lib/src/validate.ts`, so the pre-commit hook and adopter CI get it. No CI file touched (the CI seam belongs to another worker this wave).
+
+Extra beyond the checklist, flagged for the coordinator: the rule surfaced 4 item files that are 0-byte blobs on `main` (their own `chore(tasks): commented` commits emptied them). Restored byte-for-byte in a separate droppable commit; the underlying WRITER regression is unfixed and un-reproduced, and warrants its own item.

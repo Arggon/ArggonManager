@@ -1661,21 +1661,31 @@ function matchesPredicate(item, pred, blockedByIndex, ancestorIndex) {
 __arggonModules.set("lib/src/frontmatter.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.FrontmatterParseError = void 0;
 exports.parseFrontmatter = parseFrontmatter;
 exports.stringifyFrontmatter = stringifyFrontmatter;
 exports.stringField = stringField;
 exports.numberField = numberField;
 exports.stringArrayField = stringArrayField;
 const FENCE = "---";
+class FrontmatterParseError extends Error {
+    code;
+    constructor(code, message) {
+        super(message);
+        this.name = "FrontmatterParseError";
+        this.code = code;
+    }
+}
+exports.FrontmatterParseError = FrontmatterParseError;
 function parseFrontmatter(raw) {
     const normalized = raw.replace(/^\uFEFF/, "");
     if (!normalized.startsWith(`${FENCE}\n`) && !normalized.startsWith(`${FENCE}\r\n`)) {
-        throw new Error("missing YAML frontmatter (expected file to start with ---)");
+        throw new FrontmatterParseError("MISSING_FRONTMATTER", "missing YAML frontmatter (expected file to start with ---)");
     }
     const rest = normalized.slice(normalized.indexOf("\n") + 1);
     const endMatch = rest.match(/\r?\n---\r?\n?/);
     if (!endMatch || endMatch.index === undefined) {
-        throw new Error("unterminated YAML frontmatter");
+        throw new FrontmatterParseError("UNTERMINATED_FRONTMATTER", "unterminated YAML frontmatter");
     }
     const yaml = rest.slice(0, endMatch.index);
     const body = rest.slice(endMatch.index + endMatch[0].length);
@@ -1685,7 +1695,7 @@ function parseFrontmatter(raw) {
             continue;
         const idx = line.indexOf(":");
         if (idx === -1) {
-            throw new Error(`invalid frontmatter line: ${JSON.stringify(line)}`);
+            throw new FrontmatterParseError("INVALID_FRONTMATTER_LINE", `invalid frontmatter line: ${JSON.stringify(line)}`);
         }
         const key = line.slice(0, idx).trim();
         const value = line.slice(idx + 1).trim();
@@ -2785,6 +2795,14 @@ function walkTasksTree(dir, opts) {
     }
     return { files, dirs };
 }
+function parseIssue(err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (err instanceof frontmatter_js_1.FrontmatterParseError &&
+        (err.code === "MISSING_FRONTMATTER" || err.code === "UNTERMINATED_FRONTMATTER")) {
+        return { code: err.code, message };
+    }
+    return { code: "BROKEN_YAML", message };
+}
 function softTryLoadItem(filePath) {
     let raw;
     try {
@@ -2797,21 +2815,18 @@ function softTryLoadItem(filePath) {
         };
     }
     if (!raw.startsWith("---"))
-        return { kind: "skip" };
+        return { kind: "skip", reason: "no-frontmatter" };
     let data;
     let body;
     try {
         ({ data, body } = (0, frontmatter_js_1.parseFrontmatter)(raw));
     }
     catch (err) {
-        return {
-            kind: "fatal",
-            issues: [{ code: "BROKEN_YAML", message: err instanceof Error ? err.message : String(err) }],
-        };
+        return { kind: "fatal", issues: [parseIssue(err)] };
     }
     const typeRaw = (0, frontmatter_js_1.stringField)(data, "type");
     if (!typeRaw)
-        return { kind: "skip" };
+        return { kind: "skip", reason: "no-type" };
     if (!(0, ids_js_1.isItemType)(typeRaw)) {
         return {
             kind: "fatal",
@@ -5701,6 +5716,15 @@ function posixRel(root, abs) {
 function push(bucket, path, message, code) {
     bucket.push({ path, message, code });
 }
+function isItemFilePosition(filePath) {
+    const name = (0, node_path_1.basename)(filePath);
+    if (!name.endsWith(".md"))
+        return false;
+    const stem = name.slice(0, -".md".length);
+    if (stem === (0, node_path_1.basename)((0, node_path_1.dirname)(filePath)))
+        return true;
+    return stem.startsWith("task-") || stem.startsWith("bug-");
+}
 function checkItemShape(item, errors) {
     const { relPath: rel, filePath, type, id, status, assignee, blockedReason, data } = item;
     try {
@@ -5845,8 +5869,12 @@ function runValidate(opts) {
             continue;
         const rel = posixRel(root, file);
         const loaded = (0, items_js_1.softTryLoadItem)(file);
-        if (loaded.kind === "skip")
+        if (loaded.kind === "skip") {
+            if (loaded.reason === "no-frontmatter" && isItemFilePosition(file)) {
+                push(errors, rel, "missing required YAML frontmatter: a work item file must start with a `---` block carrying at least `type`, `id` and `status`", "MISSING_FRONTMATTER");
+            }
             continue;
+        }
         if (loaded.kind === "fatal") {
             for (const issue of loaded.issues) {
                 push(errors, rel, issue.message, issue.code);

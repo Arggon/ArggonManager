@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { basename, join, relative, sep } from "node:path";
+import { basename, dirname, join, relative, sep } from "node:path";
 import { CONVENTION_VERSION, readConventionConfig, readConventionVersion } from "./convention.js";
 import { assertValidId, BRANCH_PATTERN } from "./ids.js";
 import { isPriority } from "./priority.js";
@@ -31,6 +31,30 @@ function posixRel(root: string, abs: string): string {
 
 function push(bucket: Issue[], path: string, message: string, code: string): void {
   bucket.push({ path, message, code });
+}
+
+/**
+ * The file positions the v0 layout RESERVES for a work item: a container index
+ * (`<dir>/<dir>.md`, the one shape every initiative/epic/story uses) or a leaf
+ * (`task-*.md` / `bug-*.md`, the only names allowed directly inside a container
+ * dir — the same vocabulary `UNKNOWN_STORY_CHILD` enforces from the other
+ * direction).
+ *
+ * This is the predicate that makes the frontmatter-presence rule SAFE to
+ * enforce (bug-validate-does-not-check-frontmatter-present). `validate` already
+ * owns "which `.md` files may exist here", so demanding that those files carry
+ * a frontmatter block cannot invent a requirement for any other file: a stray
+ * `.md` that is not in an item position stays an ignored non-item document,
+ * while a `task-*.md` whose block was destroyed can no longer pass as one.
+ * Position is decided from the PATH alone, never from the file's contents —
+ * a file that lost its frontmatter has no contents left to ask.
+ */
+function isItemFilePosition(filePath: string): boolean {
+  const name = basename(filePath);
+  if (!name.endsWith(".md")) return false;
+  const stem = name.slice(0, -".md".length);
+  if (stem === basename(dirname(filePath))) return true;
+  return stem.startsWith("task-") || stem.startsWith("bug-");
 }
 
 function checkItemShape(item: SoftItem, errors: Issue[]): void {
@@ -259,7 +283,29 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
     if (!file.endsWith(".md")) continue;
     const rel = posixRel(root, file);
     const loaded = softTryLoadItem(file);
-    if (loaded.kind === "skip") continue;
+    if (loaded.kind === "skip") {
+      // The one shape the loader cannot judge: the file has no block at all, so
+      // there are no required fields to check and the item checks below have
+      // nothing to run on. Reading it as body prose is what made this the WORST
+      // possible corruption be the only one accepted — an item file with no id,
+      // no status and no parent cannot be listed, claimed, gated on done or
+      // resolved by depends_on, while the gate that owns tree integrity reported
+      // the tree fine (bug-validate-does-not-check-frontmatter-present). The
+      // layout decides whether this file was ever supposed to be an item; the
+      // `path` field is what names it in the report.
+      //
+      // `no-type` is NOT an error: a block without `type` is a plain document,
+      // and that stays the caller's business.
+      if (loaded.reason === "no-frontmatter" && isItemFilePosition(file)) {
+        push(
+          errors,
+          rel,
+          "missing required YAML frontmatter: a work item file must start with a `---` block carrying at least `type`, `id` and `status`",
+          "MISSING_FRONTMATTER",
+        );
+      }
+      continue;
+    }
     if (loaded.kind === "fatal") {
       for (const issue of loaded.issues) {
         push(errors, rel, issue.message, issue.code);
