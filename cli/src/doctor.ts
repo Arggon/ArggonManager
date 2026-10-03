@@ -31,6 +31,11 @@ import {
 } from "./docs.js";
 
 import { measureBudget, formatBudgetLines, type BudgetResult } from "./measure.js";
+import {
+  formatMatrixLines,
+  readCapabilityMatrix,
+  type CapabilityMatrix,
+} from "./capability-matrix.js";
 
 // The sanitizer implementation moved to sanitize.ts (bug-cli-error-output-injection
 // F1) so the CLI error channel shares it; re-exported for existing consumers.
@@ -517,6 +522,17 @@ export type DoctorResult = {
    */
   opencode: DoctorOpenCode;
   /**
+   * Capability-matrix state (additive, task-capability-matrix; spec S3,
+   * ADR 0020): the committed `adapters/capability-matrix.json` — declared
+   * invariants, agents, row/gap counts and the bounded gap detail. DATA only:
+   * the matrix carries no rule logic and nothing here gates anything (report-
+   * only, never blocking; the kernel stays the enforcement of record). Present
+   * on initialized and non-initialized reports alike — both probe the same tree
+   * root (the cwd when there is no tracker) and report the absence with its
+   * reason rather than dropping the field.
+   */
+  matrix: CapabilityMatrix;
+  /**
    * Context-budget measurement (additive, task-adr0006-remeasure): present
    * only when `doctor --budget` is passed. Measures the ADR 0006 agent-facing
    * surfaces with the 2026-09-14 baseline method (fresh `init --full` in a
@@ -622,6 +638,10 @@ export function runDoctor(opts: {
       // No tasks/ tree, so cwd is the best root for the OpenCode probe — the
       // same directory gitState probes (task-opencode-v2-doctor).
       opencode: detectOpenCode(opts.cwd),
+      // Same reasoning for the matrix probe: no tree, so no matrix — the
+      // reader is tree-only and reports the absence instead of reaching for a
+      // package copy (that fallback broke pack/checkout envelope parity).
+      matrix: readCapabilityMatrix({ root: opts.cwd }),
     };
   }
 
@@ -738,6 +758,10 @@ export function runDoctor(opts: {
     },
     git: gitState(root),
     opencode: detectOpenCode(root),
+    // The tree's own committed matrix when it carries one (this repo does);
+    // otherwise an honest absence. Tree-only by construction, never a package
+    // fallback: an additive field must depend only on the examined tree.
+    matrix: readCapabilityMatrix({ root }),
   };
 }
 
@@ -815,6 +839,9 @@ export function formatDoctorReport(result: DoctorResult): string {
       "arggon doctor: not initialized (no tracker .convention.yml found — ArggonManager/ or legacy tasks/) — run `arggon init`",
     ];
     if (hasOpenCodeSignal(result.opencode)) lines.push(...formatOpenCodeLines(result.opencode));
+    // The matrix describes the examined tree, so it prints on both report
+    // shapes — whenever it is readable, or why it is not.
+    lines.push(...formatMatrixLines(result.matrix));
     if (result.budget) lines.push(...formatBudgetLines(result.budget));
     return `${lines.join("\n")}\n`;
   }
@@ -833,6 +860,8 @@ export function formatDoctorReport(result: DoctorResult): string {
       : []),
     `  git: ${formatGitLine(result.git)}`,
     ...formatOpenCodeLines(result.opencode),
+    // Gap rows are advisory (spec S3, ADR 0020): printed, never blocking.
+    ...formatMatrixLines(result.matrix),
   ];
   if (result.budget) {
     lines.push(...formatBudgetLines(result.budget));
