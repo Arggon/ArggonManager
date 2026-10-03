@@ -769,17 +769,27 @@ describe("acceptance parity over the LIVE tracker (bug-three-acceptance-parsers-
       if (acceptanceComplete(acceptanceBody(item))) return false;
       return acceptanceUnchecked(showBoundedParts(item, 0).prose).length === 0;
     });
-    // Reported, not asserted on a count: it is a live number that moves as
-    // items are filed. The assertion is that the SHAPE exists, so the guard
-    // above is proving something.
-    expect(commentOnly.length).toBeGreaterThanOrEqual(0);
+    // Non-vacuity, done properly. The previous assertion here was
+    // `toBeGreaterThanOrEqual(0)`, which is true for EVERY array including an
+    // empty one and therefore asserted nothing (review F3). The shape must
+    // actually be present, because the guard in the previous test is only
+    // meaningful if some item would have been got wrong by a stripping reader.
+    //
+    // A floor, not an exact count: this is a LIVE number that grows as items
+    // are filed, so the test must not break on an unrelated commit. One is the
+    // honest minimum — if the shape disappears from the tracker entirely, the
+    // parity guard has stopped covering the defect it was filed for, and that
+    // deserves a failing test rather than a silent pass.
+    expect(commentOnly.length).toBeGreaterThanOrEqual(1);
+    // And the shape is what we think it is: a real unchecked criterion the gate
+    // sees, invisible to the bounded reader.
+    for (const item of commentOnly) {
+      expect(acceptanceUnchecked(acceptanceBody(item)).length, item.id).toBeGreaterThan(0);
+      expect(acceptanceUnchecked(showBoundedParts(item, 0).prose).length, item.id).toBe(0);
+    }
     console.log(
-      `[acceptance-parity] live tracker: ${items.length} items, ${gatedCount(items)} blocked, ` +
+      `[acceptance-parity] live tracker: ${items.length} items, ` +
         `${commentOnly.length} with comment-only criteria`,
     );
   });
 });
-
-function gatedCount(items: ReadonlyArray<{ body: string }>): number {
-  return items.filter((item) => !acceptanceComplete(item.body)).length;
-}
