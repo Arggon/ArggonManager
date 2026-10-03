@@ -4,6 +4,7 @@
 - Date: 2026-10-01
 - Deciders: Gonzalo Arganaraz
 - Input: [exploration-update-delivery-016](../explorations/exploration-update-delivery-016.md) (2026-10-01)
+- Index title: Update delivery and distribution channel (release pipeline, update channel, skew, tarballs)
 
 ## Context
 

@@ -4,6 +4,7 @@
 > Status note (2026-09-29): accepted retroactively — the board shipped (static board + drag-and-drop + `--serve`, per `ArggonManager/docs/engineering.md`); it sat `Proposed` without a recorded acceptance (task-adr-status-housekeeping).
 - Date: 2026-09-07
 - Deciders: Software Developer (author), Software Architect (review), Project Manager (aware)
+- Index title: Board viewer v0 (static + serve)
 
 ## Context
 
