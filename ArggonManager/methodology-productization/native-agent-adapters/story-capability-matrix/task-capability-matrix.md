@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-capability-matrix
 title: Committed capability matrix + doctor gap rows (plan T3)
 assignee: Arggon
@@ -8,12 +8,10 @@ branch: feat/task-capability-matrix
 parent: story-capability-matrix
 labels: []
 created: "2026-10-02"
-updated: "2026-10-02"
-claimed_at: "2026-10-02T22:27:40.179Z"
+updated: "2026-10-03"
 depends_on: [task-methodology-carriers]
 worktree_path: /home/arggon/Projects/ArggonManager-task-capability-matrix
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-capability-matrix/task-capability-matrix.md
   Leaves live only under a story. id is the filename stem: task-capability-matrix.
