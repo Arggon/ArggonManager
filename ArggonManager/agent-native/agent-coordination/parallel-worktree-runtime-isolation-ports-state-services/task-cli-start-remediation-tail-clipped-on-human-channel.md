@@ -392,3 +392,7 @@ The gap is **104 at every path length for this composition**, not 183 — so bot
 ### Gates (build BEFORE test)
 
 `npm run build` (bundle regenerated, 457609 → 457642 bytes — `lib/src/json.ts` is inlined into the plugin; not hand-edited) · `npm test` **122 files / 2289 tests** · `npm run lint` · `npm run arggon -- validate` ok · `npm run check:plugin` no drift · `npm run test:structure` 3 passed · `npm run lint:structure` clean. CI on the merged head: `cli` pass 5m2s (run 37097168986, job 111129346900), `tasks-validate` pass, `ui-smoke` pass.
+
+### handoff 2026-10-03 @Arggon — next: Re-review+merge PR #608: bound now budget-derived (7/8 typical, 2/8 worst), readiness array on the failure envelope, cli green
+- branch: feat/task-cli-start-remediation-tail-clipped-on-human-channel
+- open questions: Is failEnvelope's new optional payload acceptable surface-wise, or should the readiness receipt be CLI-only?; F4: my measurement contradicts the review's 183 — accept the measured 104 table?
