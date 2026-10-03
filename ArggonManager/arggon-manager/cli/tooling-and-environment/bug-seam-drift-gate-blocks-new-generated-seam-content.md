@@ -60,6 +60,13 @@ Extra, not in the original list (found while proving the fix):
 - [x] Both directions are provable: hermetic two-direction coverage in `cli/src/headless-ci.test.ts` plus a real probe (real build, real templates, the shipped step bodies) documented in `ArggonManager/docs/ci.md` §Reproduce the drift gate both ways.
 - [x] A missing `dist/cli.js` is a hard error, never a silent fall-back to the pinned release (that fall-back *is* the bug).
 
+### Round 2 — review `request-changes` (design accepted, no redesign)
+
+- [x] `cli` red on `628a4332` handled as the known artifact-drift flake, not chased: `gh run rerun 37090935003 --failed` → run 37090935003 **attempt 2** `cli` = **success** (ui-smoke was already success). No code change for it.
+- [x] `ArggonManager/docs/ci.md` compensation brought down to words the code supports: the pinned-lag assertion is named a **version-skew proxy, not byte-equality**, its blindness in exactly the case this item unblocks is named (a feature PR that moves templates and regenerates with **no version bump** leaves every stamp at the pin), and the false "neither copy can rot silently" claim is gone — `pinLagsSeam()`'s extra `pin !== pkgVersion` conjunct is documented as known skew (`bug-ci-seam-pin-shell-vs-test-copy-divergence`). The section now states the same ceiling `release.md` §One release story does ("the price paid is one weaker claim").
+- [x] `cli/src/ci-seam-pin.test.ts`'s header corrected to the gate CI actually runs (literal pin + the workflow's pinned-lag assertion; the byte comparison is branch-local here, pinned only for adopters), with a pointer to the two-copy skew item.
+- [x] The two-copy invariant is now machine-checked: `cli/src/headless-ci.test.ts` has a `workflow parity: template vs the copy CI runs` block — byte comparison of the two workflow files modulo `uses:` action refs, plus the branch-aware generator predicate, the pinned-release fallback and the lag-before-diff ordering asserted in **both steps of both copies**. Verified discriminating: neutering the lag line or the predicate in the committed copy turns it red, naming the file and the step. The rule of record is stated in `ArggonManager/docs/ci.md` §Where the rule of record lives: the TEMPLATE is the rule; the committed copy is what CI runs and is held to it.
+
 ## Notes
 
 ### 2026-10-03 @ses_f02ab5836ffeOAxmisboIwWE4x
