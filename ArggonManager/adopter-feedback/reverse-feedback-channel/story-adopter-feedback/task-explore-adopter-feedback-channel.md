@@ -13,7 +13,6 @@ updated: "2026-10-02"
 claimed_at: "2026-10-02T14:18:08.885Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-explore-adopter-feedback-channel
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-explore-adopter-feedback-channel.md
   Leaves live only under a story. id is the filename stem: task-explore-adopter-feedback-channel.
@@ -420,3 +419,79 @@ Also required before this merges, from the reviewer's remaining findings:
 And the two scope calls the reviewer ruled on, which you should carry into the ADR: keep the `doctor` `friction` block but re-justify it on the grounds that actually hold (per-file `triggerVersion` plus separating "trigger absent" from generic template drift — `doctor.ts` already re-renders templates for acked entries too, so `outdated` alone does not give it) and stop claiming it is claimed by both T5 and T6; and name in the spec that local fingerprint dedupe cannot see an already-filed upstream issue, which is the honest boundary of stopping at tier B.
 
 `bug-spec-analyze-does-not-detect-duplicate-doc-numbers` has MERGED, so `arggon spec validate` / `spec analyze` will now catch any residual collision — use them as the check rather than by eye.
+
+### 2026-10-03 @ses_f01435336ffeYS4KAJmBnNqG2k
+**request-changes addressed: B1–B4 + N1–N6 + both scope calls. Branch pushed (no force). Item left `in_progress`.**
+
+## Renumber map (old → new)
+
+| Old | New |
+| --- | --- |
+| `ArggonManager/docs/adr/0020-adopter-friction-channel.md` | `0021-adopter-friction-channel.md` |
+| `spec-friction-capture-017.md` | `spec-friction-capture-018.md` |
+| `plan-friction-capture-017.md` | `plan-friction-capture-018.md` |
+| `exploration-adopter-feedback-channel-018.md` | `exploration-adopter-feedback-channel-019.md` |
+
+Every internal reference follows: `spec_id` / `plan_id` / `exploration_id`, the plan's `spec:` path, the exploration's Decision link to its ADR, the spec + plan back-links, the item body, all 9 leaves, both containers, and the epic's Acceptance links. The ADR carries a `Numbering note` per the ADR 0016 / ADR 0019 precedent.
+
+**Residual duplicate-number findings: exactly 5 — all pre-existing, none mine.**
+
+| # | Pair |
+| --- | --- |
+| 1 | `exploration-cheap-path-to-prod-001` ↔ `exploration-token-context-efficiency-001` |
+| 2 | `spec-deps-001` ↔ `spec-sync-001` |
+| 3 | `spec-release-pipeline-015` ↔ `spec-update-channel-015` |
+| 4 | `plan-deps-001` ↔ `plan-sync-001` |
+| 5 | `plan-release-pipeline-015` ↔ `plan-update-channel-015` |
+
+That is precisely the five `task-renumber-colliding-doc-numbers` enumerates. **Proof that none are mine:** `spec analyze --baseline` was filtered for my four filenames and returned nothing, and each of my numbers is unique in its directory (ADR 0021 → 1 file, spec/plan 018 → 1 each, exploration 019 → 1). I did not touch the other five — they are not mine to renumber.
+
+## B2 — the `done` item
+
+`bug-contributing-github-issue-contradiction.md` **no longer appears in the branch diff at all**; the branch copy is byte-identical to main's (`status: done`, assignee, branch, ticked boxes, fix evidence, approve verdict).
+
+**I also checked the other direction you asked about, and found one more item.** `bug-prettier-glues-split-inline-code-span.md` — my branch's copy was *older* than main's: it carried the broken four-level link prefix while main had already fixed it in `368809d5`. So my branch would have **reverted main's fix**. The merge took main's newer copy and the file is now correct. That is the second B2-class item, and it was not in the reviewer's list.
+
+## Rebase vs merge — reporting, per instruction
+
+I **merged `origin/main` rather than rebasing**, so no force-push was needed and the push was a clean fast-forward (`85c552cd..<head>`). Two reasons: `docs/agents.md` §0 mandates merge-don't-squash for PRs carrying tracker auto-commits, and a rebase would have required the force-push I was told to refuse. Nothing about the intent differs — the branch contains main and takes main's copy for the done item.
+
+**One thing worth flagging: main moved twice while I worked.** My first merge predated PRs #605/#606, and at that point `git diff origin/main` showed `D cli/src/adapters.ts`, `D cli/src/adapter-selection.test.ts`, `M cli/src/cli.ts` — the branch would have **deleted main's new adapter-selection work**. I caught it by diffing against main after merging and merged again. Had I trusted the first merge, this PR would have reverted a merged feature.
+
+## B3 / B4
+
+ADR ships `Status: Proposed` with a `Status note` naming the two-step precedent. The epic box stays **unticked** with a note explaining why: the spec gate is met, the word *settles* waits on acceptance, and ticking it would contradict the ADR's own status line (N3). ADR indexed in `docs/adr/README.md` — mandatory, since #602's parity test asserts one index row per ADR file.
+
+## Scope call 4a — the correction, in the ADR
+
+My earlier justification was **wrong and is now corrected in ADR §2**. I claimed the block was needed because a missing trigger is "otherwise invisible". It isn't: `doctor.ts` re-renders the current template for every `config.generated` entry in every local state including acked, and the OpenCode agent files are in that map, so editing the worker template already surfaces as `outdated`. I verified this against `origin/main` rather than taking the reviewer's line. The block's real value is narrower and still real: **per-file `triggerVersion`**, and **separating _trigger absent_ from generic template drift** — the observable the compliance spike needs to tell "never seen" from "seen and ignored". §2 now says that, and notes the cuttable part is `triggerVersion`/`files`, not the block.
+
+## Scope call 4b — the honest boundary, in the spec
+
+New acceptance criterion: local fingerprint dedupe collapses repeats **inside one log and nothing else**. It cannot see an issue a human already filed upstream, so a class already in the maintainer's tracker is re-emitted as "new" and may be filed twice. Recorded as a **deferred capability, not a postponed one** (upstream pre-search needs network + `gh` = tier C), and the report must state its dedupe scope is local-only and never imply upstream coverage.
+
+## Other findings folded in
+
+- **N1** — `doctor.friction` has **one owner: T6**. T5 keeps `arggon friction` surface parity plus the json-output rows, and both files now say which half each owns.
+- **N2** — `task-spike-friction-trigger-compliance` now carries `depends_on: [task-friction-trigger-carrier]` (real frontmatter edge, not just prose).
+- **N4** — duplicate H1s removed from the 5 files that actually had them (the reviewer's "all 10" overcounts; the 9 leaves I created each have exactly one).
+- **N6a** — the exploration's concurrency row said `O_EXCL`-style create; corrected to `O_APPEND` with a dated note.
+- **N6b** — rotation (the 5000-line cap) owned by T1; T3 only renders `dropped: N`.
+- Also fixed a **stale item id** in the spec and plan: they referenced `spike-friction-trigger-compliance`, which resolves to nothing — the real id is `task-spike-…`.
+
+## Comment history kept verbatim — deliberate, please overrule if you disagree
+
+A comment records what was said on a date, so I did **not** renumber inside the dated comments — including the reviewer's own B1 evidence table, which would be *falsified* by editing it (its "this PR" column would read as though the PR always had those names). Instead the item body gained a `## Renumber map` section stating the old→new mapping and that the older blocks intentionally still read "ADR 0020". The trade: a reader must consult the map to resolve an old label, in exchange for an unaltered record.
+
+The one exception: link **targets** in the two files main owns were updated so nothing dangles after the rename — their records (status/assignee/branch/boxes) are untouched.
+
+## Two of my own bugs found and fixed
+
+1. **Broken epic links.** `../docs/` from `reverse-feedback-channel/` resolves to `adopter-feedback/docs/`, which does not exist — the correct prefix is two levels. Both links were mine and both would have dangled after the renumber. Every live-body link in the diff now resolves under an anchor-aware sweep.
+2. **Prettier non-idempotence, twice.** My ticked-box continuations and the epic note were indented list paragraphs; prettier 3.9.6 grows their indent by two spaces on every `--write`, so `--check` fails on the file it just produced — the same class as `bug-prettier-glues-split-inline-code-span`, a different manifestation (indent growth, not span splitting). Both are now written as single-line bullets and converge across consecutive writes. **If the reviewer considers indent-growth a distinct defect from the tracked span-splitting bug, it is not filed** — I kept the diff tight. Say the word and I will file it.
+
+## Gates on the merged tree
+
+`build` ✅ · `test` ✅ **122 files / 2275 tests** · `lint` ✅ clean · `check:plugin` ✅ · `validate` ✅ ok (0 warnings, convention v5) · `spec validate` ✅ ok (34 docs, **5 warnings — all the pre-existing duplicates above**) · `spec analyze --baseline` ✅ **5 new, 1 resolved, 5 unchanged** — all 5 new are the known duplicates, **zero name my artifacts** · prettier ✅ clean **and idempotent**.
+
+**Tracker-write check:** every mutation ran via `npm run arggon -- …` with the worktree as cwd; all three of this round's commits are on `origin/feat/task-explore-adopter-feedback-channel`; the primary checkout is on `main` and its unpushed commits belong to another session (`bug-prover-agent`), not to me.
