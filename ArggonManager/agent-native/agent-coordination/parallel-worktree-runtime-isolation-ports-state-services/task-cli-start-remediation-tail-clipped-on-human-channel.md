@@ -198,3 +198,42 @@ Net at that worst case: the composed message is 1831 chars, under the 2000 cap, 
 **Doc drift fixed in the same PR (F2).** `docs/convention.md` and `docs/json-output.md` documented the post-start report with the hint TRAILING while this PR ships it leading; both carriers now describe shipped output and say WHY the order is what it is.
 
 **One vacuous assertion repaired, four guarded (F3).** The pre-commit-gate ordering test searched lowercase `if this is an identity error` against a message that now capitalizes it, so `indexOf` returned -1 and `-1 < n` passed unconditionally. All four substring-ordering assertions in this PR are now presence-checked before comparison.
+
+### 2026-10-03 @Arggon
+## Round 2 — all five review findings addressed, CI green, smoke run
+
+Branch `feat/task-cli-start-remediation-tail-clipped-on-human-channel` (merged `origin/main` in — the item-body conflict resolved as a UNION, this branch's evidence plus the reviewer's verdict block). Item left `in_progress`.
+
+**F1 — the class WAS not closed; fifth site fixed.** `worktreeRemediation`'s `committing the claim` branch composed `<generic fix>` + `<readiness bin list, uncapped>` + `Exact fix: run \`npm ci\` in <worktree>`. Two changes, both needed: the exact fix now LEADS the evidence (index 3202 -> 584 on the committed worst-case fixture; it was clipped away entirely), and the readiness list is bounded (`MAX_HUMAN_GATE_BIN_NAMES = 2`, remainder counted as `and N more bins`) so the caller's discard hint survives too. Composed length at that worst case: 3687 (over the cap) -> 1831, nothing elided. Proven failing against the pre-fix code: `expected 3202 to be less than 584` / `expected 'start failed while committing the cla…' to contain 'Exact fix for the observed resolution'` / `expected 969 to be 1607`.
+
+**F2 — docs travel with the change.** `docs/convention.md` + `docs/json-output.md` now describe the shipped post-start shape (hint leading) and say why, so the next reader does not "tidy" it back.
+
+**F3 — the vacuous assertion repaired, and the three that could have been.** The pre-commit-gate test searched lowercase `if this is an identity error` against a capitalized message -> `indexOf` = -1 -> `-1 < n` always passed. All four substring-ordering assertions in this PR are now presence-checked before comparison.
+
+**F4 — my own evidence corrected, not defended.** `459 < 355` is `$TMPDIR`-dependent (the worktree path appears twice in the composition): same commit, default `/tmp` gives `459 < 355`, `TMPDIR=/tmp/opencode/a-longer-tmpdir-prefix` gives `523 < 419` — both shift by 64. The reproducible claim is the ORDER, now a pinned assertion. The item's Notes carry the correction instead of the old number.
+
+**F5 — the deferred four are corrected out of the class** in the Notes: stderr is `ignore`d there, so `err.message` is a bounded argv echo and not clip-reachable. My round-1 "same shape" label was wrong; the record now says so.
+
+**F6 — CI.** `cli` **pass** on this head: run 37094336430, job 111121055514, 5m40s (122 files / 2280 tests). The requested rerun of the old job 111115828164 (old head `9bec17b9`) failed again with the known flake — `mcp-parity` -> `SpawnHarnessError: kernel artifact drift: the repo's built artifacts were REWRITTEN while this child ran` + `SyntaxError: './frontmatter.js' does not provide an export named 'numberField'`, 1 failed / 2276 passed: a parallel lane rebuilding `lib/dist` mid-run, not this diff (nothing in `lib/src`, no bundle change).
+
+**Smoke probe (engineering.md SSmoke).** Disposable fixture, real built CLI, human stderr read top-down; pre-fix (`start.ts` from `2f688024`) vs post-fix on the same probe for the `committing the claim (pre-commit gate)` step:
+
+```
+pre-fix : …attaches to the existing worktree.
+          Readiness: the gate binaries do not resolve inside the worktree — smoke-gate-dep: …
+          Exact fix for the observed resolution: run `npm ci` in <worktree>, then …   <-- trails
+          To discard it instead: `git worktree remove --force <worktree>`.
+
+post-fix: …attaches to the existing worktree.
+          Exact fix for the observed resolution: run `npm ci` in <worktree>, then …   <-- leads
+          Readiness: the gate binaries do not resolve inside the worktree — smoke-gate-dep: …
+          To discard it instead: `git worktree remove --force <worktree>`.
+          If this is an identity error, set `git config user.name` / `git config user.email`.
+          git commit -m claim: task-smoke failed: gate: deliberate failure
+```
+
+Every actionable clause leads; all evidence trails. `--json` keeps the full raw message (1092 chars, no elision) — the `--json` contract is unchanged.
+
+**Gates** (build BEFORE test): `npm run build` (bundle byte-identical) · `npm test` 122 files / 2280 tests · `npm run lint` · `npm run arggon -- validate` ok · `npm run check:plugin` no drift · `npm run test:structure` 3 passed · `npm run lint:structure` clean.
+
+**Acceptance #4** stays ticked but is annotated: round 1 ticked it at four sites and was wrong. It is re-ticked only now that the fifth site is fixed and the four non-reachable deferrals are corrected — with a note that a future site needs the `indexOf` presence-guard idiom, not another one-line reorder.
