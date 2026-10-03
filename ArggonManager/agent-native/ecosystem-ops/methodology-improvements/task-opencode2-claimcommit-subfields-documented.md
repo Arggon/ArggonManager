@@ -2,7 +2,7 @@
 type: task
 status: todo
 id: task-opencode2-claimcommit-subfields-documented
-title: "`docs/opencode2.md` start row names only part of `preparation.claimCommit` (committed, hash, message, skipped, ignored[]) — same incompleteness class the sibling item just closed for `preparation`"
+title: "`docs/opencode2.md` names only part of the top-level `claimCommit` receipt (committed, hash, message, skipped, ignored[]) — and `NativeClaimCommitReceipt.status` carries a dead \"already-committed\" union member"
 parent: methodology-improvements
 labels: [docs, json-contract]
 created: "2026-10-03"
