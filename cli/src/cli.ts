@@ -58,7 +58,7 @@ import {
   type TrendResult,
 } from "@arggondev/lib";
 
-import { runStart, startTakeoverNotes } from "./start.js";
+import { runStart, startFailureReadiness, startTakeoverNotes } from "./start.js";
 import { runCleanup } from "./cleanup.js";
 
 import { runDoctor, formatDoctorReport, measureBudgetForDoctor } from "./doctor.js";
@@ -2526,11 +2526,18 @@ program
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (json) {
+          // A worktree failure bounds the bin NAMES inside `message` to what the
+          // human clip can show, so forward the full observation as an additive
+          // field: on the failure path the gate bins exist nowhere else
+          // (`gateBins` rides the success envelope only)
+          // (task-cli-start-remediation-tail-clipped-on-human-channel).
+          const readiness = startFailureReadiness(err);
           failJson({
             command: "start",
             message,
             code: "START_FAILED",
             conventionVersion: readConventionVersion(process.cwd()),
+            ...(readiness === undefined ? {} : { payload: { readiness } }),
           });
           return;
         }

@@ -25,13 +25,103 @@ Found by the reviewer of PR #597 (task-strictgatebinfailure-tail-clipped-by-head
 
 ## Acceptance
 
-- [ ] The CLI failure composition puts the actionable remediation (worktreeRemediation + attach/discard hint) BEFORE the kernel detail, keeping every existing clause verbatim — matching the shape PRs #573/#579/#595 landed
-- [ ] A test at the full MAX_GATE_BINS worst case asserts the remedy survives the MAX_HUMAN_ERROR_CHARS=2000 head-clip, with ordering pinned (remedy index precedes the first named bin)
-- [ ] Negative control: message at the cap and the last named bin absent
-- [ ] Every CLI error path that appends a remedy after kernel detail is swept for the same violation — this must be a class fix, not a single call site
+- [x] The CLI failure composition puts the actionable remediation (worktreeRemediation + attach/discard hint) BEFORE the kernel detail, keeping every existing clause verbatim — matching the shape PRs #573/#579/#595 landed
+- [x] A test at the full MAX_GATE_BINS worst case asserts the remedy survives the MAX_HUMAN_ERROR_CHARS=2000 head-clip, with ordering pinned (remedy index precedes the first named bin)
+- [x] Negative control: message at the cap and the last named bin absent
+- [x] Every CLI error path that appends a remedy after kernel detail is swept for the same violation — this must be a class fix, not a single call site
+  - Round 1 ticked this at FOUR sites and was wrong: `worktreeRemediation`'s `committing the claim` branch was a live instance the sweep missed. Re-ticked only after F1 landed (fifth site) and the four "same shape" deferrals were corrected to NOT clip-reachable. The list is in Notes; a future site needs the `indexOf` presence-guard idiom, not a new one-line reorder.
+  - Round 3: the evidence each site bounds must not become lossy either. The readiness clause is budget-filled rather than constant-capped, and the complete observation rides the `--json` failure envelope as `readiness` — so the rule is "cap + count + array", and a bound on a human line is only acceptable when a machine surface still enumerates what did not fit.
 
 ## Notes
 
+### Class sweep — the full surface, closed or explicitly deferred
+
+The defect class: a human-channel CLI error whose ONLY actionable clause is composed AFTER an unbounded detail, so the head-kept `MAX_HUMAN_ERROR_CHARS` (2000) clip eats the fix and the reader keeps only the diagnosis.
+
+**Fixed in `cli/src/start.ts` (five sites — four found in round 1, the `committing the claim` branch found in round 2 and listed below):**
+
+| site | before | after |
+| --- | --- | --- |
+| `worktreeFailureMessage` | kernel detail, then `worktreeRemediation(...)` + the `To discard it instead` hint | kept-worktree note -> remediation -> discard hint -> kernel detail |
+| `gh()` | ``gh <args> failed: <stderr> (check `gh auth status`)`` | ``Check `gh auth status`. gh <args> failed: <stderr>`` |
+| `commitFile()` | ``<git commit detail> (if this is an identity error, set `git config user.name` / `git config user.email`)`` | ``If this is an identity error, set `git config user.name` / `git config user.email`. <git commit detail>`` |
+| `runPostStart()`'s `failure()` | ``post-start failed: <cmd> -> <stderr tail> (hint: hooks inherit ...)`` | ``(hint: hooks inherit ...) post-start failed: <cmd> -> <stderr tail>`` |
+| `worktreeRemediation`'s `committing the claim` branch (round 2) | ``<generic fix> …<uncapped readiness bin list>… Exact fix: run `npm ci` in <worktree>`` | ``<generic fix>… Exact fix: run `npm ci` in <worktree>. <budget-filled readiness list>`` |
+
+Only clause ORDER moved — every clause is verbatim, none added or dropped. `worktreeFailureMessage` is the single funnel every worktree-start refusal passes through, so the one reorder also covers `strictWorktreeWriteFailure`, `strictGateBinFailure` and `freshWorktreeInstallRefusal` (each of which keeps its own remedy-first internal order from #573/#597).
+
+**Swept, already compliant (deliberately not changed):**
+
+- `assertStartableTree` — cause first, evidence list last, no trailing remedy.
+- `git()` — detail only, no trailing advice at all.
+- The plain (non-worktree) start flow — composes no remedy, so there is nothing to reorder.
+- `cli/src/cleanup.ts` refusals — clamped at `MAX_ENVELOPE_DETAIL_CHARS` (500) on a machine surface before any advice could be clipped.
+- `cli/src/mcp-server.ts` `spawnedOutcome` — the raw stderr is already the LAST clause, and `clipTail` keeps the tail.
+
+**CORRECTION (round-2 review F5 + coordinator): NOT part of this class.** The four sites this sweep originally deferred were reported as "same shape", which was wrong, and the record is corrected here rather than left standing:
+
+- `cli/src/board.ts:141`, `lib/src/get-open-prs.ts:67`, `lib/src/import-issues.ts:187`, `lib/src/cleanup.ts:259` — all four run `gh` with `stdio: ["ignore","pipe","ignore"]`, so the interpolated `err.message` is a bounded `Command failed: gh … <argv>` echo, NOT an unbounded stderr tail. They are therefore **not clip-reachable**: no amount of remedy-after-detail ordering can push a remedy off a 2000-char head-clip that the detail cannot reach. They are a CONSISTENCY question, tracked as such in `task-clip-class-sweep-remaining-sites`; nothing here needed to change, and no future auditor should re-audit them as clip sites.
+- `cli/src/branch.ts:127`, `lib/src/comment.ts:236-239`, `lib/src/show.ts:184`, `cli/src/layout-migrate.ts:83` — advice after a BOUNDED short clause (a branch name, a filename); no realistic clip exposure. Verified by the reviewer on reading.
+
+**Correction to the "Fixed (4 sites)" count above: it was five, not four.** `worktreeRemediation`'s `committing the claim` branch (from #517) was a live instance of the same rule that the first sweep missed — see the round-2 section below.
+
+### 2026-10-03 @Arggon
+## Evidence — PR #608 (`feat/task-cli-start-remediation-tail-clipped-on-human-channel`)
+
+### Pre-fix failure is real, on the real `runStart` path
+
+`git stash push -- cli/src/start.ts` (tests kept), then:
+
+```
+$ npx vitest run cli/src/start.test.ts -t "refuses the claim commit when the flag is set"
+AssertionError: expected 459 to be less than 355
+ ❯ cli/src/start.test.ts:327  expect(message.indexOf(`arggon start ${id} --worktree`))
+```
+The attach re-run sat at index 459, the kernel's named bin at 355 — the remedy trailed the evidence, exactly the defect.
+
+### Observed pre-fix text at the MAX_GATE_BINS worst case
+
+Composed through the real `sanitizeHumanError` (what `printHumanError` calls), full 8-bin list with long sibling paths:
+
+```
+full length: 3309
+clipped length: 2002 (cap 2000)
+remedy idx in clipped: -1      <-- `re-run arggon start <id> --worktree` GONE
+discard idx in clipped: -1     <-- `To discard it instead: …` GONE
+first bin idx in clipped: 392
+last bin absent from clip: true
+
+start failed while enforcing x-tracker.strict-gate-bins; the worktree was kept at
+home/dev/projects/ArggonManager-task-cli-start-remediation (nothing was rolled back).
+Fix: run `npm ci` in ... for a worktree-local install. x-tracker.strict-gate-bins is set:
+refusing the claim commit — gate binaries do not resolve inside the worktree:
+worktree-gate-binary-number-0-...: resolves only via PATH from .../node_modules/.bin/…
+```
+
+Diagnosis, no fix — at the cap, with three of the eight named bins already gone. Post-fix the same probe keeps `re-run arggon start …`, `To discard it instead` and `Fix: run npm ci` inside the kept window.
+
+### Gates (worktree cwd, build BEFORE test)
+
+```
+$ npm run build          # ok — bundle rebuilt byte-identical (CLI-only change)
+$ npm test               # Test Files 122 passed (122) · Tests 2277 passed (2277)
+$ npm run lint           # clean
+$ npm run arggon -- validate
+arggon validate: ok (0 warning(s), convention v5)
+$ npm run check:plugin   # build:plugin + git diff --exit-code — no drift
+```
+
+`git status` after `npm run build` shows only the four intended source/test files — `opencode/plugins/arggon/index.bundle.ts` is NOT among them, confirming the CLI-only change leaves the generated bundle untouched (proved, not assumed). No template or skill file touched, so the seam needed no regeneration.
+
+### Class sweep
+
+Four sites in `cli/src/start.ts` fixed together: `worktreeFailureMessage` (the named defect; the single funnel for `strictWorktreeWriteFailure`, `strictGateBinFailure`, `freshWorktreeInstallRefusal`), `gh()`, `commitFile()`, `runPostStart()`'s failure report. Full swept list — compliant sites and the three deferred siblings (`cli/src/board.ts:141` owned by the concurrent `bug-three-acceptance-parsers-diverging`; the kernel-side `gh auth status` wrappers in `lib/src/get-open-prs.ts:67`, `lib/src/import-issues.ts:187`, `lib/src/cleanup.ts:259`) — is recorded in the item's Notes section.
+
+Item left `in_progress` for coordinator review.
+
+### handoff 2026-10-03 @Arggon — next: Review+merge PR #608 (draft): 4 CLI start error paths reordered so the remedy leads; item stays in_progress
+- branch: feat/task-cli-start-remediation-tail-clipped-on-human-channel
+- open questions: cli/src/board.ts:141 has the same violation but is owned by the concurrent item — file a follow-up?; kernel-side gh auth-status wrappers in lib (get-open-prs/import-issues/cleanup) deferred — want th…
 ### 2026-10-03 @ses_f003caa48ffeGSthQJfGGpwkog
 ### 2026-10-03 @Reviewer
 verdict: request-changes (class not yet closed: one live instance of the same rule inside `worktreeRemediation`, doc drift on the post-start contract, one vacuous ordering assertion, CI red)
@@ -90,6 +180,102 @@ cwd for probes 1–3: /home/arggon/Projects/ArggonManager-task-cli-start-remedia
 3. **Worst-case clip numbers through the real sanitizer.** `npx vitest run cli/src/start.test.ts -t "MAX_HUMAN_ERROR_CHARS"`. Expected: both new tests pass with clipped length exactly 2003 and the tail bin absent — confirms the committed length formula on the real code path rather than my string arithmetic.
 4. **Smoke probe (blocking per engineering.md §Smoke — CLI behavior change).** On a disposable fixture repo: declare a bin-bearing devDependency, create a worktree with no install, run `arggon start <id> --worktree` and read the human stderr line top-down; repeat with a failing `pre-commit` hook; and capture `--json`. Expected: the human line leads with "start failed while …; the worktree was kept at …", then the remediation and the discard hint, with raw gate/bin output trailing — and for the pre-commit case the "Exact fix: run `npm ci` in <worktree>" clause present at or before the clip (that is F1's observable symptom). `--json` `error.message` must keep the full raw text. Expected-vs-observed goes in the verdict per convention.md.
 
+### Round 2 — `worktreeRemediation`'s `committing the claim` branch (F1), the site the first sweep missed
+
+The first sweep of this item enumerated four sites and called the class closed. It was not: `worktreeRemediation`'s `committing the claim` branch (`cli/src/start.ts`, from #517 `fb3b186e`) composed `<generic fix>` + `<readiness bin list, UNCAPPED>` + `Exact fix: run \`npm ci\` in <worktree>`, so the exact fix trailed the evidence and the head-kept clip ate the only clause naming the command to run. It is the MOST COMMON start failure — the one that actually creates the worktree. Five PRs (#573, #579, #595, #597, #608) each fixed the site they were looking at; this one was found only by a reviewer.
+
+Fixed here with TWO changes, because one was not enough:
+
+- **the exact fix leads the readiness evidence** — its position is now a function of the remediation clauses alone, so no bin list can push it past the clip. Measured on the committed worst-case fixture: exact fix at **3202 pre-fix** (clipped away entirely) and **584 post-fix**.
+- **the readiness list is bounded** (`MAX_HUMAN_GATE_BIN_NAMES = 2`, remainder counted as `and N more bins`, the same shape as `MAX_MISSING_DEPENDENCIES`/`MAX_CLAIM_WRITE_NAMES` and `strictWorktreeWriteFailure`'s `(and N more)`). Reordering alone left the caller's `To discard it instead` hint past the clip. Two and not three because at three the discard hint's tail was still cut: the guarantee is that every ACTIONABLE clause survives the clip WHOLE.
+
+Net at that worst case: the composed message is 1831 chars, under the 2000 cap, so nothing is elided at all.
+
+**On the numbers this item records (F4).** The `459 < 355` quoted in round 1 is NOT a stable fact and should not be read as one: both indices are `$TMPDIR`-length-dependent, because the worktree path appears twice in the composition (the kept-worktree note and the kernel's `npm ci in <path>`). Reproduced on the same commit: default `/tmp` gives `expected 459 to be less than 355`; the same test with `TMPDIR=/tmp/opencode/a-longer-tmpdir-prefix` gives `expected 523 to be less than 419` — both indices shift by the same 64. What reproduces everywhere is the ORDER: pre-fix the remedy index always exceeds the named-bin index, because the composition was lead -> detail -> remediation. That is now a pinned assertion, not a quoted number.
+
+**Doc drift fixed in the same PR (F2).** `docs/convention.md` and `docs/json-output.md` documented the post-start report with the hint TRAILING while this PR ships it leading; both carriers now describe shipped output and say WHY the order is what it is.
+
+**One vacuous assertion repaired, four guarded (F3).** The pre-commit-gate ordering test searched lowercase `if this is an identity error` against a message that now capitalizes it, so `indexOf` returned -1 and `-1 < n` passed unconditionally. All four substring-ordering assertions in this PR are now presence-checked before comparison.
+
+### 2026-10-03 @Arggon
+## Round 2 — all five review findings addressed, CI green, smoke run
+
+Branch `feat/task-cli-start-remediation-tail-clipped-on-human-channel` (merged `origin/main` in — the item-body conflict resolved as a UNION, this branch's evidence plus the reviewer's verdict block). Item left `in_progress`.
+
+**F1 — the class WAS not closed; fifth site fixed.** `worktreeRemediation`'s `committing the claim` branch composed `<generic fix>` + `<readiness bin list, uncapped>` + `Exact fix: run \`npm ci\` in <worktree>`. Two changes, both needed: the exact fix now LEADS the evidence (index 3202 -> 584 on the committed worst-case fixture; it was clipped away entirely), and the readiness list is bounded (`MAX_HUMAN_GATE_BIN_NAMES = 2`, remainder counted as `and N more bins`) so the caller's discard hint survives too. Composed length at that worst case: 3687 (over the cap) -> 1831, nothing elided. Proven failing against the pre-fix code: `expected 3202 to be less than 584` / `expected 'start failed while committing the cla…' to contain 'Exact fix for the observed resolution'` / `expected 969 to be 1607`.
+
+**F2 — docs travel with the change.** `docs/convention.md` + `docs/json-output.md` now describe the shipped post-start shape (hint leading) and say why, so the next reader does not "tidy" it back.
+
+**F3 — the vacuous assertion repaired, and the three that could have been.** The pre-commit-gate test searched lowercase `if this is an identity error` against a capitalized message -> `indexOf` = -1 -> `-1 < n` always passed. All four substring-ordering assertions in this PR are now presence-checked before comparison.
+
+**F4 — my own evidence corrected, not defended.** `459 < 355` is `$TMPDIR`-dependent (the worktree path appears twice in the composition): same commit, default `/tmp` gives `459 < 355`, `TMPDIR=/tmp/opencode/a-longer-tmpdir-prefix` gives `523 < 419` — both shift by 64. The reproducible claim is the ORDER, now a pinned assertion. The item's Notes carry the correction instead of the old number.
+
+**F5 — the deferred four are corrected out of the class** in the Notes: stderr is `ignore`d there, so `err.message` is a bounded argv echo and not clip-reachable. My round-1 "same shape" label was wrong; the record now says so.
+
+**F6 — CI.** `cli` **pass** on this head: run 37094336430, job 111121055514, 5m40s (122 files / 2280 tests). The requested rerun of the old job 111115828164 (old head `9bec17b9`) failed again with the known flake — `mcp-parity` -> `SpawnHarnessError: kernel artifact drift: the repo's built artifacts were REWRITTEN while this child ran` + `SyntaxError: './frontmatter.js' does not provide an export named 'numberField'`, 1 failed / 2276 passed: a parallel lane rebuilding `lib/dist` mid-run, not this diff (nothing in `lib/src`, no bundle change).
+
+**Smoke probe (engineering.md SSmoke).** Disposable fixture, real built CLI, human stderr read top-down; pre-fix (`start.ts` from `2f688024`) vs post-fix on the same probe for the `committing the claim (pre-commit gate)` step:
+
+```
+pre-fix : …attaches to the existing worktree.
+          Readiness: the gate binaries do not resolve inside the worktree — smoke-gate-dep: …
+          Exact fix for the observed resolution: run `npm ci` in <worktree>, then …   <-- trails
+          To discard it instead: `git worktree remove --force <worktree>`.
+
+post-fix: …attaches to the existing worktree.
+          Exact fix for the observed resolution: run `npm ci` in <worktree>, then …   <-- leads
+          Readiness: the gate binaries do not resolve inside the worktree — smoke-gate-dep: …
+          To discard it instead: `git worktree remove --force <worktree>`.
+          If this is an identity error, set `git config user.name` / `git config user.email`.
+          git commit -m claim: task-smoke failed: gate: deliberate failure
+```
+
+Every actionable clause leads; all evidence trails. `--json` keeps the full raw message (1092 chars, no elision) — the `--json` contract is unchanged.
+
+**Gates** (build BEFORE test): `npm run build` (bundle byte-identical) · `npm test` 122 files / 2280 tests · `npm run lint` · `npm run arggon -- validate` ok · `npm run check:plugin` no drift · `npm run test:structure` 3 passed · `npm run lint:structure` clean.
+
+**Acceptance #4** stays ticked but is annotated: round 1 ticked it at four sites and was wrong. It is re-ticked only now that the fifth site is fixed and the four non-reachable deferrals are corrected — with a note that a future site needs the `indexOf` presence-guard idiom, not another one-line reorder.
+
+### handoff 2026-10-03 @Arggon — next: Re-review+merge PR #608: F1 fifth site fixed, docs+tests repaired, cli job green (run 37094336430)
+- branch: feat/task-cli-start-remediation-tail-clipped-on-human-channel
+- open questions: Acceptance #4 is ticked with an annotation saying round 1 got it wrong — re-tick or leave?; MAX_HUMAN_GATE_BIN_NAMES=2 is my bound choice (3 still cut the discard hint) — sanity-check that trade-off?
+
+### Round 3 — the readiness bound is derived, and the failure envelope carries the array
+
+Round 2 approved the approach and the invariant but rejected the constant: `MAX_HUMAN_GATE_BIN_NAMES = 2` was an arbitrary discount, not the minimum needed to buy the invariant. The ruling was right, and the fix replaced the constant with a budget.
+
+**The budget.** `worktreeRemediation` now returns remedy ONLY. `worktreeFailureMessage` composes every mandatory clause (kept-worktree note, generic fix, exact fix, attach re-run, discard hint, raw detail), reserves their lengths plus the separator against `MAX_HUMAN_ERROR_CHARS`, and hands the remainder to `gateBinFailureReport(readiness, budget)`, which fills names until they stop fitting and counts the rest. At least one name whenever there is evidence; the budget can never reach a mandatory clause, because those were reserved first.
+
+**Measured on this item's own fixtures (8 broken bins):**
+
+| entry shape | chars/entry | names the budget fills | the constant-2 form showed | composed length |
+| --- | --- | --- | --- | --- |
+| deep sibling path (pathological) | ~317 | **2 of 8** | 2 (identical) | 1795, nothing elided |
+| ordinary checkout (`…/ArggonManager-main/node_modules/.bin`) | ~117 | **7 of 8** | 2 (five hidden that fitted) | 1980, nothing elided |
+
+**Why the hidden names were not cosmetic** — the same 8-bin fixture, run through the real built CLI before and after:
+
+| | constant-2 form | budget form |
+| --- | --- | --- |
+| names in `error.message` | 2 (`ast-grep`, `c8`) | 7 + `and 1 more bin not resolving inside it` |
+| flavors visible | `missing missing` | `missing missing path missing path path path` |
+| all 8 enumerable from a CLI surface | **no** — `readiness` absent | yes — `readiness.gateBins` carries all 8 with sources |
+
+The flavor line is failure mode #2 exactly: under the constant the two visible entries were both `missing`, so a reader would conclude "nothing resolves here" and never see that five bins resolve from a sibling `.bin` on PATH — a different diagnosis and a different first action. And the third piece of the `missingDependencies` / `missingDependenciesTotal` precedent that round 2 lacked is now real: the `--json` failure envelope gained an additive `readiness: { hasInstall, gateBins }` (`failEnvelope` takes an optional payload, the reason `successEnvelope` already did), carrying the COMPLETE observation, because `gateBins` rides the success envelope only.
+
+**F4 residual — the reviewer's arithmetic does not reproduce either, and here is the measurement.** The claim was that the gap between the two quoted indices is invariant at 183, so no `$TMPDIR` produces the 104 the evidence shows. Measured on the same composition the test builds (one `missing` bin, step `enforcing x-tracker.strict-gate-bins`, id `task-rate-limit`), sweeping `$TMPDIR`:
+
+| `$TMPDIR` | worktree path length | attach re-run index | named-bin index | gap |
+| --- | --- | --- | --- | --- |
+| `/tmp` | 40 | 459 | 355 | **104** |
+| `/tmp/x` | 42 | 463 | 359 | **104** |
+| `/tmp/a-longer-tmpdir-prefix` | 63 | 505 | 401 | **104** |
+
+So the gap is 104 for THIS composition at every path length, not 183 — both quoted numbers were real measurements of one run, and both move together with the path (the path appears twice, so +1 path char moves each index by 2). 183 does appear in the POST-fix composition of the same fixture (attach 203, named bin 622), which is the shape the reviewer may have measured. Nothing is dropped here because nothing was unreproducible; the order claim remains a pinned assertion rather than a quoted number.
+
+**Also folded in:** the tautological `expect([firstEntry, lastEntry]).toHaveLength(2)` is deleted (an array literal is always length 2; the surrounding `toContain` / `not.toContain` / derived-count assertions are the real guards); the bound is documented in words — not as a constant, because it is data-dependent — in `docs/convention.md` next to the `x-tracker.strict-gate-bins` bullet, which also reconciles the "names each offending bin" promise with what the readiness clause now does (the two kernel refusals are NOT bounded: their remedy is inside the message and the evidence is its tail); `docs/json-output.md` gains the `readiness` row.
+
+**One defect the round-3 smoke probe found that reading did not:** the wrapper takes a readiness snapshot for EVERY step, so appending the clause unconditionally grew a push failure a `Readiness: the gate binaries do not resolve …` list — and its exact fix — that had nothing to do with a push. The clause now hangs off the same condition the exact fix does, pinned per step.
 ### 2026-10-03 @ses_f003caa48ffeGSthQJfGGpwkog
 ### 2026-10-03 @Reviewer (round 2)
 verdict: request-changes (narrow: one required change — the readiness bound must be budget-derived, not the constant 2 — plus a doc line for it. F1/F2/F3/F5/F6 are closed and accepted; the approach and the invariant you chose are right.)
@@ -152,7 +338,62 @@ cwd for probes 1–2 and 4: /home/arggon/Projects/ArggonManager-task-cli-start-r
 3. **Gates on the amended head.** `npm run build && npm test && npm run lint` plus a green `cli` job. Expected: 122 files / 2280+ tests, lint clean, `check:plugin` no drift. The branch will move, so the earlier green run does not carry.
 4. **F4 numbers from an observed run.** `git stash push -- cli/src/start.ts && npx vitest run cli/src/start.test.ts -t "refuses the claim commit when the flag is set"; git stash pop` and paste the raw failure into the item. Expected: the attach re-run index strictly greater than the named-bin index (I compute ~537 vs ~356 for a 40-char `$TMPDIR` path), never a 104-char gap.
 
-### 2026-10-03 @ses_f003caa48ffeGSthQJfGGpwkog
+
+### 2026-10-03 @Arggon
+## Round 3 — the bound is derived, and the bound is no longer lossy
+
+Branch merged `origin/main` (PR was DIRTY against the coordinator's concurrent commits; item-body conflict resolved as a UNION — this branch's blocks and both verdict blocks all kept). Item left `in_progress`.
+
+### The constant is gone; the budget replaces it
+
+`worktreeRemediation` returns **remedy only**. `worktreeFailureMessage` composes every mandatory clause — kept-worktree note, generic fix, exact fix, attach re-run, discard hint, raw detail — reserves their lengths plus the separator against `MAX_HUMAN_ERROR_CHARS`, and hands the remainder to `gateBinFailureReport(readiness, budget)`, which fills names until they stop fitting and counts the rest. At least one name whenever there is evidence; the budget can never reach a mandatory clause, because those are reserved first.
+
+**Measured on this item's own fixtures (8 broken bins), both shapes as asked:**
+
+| entry shape | chars/entry | budget fills | constant-2 showed | composed length |
+| --- | --- | --- | --- | --- |
+| deep sibling path (pathological) | ~317 | **2 of 8** | 2 (identical) | 1795, nothing elided |
+| ordinary checkout (`…/ArggonManager-main/node_modules/.bin`) | ~117 | **7 of 8** | 2 (five hidden that fitted) | 1980, nothing elided |
+
+### The three failure modes, on the real built CLI, same 8-bin fixture, before vs after
+
+| | constant-2 form | budget form |
+| --- | --- | --- |
+| names in `error.message` | 2 (`ast-grep`, `c8`) | 7 + `and 1 more bin not resolving inside it` |
+| flavors visible | `missing missing` | `missing missing path missing path path path` |
+| all 8 enumerable from a CLI surface | **no** — no `readiness` field | yes — `readiness.gateBins` = all 8 with sources |
+
+The flavor row is failure mode #2 exactly: under the constant the two visible entries were both `missing`, so a reader concludes "nothing resolves here" and never sees that five bins resolve from a sibling `.bin` on PATH — a different diagnosis, a different first action.
+
+I verified the envelope claim before relying on it: the `start` failure path did carry only `{command, message, code, conventionVersion}` (`cli/src/cli.ts`, both `failJson` calls), and `gateBins` rides the success envelope only — so the hidden names were genuinely unreachable. Hence the third piece of the `missingDependencies` / `missingDependenciesTotal` precedent: **`failEnvelope` now takes an optional additive `payload`** (the reason `successEnvelope` already did), and `start` forwards `readiness: { hasInstall, gateBins }` with the COMPLETE observation. The bound is now a human-channel bound only.
+
+### F4 residual — settled by measurement, and the reviewer's arithmetic does not reproduce either
+
+Claim under test: the gap between the quoted indices is invariant at 183, so no `$TMPDIR` yields the 104 the evidence shows. Measured on the exact composition that test builds (one `missing` bin, step `enforcing x-tracker.strict-gate-bins`, id `task-rate-limit`), sweeping `$TMPDIR`:
+
+| `$TMPDIR` | path length | attach index | named-bin index | gap |
+| --- | --- | --- | --- | --- |
+| `/tmp` | 40 | 459 | 355 | **104** |
+| `/tmp/x` | 42 | 463 | 359 | **104** |
+| `/tmp/a-longer-tmpdir-prefix` | 63 | 505 | 401 | **104** |
+
+The gap is **104 at every path length for this composition**, not 183 — so both quoted numbers were real measurements of a single run, and both move together (+1 path char moves each index by 2, the path appearing twice). 183 does appear in the POST-fix composition of the same fixture (attach 203, named bin 622), which is plausibly what was measured. Nothing was dropped because nothing was unreproducible; the load-bearing claim remains a pinned assertion, not a quoted number.
+
+### Also in this round
+
+- The tautological `expect([firstEntry, lastEntry]).toHaveLength(2)` is deleted; the overflow count is derived from the fixture (`names.filter(...)`) so it cannot pass by naming nothing.
+- A mandatory clause cannot be eaten: an entry long enough to blow the whole budget (1200-char path segment) still yields a report with the generic fix, exact fix, attach re-run and discard hint intact. Min-1 rule pinned at budget 0.
+- Docs: `docs/convention.md` gains the bound stated **in words** (it is data-dependent), plus reconciliation of the "names each offending bin" promise — the two kernel refusals are NOT bounded (their remedy is inside the message, the evidence is its tail); `docs/json-output.md` gains the `readiness` row.
+- **One defect the probe found that reading did not:** the wrapper takes a readiness snapshot for EVERY step, so appending the clause unconditionally grew a *push* failure a `Readiness: the gate binaries do not resolve …` list and its exact fix. Now scoped to the committing-claim step and pinned per step.
+
+### Gates (build BEFORE test)
+
+`npm run build` (bundle regenerated, 457609 → 457642 bytes — `lib/src/json.ts` is inlined into the plugin; not hand-edited) · `npm test` **122 files / 2289 tests** · `npm run lint` · `npm run arggon -- validate` ok · `npm run check:plugin` no drift · `npm run test:structure` 3 passed · `npm run lint:structure` clean. CI on the merged head: `cli` pass 5m2s (run 37097168986, job 111129346900), `tasks-validate` pass, `ui-smoke` pass.
+
+### handoff 2026-10-03 @Arggon — next: Re-review+merge PR #608: bound now budget-derived (7/8 typical, 2/8 worst), readiness array on the failure envelope, cli green
+- branch: feat/task-cli-start-remediation-tail-clipped-on-human-channel
+- open questions: Is failEnvelope's new optional payload acceptable surface-wise, or should the readiness receipt be CLI-only?; F4: my measurement contradicts the review's 183 — accept the measured 104 table?
+
 ### 2026-10-03 @Reviewer (round 3)
 verdict: approve (the review findings are closed and verified; merge is still gated on one green `cli` run — the latest head `b0b9f93d` is red)
 

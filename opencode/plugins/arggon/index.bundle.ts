@@ -3037,6 +3037,7 @@ function failEnvelope(opts) {
         schemaVersion: exports.JSON_SCHEMA_VERSION,
         conventionVersion: opts.conventionVersion ?? convention_js_1.CONVENTION_VERSION_DEFAULT,
         command: opts.command,
+        ...(opts.payload ?? {}),
         error,
     };
 }
