@@ -118,3 +118,7 @@ $ npm run check:plugin   # build:plugin + git diff --exit-code — no drift
 Four sites in `cli/src/start.ts` fixed together: `worktreeFailureMessage` (the named defect; the single funnel for `strictWorktreeWriteFailure`, `strictGateBinFailure`, `freshWorktreeInstallRefusal`), `gh()`, `commitFile()`, `runPostStart()`'s failure report. Full swept list — compliant sites and the three deferred siblings (`cli/src/board.ts:141` owned by the concurrent `bug-three-acceptance-parsers-diverging`; the kernel-side `gh auth status` wrappers in `lib/src/get-open-prs.ts:67`, `lib/src/import-issues.ts:187`, `lib/src/cleanup.ts:259`) — is recorded in the item's Notes section.
 
 Item left `in_progress` for coordinator review.
+
+### handoff 2026-10-03 @Arggon — next: Review+merge PR #608 (draft): 4 CLI start error paths reordered so the remedy leads; item stays in_progress
+- branch: feat/task-cli-start-remediation-tail-clipped-on-human-channel
+- open questions: cli/src/board.ts:141 has the same violation but is owned by the concurrent item — file a follow-up?; kernel-side gh auth-status wrappers in lib (get-open-prs/import-issues/cleanup) deferred — want th…
