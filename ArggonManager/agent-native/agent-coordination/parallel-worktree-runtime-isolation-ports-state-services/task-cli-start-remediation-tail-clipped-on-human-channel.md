@@ -59,11 +59,12 @@ Only clause ORDER moved — every clause is verbatim, none added or dropped. `wo
 - `cli/src/cleanup.ts` refusals — clamped at `MAX_ENVELOPE_DETAIL_CHARS` (500) on a machine surface before any advice could be clipped.
 - `cli/src/mcp-server.ts` `spawnedOutcome` — the raw stderr is already the LAST clause, and `clipTail` keeps the tail.
 
-**Swept, same shape, DEFERRED to the coordinator (out of this item's files):**
+**CORRECTION (round-2 review F5 + coordinator): NOT part of this class.** The four sites this sweep originally deferred were reported as "same shape", which was wrong, and the record is corrected here rather than left standing:
 
-- `cli/src/board.ts:141` — ``GitHub overlay unavailable: <gh detail> (or run plain `arggon board` for the offline snapshot)``: the identical ordering violation, but `cli/src/board.ts` + `cli/src/board.test.ts` are owned by the concurrently worked `bug-three-acceptance-parsers-diverging`, so this fix must not touch them. Worth one small follow-up.
-- `lib/src/get-open-prs.ts:67`, `lib/src/import-issues.ts:187`, `lib/src/cleanup.ts:259` — the ``gh <args> failed (<stderr>; check `gh auth status`)`` kernel wrappers: same shape (unbounded gh stderr, then the auth hint), one line each, kernel-side. Reported rather than fixed here to keep this diff on the CLI start channel.
-- `cli/src/branch.ts:127`, `lib/src/comment.ts:236-239`, `lib/src/show.ts:184`, `cli/src/layout-migrate.ts:83` — advice after a BOUNDED short clause (a branch name, a filename); no realistic clip exposure.
+- `cli/src/board.ts:141`, `lib/src/get-open-prs.ts:67`, `lib/src/import-issues.ts:187`, `lib/src/cleanup.ts:259` — all four run `gh` with `stdio: ["ignore","pipe","ignore"]`, so the interpolated `err.message` is a bounded `Command failed: gh … <argv>` echo, NOT an unbounded stderr tail. They are therefore **not clip-reachable**: no amount of remedy-after-detail ordering can push a remedy off a 2000-char head-clip that the detail cannot reach. They are a CONSISTENCY question, tracked as such in `task-clip-class-sweep-remaining-sites`; nothing here needed to change, and no future auditor should re-audit them as clip sites.
+- `cli/src/branch.ts:127`, `lib/src/comment.ts:236-239`, `lib/src/show.ts:184`, `cli/src/layout-migrate.ts:83` — advice after a BOUNDED short clause (a branch name, a filename); no realistic clip exposure. Verified by the reviewer on reading.
+
+**Correction to the "Fixed (4 sites)" count above: it was five, not four.** `worktreeRemediation`'s `committing the claim` branch (from #517) was a live instance of the same rule that the first sweep missed — see the round-2 section below.
 
 ### 2026-10-03 @Arggon
 ## Evidence — PR #608 (`feat/task-cli-start-remediation-tail-clipped-on-human-channel`)
@@ -179,3 +180,20 @@ cwd for probes 1–3: /home/arggon/Projects/ArggonManager-task-cli-start-remedia
 2. **Pre-fix proof re-record.** `git stash push -- cli/src/start.ts && npx vitest run cli/src/start.test.ts -t "refuses the claim commit when the flag is set"; git stash pop`. Expected: the new ordering assertion fails with the attach re-run index AFTER the named-bin index (my arithmetic: ~537 vs ~355 for a 39-char temp path — not 459). Turns F4 into a recorded, reproducible proof.
 3. **Worst-case clip numbers through the real sanitizer.** `npx vitest run cli/src/start.test.ts -t "MAX_HUMAN_ERROR_CHARS"`. Expected: both new tests pass with clipped length exactly 2003 and the tail bin absent — confirms the committed length formula on the real code path rather than my string arithmetic.
 4. **Smoke probe (blocking per engineering.md §Smoke — CLI behavior change).** On a disposable fixture repo: declare a bin-bearing devDependency, create a worktree with no install, run `arggon start <id> --worktree` and read the human stderr line top-down; repeat with a failing `pre-commit` hook; and capture `--json`. Expected: the human line leads with "start failed while …; the worktree was kept at …", then the remediation and the discard hint, with raw gate/bin output trailing — and for the pre-commit case the "Exact fix: run `npm ci` in <worktree>" clause present at or before the clip (that is F1's observable symptom). `--json` `error.message` must keep the full raw text. Expected-vs-observed goes in the verdict per convention.md.
+
+### Round 2 — `worktreeRemediation`'s `committing the claim` branch (F1), the site the first sweep missed
+
+The first sweep of this item enumerated four sites and called the class closed. It was not: `worktreeRemediation`'s `committing the claim` branch (`cli/src/start.ts`, from #517 `fb3b186e`) composed `<generic fix>` + `<readiness bin list, UNCAPPED>` + `Exact fix: run \`npm ci\` in <worktree>`, so the exact fix trailed the evidence and the head-kept clip ate the only clause naming the command to run. It is the MOST COMMON start failure — the one that actually creates the worktree. Five PRs (#573, #579, #595, #597, #608) each fixed the site they were looking at; this one was found only by a reviewer.
+
+Fixed here with TWO changes, because one was not enough:
+
+- **the exact fix leads the readiness evidence** — its position is now a function of the remediation clauses alone, so no bin list can push it past the clip. Measured on the committed worst-case fixture: exact fix at **3202 pre-fix** (clipped away entirely) and **584 post-fix**.
+- **the readiness list is bounded** (`MAX_HUMAN_GATE_BIN_NAMES = 2`, remainder counted as `and N more bins`, the same shape as `MAX_MISSING_DEPENDENCIES`/`MAX_CLAIM_WRITE_NAMES` and `strictWorktreeWriteFailure`'s `(and N more)`). Reordering alone left the caller's `To discard it instead` hint past the clip. Two and not three because at three the discard hint's tail was still cut: the guarantee is that every ACTIONABLE clause survives the clip WHOLE.
+
+Net at that worst case: the composed message is 1831 chars, under the 2000 cap, so nothing is elided at all.
+
+**On the numbers this item records (F4).** The `459 < 355` quoted in round 1 is NOT a stable fact and should not be read as one: both indices are `$TMPDIR`-length-dependent, because the worktree path appears twice in the composition (the kept-worktree note and the kernel's `npm ci in <path>`). Reproduced on the same commit: default `/tmp` gives `expected 459 to be less than 355`; the same test with `TMPDIR=/tmp/opencode/a-longer-tmpdir-prefix` gives `expected 523 to be less than 419` — both indices shift by the same 64. What reproduces everywhere is the ORDER: pre-fix the remedy index always exceeds the named-bin index, because the composition was lead -> detail -> remediation. That is now a pinned assertion, not a quoted number.
+
+**Doc drift fixed in the same PR (F2).** `docs/convention.md` and `docs/json-output.md` documented the post-start report with the hint TRAILING while this PR ships it leading; both carriers now describe shipped output and say WHY the order is what it is.
+
+**One vacuous assertion repaired, four guarded (F3).** The pre-commit-gate ordering test searched lowercase `if this is an identity error` against a message that now capitalizes it, so `indexOf` returned -1 and `-1 < n` passed unconditionally. All four substring-ordering assertions in this PR are now presence-checked before comparison.
