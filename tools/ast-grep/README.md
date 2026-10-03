@@ -120,16 +120,80 @@ plugin schema/parity tests remain the authoritative check for renamed
 receivers, as for handle indirection: this guard is high-confidence and
 deliberately not exhaustive semantic enforcement.
 
+## `ordering-assertions-use-assert-order`
+
+An **ordering** assertion — "this clause comes before that one" — must go
+through `assertOrder` from `test/assert-order.ts`, not a bare `indexOf`
+comparison.
+
+This exists because of `bug-vacuous-substring-ordering-assertions`. The idiom
+this repo keeps adding for clip-order contracts was written
+
+```ts
+expect(msg.indexOf("if this is an identity error")).toBeLessThan(msg.indexOf("something"));
+```
+
+`String.prototype.indexOf` answers **-1** for an absent needle, and `-1` sorts
+before every real index, so the assertion passes when the order is correct,
+when it is **reversed**, and when the clause was **renamed out from under it**.
+The live instance: PR #608 reworded a refusal message to `If this is an
+identity error, set ….`, the test kept searching the lowercase
+`"if this is an identity error"`, and the guard went vacuous at exactly the
+moment the behavior it pinned changed. A guard that disarms itself on a rename
+is worse than none, because it still reads like coverage.
+
+**What it catches.** A positional comparison of an `indexOf` result inside
+`expect(...)`, in either shape:
+
+- two-sided — `expect(a.indexOf(x)).toBeLessThan(b.indexOf(y))`;
+- one-sided — `expect(a.indexOf(x)).toBeLessThan(idx)`, where `idx` is a
+  variable holding another needle's position (this is how all 22 swept sites
+  were written).
+
+Every matcher in the family fires: `toBeLessThan`, `toBeGreaterThan`,
+`toBeLessThanOrEqual`, `toBeGreaterThanOrEqual`.
+
+**What it does not catch** — deliberate, and the same shape of limitation the
+sibling rules document:
+
+- **A numeric literal on the right is exempt.** `expect(html.indexOf("</head>"))
+.toBeGreaterThan(0)` is a presence check, not an order claim: an absent
+  needle answers `-1` and `-1 > 0` fails loudly. Such forms already pin
+  presence, so they stay legal.
+- **An intermediate variable.** `const at = msg.indexOf(needle)` followed by
+  `expect(at).toBeLessThan(other)` carries no `indexOf` at the comparison site,
+  so it is not matched. The clean forms of that shape are covered by
+  `cli/src/assert-order.test.ts` and by review; presence still has to be
+  asserted there. Renaming the receiver or splitting the call across lines is
+  likewise out of structural reach.
+- **An ordering claim expressed another way** — regex capture groups, a
+  `split`/`join` round-trip — is not this rule's subject.
+- **Production code.** Only test files are scanned (`**/*.test.ts(x)`,
+  `**/*.spec.ts(x)`): the vacuity is a property of an _assertion_, and
+  `indexOf` in production code is ordinary string work. `indexOf` used as a
+  **parser** (`raw.slice(0, raw.indexOf("\n---\n") + 5)`) asserts nothing and is
+  untouched.
+- `cli/src/assert-order.test.ts` is ignored on purpose: that file asserts the
+  bare idiom IS vacuously green for the exact reworded message, so the defect
+  stays demonstrated in the suite rather than only described in a comment.
+
+The sanctioned replacement is `assertOrder(haystack, ...needles)`: it requires
+every required needle to be **present** before it compares positions, and
+optionality must be spelled `{ text, optional: true }` at the call site, so it
+can never be inferred. For presence alone use `expect(subject).toContain(text)`
+— `toContain` fails on an absent needle, so it is never vacuous.
+
 ## Scope and local checks
 
 The two tracker rules scan hand-authored production `.ts`/`.tsx` files outside
 `lib/src`. The native rule scans only the hand-authored Arggon plugin sources.
-Unit/smoke harnesses, fixture trees, the committed plugin bundle, generated or
-vendored `.opencode` plugin files, and `tools/ast-grep/**` itself are excluded to
-avoid false positives. The two package-excluded test helpers
-`cli/src/test-tmp.ts` and `cli/src/pack-fixtures.ts` are explicitly excluded and
-documented here; the canonical plugin source remains covered by the native-tool
-rule. These scope choices do not let production adapters bypass a boundary.
+The ordering rule scans only test files. Unit/smoke harnesses, fixture trees,
+the committed plugin bundle, generated or vendored `.opencode` plugin files,
+and `tools/ast-grep/**` itself are excluded to avoid false positives. The two
+package-excluded test helpers `cli/src/test-tmp.ts` and
+`cli/src/pack-fixtures.ts` are explicitly excluded and documented here; the
+canonical plugin source remains covered by the native-tool rule. These scope
+choices do not let production adapters bypass a boundary.
 
 Run the deterministic checks from the repository root:
 
