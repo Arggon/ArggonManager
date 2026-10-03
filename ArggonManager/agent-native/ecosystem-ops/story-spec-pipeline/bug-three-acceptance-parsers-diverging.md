@@ -145,3 +145,7 @@ verdict agreement: gate blocks=true board=true pane=true panel=true
 
 1. **PR #605 must be re-checked after this merges.** Its corrected header now says "there are TWO parsers, not one", names `cli/src/board.ts` as CRLF-blind, requires `normalizeEol` "not cosmetic", and keeps an `UNRENDERABLE` branch for "the kernel predicate and the checklist reader disagree on this body". After this merge all four are false: there is one parser, the kernel is CRLF-safe, `normalizeEol` is optional, and that branch is unreachable. Those files are not on `main`, so I could not correct them from here. The board's own "kernel's own" prose was already corrected in #605 (item Notes line 907 records it) and nothing stale shipped on `main` — verified by grep.
 2. **`describe.sequential` in `cli/src/headless-ci.test.ts:150` does not typecheck against the installed vitest 5.0.0** (`SuiteAPI` has no `sequential`), which fails `npm run build`'s `tsconfig.typecheck.json` pass. Pre-existing, not mine, not fixed here.
+
+### handoff 2026-10-03 @Arggon — next: Review + open the PR for fix/bug-three-acceptance-parsers-diverging (pushed, 9 commits, all gates green); then re-check PR #605's goal-mode header after this merges.
+- branch: fix/bug-three-acceptance-parsers-diverging
+- open questions: #605's 'TWO parsers / CRLF-blind board / normalizeEol required / UNRENDERABLE' prose becomes false once this merges - who updates it? Also pre-existing: describe.sequential vs vitest 5.0.0 types brea…
