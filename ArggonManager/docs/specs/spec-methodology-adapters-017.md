@@ -72,11 +72,38 @@ failing adapter degrades to that.
 ### S2 — Adapter selection at init
 
 - `arggon init --agents <list>` (comma-separated: `opencode`, `zcode`,
-  `claude`) selects which adapters materialize. Default: every detected
-  agent. `--no-agents` suppresses adapter generation (docs+CLI only).
-- `arggon doctor --agents` reports, per agent: adapter files present /
-  stale / adopter-edited, and the matching methodology-mechanism row from
-  the capability matrix.
+  `claude`) selects which adapters materialize. `--no-agents` suppresses
+  adapter generation (docs+CLI only).
+- The **default selection is two-part**, because "every detected agent" alone is
+  wrong for a tree that has no agent yet — which is every brand-new
+  `arggon init`:
+  1. **the tree carries a marker for agent X** → select exactly the detected
+     agents (markers: OpenCode's four config shapes or `.opencode/`,
+     `.zcode-marketplace/`, `CLAUDE.md`/`.claude`; the repo's own config, never
+     what happens to be on the operator's PATH);
+  2. **the tree carries no marker at all** (a fresh scaffold) → select every
+     KNOWN agent.
+
+  The reason for (2): a literal "default: every detected agent" makes a first
+  `arggon init` in a fresh repo detect nothing and therefore ship **no adapter at
+  all** — silently deleting the OpenCode and ZCode seams init has always
+  generated, breaking the generated `AGENTS.md` contract and the tier-1 doc list
+  in `README.md`, and leaving the very first adopter with a docs-and-CLI-only
+  tree they never asked for. (2) keeps the pre-selection default on the one
+  tree that cannot express a preference, while an adopter who wants a narrower
+  set says so with `--agents` — the flag is how an existing tree is narrowed.
+  `--json` reports which rule fired (`selection.mode: "detect"` plus `detected`),
+  so the default is never a silent one.
+
+- `arggon doctor --agents` reports, per agent: adapter files by what `init`
+  would actually do with them — `present` (byte-equal to the current render) /
+  `acknowledged` / `acknowledged-drifted` / `adopter-edited` / `stale` /
+  `missing` / `unverified` — and that agent's capability-matrix gap rows. No
+  status may name a protection or a refresh `init` does not provide: `stale` is
+  the only one that means "`arggon init` would refresh this", and a file with no
+  provenance state is adopter-owned (`adopter-edited`), not `stale`. The
+  acknowledged statuses mirror the `docs` block's existing vocabulary so one
+  envelope never calls the same file two different things.
 
 ### S3 — Capability matrix (machine-readable, report-only)
 
@@ -120,11 +147,20 @@ failing adapter degrades to that.
 
 - [ ] README + carriers declare the methodology (scope/invariants/version/
       upgrade channel); a fresh adopter can find it from `README.md` in one hop
-- [ ] `arggon init --agents opencode,zcode --no-agents` matrix tested: each
+- [x] `arggon init --agents opencode,zcode --no-agents` matrix tested: each
       combination generates exactly the selected adapter, never overwrites
       adopter edits, and `--json` reports what was written/skipped
-- [ ] `arggon doctor --agents` prints present/stale/adopter-edited per
+      (PR #606, `task-adapter-selection-flags`: 7-row flag matrix over the real
+      fixture tree incl. the re-init path and the detection default, an UNKNOWN
+      name refused by name with nothing written, and `--backup`'s
+      archived-and-regenerated file reported as `replaced`)
+- [x] `arggon doctor --agents` prints present/stale/adopter-edited per
       adapter file and lists matrix gap rows
+      (PR #606: the status set was widened to what `init` really does — the
+      `acknowledged`/`acknowledged-drifted` pair plus `adopter-edited` for a
+      no-provenance-state file, with `stale` narrowed to the case a re-init
+      would refresh — and per-agent gap rows come from the shipped matrix
+      reader)
 - [ ] Capability matrix committed, valid JSON, one row per
       invariant × supported agent, every gap carrying a note
 - [ ] OpenCode adapter: prompt-admission stamp + event-driven board panel
