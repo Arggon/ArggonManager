@@ -13,7 +13,6 @@ claimed_at: "2026-10-02T23:58:06.586Z"
 depends_on: [task-adapter-selection-flags, task-capability-matrix]
 worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-goal-mode
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-zcode-adapter/task-zcode-goal-mode.md
   Leaves live only under a story. id is the filename stem: task-zcode-goal-mode.
@@ -1447,3 +1446,72 @@ For the coordinator/prover in `/home/arggon/Projects/ArggonManager-task-zcode-go
 
 <<<THEIRS>>>
 What remains is the same defect B1 was filed for, arriving through the input instead of the parser: the gate's verdict is now authoritative but is read from `shown.prose` while the gate reads `item.body`, which disagrees on **21 of the 280 items in this tracker** — every item whose acceptance checklist was filed as a comment, the shape `arggon create` produces by design. Fix line 526, correct the two comments that describe the call as taking `body`, add one comment-borne case to the corpus, and extend the follow-up item's acceptance to name this case. Then squash-merge — no rebase, no force-push.
+
+### 2026-10-03 @Arggon
+Round-3 review closed: B1/B2/B3 fixed, published. Branch tip `92aff9e1` == worktree tip == remote tip.
+
+**B1 — the reviewed tip is now published (the real blocker).** `git ls-remote origin refs/heads/feat/task-zcode-goal-mode` → `92aff9e1426ce409f63847b33b1662f0ea5375b0`, identical to this worktree's `git rev-parse HEAD`. The push was `9686798d..92aff9e1` — a **fast-forward**, `origin/main` contained first (`git merge-base --is-ancestor origin/main HEAD` → yes), **no force-push and none attempted** (the branch stays published and un-rebased for the coordinator's squash).
+
+What the push carries, in order:
+- `93ec81b5` — the seam regeneration, which is exactly what makes `tasks-validate` green (below)
+- `92aff9e1` — the `origin/main` merge with B2/B3 below and the two cheap non-blocking fixes
+
+**The drift gate is green at this head, proven the way CI runs it** (`.github/workflows/arggon.yml`, job `tasks-validate`, step "Committed seam is current"; `ARGGON_VERSION: "0.5.0"` read from the workflow's own literal):
+```
+--- step 1: committed provenance marker present?  yes
+--- step 2: pinned-lag (COMMITTED state via git show HEAD:…)  newest committed stamp = 0.5.0 (not ahead of the pin)
+--- step 3: re-generate with this checkout's own build, then require a clean tree
+    clean (exit 0)
+--- state-file-only changes (documented exclusion):  M ArggonManager/.convention.yml
+GATE RESULT: PASS
+```
+Reproduced-then-fixed, so the failure was real and is now gone: before `93ec81b5`, `node dist/cli.js init --no-commit` left exactly ` M .zcode-marketplace/arggon/commands/arggon-goal.md` and ` M .zcode-marketplace/arggon/templates/goal-mode.md`. Both are now byte-identical to their templates modulo the marker line (`diff <(tail -n +3 seam) <(tail -n +2 template)` is empty; marker `# arggon:generated template="zcode/arggon/…"`).
+
+**On "was the seam hand-edited?" — no, and that is the finding.** Round 3 edited only `templates/docs/zcode/**`; the committed seam still carried the round-1 generator's bytes. An omission, not a hand-edit, so there was nothing to reverse. Regenerated with the gate's own remedy (`npm ci --ignore-scripts && npm run build && node dist/cli.js init`, `--no-commit` so nothing is silently staged) and committed **with** the template change, not after it.
+
+**B2 — the botched README sentence, re-read in full.** `README.md` now says:
+
+> Bounded output: the objective and each verification line are byte-clipped, at most 8 criteria are inlined and the rest are counted in `verificationOmitted` (clipping the ROWS is the kernel's guidance for a consumer that renders them), and the template copy is clipped before rendering — so a tampered or oversized item (or an inflated template) cannot produce an unbounded contract.
+
+Every clause is a thing the code does (`MAX_OBJECTIVE_BYTES`, `MAX_VERIFICATION_LINE_BYTES`, `MAX_INLINED_CRITERIA`, `verificationOmitted`, the template-copy cap, `truncated`) — no leftover "a clipped rows".
+
+**B3 — both union artifacts, and one more found while proving it.** Repaired in the merge commit `92aff9e1`:
+- the two-spaces evidence cell is back: line 182 reads `DIVERGE | two spaces before box gate_unchecked=false goal_has_criterion=true   ("-  [ ] x")`
+- the round-2 `### …@…` heading is on its own line, so `parseComments` can see it
+
+Verified the way you asked (`lib/src/show.ts` `parseComments` matches `^### (\d{4}-\d{2}-\d{2}) @(\S+)\s*$` — a heading must be the WHOLE line): **11 dated headings, 11 alone on their own line, 0 glued and 0 with trailing content** (that is a stricter check than the one you ran, because the artifact you found was heading-*first*-then-prose, not prose-then-heading — a date-and-`@`-pattern scan catches only the latter). The item file still parses: `npm run arggon -- validate` → `ok (0 warning(s), convention v5)`, and `arggon show task-zcode-goal-mode --json` returns the item with its claim.
+
+**While proving "nothing was lost" I found a third record defect, also fixed.** The auto-merge had kept *this branch's* copy of the round-1 verdict — which an earlier union had already truncated to a fragment — and dropped main's complete copy: the fragment was missing `## Scope reviewed`, `## Blocking findings` and the `verdict: request-changes (…)` line, i.e. the verdict's own summary. The union is now rebuilt deterministically: all of this side's blocks plus all of main's, interleaved in true chronology (evidence → round-1 verdict → round-1 response → round-2 verdict → round-2 response → pass-3 note → round-3 verdict), main's complete text winning for a block that exists on both sides. All three verdicts' bodies and headings are present (`derivation does not reuse` ×1, `round 2 —` ×3, `round 3 —` ×1).
+
+**One deliberate deviation from "main's frontmatter", flagged rather than hidden:** main's copy of this item carries **no claim at all** (`status: todo`, no `assignee`/`branch`/`claimed_at`/`worktree_path`) because the claim commit lives on this branch. Taking main's frontmatter verbatim would have unclaimed an in-flight item whose worktree exists, so the union keeps this branch's live claim fields on top of main's metadata. That is the only field-level departure; the comment record is a union as instructed.
+
+**Non-blocking, the two cheap ones done:**
+- `cli/src/board.ts:757` — the clause no longer names `cli/src/goal-mode.ts` as an importer; it now reads that the alias is kept for the drawer tests and adopter-side callers, "since the unification the ZCode goal contract reads the kernel directly, like every other consumer".
+- **`GOAL_WORKTREE_MISMATCH` probe added**, and it discriminates: the item's recorded `worktree_path` points at a *real* sibling checkout (so `GOAL_WORKTREE_MISSING` cannot be what fired), and the same item renders from inside it —
+```
+$ arggon goal task-wrongwt --json      # from the checkout that is NOT the recorded worktree
+{'ok': False, 'code': 'GOAL_WORKTREE_MISMATCH', 'conventionVersion': 5}
+$ (cd "$RECORDED_WORKTREE" && arggon goal task-wrongwt --json)
+{"objective": "a criterion", "hasGoal": true, "gateUnchecked": true}
+```
+  My first version of this probe was **wrong and said nothing**: it appended `worktree_path:` at the end of the file, i.e. into the *body*, so the frontmatter had none and the command correctly rendered (`recorded: false`). Two independent shapes now recorded in the probe. All 13 probe cases re-run green, and the case is in the PR body.
+- **Delivery-note wording** — the PR body said "The push is a fast-forward" while the push had not happened; it now names the actual range `9686798d..92aff9e1`, and the item-file note says precisely what the union did (above) instead of the shorthand "main's frontmatter".
+
+**Not fixed here, and why:** `ArggonManager/docs/convention.md:150`'s "still needs `cli/src/acceptance-parity.test.ts`, which asserts each consumer reads `acceptanceBody(item)`" is an overstatement — the suite hands `acceptanceBody(item)` to both consumers itself, so a wrong call site stays green. That is exactly the open bug `bug-parity-suite-cannot-catch-wrong-input-at-call-sites` (status `todo`, parent `story-spec-pipeline`), and the sentence is the claim that bug exists to retire. Editing the carrier doc here would pre-empt that item's scope under a Behavioral impact class, so it is left for its owner rather than duplicated here.
+
+**Gates on the pushed tree** (`npm run build` before `npm test`, in the worktree at `92aff9e1`):
+
+| gate | observed |
+| --- | --- |
+| `npm run build` | ok — build:plugin 459439 bytes |
+| `npm test` | green — 127 files, 2633 passed |
+| `npm run lint` | clean |
+| `npm run arggon -- validate` | `ok (0 warning(s), convention v5)` |
+| `npm run check:plugin` | bundle byte-identical, no diff |
+| `npm run test:structure` | 5 ast-grep tests passed (incl. `acceptance-rows-use-kernel`) |
+| `npm run lint:structure` | green |
+| `tasks-validate` drift gate | PASS (transcript above) |
+
+PR #605 body updated with the new probe, the seam/drift-gate note, the corrected delivery note and the refreshed gate numbers; head is `92aff9e1`, mergeable, ready for review.
+
+Item stays `in_progress`; spec/plan `status` stays `proposed` (§S5's box also covers `task-zcode-automations`); the 15 pre-existing stamp mismatches remain stated-not-fixed (`arggon adopt --ack` is a human step).
