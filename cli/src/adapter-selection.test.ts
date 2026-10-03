@@ -408,6 +408,28 @@ describe("doctor --agents: per-agent report", () => {
     }
   });
 
+  it("snapshots the per-agent human block on a full init (the report's contract)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    // A full init with no markers narrowing it and no matrix in the tree: every
+    // file is present, every agent is detected, every gap list is empty. That is
+    // the deterministic shape, so the block's exact wording — the report an
+    // operator reads — is pinned rather than merely probed for substrings.
+    //
+    // Only the per-agent lines are snapshotted: they carry counts and statuses,
+    // never a path, so they do not move with a new template, while the file
+    // counts themselves FAIL the snapshot whenever the seam's shape changes.
+    const lines = formatDoctorReport(runDoctor({ cwd: dir, agents: true }))
+      .split("\n")
+      .filter((line) => /^ {2}agent[s]?\b/.test(line) || /^ {4}gap:/.test(line));
+    expect(lines.join("\n")).toMatchInlineSnapshot(`
+      "  agents: claude, opencode, zcode (adapter selection: init --agents / --no-agents; report-only)
+        agent claude: 2 file(s) — 2 present, 0 stale, 0 adopter-edited (yours, never overwritten), 0 missing, 0 unverified; 0 capability gap(s)
+        agent opencode: 18 file(s) — 18 present, 0 stale, 0 adopter-edited (yours, never overwritten), 0 missing, 0 unverified; 0 capability gap(s)
+        agent zcode: 19 file(s) — 19 present, 0 stale, 0 adopter-edited (yours, never overwritten), 0 missing, 0 unverified; 0 capability gap(s)"
+    `);
+  });
+
   it("reports a tree with no matrix as present:false, exit 0, never a failure", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
@@ -446,6 +468,10 @@ describe("doctor --agents: per-agent report", () => {
       expect(text).toContain(`${PER_AGENT_COUNT[agent]} file(s)`);
       expect(text).toContain("adopter-edited (yours, never overwritten)");
     }
+    // The file counts are asserted against the registry, not against a literal:
+    // the seam grows whenever a template is added, and a hardcoded count here
+    // would rot silently into a wrong expectation. (The counts the SNAPSHOT
+    // pins are the ones that must not move for a reason we did not intend.)
     // Report-only wording is explicit, and gap rows are attached to their agent.
     expect(text).toContain("report-only");
     const claude = text.split("agent claude: ")[1]!;
