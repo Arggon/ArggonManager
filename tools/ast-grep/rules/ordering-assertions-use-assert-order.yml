@@ -1,0 +1,72 @@
+id: ordering-assertions-use-assert-order
+language: Tsx
+severity: error
+message: >-
+  Ordering assertions must go through assertOrder (test/assert-order.ts), not a bare
+  `expect(text.indexOf(needle)).toBeLessThan(...)`: indexOf answers -1 for an absent
+  needle and -1 sorts before every real index, so the assertion passes when the order
+  is wrong, reversed, or the clause was renamed out from under it.
+note: |
+  Rationale: bug-vacuous-substring-ordering-assertions. The live instance was a
+  refusal-message ordering test that searched a lowercase "if this is an identity
+  error" after the message was reworded to "If this is an identity error, set ...".
+  The substring stopped matching, indexOf answered -1, and `-1 < n` passed — at the
+  exact moment the behavior it was meant to pin changed. A guard that disarms itself
+  on a rename is worse than no guard, because it reads like coverage.
+
+  This is the ordering-of-message idiom the clip-order work keeps adding, so it is
+  guarded STRUCTURALLY rather than per-site: every new clause is covered the moment
+  it is written.
+
+  WHAT IT CATCHES: a positional comparison of an indexOf result inside expect(...).
+  Both the two-sided form (needle vs needle) and the one-sided form (needle vs a
+  variable holding another needle's index) fire, as do every matcher in the family
+  — toBeLessThan, toBeGreaterThan and their -OrEqual variants.
+
+  WHAT IT DOES NOT CATCH — deliberate, and the same shape of limitation the sibling
+  rules document:
+
+  - An intermediate variable. `const at = msg.indexOf(needle)` followed by
+    `expect(at).toBeLessThan(other)` carries no indexOf at the comparison site, so
+    it is not matched. The clean forms of that shape ARE covered by the unit suite
+    (cli/src/assert-order.test.ts) and by review; presence still has to be asserted
+    there. Renaming the receiver or splitting the call across lines is likewise out
+    of structural reach.
+  - An ordering claim expressed any other way. Comparing positions without indexOf
+    (a regex with capture groups, a split/join round-trip) is not this rule's
+    subject.
+  - Production code. Only test files are scanned: the vacuity here is a property of
+    an ASSERTION, and indexOf in production code is ordinary string work.
+
+  The sanctioned replacement is assertOrder(haystack, ...needles) from
+  test/assert-order.ts: it requires every required needle to be PRESENT before it
+  compares positions, and optionality must be spelled { text, optional: true } at
+  the call site so it can never be inferred. Presence-only assertions should use
+  expect(subject).toContain(text) — toContain fails on an absent needle, so it is
+  never vacuous.
+files:
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+ignores:
+  - "opencode/plugins/arggon/index.bundle.ts"
+  - ".opencode/plugins/arggon/**"
+  - "node_modules/**"
+  - "tools/ast-grep/**"
+  # The regression proof itself: cli/src/assert-order.test.ts asserts that the
+  # bare idiom IS vacuously green for the exact reworded message, so the
+  # defect this rule forbids stays demonstrated in the suite rather than only
+  # described in a comment.
+  - "cli/src/assert-order.test.ts"
+rule:
+  pattern: expect($SUBJECT.indexOf($$$NEEDLE_ARGS)).$MATCHER($POSITION)
+constraints:
+  MATCHER:
+    regex: "^(toBeLessThan|toBeGreaterThan|toBeLessThanOrEqual|toBeGreaterThanOrEqual)$"
+  # A NUMERIC literal on the right is a presence check, not an order claim: an
+  # absent needle answers -1, and `-1 > 0` / `-1 >= 0` fail loudly, so those
+  # forms already pin presence and stay legal.
+  POSITION:
+    not:
+      regex: "^-?[0-9]+(\\.[0-9]+)?$"
