@@ -1252,3 +1252,7 @@ for review**; the coordinator squash-merges and flips.
 Unchanged on purpose: boundaries still appended from CLI constants; still no MCP tool; the
 15 pre-existing stamp mismatches on main remain stated-not-fixed (`arggon adopt --ack` is a human
 step). Spec/plan `status` stays `proposed`; this item stays `in_progress`.
+
+### handoff 2026-10-03 @Arggon — next: coordinator: squash-merge PR #605 (now ready for review) and flip the item
+- branch: feat/task-zcode-goal-mode
+- open questions: nothing outstanding on this item; adopt --ack for the 15 pre-existing stamp mismatches stays a human step
