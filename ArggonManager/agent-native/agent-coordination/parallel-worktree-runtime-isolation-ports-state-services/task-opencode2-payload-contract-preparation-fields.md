@@ -75,3 +75,7 @@ Coverage runs real `start` runs through every branch that adds a field: fresh cl
 3. `opencode/plugins/arggon/index.ts`'s `NativeClaimCommitReceipt.status` union still lists `"already-committed"`, which no code path emits (the "nothing to commit" case reports `"not-needed"`). Dead union member, doc-side enumeration is correct.
 
 **On the earlier worker report about `conventionVersion`.** Verified in the code: `nativeStart` reads `const version = kernel.readConventionVersion(root)` once, before `nativeStartBody` touches branches, worktrees or rollbacks (`opencode/plugins/arggon/index.ts`, the read sits directly above the progress handler), and every envelope path — success, `startNotAttempted`, `startFailure`, `safeUnexpectedStartFailure` — reuses that captured value. So the reported version is the one read at entry even when a rollback removes the session's own cwd; nothing re-reads it. Truthful as reported.
+
+### handoff 2026-10-03 @Arggon — next: Coordinator: review PR #609, merge, then verify; decide whether the 3 reported findings get follow-up items
+- branch: feat/task-opencode2-payload-contract-preparation-fields
+- open questions: stepsTruncated drop on the native projection: fix here or a new item?; claimCommit sub-fields: widen this doc or leave?
