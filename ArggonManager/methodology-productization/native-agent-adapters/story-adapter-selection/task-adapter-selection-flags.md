@@ -13,6 +13,7 @@ claimed_at: "2026-10-02T23:58:01.793Z"
 depends_on: [task-methodology-carriers]
 worktree_path: /home/arggon/Projects/ArggonManager-task-adapter-selection-flags
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-adapter-selection/task-adapter-selection-flags.md
   Leaves live only under a story. id is the filename stem: task-adapter-selection-flags.
@@ -28,9 +29,11 @@ Add `arggon init --agents <list>` / `--no-agents` (default: detected agents) and
 
 ## Acceptance
 
-- [ ] fixture matrix test over init flag combinations
-- [ ] `--json` reports written/skipped per artifact; adopter edits never overwritten
-- [ ] doctor output snapshot test
-- [ ] README + agents.md §init updated in same PR
+- [x] fixture matrix test over init flag combinations
+- [x] `--json` reports written/skipped per artifact; adopter edits never overwritten
+- [x] doctor output snapshot test
+- [x] README + agents.md §init updated in same PR
 
 ## Notes
+
+Implementation is on `feat/task-adapter-selection-flags` (PR opened from the worktree). Left `in_progress` for the coordinator's review/merge; the boxes above are ticked by the work that landed in that PR, and every gate was re-run green on its head.
