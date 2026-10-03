@@ -4,6 +4,12 @@ See [ADR process](../engineering.md#adr-process) in `docs/engineering.md`.
 
 Files: `NNNN-short-title.md` (four-digit number, kebab title).
 
+The Title column is the ADR's own `# NNNN Title` heading, verbatim. A row that
+deliberately differs declares the difference in its own ADR as
+`- Index title: …`; without that line the row must copy the heading. Enforced
+by `cli/src/adr-index-parity.test.ts`, which also pins one row per ADR, the
+numbering, the status and the row order.
+
 | ADR                                                        | Title                                                                                                          | Status                                 |
 | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
 | [0001](./0001-cli-stack.md)                                | CLI stack (Phase 1)                                                                                            | Accepted                               |
