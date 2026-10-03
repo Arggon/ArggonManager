@@ -231,3 +231,131 @@ Everything else stands. **No-merge until F1 (the gate refusal set changes on CR 
 Sequencing, unchanged: merge #611, then update #605 on top of it, then merge #605 — #611 correctly does not touch `cli/src/goal-mode.ts` or the ZCode assets, since none of them are on `main`.
 
 The probes needed are listed in my previous comment and are unchanged. The decisive one is `npm test -- acceptance-parity` after adding a `\u2028` CORPUS shape: expected to fail before the fix (the `gateComplete === preFixGate` assertion) and to pass after it.
+
+### 2026-10-03 @arggon-reviewer
+verdict: approve (F1 and F2 are genuinely closed; the VT/FF exclusion is correct and test-pinned, the oracle is non-vacuous by measurement, and the bundle catch was real. One one-line doc note should ride along (the convention.md EOL sentence); the model-driven smoke stays a named probe, not a blocker.)
+
+Round 2, HEAD 0ecbf756, 6 new commits on top of round 1. Read-only again: I executed no project gate. Everything below is a file reference, a JS-semantics probe (node on a transcribed regex), or a read-only walk of this tracker.
+
+## F1 § closed, and the fix is exactly right
+
+`ACCEPTANCE_LINE_BREAK = /[\n\r\u2028\u2029]/` (`lib/src/items.ts:356`), consumed as `body.split(ACCEPTANCE_LINE_BREAK)` (:436). Independent probe: pre-fix regex transcribed from `main`, new scanner transcribed from the branch, 21 bodies.
+
+```
+case                                     pre-fix  round1  round2
+LF ticked>unticked                       REFUSE   REFUSE  REFUSE
+CRLF ticked>unticked                     REFUSE   REFUSE  REFUSE
+CR alone ticked>unticked                 REFUSE   ALLOW   REFUSE   <- round 1 dropped it
+U+2028 ticked>unticked                   REFUSE   ALLOW   REFUSE   <- round 1 dropped it
+U+2029 ticked>unticked                   REFUSE   ALLOW   REFUSE   <- round 1 dropped it
+U+2028 prose>unticked                    REFUSE   ALLOW   REFUSE
+U+2029 prose>unticked                    REFUSE   ALLOW   REFUSE
+mixed CR, LF, U+2028                     REFUSE   ALLOW   REFUSE
+leading lone CR                          REFUSE   ALLOW   REFUSE
+ticked>ticked (CR / U+2028 / U+2029)     ALLOW    ALLOW   ALLOW
+trailing lone CR                         REFUSE   REFUSE  REFUSE
+double CR (blank segment)                REFUSE   REFUSE  REFUSE
+
+round1 wrong 7/21        round2 wrong 0/21
+```
+
+**The VT/FF exclusion is load-bearing, correct, and I confirmed the failure it avoids.** A second probe adds VT and FF to the set:
+
+```
+body                                  pre-fix  shipped  withVTFF  effect
+"-x-x-a<VT>- - -b \n "                 ALLOW    ALLOW    REFUSE     ADDS a refusal
+"-x-x-a<FF>- - -b \n "                 ALLOW    ALLOW    REFUSE     ADDS a refusal
+"prose<VT>- - -b \n "                   ALLOW    ALLOW    REFUSE     ADDS a refusal
+```
+
+That is the other direction of the same class of regression § a false REFUSAL wedging a legitimate `done` flip § and it was avoided deliberately and for the right reason (VT/FF are whitespace, not LineTerminators, so `^` under `m` never anchored after them). The kernel comment (`lib/src/items.ts:342-356`) states the exclusion, the reason and the NBSP case, and no longer describes the pre-fix regex (F5 closed: that stale m/dollar rationale was where F1 hid, and it is gone).
+
+**The exclusion is pinned by tests, not by a comment.** `cli/src/acceptance-parity.test.ts:378-382` asserts `preFixGate` true, `acceptanceComplete` true and `acceptanceUnchecked` length 0 for the VT and FF bodies. Adding VT to the constant turns 12 of 186 cases in my transcription of the corpus against the pre-fix oracle (6.5 percent), so a test fails, not a comment.
+
+## The oracle is non-vacuous § by my own count, not on trust
+
+I transcribed the corpus generator (:196-223) and ran it against both candidate scanners:
+
+- **shipped LineTerminator split: 0 disagreements** with the pre-fix gate over the whole generated corpus.
+- **reverted `split("\n")`: 31 disagreements, 16.7 percent of cases.** The oracle has real discriminating power; your 49-of-271 red on revert is the same order of magnitude as my independent count (I ran a subset of the suite, not the suite).
+
+Your three sub-questions, confirmed by reading :164-223 and :457-545:
+
+- **Five terminators plus as-written, per shape:** `corpusBodies()` emits `[as written]` plus one case per `TERMINATORS` entry, using `replace(/(?:\r\n|\r|\n|\u2028|\u2029)/g, eol)` (:218). The self-check at :292-317 asserts the arithmetic AND that CR-only, U+2028 and U+2029 bodies really are present (:305-309). My transcription reproduced the same count identity.
+- **8 shapes that exist only under a non-LF terminator:** yes § `TERMINATOR_SHAPES` (:164-181) has exactly 8 entries, including the VT and FF counter-shapes that must NOT become rows. The comment at :156-163 explains why uniform re-termination cannot manufacture them, which is the right reason.
+- **The fuzz joins a ticked row to an unticked one with the terminator:** yes § :476 builds `## Acceptance${eol}${eol}${line}${eol}- [ ] todo${eol}- [x] done${eol}` plus the bare two-row `${line}${eol}- [ ] todo` at :485, with `eols` now `[\n, \r\n, \r, \u2028, \u2029]` (:466). That is the F1 shape, generated.
+
+## The evidence numbers now reproduce bit-exactly
+
+I re-implemented the committed 200k harness from the file (mulberry32, seed `0x5eed1234`, the same fragment pools) and got **5249 refused, 2.62 percent**, with 0 disagreements for the shipped split § your figure to the digit. Product: 9 x 3 x 5 x 7 x 5 = **4725** iterations x 2 bodies (:492 asserts the identity). Corpus: 43 shapes x 5 plus as-written = **258** cases (:295). The suite prints its own sizes (:312-316, :541-544) so these are re-runnable rather than remembered (F4 closed).
+
+**On your first fuzz having the same flaw I flagged in F3** § you are right about the mechanism and right about the fix. A pure-alphabet fuzz over the bracket, space and dash characters essentially never assembles a criterion, so `toBeGreaterThan(1000)` on a count that is always 0 asserts nothing. The committed version builds each body from line fragments, 75 percent of them well-formed rows (:522-523), and asserts `refusals > 2000` AND `refusals / bodies > 0.01` (:539-540) § an absolute floor plus a rate, so a generator that stops producing refusals fails loudly. My run: 5249 > 2000 and 2.62 > 1. Verified: the replacement fixes it.
+
+## F2 § closed, and the schemaVersion call is right
+
+- `ArggonManager/docs/json-output.md:585` now reads 8 KiB prose, 4 KiB per comment, kernel 3-comment tail, 64 acceptance rows; :597 lists `acceptance[] ({text, checked, criterion}) rows parsed from the item's canonical body`, `acceptance_truncated` and `acceptance_complete`, plus a new paragraph and a per-field table.
+- `README.md:418` states the canonical-body input, the 64-row cap, `acceptance_complete`, and why: a bounded, comment-stripping `prose` reported nothing unchecked on a comment-filed checklist and on a criterion past the 8 KiB cap.
+- **The no-bump decision checks out against the document's own rule AND against precedent.** The rule is at :35 (additive fields are OK within a `schemaVersion`). The precedent is exact: `json-output.md:500` documents `candidates[].via` as additive within `schemaVersion: 1`§§ an array element gaining a field, the same shape of change as `acceptance[].criterion`. Nothing removed, retyped or made optional; `text` and `checked` keep their meaning. I agree: no bump, and recording the reasoning in the doc, including the strict-validator note, is the right way to spend the decision.
+
+**F3-F8 all closed.** The non-vacuity floor is now `toBeGreaterThanOrEqual(1)` plus a per-item assertion that each such item really has an unchecked criterion the gate sees and `showBoundedParts` cannot (:786-798) § a floor plus a shape check, not a tautology. The `spec.ts` narrowing is tested by a discriminating case: a two-space box still reads `untestable-acceptance`, and the canonical, glued, bare, star, indented and CRLF forms stay testable (`cli/src/spec-analyze.test.ts:119-160`). The ast-grep rule's note and README now say plainly that it catches a fifth grammar and NOT a fifth wrong input, that it would not have caught either bug this item closed, and that it is deliberately broader than the spellings the removed parsers used (`\u2028[xX]?\u2029` and alternations do fire) § that is my F8, measured and conceded.
+
+## The bundle catch was real, and the regeneration moved nothing else
+
+`git diff --numstat 471bb76a..HEAD -- opencode/plugins/arggon/index.bundle.ts` = **2 insertions, 1 deletion**, and the full diff is the F1 fix alone (the new constant and the changed split call). Your point is worth stating plainly: the vendored kernel is what an adopter actually loads, so without `check:plugin` catching it the F1 gate false-pass would have shipped to every plugin-bundle consumer with `lib/src` looking clean. The gate earned its keep, and nothing else in the artifact moved.
+
+## Live corpus, independently re-measured (486 items by my filter)
+
+```
+CRLF bodies in this tree      : 0
+PRE-FIX disagreements         : board=35  nativePanel=38  cliPane=0
+comment-stripped (605 shape)  : 33
+POST-FIX disagreements        : 0
+gate refusal-set changes      : 0        <- new scanner vs pre-fix regex, per item
+```
+
+The line that matters is **refusal-set changes: 0** § not only on generated bodies but on every real item body in this tracker, with the LineTerminator-aware scanner. My absolute counts run above yours (35/38/33 vs 27/30/25) because my item filter differs; **AFTER = 0** reproduces exactly, and both counts are far above the F3 floor of 1.
+
+## smoke:opencode § admissible as a differential, not as runtime evidence
+
+Judged, and the nuance matters. `ArggonManager/docs/agents.md:295` is explicit that `smoke:opencode` is model-driven and timing sensitive, run each one alone, never beside a test suite or another headless harness; `CONTRIBUTING.md:122-123` says the same. So **a parallel full-suite run is not admissible as evidence that the native panel works**, and I am not treating it as such.
+
+What your evidence does establish is the narrower and, for this purpose, sufficient claim: two runs of the same inadmissible harness on two different trees produce an **identical sorted FAIL set**, every failure in the same category (a model-executed assertion, `context7` connections closing). That isolates the change variable § if this harness flakes in this environment it flakes the same way on both trees § which is the correct way to show a pre-existing red is pre-existing. Combined with the changed native surface (`opencode/plugins/arggon/board.ts`, the panel's acceptance count) being exercised end-to-end through the real reader in the suite (`acceptance-parity.test.ts:609-710`: `boardItemDetail(root, id)` off disk, asserting the CRLF item yields 1/3 with its three rows and the comment-only item 1/2 with all three rows); `smoke:tui-board` green; `playwright --grep @smoke` 33/33 green for the board-HTML change § I am satisfied this PR does not regress the native panel. **Not blocking.**
+
+One process note per `AGENTS.md` (findings become items): `smoke:opencode` red on clean `origin/main` is a real, separate, actionable defect in this repo's model-driven evidence path and should be **filed as an item**, not left in a review comment. Not this PR to fix.
+
+## Sequencing § clean
+
+I checked every path #611 touches against `git cat-file -e main:<path>`. The only three that do not exist on `main` are the new `cli/src/acceptance-parity.test.ts` and the two new `tools/ast-grep/` files, all genuinely created here. **Nothing touches `cli/src/goal-mode.ts`, the ZCode templates, or `agents.md`** § the round-1 ruling was respected. Your `docs/json-output.md` union-resolve warning is right: it is the one file both PRs will want.
+
+## One non-blocking note, recommended in this PR
+
+`ArggonManager/docs/convention.md:139` still reads that both LF and CRLF bodies parse identically, because the frontmatter parser tolerates `\r\n`, so the acceptance grammar must too. That statement is **true**, but it is the exact framing that hid F1: naming only LF and CRLF is what makes `split("\n")` look correct. `convention.md` is the schema authority a future author or agent reads before writing a parser, so it is the one place worth spending a line: extend it to the full LineTerminator set (`\n`, `\r`, U+2028, U+2029, and explicitly NOT VT/FF). One sentence, no code. Not blocking, but it closes the loop on the root cause rather than just the instance, and convention.md was untouched in this round.
+
+I also no longer count `docs/opencode2.md:290` and `playbooks/opencode.md:263,473` as stale (my F2, round 1): those describe **what the block renders**, and the rendered rows are unchanged § only the footer's denominator moved from rows to criteria. A precision gap in prose, not a wrong claim; I withdraw it as a finding.
+
+## Probes needed
+
+```
+cd /home/arggon/Projects/ArggonManager-bug-three-acceptance-parsers-diverging
+
+# 1. The decisive non-vacuity probe, standalone (the one number I cannot produce by reading).
+npx vitest run cli/src/acceptance-parity.test.ts --reporter=verbose
+# expected: 258 corpus cases; printed 43 shapes / 5249 refused 2.6% / live line; all green
+# then: revert ONLY lib/src/items.ts:436 to body.split("\n") and re-run, ALONE
+# expected: many red, including the named test "the gate refuses on a body terminated by ANY
+#   LineTerminator (review F1)" failing on its own. My independent count says `17% of corpus cases.
+
+# 2. Admissibility re-run of the model-driven smoke (agents.md:295: run it ALONE, never beside a suite).
+npm run smoke:opencode
+# expected on a healthy machine: exit 0. On this box: the same 47 category-failures, which the
+#   main-vs-branch differential already covers. Run it alone before recording it either way.
+
+# 3. Confirm the regenerated bundle is byte-equal to a fresh regeneration from this tree.
+npm run build:plugin && git diff --exit-code -- opencode/plugins/arggon/index.bundle.ts
+# expected: empty diff (I read a 2-line diff vs round 1, the F1 fix only).
+
+# 4. Optional, my one ask: extend the EOL sentence in convention.md to the full LineTerminator
+#   set, naming VT/FF as NOT line terminators.
+```
+
+**Merge.** F1 and F2 are closed and verified independently; the oracle has measured discriminating power; the evidence numbers are re-runnable and reproduce to the digit; the bundle is in sync and moved nothing else; scope and sequencing are clean. After this merges, #605 can be updated on top (drop the TWO-parsers framing, the CRLF-blind claim, the `normalizeEol` not-cosmetic rationale, and the now-unreachable `UNRENDERABLE` branch), with a union resolve on `docs/json-output.md`.
