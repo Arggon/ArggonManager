@@ -13,7 +13,6 @@ claimed_at: "2026-10-02T23:58:06.586Z"
 depends_on: [task-adapter-selection-flags, task-capability-matrix]
 worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-goal-mode
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-zcode-adapter/task-zcode-goal-mode.md
   Leaves live only under a story. id is the filename stem: task-zcode-goal-mode.
@@ -68,3 +67,40 @@ Gates: `npm run build`, `npm test` (2206 passed / 119 files), `npm run lint`,
 (byte-identical). Spec/plan `status` left at `proposed` — S5's acceptance box
 also covers the automations templates (sibling `task-zcode-automations`), so
 it is not ticked by this item.
+
+### 2026-10-03 @Arggon
+## @Arggon — worker evidence (PR #605, branch feat/task-zcode-goal-mode)
+
+Claim/worktree safety: all tracker writes routed through `npm run arggon -- …` with this
+worktree as cwd; the native `tools.arggon.*` were not used for writes. Primary checkout
+(`/home/arggon/Projects/ArggonManager`) verified on `main` @ 26c3b13b with a clean tree and
+its own pre-claim copy of this item (status todo, no assignee) — none of this branch's
+commits are in it (`git log --oneline origin/main..HEAD` = 2 commits, both on
+feat/task-zcode-goal-mode).
+
+### Expected vs observed (gates, post-rebase onto origin/main @ ba808947)
+
+| gate | expected | observed |
+| --- | --- | --- |
+| `npm run build` | ok | ok (build:plugin 457609 bytes) |
+| `npm test` | green | 120 files, 2229 passed (119/2206 before the rebase picked up main's new test file) |
+| `npm run lint` | clean | clean |
+| `npm run arggon -- validate` | ok | `arggon validate: ok (0 warning(s), convention v5)` |
+| `npm run check:plugin` | bundle byte-identical | no diff |
+
+### Behavior, live (from this worktree)
+
+- `npm run arggon -- goal task-zcode-goal-mode` → objective `template generation test`,
+  verification 1–3 = the three unchecked boxes, `## Boundaries (hard)` +
+  `## Refusals (stop and report …)` appended, `Claim holder: Arggon`.
+- same command with `--json` from the primary checkout →
+  `{"ok":false,…,"error":{"code":"GOAL_UNCLAIMED"}}`, exit 1 (that checkout has no claim).
+
+### Not done here (deliberate)
+
+- No MCP tool for `goal`: it mutates nothing, so the fifteen-tool kernel surface stays as
+  it is; the ZCode seam reaches the command through the headless bin. Flagging in case the
+  reviewer wants an MCP wrapper instead — that would touch the tool-count docs
+  (`agents.md`, `opencode2.md`, `json-contract.md`) and `mcp-parity`.
+- Spec §S5 acceptance box also covers the automation templates (`task-zcode-automations`),
+  so spec/plan `status` stays `proposed` and this box is not ticked.
