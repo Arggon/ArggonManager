@@ -26,3 +26,15 @@ updated: "2026-10-03"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-03 @ses_f02ab5836ffeOAxmisboIwWE4x
+Found by the worker on PR #607 (bug-seam-drift-gate-blocks-new-generated-seam-content), 2026-10-03, while making the seam drift gate branch-aware. Independently confirmed twice: the reviewer of PR #606 also identified this exact file as the live example of the no-provenance-state case it had to fix classification for.
+
+**The gap.** `.opencode/agents/arggon-prover.md` exists in the tree but has **no `x-generated` entry** in `ArggonManager/.convention.yml` — it was added after v0.5.0 (by d0aba5ef / #583) without a regenerated state file. So:
+
+- `arggon init` classifies it **adopter-modified** and skips it. If its template ever drifts, nobody is told.
+- The seam drift gate cannot see it either: it compares committed bytes against what the generator produces, and this file is in the skipped set, so it is neither verified nor reported.
+
+This is a genuine blind spot in BOTH enforcement layers: the file is unverified and unreported, and it looks like ordinary committed content. Note the irony worth recording — it is also the one file that PR #606's classification fix was *proven against* (a present dest with no provenance state must be `adopter-edited`, not `stale`), so the bug that made it invisible is the same bug that class caught.
+
+Two possible remedies, and the choice is not obvious: (a) run a full seam regeneration and commit the resulting state entry, accepting the known 15-stamp drift sweep; or (b) make the gates report "a committed file under a managed path has no provenance entry" as a finding, which would catch the whole CLASS rather than this instance — the same false-absence lint shape the capability matrix adopted for gap notes.
