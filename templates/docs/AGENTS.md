@@ -2,7 +2,7 @@
 
 For humans and AI agents working on **{{PROJECT_NAME}}**. Work items live in-tree under `ArggonManager/`, managed by `arggon`; GitHub is for PRs only — never open GitHub issues.
 
-> **Use the `arggon-cli` skill by default** (`.agents/skills/arggon-cli/SKILL.md`): contract, claim rules, pitfalls. In OpenCode V2 the native `arggon` tools (Code Mode `tools.arggon.*`) and the `/arggon-*` commands are the default surface; the headless CLI stays for bootstrap, gates and CI.
+> **Use the `arggon-cli` skill by default** (`.agents/skills/arggon-cli/SKILL.md`): contract, claim rules, pitfalls. OpenCode V2's native `arggon` tools (Code Mode `tools.arggon.*`) and `/arggon-*` commands ship with its seam (`arggon init` default; `--no-agents` omits it); without it the CLI is the complete surface.
 
 ## Task workflow
 

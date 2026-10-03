@@ -83,6 +83,16 @@ export type CapabilityMatrix = {
   rows: number;
   /** Gap rows in the FILE (not the capped detail list below). */
   gaps: number;
+  /**
+   * Honest per-agent gap totals over the WHOLE file (not the capped detail
+   * list), one entry per agent that declares at least one gap, sorted. Added
+   * with `doctor --agents` (task-adapter-selection-flags): a per-agent report
+   * needs each agent's own total, and deriving it from the capped `gapRows`
+   * would understate an agent whose rows were cut — a dishonest count in a
+   * report-only surface. Bounded by `MAX_MATRIX_AGENTS`; the sum equals `gaps`
+   * unless the cap cut an agent's whole tally.
+   */
+  gapsByAgent: { agent: string; gaps: number }[];
   /** Gap detail, capped at {@link MAX_MATRIX_GAP_ROWS}. */
   gapRows: MatrixGapRow[];
   /** A gap row was cut from `gapRows` (`gaps` still counts them all). */
@@ -114,6 +124,7 @@ function emptyMatrix(error: string | null, source: string | null): CapabilityMat
     invariants: 0,
     rows: 0,
     gaps: 0,
+    gapsByAgent: [],
     gapRows: [],
     truncated: false,
     invalid: 0,
@@ -168,6 +179,7 @@ export function parseCapabilityMatrix(text: string, source: string | null): Capa
   let invalid = 0;
   let gaps = 0;
   const gapRows: MatrixGapRow[] = [];
+  const gapsByAgent: { agent: string; gaps: number }[] = [];
   let truncated = false;
   for (const entry of declaredRows) {
     if (!isObject(entry)) {
@@ -197,6 +209,15 @@ export function parseCapabilityMatrix(text: string, source: string | null): Capa
     rows++;
     if (!gap) continue;
     gaps++;
+    // Per-agent honest tally (`doctor --agents`): every counted gap row, capped
+    // only by the agent list — never by the detail cap below, which is why a
+    // per-agent report can state an exact total even when rows were cut.
+    const tally = gapsByAgent.find((entry) => entry.agent === agent);
+    if (tally !== undefined) {
+      tally.gaps++;
+    } else if (gapsByAgent.length < MAX_MATRIX_AGENTS) {
+      gapsByAgent.push({ agent, gaps: 1 });
+    }
     if (gapRows.length < MAX_MATRIX_GAP_ROWS) {
       gapRows.push({ invariant, agent, mechanism, package: pkg, note: note as string });
     } else {
@@ -212,6 +233,7 @@ export function parseCapabilityMatrix(text: string, source: string | null): Capa
     invariants,
     rows,
     gaps,
+    gapsByAgent: gapsByAgent.sort((a, b) => a.agent.localeCompare(b.agent)),
     gapRows,
     truncated,
     invalid,

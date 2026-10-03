@@ -16,25 +16,31 @@ import {
   loadItems,
   readConventionConfig,
   readConventionVersion,
+  readGeneratedState,
   sanitizeHumanText,
   sanitizeHumanValue,
+  trackerAt,
+  type GeneratedEntry,
   type TrackerLayout,
 } from "@arggondev/lib";
 import { bundledTemplatesDir } from "./package-assets.js";
 import {
   checksumMatches,
   currentGeneratedTemplatesFrom,
+  isBundledPluginDest,
   normalizeEol,
   OPENCODE_CONFIG_CANDIDATES,
   renderGeneratedDoc,
   resolveProjectName,
 } from "./docs.js";
+import { agentForTemplate, AGENT_IDS, detectAgents, type AgentId } from "./adapters.js";
 
 import { measureBudget, formatBudgetLines, type BudgetResult } from "./measure.js";
 import {
   formatMatrixLines,
   readCapabilityMatrix,
   type CapabilityMatrix,
+  type MatrixGapRow,
 } from "./capability-matrix.js";
 
 // The sanitizer implementation moved to sanitize.ts (bug-cli-error-output-injection
@@ -487,6 +493,283 @@ export function detectOpenCode(root: string): DoctorOpenCode {
   };
 }
 
+/**
+ * Per-adapter-file state (`doctor --agents`, spec §S2,
+ * task-adapter-selection-flags). Exactly one status per destination, decided
+ * from what is already on disk plus the shipped templates — never a verdict and
+ * never a gate. Every status names what `arggon init` would DO with the file,
+ * because a status is only useful if it maps onto a real operator action: no
+ * label may promise a protection or a refresh init does not provide.
+ *
+ * The vocabulary mirrors the `docs` block in this same payload
+ * (`docs.acknowledged` / `docs.acknowledgedDrifted`), so one envelope never says
+ * `present` for a file the other half calls acknowledged:
+ *
+ *  - `present` — on disk and byte-equal to the CURRENT template render: exactly
+ *    what an untouched re-run would leave there.
+ *  - `acknowledged` — on disk and byte-equal to the **acked baseline**
+ *    (`arggon adopt --ack`, bug-ack-baseline-regen-loss): sanctioned content.
+ *    `arggon adopt --ack` acks EVERY state entry, so this is the normal state of
+ *    a fully-adopted tree, not an edge case. Init never regenerates it.
+ *  - `acknowledged-drifted` — acknowledged, but the bytes have since diverged
+ *    from the acked baseline (bug-ack-drift-promise): a hand edit landed AFTER
+ *    the ack. Still adopter-owned and never regenerated; the edit is what the
+ *    operator may want to re-ack (`arggon adopt --ack`) or revert.
+ *  - `adopter-edited` — a hand edit landed on an ordinary generated file (the
+ *    recorded checksum differs), or the file is on disk with **no provenance
+ *    state at all** (docs.ts treats exactly that case as adopter-modified, since
+ *    a pre-provenance file is not arggon's to rewrite). Init skips it by
+ *    default; `--backup` archives it and regenerates.
+ *  - `stale` — state-backed and untouched (the checksum matches), but the
+ *    current template render differs: upstream moved and `arggon init` WOULD
+ *    refresh it. Requires a state entry, because without one init refuses to
+ *    touch the file — reporting `stale` there would send an operator to a
+ *    command that cannot work.
+ *  - `missing` — tracked by the seam but absent from the tree.
+ *  - `unverified` — the render cannot be produced (template/bundle absent, or
+ *    the project name is unrecoverable): "cannot decide", never a failure.
+ *
+ * "The template moved on" is deliberately NOT one of these: it is orthogonal to
+ * the local state and is already carried, for every one of these files, by
+ * `docs.outdated` / `docs.outdatedDocs` in this same payload.
+ */
+export type AdapterFileStatus =
+  | "present"
+  | "acknowledged"
+  | "acknowledged-drifted"
+  | "adopter-edited"
+  | "stale"
+  | "missing"
+  | "unverified";
+
+/** One adapter destination and its state. */
+export type AdapterFileState = {
+  /** Destination path (posix, relative to the probed root). */
+  path: string;
+  status: AdapterFileStatus;
+};
+
+/** Per-agent adapter report: the seam's files plus its matrix gap rows. */
+export type AdapterAgentReport = {
+  agent: AgentId;
+  /** The tree carries this agent's marker, so `init` would materialize it. */
+  detected: boolean;
+  /** Adapter files, capped at {@link MAX_ADAPTER_AGENT_FILES}. */
+  files: AdapterFileState[];
+  /** A file was cut from `files` (`counts` still totals every file). */
+  truncated: boolean;
+  /** Honest totals over every file this agent's seam defines. */
+  counts: Record<AdapterFileStatus | "total", number>;
+  /**
+   * This agent's rows from the committed capability matrix
+   * (`adapters/capability-matrix.json`), through the SAME reader the `matrix`
+   * block uses (cli/src/capability-matrix.ts) — never a second parse. Report
+   * only: a gap is advisory in every surface (ADR 0020, spec §S3).
+   */
+  gaps: {
+    /** Bounded detail rows for this agent; `total` stays honest past the cap. */
+    rows: MatrixGapRow[];
+    /** Gap rows for this agent in the file (independent of the cap). */
+    total: number;
+    /** Detail rows were cut, or the matrix itself was unreadable. */
+    truncated: boolean;
+    /** Whether a matrix was read at all; `error` says why not. */
+    matrixPresent: boolean;
+  };
+};
+
+/** Per-agent file cap; `counts` totals every file so a cut stays visible. */
+export const MAX_ADAPTER_AGENT_FILES = 64;
+
+/** `doctor --agents` report (additive; only present with the flag). */
+export type DoctorAdapters = {
+  /** Per-agent entries, in {@link AGENT_IDS} order. */
+  agents: AdapterAgentReport[];
+  /** Matrix state the per-agent gap rows came from (the reader's own verdict). */
+  matrix: {
+    present: boolean;
+    source: string | null;
+    error: string | null;
+  };
+};
+
+/**
+ * Classify one adapter destination (`doctor --agents`). Pure read: one
+ * `existsSync`, one read when present, one re-render from the CURRENT templates
+ * (the same resolution + placeholder path init uses). Order matters — each
+ * branch mirrors one of init's own decisions, in init's own precedence, so a
+ * status never names an action init would not take.
+ *
+ * Two order-sensitive cases, both read off what init actually DOES with the
+ * destination rather than off the checksum alone:
+ *
+ *  - A **vendored plugin artifact** (`.opencode/plugins/arggon/index.ts` and the
+ *    `tui.tsx` entry) is derived per checkout and RE-VENDORED from the committed
+ *    bundle on a provenance mismatch (bug-stale-vendored-plugin-copy): init
+ *    deliberately does not degrade it to modified-skip, because the shared
+ *    checksum cannot describe this checkout. So a present copy is `present`
+ *    whatever its recorded checksum says — calling it `adopter-edited` would
+ *    advertise a protection init does not give it.
+ *    Nothing is lost: this report's `opencode` block already carries the richer
+ *    derived-artifact verdict for the plugin copy (`vendored plugin current` /
+ *    `STALE` / `unverified`).
+ *  - An **acknowledged** entry is the adopter's sanctioned baseline, which init
+ *    never regenerates. It is decided by its OWN recorded checksum — the acked
+ *    baseline is the thing init compares against — and reads `acknowledged` or
+ *    `acknowledged-drifted`, never `present` (folding it in claimed "byte-equal
+ *    to the current render" for a file this same envelope's `docs` block calls
+ *    acknowledged), never `stale` (init would not refresh it) and never
+ *    `adopter-edited` (no hand edit happened, and `arggon adopt --ack` is the
+ *    sanctioned, reversible way to take one).
+ */
+function classifyAdapterFile(opts: {
+  root: string;
+  dest: string;
+  template: string;
+  state: GeneratedEntry | undefined;
+  templatesDir: string;
+  projectName: string | null;
+}): AdapterFileState {
+  const { root, dest, template, state, templatesDir, projectName } = opts;
+  const abs = join(root, ...dest.split("/"));
+  if (!existsSync(abs)) return { path: dest, status: "missing" };
+  let disk: string;
+  try {
+    disk = readFileSync(abs, "utf8");
+  } catch {
+    // Present but unreadable: on disk, and nothing can be said about its bytes.
+    return { path: dest, status: "unverified" };
+  }
+  // Derived vendored artifact FIRST: init re-vendors it on a provenance
+  // mismatch instead of skipping it (bug-stale-vendored-plugin-copy), so its
+  // recorded checksum never describes this checkout and is not evidence of an
+  // adopter edit. See the docstring.
+  if (isBundledPluginDest(dest)) return { path: dest, status: "present" };
+  // Acknowledged baseline: the adopter sanctioned these bytes and init will
+  // never regenerate them, so the acked checksum decides — and it decides on its
+  // OWN terms (`acknowledged` vs `acknowledged-drifted`), never as `present`
+  // and never as `stale`.
+  if (state?.acknowledged) {
+    const drifted = Boolean(state.checksum) && !checksumMatches(state.checksum!, disk);
+    return { path: dest, status: drifted ? "acknowledged-drifted" : "acknowledged" };
+  }
+  // A present file with NO state entry is ADOPTER-OWNED, not stale: docs.ts
+  // classifies "on disk with no provenance state" as adopter-modified and skips
+  // it, so `stale` (which promises "init would refresh it") would send the
+  // operator to a command that cannot work. This is the pre-init adopter tree —
+  // a repo carrying its own `.opencode/agents/…` before arggon ever saw it.
+  if (!state?.checksum) return { path: dest, status: "adopter-edited" };
+  // Checksum divergence on an ordinary generated destination IS the adopter's
+  // own edit, and it wins over the render compare: the edit — not an upstream
+  // move — is what blocks regeneration.
+  if (!checksumMatches(state.checksum, disk)) {
+    return { path: dest, status: "adopter-edited" };
+  }
+  const render = renderGeneratedDoc({ templatesDir, root, template, dest, projectName });
+  // Render refused (template/bundle absent, or the project name unrecoverable):
+  // cannot decide — never reported as stale.
+  if (render === null) return { path: dest, status: "unverified" };
+  // bug-crlf-provenance-breakage: EOL-tolerant compare, like every other
+  // provenance comparison, so a smudged working tree is not "stale".
+  return {
+    path: dest,
+    status: normalizeEol(render) === normalizeEol(disk) ? "present" : "stale",
+  };
+}
+
+/**
+ * Per-agent adapter report (spec §S2): for each supported agent, its adapter
+ * files (present / stale / adopter-edited / missing / unverified) and its rows
+ * from the committed capability matrix. Report-only: nothing here blocks, no
+ * exit code changes, nothing is written. Bounded — one render per adapter file,
+ * every file list capped, and the matrix detail comes from the reader's already
+ * capped list.
+ *
+ * Detection and classification both read the EXAMINED TREE, like the matrix
+ * reader: an additive field that resolved against the installed package would
+ * make `doctor --json` differ between the packed bin and the checkout CLI on
+ * the same tree, which the headless pack-parity gate pins byte-identical.
+ */
+export function runAdapterReport(opts: {
+  root: string;
+  /** Templates dir to re-render from (runDoctor already resolved it). */
+  templatesDir: string;
+  /** Project name for renders; `null` = unrecoverable (render refused). */
+  projectName: string | null;
+  /** Matrix already read by runDoctor — reused, never parsed twice. */
+  matrix: CapabilityMatrix;
+}): DoctorAdapters {
+  const templatesDir = opts.templatesDir;
+  const state = readGeneratedState(opts.root);
+  const detected = new Set(detectAgents(opts.root));
+  // Layout-aware so the destinations match what init writes on this tree.
+  const layout = trackerAt(opts.root)?.layout ?? "arggon-manager";
+  const gapDetail = opts.matrix.gapRows;
+  // Honest per-agent totals straight from the reader's own tally — never derived
+  // from the capped detail list, which would understate a cut agent.
+  const gapTotals = new Map(
+    opts.matrix.gapsByAgent.map((entry) => [entry.agent, entry.gaps] as const),
+  );
+
+  const agents: AdapterAgentReport[] = AGENT_IDS.map((agent) => {
+    const files: AdapterFileState[] = [];
+    // One counter per status, so a NEW status can never be silently dropped
+    // from `counts` (the object is the report's honest total).
+    const counts = {
+      total: 0,
+      present: 0,
+      acknowledged: 0,
+      "acknowledged-drifted": 0,
+      "adopter-edited": 0,
+      stale: 0,
+      missing: 0,
+      unverified: 0,
+    } as Record<AdapterFileStatus | "total", number>;
+    for (const { dest, template } of currentGeneratedTemplatesFrom(templatesDir, layout)) {
+      if (agentForTemplate(template) !== agent) continue;
+      counts.total++;
+      const file = classifyAdapterFile({
+        root: opts.root,
+        dest,
+        template,
+        state: state[dest],
+        templatesDir,
+        projectName: opts.projectName,
+      });
+      counts[file.status]++;
+      if (files.length < MAX_ADAPTER_AGENT_FILES) files.push(file);
+    }
+    // Per-agent gap rows: the reader's single capped detail list filtered to this
+    // agent, with the honest per-agent total from the reader's tally. When the
+    // global detail cap cut this agent's rows, `truncated` says so instead of
+    // passing a short list off as complete.
+    const rows = gapDetail.filter((row) => row.agent === agent);
+    const total = gapTotals.get(agent) ?? 0;
+    return {
+      agent,
+      detected: detected.has(agent),
+      files,
+      truncated: counts.total > files.length,
+      counts,
+      gaps: {
+        rows,
+        total,
+        truncated: rows.length < total,
+        matrixPresent: opts.matrix.present,
+      },
+    };
+  });
+
+  return {
+    agents,
+    matrix: {
+      present: opts.matrix.present,
+      source: opts.matrix.source,
+      error: opts.matrix.error,
+    },
+  };
+}
+
 export type DoctorResult = {
   /** Repo root, or null when no tasks/.convention.yml was found. */
   root: string | null;
@@ -541,6 +824,14 @@ export type DoctorResult = {
   budget?: BudgetResult;
   /** Set when the budget measurement itself failed (doctor still exits 0). */
   budgetError?: string;
+  /**
+   * Per-agent adapter report (additive, task-adapter-selection-flags,
+   * spec §S2): present only when `doctor --agents` is passed. Per agent: the
+   * seam's files (present / stale / adopter-edited / missing / unverified) and
+   * that agent's capability-matrix gap rows. Report-only and bounded; nothing
+   * here blocks and the exit code is unchanged.
+   */
+  agents?: DoctorAdapters;
 };
 
 const ZERO_DOCS: DoctorDocs = {
@@ -615,6 +906,12 @@ export function runDoctor(opts: {
    * movement. Doctor never writes to it.
    */
   templatesRoot?: string;
+  /**
+   * Emit the per-agent adapter block (`--agents`, spec §S2). Off by default:
+   * the block is additive, so a plain `doctor` envelope stays exactly as it
+   * was and clients that never ask for it read nothing new.
+   */
+  agents?: boolean;
 }): DoctorResult {
   let tasksDir: string;
   let root: string;
@@ -627,6 +924,10 @@ export function runDoctor(opts: {
   } catch {
     // Missing tree: a normal report, not a failure (task-doctor-command).
     // Budget, when requested, is attached by the caller (measureBudgetForDoctor).
+    // The matrix is read ONCE and both the block and the per-agent report are
+    // built from it — a second read could disagree with the first on a tree
+    // edited mid-run.
+    const matrix = readCapabilityMatrix({ root: opts.cwd });
     return {
       root: null,
       initialized: false,
@@ -641,7 +942,20 @@ export function runDoctor(opts: {
       // Same reasoning for the matrix probe: no tree, so no matrix — the
       // reader is tree-only and reports the absence instead of reaching for a
       // package copy (that fallback broke pack/checkout envelope parity).
-      matrix: readCapabilityMatrix({ root: opts.cwd }),
+      matrix,
+      ...(opts.agents === true
+        ? {
+            agents: runAdapterReport({
+              root: opts.cwd,
+              templatesDir: opts.templatesRoot ?? bundledTemplatesDir(),
+              // No tree means no `x-generated.projectName`: renders are refused
+              // rather than guessing the directory name, so adapter files report
+              // `unverified` (cannot decide) instead of a false `stale`.
+              projectName: null,
+              matrix,
+            }),
+          }
+        : {}),
     };
   }
 
@@ -734,6 +1048,7 @@ export function runDoctor(opts: {
   }
 
   const items = loadItems(tasksDir);
+  const matrix = readCapabilityMatrix({ root });
   return {
     root,
     initialized: true,
@@ -760,8 +1075,19 @@ export function runDoctor(opts: {
     opencode: detectOpenCode(root),
     // The tree's own committed matrix when it carries one (this repo does);
     // otherwise an honest absence. Tree-only by construction, never a package
-    // fallback: an additive field must depend only on the examined tree.
-    matrix: readCapabilityMatrix({ root }),
+    // fallback: an additive field must depend only on the examined tree. Read
+    // once and reused by the per-agent report below.
+    matrix,
+    ...(opts.agents === true
+      ? {
+          agents: runAdapterReport({
+            root,
+            templatesDir,
+            projectName: nameRes.name,
+            matrix,
+          }),
+        }
+      : {}),
   };
 }
 
@@ -832,6 +1158,63 @@ function formatOpenCodeLines(opencode: DoctorOpenCode): string[] {
   return lines;
 }
 
+/**
+ * Human lines for the per-agent adapter block (`doctor --agents`, spec §S2):
+ * one `agents:` header (the detected set, so the reader can tell an absent seam
+ * from an unselected one), then one line per agent with its file counts and its
+ * gap-row total, followed by an indented `gap:` line per matrix gap row. Report
+ * wording is explicit — nothing here is a failure, and the matrix says so.
+ *
+ * Every bucket carries its OWN operator consequence, because that is the whole
+ * value of the status: `present` is what an untouched re-run leaves,
+ * `acknowledged` is never regenerated, `acknowledged-drifted` is a hand edit
+ * after the ack, `adopter-edited` is skipped unless `--backup` archives it, and
+ * only `stale` is one `arggon init` actually refreshes. No label promises a
+ * protection or a refresh init does not provide.
+ *
+ * Display-sanitized like every other doctor value (the notes are matrix data,
+ * i.e. repo-controlled).
+ */
+export function formatAdapterLines(adapters: DoctorAdapters): string[] {
+  const detected = adapters.agents.filter((a) => a.detected).map((a) => a.agent);
+  const lines = [
+    `  agents: ${detected.length > 0 ? detected.join(", ") : "none detected in this tree"} ` +
+      "(adapter selection: init --agents / --no-agents; report-only)",
+  ];
+  for (const agent of adapters.agents) {
+    const c = agent.counts;
+    lines.push(
+      `  agent ${agent.agent}: ${c.total} file(s) — ${c.present} present, ` +
+        `${c.acknowledged} acknowledged (yours, never regenerated), ` +
+        `${c["acknowledged-drifted"]} acknowledged-drifted (hand edit after the ack), ` +
+        `${c["adopter-edited"]} adopter-edited (yours; init skips it unless --backup), ` +
+        `${c.stale} stale (arggon init would refresh it), ${c.missing} missing, ` +
+        `${c.unverified} unverified; ${agent.gaps.total} capability gap(s)` +
+        `${agent.detected ? "" : " — not detected in this tree"}`,
+    );
+    if (agent.truncated) {
+      lines.push(`  note: agent ${agent.agent} file list cut (cap) — counts cover every file`);
+    }
+    for (const gap of agent.gaps.rows) {
+      lines.push(
+        `    gap: ${sanitizeHumanText(gap.invariant)} x ${sanitizeHumanText(gap.agent)} — ` +
+          `${sanitizeHumanText(gap.note)} (report-only)`,
+      );
+    }
+    if (agent.gaps.truncated) {
+      lines.push(
+        `    note: ${agent.gaps.total - agent.gaps.rows.length} further ${agent.agent} gap row(s) ` +
+          "not listed (detail cap)",
+      );
+    }
+  }
+  if (!adapters.matrix.present) {
+    const why = adapters.matrix.error ?? "not found in this tree";
+    lines.push(`  note: no capability matrix — ${sanitizeHumanText(why)} (report-only)`);
+  }
+  return lines;
+}
+
 /** Human-readable report (never writes; pairs with the doctor --json payload). */
 export function formatDoctorReport(result: DoctorResult): string {
   if (!result.initialized) {
@@ -842,6 +1225,9 @@ export function formatDoctorReport(result: DoctorResult): string {
     // The matrix describes the examined tree, so it prints on both report
     // shapes — whenever it is readable, or why it is not.
     lines.push(...formatMatrixLines(result.matrix));
+    // The per-agent block prints on both shapes too (report-only), so a
+    // non-initialized tree can still show which seams are missing.
+    if (result.agents) lines.push(...formatAdapterLines(result.agents));
     if (result.budget) lines.push(...formatBudgetLines(result.budget));
     return `${lines.join("\n")}\n`;
   }
@@ -862,6 +1248,8 @@ export function formatDoctorReport(result: DoctorResult): string {
     ...formatOpenCodeLines(result.opencode),
     // Gap rows are advisory (spec S3, ADR 0020): printed, never blocking.
     ...formatMatrixLines(result.matrix),
+    // Per-agent adapter state (spec S2), only with `--agents`; also report-only.
+    ...(result.agents ? formatAdapterLines(result.agents) : []),
   ];
   if (result.budget) {
     lines.push(...formatBudgetLines(result.budget));

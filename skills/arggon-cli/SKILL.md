@@ -21,13 +21,13 @@ is for PRs only. This umbrella covers **when** to use the skill, install/update,
 and the work loop. The operational detail lives in the references beside this
 file — read the one that matches the task **before** acting:
 
-| Reference                     | Read it for                                                                                                  |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `references/json-contract.md` | **JSON contract**: `--json` envelopes, error codes, filters, output surfaces, native tools, MCP              |
-| `references/methodology.md`   | **Methodology**: what the work needs — spec, plan, ADR, exploration, playbook, runbook — and the quality bar |
+| Reference                     | Read it for                                                                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `references/json-contract.md` | **JSON contract**: `--json` envelopes, error codes, filters, output surfaces, native tools, MCP                                                  |
+| `references/methodology.md`   | **Methodology**: what the work needs — spec, plan, ADR, exploration, playbook, runbook — and the quality bar                                     |
 | `references/exploration.md`   | **Greenfield exploration**: the six-phase protocol — classify, stance, ground, frontier rounds, edge-case hunt, artifacts + hard gate (ADR 0017) |
-| `references/orchestration.md` | **Orchestration**: coordinator/subagent waves, review bar, smoke gate, worktrees                             |
-| `references/pitfalls.md`      | **Pitfalls**: claim, cascade, tracker-merge and commit-staging traps                                         |
+| `references/orchestration.md` | **Orchestration**: coordinator/subagent waves, review bar, smoke gate, worktrees                                                                 |
+| `references/pitfalls.md`      | **Pitfalls**: claim, cascade, tracker-merge and commit-staging traps                                                                             |
 
 The full workflow rules are `ArggonManager/docs/agents.md`; the review bar is
 `ArggonManager/docs/engineering.md`.
@@ -54,7 +54,11 @@ CI:
   never reopen `done`/`cancelled`: the kernel refuses both whatever the
   permissions say.
 - **Plugin**: vendored single-file at `.opencode/plugins/arggon/index.ts` (no
-  `node_modules` needed); `arggon init` refreshes it with provenance.
+  `node_modules` needed); `arggon init` refreshes it with provenance. It ships
+  with the **opencode adapter seam** — materialized by default, omitted by
+  `arggon init --no-agents` (or by `--agents` without `opencode`). In a tree
+  without that seam none of the native surfaces above exist: use the CLI, which
+  is always complete; `arggon doctor --agents` reports which seams are there.
 - The CLI (`npm run arggon -- …`) stays for `init`/`validate`/`doctor` and
   model-less CI; there is no MCP stanza in the generated config by default.
 
