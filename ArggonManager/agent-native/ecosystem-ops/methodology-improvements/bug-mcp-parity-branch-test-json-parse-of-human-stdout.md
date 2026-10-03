@@ -4,9 +4,10 @@ status: todo
 id: bug-mcp-parity-branch-test-json-parse-of-human-stdout
 title: "mcp-parity \"branch checks out identically\" test JSON.parses a CLI line that can be the human \"arggon branch …\" success message, not the --json envelope"
 parent: methodology-improvements
-labels: [tests, mcp]
+labels: [tests, mcp, ci-blocking]
+priority: p1
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-03"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-mcp-parity-branch-test-json-parse-of-human-stdout.md
@@ -29,3 +30,7 @@ updated: "2026-10-02"
 - [ ] The fix is in the test/harness (the reader), not a change to `arggon branch` output, unless the human line is genuinely wrong for `--json` mode — if so, file that separately
 
 ## Notes
+
+### handoff 2026-10-03 @ses_f0012889dffeCYbPnHJZ04IJ3Y (session: ses_f0012889dffeCYbPnHJZ04IJ3Y) — next: Review PR #612; the spawn-under-load trigger itself is the known flake (bug-cli-spawn-suites-exit-1-flake), this PR only fixes the reader.
+- branch: main
+- open questions: cascade.test.ts spawnJson null-on-empty-stdout + `void err;` is a SEPARATE defect; file it? Suggested: use shared SpawnHarnessError/readEnvelope classification.
