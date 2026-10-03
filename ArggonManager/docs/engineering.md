@@ -190,6 +190,8 @@ Use a 4-digit monotonic number. Title is kebab-case.
 
 **Lifecycle:** Proposed in a PR → Accepted when merged (or explicitly recorded) → Superseded by a later ADR, never silently rewritten.
 
+**A status change lands in the ADR file, and the check that says so is a test, not a sweep.** A carrier (`agents.md`, this file, `convention.md`, `skills/arggon-cli/**`) links to the ADR that decided something; it never restates that ADR's status. Restating is what makes status drift — a carrier claiming `Proposed` for an ADR merged as Accepted is wrong in a way its reader cannot recover from the link, and it has to be re-edited by hand on every acceptance, so it is eventually not. `cli/src/adr-index-parity.test.ts` fails a PR whose [ADR index](./adr/README.md) row misreports a file's status; `cli/src/adr-status-doc-contract.test.ts` fails a PR that restates an ADR's status, or links an ADR that does not resolve. Both read `docs/adr/*.md` as the authority, so adding, accepting, superseding or renaming an ADR needs no documentation edit elsewhere — only the ADR file and its index row. The restatement rule covers every carrier; the link rule is narrower only because `convention.md` still links a dead ADR 0015 (`bug-convention-md-links-nonexistent-adr-0015`). **Coverage: status restatement in `engineering.md`, `agents.md`, `convention.md`; link resolution in `engineering.md`.**
+
 ---
 
 ## Naming, commits, PRs
@@ -227,6 +229,6 @@ Details belong in later ADRs — do not pre-build those packages in Phase 1.
 ## Related
 
 - Task convention: [`ArggonManager/docs/convention.md`](./convention.md)
-- CLI stack: [ADR 0001](./adr/0001-cli-stack.md) · board: [ADR 0002](./adr/0002-board-viewer-v0.md) · milestone field (Proposed): [ADR 0003](./adr/0003-milestone-field.md) · review smoke gate: [ADR 0008](./adr/0008-review-smoke-gate.md)
+- CLI stack: [ADR 0001](./adr/0001-cli-stack.md) · board: [ADR 0002](./adr/0002-board-viewer-v0.md) · milestone field: [ADR 0003](./adr/0003-milestone-field.md) · review smoke gate: [ADR 0008](./adr/0008-review-smoke-gate.md) · **each ADR's status lives in its own `- Status:` line** — the [ADR index](./adr/README.md) is the register (see [ADR process](#adr-process): carriers link to ADRs, they never restate a status)
 - Claim concurrency: [`ArggonManager/docs/claim.md`](./claim.md)
 - Agent playbook: [`ArggonManager/docs/agents.md`](./agents.md) · JSON contract: [`ArggonManager/docs/json-output.md`](./json-output.md)
