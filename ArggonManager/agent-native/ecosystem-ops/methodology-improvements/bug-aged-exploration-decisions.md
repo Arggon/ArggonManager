@@ -1,12 +1,13 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-aged-exploration-decisions
 title: Aged explorations 012/013 record no Decision section link
+assignee: Arggon
 parent: methodology-improvements
 labels: [spec-analyze]
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-03"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-aged-exploration-decisions.md

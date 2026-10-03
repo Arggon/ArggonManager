@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: [docs, adr]
 created: "2026-10-02"
 updated: "2026-10-03"
-worktree_path: /home/arggon/Projects/ArggonManager-task-adr-readme-index-missing-adr-0020
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr-readme-index-missing-adr-0020.md
