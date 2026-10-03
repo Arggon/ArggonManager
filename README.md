@@ -616,7 +616,7 @@ Prints the agent wiring (install commands, pre-commit hook, CI gate, `AGENTS.md`
 
 ### `arggon mcp`
 
-Starts a stdio MCP server (JSON-RPC 2.0) exposing `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`, `arggon_handoff`, `arggon_show`, `arggon_next`, `arggon_report`, and `arggon_validate` with the same rules and JSON envelopes as the CLI. Optional: OpenCode V2 does not need it (the vendored plugin serves the native `arggon` tools in-process); it remains for other MCP clients, which `arggon init` wires through `.mcp.json`. The MCP layer always runs with agent playbook rules: no reopening `done`/`cancelled`, no claim stealing. See [ArggonManager/docs/agents.md](ArggonManager/docs/agents.md) §MCP server.
+Starts a stdio MCP server (JSON-RPC 2.0) exposing **fifteen** tools — `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`, `arggon_handoff`, `arggon_show`, `arggon_next`, `arggon_report`, `arggon_validate`, `arggon_priority`, `arggon_sync`, `arggon_import_issues`, `arggon_start`, `arggon_branch` and `arggon_cleanup` — with the same rules and JSON envelopes as the CLI. Optional: OpenCode V2 does not need it (the vendored plugin serves the native `arggon` tools in-process); it remains for other MCP clients, which `arggon init` wires through `.mcp.json`. The MCP layer always runs with agent playbook rules: no reopening `done`/`cancelled`, no claim stealing. See [ArggonManager/docs/agents.md](ArggonManager/docs/agents.md) §MCP server.
 
 Fixtures: [fixtures/](fixtures/).
 
