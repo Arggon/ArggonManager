@@ -33,6 +33,7 @@ Found by the reviewer of PR #597 (task-strictgatebinfailure-tail-clipped-by-head
 - [x] A test at the full MAX_GATE_BINS worst case asserts the remedy survives the MAX_HUMAN_ERROR_CHARS=2000 head-clip, with ordering pinned (remedy index precedes the first named bin)
 - [x] Negative control: message at the cap and the last named bin absent
 - [x] Every CLI error path that appends a remedy after kernel detail is swept for the same violation — this must be a class fix, not a single call site
+  - Round 1 ticked this at FOUR sites and was wrong: `worktreeRemediation`'s `committing the claim` branch was a live instance the sweep missed. Re-ticked only after F1 landed (fifth site) and the four "same shape" deferrals were corrected to NOT clip-reachable. The list is in Notes; a future site needs the `indexOf` presence-guard idiom, not a new one-line reorder.
 
 ## Notes
 
