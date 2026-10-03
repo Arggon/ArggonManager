@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-remove-diag-listener
 title: "Remove the dead [DIAG] stderr listener in startBoardServer's spec fixture (leftover diagnostics)"
 assignee: Arggon
@@ -9,8 +9,7 @@ parent: ci-stability
 labels: [board, testing]
 priority: p3
 created: "2026-10-01"
-updated: "2026-10-01"
-claimed_at: "2026-10-01T14:30:03.134Z"
+updated: "2026-10-03"
 worktree_path: /home/arggon/Projects/ArggonManager-task-remove-diag-listener
 ---
 <!--
