@@ -60,13 +60,33 @@ ignores:
   # described in a comment.
   - "cli/src/assert-order.test.ts"
 rule:
-  pattern: expect($SUBJECT.indexOf($$$NEEDLE_ARGS)).$MATCHER($POSITION)
+  all:
+    - pattern: expect($SUBJECT.indexOf($$$NEEDLE_ARGS)).$MATCHER($POSITION)
+    #
+    # A numeric literal on the right is exempt ONLY where the comparison
+    # genuinely FAILS on an absent needle, i.e. where `-1 <op> n` is false.
+    # Per comparator:
+    #
+    #   toBeGreaterThan(n)         sound iff -1 >  n is false  <=>  n >= -1
+    #   toBeGreaterThanOrEqual(n)  sound iff -1 >= n is false  <=>  n >= 0
+    #   toBeLessThan(n)            sound iff -1 <  n is false  <=>  n <= -1
+    #   toBeLessThanOrEqual(n)     sound iff -1 <= n is false  <=>  n <= -2
+    #
+    # Only the first two are meaningful ("the clause is present" guards), and
+    # only those are exempted. The `<` family is left to FIRE on every numeric
+    # literal because `-1 < 38` and `-1 <= -1` are both TRUE — exempting them
+    # is exactly the bug: an over-broad first cut of this rule exempted all
+    # numerics and would have waved through `toBeLessThan(<literal>)` and
+    # `toBeGreaterThanOrEqual(-1)`. Negative literals other than exactly -1
+    # also fire (`-1 > -0.5` is true), so the sound set is -1 plus the
+    # non-negatives; erring toward firing is the safe direction.
+    #
+    # Both regexes are anchored at the END of the node's text, so they match
+    # the matcher call and its argument without constraining the subject.
+    - not:
+        regex: '\.toBeGreaterThan\((-1|[0-9][0-9]*)(\.[0-9]+)?\)$'
+    - not:
+        regex: '\.toBeGreaterThanOrEqual\(([0-9][0-9]*)(\.[0-9]+)?\)$'
 constraints:
   MATCHER:
     regex: "^(toBeLessThan|toBeGreaterThan|toBeLessThanOrEqual|toBeGreaterThanOrEqual)$"
-  # A NUMERIC literal on the right is a presence check, not an order claim: an
-  # absent needle answers -1, and `-1 > 0` / `-1 >= 0` fail loudly, so those
-  # forms already pin presence and stay legal.
-  POSITION:
-    not:
-      regex: "^-?[0-9]+(\\.[0-9]+)?$"

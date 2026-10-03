@@ -30,10 +30,14 @@ valid:
     // A non-ordering matcher on an indexOf result is not a vacuous ORDER claim.
     expect(message.indexOf("--state")).toBe(-1);
   - |
-    // A NUMERIC literal on the right is a presence check that already fails
-    // loudly when the needle is absent (`-1 > 0` is false), so it stays legal.
+    // A numeric literal on the right is exempt ONLY where `-1 <op> n` is
+    // FALSE, so the clause's absence fails loudly and presence is already
+    // pinned. Both of these are exactly that.
     expect(html.indexOf("</head>")).toBeGreaterThan(0);
-    expect(refusal.indexOf(files[0]!)).toBeGreaterThan(-1);
+    expect(cells.indexOf(marker)).toBeGreaterThan(-1);
+    expect(hint).toBeGreaterThanOrEqual(0);
+    // A non-negative literal with toBeGreaterThanOrEqual, for completeness.
+    expect(refusal.indexOf(files[0]!)).toBeGreaterThanOrEqual(1);
   - |
     // Other positional comparisons stay legal; only indexOf-of-a-substring
     // ordering is vacuous.
@@ -68,3 +72,21 @@ invalid:
   # presence it is really asserting.
   - |
     expect(list.indexOf(id)).toBeGreaterThan(previous);
+  # A NUMERIC literal is exempt ONLY where `-1 <op> n` is false. These four are
+  # the pairs the over-broad first cut of the rule wrongly waved through:
+  - |
+    // -1 < 38 is TRUE — passes on an absent needle.
+    expect(rendered.indexOf("324")).toBeLessThan(38);
+  - |
+    // -1 <= -1 is TRUE — passes on an absent needle.
+    expect(message.indexOf("npm ci")).toBeLessThanOrEqual(-1);
+  - |
+    // -1 <= 0 is TRUE — passes on an absent needle.
+    expect(html.indexOf("</head>")).toBeLessThanOrEqual(0);
+  - |
+    // -1 >= -1 is TRUE — passes on an absent needle. One keystroke away from
+    // the SOUND `toBeGreaterThanOrEqual(0)` presence guard PR #608 used.
+    expect(hint.indexOf("If this is an identity error")).toBeGreaterThanOrEqual(-1);
+  # A negative literal other than -1: -1 > -0.5 is TRUE, so this fires too.
+  - |
+    expect(html.indexOf("</head>")).toBeGreaterThan(-0.5);
