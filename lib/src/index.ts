@@ -43,13 +43,18 @@ export type { Frontmatter } from "./frontmatter.js";
 // --- Items -----------------------------------------------------------------
 
 export {
+  acceptanceBody,
   acceptanceComplete,
+  acceptanceCriteria,
+  acceptanceRows,
+  acceptanceUnchecked,
   itemsById,
   loadItems,
   softTryLoadItem,
   tryLoadItem,
   walkTasksTree,
 } from "./items.js";
+export type { AcceptanceBodySource, AcceptanceRow } from "./items.js";
 export {
   numberField,
   parseFrontmatter,

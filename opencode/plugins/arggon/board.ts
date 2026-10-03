@@ -18,6 +18,9 @@
  * and of any npm dependency; node builtins only.
  */
 import {
+  acceptanceBody,
+  acceptanceCriteria,
+  acceptanceRows,
   findTasksDir,
   itemsById,
   loadItems,
@@ -32,6 +35,7 @@ import {
   statusCounts,
   treeEntries,
   type ItemType,
+  type KernelWorkItem,
   type Status,
 } from "@arggondev/lib";
 
@@ -396,7 +400,7 @@ export type BoardItemDetail = {
   acceptance: string[];
   /** Prose rows with acceptance rows, comments and the leading H1 removed. */
   body: string[];
-  /** Checked / total acceptance rows over the WHOLE checklist (not the slice). */
+  /** Checked / total CRITERIA rows over the WHOLE canonical body (not the slice). */
   acceptanceDone: number;
   acceptanceTotal: number;
   /** True when the row budget dropped content. */
@@ -406,26 +410,53 @@ export type BoardItemDetail = {
 };
 
 /** `- [ ] text` / `- [x] text` markdown checklist row (kernel acceptance shape). */
-const BOARD_ACCEPTANCE_ROW = /^\s*[-*]\s+\[([ xX])\]\s?(.*)$/;
+// There is deliberately NO regex here. The acceptance grammar belongs to the
+// kernel (`acceptanceRows` / `acceptanceCriteria` in lib/src/items.ts), beside
+// the DONE GATE that refuses the `--status done` flip
+// (bug-three-acceptance-parsers-diverging). This module used to carry its own
+// `/^\s*[-*]\s+\[([ xX])\]\s?(.*)$/`, which (a) is CRLF-blind — `.` never
+// matches `\r`, so a CRLF item rendered as "no acceptance rows" while the gate
+// still refused — and (b) accepted `-  [ ] text` (two spaces) as a row while the
+// gate does not, so the panel's count could read "0/2 acceptance" on an item the
+// gate considered finished. Both are the same defect class as the board drawer;
+// there is now one parser and one canonical body.
 
 /**
- * Split the item prose into acceptance rows and the remaining body rows. The
- * item template's HTML placement comment and the leading H1 (already shown as
- * `id — title` in the header) are authoring metadata, not content; blank runs
- * are collapsed so the row budget carries signal, not air. Pure.
+ * Acceptance rows of the WHOLE canonical body, rendered for the panel
+ * (`[ ] text`, or a bare `[ ]` for a scaffold placeholder). Read through the
+ * kernel's `acceptanceRows` over `acceptanceBody(item)` — the whole body,
+ * COMMENT SECTIONS INCLUDED. `runShow`'s `prose` excludes comment sections, so
+ * reading rows from it made a checklist filed as a comment render as "no
+ * acceptance rows" while the gate blocked the flip (`create` has no `--body`
+ * flag, so a comment checklist is the default shape for every new item).
  */
-function splitBoardDetailRows(prose: string): { acceptance: string[]; body: string[] } {
-  const acceptance: string[] = [];
+function acceptanceRenderRows(item: KernelWorkItem): string[] {
+  return acceptanceRows(acceptanceBody(item)).map((row) => {
+    const mark = row.checked ? "x" : " ";
+    return row.text === "" ? `[${mark}]` : `[${mark}] ${row.text}`;
+  });
+}
+
+/**
+ * Split the item prose into the acceptance section and the remaining body rows.
+ * The acceptance rows themselves come from `acceptanceRenderRows` (the canonical
+ * body, kernel-parsed); this loop only partitions the DISPLAY prose — the item
+ * template's HTML placement comment and the leading H1 (already shown as
+ * `id — title` in the header) are authoring metadata, not content, and blank
+ * runs are collapsed so the row budget carries signal, not air. A line the
+ * kernel calls a row is skipped here so it is never rendered twice. Pure.
+ */
+function splitBoardDetailRows(
+  item: KernelWorkItem,
+  prose: string,
+): { acceptance: string[]; body: string[] } {
+  const acceptance = acceptanceRenderRows(item);
   const body: string[] = [];
   for (const raw of prose.replace(/<!--[\s\S]*?-->/g, "").split(/\r?\n/)) {
     const row = raw.replace(/\t/g, "  ").trimEnd();
-    const check = BOARD_ACCEPTANCE_ROW.exec(row);
-    if (check) {
-      const mark = (check[1] ?? " ").toLowerCase() === "x" ? "x" : " ";
-      const text = (check[2] ?? "").trimEnd();
-      acceptance.push(text === "" ? `[${mark}]` : `[${mark}] ${text}`);
-      continue;
-    }
+    // Kernel predicate on a single line, so the two lists can never disagree
+    // about which lines are rows.
+    if (acceptanceRows(row).length > 0) continue;
     if (body.length === 0 && acceptance.length === 0 && /^#\s+/.test(row)) continue;
     if (row.trim() === "") {
       if (body.length === 0 || body[body.length - 1] === "") continue;
@@ -440,9 +471,13 @@ function splitBoardDetailRows(prose: string): { acceptance: string[]; body: stri
 
 /**
  * Read one item for the inline detail block through the kernel's bounded read
- * path (`runShow`: frontmatter + prose, comments excluded). Never throws and
- * never writes: a missing id, a corrupt tracker or any read failure degrades to
- * an error detail the panel renders. `rows` overrides the row budget (tests).
+ * path (`runShow`: frontmatter + prose, comments excluded) — with ONE exception:
+ * the acceptance rows and the `done`/`total` count come from the CANONICAL body
+ * (`acceptanceBody(shown.item)`), because the gate the count mirrors reads that
+ * one, and a bounded reader's prose is a different question
+ * (bug-three-acceptance-parsers-diverging). Never throws and never writes: a
+ * missing id, a corrupt tracker or any read failure degrades to an error detail
+ * the panel renders. `rows` overrides the row budget (tests).
  */
 export function boardItemDetail(
   cwd: string,
@@ -464,7 +499,8 @@ export function boardItemDetail(
   if (requested === "") return failed("detail unavailable: no selected item");
   try {
     const shown = runShow({ cwd, id: requested });
-    const { acceptance, body } = splitBoardDetailRows(shown.prose);
+    const { acceptance, body } = splitBoardDetailRows(shown.item, shown.prose);
+    const criteria = acceptanceCriteria(acceptanceBody(shown.item));
     const budget = Math.max(options.rows ?? BOARD_DETAIL_MAX_ROWS, 0);
     const shownAcceptance = acceptance.slice(0, budget);
     const shownBody = body.slice(0, Math.max(budget - shownAcceptance.length, 0));
@@ -478,8 +514,13 @@ export function boardItemDetail(
       path: sanitizeHumanTextUncapped(shown.path),
       acceptance: shownAcceptance.map(row),
       body: shownBody.map(row),
-      acceptanceDone: acceptance.filter((entry) => entry.startsWith("[x]")).length,
-      acceptanceTotal: acceptance.length,
+      // Counted over the kernel's CRITERIA rows — the gate's own row set, from
+      // which the bare scaffold placeholders are excluded
+      // (bug-empty-template-checkbox). Counting every row could report "1/2
+      // acceptance" for an item whose one ticked criterion is the only
+      // criterion, i.e. an unfinished-looking count on a gate-complete item.
+      acceptanceDone: criteria.filter((entry) => entry.checked).length,
+      acceptanceTotal: criteria.length,
       truncated: acceptance.length + body.length > budget,
       error: null,
     };

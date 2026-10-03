@@ -1188,6 +1188,8 @@ describe("static export --details (task-board-static-details)", () => {
         prose: "body",
         prose_truncated: false,
         acceptance: [],
+        acceptance_truncated: false,
+        acceptance_complete: true,
         comments: [],
         hidden_comments: 0,
         dependencies: [],
