@@ -25,7 +25,10 @@ claimed_at: "2026-10-03T11:57:05.659Z"
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [x] Native `stepsTruncated` mirrors the kernel's decision; the projection does not re-derive it from a different cap — `index.ts` reads `input.stepsTruncated === true` and emits it verbatim; both mutations (mirror killed, fold killed) fail the new test with `expected undefined to be true`.
+- [x] A test drives `> MAX_PREP_STEPS` through the NATIVE seam and asserts both the shortened list AND the flag, matching the CLI's behavior on the same kernel event — `tools.test.ts`: 16 linked workspace packages → native `preparation.steps` has 16 entries, `stepsTruncated === true`, a direct `prepareWorktreeDependencies` receipt for the same worktree agrees on both, and the CLI twin's `prepSteps` deep-equals the native log. **The CLI carries no flag at all** (see §Context), so the flag is matched against the kernel — the decision both surfaces project from — rather than against a CLI field that does not exist; a second test pins that an uncapped log stays unflagged.
+- [x] Sweep `boundedPreparation` (and any sibling native projection) for other kernel-set flags it recomputes instead of mirroring — the class, not this one field — **done in §Sweep below: one instance of the class (this field), now closed on the native seam.** Two adjacent findings that are NOT recomputes are reported there: the CLI drops the same flag, and the kernel's refusal prose quotes the capped log without saying entries were dropped.
+- [x] If a native cap genuinely must exist (the 32-name cap suggests one once did), say why and make it additive rather than a replacement for the kernel's decision — it stays as defense in depth (a hand-built receipt is the only way it can fire through the kernel's 16) and folds into the shared `truncated`; the kernel's decision is mirrored alongside it, never replaced by it.
 
 ## Notes
 
