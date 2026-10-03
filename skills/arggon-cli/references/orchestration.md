@@ -84,6 +84,8 @@ role forks them.
 
 One goal per claimed item: `arggon goal <id>` (rendered from inside the item's
 worktree) turns the item's acceptance checklist into the goal-mode contract an
-agent loop runs on — objective, verification, boundaries. It refuses a foreign
-claim, a closed item and any checkout that is not the item's recorded
-`worktree_path` (no override flag), and a goal never spans worktrees or items.
+agent loop runs on — objective, verification, boundaries — and takes "is there
+work left" from the DONE GATE, so it never contradicts what `done` would refuse.
+It refuses an unresolvable identity, a foreign claim, a closed item and any
+checkout that is not the item's recorded `worktree_path` (no override flag), and
+a goal never spans worktrees or items.

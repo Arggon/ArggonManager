@@ -4,19 +4,39 @@
  * one claimed item's acceptance checklist, and the hard boundaries (one goal per
  * claimed item, one worktree per item) hold on the rendered output.
  *
- * The refusals are asserted against real trees (init + claim + a recorded
- * worktree path), not mocks: the whole point of the boundaries is that they
- * fire in the shape an agent actually hits them.
+ * Two properties carry this command, and both are asserted here:
+ *
+ *  1. **The goal never inverts the done gate.** `acceptanceComplete` (the
+ *     kernel predicate a `done` flip is refused by) decides whether work
+ *     remains; the row parser only supplies text. The PARITY CORPUS walks the
+ *     shapes where the two line regexes historically disagreed (CRLF, `- [ ]x`
+ *     with no space, `*` bullets, indentation, empty boxes, tabs) and asserts
+ *     `goal.hasGoal === !acceptanceComplete(body)` for every one of them.
+ *  2. **The refusals hold on real trees** (init + claim + a recorded
+ *     `worktree_path`), not mocks, and every documented code is asserted —
+ *     a refusal that is not asserted is a refusal that can rot.
+ *
+ * `bug-three-acceptance-parsers-diverging` owns unifying the parsers; until it
+ * lands, this corpus is what keeps the adapter honest.
  */
-import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync as _mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCreate, runShow, runUpdate } from "@arggondev/lib";
+import { acceptanceComplete, runCreate, runShow, runUpdate } from "@arggondev/lib";
 import { runInit } from "./init.js";
+import { parseAcceptanceRows } from "./board.js";
+import { normalizeEol } from "./docs.js";
 import {
   GOAL_TEMPLATE_REL,
   MAX_GOAL_CONTRACT_BYTES,
+  MAX_GOAL_PROSE_BYTES,
   MAX_GOAL_TEMPLATE_BYTES,
   deriveGoal,
   goalOperation,
@@ -41,14 +61,11 @@ const FRONTMATTER_END = "\n---\n";
 
 /** Replace everything after the frontmatter terminator (body is fixture text). */
 function writeBody(dir: string, id: string, body: string): void {
-  const raw = readFileSync(runShow({ cwd: dir, id }).path, "utf8");
+  const path = runShow({ cwd: dir, id }).path;
+  const raw = readFileSync(path, "utf8");
   const sep = raw.indexOf(FRONTMATTER_END);
   if (sep < 0) throw new Error("goal-mode fixture: no frontmatter terminator");
-  writeFileSync(
-    runShow({ cwd: dir, id }).path,
-    raw.slice(0, sep + FRONTMATTER_END.length) + body,
-    "utf8",
-  );
+  writeFileSync(path, raw.slice(0, sep + FRONTMATTER_END.length) + body, "utf8");
 }
 
 /** Stamp `worktree_path` into the item's frontmatter (fixture-only edit). */
@@ -66,7 +83,7 @@ function writeWorktreePath(dir: string, id: string, worktreePath: string): void 
 /** A primed tree with one task carrying the given acceptance rows. */
 function treeWithTask(
   acceptance: string,
-  opts?: { assignee?: string; status?: string },
+  opts?: { assignee?: string; status?: string; eol?: "\n" | "\r\n" },
 ): { dir: string; id: string } {
   const dir = mkdtempSync(join(tmpdir(), "arggon-goal-"));
   runInit({ dir, force: false });
@@ -80,11 +97,8 @@ function treeWithTask(
     parent: "story-seam",
     id: "goal-contract",
   });
-  writeBody(
-    dir,
-    id,
-    `# Ship the goal contract\n\n## Context\n\nFixture.\n\n## Acceptance\n\n${acceptance}\n\n## Notes\n`,
-  );
+  const body = `# Ship the goal contract\n\n## Context\n\nFixture.\n\n## Acceptance\n\n${acceptance}\n\n## Notes\n`;
+  writeBody(dir, id, opts?.eol === "\r\n" ? body.replaceAll("\n", "\r\n") : body);
   if (opts?.assignee !== undefined || opts?.status !== undefined) {
     runUpdate({
       cwd: dir,
@@ -97,54 +111,134 @@ function treeWithTask(
   return { dir, id };
 }
 
-describe("deriveGoal (pure derivation from the acceptance checklist)", () => {
-  const rows = [
-    { text: "template generation test", checked: false },
-    { text: "goal contract parses the checklist", checked: false },
-    { text: "documented: one goal per claimed item", checked: false },
-    { text: "already done", checked: true },
+/** The derivation as `runGoal` performs it, for the pure corpus matrix. */
+function deriveAsRun(body: string): ReturnType<typeof deriveGoal> {
+  return deriveGoal(parseAcceptanceRows(normalizeEol(body)), !acceptanceComplete(body));
+}
+
+// ---------------------------------------------------------------------------
+
+describe("parity corpus: the goal never inverts the done gate", () => {
+  const body = (checklist: string): string =>
+    `# Item\n\n## Context\n\nx\n\n## Acceptance\n\n${checklist}\n\n## Notes\n`;
+
+  const cases: Array<{
+    name: string;
+    checklist: string;
+    gateUnchecked: boolean;
+    renderable?: boolean;
+    objective?: RegExp;
+  }> = [
+    {
+      name: "no checklist at all",
+      checklist: "(none)",
+      gateUnchecked: false,
+      objective: /DEFINE THE GOAL FIRST/,
+    },
+    {
+      name: "one unchecked",
+      checklist: "- [ ] a criterion",
+      gateUnchecked: true,
+      objective: /^a criterion$/,
+    },
+    { name: "all ticked", checklist: "- [x] a criterion", gateUnchecked: false },
+    {
+      name: "mixed",
+      checklist: "- [x] done one\n- [ ] still open",
+      gateUnchecked: true,
+      objective: /still open/,
+    },
+    {
+      name: "empty box is a placeholder, not a criterion",
+      checklist: "- [ ]\n- [x] done",
+      gateUnchecked: false,
+      objective: /DEFINE THE GOAL FIRST/,
+    },
+    {
+      name: "star bullet",
+      checklist: "* [ ] star criterion",
+      gateUnchecked: true,
+      objective: /star criterion/,
+    },
+    {
+      name: "indented criterion",
+      checklist: "  - [ ] indented criterion",
+      gateUnchecked: true,
+      objective: /indented criterion/,
+    },
+    {
+      name: "uppercase X",
+      checklist: "- [X] done\n- [ ] open",
+      gateUnchecked: true,
+      objective: /open/,
+    },
+    {
+      name: "tab after the box",
+      checklist: "- [ ]\ttabbed criterion",
+      gateUnchecked: true,
+      objective: /tabbed criterion/,
+    },
+    // The two shapes that used to DIVERGE. `acceptanceComplete` counts both
+    // (`[^\s]` needs no space after the box), the board row regex needs
+    // `\s+` — so without the gate-authoritative verdict the goal used to claim
+    // "nothing to do" while the done gate refused to close the item.
+    {
+      name: "no space after the box (row regex misses it)",
+      checklist: "- [ ]x",
+      gateUnchecked: true,
+      objective: /READ THE ITEM BODY FIRST/,
+      renderable: false,
+    },
+    {
+      name: "one-space single char (both see it)",
+      checklist: "- [ ] x",
+      gateUnchecked: true,
+      objective: /^x$/,
+    },
   ];
 
-  it("takes ONE goal from the first unchecked box and verifies against them all", () => {
-    const goal = deriveGoal(rows);
-    expect(goal.objective).toBe("template generation test");
-    expect(goal.verification).toEqual([
-      "template generation test",
-      "goal contract parses the checklist",
-      "documented: one goal per claimed item",
-    ]);
-    expect(goal.checklist).toEqual({ total: 4, unchecked: 3, checked: 1 });
-    expect(goal.truncated).toBe(false);
-  });
+  for (const testCase of cases) {
+    it(`${testCase.name}: hasGoal === !acceptanceComplete`, () => {
+      const source = body(testCase.checklist);
+      const gateUnchecked = !acceptanceComplete(source);
+      expect(gateUnchecked, "corpus expectation for the done gate").toBe(testCase.gateUnchecked);
+      const goal = deriveAsRun(source);
+      expect(goal.hasGoal, "goal must agree with the gate").toBe(gateUnchecked);
+      if (testCase.renderable !== undefined) {
+        expect(goal.renderable).toBe(testCase.renderable);
+      }
+      // Text is only ever rendered for work the gate found — never the inverse.
+      if (goal.renderable) expect(gateUnchecked).toBe(true);
+      if (testCase.objective) expect(goal.objective).toMatch(testCase.objective);
+      // The inverse must never be reported: a goal that claims work while the
+      // gate is satisfied would send an agent after a criterion that does not
+      // block `done`.
+      if (!gateUnchecked) expect(goal.hasGoal).toBe(false);
+    });
+  }
 
-  it("skips empty boxes (scaffold placeholders are not criteria)", () => {
-    const goal = deriveGoal([
-      { text: "", checked: false },
-      { text: "  ", checked: false },
-      { text: "a real criterion", checked: false },
-    ]);
-    expect(goal.objective).toBe("a real criterion");
-    expect(goal.checklist.unchecked).toBe(1);
-  });
-
-  it("yields an explicit define-the-goal-first shape, never an empty goal", () => {
-    for (const candidate of [
-      [],
-      [{ text: "", checked: false }],
-      [{ text: "all ticked", checked: true }],
-    ]) {
-      const goal = deriveGoal(candidate);
-      expect(goal.objective).toMatch(/DEFINE THE GOAL FIRST/);
-      expect(goal.objective.length).toBeGreaterThan(40);
-      expect(goal.verification[0]).toMatch(/cannot start until/);
-    }
+  it("CRLF: gate and contract agree (the round-1 inversion)", () => {
+    const lf = body("- [ ] crlf criterion\n- [x] done one");
+    const crlf = lf.replaceAll("\n", "\r\n");
+    // The frontmatter parser tolerates CRLF, the done gate reads it...
+    expect(acceptanceComplete(crlf)).toBe(false);
+    // ...and the raw row regex alone sees NOTHING (`.` never matches `\r`).
+    expect(parseAcceptanceRows(crlf.split("\n").join("\r\n"))).toEqual([]);
+    // Normalizing first (docs.ts `normalizeEol`) is what makes the rows usable.
+    expect(parseAcceptanceRows(normalizeEol(crlf)).length).toBe(2);
+    const goal = deriveAsRun(crlf);
+    expect(goal.hasGoal).toBe(true);
+    expect(goal.renderable).toBe(true);
+    expect(goal.objective).toBe("crlf criterion");
   });
 
   it("stays bounded on a tampered oversized item (clipped lines, counted overflow)", () => {
     const huge = "x".repeat(200_000);
-    const goal = deriveGoal(
-      Array.from({ length: 40 }, (_, i) => ({ text: `${i}: ${huge}`, checked: false })),
-    );
+    const rows = Array.from({ length: 40 }, (_, i) => ({
+      text: `${i}: ${huge}`,
+      checked: false,
+    }));
+    const goal = deriveGoal(rows, true);
     expect(goal.verification).toHaveLength(8);
     expect(goal.verificationOmitted).toBe(32);
     expect(goal.truncated).toBe(true);
@@ -152,6 +246,16 @@ describe("deriveGoal (pure derivation from the acceptance checklist)", () => {
       expect(Buffer.byteLength(line, "utf8")).toBeLessThanOrEqual(200);
     }
     expect(Buffer.byteLength(goal.objective, "utf8")).toBeLessThanOrEqual(240);
+  });
+
+  it("reports the no-goal and unrenderable shapes explicitly, never an empty goal", () => {
+    const done = deriveGoal([{ text: "all ticked", checked: true }], false);
+    expect(done.objective).toMatch(/DEFINE THE GOAL FIRST/);
+    expect(done.verification[0]).toMatch(/cannot start until/);
+    const unreadable = deriveGoal([], true);
+    expect(unreadable.hasGoal).toBe(true);
+    expect(unreadable.renderable).toBe(false);
+    expect(unreadable.objective).toMatch(/READ THE ITEM BODY FIRST/);
   });
 });
 
@@ -167,11 +271,67 @@ describe("runGoal (rendered contract from a real item)", () => {
       "template generation test",
       "goal contract parses the checklist",
     ]);
+    expect(result.goal.gateUnchecked).toBe(true);
     // Every slot is filled; none is left behind.
     expect(result.contract).not.toMatch(/\{\{[A-Z_]+\}\}/);
     expect(result.contract).toContain("## Objective (exactly one)");
     expect(result.goal.template).toBe("adopter");
     expect(result.goal.identity).toBe("Arggon");
+  });
+
+  it("agrees with the done gate on a CRLF item, end to end", () => {
+    const { dir, id } = treeWithTask("- [ ] crlf criterion\n- [x] done one", {
+      assignee: "Arggon",
+      eol: "\r\n",
+    });
+    const raw = readFileSync(runShow({ cwd: dir, id }).path, "utf8");
+    expect(raw).toContain("\r\n");
+    // The gate would refuse `done` on this item...
+    expect(
+      acceptanceComplete(raw.slice(raw.indexOf(FRONTMATTER_END) + FRONTMATTER_END.length)),
+    ).toBe(false);
+    // ...and the goal therefore offers work, with readable text.
+    const result = runGoal({ cwd: dir, id, login: "Arggon" });
+    expect(result.goal.hasGoal).toBe(true);
+    expect(result.goal.renderable).toBe(true);
+    expect(result.goal.objective).toBe("crlf criterion");
+  });
+
+  it("clips the prose read at its budget, and the clip cannot invert the gate", () => {
+    const { dir, id } = treeWithTask("- [ ] beyond the budget", { assignee: "Arggon" });
+    // Move the whole checklist past MAX_GOAL_PROSE_BYTES of filler: the read is
+    // clipped, so no criterion row is parsed — and the contract must still say
+    // "work remains" (the gate's verdict), never "define the goal first".
+    const path = runShow({ cwd: dir, id }).path;
+    const raw = readFileSync(path, "utf8");
+    const sep = raw.indexOf(FRONTMATTER_END) + FRONTMATTER_END.length;
+    const head = raw.slice(0, sep);
+    const tail = raw.slice(sep);
+    const unit = "filler line\n";
+    const filler = unit.repeat(
+      Math.ceil((MAX_GOAL_PROSE_BYTES * 1.2) / Buffer.byteLength(unit, "utf8")),
+    );
+    writeFileSync(path, `${head}\n${filler}\n${tail}`, "utf8");
+    const result = runGoal({ cwd: dir, id, login: "Arggon" });
+    expect(result.goal.gateUnchecked).toBe(true);
+    expect(result.goal.hasGoal).toBe(true);
+    expect(result.goal.renderable).toBe(false);
+    expect(result.goal.objective).toMatch(/READ THE ITEM BODY FIRST/);
+    expect(Buffer.byteLength(result.contract, "utf8")).toBeLessThanOrEqual(MAX_GOAL_CONTRACT_BYTES);
+  });
+
+  it("clips a long criterion line and reports the contract as truncated", () => {
+    const long = "y".repeat(4_000);
+    const { dir, id } = treeWithTask(`- [ ] ${long}\n- [ ] short one`, {
+      assignee: "Arggon",
+    });
+    const result = runGoal({ cwd: dir, id, login: "Arggon" });
+    expect(result.goal.truncated).toBe(true);
+    for (const line of result.goal.verification) {
+      expect(Buffer.byteLength(line, "utf8")).toBeLessThanOrEqual(200);
+    }
+    expect(result.goal.objective.endsWith("…")).toBe(true);
+    expect(result.contract).toContain("Some checklist text was clipped or deferred");
   });
 
   it("states the one-item / one-worktree boundaries in the rendered contract", () => {
@@ -185,6 +345,7 @@ describe("runGoal (rendered contract from a real item)", () => {
     expect(contract).toContain("The kernel is the enforcement of record");
     // The reviewer backstop is named, not routed around.
     expect(contract).toContain("reviewer dispatch in flight is read-only");
+    expect(contract).toContain("Claim holder: Arggon");
   });
 
   it("keeps the boundaries when the adopter's template copy is stripped down", () => {
@@ -214,32 +375,6 @@ describe("runGoal (rendered contract from a real item)", () => {
     expect(result.contract.endsWith("not from the template file.\n")).toBe(true);
   });
 
-  it("refuses an unclaimed item, a foreign claim, and a closed item", () => {
-    const unclaimed = treeWithTask("- [ ] one goal");
-    expect(() => runGoal({ cwd: unclaimed.dir, id: unclaimed.id, login: "Arggon" })).toThrow(
-      /no claim/,
-    );
-    const foreign = treeWithTask("- [ ] one goal", { assignee: "Someone-else" });
-    expect(() => runGoal({ cwd: foreign.dir, id: foreign.id, login: "Arggon" })).toThrow(
-      /claimed by 'Someone-else'/,
-    );
-    const done = treeWithTask("- [x] shipped", { assignee: "Arggon" });
-    tickAcceptance(done.dir, done.id);
-    runUpdate({ cwd: done.dir, id: done.id, status: "done", now: NOW });
-    expect(() => runGoal({ cwd: done.dir, id: done.id, login: "Arggon" })).toThrow(
-      /never reopened/,
-    );
-  });
-
-  it("refuses to run outside the item's worktree, and when it no longer exists", () => {
-    const { dir, id } = treeWithTask("- [ ] one goal", { assignee: "Arggon" });
-    const other = mkdtempSync(join(tmpdir(), "arggon-goal-other-"));
-    writeWorktreePath(dir, id, other);
-    expect(() => runGoal({ cwd: dir, id, login: "Arggon" })).toThrow(/never spans worktrees/);
-    rmSync(other, { recursive: true, force: true });
-    expect(() => runGoal({ cwd: dir, id, login: "Arggon" })).toThrow(/no longer exists/);
-  });
-
   it("falls back to the packaged template when the adopter copy is absent", () => {
     const { dir, id } = treeWithTask("- [ ] one goal", { assignee: "Arggon" });
     rmSync(join(dir, ...GOAL_TEMPLATE_REL.split("/")));
@@ -248,12 +383,118 @@ describe("runGoal (rendered contract from a real item)", () => {
     expect(result.contract).toContain("## Objective (exactly one)");
     expect(result.contract).toContain("one goal");
   });
+});
 
-  it("reports an unresolved caller identity instead of pretending to know it", () => {
-    const { dir, id } = treeWithTask("- [ ] one goal", { assignee: "Arggon" });
-    const result = runGoal({ cwd: dir, id, login: "" });
-    expect(result.goal.identity).toBeNull();
-    expect(result.contract).toContain("could not be resolved");
+describe("refusals: every documented code is asserted", () => {
+  /** Each case: arrange a tree, return the invocation that must refuse. */
+  const refusals: Array<{
+    code: string;
+    arrange: () => { dir: string; id: string; login?: string; templatesDir?: string };
+  }> = [
+    {
+      code: "GOAL_UNCLAIMED",
+      arrange: () => treeWithTask("- [ ] one goal"),
+    },
+    {
+      code: "GOAL_ITEM_CLOSED",
+      arrange: () => {
+        const { dir, id } = treeWithTask("- [x] shipped", { assignee: "Arggon" });
+        tickAcceptance(dir, id);
+        runUpdate({ cwd: dir, id, status: "done", now: NOW });
+        return { dir, id };
+      },
+    },
+    {
+      code: "GOAL_FOREIGN_CLAIM",
+      arrange: () => treeWithTask("- [ ] one goal", { assignee: "Someone-else" }),
+    },
+    {
+      // B2: an unresolvable identity must REFUSE, not render the goal anyway.
+      code: "GOAL_IDENTITY_UNKNOWN",
+      arrange: () => {
+        const { dir, id } = treeWithTask("- [ ] one goal", { assignee: "Arggon" });
+        return { dir, id, login: "" };
+      },
+    },
+    {
+      code: "GOAL_WORKTREE_MISMATCH",
+      arrange: () => {
+        const { dir, id } = treeWithTask("- [ ] one goal", { assignee: "Arggon" });
+        writeWorktreePath(dir, id, mkdtempSync(join(tmpdir(), "arggon-goal-other-")));
+        return { dir, id };
+      },
+    },
+    {
+      code: "GOAL_WORKTREE_MISSING",
+      arrange: () => {
+        const { dir, id } = treeWithTask("- [ ] one goal", { assignee: "Arggon" });
+        const gone = mkdtempSync(join(tmpdir(), "arggon-goal-gone-"));
+        writeWorktreePath(dir, id, gone);
+        rmSync(gone, { recursive: true, force: true });
+        return { dir, id };
+      },
+    },
+    {
+      code: "GOAL_TEMPLATE_UNAVAILABLE",
+      arrange: () => {
+        const { dir, id } = treeWithTask("- [ ] one goal", { assignee: "Arggon" });
+        rmSync(join(dir, ...GOAL_TEMPLATE_REL.split("/")));
+        // An empty templates dir removes the packaged fallback too.
+        const empty = mkdtempSync(join(tmpdir(), "arggon-goal-templates-"));
+        mkdirSync(join(empty, "docs/zcode/arggon/templates"), { recursive: true });
+        return { dir, id, templatesDir: empty };
+      },
+    },
+    {
+      code: "GOAL_FAILED",
+      arrange: () => {
+        const { dir } = treeWithTask("- [ ] one goal", { assignee: "Arggon" });
+        return { dir, id: "task-does-not-exist" };
+      },
+    },
+  ];
+
+  for (const refusal of refusals) {
+    it(`refuses with ${refusal.code}`, () => {
+      const { dir, id, login, templatesDir } = refusal.arrange();
+      const outcome = goalOperation({ cwd: dir, id, login, templatesDir });
+      expect(outcome.ok, refusal.code).toBe(false);
+      expect(outcome.exitCode).toBe(1);
+      const envelope = outcome.envelope as unknown as Record<string, unknown>;
+      expect((envelope.error as { code?: string }).code).toBe(refusal.code);
+      expect(envelope.goal).toBeUndefined();
+      // A refusal envelope still reports the tree's real convention version
+      // (not the 0 default a subdirectory cwd used to produce).
+      expect(envelope.conventionVersion).toBe(5);
+    });
+  }
+
+  it("reports the real convention version from a SUBDIRECTORY cwd", () => {
+    const { dir, id } = treeWithTask("- [ ] one goal");
+    const sub = join(dir, "cli", "src");
+    mkdirSync(sub, { recursive: true });
+    const outcome = goalOperation({ cwd: sub, id });
+    expect(outcome.ok).toBe(false);
+    expect((outcome.envelope as unknown as Record<string, unknown>).conventionVersion).toBe(5);
+  });
+
+  it("reports the closed item before the environment (no misleading remedy)", () => {
+    const { dir, id } = treeWithTask("- [x] shipped", { assignee: "Arggon" });
+    tickAcceptance(dir, id);
+    runUpdate({ cwd: dir, id, status: "done", now: NOW });
+    // Identity ALSO unresolvable: the intrinsic cause must still win.
+    const outcome = goalOperation({ cwd: dir, id, login: "" });
+    expect((outcome.envelope as unknown as Record<string, unknown>).error).toMatchObject({
+      code: "GOAL_ITEM_CLOSED",
+    });
+  });
+
+  it("still refuses an unclaimed item when the identity is also unknown", () => {
+    const { dir, id } = treeWithTask("- [ ] one goal");
+    const outcome = goalOperation({ cwd: dir, id, login: "" });
+    expect((outcome.envelope as unknown as Record<string, unknown>).error).toMatchObject({
+      code: "GOAL_IDENTITY_UNKNOWN",
+    });
   });
 });
 
@@ -266,27 +507,22 @@ describe("goalOperation (json envelope)", () => {
     const envelope = outcome.envelope as unknown as Record<string, unknown>;
     expect(envelope.command).toBe("goal");
     expect(envelope.schemaVersion).toBe(1);
+    expect(envelope.conventionVersion).toBe(5);
     const goal = envelope.goal as GoalContract & { contract: string };
     expect(goal.objective).toBe("one goal");
     expect(goal.verification).toEqual(["one goal", "two goals"]);
     expect(goal.boundaries.length).toBeGreaterThan(3);
+    expect(goal.gateUnchecked).toBe(true);
+    expect(goal.renderable).toBe(true);
+    expect(goal.identity).toBe("Arggon");
     expect(Buffer.byteLength(goal.contract, "utf8")).toBeLessThanOrEqual(MAX_GOAL_CONTRACT_BYTES);
-  });
-
-  it("emits ok:false with the refusal code and exit 1", () => {
-    const { dir, id } = treeWithTask("- [ ] one goal");
-    const outcome = goalOperation({ cwd: dir, id, login: "Arggon" });
-    expect(outcome.ok).toBe(false);
-    expect(outcome.exitCode).toBe(1);
-    const envelope = outcome.envelope as unknown as Record<string, unknown>;
-    expect((envelope.error as { code?: string }).code).toBe("GOAL_UNCLAIMED");
-    expect(envelope.goal).toBeUndefined();
   });
 
   it("turns a fully ticked checklist into the define-the-goal-first shape", () => {
     const { dir, id } = treeWithTask("- [ ] one goal\n- [ ] two goals", { assignee: "Arggon" });
     tickAcceptance(dir, id);
     const result = runGoal({ cwd: dir, id, login: "Arggon" });
+    expect(result.goal.gateUnchecked).toBe(false);
     expect(result.goal.objective).toMatch(/DEFINE THE GOAL FIRST/);
     expect(result.goal.verificationOmitted).toBe(0);
   });

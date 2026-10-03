@@ -1,4 +1,5 @@
 ---
+# arggon:generated template="zcode/arggon/templates/goal-mode.md"
 name: arggon-goal-mode
 description: ArggonManager goal-mode contract for ONE claimed item — objective and verification derived from that item's acceptance checklist, never hand-written. Instantiate with `arggon goal <item-id>` (the /arggon-goal command); this file is the shape, the CLI fills the slots and appends the hard boundaries.
 ---

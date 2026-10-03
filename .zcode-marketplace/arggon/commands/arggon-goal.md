@@ -1,4 +1,5 @@
 ---
+# arggon:generated template="zcode/arggon/commands/arggon-goal.md"
 description: Render the goal-mode contract for one claimed item (objective + verification + boundaries)
 argument-hint: "<item-id>"
 ---

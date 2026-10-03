@@ -46,12 +46,14 @@ PRIORITY_FAILED`.
 - `doctor` is report-only (exit 0 always): installation + docs + tracker health.
   Use `--budget` for the context-budget surfaces (report-only).
 - `goal <id>` is a pure read with refusals: `--json` emits
-  `{ item, path, goal: { objective, verification, boundaries, refusals,
-truncated, hasGoal, checklist, worktree, template, identity, contract } }`;
-  `error.code` is `GOAL_ITEM_CLOSED` / `GOAL_UNCLAIMED` / `GOAL_FOREIGN_CLAIM` /
-  `GOAL_WORKTREE_MISMATCH` / `GOAL_WORKTREE_MISSING` /
-  `GOAL_TEMPLATE_UNAVAILABLE` / `GOAL_FAILED` with exit 1. There is no override
-  flag — read the refusal.
+  `{ item, path, goal: { objective, verification, boundaries, refusals, truncated,
+hasGoal, renderable, gateUnchecked, checklist, worktree, template, identity,
+contract } }`. `goal.gateUnchecked` is the DONE GATE's own verdict
+  (`!acceptanceComplete`) — the goal never claims work the gate does not see, nor
+  the reverse. `error.code` is `GOAL_IDENTITY_UNKNOWN` / `GOAL_ITEM_CLOSED` /
+  `GOAL_UNCLAIMED` / `GOAL_FOREIGN_CLAIM` / `GOAL_WORKTREE_MISMATCH` /
+  `GOAL_WORKTREE_MISSING` / `GOAL_TEMPLATE_UNAVAILABLE` / `GOAL_FAILED` with exit
+  1. There is no override flag — read the refusal.
 
 ## Verification
 

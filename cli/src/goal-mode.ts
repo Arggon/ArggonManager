@@ -12,11 +12,23 @@
  * Shape (the generated plugin file `templates/goal-mode.md` holds only the
  * shape):
  *
- *   1. ONE objective = the item's first UNCHECKED acceptance box (an empty box
- *      is a scaffold placeholder, not a criterion — the same rule the done gate
- *      applies). No unchecked box → an explicit "define the goal first"
- *      contract, never an empty goal.
- *   2. Verification = the same unchecked boxes as the contract the loop must
+ *   1. ONE objective = the item's first UNCHECKED acceptance criterion. WHICH
+ *      criteria exist is decided by the KERNEL's done-gate predicate
+ *      `acceptanceComplete` (lib/src/items.ts) — the same call the `done` flip
+ *      is refused by, so a goal can never tell an agent "nothing left to do"
+ *      while the gate refuses to close the item. The criterion TEXT comes from
+ *      the board renderer's row parser (cli/src/board.ts), normalized to LF
+ *      first (its regex is CRLF-blind, `.` never matches `\r`) and filtered
+ *      through no rule of its own beyond "has text" (the gate's own rule: a box
+ *      with no text after it is a scaffold placeholder, not a criterion). Those
+ *      are TWO parsers, not one: they can still disagree, so the disagreement is
+ *      handled, never hidden — when the gate says work remains but no criterion
+ *      text could be read, the contract says exactly that instead of inventing
+ *      an empty goal (see UNRENDERABLE below). One kernel predicate owning
+ *      unification is `bug-three-acceptance-parsers-diverging`; until that
+ *      lands, the parity corpus in cli/src/goal-mode.test.ts is what keeps this
+ *      adapter honest.
+ *   2. Verification = the same unchecked criteria as the contract the loop must
  *      satisfy, because every one of them must hold before the item can flip to
  *      `done` (ADR 0015 done gate). Bounded: N lines, each clipped, overflow
  *      counted, so a tampered or oversized item can never produce an unbounded
@@ -27,17 +39,19 @@
  *      backstop in `hooks/gate.mjs`. The kernel (`arggon validate`, the claim
  *      lease, the done gate) stays the enforcement of record; this is a prompt.
  *
- * Refusals (hard, decided and documented in docs/agents.md §ZCode): the item is
- * closed, unclaimed, claimed by another identity, or the caller's checkout is
- * not the item's recorded worktree (or that worktree no longer exists). There is
- * no override flag — pointing a goal at another session's worktree is a refusal,
- * not a mode.
+ * Refusals (hard, decided and documented in docs/agents.md §ZCode): the caller
+ * identity is unresolvable (so the claim holder cannot be proven to be you), the
+ * item is closed, unclaimed, claimed by another identity, or the caller's
+ * checkout is not the item's recorded worktree (or that worktree no longer
+ * exists). There is no override flag — pointing a goal at another session's
+ * worktree is a refusal, not a mode.
  *
  * Pure read: no lock, no writes, no tracker commit. Ever.
  */
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import {
+  acceptanceComplete,
   failEnvelope,
   findTasksDir,
   readConventionVersion,
@@ -52,6 +66,12 @@ import {
   type KernelSuccessEnvelope,
 } from "@arggondev/lib";
 import { parseAcceptanceRows } from "./board.js";
+// The CLI's single EOL helper (docs.ts). Required, not cosmetic: the frontmatter
+// parser tolerates CRLF and the board's row regex does not (`.` never matches
+// `\r`), so a CRLF item read without normalizing yields ZERO criteria — which is
+// exactly how this adapter used to tell an agent "nothing left to do" on an item
+// the done gate still refused to close.
+import { normalizeEol } from "./docs.js";
 import { bundledTemplatesDir } from "./package-assets.js";
 
 /** Generated destination of the goal-mode template (the ZCode plugin seam). */
@@ -104,16 +124,18 @@ export const GOAL_BOUNDARIES: readonly string[] = [
 /** The refusal cases, spelled out where the loop reads them. */
 export const GOAL_REFUSALS: readonly string[] = [
   "the item is not claimed — claim it with `arggon start <id>` (the claim is what creates its worktree);",
+  "the caller identity is unresolvable, so the claim holder cannot be proven to be you — export `GITHUB_USER` (or `GITHUB_ACTOR`, or authenticate `gh`) and re-run;",
   "the item is claimed by another identity — `arggon show <id> --meta` names the assignee;",
   "the item is done or cancelled — never reopened to satisfy a goal;",
   "this checkout is not the item's recorded worktree — the recorded `worktree_path` is the only place the goal may run;",
   "the recorded worktree no longer exists — re-claim it or release the footprint (`arggon cleanup`) before running a goal here.",
 ];
 
-/** Failure codes surfaced as `error.code` (plus `GOAL_FAILED` for kernel errors). */
+/** Failure codes surfaced as `error.code` (`GOAL_FAILED` for kernel errors). */
 export type GoalErrorCode =
   | "GOAL_FAILED"
   | "GOAL_ITEM_CLOSED"
+  | "GOAL_IDENTITY_UNKNOWN"
   | "GOAL_UNCLAIMED"
   | "GOAL_FOREIGN_CLAIM"
   | "GOAL_WORKTREE_MISSING"
@@ -133,26 +155,37 @@ export class GoalError extends Error {
 
 /** The derived contract, structured (the `goal` field of the `--json` envelope). */
 export type GoalContract = {
-  /** The single goal, drawn from the first unchecked acceptance box. */
+  /** The single goal, drawn from the first unchecked acceptance criterion. */
   objective: string;
   /** Every unchecked criterion the loop must satisfy, inlined and clipped. */
   verification: string[];
   /** Unchecked criteria NOT inlined (the overflow count). */
   verificationOmitted: number;
-  /** False when the item carries no unchecked criterion ("define the goal first"). */
+  /** False when the DONE GATE is satisfied (nothing left to satisfy). */
   hasGoal: boolean;
+  /**
+   * False when no criterion text could be read while the gate says work remains
+   * (the two parsers disagree — `bug-three-acceptance-parsers-diverging`). The
+   * contract then says so instead of inventing a goal.
+   */
+  renderable: boolean;
   boundaries: string[];
   refusals: string[];
   /** True when any line was clipped or any criterion deferred to the item. */
   truncated: boolean;
   /** Acceptance-checklist arithmetic behind the contract. */
   checklist: { total: number; unchecked: number; checked: number };
+  /**
+   * The DONE GATE's verdict, verbatim: `!acceptanceComplete(item body)`. The
+   * goal never disagrees with it — this is the load-bearing invariant.
+   */
+  gateUnchecked: boolean;
   /** Where the loop may run, and whether the item recorded a worktree. */
   worktree: { path: string; recorded: boolean };
   /** Which template copy rendered it: the adopter's, or the packaged one. */
   template: "adopter" | "package";
-  /** Caller identity resolved from the environment; null when unresolved. */
-  identity: string | null;
+  /** Caller identity that holds the claim; a goal always has one (or refuses). */
+  identity: string;
 };
 
 export type GoalResult = {
@@ -171,6 +204,13 @@ export type GoalOptions = {
   id: string;
   /** Caller login override (tests); defaults to @me resolution. */
   login?: string | undefined;
+  /**
+   * Templates root override (tests only): same injection point as
+   * `currentGeneratedTemplatesFrom` in cli/src/docs.ts, so the
+   * `GOAL_TEMPLATE_UNAVAILABLE` refusal can be exercised against a real tree
+   * with no template anywhere instead of a mock.
+   */
+  templatesDir?: string;
 };
 
 /** Clip `text` to at most `maxBytes` UTF-8 bytes without splitting a code point. */
@@ -194,32 +234,66 @@ function oneLine(text: string): string {
 }
 
 /**
- * The derivation, pure: unchecked acceptance rows → objective + verification.
- * Rows come from the kernel's own acceptance parser, so the goal reads exactly
- * the checklist the done gate gates on (empty `- [ ]` boxes are placeholders,
- * not criteria, and are skipped).
+ * The derivation, pure: criterion rows + the DONE GATE's verdict → objective +
+ * verification.
+ *
+ * `hasUncheckedCriterion` is `!acceptanceComplete(body)` — the kernel predicate
+ * the `done` flip is refused by — so the goal's "is there work left" answer can
+ * never contradict the gate's. The rows only supply TEXT. Three shapes, and no
+ * fourth:
+ *
+ *   - work remains and a criterion line was read → one objective (the first
+ *     unchecked one) + the unchecked criteria as the verification contract;
+ *   - the gate says nothing remains → "DEFINE THE GOAL FIRST", never an empty
+ *     goal (a body with no criteria at all has no contract to satisfy);
+ *   - the gate says work remains but no criterion text could be read (the two
+ *     parsers disagree — see the module header and
+ *     `bug-three-acceptance-parsers-diverging`) → `UNRENDERABLE`: the contract
+ *     says an unchecked criterion exists and refuses to invent its text. This is
+ *     the case that used to invert: a CRLF item used to render "define the goal
+ *     first" while the done gate refused to close it.
  */
 export function deriveGoal(
   rows: Array<{ text: string; checked: boolean }>,
+  hasUncheckedCriterion: boolean,
 ): Pick<
   GoalContract,
-  "objective" | "verification" | "verificationOmitted" | "hasGoal" | "truncated" | "checklist"
+  | "objective"
+  | "verification"
+  | "verificationOmitted"
+  | "hasGoal"
+  | "renderable"
+  | "truncated"
+  | "checklist"
 > {
   const total = rows.length;
   const checked = rows.filter((row) => row.checked).length;
-  const unchecked = rows.filter((row) => !row.checked).map((row) => oneLine(row.text));
-  const live = unchecked.filter((row) => row.length > 0);
+  const live = rows
+    .filter((row) => !row.checked)
+    .map((row) => oneLine(row.text))
+    .filter((text) => text.length > 0);
+
+  if (!hasUncheckedCriterion) {
+    return {
+      hasGoal: false,
+      renderable: false,
+      objective: NO_GOAL_OBJECTIVE,
+      verification: [
+        "No verification contract: this goal cannot start until the item carries at least one unchecked acceptance criterion.",
+      ],
+      verificationOmitted: 0,
+      truncated: false,
+      checklist: { total, unchecked: 0, checked },
+    };
+  }
 
   if (live.length === 0) {
     return {
-      hasGoal: false,
-      objective:
-        "DEFINE THE GOAL FIRST: this item carries no unchecked acceptance criterion " +
-        "(every box is ticked, or its checklist is empty), so there is nothing verifiable to loop on. " +
-        "Either the work is finished — merge the PR and let the coordinator flip the item — or write the " +
-        "criterion into the item's Acceptance section (arggon comment) before starting a goal.",
+      hasGoal: true,
+      renderable: false,
+      objective: UNRENDERABLE_OBJECTIVE,
       verification: [
-        "No verification contract: this goal cannot start until the item carries at least one unchecked acceptance criterion.",
+        "No criterion text could be read from the checklist (the kernel's done gate still sees unchecked work), so read the item body before planning: `arggon show <id> --body`.",
       ],
       verificationOmitted: 0,
       truncated: false,
@@ -233,6 +307,7 @@ export function deriveGoal(
   const verificationOmitted = live.length - inlined.length;
   return {
     hasGoal: true,
+    renderable: true,
     objective: objective.text,
     verification: verification.map((line) => line.text),
     verificationOmitted,
@@ -242,10 +317,27 @@ export function deriveGoal(
   };
 }
 
+/** Objective for "the gate says the contract is satisfied" (never empty). */
+const NO_GOAL_OBJECTIVE =
+  "DEFINE THE GOAL FIRST: the done gate is satisfied for this item — every acceptance " +
+  "criterion is ticked, or its checklist is empty, so there is nothing verifiable to loop " +
+  "on. Either the work is finished — merge the PR and let the coordinator flip the item — or " +
+  "write the criterion into the item's Acceptance section (arggon comment) before starting a goal.";
+
+/** Objective for "unchecked work exists but its text was not readable". */
+const UNRENDERABLE_OBJECTIVE =
+  "READ THE ITEM BODY FIRST: the done gate refuses to close this item (an unchecked " +
+  "acceptance criterion exists), but no criterion line could be read from the checklist — the " +
+  "kernel predicate and the checklist reader disagree on this body. Do NOT treat the item as " +
+  "finished; read `arggon show <id> --body` and plan from what it says.";
+
 /** The checklist tail note: what the inlined lines do and do not cover. */
 function checklistNote(goal: GoalContract): string {
   if (!goal.hasGoal) {
-    return "No unchecked acceptance criterion exists, so there is nothing to verify yet.";
+    return "The done gate is satisfied for this item, so there is nothing to verify yet.";
+  }
+  if (!goal.renderable) {
+    return "The checklist text could not be read; the goal verdict still comes from the done gate, never from a parser.";
   }
   if (goal.truncated) {
     return "Some checklist text was clipped or deferred: read `arggon show <id> --body` before calling the goal met.";
@@ -264,9 +356,7 @@ export function renderBoundaryBlock(goal: GoalContract): string {
     "",
     ...GOAL_REFUSALS.map((line) => `- ${line}`),
     "",
-    goal.identity === null
-      ? "Caller identity could not be resolved in this environment (GITHUB_USER / GITHUB_ACTOR / `gh api user`), so the claim holder was not verified by login: confirm `arggon show <id> --meta` names you before the first write."
-      : `Claim holder: ${goal.identity} — the goal is only valid while that identity still holds the claim.`,
+    `Claim holder: ${goal.identity} — the goal is only valid while that identity still holds the claim.`,
     "",
     checklistNote(goal),
     "",
@@ -276,11 +366,14 @@ export function renderBoundaryBlock(goal: GoalContract): string {
 }
 
 /** Template text the contract renders from: the adopter's copy, else the packaged one. */
-function loadGoalTemplate(root: string): { body: string; source: "adopter" | "package" } {
+function loadGoalTemplate(
+  root: string,
+  templatesDir?: string,
+): { body: string; source: "adopter" | "package" } {
   const candidates: Array<{ path: string; source: "adopter" | "package" }> = [
     { path: join(root, ...GOAL_TEMPLATE_REL.split("/")), source: "adopter" },
     {
-      path: join(bundledTemplatesDir(), ...GOAL_TEMPLATE_SOURCE.split("/")),
+      path: join(templatesDir ?? bundledTemplatesDir(), ...GOAL_TEMPLATE_SOURCE.split("/")),
       source: "package",
     },
   ];
@@ -304,25 +397,48 @@ function realpathOrSelf(path: string): string {
   }
 }
 
-function assertClaimed(item: GoalItem, login: string | undefined): void {
+/**
+ * A closed item never has a goal, whoever asks. Reported FIRST so the refusal
+ * names the intrinsic cause ("it is done") instead of an environmental one
+ * ("set GITHUB_USER") that would send an agent down the wrong path.
+ */
+function assertNotClosed(item: GoalItem): void {
   if (item.status === "done" || item.status === "cancelled") {
     throw new GoalError(
       "GOAL_ITEM_CLOSED",
       `${item.id} is ${item.status} — a closed item is never reopened to satisfy a goal`,
     );
   }
+}
+
+function assertClaimed(item: GoalItem, login: string): void {
   if (!item.assignee) {
     throw new GoalError(
       "GOAL_UNCLAIMED",
       `${item.id} has no claim: one goal per CLAIMED item, so claim it first (\`arggon start ${item.id}\`, which also creates its worktree)`,
     );
   }
-  if (login !== undefined && item.assignee !== login) {
+  if (item.assignee !== login) {
     throw new GoalError(
       "GOAL_FOREIGN_CLAIM",
       `${item.id} is claimed by '${item.assignee}', not by '${login}' — a goal never targets another identity's claim`,
     );
   }
+}
+
+/**
+ * The claim-lease proof (B2): the invariant "a goal never targets an item
+ * claimed by another identity" can only be enforced if the caller's identity is
+ * known. An unresolvable identity therefore REFUSES — it never downgrades to
+ * "render it and trust the agent to check", which is how a goal could be pointed
+ * at another session's claim.
+ */
+function assertIdentityResolvable(item: GoalItem, login: string | null): string {
+  if (login !== null) return login;
+  throw new GoalError(
+    "GOAL_IDENTITY_UNKNOWN",
+    `cannot resolve the caller identity for ${item.id}, so the claim holder cannot be proven: set GITHUB_USER (or GITHUB_ACTOR), or authenticate \`gh api user\`, and re-run — a goal never renders for an unproven identity`,
+  );
 }
 
 /**
@@ -380,19 +496,30 @@ export function runGoal(opts: GoalOptions): GoalResult {
   // An explicitly empty login means "unresolved", never "matches nobody".
   const identity = login && login.length > 0 ? login : null;
 
-  assertClaimed(item, identity ?? undefined);
+  // Order matters: each refusal names its most specific cause — a closed item
+  // first (intrinsic), then the identity that proves the claim lease, then the
+  // claim itself, then the checkout. An unproven identity never renders.
+  assertNotClosed(item);
+  const caller = assertIdentityResolvable(item, identity);
+  assertClaimed(item, caller);
   assertWorktree(root, item);
 
-  const template = loadGoalTemplate(root);
-  const derived = deriveGoal(parseAcceptanceRows(clip(shown.prose, MAX_GOAL_PROSE_BYTES).text));
+  const template = loadGoalTemplate(root, opts.templatesDir);
+  // The DONE GATE decides whether work remains (`acceptanceComplete` is the
+  // predicate a `done` flip is refused by); the row parser only supplies text,
+  // and its CRLF blindness is neutralized by normalizing the prose first.
+  const gateUnchecked = !acceptanceComplete(shown.prose);
+  const rows = parseAcceptanceRows(normalizeEol(clip(shown.prose, MAX_GOAL_PROSE_BYTES).text));
+  const derived = deriveGoal(rows, gateUnchecked);
   const worktreePath = item.worktreePath ?? root;
   const goal: GoalContract = {
     ...derived,
+    gateUnchecked,
     boundaries: [...GOAL_BOUNDARIES],
     refusals: [...GOAL_REFUSALS],
     worktree: { path: worktreePath, recorded: Boolean(item.worktreePath) },
     template: template.source,
-    identity,
+    identity: caller,
   };
 
   const verification = goal.verification.map((line, i) => `${i + 1}. ${line}`).join("\n");
@@ -431,6 +558,22 @@ export type GoalPayload = {
   goal: GoalContract & { contract: string };
 };
 
+/**
+ * Convention version for a FAILURE envelope. `readConventionVersion` expects the
+ * REPO ROOT (`conventionPathForRoot` joins the tracker dir onto what it is
+ * given), so handing it a subdirectory cwd silently yields the default 0 — a
+ * refusal envelope that claims the wrong convention version is exactly the kind
+ * of quiet wrongness this command exists to avoid. Resolve the tracker root
+ * first, and fall back to the raw cwd only when there is no tracker at all.
+ */
+function conventionVersionFor(cwd: string): number {
+  try {
+    return readConventionVersion(repoRootFromTasks(findTasksDir(cwd)));
+  } catch {
+    return readConventionVersion(cwd);
+  }
+}
+
 /** Envelope assembly + exit codes, one place (the `--json` path). */
 export function goalOperation(opts: GoalOptions): CommandOutcome<GoalPayload> {
   try {
@@ -460,7 +603,7 @@ export function goalOperation(opts: GoalOptions): CommandOutcome<GoalPayload> {
         command: "goal",
         message: error.message,
         code,
-        conventionVersion: readConventionVersion(opts.cwd),
+        conventionVersion: conventionVersionFor(opts.cwd),
       }) as KernelFailureEnvelope<GoalPayload>,
     };
   }
