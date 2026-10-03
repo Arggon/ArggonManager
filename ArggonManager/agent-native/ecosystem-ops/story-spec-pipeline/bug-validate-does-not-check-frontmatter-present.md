@@ -113,3 +113,16 @@ A previously-ok tree now errors — the intended effect. Reasoning: a validator 
 ### handoff 2026-10-03 @ses_efe3043b8ffed48yGgAx3qryzL (session: ses_efe3043b8ffed48yGgAx3qryzL) — next: Coordinator: review PR #619 and merge; tick the acceptance boxes, then set status done.
 - branch: fix/bug-validate-does-not-check-frontmatter-present
 - open questions: Item needs a decision: file a new bug for the WRITER regression that emptied 4 item files to 0 bytes (their own chore(tasks): commented commits; not reproduced, not fixed here); the 2nd commit in the…
+
+### 2026-10-03 @ses_efe3043b8ffed48yGgAx3qryzL
+### Acceptance ticked with evidence (PR #619)
+
+Original checklist, each box now met — evidence inline, full commands in the PR body.
+
+- [x] **An item file with NO frontmatter block is a validate ERROR, naming the file** — `MISSING_FRONTMATTER`, verified red on mutation: expected the code, observed `arggon validate: ok (0 warning(s))` exit 0 before the fix, `error ArggonManager/.../bug-validate-does-not-check-frontmatter-present.md: missing required YAML frontmatter: … [MISSING_FRONTMATTER]` exit 1 after. Also covers a zero-byte file (same shape: no block at all).
+- [x] **Same for an unterminated (unclosed `---`) block** — now `UNTERMINATED_FRONTMATTER`, its own typed code instead of the generic `BROKEN_YAML`. Note honestly: this shape was ALREADY an error before the fix (as `BROKEN_YAML`), so it needed a distinct code, not a new rule — the item's "likely read as body prose too" turned out to be wrong for the unclosed case. The missing-frontmatter case was the real hole.
+- [x] **A fixture per case, following the repo convention of one failing fixture per layout rule** — `missing-frontmatter/`, `missing-frontmatter-index/`, `unterminated-frontmatter/`, `empty-item-file/`, plus `non-item-markdown/` as the pinned no-false-positive control (the rule must not fire on a plain `.md` in a non-item position). README table updated; `cli/src/validate.test.ts` asserts each code and path.
+- [x] **Check the other frontmatter readers (`list`, `show`, `next`, done gate, cascade)** — done, answer in the sweep comment above: every reader degrades safely to "not an item", and NO writer emits a frontmatter-less file (all writes funnel through `stringifyFrontmatter`; every write surface refuses the wiped id and leaves the file byte-unchanged). Also checked specifically: there is no tolerant mode relying on the old lenient read, so the union-resolution workflows are unaffected.
+- [x] **The kernel is the owner (`@arggondev/lib`); a CI-only check is not enough** — the rule ships in `lib/src/validate.ts`, so the pre-commit hook and adopter CI get it. No CI file touched (the CI seam belongs to another worker this wave).
+
+Extra beyond the checklist, flagged for the coordinator: the rule surfaced 4 item files that are 0-byte blobs on `main` (their own `chore(tasks): commented` commits emptied them). Restored byte-for-byte in a separate droppable commit; the underlying WRITER regression is unfixed and un-reproduced, and warrants its own item.
