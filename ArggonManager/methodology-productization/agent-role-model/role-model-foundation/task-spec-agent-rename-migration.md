@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-spec-agent-rename-migration
 title: "Spec: the agent rename migration (coordinator→delivery-lead, reviewer→standards-reviewer, worker→maker, prover→verifier) + orphan reaping for adopter trees"
+assignee: arggon-coordinator
+branch: feat/task-spec-agent-rename-migration
 parent: role-model-foundation
 labels: [methodology, spec, seam, migration]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
+claimed_at: "2026-10-04T20:51:56.148Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-spec-agent-rename-migration
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-spec-agent-rename-migration.md
@@ -97,13 +101,44 @@ Waves 2 and 3 are file-disjoint and may run in the same wave.
 
 ### Acceptance
 
-- [ ] Spec written with `arggon spec new` at `ArggonManager/docs/specs/` (next free number), status `proposed`
-- [ ] Every row of the surface inventory (A–G) is in the spec with its exact file list, so the rename cannot half-land
-- [ ] AC: the `/(^\|:)arggon-reviewer$/` gate regex and its two copies (template + generated) are renamed together — a test asserts the hook's reviewer matcher equals the shipped reviewer agent name, so this coupling can never drift again
-- [ ] AC: the coordinator prompt's subagent allow-list resources use the new names, and a test pins the allow-list to the four shipped ids
-- [ ] AC: `doctor` gains the `orphaned` status; `init` reaps an unmodified orphan and refuses an adopter-edited one, with the refusal reported (never silent)
-- [ ] AC: `doctor --agents` on an adopter tree that still holds the four old files reports 4 `orphaned` and **0** `missing` — the migration is observable before `init` acts
-- [ ] AC: idempotent — a second `init` finds nothing to reap; a re-applied rename introduces no new orphan
-- [ ] AC: no kernel rule, envelope, schema field, CLI flag or command changes; the capability matrix needs no row change
-- [ ] AC: the ADR 0021 §6.2a supersede is merged first or in the same PR — the record must not keep saying the rename is rejected
-- [ ] `arggon spec analyze` reports no NEW findings before this item is done
+- [x] Spec written with `arggon spec new` at `ArggonManager/docs/specs/` (next free number), status `proposed`
+- [x] Every row of the surface inventory (A–G) is in the spec with its exact file list, so the rename cannot half-land
+- [x] AC: the `/(^\|:)arggon-reviewer$/` gate regex and its two copies (template + generated) are renamed together — a test asserts the hook's reviewer matcher equals the shipped reviewer agent name, so this coupling can never drift again
+- [x] AC: the coordinator prompt's subagent allow-list resources use the new names, and a test pins the allow-list to the four shipped ids
+- [x] AC: `doctor` gains the `orphaned` status; `init` reaps an unmodified orphan and refuses an adopter-edited one, with the refusal reported (never silent)
+- [x] AC: `doctor --agents` on an adopter tree that still holds the four old files reports 4 `orphaned` and **0** `missing` — the migration is observable before `init` acts
+- [x] AC: idempotent — a second `init` finds nothing to reap; a re-applied rename introduces no new orphan
+- [x] AC: no kernel rule, envelope, schema field, CLI flag or command changes; the capability matrix needs no row change
+- [x] AC: the ADR 0021 §6.2a supersede is merged first or in the same PR — the record must not keep saying the rename is rejected
+- [x] `arggon spec analyze` reports no NEW findings before this item is done
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+verdict: approve
+
+Spec written at `ArggonManager/docs/specs/spec-agent-rename-019.md` (status
+`proposed`; number 019 = next FREE after the 018 that merged as `e14dd75e`).
+
+Gates, expected vs observed:
+- `spec validate --file` → `ok (1 doc(s), 0 warning(s))`
+- `spec analyze` → 10 findings across 21 specs, all pre-existing; **0 name this spec** — the ADR 0017 hard gate holds
+- `prettier --check` → clean
+- link probe → **dead links: none** (first pass had `../../../docs/explorations/…`, one level too deep from `docs/specs/` — same slip as spec-018, caught by the same probe, fixed and re-probed)
+- `arggon validate` → `ok (0 warning(s), convention v5)`
+
+What the spec settles, beyond restating the scope already on the item:
+- **AC 2** binds `isReviewerDispatch`'s `/(^|:)arggon-reviewer$/` matcher to the
+  shipped reviewer id **by reading the id out of the shipped template** — so a
+  future rename that misses the hook fails CI instead of silently disarming the
+  reviewer's read-only window. That is the one failure mode in this migration that
+  is both silent and security-relevant.
+- **AC 6** adds a rule the scope had not: a *downgrade* (destination newer than the
+  installed templates) must report, never delete — otherwise an adopter who pins an
+  older arggon loses four agent files to a version that predates them.
+- **AC 8** is an end-to-end migration test on a fixture: generate a seam, remove a
+  template, assert `orphaned` for the old destinations and `missing` for none, reap
+  the unmodified ones, and prove a second `init` is a no-op.
+- The **worked example** required to close exploration-018's deferred spike is an
+  explicit acceptance clause, scoped to the agent half; the branch/PR model for
+  non-code repos is named out of scope with the reason.
+
+The checklist above is complete; the item flips `done` on merge.
