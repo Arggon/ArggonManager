@@ -27,3 +27,25 @@ updated: "2026-10-04"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+## Context
+
+ADR 0021 §1, §2, §6 — supersede the parity invariant everywhere it is stated
+and remap the review-bar roles. **Methodology impact class: Behavioral**
+(`ArggonManager/docs/agents.md:471–478`): agents must re-learn something, so this
+PR references the ADR 0016 upgrade channel, states the impact class in the PR
+description and as an item comment, and keeps the skill copies byte-equal.
+
+## Acceptance
+
+- [ ] Depends on `task-spec-promotion-policy-and-acceptance` (ADR 0017 gate) landing first
+- [ ] `README.md:59` (Principle 3), the invariant blocks of `agents.md:6`, `engineering.md:6`, `convention.md:6`, and ADR 0020's invariant block all carry the two-axis rule: **work-loop parity, asymmetric and named authority**
+- [ ] `engineering.md:12` and the review-bar section headers stop naming human job titles for work the shipped agents perform; architect / reviewer / prover / QA become agent roles
+- [ ] The bounded **authority map** table lands in `engineering.md` (ADR 0021 §2): the four irreversible powers keep their existing structural gates and are named as such
+- [ ] The bounded **promotion-policy tier table** lands beside the review bar (ADR 0021 §3)
+- [ ] `agents.md` §5 / §Orchestration / §Changing the methodology itself updated where the old wording becomes false; the `SECURITY.md`-contact-is-human-input style human-only notes are kept, not deleted
+- [ ] `skills/arggon-cli/**` and `.agents/skills/arggon-cli/**` byte-equal in this PR (parity test enforces it)
+- [ ] README §The methodology + the release note name the new convention for adopters
+- [ ] `arggon validate` and `arggon spec validate` green; no carrier statement left false by this edit
+- [ ] No kernel rule, schema field, command or per-adapter behavior changed — this item is carriers only
