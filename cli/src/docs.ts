@@ -14,6 +14,7 @@ import {
   TRACKER_DIR_NAME,
   conventionPathForLayout,
   parseGeneratedProjectName,
+  readConventionConfig,
   readGeneratedProjectName,
   readGeneratedState,
   trackerAt,
@@ -968,38 +969,38 @@ export function compareArggonVersions(a: string | undefined, b: string): number 
  *     behind, and deleting the file would destroy a current-generation
  *     artifact. An undecidable version comparison refuses too.
  *  4. **byte-identical to the recorded checksum** — the adopter has not changed
- *     it since the baseline it was recorded against, so reaping removes only
- *     bytes arggon is answerable for.
+ *     it since the baseline it was recorded against. This is the OWNERSHIP test,
+ *     and it is exactly as strong as the recorded baseline it compares against.
  *
- * **`acknowledged` is deliberately NOT a veto here** (the adopt-vs-reap policy,
- * kept out of this function's checks on purpose):
+ * **The acknowledged middle case, and why it is opt-in** (the adopt-vs-reap
+ * policy; `reapAckedOrphans` is `x-tracker.reap-acked-orphans`, the same
+ * default-refused shape as `x-tracker.allow-steal`):
  *
- *  - Acknowledgment exists to stop `init` REGENERATING an adopter's sanctioned
- *    content (`runAdoptAck`: "later init re-runs must never regenerate these
- *    files"). It says nothing about deleting, and it cannot meaningfully apply
- *    to a file whose upstream template no longer exists in this version: there
- *    is no regeneration left to protect against.
- *  - More concretely, an `acknowledged` veto would DEFEAT the migration reaping
- *    exists to enable. `runAdoptAck` iterates EVERY `x-generated` entry, so a
- *    repo that adopted properly carries `acknowledged: true` on its
- *    `.opencode/agents/*.md` — and refusing those would strand the dead agents
- *    in exactly the repos that treated the methodology as meant to be
- *    (ADR 0021 §6.2a′ gates the rename on reaping; a dispatchable
- *    `.opencode/agents/arggon-coordinator.md` would survive).
- *  - The honest limit of the remaining ownership test, stated so nobody
- *    re-derives it wrongly: `runAdoptAck` also RE-BASELINES the recorded
- *    checksum from the on-disk bytes, so for an acknowledged entry "matches the
- *    recorded checksum" means **unchanged since the ack**, not "arggon wrote
- *    these exact bytes". A file that was curated and THEN acked therefore
- *    matches too, and is reaped. Nothing in the recorded state can separate the
- *    two cases, so the policy is: reap it, but say so loudly (the reason below,
- *    `doctor --agents` before `init` acts, and one human line per file).
+ *  - `runAdoptAck` iterates EVERY `x-generated` entry, so a repo that adopted
+ *    properly carries `acknowledged: true` on its `.opencode/agents/*.md`.
+ *  - …and it RE-BASELINES the recorded checksum from the on-disk bytes. So for an
+ *    acknowledged entry, "matches the recorded checksum" proves only **unchanged
+ *    since the ack** — not "arggon wrote these exact bytes". A file the adopter
+ *    CURATED and then acked matches too, and nothing in the recorded state
+ *    separates the two (the generated marker survives hand edits as well).
+ *  - Therefore a matching **acknowledged** orphan is refused by default and
+ *    reaped only when the repo arms the flag: the default cannot destroy
+ *    sanctioned content, while arming still lets an adopted adopter clear a
+ *    dead agent — which the agent rename depends on (ADR 0021 §6.2a′ gates it
+ *    on reaping, and a stranded `.opencode/agents/arggon-coordinator.md` stays
+ *    dispatchable). Refusing outright would push exactly that chore onto the
+ *    repos that adopted properly; reaping by default would delete their curated
+ *    files. The flag is the choice.
+ *  - An entry whose bytes DIFFER is refused regardless of arming: that is a
+ *    known edit, not an unknowable one.
  */
 function classifyOrphan(opts: {
   root: string;
   dest: string;
   entry: GeneratedEntry;
   version: string;
+  /** `x-tracker.reap-acked-orphans`; see the policy note above. */
+  reapAckedOrphans: boolean;
 }): { action: "reap" | "refuse"; reason: string } {
   const { root, dest, entry, version } = opts;
   const rootAbs = resolve(root);
@@ -1065,19 +1066,32 @@ function classifyOrphan(opts: {
     return {
       action: "refuse",
       reason:
-        "adopter-edited since generation — refused; your edits are never deleted. Delete the " +
-        "file by hand if the template is really gone",
+        "adopter-edited since the recorded baseline — refused; your edits are never deleted, " +
+        "whatever the reaping flag says. Delete the file by hand if the template is really gone",
+    };
+  }
+  if (entry.acknowledged && !opts.reapAckedOrphans) {
+    // The unknowable case, refused by default. The reason carries BOTH routes
+    // out — do it by hand now, or arm the flag for future runs — so an operator
+    // who wanted the deletion is never left hunting for the switch.
+    return {
+      action: "refuse",
+      reason:
+        "acknowledged baseline (arggon adopt --ack) and unchanged since the ack — NOT deleted by " +
+        "default: the ack re-records the checksum from disk, so provenance cannot tell 'unedited' " +
+        "from 'curated then acked'. Delete it by hand, or set `x-tracker.reap-acked-orphans: true` " +
+        "to let `arggon init` reap it",
     };
   }
   return {
     action: "reap",
-    // An acknowledged orphan is named here on purpose: its recorded checksum is
-    // the ack baseline (refreshed from disk by `adopt --ack`), so "unchanged
-    // since the ack" is what the reap actually proves — and the operator must be
-    // able to see that BEFORE `init` removes the file, not after.
+    // An acknowledged reap is named here on purpose, both the baseline it is
+    // judged against and the arming that allowed it: the audit trail must say a
+    // sanctioned file was removed DELIBERATELY, in `doctor --agents` before the
+    // run and on the human line of the run itself.
     reason:
       `template ${entry.template} is gone from this arggon version and the bytes are unchanged ` +
-      `since they were recorded${entry.acknowledged ? " (acknowledged baseline, `adopt --ack`)" : ""} ` +
+      `since they were recorded${entry.acknowledged ? " (acknowledged baseline, `adopt --ack`; reaped because `x-tracker.reap-acked-orphans: true` is armed)" : ""} ` +
       "— reaped; restore the template (or pin the old arggon) to keep it",
   };
 }
@@ -1108,6 +1122,15 @@ export function planOrphanReaps(opts: {
   version?: string;
   /** Tracker layout (destinations are layout-shaped; template ids are not). */
   layout?: TrackerLayout;
+  /**
+   * Arming for the acknowledged middle case (`x-tracker.reap-acked-orphans`).
+   * `undefined` reads the tree's own tracker config ONCE per call, so the run
+   * and the report can never see different arming. An unreadable config
+   * resolves to UNARMED — the defensive floor under the parser, which rejects a
+   * non-boolean `x-tracker` value outright (so a real run stops and names the
+   * key rather than quietly taking the default).
+   */
+  reapAckedOrphans?: boolean;
 }): OrphanReapDecision[] {
   const version = opts.version ?? arggonVersion();
   const current = new Set(
@@ -1115,6 +1138,7 @@ export function planOrphanReaps(opts: {
       (t) => t.template,
     ),
   );
+  const reapAckedOrphans = opts.reapAckedOrphans ?? reapAckedOrphansArmed(opts.root);
   const out: OrphanReapDecision[] = [];
   for (const [dest, entry] of Object.entries(opts.state)) {
     // Reachable ONLY through recorded provenance: a destination with no entry is
@@ -1125,6 +1149,7 @@ export function planOrphanReaps(opts: {
       dest,
       entry,
       version,
+      reapAckedOrphans,
     };
     out.push({
       dest,
@@ -1134,6 +1159,23 @@ export function planOrphanReaps(opts: {
     });
   }
   return out.sort((a, b) => a.dest.localeCompare(b.dest));
+}
+
+/**
+ * Is this repo ARMED to reap ACKNOWLEDGED orphans
+ * (`x-tracker.reap-acked-orphans: true`)? Read once per plan and tolerant by
+ * construction: no convention file, no key, and an unreadable config all mean
+ * UNARMED — the default that cannot lose the adopter's content. Same shape as
+ * `x-tracker.allow-steal`: arming is explicit, the default is the safe side.
+ * (In a real run the parser gets there first and refuses a non-boolean value by
+ * name, so this catch is the floor for a caller that passes state explicitly.)
+ */
+function reapAckedOrphansArmed(root: string): boolean {
+  try {
+    return readConventionConfig(root).tracker.reapAckedOrphans === true;
+  } catch {
+    return false;
+  }
 }
 
 /**

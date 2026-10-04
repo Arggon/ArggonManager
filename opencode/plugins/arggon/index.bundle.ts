@@ -936,6 +936,7 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
     const tracker = {
         autoCommit: null,
         allowSteal: null,
+        reapAckedOrphans: null,
         strictGateBins: null,
         strictWorktreeWrites: null,
         productAcceptance: null,
@@ -1095,6 +1096,13 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
                 tracker.productAcceptance = value === "true";
                 continue;
             }
+            if (key === "reap-acked-orphans") {
+                if (value !== "true" && value !== "false") {
+                    throw new Error(`${sourcePath}: 'reap-acked-orphans' must be a boolean (got ${JSON.stringify(value)})`);
+                }
+                tracker.reapAckedOrphans = value === "true";
+                continue;
+            }
             if (key !== "auto-commit")
                 continue;
             if (value !== "true" && value !== "false") {
@@ -1235,6 +1243,7 @@ function readConventionConfig(dir) {
             tracker: {
                 autoCommit: null,
                 allowSteal: null,
+                reapAckedOrphans: null,
                 strictGateBins: null,
                 strictWorktreeWrites: null,
                 productAcceptance: null,

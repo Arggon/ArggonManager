@@ -599,6 +599,40 @@ describe("spec analyze: MISSING-PRODUCT-ACCEPTANCE", () => {
   });
 });
 
+describe("x-tracker.reap-acked-orphans parsing (allow-steal precedent)", () => {
+  it("defaults to null when absent, and reads true/false", () => {
+    // Default-refused, like `allow-steal`: the flag only ever widens what a
+    // repo has explicitly chosen to allow (task-adapter-orphan-reaping).
+    expect(parseConventionConfig("version: 5\n").tracker.reapAckedOrphans).toBeNull();
+    expect(
+      parseConventionConfig("version: 5\nx-tracker:\n  auto-commit: false\n").tracker
+        .reapAckedOrphans,
+    ).toBeNull();
+    expect(
+      parseConventionConfig("x-tracker:\n  reap-acked-orphans: true\n").tracker.reapAckedOrphans,
+    ).toBe(true);
+    expect(
+      parseConventionConfig("x-tracker:\n  reap-acked-orphans: false\n").tracker.reapAckedOrphans,
+    ).toBe(false);
+  });
+
+  it("is a parse error on a non-boolean value", () => {
+    expect(() => parseConventionConfig("x-tracker:\n  reap-acked-orphans: maybe\n")).toThrow(
+      /'reap-acked-orphans' must be a boolean/,
+    );
+    expect(() => parseConventionConfig("x-tracker:\n  reap-acked-orphans: 1\n")).toThrow(
+      /'reap-acked-orphans' must be a boolean/,
+    );
+  });
+
+  it("ignores an unknown nested key (forward compat)", () => {
+    expect(
+      parseConventionConfig("x-tracker:\n  reap-acked-orphans-typo: true\n").tracker
+        .reapAckedOrphans,
+    ).toBeNull();
+  });
+});
+
 describe("x-tracker.product-acceptance parsing (allow-steal precedent)", () => {
   it("defaults to null when absent, and reads true/false", () => {
     expect(parseConventionConfig("version: 5\n").tracker.productAcceptance).toBeNull();

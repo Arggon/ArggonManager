@@ -47,7 +47,7 @@ import {
   type OrphanReapDecision,
 } from "./docs.js";
 import { dryRunInit, runInit } from "./init.js";
-import { formatDoctorReport, runDoctor } from "./doctor.js";
+import { formatDoctorReport, runDoctor, type DoctorAdapters } from "./doctor.js";
 import { runCli } from "./test-spawn.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -114,6 +114,37 @@ function ackEntry(dir: string, dest: string): void {
   const checksum = `sha256:${createHash("sha256").update(readFileSync(abs, "utf8"), "utf8").digest("hex")}`;
   setStateField(dir, dest, "checksum", JSON.stringify(checksum));
   setStateField(dir, dest, "acknowledged", "true");
+}
+
+/**
+ * Set one `x-tracker` option the way an adopter edits their convention file
+ * (there is no CLI setter): insert or replace the key inside the `x-tracker:`
+ * block, creating the block when the scaffolded file has none. Block-indentation
+ * scoped, so a sibling option is never clobbered.
+ */
+function setTrackerOption(dir: string, key: string, value: string): void {
+  const path = join(dir, "ArggonManager/.convention.yml");
+  const lines = readFileSync(path, "utf8").split("\n");
+  let start = lines.findIndex((line) => /^x-tracker:\s*$/.test(line));
+  if (start === -1) {
+    start = lines.length - 1;
+    lines.splice(start, 0, "x-tracker:");
+  }
+  let end = start + 1;
+  while (end < lines.length && lines[end]!.startsWith("  ")) end++;
+  const at = lines.findIndex((line, i) => i > start && i < end && line.startsWith(`  ${key}:`));
+  if (at === -1) lines.splice(start + 1, 0, `  ${key}: ${value}`);
+  else lines[at] = `  ${key}: ${value}`;
+  writeFileSync(path, lines.join("\n"), "utf8");
+}
+
+/** The `reap` verdict doctor carries on one destination's row. */
+function verdictFor(report: DoctorAdapters, dest: string): { action: string; reason: string } {
+  for (const agent of report.agents) {
+    const row = agent.files.find((f) => f.path === dest);
+    if (row?.reap) return row.reap;
+  }
+  throw new Error(`no reap row for ${dest}`);
 }
 
 /** Rewrite one field of one `x-generated` entry, inside its own block only. */
@@ -241,57 +272,140 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
     expect(row.reason).toContain("Delete the file by hand");
   });
 
-  it("REAPS an acknowledged orphan whose bytes are unchanged — the adoption migration case", () => {
-    // The veto that must NOT exist: `adopt --ack` acks EVERY `x-generated`
-    // entry, so a repo that adopted properly carries `acknowledged: true` on
-    // its `.opencode/agents/*.md`. Refusing those would strand the dead agent
-    // in exactly the repos that treated the methodology as meant to be — and
-    // `.opencode/agents/` is auto-discovered, so it would stay dispatchable
-    // (ADR 0021 §6.2a′ gates the rename on reaping).
+  it("does NOT delete an UNARMED acknowledged orphan, and says why + how to arm", () => {
+    // The default must be the safe side. `adopt --ack` acks EVERY entry AND
+    // re-baselines the checksum from disk, so "matches" proves only "unchanged
+    // since the ack" — a file the adopter curated and then acked matches too,
+    // and provenance cannot tell the two apart. So: reported, never deleted,
+    // unless the repo arms it.
     const templates = installedPackage();
     const dir = primed(templates);
     const victim = ".opencode/agents/arggon-worker.md";
     ackEntry(dir, victim);
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
-    const row = decisionFor(
-      planOrphanReaps({ root: dir, state: readGeneratedState(dir), templatesDir: templates }),
-      victim,
-    );
-    expect(row.action).toBe("reap");
-    // Loud, not silent: the reason names the ack, so `doctor --agents` shows the
-    // operator what will be removed BEFORE `init` removes it.
-    expect(row.reason).toContain("acknowledged baseline");
-    expect(row.reason).toContain("adopt --ack");
-    // And the real run acts on it — an adopted tree is not the blocker.
-    const result = runInit({ dir, force: false, full: true, templatesDir: templates });
-    expect(result.reaped).toEqual([victim]);
-    expect(existsIn(dir, victim)).toBe(false);
-    expect(result.reapRefused).toEqual([]);
-  });
-
-  it("REFUSES an acknowledged orphan whose bytes changed after the ack", () => {
-    // Same entry, one edited byte: the ack baseline is the ownership test, and
-    // this is the branch that keeps an adopter's post-ack edit on disk.
-    const templates = installedPackage();
-    const dir = primed(templates);
-    const victim = ".opencode/agents/arggon-worker.md";
-    ackEntry(dir, victim);
-    writeFileSync(
-      join(dir, ...victim.split("/")),
-      `${readFileSync(join(dir, ...victim.split("/")), "utf8")}\nPOST-ACK EDIT\n`,
-      "utf8",
-    );
     dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
     const row = decisionFor(
       planOrphanReaps({ root: dir, state: readGeneratedState(dir), templatesDir: templates }),
       victim,
     );
     expect(row.action).toBe("refuse");
-    expect(row.reason).toContain("adopter-edited");
+    // The reason must name the flag AND the manual alternative — an operator
+    // who wanted the deletion is never left hunting for the switch.
+    expect(row.reason).toContain("acknowledged baseline");
+    expect(row.reason).toContain("NOT deleted by default");
+    expect(row.reason).toContain("x-tracker.reap-acked-orphans: true");
+    expect(row.reason).toContain("Delete it by hand");
+    // And the real run agrees: the file survives, the refusal is named.
     const result = runInit({ dir, force: false, full: true, templatesDir: templates });
     expect(result.reaped).toEqual([]);
     expect(result.reapRefused.map((r) => r.dest)).toEqual([victim]);
     expect(existsIn(dir, victim)).toBe(true);
+    // Its provenance survives too, so arming later reaps exactly this file.
+    expect(readGeneratedState(dir)[victim]?.template).toBe("docs/opencode/agents/arggon-worker.md");
+  });
+
+  it("REAPS an armed acknowledged orphan whose bytes are unchanged (the migration case)", () => {
+    // Armed (`x-tracker.reap-acked-orphans: true`) is how an adopted adopter
+    // clears a dead agent: ADR 0021 §6.2a′ gates the rename on reaping, and a
+    // stranded `.opencode/agents/arggon-coordinator.md` stays dispatchable.
+    const templates = installedPackage();
+    const dir = primed(templates);
+    const victim = ".opencode/agents/arggon-worker.md";
+    ackEntry(dir, victim);
+    setTrackerOption(dir, "reap-acked-orphans", "true");
+    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    const row = decisionFor(
+      planOrphanReaps({ root: dir, state: readGeneratedState(dir), templatesDir: templates }),
+      victim,
+    );
+    expect(row.action).toBe("reap");
+    // The audit trail says a SANCTIONED file was removed deliberately: both the
+    // baseline and the arming are named.
+    expect(row.reason).toContain("acknowledged baseline");
+    expect(row.reason).toContain("adopt --ack");
+    expect(row.reason).toContain("reap-acked-orphans: true");
+    const result = runInit({ dir, force: false, full: true, templatesDir: templates });
+    expect(result.reaped).toEqual([victim]);
+    expect(existsIn(dir, victim)).toBe(false);
+    expect(result.reapRefused).toEqual([]);
+  });
+
+  it("reads the arming from the tree ONCE — doctor and init cannot disagree", () => {
+    const templates = installedPackage();
+    const dir = primed(templates);
+    const victim = ".opencode/agents/arggon-worker.md";
+    ackEntry(dir, victim);
+    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    const unarmed = runDoctor({ cwd: dir, agents: true, templatesRoot: templates }).agents!;
+    expect(verdictFor(unarmed, victim).action).toBe("refuse");
+    setTrackerOption(dir, "reap-acked-orphans", "true");
+    const armed = runDoctor({ cwd: dir, agents: true, templatesRoot: templates }).agents!;
+    expect(verdictFor(armed, victim).action).toBe("reap");
+  });
+
+  it("refuses an acknowledged orphan whose bytes changed after the ack, ARMED OR NOT", () => {
+    // A known edit is a known edit: arming widens the unknowable case only, and
+    // never reaches a file whose bytes differ from the recorded baseline.
+    for (const armed of [false, true]) {
+      const templates = installedPackage();
+      const dir = primed(templates);
+      const victim = ".opencode/agents/arggon-worker.md";
+      ackEntry(dir, victim);
+      if (armed) setTrackerOption(dir, "reap-acked-orphans", "true");
+      writeFileSync(
+        join(dir, ...victim.split("/")),
+        `${readFileSync(join(dir, ...victim.split("/")), "utf8")}\nPOST-ACK EDIT\n`,
+        "utf8",
+      );
+      dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+      const row = decisionFor(
+        planOrphanReaps({ root: dir, state: readGeneratedState(dir), templatesDir: templates }),
+        victim,
+      );
+      expect(row.action, `armed=${armed}`).toBe("refuse");
+      expect(row.reason).toContain("adopter-edited");
+      // Arming must not even be mentioned as the deciding factor.
+      expect(row.reason).not.toContain("reap-acked-orphans");
+      const result = runInit({ dir, force: false, full: true, templatesDir: templates });
+      expect(result.reaped, `armed=${armed}`).toEqual([]);
+      expect(existsIn(dir, victim), `armed=${armed}`).toBe(true);
+    }
+  });
+
+  it("a malformed arming value is reported by validate and deletes nothing", () => {
+    // The parser rejects a non-boolean `x-tracker` value (the `allow-steal`
+    // rule) and `arggon validate` is where that surfaces, naming the key — so
+    // the operator fixes it instead of silently getting the default. What
+    // matters for reaping is only that nothing is deleted: init's own state
+    // read degrades to an empty set on an unparseable convention file
+    // (pre-existing, and the safe direction), with the classifier's tolerant
+    // read as the floor behind it.
+    const templates = installedPackage();
+    const dir = primed(templates);
+    const victim = ".opencode/agents/arggon-worker.md";
+    ackEntry(dir, victim);
+    setTrackerOption(dir, "reap-acked-orphans", "maybe");
+    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    const validated = runCli(["validate"], dir);
+    expect(validated.status).toBe(1);
+    expect(validated.stdout).toContain("'reap-acked-orphans' must be a boolean");
+    const proc = runCli(["--json", "init", dir], repoRoot);
+    expect(existsIn(dir, victim)).toBe(true);
+    expect(JSON.parse(proc.stdout).reaped).toEqual([]);
+    // And the decision path refuses on an unreadable flag, never reaps.
+    const rows = planOrphanReaps({
+      root: dir,
+      state: {
+        [victim]: {
+          template: "docs/opencode/agents/arggon-worker.md",
+          checksum: "",
+          arggonVersion: "0.5.0",
+          generatedAt: "2026-10-01T00:00:00.000Z",
+          acknowledged: true,
+        },
+      },
+      templatesDir: templates,
+    });
+    expect(decisionFor(rows, victim).action).toBe("refuse");
   });
 
   it("REFUSES an unacknowledged orphan whose bytes changed since generation", () => {
