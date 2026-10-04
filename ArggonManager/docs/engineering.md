@@ -3,13 +3,15 @@
 > **Methodology carrier (per [ADR 0020](./adr/0020-methodology-first-productization.md)).** This document is a carrier of the ArggonManager methodology — declared together with `ArggonManager/docs/agents.md`, `ArggonManager/docs/engineering.md`, `ArggonManager/docs/convention.md`, and the bundled `arggon-cli` skill.
 >
 > - **Scope:** any project — not only software.
-> - **Invariants:** humans and agents follow the same rules; state lives in git; discipline is enforceable; docs travel with code; never-steal / never-reopen.
+> - **Invariants:** work-loop parity: any human and any agent may claim, work, review, comment and merge under the same kernel rules and the same JSON contracts; state lives in git; discipline is enforceable; docs travel with code; never-steal / never-reopen, with authority asymmetric and named — the irreversible overrides stay product-owner powers, structurally human-only.
 > - **Version:** tracks the ArggonManager package version.
 > - **Upgrade channel:** methodology changes reach adopters through the adopter upgrade channel ([ADR 0016](./adr/0016-adopter-upgrade-channel.md)).
 
 Technical direction for ArggonManager: how we structure the repo, what “done” means for eng, and the bars that block merge.
 
-This document is owned by **Software Architect**. It complements [`ArggonManager/docs/convention.md`](./convention.md) (task tree / frontmatter schema). Product/feature acceptance stays with **Project Manager**. Implementation stays with **Software Developer**. UI QA (Phase 2+) stays with **UI Tester**.
+Two axes, not one ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §1): the **work loop is identical** for every human and every agent — same kernel rules, same envelopes, same claim discipline — while **authority is asymmetric and named**: a bounded set of decisions belongs to the **product owner** (a human), and the irreversible ones are structurally human-only. Agents are the primary workers; the human in the loop holds those decisions. This is a recorded authority split, not an agent-only dialect: one rules module (`lib/src/rules.ts`), one envelope contract, no per-adapter divergence (ADR 0020 §Decision.1).
+
+This document is owned by the **practice & standards** role. It complements [`ArggonManager/docs/convention.md`](./convention.md) (task tree / frontmatter schema). Product acceptance belongs to the **product owner**, bounded by the promotion-policy tiers next to the review bar below. Implementation stays with the **maker**; executing and reporting the verification gates stays with the **verifier**. The role table, the authority map and the human-only powers: §Roles and authority.
 
 **Status:** active. Phase 1 (convention + CLI) is implemented — stack per [ADR 0001](./adr/0001-cli-stack.md), board per [ADR 0002](./adr/0002-board-viewer-v0.md). This doc evolves in the same PRs as the behavior it governs.
 
@@ -46,40 +48,117 @@ fixtures/               # golden trees for validate + integration tests
 
 **Boundaries**
 
-| Concern                               | Lives in                                                          | Does not                                    |
-| ------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------- |
-| Task schema / statuses / folder rules | `ArggonManager/docs/convention.md` + sample `ArggonManager/` tree | CLI source comments as sole source of truth |
-| Eng process, review bar, ADR, DoD     | `ArggonManager/docs/engineering.md`                               | Product roadmap (PM)                        |
-| CLI behavior                          | `cli/` (or stack equivalent)                                      | Phase 2 board UI, Phase 3 SDK               |
-| Durable decisions                     | `ArggonManager/docs/adr/`                                         | Long debate only in PR threads              |
+| Concern                               | Lives in                                                          | Does not                                       |
+| ------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------- |
+| Task schema / statuses / folder rules | `ArggonManager/docs/convention.md` + sample `ArggonManager/` tree | CLI source comments as sole source of truth    |
+| Eng process, review bar, ADR, DoD     | `ArggonManager/docs/engineering.md`                               | Product roadmap and acceptance (product owner) |
+| CLI behavior                          | `cli/` (or stack equivalent)                                      | Phase 2 board UI, Phase 3 SDK                  |
+| Durable decisions                     | `ArggonManager/docs/adr/`                                         | Long debate only in PR threads                 |
 
-**Shipped beyond the original Phase 1 scope** (each behind its own ADR/PR): static board + drag-and-drop + local serve (ADR 0002), GitHub reconciliation (`sync`), stdio MCP server. **Still out without an ADR:** hosted/SaaS anything, a parallel task schema, or an agent-only dialect of the rules.
+**Shipped beyond the original Phase 1 scope** (each behind its own ADR/PR): static board + drag-and-drop + local serve (ADR 0002), GitHub reconciliation (`sync`), stdio MCP server. **Still out without an ADR:** hosted/SaaS anything, a parallel task schema, or an agent-only dialect of the rules — [ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) is one such ADR: it grants the four irreversible powers to a named human role and no agent a second rule set.
 
 **Sample tree:** the fixture `fixtures/tasks-valid/tasks/launch-mvp/` is both the product demo and a test fixture. Changing convention requires updating samples and CLI tests in the same change set when the CLI exists.
 
 ---
 
+## Roles and authority
+
+The methodology states two axes, not one ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §1): the **work loop is identical** for every human and every agent — same kernel rules, same JSON contracts, same claim discipline — while **authority is asymmetric and named**: a bounded set of decisions belongs to the **product owner**, and the irreversible ones are structurally human-only. Agents are primary workers ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §6.1); the human in the loop is the product owner.
+
+Nothing below is a second rule set: every role calls the same kernel through the same envelopes (ADR 0010/0011, one logic path), and a role difference an adapter cannot express is a **gap row** in the capability matrix, never a second rule (ADR 0020).
+
+### The role table
+
+A role is defined by **what it decides**, never by the artifacts it touches (ADR 0021 §6.2) — that is what makes the table readable in a project that is not software. The middle column is a mapping for readers who know the software vocabulary; it is **non-normative** and never a requirement.
+
+| Shipped id           | Role                     | Software analogue _(non-normative)_ | Non-software analogue                     | Decides                                                                                                        |
+| -------------------- | ------------------------ | ----------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| _(human)_            | **Product Owner**        | Product owner / sponsor             | Same                                      | Direction, priority, acceptance, risk, release (§Authority map)                                                |
+| `arggon-coordinator` | **Delivery lead**        | Product manager                     | Project manager                           | What is built next and in what order; who is dispatched; tracker state; merge verification and the `done` flip |
+| `arggon-reviewer`    | **Practice & standards** | Tech lead / software architect      | Standards, methods, editorial, compliance | Whether a change is right by the project's own bar — structure, patterns, principles, scope; asks for refactor |
+| `arggon-worker`      | **Maker**                | Programmer                          | Author, analyst, executor                 | Producing the change, keeping it on the item                                                                   |
+| `arggon-prover`      | **Verifier**             | Manual QA                           | Independent checker / inspector           | Whether the delivered thing does what was specified — by executing the project's verification gates            |
+
+The **ids are wire names**, not role names: permissions, plugin manifests and existing adopter files keep pointing at them (ADR 0021 §6.2a′ schedules the rename to role-named ids, gated on orphan reaping). The role — what a role decides — is what this table states.
+
+Two boundaries this makes explicit, because the roles otherwise blur (ADR 0021 §6.1):
+
+1. **Delivery lead ≠ priority owner.** A delivery lead _sequences_ delivery; the product owner _sets_ the `priority` field. The delivery lead recommends priority changes and owns wave planning, dispatch and tracker state — the product owner's authority map below is unchanged.
+2. **The verifier reports, it does not rule.** Checking the delivered thing against the specification and reporting observed-versus-expected is the whole job. The verifier does **not** decide the verdict: the reviewer's judgment and the delivery lead's merge call are unchanged — the role gets its teeth without becoming an approver.
+
+### Authority map
+
+Bounded and named (ADR 0021 §2). No new authority is granted to any agent by this table.
+
+| Decision                           | Owner             | Enforced today                                                                    |
+| ---------------------------------- | ----------------- | --------------------------------------------------------------------------------- |
+| Direction and priority             | **product owner** | recorded as `priority`; decided by a person                                       |
+| Product acceptance of a container  | **product owner** | recorded as an `accept:` comment (§Review bar → Product acceptance); never a gate |
+| Accepting residual risk            | **product owner** | ADR 0015 waiver — human-only, no agent parameter                                  |
+| Taking over another writer's claim | **product owner** | `--steal` — armed config (`x-tracker.allow-steal`) + TTY confirmation             |
+| Publishing a release               | **product owner** | human-pushed version bump (spec-release-pipeline-015 AC 7)                        |
+| Exploring, specifying, planning    | agent             | the loop, unchanged                                                               |
+| Implementing, testing, docs        | agent             | the loop, unchanged                                                               |
+| Reviewing and proving              | agent             | reviewer (read-only) / prover (no mutation) split (`agents.md` §Orchestration)    |
+| Verifying merges, flipping `done`  | agent             | delivery lead; the done gate still holds (ADR 0015)                               |
+| Filing follow-up work              | agent             | the delivery lead consolidates and files (`agents.md` §Orchestration)             |
+
+**The four irreversible powers are human-only, structurally — not undocumented exceptions** (ADR 0021 §1/§2; every row keeps the gate it already had, and this table grants nothing):
+
+| Power                            | The structural gate                                                                                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Take over another writer's claim | `--steal`: `x-tracker.allow-steal: true` **and** a y/N confirmation on an interactive terminal; non-TTY callers refused (`convention.md` §Claim lease) |
+| Waive the done gate              | `--waive` on `update --status done` (ADR 0015); no MCP/native parameter exists and the kernel refuses agent callers (`agents.md` §5)                   |
+| Force a claim reassignment       | `--force` on `update`: refused for agent callers by the shared rules module; no native parameter (`lib/src/rules.ts`)                                  |
+| Reopen a terminal item           | `update --status todo` on `done`/`cancelled` needs a y/N confirmation over a TTY stdin; piped stdin is refused, no `--yes`, no config opt-in           |
+
+Publishing a release is the fifth human step and is human by construction (a human-pushed commit), not by a CLI gate.
+
 ## Review bar (blocks merge)
+
+A bar is named by **what the project declares**, never by a tool: this document declares ArggonManager's own bar, and every adopting project rewrites its own (`arggon init` never overwrites it — `agents.md` §Prerequisites). The domain-invariant that survives every project is the **acceptance contract on the item** — the checklist in the item body — not the tool that checks it. Everything below is this project's declaration, and the parenthetical gates are the software worked example (ADR 0021 §6.2).
 
 A PR merges only when **all** applicable bars pass:
 
-### Architecture / boundaries (Software Architect)
+### Architecture / boundaries (practice & standards)
 
-**Operating principle 1: code is cheap; good practices and sound software architecture are always important.** Architecture quality is always in scope, on every PR: clear module boundaries, small surfaces, tests that travel with behavior, and docs that travel with code are part of "done" — never deferred as "refactor later". The speed of writing code never justifies structural debt.
+**Operating principle 1: code is cheap; good practices and sound software architecture are always important.** Architecture quality is always in scope, on every PR: clear module boundaries, small surfaces, evidence that travels with the change, and docs that travel with code are part of "done" — never deferred as "refactor later". The speed of writing code never justifies structural debt.
 
 - Changes match documented boundaries (convention vs eng vs CLI).
 - No silent schema forks: if CLI behavior disagrees with `ArggonManager/docs/convention.md`, update the doc **in the same PR** or open a follow-up that blocks release.
 - No shortcuts that break Phase 2/3 extensibility without an ADR (e.g. hard-coding non-unique ids, inventing frontmatter keys outside reserved extension rules).
-- Architect may **block merge** on quality even if PM accepted the feature.
+- This role may **block merge** on quality even if the product owner accepted the change.
 
-### Product acceptance (Project Manager)
+### Product acceptance (product owner)
 
 - Behavior matches product intent and is shippable.
-- PM may bounce a feature that is technically clean.
+- The product owner may bounce a change that is technically clean.
 
-### Implementation quality (Software Developer, checked in review)
+**Promotion policy — how deep product-owner review goes per class of work** (ADR 0021 §3; content fixed by [spec promotion-policy-018](./specs/spec-promotion-policy-018.md)). A written, agreed-in-advance tiered review path keeps human attention the scarce input it is: leaves are agent-owned end to end, so no product-owner review per leaf PR.
 
-- Code is readable; public CLI flags/commands documented in README or `cli` help.
+| Tier | Applies to                                          | Who accepts                                                                               | Blocking?                     |
+| ---- | --------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------- |
+| T0   | `task` / `bug` leaves                               | the agent self-certifies on the review-bar evidence plus the project's verification gates | no — and the **default**      |
+| T1   | `story` containers                                  | the product owner, recorded as an `accept:` comment                                       | no — recorded, never gated    |
+| T2   | the four irreversible powers (§Roles and authority) | a human, already structurally gated; the acceptance records the why                       | yes — by ADR 0015 / TTY gates |
+
+A repository with **no product owner is compliant by default**: T0 applies, nothing is blocked, and every surface stays silent unless the project arms the convention itself. There is no SLA and no product-owner-blocked status, so an absent product owner can never wedge a container's children — only its bookkeeping.
+
+**The record (bounded, mirrors the verdict convention).** A product acceptance is a comment on the item whose first acceptance-looking line is the header:
+
+```
+### 2026-10-04 @gonzalo
+accept: approve
+- login rate limit behaves as specified; p95 unchanged at 40 rps
+```
+
+`accept: approve` or `accept: changes-requested`, optionally followed by a short scope in parentheses, then the evidence list; a later `approve` supersedes an earlier `changes-requested`. Prose, documentation, not schema.
+
+**Never a gate.** The tracker has no identity — the session id is correlation metadata only (`agents.md` §MCP server) — so an acceptance cannot be authenticated; a gate built on it would be forgeable or unusable, and both are worse than none. An acceptance written by the item's own assignee is reported as self-accepted rather than blocked. [spec promotion-policy-018](./specs/spec-promotion-policy-018.md) specifies the read-only surfaces that classify it (`report` / `show` per container, plus one opt-in `spec analyze` finding); none of them gates a transition, ever.
+
+### Implementation quality (maker, checked in review)
+
+- The change is readable and its public surface documented where users meet it (in software: public CLI flags/commands documented in README or `cli` help).
 - Errors are actionable (especially validate failures).
 
 ### Non-functional bar (quality · scalability · security)
@@ -91,7 +170,7 @@ Quality is the operating principle above; **scalability and security are named r
 
 ### Smoke test (blocks merge)
 
-Before a change is approved it is **smoked — executed end-to-end, not just unit-tested**. The bar is blocking for applicable changes; docs-only PRs are exempt.
+Before a change is approved it is **smoked — executed end-to-end, not just unit-tested**. The gate is **the project's own verification gates**, and the evidence is observed-versus-expected against the specification (ADR 0021 §6.2); in software that is the test suite, lint, typecheck, build and the review-time smoke below ([ADR 0008](./adr/0008-review-smoke-gate.md)). The bar is blocking for applicable changes; docs-only PRs are exempt. The **verifier** role executes these gates and reports them; it does not decide the verdict (§Roles and authority).
 
 - **CLI behavior changes:** the reviewer probes every changed/new command on a fixture repo and records the evidence in the review verdict (commands run, expected vs observed). Prefer deterministic `--json` output for evidence.
 - **UI changes (board HTML / `board --serve`):** the reviewer drives a real browser against `arggon board --serve` on a fixture tree — the board renders, cards match `arggon list`, and one status change round-trips through the UI and persists (verified with `arggon show`). Tool: **Playwright CLI** (`@playwright/cli`, agent-first; fallback Playwright MCP) — see [ADR 0008](./adr/0008-review-smoke-gate.md).
@@ -117,9 +196,9 @@ verdict: request-changes (smoke evidence missing)
 - unit tests travel with the parser
 ```
 
-### UI (UI Tester)
+### UI (verifier)
 
-- When a PR touches UI, the **smoke-test bar above applies** (real-browser drive); UI QA ownership (UI Tester) remains as scoped in Phase 2.
+- When a change touches a user-facing surface, the **smoke-test bar above applies** (drive the real thing); ownership of that bar sits with the **verifier** role (software analogue: manual QA) and stays scoped as in Phase 2.
 
 ### Docs
 
@@ -130,6 +209,8 @@ verdict: request-changes (smoke evidence missing)
 ---
 
 ## Testing expectations
+
+A project declares its own layers and its own commands; this is ArggonManager's declaration, and the software rows below are the worked example every other project replaces with its own (ADR 0021 §6.2).
 
 | Layer                        | Required                         | Notes                                                                                                                                                                                                                                                                                                                         |
 | ---------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -198,16 +279,16 @@ Use a 4-digit monotonic number. Title is kebab-case.
 - **Commits:** imperative, scoped when helpful (`docs:`, `cli:`, `test:`)
 - **PRs:** problem + approach + test plan; reference the tracker work item id — move it to `done` only when fully done (issues live in the tracker, not GitHub; see `ArggonManager/docs/agents.md` §0)
 - **Convention vs engineering:** schema/layout/status → `ArggonManager/docs/convention.md`; process/structure/review/ADR → `ArggonManager/docs/engineering.md` or `ArggonManager/docs/adr/`
-- **Agents and humans** follow the same PR and claim rules; agent-only shortcuts are out of scope unless an ADR says otherwise
+- **Humans and agents share one work loop** — the same PR and claim rules, the same kernel, the same envelopes; what is asymmetric is **authority**, not the loop, and it is named in §Roles and authority. Agent-only shortcuts are out of scope unless an ADR says otherwise
 
 ---
 
 ## Definition of done (engineering, Phase 1)
 
-A Phase 1 eng change is done when:
+The **acceptance contract on the item** — its checklist — is the done contract, and it is the domain-invariant: the project declares what done means, and the gates below are how _this_ project checks it (ADR 0021 §6.2). A Phase 1 eng change is done when:
 
 1. Behavior matches `ArggonManager/docs/convention.md` where applicable
-2. Review bars above are satisfied (Architect + PM as relevant)
+2. Review bars above are satisfied (practice & standards, plus the product-acceptance tier that applies to the item)
 3. Tests/fixtures cover the change (once CLI exists)
 4. Docs/ADR updated in the same PR when contracts change
 5. No known validate false-pass for the new behavior

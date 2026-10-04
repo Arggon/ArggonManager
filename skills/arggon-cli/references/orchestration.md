@@ -5,6 +5,29 @@ by default**: a coordinator delegates them to subagents instead of working them
 inline. Trivial items (one-line fixes, doc tweaks) stay inline. Full rules:
 `ArggonManager/docs/agents.md` §Orchestration.
 
+## The roles (named by what they decide)
+
+Authoritative table, with the software analogue marked non-normative:
+`ArggonManager/docs/engineering.md` §Roles and authority (ADR 0021 §6.1).
+
+| Shipped id           | Role                 | Decides                                                                                                        |
+| -------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `arggon-coordinator` | Delivery lead        | what is built next and in what order; who is dispatched; tracker state; merge verification and the `done` flip |
+| `arggon-reviewer`    | Practice & standards | whether a change is right by the project's own bar; asks for refactor                                          |
+| `arggon-worker`      | Maker                | producing the change, keeping it on the item                                                                   |
+| `arggon-prover`      | Verifier             | whether the delivered thing does what was specified, by executing the project's gates                          |
+
+Two boundaries the roles must not blur: the delivery lead **sequences** and
+recommends priority — the product owner (human) sets the `priority` field; and
+the verifier **reports** observed-versus-expected without deciding the verdict.
+The shipped ids are wire names permissions and manifests point at (ADR 0021
+§6.2a′), so cite the role, never the file name.
+
+Everywhere else the loop is **parity**: any human and any agent may claim, work,
+review, comment and merge under the same kernel rules and the same JSON
+contracts. Only the irreversible overrides are structurally human-only — steal,
+waive, force, reopen — and they are the product owner's (ADR 0021 §1/§2).
+
 ## Coordinator duties
 
 - **Wave planning by file-disjointness:** group claimable items into waves whose
@@ -28,10 +51,12 @@ inline. Trivial items (one-line fixes, doc tweaks) stay inline. Full rules:
 - **Per-item worktrees:** one subagent per item, each in its own worktree — the
   recorded `worktree_path` on the item, never a `../<repo>-<id>` convention
   guess; no two subagents share a working tree.
-- **Code review (lead architect):** review **every** subagent PR before merge
-  against the review bar in `ArggonManager/docs/engineering.md` (architecture-first,
-  conventions first, quality/security bar, tests travel with behavior, docs
-  travel with code, scope stays on the item, **blocking smoke test**) plus the
+- **Code review (practice & standards):** review **every** subagent PR before merge
+  against the bar the **project's engineering docs declare** (this project's
+  `ArggonManager/docs/engineering.md` §Review bar: architecture-first,
+  conventions first, quality/security bar, evidence travels with the change, docs
+  travel with code, scope stays on the item, **blocking smoke test** — in software
+  the probe evidence and the browser drive the review bar describes) plus the
   coordination specifics: surgical staging, no cross-item files, no unrelated
   reformatting, acceptance ticks honest. Change requests and verdicts go back via
   `arggon comment <item-id>` on the item — never as GitHub PR comments.
@@ -39,6 +64,8 @@ inline. Trivial items (one-line fixes, doc tweaks) stay inline. Full rules:
   cross-item conflicts when waves overlap.
 - **Tracker ownership:** claim conflicts, blocked items, follow-up filing, and
   final wave verification (`arggon validate` ok, `arggon doctor` clean).
+- **Sequencing ≠ priority:** decide what is built next and in what order, and
+  recommend `priority` changes — the product owner sets the field (ADR 0021 §6.1).
 
 ## Subagent rules
 
@@ -49,11 +76,17 @@ inline. Trivial items (one-line fixes, doc tweaks) stay inline. Full rules:
   (never a bare `update --status in_progress`) only when you picked the item up
   yourself and no claim exists.
 - Never flip your item `done` — completion is the coordinator's call after merge
-  verification — and never reopen `done`/`cancelled` or steal a claim.
-- Expect the coordinator's review and address change requests before merge.
-- Come with smoke evidence for behavior changes: changed commands probed on a
-  fixture (expected vs observed); UI changes browser-driven per ADR 0008 — the
-  smoke gate blocks merge.
+  verification — and never reopen `done`/`cancelled` or steal a claim. Those
+  irreversible overrides are the product owner's, structurally.
+- Expect the coordinator's code review on your PR and address change requests
+  before it merges.
+- Come with smoke evidence for behavior changes: the project's gates executed
+  end-to-end against the specification, reported as expected-vs-observed (in
+  software: changed commands probed on a fixture, UI changes browser-driven per
+  ADR 0008) — the smoke gate blocks merge.
+- Keep the item's acceptance checklist honest: it is the **done contract** and
+  the domain-invariant — a non-software project checks it with its own gates, a
+  software project with tests, lint and a smoke.
 - Report findings back to the coordinator instead of filing tracker items — the
   coordinator consolidates and files.
 
