@@ -115,3 +115,21 @@ done` on a task/bug whose body still has unchecked acceptance boxes is
 - **Leave it cleaner:** release expired claims (`update <id> --status todo`), prune
   merged worktrees (`arggon cleanup --prune`), flag stale playbooks, and keep the
   tree validating before every commit.
+
+## Who decides — the human-only flags are named, not exceptions
+
+Everywhere else in the loop you and the human are peers: any of you may claim,
+work, review, comment and merge under the same kernel rules and the same JSON
+contracts (`ArggonManager/docs/adr/0021-agents-primary-workers-human-product-owner.md`
+§1).
+The **four irreversible overrides above — steal, waive, force, reopen — are the
+product owner's**, structurally: a TTY confirmation, an armed config flag, or no
+agent parameter at all. Treat them as the published authority surface they are:
+needing one means asking a human, never routing around the gate.
+
+The rest of that surface, the roles (delivery lead / practice & standards / maker
+/ verifier, each named by what it decides) and the promotion-policy tiers live in
+`ArggonManager/docs/engineering.md` §Roles and authority. Two boundaries worth
+remembering: the delivery lead sequences work and **recommends** `priority` — the
+product owner sets the field — and a product acceptance is recorded as an
+`accept:` comment on a container, **never a gate**.

@@ -77,3 +77,23 @@ exists, or adopters keep a dispatchable orphan per old file (§6.2a′).
 
 Everything else in this checklist stands; the role-contract and domain-neutrality
 criteria from the cancelled `task-spec-agent-role-contracts` moved here verbatim.
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+### 2026-10-04 @coordinator
+verdict: changes-requested (one more file set to sweep, from PR #636's review)
+
+The carrier wiring landed a **role table carrying the old ids** in
+`ArggonManager/docs/engineering.md` (§Roles and authority) and a four-row table in
+`skills/arggon-cli/references/orchestration.md`. Both name the ids this item renames, so
+the rename must refresh them **in the same PR** or the carriers will contradict the
+seam:
+
+- [ ] `docs/engineering.md` role table: the **Shipped id** column becomes the four new ids
+- [ ] `skills/arggon-cli/references/orchestration.md`: the four-row table plus the two surrounding sentences naming the old ids
+- [ ] `skills/arggon-cli/**` and `.agents/skills/arggon-cli/**` stay byte-equal
+- [ ] `docs/agents.md` §Orchestration agent list and the review-bar headings use the new ids
+
+A stale id in a carrier is worse than a stale id in prose: the carriers are what every
+adopter's agents read as the contract. It also keeps
+`task-agent-identity-claim-discipline` honest — it must not tell agents to claim as an
+id that no longer ships.
