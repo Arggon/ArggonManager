@@ -8,7 +8,7 @@ labels: [methodology, seam, roles]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
-depends_on: [task-spec-agent-role-contracts, task-wire-role-model-carriers, task-spec-agent-rename-migration]
+depends_on: [task-spec-agent-role-contracts, task-wire-role-model-carriers, task-spec-agent-rename-migration, task-adapter-orphan-reaping]
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-agent-role-contracts-seam.md
