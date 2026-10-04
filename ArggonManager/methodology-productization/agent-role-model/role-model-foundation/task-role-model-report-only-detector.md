@@ -155,3 +155,6 @@ I did not re-run `npm run smoke:native-start-cold` this round (it is not in this
 `agents.md`, `engineering.md`, `README.md`, `skills/**`, `templates/**`, `smoke/**` — no edits. No tracker item other than this one. The struck-through `sync --json` checklist row is left **exactly** as I wrote it (you are adjudicating it). Item **not** flipped to `done`; PR **not** merged.
 
 **Merge, do not squash** — the branch carries tracker auto-commits.
+
+### 2026-10-04 @ses_ef74306c7ffeyb24EIcXcBGIoM
+Correction to the previous comment (typo, no change to substance): the generated bundle path is `opencode/plugins/arggon/index.bundle.ts` — I wrote `argdon` once. The `check:plugin` result and the 10-match content check both refer to that file.
