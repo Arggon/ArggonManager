@@ -8,6 +8,7 @@ labels: [methodology, cli, report-only]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
+depends_on: [task-spec-promotion-policy-and-acceptance]
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-role-model-report-only-detector.md
