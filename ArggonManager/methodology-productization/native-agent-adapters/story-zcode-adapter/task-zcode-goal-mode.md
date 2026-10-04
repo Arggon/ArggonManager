@@ -927,3 +927,16 @@ so the `done` flip is no longer refused by the gate this PR exists to agree with
 **Gates at `de288031`** (item-file-only change; `npm run build` before `npm test`): build ok (build:plugin 459,439 bytes) · `npm test` **127 files, 2637 passed** · `npm run lint` clean · `npm run arggon -- validate` `ok (0 warning(s), convention v5)` · `npm run check:plugin` no diff · `npm run test:structure` 5 passed · `npm run lint:structure` green · `tasks-validate` drift gate re-run locally: marker present, committed stamp `0.5.0` not ahead of the pin, re-generate → clean, **PASS**. Re-checked after the `origin/main` auto-done merge (`acfdfbaf`): validate ok, drift gate PASS, item file byte-identical through that merge.
 
 Delivery: two fast-forwards (`53ce55d4..de288031`, `de288031..acfdfbaf`); `origin/main` merged, contained; **no force-push, none attempted**; branch published and un-rebased for the coordinator's squash. Item stays `in_progress`; spec/plan `status` stays `proposed`.
+
+### 2026-10-04 @Arggon
+Re-running the same four probes **after** this comment was appended, so the numbers in it cannot be read as stale (my comment is itself a new block — 16 now, and the one block the identity check reports as "not in a source file" is this comment; the 12-file source set the check enumerates predates it):
+
+```
+parseVerdicts: 4 verdict comments — round 1 (order 5), round 2 (19), round 3 (28), round 4 (32)
+classifyVerdicts: changes-requested (latest: round 4, order 32)
+round-3-era prefix (before round 4's block): latest is round 3 (order 28)
+parseComments: 11 comments {Arggon: 7, @ses_f00: 2, @ses_efe0: 2}
+acceptanceComplete(item.body): true (rows=3, unchecked=0)
+```
+
+This comment carries no verdict line, so it does not enter the verdict race — the counts above are the record at `de288031` plus this comment, nothing else changed.
