@@ -267,6 +267,31 @@ accept: approve
   A gate built on it would be forgeable or unusable; both are worse than not having
   one. The enforced human steps remain the four irreversible ones in §2.
 
+> **Amendment (2026-10-04, `task-role-model-report-only-detector`): the second bullet's
+> `sync` is corrected to `report` + `show`.** The decision above is unchanged — one
+> bounded, author-attributed, report-only record — and nothing above or below this note
+> is rewritten. The implementation spec
+> ([`docs/specs/spec-promotion-policy-018.md`](specs/spec-promotion-policy-018.md)) found
+> that the surface this section names **cannot carry the artifact**: `sync` classifies
+> only the items it reconciles with an **open PR** (`lib/src/sync-command.ts:83`, the
+> verdict map is built over PR matches), while a product acceptance is a **container**
+> decision — containers carry no branch, so they never appear in that map and a
+> container's acceptance could never be reported there. The surfaces that can carry it
+> are the ones that already aggregate per container and per item: `arggon report --json`
+> (one `acceptance` per container row) and `arggon show <id> --json` (one `acceptance`
+> per item, read from the item's canonical body). `sync` is left **byte-identical**: its
+> review-verdict classification is untouched, and the container-level reading is simply
+> not its question.
+>
+> Two further facts the spec settled, both consistent with §4 above: `self-accepted` is a
+> first-class state (attribution is the only honest signal without an identity layer, so
+> a reader must see it before trusting an acceptance), and the `spec analyze` finding is
+> **opt-in** — it fires only where the project has declared
+> `x-tracker.product-acceptance: true`, so a project with no product owner stays silent
+> instead of being nagged about a role it does not have. Both are report-only, like
+> everything in §4: no transition consults the state, no command refuses because of it,
+> and CI never fails on it.
+
 ### 5. Agent identity
 
 Agents claim as their shipped role id — `arggon-coordinator`, `arggon-worker`,
