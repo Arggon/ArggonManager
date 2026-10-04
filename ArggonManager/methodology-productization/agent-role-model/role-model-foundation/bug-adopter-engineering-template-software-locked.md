@@ -51,3 +51,31 @@ file set).
 - [ ] `x-generated` provenance respected — re-running `init` must not read as adopter-edited spuriously
 - [ ] `cli/src/init.test.ts` + the prose-format suite green; `arggon validate` ok; prettier clean
 - [ ] Cross-checked against `templates/docs/docs/agents.md` and `convention.md` for the same lock — if clean, say so in the item rather than editing them
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+### 2026-10-04 @coordinator — scope widened (finding from PR #638's review)
+
+A worker on `bug-parity-invariant-restated-outside-carriers` found the **same defect in a
+sibling file with a larger blast radius**, and it belongs in this item rather than a
+near-duplicate:
+
+- **`templates/docs/docs/convention.md:3`** — the adopter template `arggon init` writes into
+  every new project still says *"Humans and agents follow the same rules"* **verbatim**,
+  which the two-axis rule (ADR 0021 §1) superseded. This is the file that becomes every
+  new adopter's `ArggonManager/docs/convention.md`, so it teaches the superseded rule at
+  `init` time — before the adopter has read anything else.
+
+**The part that matters more than the sentence:** no test guards it.
+`cli/src/init-docs.test.ts:166` asserts the file is *adopter-owned* but never compares its
+content against the carriers' invariant block. So an adopter template can carry a
+superseded rule, ship green, and be wrong at every adopter's first read. That is the same
+class as `bug-x-tracker-option-list-has-no-doc-drift-guard` — a carrier restated in a
+second place with nothing tying the two together.
+
+**Added to this item's acceptance:**
+
+- [ ] `templates/docs/docs/convention.md` carries the two-axis rule (or points at the carrier that does) instead of the verbatim parity sentence
+- [ ] **A guard exists**: a test asserts the adopter templates' invariant statement matches the carriers' invariant block, so the two cannot drift. Without this row, the fix is one `init` regeneration away from regressing
+- [ ] The guard covers `templates/docs/docs/engineering.md`, `agents.md`, `convention.md`, `AGENTS.md` and `README.md` as one set — the whole template family — rather than the single file that happened to break
+- [ ] ADR 0016 upgrade-channel note: an **existing** adopter's copy is not refreshed by `init` (never-overwrite), so the corrected template only reaches **new** trees. Say in the release notes that adopters must reconcile their own copies, and decide whether `init --propose` should carry it
+- [ ] Cross-checked against `templates/docs/docs/AGENTS.md:17` and `templates/docs/docs/viewer-spike.md` — the work-loop-parity statements there are still correct under the two-axis rule and must be left alone
