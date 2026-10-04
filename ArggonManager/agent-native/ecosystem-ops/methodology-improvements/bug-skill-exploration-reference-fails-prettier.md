@@ -27,3 +27,21 @@ updated: "2026-10-04"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+## Context
+
+`skills/arggon-cli/references/exploration.md` fails `npx prettier --check` at HEAD —
+pre-existing, found while keeping PR #636's diff on-item. The worker deliberately did
+not fix a pre-existing formatting failure inside a methodology PR, which is right.
+
+It matters beyond cosmetics: `skills/arggon-cli/**` and `.agents/skills/arggon-cli/**`
+must stay byte-equal, and a file that cannot pass the repo's own formatter is one the
+next agent either reformats silently or leaves forever.
+
+## Acceptance
+
+- [ ] `npx prettier --check skills/arggon-cli/references/exploration.md` passes
+- [ ] Semantically identical — formatting fix only, no sentence changes
+- [ ] `cli/src/skill-copy.test.ts` green (the `.agents/skills/` copy stays byte-equal modulo the generated marker)
+- [ ] `npx prettier --check` over the whole `skills/` tree passes, so this is not the last one
