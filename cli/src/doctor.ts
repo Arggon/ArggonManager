@@ -563,8 +563,10 @@ export type AdapterFileState = {
    * file, read from the same classifier init acts on (`planOrphanReaps`), so
    * the report cannot promise a deletion init would refuse (or refuse one it
    * would perform). `reap` = init removes it; `refuse` = init keeps it and
-   * `reason` says why (adopter edit, acknowledged baseline, downgrade,
-   * non-regular file, outside the repo root, not on disk).
+   * `reason` says why (an edit since the recorded baseline, a downgrade, a
+   * non-regular file, outside the repo root, not on disk). An acknowledged
+   * orphan is NOT a refusal — see `classifyOrphan` in `cli/src/docs.ts` for the
+   * policy; its `reason` names the ack so the operator sees it before acting.
    */
   reap?: { action: "reap" | "refuse"; reason: string };
 };

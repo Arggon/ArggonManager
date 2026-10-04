@@ -33,10 +33,17 @@ Upgrading is non-destructive for agents too: an agent's edits to a generated doc
 
 `init` never deletes a file it did not generate — with **one** exception, because a release that drops or renames a template would otherwise strand its destination forever, and a stranded file under `.opencode/agents/` is still **dispatchable**. An **orphan** is a destination recorded in `x-generated` whose `template:` is absent from this arggon version: the recorded provenance is the whole detection mechanism, so no new state is needed.
 
-- `arggon doctor --agents` reports it first, as `orphaned`, with the remedy: `init` removes it when it is still exactly as generated, otherwise you delete it by hand. Run doctor **before** `init` when upgrading across a rename.
-- `arggon init` removes an orphan only when every rule holds: inside the repo root, a regular file (never a directory, never a symlink), recorded by no **newer** arggon than the one running (a downgrade reports instead of deleting), not an acknowledged baseline, and byte-identical to the recorded checksum. Anything else is **refused and named** — never-overwrite binds reaping exactly as it binds refresh, so your edits are never deleted.
-- Reaping is never silent: `--json` carries `reaped[]` and `reapRefused[]` (their own action family, never folded into the create/replace/skip counts) and human output prints one line per file. `init --dry-run` previews both without writing.
-- A reaped destination loses its `x-generated` entry in the same run and the removal rides the auto-commit, so a later `init` reaps nothing and a committed tree never keeps provenance for a file that is gone.
+**`init` DELETES** an orphan when all of these hold: it is inside the repo root · it is a regular file (never a directory, never a symlink) · it was recorded by no **newer** arggon than the one running (a downgrade reports instead of deleting) · and its bytes are **unchanged since the recorded baseline** — byte-identical to the recorded checksum.
+
+**`init` REFUSES and names** it in every other case: an edit since that baseline (yours — never deleted), a downgrade, a destination outside the repo root, a directory or symlink, or a destination not on disk.
+
+**`acknowledged: true` is not a veto** (`arggon adopt --ack`), and that is deliberate — read this before "fixing" it:
+
+- The ack exists to stop `init` **regenerating** your sanctioned content; it says nothing about deleting, and it cannot apply to a file whose upstream template no longer exists in this version — there is no regeneration left to protect against.
+- `adopt --ack` acks **every** `x-generated` entry, so a repo that adopted properly carries the flag on its `.opencode/agents/*.md`. Treating it as a veto would strand the dead agent in exactly the repos that took the methodology seriously, and a stranded `.opencode/agents/arggon-*.md` stays **dispatchable** — which is the whole hazard reaping exists to close ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §6.2a′ gates the agent rename on reaping).
+- What "unchanged since the recorded baseline" proves depends on the entry: for an ordinary generated file the recorded checksum is the one `init` wrote, so a match means _we generated these bytes and nobody has touched them since_. For an **acknowledged** entry the ack re-recorded the checksum from disk, so a match means _unchanged since the ack_ — the strongest statement the recorded state can support, and never "arggon wrote exactly these bytes". If you curated a file and then acked it, run `arggon doctor --agents` **before** `arggon init` when upgrading: the `orphaned` row names the ack in its reason, so you can see the removal coming (or restore the template / delete the file yourself first).
+
+Reaping is never silent: `--json` carries `reaped[]` and `reapRefused[]` (their own action family, never folded into the create/replace/skip counts) and human output prints one line per file. `init --dry-run` previews both without writing. A reaped destination loses its `x-generated` entry in the same run and the removal rides the auto-commit, so a later `init` reaps nothing and a committed tree never keeps provenance for a file that is gone.
 
 ## 0. Issue tracking: the tracker (`ArggonManager/`), not GitHub issues
 

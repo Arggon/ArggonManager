@@ -194,11 +194,12 @@ export type DocsPlanDecision =
    * Orphan reaping (task-adapter-orphan-reaping, spec-agent-rename-019 §The
    * precondition): the destination's recorded template no longer exists in this
    * version, so init can neither refresh nor keep generating it.
-   * `orphan-reap` REMOVES it — only when the bytes are still exactly as
-   * generated; `orphan-refused` reports it and leaves it alone (an adopter edit,
-   * an acknowledged baseline, a downgrade, a non-regular file, or anything the
-   * safety rules refuse). The two are separate decisions so the plan says which
-   * one happened instead of collapsing into one informational row.
+   * `orphan-reap` REMOVES it — only when the bytes are unchanged since the
+   * recorded baseline (acknowledged or not: see `classifyOrphan`'s policy
+   * comment); `orphan-refused` reports it and leaves it alone (an edit since the
+   * recorded baseline, a downgrade, a non-regular file, a path outside the repo,
+   * or a destination that is not on disk). The two are separate decisions so the
+   * plan says which one happened instead of collapsing into one row.
    */
   | "orphan-reap"
   | "orphan-refused";
@@ -966,11 +967,33 @@ export function compareArggonVersions(a: string | undefined, b: string): number 
  *     this install's template set for the wrong reason: the operator's arggon is
  *     behind, and deleting the file would destroy a current-generation
  *     artifact. An undecidable version comparison refuses too.
- *  4. **not an acknowledged baseline** — `arggon adopt --ack` sanctions those
- *     bytes as the adopter's, and never-overwrite binds reaping exactly as it
- *     binds refresh.
- *  5. **byte-identical to the recorded checksum** — unmodified since
- *     generation, so reaping removes only what arggon itself wrote.
+ *  4. **byte-identical to the recorded checksum** — the adopter has not changed
+ *     it since the baseline it was recorded against, so reaping removes only
+ *     bytes arggon is answerable for.
+ *
+ * **`acknowledged` is deliberately NOT a veto here** (the adopt-vs-reap policy,
+ * kept out of this function's checks on purpose):
+ *
+ *  - Acknowledgment exists to stop `init` REGENERATING an adopter's sanctioned
+ *    content (`runAdoptAck`: "later init re-runs must never regenerate these
+ *    files"). It says nothing about deleting, and it cannot meaningfully apply
+ *    to a file whose upstream template no longer exists in this version: there
+ *    is no regeneration left to protect against.
+ *  - More concretely, an `acknowledged` veto would DEFEAT the migration reaping
+ *    exists to enable. `runAdoptAck` iterates EVERY `x-generated` entry, so a
+ *    repo that adopted properly carries `acknowledged: true` on its
+ *    `.opencode/agents/*.md` — and refusing those would strand the dead agents
+ *    in exactly the repos that treated the methodology as meant to be
+ *    (ADR 0021 §6.2a′ gates the rename on reaping; a dispatchable
+ *    `.opencode/agents/arggon-coordinator.md` would survive).
+ *  - The honest limit of the remaining ownership test, stated so nobody
+ *    re-derives it wrongly: `runAdoptAck` also RE-BASELINES the recorded
+ *    checksum from the on-disk bytes, so for an acknowledged entry "matches the
+ *    recorded checksum" means **unchanged since the ack**, not "arggon wrote
+ *    these exact bytes". A file that was curated and THEN acked therefore
+ *    matches too, and is reaped. Nothing in the recorded state can separate the
+ *    two cases, so the policy is: reap it, but say so loudly (the reason below,
+ *    `doctor --agents` before `init` acts, and one human line per file).
  */
 function classifyOrphan(opts: {
   root: string;
@@ -1020,14 +1043,6 @@ function classifyOrphan(opts: {
         "behind, so the absent template is not a removal: upgrade arggon (reported, not reaped)",
     };
   }
-  if (entry.acknowledged) {
-    return {
-      action: "refuse",
-      reason:
-        "acknowledged baseline (arggon adopt --ack) — your sanctioned bytes, and init never " +
-        "deletes them; delete the file by hand if the template is really gone",
-    };
-  }
   let disk: string;
   try {
     disk = readFileSync(abs, "utf8");
@@ -1056,9 +1071,14 @@ function classifyOrphan(opts: {
   }
   return {
     action: "reap",
+    // An acknowledged orphan is named here on purpose: its recorded checksum is
+    // the ack baseline (refreshed from disk by `adopt --ack`), so "unchanged
+    // since the ack" is what the reap actually proves — and the operator must be
+    // able to see that BEFORE `init` removes the file, not after.
     reason:
-      `template ${entry.template} is gone from this arggon version and the bytes are still as ` +
-      "generated — reaped; restore the template (or pin the old arggon) to keep it",
+      `template ${entry.template} is gone from this arggon version and the bytes are unchanged ` +
+      `since they were recorded${entry.acknowledged ? " (acknowledged baseline, `adopt --ack`)" : ""} ` +
+      "— reaped; restore the template (or pin the old arggon) to keep it",
   };
 }
 
@@ -1483,8 +1503,8 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
  *
  * The reap is the one destructive step, so it is deliberately narrow: only an
  * `orphan-reap` row (which the classifier produced after proving the path is
- * inside the repo, a regular file, not a downgrade, not acknowledged and
- * byte-identical to the recorded checksum) is removed, and `rmSync` runs
+ * inside the repo, a regular file, not a downgrade, and byte-identical to the
+ * recorded checksum) is removed, and `rmSync` runs
  * WITHOUT `recursive` — so a destination that turned into a directory between
  * plan and apply fails loudly instead of being removed recursively. `force`
  * only swallows the already-gone case, which keeps a re-run idempotent.

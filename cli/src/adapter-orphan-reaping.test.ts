@@ -34,6 +34,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -98,6 +99,21 @@ function primed(templates?: string): string {
 /** Adopt one `x-generated` entry with a template id the install does not ship. */
 function setRecordedTemplate(dir: string, dest: string, template: string): void {
   setStateField(dir, dest, "template", JSON.stringify(template));
+}
+
+/**
+ * Acknowledge one destination exactly as `arggon adopt --ack` does
+ * (`runAdoptAck`, cli/src/adopt.ts): `acknowledged: true` AND the checksum
+ * RE-BASELINED from the current on-disk bytes. Reproducing both halves matters
+ * — the re-baseline is why "matches the recorded checksum" means "unchanged
+ * since the ack" for an acknowledged entry, which is exactly the property the
+ * reaping policy leans on.
+ */
+function ackEntry(dir: string, dest: string): void {
+  const abs = join(dir, ...dest.split("/"));
+  const checksum = `sha256:${createHash("sha256").update(readFileSync(abs, "utf8"), "utf8").digest("hex")}`;
+  setStateField(dir, dest, "checksum", JSON.stringify(checksum));
+  setStateField(dir, dest, "acknowledged", "true");
 }
 
 /** Rewrite one field of one `x-generated` entry, inside its own block only. */
@@ -168,7 +184,7 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
     // Attribution is by the RECORDED template id, so the orphan still files
     // itself under the agent whose seam produced it.
     expect(row.agent).toBe("opencode");
-    expect(row.reason).toContain("still as generated");
+    expect(row.reason).toContain("unchanged since they were recorded");
   });
 
   it("reaps a plain doc orphan too — the leak is not seam-specific", () => {
@@ -225,20 +241,77 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
     expect(row.reason).toContain("Delete the file by hand");
   });
 
-  it("refuses an acknowledged orphan (a sanctioned baseline is the adopter's)", () => {
+  it("REAPS an acknowledged orphan whose bytes are unchanged — the adoption migration case", () => {
+    // The veto that must NOT exist: `adopt --ack` acks EVERY `x-generated`
+    // entry, so a repo that adopted properly carries `acknowledged: true` on
+    // its `.opencode/agents/*.md`. Refusing those would strand the dead agent
+    // in exactly the repos that treated the methodology as meant to be — and
+    // `.opencode/agents/` is auto-discovered, so it would stay dispatchable
+    // (ADR 0021 §6.2a′ gates the rename on reaping).
     const templates = installedPackage();
     const dir = primed(templates);
     const victim = ".opencode/agents/arggon-worker.md";
-    // `adopt --ack` acks EVERY state entry, so this is the state of a fully
-    // adopted tree — the common case, not an edge case.
-    setStateField(dir, victim, "acknowledged", "true");
+    ackEntry(dir, victim);
+    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    const row = decisionFor(
+      planOrphanReaps({ root: dir, state: readGeneratedState(dir), templatesDir: templates }),
+      victim,
+    );
+    expect(row.action).toBe("reap");
+    // Loud, not silent: the reason names the ack, so `doctor --agents` shows the
+    // operator what will be removed BEFORE `init` removes it.
+    expect(row.reason).toContain("acknowledged baseline");
+    expect(row.reason).toContain("adopt --ack");
+    // And the real run acts on it — an adopted tree is not the blocker.
+    const result = runInit({ dir, force: false, full: true, templatesDir: templates });
+    expect(result.reaped).toEqual([victim]);
+    expect(existsIn(dir, victim)).toBe(false);
+    expect(result.reapRefused).toEqual([]);
+  });
+
+  it("REFUSES an acknowledged orphan whose bytes changed after the ack", () => {
+    // Same entry, one edited byte: the ack baseline is the ownership test, and
+    // this is the branch that keeps an adopter's post-ack edit on disk.
+    const templates = installedPackage();
+    const dir = primed(templates);
+    const victim = ".opencode/agents/arggon-worker.md";
+    ackEntry(dir, victim);
+    writeFileSync(
+      join(dir, ...victim.split("/")),
+      `${readFileSync(join(dir, ...victim.split("/")), "utf8")}\nPOST-ACK EDIT\n`,
+      "utf8",
+    );
     dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
     const row = decisionFor(
       planOrphanReaps({ root: dir, state: readGeneratedState(dir), templatesDir: templates }),
       victim,
     );
     expect(row.action).toBe("refuse");
-    expect(row.reason).toContain("acknowledged baseline");
+    expect(row.reason).toContain("adopter-edited");
+    const result = runInit({ dir, force: false, full: true, templatesDir: templates });
+    expect(result.reaped).toEqual([]);
+    expect(result.reapRefused.map((r) => r.dest)).toEqual([victim]);
+    expect(existsIn(dir, victim)).toBe(true);
+  });
+
+  it("REFUSES an unacknowledged orphan whose bytes changed since generation", () => {
+    // The same ownership test without the ack: one edited byte against the
+    // generation checksum, which the ack never touched.
+    const templates = installedPackage();
+    const dir = primed(templates);
+    const victim = ".opencode/agents/arggon-worker.md";
+    writeFileSync(
+      join(dir, ...victim.split("/")),
+      `${readFileSync(join(dir, ...victim.split("/")), "utf8")}\nADOPTER EDIT\n`,
+      "utf8",
+    );
+    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    const row = decisionFor(
+      planOrphanReaps({ root: dir, state: readGeneratedState(dir), templatesDir: templates }),
+      victim,
+    );
+    expect(row.action).toBe("refuse");
+    expect(row.reason).toContain("adopter-edited");
   });
 
   it("refuses a downgrade: a template absent only because THIS install is older", () => {
@@ -374,7 +447,7 @@ describe("doctor --agents: the orphaned status", () => {
     expect(reapable.status).toBe("orphaned");
     expect(reapable.reap).toEqual({
       action: "reap",
-      reason: expect.stringContaining("still as generated") as unknown as string,
+      reason: expect.stringContaining("unchanged since they were recorded") as unknown as string,
     });
     const refused = opencode.files.find((f) => f.path === edited)!;
     expect(refused.status).toBe("orphaned");
