@@ -50,12 +50,12 @@ amendment, the pattern ADR 0020 already uses twice.
 
 ## Acceptance
 
-- [ ] ADR 0021 carries a dated amendment adding §6.1 (role table: shipped id → role → software analogue marked non-normative → non-software analogue → what it decides) and §6.2 (a role is defined by what it decides, never by software artifacts)
-- [ ] §6.1 pins the two boundaries: the coordinator sequences and dispatches but the PO owns `priority`; the prover reports observed-vs-expected without deciding the verdict
-- [ ] §6.2a records the **rejected rename** with its evidence (~320 references across ~130 files; `init` never overwrites and never deletes a generated file, so adopters would keep an orphaned, still-dispatchable fifth agent) and states the id is a stable wire name
-- [ ] §6.2b states what does NOT change: no permission, tool, capability-matrix, kernel, envelope or schema change
-- [ ] The ADR's own body is **not** rewritten — an ADR is superseded, never silently rewritten (`docs/engineering.md` §ADR process); the amendment sits in the header block above `## Context`
-- [ ] `cli/src/adr-index-parity.test.ts` green (7 passed) — the index row status is untouched (`Accepted`)
-- [ ] `npx prettier --check` clean; `arggon validate` ok
-- [ ] Follow-ups filed and gated: `task-spec-agent-role-contracts` → `task-agent-role-contracts-seam` (depends on this role table landing first), with `task-wire-role-model-carriers` extended to carry the authoritative table
-- [ ] Impact class: **Behavioral** (an agent's operating contract changes) — ADR 0016 channel named in the PR
+- [x] ADR 0021 carries a dated amendment adding §6.1 (role table: shipped id → role → software analogue marked non-normative → non-software analogue → what it decides) and §6.2 (a role is defined by what it decides, never by software artifacts)
+- [x] §6.1 pins the two boundaries: the coordinator sequences and dispatches but the PO owns `priority`; the prover reports observed-vs-expected without deciding the verdict
+- [x] §6.2a records the **rejected rename** with its evidence (~320 references across ~130 files; `init` never overwrites and never deletes a generated file, so adopters would keep an orphaned, still-dispatchable fifth agent) and states the id is a stable wire name
+- [x] §6.2b states what does NOT change: no permission, tool, capability-matrix, kernel, envelope or schema change
+- [x] The ADR's own body is **not** rewritten — an ADR is superseded, never silently rewritten (`docs/engineering.md` §ADR process); the amendment sits in the header block above `## Context`
+- [x] `cli/src/adr-index-parity.test.ts` green (7 passed) — the index row status is untouched (`Accepted`)
+- [x] `npx prettier --check` clean; `arggon validate` ok
+- [x] Follow-ups filed and gated: `task-spec-agent-role-contracts` → `task-agent-role-contracts-seam` (depends on this role table landing first), with `task-wire-role-model-carriers` extended to carry the authoritative table
+- [x] Impact class: **Behavioral** (an agent's operating contract changes) — ADR 0016 channel named in the PR
