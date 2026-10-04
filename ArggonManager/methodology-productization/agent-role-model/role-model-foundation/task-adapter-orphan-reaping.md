@@ -108,3 +108,62 @@ Two pre-existing drift points were updated, both intentional: the `counts` statu
 
 - branch: feat/task-adapter-orphan-reaping
 - open questions: Acked orphans are refused, not reaped (safe reading; spec silent). README doctor section still needs orphaned - parallel worker owns README.md.
+
+### 2026-10-04 @ses_ef703fae0ffeWMIXzKu8aOors8
+### AC 8 judgment — accepted, on the record (lead architect, 2026-10-04)
+
+Spec AC 8 says the end-to-end test must report `orphaned` for "the four old destinations" and create "the new ids". Both clauses describe the **rename**, which is a later item; this item is only its precondition, so neither the four old ids nor the new ids exist to be asserted here. The test therefore drives the same assertions at seam scale — a generated OpenCode seam, two agent templates removed from a copy of the installed package: `doctor --agents` reports `2 orphaned` and `0 missing`, `init` reaps the untouched one and refuses the edited one, and a second `init` is a no-op. Hardcoding "four old destinations" would have duplicated rename logic inside a reaping test and asserted a state this PR does not create.
+
+The checklist row now carries this reasoning inline. A second, complementary test covers the rename's own shape without the rename: the **real spawned CLI** on a tree whose `x-generated` records a template the install never shipped (exactly what a rename leaves behind) — reaped, reported in `reaped[]`, one human line, and idempotent on the next run.
+
+### 2026-10-04 @ses_ef703fae0ffeWMIXzKu8aOors8
+## Review round 2 — the acknowledged veto is gone; README in; AC 8 on the record
+
+PR #640 @ `16f46991` (branch merged with `origin/main`, no force-push anywhere). **CI: `cli` / `tasks-validate` / `ui-smoke` all green.** Item left `in_progress`, nothing merged.
+
+### 1. The acknowledged-baseline veto — removed, and the migration is unblocked
+
+Your verification holds and I re-checked it myself: `runAdoptAck` (`cli/src/adopt.ts:730`) iterates `Object.keys(prevState)` — **every** `x-generated` entry — and `.opencode/agents/*.md` are entries (`ArggonManager/.convention.yml:84–96`). A repo that adopted properly therefore carries `acknowledged: true` on its agent files, and the veto I shipped would have stranded the dead agent in exactly those repos while `.opencode/agents/` stays auto-discovered. Implemented as instructed.
+
+**What I found while implementing, and what it changed in the code (you should see this):** `runAdoptAck` also **re-baselines** the recorded checksum — `const checksum = checksumOf(readFileSync(abs, "utf8"))` (`adopt.ts:733`) — for every entry it touches. So for an acknowledged entry, "matches the recorded checksum" means **unchanged since the ack**, *not* "arggon wrote these exact bytes". A file that was curated and *then* acked matches too, and is reaped. Nothing in the recorded state separates the two cases (the marker survives edits too). Your rule is therefore implemented as specified — reaped when byte-identical, refused when the bytes differ — and the limit is now stated in three places instead of being left for someone to re-derive wrongly: the `classifyOrphan` policy comment (`cli/src/docs.ts`), the reap reason string, and `docs/agents.md` §Orphaned destinations ("read this before 'fixing' it"). I kept the ack **loud rather than silent**: a reaped acknowledged orphan's reason names `(acknowledged baseline, adopt --ack)`, so `doctor --agents` shows the removal coming before `init` acts. If you want a hard stop there instead, it is one line — but it re-blocks adopted trees, so it is your call, not mine to take quietly.
+
+Removed from the classifier: the `entry.acknowledged` veto and its reason string. Every message that claimed "init never deletes them" for the acked case is gone — `docs/agents.md`, `docs/json-output.md` (both reason enumerations) and the JSON doc row now say what reaping deletes vs refuses. No stale claim survives; I grepped for it.
+
+### 2. Tests that prove both branches
+
+- `REAPS an acknowledged orphan whose bytes are unchanged — the adoption migration case` — acks exactly as `runAdoptAck` does, **re-baseline included** (the `ackEntry` helper re-records the checksum from disk, so the fixture is faithful, not a hand-set flag), drops the template, asserts `action: "reap"`, asserts the reason names the ack, then runs `init` and asserts the file is gone and `reapRefused` is empty.
+- `REFUSES an acknowledged orphan whose bytes changed after the ack` — one appended line; `action: "refuse"`, reason names `adopter-edited`, `init` keeps the file.
+- `REFUSES an unacknowledged orphan whose bytes changed since generation` — the edit branch on the unacked flavor, so "bytes differ ⇒ refused" is proven on **both** entries.
+- Plus a doctor-side assertion that an acknowledged reap carries `reap.action: "reap"` and its ack-naming reason. The file is now 26 tests (was 24).
+
+### 3. `README.md` — in, per the §Documentation maintenance mapping
+
+`README.md` now carries: the orphan rule in the init re-run semantics (the four DELETES conditions, what is REFUSED, and why `acknowledged` is not a refusal); `orphaned` + its per-file `reap.action` verdict in the `doctor --agents` status list; a **refreshed real** `doctor --agents` sample (the old one predated the acknowledged buckets) plus a **real** orphan/refusal sample, both pasted from actual runs of this branch's CLI; and the `plan[].decision` enumeration corrected — `stale` no longer exists there, it is now `orphan-reap` | `orphan-refused`. Length kept in line with the surrounding prose: one bullet plus two fenced blocks.
+
+### 4. AC 8 — recorded and ticked with the reason
+
+Ticked inline on the checklist row and posted as its own comment: spec AC 8's "four old destinations" and "creates the new ids" both describe the rename, which is a later item, so the end-to-end test drives the same assertions at seam scale (two dropped templates, one reapable one refused, `0 missing`, second `init` a no-op). The rename's own shape is covered separately by the real-CLI provenance test (a recorded template the install never shipped) — no rename logic is duplicated.
+
+### Gates (re-run in the worktree after the last edit)
+| gate | expected | observed |
+| --- | --- | --- |
+| `npm run build` | clean, bundle byte-stable | ok — 42 modules, 464371 bytes, no diff |
+| `npm run arggon -- validate` | ok, 0 warnings | `arggon validate: ok (0 warning(s), convention v5)` (also after the `origin/main` merge) |
+| `npm run arggon -- spec validate` | ok | `ok (34 doc(s), 5 warning(s))` — 5 pre-existing DOC_NUMBER_COLLISION |
+| `npm run arggon -- spec analyze` | no NEW findings | `10 finding(s) across 21 spec(s)` — unchanged from baseline |
+| `npx prettier --check` on all 10 touched files (README + 2 docs + item + 6 `cli/src`) | clean | `All matched files use Prettier code style!` |
+| `npm test` | green | `Test Files 128 passed (128) · Tests 2651 passed (2651)` |
+| `npm run check:plugin` | no bundle drift | exit 0, `git diff --exit-code` clean |
+| `npm run smoke:native-start-cold` | pass | `smoke:native-start-cold passed` |
+
+### CI: the first `cli` run was red — and it was not this PR
+
+`cli` failed once with `SpawnHarnessError … kind: child-boot-failed` and `SyntaxError: The requested module './sync-command.js' does not provide an export named 'runSync'`, plus the harness's own `kernel artifact drift: lib/dist … REWRITTEN while this child ran`. That is the **already-filed open flake `bug-test-suite-lib-dist-rebuild-race`** (p1, todo), diagnosed from PR #638 — a markdown-only diff — with the same mechanism and a different half-written module. Re-running the failed lane: `cli` **pass** (4m45s); all three lanes green. Evidence it is not mine: the failure is in `lib/dist` (I touched only `cli/src`), the source exports the symbol (`lib/src/sync-command.ts`), and the same lane passed on my first push of this branch. Honest exposure note: my new suite adds **5 spawned-CLI calls** to `cli/src/adapter-orphan-reaping.test.ts`, which cannot cause the race but marginally widens the reader side of it — the fix belongs to the filed bug (isolation, not retry), not to this PR.
+
+### One process correction
+
+While capturing the README samples I ran `npm --prefix <worktree> run arggon -- init --agents opencode .`, and npm resolves the script's cwd to the *prefix* — so `init .` ran against **my own worktree** and auto-committed (`chore(tasks): generated init docs (16 files)`, timestamp-only plus one vendored-plugin checksum line). It was never pushed; I `git reset --mixed` to `7f019125`, discarded the convention-file churn (`git status` clean, branch identical to what CI already validated), and re-took the samples from an explicit target dir. Flagging it because the diff was benign this time by luck of byte-identical re-rendering, not by design — the working tree, not just a temp dir, was the thing at risk.
+
+### handoff 2026-10-04 @ses_ef703fae0ffeWMIXzKu8aOors8 (session: ses_ef703fae0ffeWMIXzKu8aOors8) — next: Review PR #640 round 2 (CI green, all 8 gates green); merge do-not-squash, then flip the item to done. The rename item can then claim.
+- branch: feat/task-adapter-orphan-reaping
+- open questions: Acked orphans are now REAPED (per your call); ack re-baselines the checksum so curated-then-acked is indistinguishable - made loud in doctor/init instead. Open: whether that deserves a hard stop or a…
