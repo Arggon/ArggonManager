@@ -10,7 +10,6 @@ created: "2026-10-04"
 updated: "2026-10-04"
 depends_on: [task-spec-agent-rename-migration]
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-adapter-orphan-reaping.md
   Leaves live only under a story. id is the filename stem: task-adapter-orphan-reaping.
@@ -225,3 +224,36 @@ All three of us converged on the same fact from different directions: `adopt --a
 ### handoff 2026-10-04 @ses_ef703fae0ffeWMIXzKu8aOors8 (session: ses_ef703fae0ffeWMIXzKu8aOors8) — next: Review PR #640 round 3 (CI green first run, all 8 gates green); merge do-not-squash, then flip the item to done.
 - branch: feat/task-adapter-orphan-reaping
 - open questions: Adjacent, unowned: init --force drops the whole x-tracker block (disarms this flag, allow-steal, strict-*); safe direction, worth its own item. Also: no CLI setter exists for reap-acked-orphans (conv…
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+verdict: approve (coordinator, 2026-10-04) — PR #640 merged `fe6f0063`
+
+The policy went through two corrections and the final shape is the one I would defend:
+
+| case | action |
+| --- | --- |
+| unacknowledged + bytes match | **reap automatically** — unambiguously our fossil |
+| acknowledged + bytes match, **unarmed** (default) | **report only, never deleted** — names the flag *and* the manual route |
+| acknowledged + bytes match, armed | reap, reason still names the ack |
+| bytes differ, either flavour | **refuse, always** — "whatever the reaping flag says" |
+
+**The correction that mattered.** My first instruction was "byte-identical ⇒ reap, acked
+or not". The worker found that `runAdoptAck` (`cli/src/adopt.ts:730-733`) **re-baselines the
+checksum from disk**, so "matches" means *unchanged since the ack* — not *arggon wrote these
+bytes*. A file an adopter curated and then acked is indistinguishable from an untouched one,
+so my rule would have deleted their work. The default is now refuse-with-flag
+(`x-tracker.reap-acked-orphans`, the `allow-steal` shape), because the unknowable case must be
+the operator's explicit choice and the default must be the one that cannot lose work.
+
+This is also what makes the rename migration actually work: adopted repos can clear the dead
+agents by arming one flag, instead of the file staying dispatchable forever or a chore landing
+on exactly the adopters who did adoption properly.
+
+The refusal reason states the provenance limitation in the message itself, so the next agent
+reads why rather than re-adding a veto on a false premise — and it carries **both** routes out
+(delete by hand, or arm the flag), so nobody is left hunting for the switch.
+
+Verified by me on the branch before merge: the flag defaults to `null`/unarmed
+(`lib/src/convention.ts:347`), the acked+unarmed branch refuses at `cli/src/docs.ts:1073`,
+zero remaining "never deletes them" overclaims in the code, the limitation is stated in
+`docs/agents.md`, and all three CI lanes were green. `arggon validate` ok after merge.
