@@ -13,7 +13,6 @@ claimed_at: "2026-10-02T23:58:06.586Z"
 depends_on: [task-adapter-selection-flags, task-capability-matrix]
 worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-goal-mode
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-zcode-adapter/task-zcode-goal-mode.md
   Leaves live only under a story. id is the filename stem: task-zcode-goal-mode.
@@ -860,3 +859,71 @@ What blocks is that B3's repair left the item's own record wrong in two new ways
 Fix: (1) rejoin the split verdict block under `@ses_efe0cc7a9ffekSptdyYXLmvnoT` and delete the spurious `### 2026-10-03 @ses_f00…` heading — and if the union rebuild is scripted, make it skip headings inside code spans; (2) re-tick the three acceptance boxes, giving the ticked side precedence for the Acceptance section; (3) while the file is open, strip the 439 conflict-marker lines and the six fragmentary duplicate blocks so the record is citable. Then squash-merge — no rebase, no force-push — and flip.
 
 Operational note, same as round 3: this verdict is written with `tools.arggon.comment`, which resolves the tracker root from this session's cwd (the primary checkout), so it lands on the primary's copy of the item. The branch must merge `origin/main` once more — or the item-file conflict must be resolved as a union that includes this verdict — before the squash, or the merged record will not carry it and will keep the split.
+
+### 2026-10-04 @Arggon
+Round-4 review closed: the record is rebuilt from its two sources, and block identity (not heading geometry) is what proves it. Head `acfdfbaf`, published, no force-push.
+
+**How the fix was built.** Not by patching the merged file. Every block in the result is a **byte-exact copy of one real comment**, taken from where the CLI wrote it:
+- the reviewer's verdicts, whole, from `origin/main`'s copy — round-1 `18,410` chars, round-2 `13,723`, round-3 `24,070`, round-4 `18,131` (the round-3 verdict is *not* retyped from the merged file; it is `origin/main`'s blob, the copy you confirmed whole)
+- my own comments and handoffs from the commit that appended each one (`dadfddd7`, `505f8c3e`, `a1e62839`, `61e80edb`, `fa7d697f`, `9b9deb51`, `c6b130fc`, `9686798d`, `7cf2c62f`, `7f358df4`, `53ce55d4`)
+
+15 blocks joined with a blank line, in true chronological order (commit timestamps, not file position):
+
+```
+ 1. worker evidence                    B dadfddd7      1983   ### 2026-10-03 @Arggon
+ 2. handoff: review PR #605 (draft)    B 505f8c3e       362   ### handoff 2026-10-03 @Arggon
+ 3. round-1 verdict @ses_f00           A origin/main   18410   ### 2026-10-03 @ses_f00cf8887ffe…
+ 4. round-1 response                   B a1e62839      4903   ### 2026-10-03 @Arggon
+ 5. handoff: re-review                 B 61e80edb       353   ### handoff 2026-10-03 @Arggon
+ 6. round-2 verdict @ses_f00           A origin/main   13723   ### 2026-10-03 @ses_f00cf8887ffe…
+ 7. round-2 response                   B fa7d697f      4128   ### 2026-10-03 @Arggon
+ 8. handoff: squash-merge @ 5c367a10   B 9b9deb51       324   ### handoff 2026-10-03 @Arggon
+ 9. pass-3 note                        B c6b130fc      5297   ### 2026-10-03 @Arggon
+10. handoff: squash-merge (ready)      B 9686798d       273   ### handoff 2026-10-03 @Arggon
+11. round-3 verdict @ses_efe0          A origin/main   24070   ### 2026-10-03 @ses_efe0cc7a9ffek…
+12. round-3 closeout                   B 7cf2c62f      8340   ### 2026-10-03 @Arggon
+13. handoff: round-3 closeout          B 7f358df4       376   ### handoff 2026-10-03 @Arggon
+14. CI confirmation                    B 53ce55d4       914   ### 2026-10-03 @Arggon
+15. round-4 verdict @ses_efe0          A origin/main   18131   ### 2026-10-03 @ses_efe0cc7a9ffek…
+```
+
+**Block counts (your ask), from three places:** source A (`origin/main`) **4** blocks; source B (my history, the 11 appending commits) **11** blocks; the result **15** — i.e. every real comment, none invented, none merged.
+
+**Block identity — the check that catches this class.** Run with node against the built kernel, comparing every result block to every block of the 12 source files (`30` distinct source blocks):
+
+```
+block identity: 15 result blocks, 30 distinct source blocks across 12 source files
+  result blocks NOT byte-identical to any source block: 0
+  result blocks that are a FRAGMENT of a longer source block: 0
+```
+
+Plus, per block: **0** conflict-marker lines (`^(<{3,7}|={7}|>{3,7})` on a stripped line — the regex I first used was `^(<{7}|={7}|>{7})(\s|$)`, which silently missed `<<<OURS>>>` and reported 0 before too; with the right one the before-count is exactly your **439**, and after it is **0**), and **0** blocks containing a foreign comment/handoff heading (`^### (handoff )?<date> @`). Your point that heading geometry cannot see the split is taken: the check above is content equality against the sources, and it is what I report, not the "N headings each the whole line" count.
+
+**Defect 1 — attribution and the latest verdict**, measured with `lib/src/verdict.ts` on `item.body`:
+
+| | before (`HEAD`) | after |
+| --- | --- | --- |
+| `parseVerdicts` | 4 verdict comments, 4th = **round 2's marker-laden duplicate** (order 32) | 4 verdict comments: round 1 (order 5), round 2 (19), round 3 (28), round 4 (32) |
+| `classifyVerdicts` → latest | **round 2** | round 4 |
+| latest on the round-3-era prefix (file truncated before round 4's block) | — | **round 3** (order 28) |
+| `parseComments` | 13 comments | **10** (`{Arggon: 6, @ses_f00: 2, @ses_efe0: 2}`; the 5 `### handoff` entries are not comments by the tracker's own regex, 15 blocks = 10 comments + 5 handoffs) |
+
+One honest reading, flagged rather than bent: **the latest verdict in the file is round 4, not round 3**, because round 4 was filed *after* round 3 and it is now present, whole and attributed to `@ses_efe0`, as the last block. That is the correct answer to "which verdict is latest" for this item today. The requirement as stated — the latest resolves to round 3 — holds on the record **as it stood at round 3** (the prefix above), and that is the before/after that shows the fix: before, the latest was round **2**'s duplicate; now the round-3-era latest is round **3**, and the file's actual latest is the round-4 verdict under its own author. No verdict block is duplicated, and none is attributed to a session that did not write it.
+
+**Defect 2 — the acceptance checklist.** The `## Acceptance` block now comes from the **ticked** side (the round-3 pass, `954559b2`), not from main's pre-claim copy, so "main's text wins" no longer governs that section: the side that ticked them is the side with the evidence. Consequence measured with the gate's own predicate, `acceptanceComplete(item.body)` from `lib/src/items.ts`:
+
+```
+before: acceptanceComplete=false     after: acceptanceComplete=true  (rows=3, unchecked=0)
+```
+
+so the `done` flip is no longer refused by the gate this PR exists to agree with. I did **not** run `arggon update --status done` here (that would flip the item, and the flip is the coordinator's after the squash); the kernel call is the same code path the gate takes, on the file that will be merged.
+
+**Also done while the file was open** (your non-blocking): the 439 marker lines and the six fragmentary duplicate blocks are gone — the block rebuild drops them because they are not source comments, and the records they duplicated are present verbatim as blocks 3, 6 and 11. File size 120,848 → 104,262 chars, a pure removal of union artifacts.
+
+**Prose and frontmatter.** Prose is the round-3 pass verbatim (Context, ticked Acceptance, current-shape Notes). The frontmatter is byte-identical to the one you checked field by field — asserted in the rebuild (`fm_of(prose) == fm_of(HEAD)`), main's fields plus this branch's live claim (`status: in_progress`, `assignee`, `branch`, `claimed_at`, `worktree_path`).
+
+**Not done, per your instruction:** no `depends_on` added to `bug-parity-suite-cannot-catch-wrong-input-at-call-sites`; the `convention.md:150` deferral stands as accepted.
+
+**Gates at `de288031`** (item-file-only change; `npm run build` before `npm test`): build ok (build:plugin 459,439 bytes) · `npm test` **127 files, 2637 passed** · `npm run lint` clean · `npm run arggon -- validate` `ok (0 warning(s), convention v5)` · `npm run check:plugin` no diff · `npm run test:structure` 5 passed · `npm run lint:structure` green · `tasks-validate` drift gate re-run locally: marker present, committed stamp `0.5.0` not ahead of the pin, re-generate → clean, **PASS**. Re-checked after the `origin/main` auto-done merge (`acfdfbaf`): validate ok, drift gate PASS, item file byte-identical through that merge.
+
+Delivery: two fast-forwards (`53ce55d4..de288031`, `de288031..acfdfbaf`); `origin/main` merged, contained; **no force-push, none attempted**; branch published and un-rebased for the coordinator's squash. Item stays `in_progress`; spec/plan `status` stays `proposed`.
