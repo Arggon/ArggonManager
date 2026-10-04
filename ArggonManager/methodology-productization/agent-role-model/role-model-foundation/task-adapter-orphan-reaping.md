@@ -1,13 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adapter-orphan-reaping
 title: "Reap orphaned generated adapter files: `doctor` reports `orphaned` when an x-generated destination's template is gone; `init` removes it only when unmodified"
+assignee: arggon-coordinator
 parent: role-model-foundation
 labels: [cli, adapters, safety]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
+claimed_at: "2026-10-04T23:51:50.219Z"
 depends_on: [task-spec-agent-rename-migration]
 ---
 <!--
