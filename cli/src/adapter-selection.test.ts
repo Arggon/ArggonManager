@@ -396,15 +396,21 @@ describe("doctor --agents: per-agent report", () => {
         "acknowledged-drifted",
         "adopter-edited",
         "missing",
+        "orphaned",
         "present",
         "stale",
         "total",
         "unverified",
       ]);
+      // No orphan exists on a freshly generated tree: every recorded template is
+      // still shipped, so the bucket is zero (task-adapter-orphan-reaping).
+      expect(entry.counts.orphaned, `${agent} orphans after a full init`).toBe(0);
       expect(entry.truncated).toBe(false);
       // files[] is the detail behind the count, and every row names its status.
       expect(entry.files.map((f) => f.path)).toEqual(BY_AGENT[agent]);
       for (const file of entry.files) {
+        // `reap` rides ONLY an orphaned row (it is the per-file remedy); a
+        // present/stale/… row must not grow a field nothing reads.
         expect(Object.keys(file)).toEqual(["path", "status"]);
       }
     }
@@ -585,9 +591,9 @@ describe("doctor --agents: per-agent report", () => {
       .filter((line) => /^ {2}agent[s]?\b/.test(line) || /^ {4}gap:/.test(line));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "  agents: claude, opencode, zcode (adapter selection: init --agents / --no-agents; report-only)
-        agent claude: 2 file(s) — 2 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified; 0 capability gap(s)
-        agent opencode: 18 file(s) — 18 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified; 0 capability gap(s)
-        agent zcode: 19 file(s) — 19 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified; 0 capability gap(s)"
+        agent claude: 2 file(s) — 2 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)
+        agent opencode: 18 file(s) — 18 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)
+        agent zcode: 19 file(s) — 19 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)"
     `);
   });
 

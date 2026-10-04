@@ -30,6 +30,7 @@ import {
   isBundledPluginDest,
   normalizeEol,
   OPENCODE_CONFIG_CANDIDATES,
+  planOrphanReaps,
   renderGeneratedDoc,
   resolveProjectName,
 } from "./docs.js";
@@ -528,6 +529,15 @@ export function detectOpenCode(root: string): DoctorOpenCode {
  *  - `missing` — tracked by the seam but absent from the tree.
  *  - `unverified` — the render cannot be produced (template/bundle absent, or
  *    the project name is unrecoverable): "cannot decide", never a failure.
+ *  - `orphaned` — an `x-generated` destination whose RECORDED template no longer
+ *    exists in this arggon version (task-adapter-orphan-reaping,
+ *    spec-agent-rename-019 §The precondition): init can neither refresh it nor
+ *    keep generating it, yet the file is still on disk and — under an
+ *    auto-discovered seam directory like `.opencode/agents/` — still
+ *    DISPATCHABLE. The remedy is on the row itself (`reap`), because the answer
+ *    is per file: `arggon init` removes it when it is still exactly as
+ *    generated, and otherwise the adopter deletes it by hand (or restores the
+ *    template). Nothing is reaped until `init` runs, and doctor is report-only.
  *
  * "The template moved on" is deliberately NOT one of these: it is orthogonal to
  * the local state and is already carried, for every one of these files, by
@@ -540,13 +550,25 @@ export type AdapterFileStatus =
   | "adopter-edited"
   | "stale"
   | "missing"
-  | "unverified";
+  | "unverified"
+  | "orphaned";
 
 /** One adapter destination and its state. */
 export type AdapterFileState = {
   /** Destination path (posix, relative to the probed root). */
   path: string;
   status: AdapterFileStatus;
+  /**
+   * Present ONLY on an `orphaned` row: what `arggon init` would DO with this
+   * file, read from the same classifier init acts on (`planOrphanReaps`), so
+   * the report cannot promise a deletion init would refuse (or refuse one it
+   * would perform). `reap` = init removes it; `refuse` = init keeps it and
+   * `reason` says why (an edit since the recorded baseline, a downgrade, a
+   * non-regular file, outside the repo root, not on disk). An acknowledged
+   * orphan is NOT a refusal — see `classifyOrphan` in `cli/src/docs.ts` for the
+   * policy; its `reason` names the ack so the operator sees it before acting.
+   */
+  reap?: { action: "reap" | "refuse"; reason: string };
 };
 
 /** Per-agent adapter report: the seam's files plus its matrix gap rows. */
@@ -711,6 +733,14 @@ export function runAdapterReport(opts: {
     opts.matrix.gapsByAgent.map((entry) => [entry.agent, entry.gaps] as const),
   );
 
+  // Orphaned destinations (task-adapter-orphan-reaping): `x-generated` rows whose
+  // recorded template this version does not ship. They CANNOT come out of the
+  // loop below — the current template set cannot produce one — so they are read
+  // from the one classifier init acts on, and each row carries its `reap`
+  // verdict. That is what keeps the report honest: `orphaned` never claims init
+  // would remove a file init would in fact keep.
+  const orphans = planOrphanReaps({ root: opts.root, state, templatesDir, layout });
+
   const agents: AdapterAgentReport[] = AGENT_IDS.map((agent) => {
     const files: AdapterFileState[] = [];
     // One counter per status, so a NEW status can never be silently dropped
@@ -724,6 +754,7 @@ export function runAdapterReport(opts: {
       stale: 0,
       missing: 0,
       unverified: 0,
+      orphaned: 0,
     } as Record<AdapterFileStatus | "total", number>;
     for (const { dest, template } of currentGeneratedTemplatesFrom(templatesDir, layout)) {
       if (agentForTemplate(template) !== agent) continue;
@@ -737,8 +768,26 @@ export function runAdapterReport(opts: {
         projectName: opts.projectName,
       });
       counts[file.status]++;
-      if (files.length < MAX_ADAPTER_AGENT_FILES) files.push(file);
+      files.push(file);
     }
+    // Orphans, attributed by the RECORDED template (the seam that generated
+    // them) — the same `agentForTemplate` the selection uses, so a renamed or
+    // removed template still files its orphan under the right agent.
+    for (const orphan of orphans) {
+      if (orphan.agent !== agent) continue;
+      counts.total++;
+      counts.orphaned++;
+      files.push({
+        path: orphan.dest,
+        status: "orphaned",
+        reap: { action: orphan.action, reason: orphan.reason },
+      });
+    }
+    // Sort by destination before capping, so the detail list is a deterministic
+    // PREFIX of the whole seam (current files and orphans alike) rather than
+    // whichever kind happened to be walked first.
+    files.sort((a, b) => a.path.localeCompare(b.path));
+    const capped = files.slice(0, MAX_ADAPTER_AGENT_FILES);
     // Per-agent gap rows: the reader's single capped detail list filtered to this
     // agent, with the honest per-agent total from the reader's tally. When the
     // global detail cap cut this agent's rows, `truncated` says so instead of
@@ -748,8 +797,8 @@ export function runAdapterReport(opts: {
     return {
       agent,
       detected: detected.has(agent),
-      files,
-      truncated: counts.total > files.length,
+      files: capped,
+      truncated: counts.total > capped.length,
       counts,
       gaps: {
         rows,
@@ -1162,18 +1211,21 @@ function formatOpenCodeLines(opencode: DoctorOpenCode): string[] {
  * Human lines for the per-agent adapter block (`doctor --agents`, spec §S2):
  * one `agents:` header (the detected set, so the reader can tell an absent seam
  * from an unselected one), then one line per agent with its file counts and its
- * gap-row total, followed by an indented `gap:` line per matrix gap row. Report
- * wording is explicit — nothing here is a failure, and the matrix says so.
+ * gap-row total, followed by an indented `gap:` line per matrix gap row and an
+ * indented `orphan:` line per orphan `init` would KEEP. Report wording is
+ * explicit — nothing here is a failure, and the matrix says so.
  *
  * Every bucket carries its OWN operator consequence, because that is the whole
  * value of the status: `present` is what an untouched re-run leaves,
  * `acknowledged` is never regenerated, `acknowledged-drifted` is a hand edit
- * after the ack, `adopter-edited` is skipped unless `--backup` archives it, and
- * only `stale` is one `arggon init` actually refreshes. No label promises a
- * protection or a refresh init does not provide.
+ * after the ack, `adopter-edited` is skipped unless `--backup` archives it,
+ * only `stale` is one `arggon init` actually refreshes, and `orphaned` is the
+ * one a single `arggon init` would DELETE (when the bytes are still as
+ * generated). No label promises a protection, a refresh or a deletion init does
+ * not provide.
  *
  * Display-sanitized like every other doctor value (the notes are matrix data,
- * i.e. repo-controlled).
+ * i.e. repo-controlled, and so is an orphan path and its reason).
  */
 export function formatAdapterLines(adapters: DoctorAdapters): string[] {
   const detected = adapters.agents.filter((a) => a.detected).map((a) => a.agent);
@@ -1189,9 +1241,22 @@ export function formatAdapterLines(adapters: DoctorAdapters): string[] {
         `${c["acknowledged-drifted"]} acknowledged-drifted (hand edit after the ack), ` +
         `${c["adopter-edited"]} adopter-edited (yours; init skips it unless --backup), ` +
         `${c.stale} stale (arggon init would refresh it), ${c.missing} missing, ` +
-        `${c.unverified} unverified; ${agent.gaps.total} capability gap(s)` +
+        `${c.unverified} unverified, ` +
+        `${c.orphaned} orphaned (template gone from this arggon; init removes it when ` +
+        `unmodified, else you delete it by hand); ${agent.gaps.total} capability gap(s)` +
         `${agent.detected ? "" : " — not detected in this tree"}`,
     );
+    // One line per orphan init would KEEP (task-adapter-orphan-reaping): those
+    // are the ones needing a human decision, so the report names the path and
+    // the reason instead of only counting them. The reaped ones need no line —
+    // the count above already says `arggon init` removes them, and doctor writes
+    // nothing.
+    for (const file of agent.files) {
+      if (file.status !== "orphaned" || file.reap?.action !== "refuse") continue;
+      lines.push(
+        `    orphan: ${sanitizeHumanText(file.path)} — ${sanitizeHumanText(file.reap.reason)}`,
+      );
+    }
     if (agent.truncated) {
       lines.push(`  note: agent ${agent.agent} file list cut (cap) — counts cover every file`);
     }
@@ -1280,6 +1345,20 @@ export function formatDoctorReport(result: DoctorResult): string {
   if (result.docs.modified > 0) {
     lines.push(
       "  hint: re-run `arggon init --backup` to archive modified docs and regenerate them",
+    );
+  }
+  // task-adapter-orphan-reaping: `docs.stale` IS the orphan condition for a
+  // non-adapter destination (its recorded template is gone from this arggon
+  // version), and `init` now deletes the unmodified ones — so a tree with a
+  // stranded governing doc must learn that from the human report too, not only
+  // from `--json`. Per-adapter orphans are named file by file in the `--agents`
+  // block above; this line covers the rest and points at both buckets.
+  if (result.docs.stale > 0) {
+    lines.push(
+      "  hint: " +
+        `${result.docs.stale} generated doc(s) record a template this arggon no longer ships — ` +
+        "`arggon init` removes the ones still exactly as generated and keeps the rest, naming " +
+        "each (`reaped[]` / `reapRefused[]`; `doctor --agents` lists adapter orphans per file)",
     );
   }
   return `${lines.join("\n")}\n`;

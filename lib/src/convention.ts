@@ -70,6 +70,18 @@ export type TrackerConfig = {
    */
   allowSteal: boolean | null;
   /**
+   * Orphan-reaping arming from `x-tracker.reap-acked-orphans`
+   * (task-adapter-orphan-reaping). `null` (unset) and `false` both mean an
+   * ACKNOWLEDGED orphan is never deleted: `adopt --ack` re-records the checksum
+   * from disk, so for an acknowledged entry a checksum match proves only
+   * "unchanged since the ack" — provenance cannot separate "unedited" from
+   * "curated, then acked", and the second is the adopter's content. Only an
+   * explicit `true` lets `arggon init` reap that middle case (the agent-rename
+   * migration needs acked adopters to be able to clear a dead agent file).
+   * The default therefore cannot lose work; arming is the documented choice.
+   */
+  reapAckedOrphans: boolean | null;
+  /**
    * Strict start gate from `x-tracker.strict-gate-bins`
    * (task-start-gate-strict-mode). `null` (unset) and `false` both keep start
    * report-only (the documented honest-receipt design: the claim commit stays
@@ -332,6 +344,7 @@ export function parseConventionConfig(
   const tracker: TrackerConfig = {
     autoCommit: null,
     allowSteal: null,
+    reapAckedOrphans: null,
     strictGateBins: null,
     strictWorktreeWrites: null,
     productAcceptance: null,
@@ -468,8 +481,9 @@ export function parseConventionConfig(
       // (claim-steal arming, bug-cli-steal-not-gated), `strict-gate-bins`
       // (strict start gate, task-start-gate-strict-mode),
       // `strict-worktree-writes` (single-writer enforcement,
-      // task-single-writer-worktree-enforcement), and `product-acceptance`
-      // (product-acceptance recording, ADR 0021 §4).
+      // task-single-writer-worktree-enforcement), `product-acceptance`
+      // (product-acceptance recording, ADR 0021 §4) and `reap-acked-orphans`
+      // (orphan-reaping arming, task-adapter-orphan-reaping).
       if (key === "allow-steal") {
         if (value !== "true" && value !== "false") {
           throw new Error(
@@ -504,6 +518,15 @@ export function parseConventionConfig(
           );
         }
         tracker.productAcceptance = value === "true";
+        continue;
+      }
+      if (key === "reap-acked-orphans") {
+        if (value !== "true" && value !== "false") {
+          throw new Error(
+            `${sourcePath}: 'reap-acked-orphans' must be a boolean (got ${JSON.stringify(value)})`,
+          );
+        }
+        tracker.reapAckedOrphans = value === "true";
         continue;
       }
       if (key !== "auto-commit") continue;
@@ -686,6 +709,7 @@ export function readConventionConfig(dir: string): ConventionConfig {
       tracker: {
         autoCommit: null,
         allowSteal: null,
+        reapAckedOrphans: null,
         strictGateBins: null,
         strictWorktreeWrites: null,
         productAcceptance: null,
