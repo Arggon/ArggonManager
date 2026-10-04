@@ -154,3 +154,7 @@ Ticked inline on the checklist row and posted as its own comment: spec AC 8's "f
 ### One process correction
 
 While capturing the README samples I ran `npm --prefix <worktree> run arggon -- init --agents opencode .`, and npm resolves the script's cwd to the *prefix* — so `init .` ran against **my own worktree** and auto-committed (`chore(tasks): generated init docs (16 files)`, timestamp-only plus one vendored-plugin checksum line). It was never pushed; I `git reset --mixed` to `7f019125`, discarded the convention-file churn (`git status` clean, branch identical to what CI already validated), and re-took the samples from an explicit target dir. Flagging it because the diff was benign this time by luck of byte-identical re-rendering, not by design — the working tree, not just a temp dir, was the thing at risk.
+
+### handoff 2026-10-04 @ses_ef703fae0ffeWMIXzKu8aOors8 (session: ses_ef703fae0ffeWMIXzKu8aOors8) — next: Review PR #640 round 2 (CI green, all 8 gates green); merge do-not-squash, then flip the item to done. The rename item can then claim.
+- branch: feat/task-adapter-orphan-reaping
+- open questions: Acked orphans are now REAPED (per your call); ack re-baselines the checksum so curated-then-acked is indistinguishable - made loud in doctor/init instead. Open: whether that deserves a hard stop or a…
