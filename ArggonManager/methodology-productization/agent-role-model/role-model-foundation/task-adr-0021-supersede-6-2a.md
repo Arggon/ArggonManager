@@ -66,3 +66,15 @@ and dissolved most of the objection:
 - [ ] No other clause of §6.1/§6.2/§6.2b changes — the roles, the boundaries and the domain-neutrality clause stand as merged
 - [ ] `cli/src/adr-index-parity.test.ts` green; the index row stays `Accepted`
 - [ ] `npx prettier --check` clean; `arggon validate` ok
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+verdict: approve
+
+Gates (expected vs observed, in the item worktree):
+- `npx prettier --check/--write` on the ADR → clean, no reflow needed
+- `npx vitest run cli/src/adr-index-parity.test.ts` → 7 passed (index row untouched, still `Accepted`)
+- `arggon validate` → `ok (0 warning(s), convention v5)`
+- All four clauses present and ordered: §6.2, §6.2a (now carrying its superseded note, text left as taken), §6.2a′ (the superseding amendment), §6.2b
+
+Not run: `npm test` — one markdown file changed, no code, and the suite that owns
+this corpus (`adr-index-parity`) was run directly.
