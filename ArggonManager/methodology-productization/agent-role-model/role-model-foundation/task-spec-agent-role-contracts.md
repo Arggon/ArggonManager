@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: cancelled
 id: task-spec-agent-role-contracts
 title: "Spec: the four agent role contracts (Delivery lead / Practice & standards / Maker / Verifier) + domain-neutral gate language (ADR 0021 §6.1-§6.2)"
 parent: role-model-foundation
