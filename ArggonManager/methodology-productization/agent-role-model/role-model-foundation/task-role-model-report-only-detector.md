@@ -108,3 +108,7 @@ The checklist's `sync --json` classification box contradicts spec-promotion-poli
 - `ArggonManager/docs/convention.md` §Tracker hygiene: the `x-tracker` option list ("the official options today are `auto-commit`, `allow-steal`, `strict-gate-bins`, `strict-worktree-writes`") and the parse-error sentence ("an `auto-commit`/`allow-steal`/`strict-gate-bins`/`strict-worktree-writes` value that is not `true`/`false` is a parse error") both need `product-acceptance`.
 - `ArggonManager/docs/engineering.md` §Review bar: the `accept:` convention prose + the promotion-policy tier table (that file is `task-wire-role-model-carriers`'s; the spec fixes the tier *content* only).
 - `ArggonManager/docs/agents.md`: §Specs and plans enumerates the decision-pipeline finding kinds; the new bucket is separate so that sentence stays true, but a mention of `MISSING-PRODUCT-ACCEPTANCE` would be consistent.
+
+### handoff 2026-10-04 @ses_ef74306c7ffeyb24EIcXcBGIoM (session: ses_ef74306c7ffeyb24EIcXcBGIoM) — next: Review PR #637 (merge, do not squash), then flip the item to done after merge verification
+- branch: feat/task-role-model-report-only-detector
+- open questions: Payload fields ungated while the finding is gated by x-tracker.product-acceptance — agree?; story-only scope OK?; case-folded self-accepted OK?; convention.md x-tracker sentence needs product-accepta…
