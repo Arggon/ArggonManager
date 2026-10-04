@@ -49,10 +49,10 @@ index is not recoverable from the link.
 
 ## Acceptance
 
-- [ ] ADR 0021's `- Status:` line reads `Accepted`
-- [ ] Its header keeps a dated note that acceptance came from the merge of PR #624 (`171f43b3`, 2026-10-04) — an ADR is superseded, never silently rewritten (`engineering.md:191`)
-- [ ] **The `docs/adr/README.md` index row for 0021 flips in the same change** — `cli/src/adr-index-parity.test.ts` asserts the index status CLASS agrees with the file, so flipping one alone turns the suite red (the mirror image of the failure PR #624 hit)
-- [ ] `npx vitest run cli/src/adr-index-parity.test.ts` green (7 passed)
-- [ ] `npx prettier --check` on both files clean
-- [ ] `arggon validate` + `npm test` green; no other ADR touched, no row reordered
-- [ ] The exploration `exploration-agent-primary-workers-019` is **not** rewritten: its Decision wording ("Status: Proposed; becomes Accepted at PR merge") is accurate history of what was proposed
+- [x] ADR 0021's `- Status:` line reads `Accepted`
+- [x] Its header keeps a dated note that acceptance came from the merge of PR #624 (`171f43b3`, 2026-10-04) — an ADR is superseded, never silently rewritten (`engineering.md:191`)
+- [x] **The `docs/adr/README.md` index row for 0021 flips in the same change** — `cli/src/adr-index-parity.test.ts` asserts the index status CLASS agrees with the file, so flipping one alone turns the suite red (the mirror image of the failure PR #624 hit)
+- [x] `npx vitest run cli/src/adr-index-parity.test.ts` green (7 passed)
+- [x] `npx prettier --check` on both files clean
+- [x] `arggon validate` + `npm test` green; no other ADR touched, no row reordered (expected: `ok (0 warnings)`; 126 files / 2590 tests passed)
+- [x] The exploration `exploration-agent-primary-workers-019` is **not** rewritten: its Decision wording ("Status: Proposed; becomes Accepted at PR merge") is accurate history of what was proposed
