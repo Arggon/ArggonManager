@@ -50,3 +50,19 @@ description and as an item comment, and keeps the skill copies byte-equal.
 - [ ] README §The methodology + the release note name the new convention for adopters
 - [ ] `arggon validate` and `arggon spec validate` green; no carrier statement left false by this edit
 - [ ] No kernel rule, schema field, command or per-adapter behavior changed — this item is carriers only
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+verdict: changes-requested (scope extended by ADR 0021 §6.1/§6.2 amendment)
+
+The product owner extended this item's scope. Two acceptance criteria are added and
+one dependency is wired, because the authoritative role table has to exist before
+the seam prompts can cite it (ADR 0021 §6.1):
+
+- [ ] The bounded **role table** from ADR 0021 §6.1 lands in `docs/engineering.md`: each shipped id → role (Delivery lead / Practice & standards / Maker / Verifier) + software analogue (marked non-normative) + non-software analogue + what it decides
+- [ ] The table states the two boundaries §6.1 pins: the coordinator sequences and dispatches but does **not** own `priority` (the PO does), and the prover reports observed-vs-expected without deciding the verdict
+- [ ] Gate language in the carriers is domain-neutral (§6.2): each bar is named as *what the project declares*, with the software case as one worked example; the acceptance contract on the item is named as the domain-invariant
+- [ ] Now depends on `task-spec-agent-role-contracts` as well as the promotion-policy spec (ADR 0017 gate)
+- [ ] `task-agent-role-contracts-seam` depends on **this** item — the prompts cite this table, so this lands first
+
+Everything else in this checklist stands unchanged.
