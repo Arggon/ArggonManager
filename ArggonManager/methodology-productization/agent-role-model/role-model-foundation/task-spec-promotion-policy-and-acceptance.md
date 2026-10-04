@@ -9,6 +9,7 @@ priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-spec-promotion-policy-and-acceptance.md
   Leaves live only under a story. id is the filename stem: task-spec-promotion-policy-and-acceptance.
@@ -29,9 +30,10 @@ updated: "2026-10-04"
 ## Notes
 
 ### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+
 ## Context
 
-ADR 0021 §3–§4 (from [exploration-agent-primary-workers-019](../../../../docs/explorations/exploration-agent-primary-workers-019.md))
+ADR 0021 §3–§4 (from [exploration-agent-primary-workers-019](../../../docs/explorations/exploration-agent-primary-workers-019.md))
 settle two conventions and one bounded table. This item is the **spec gate**:
 under ADR 0017 no implementation task is claimed before it exists and
 `arggon spec analyze` reports no NEW findings. `task-wire-role-model-carriers`
