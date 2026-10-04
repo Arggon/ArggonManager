@@ -8,8 +8,7 @@ branch: feat/task-record-exploration-016-worktree-runtime-isolation
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [worktree, exploration, devex]
 created: "2026-10-01"
-updated: "2026-10-03"
-worktree_path: /home/arggon/Projects/ArggonManager-task-record-exploration-016-worktree-runtime-isolation
+updated: "2026-10-04"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-record-exploration-016-worktree-runtime-isolation.md

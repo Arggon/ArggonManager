@@ -10,7 +10,6 @@ labels: [methodology, exploration]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
-worktree_path: /home/arggon/Projects/ArggonManager-task-explore-agent-primary-role-model
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-explore-agent-primary-role-model.md

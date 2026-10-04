@@ -9,8 +9,7 @@ parent: ci-stability
 labels: [board, testing]
 priority: p3
 created: "2026-10-01"
-updated: "2026-10-03"
-worktree_path: /home/arggon/Projects/ArggonManager-task-remove-diag-listener
+updated: "2026-10-04"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/ci-stability/task-remove-diag-listener.md
