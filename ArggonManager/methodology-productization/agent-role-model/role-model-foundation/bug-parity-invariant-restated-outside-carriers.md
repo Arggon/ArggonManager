@@ -102,3 +102,7 @@ The two `fatal: not a git repository` lines in the `npm test` output are fixture
 2. **`ArggonManager/agent-native/agent-native.md:19` and `:30`** — a dated roadmap doc (2026-09-11) restating the differentiator as "same rules for humans and agents, state 100% in git". Same class as claim.md (live prose, not a frozen record) but weaker: it reads as a roadmap statement of intent, not a rule a reader consults as normative. Left alone deliberately; your call whether it warrants an item.
 
 Checked and **correctly left alone**: `templates/docs/AGENTS.md:17` ("Subagents follow the same rules") and `docs/agents.md` ("same CLI, same rules, no private dialect") are about **work-loop / no-private-dialect** parity, which the two-axis rule still asserts — not drift. `docs/viewer-spike.md:65` is the same case. Frozen explorations 018/011/019 and the specs keep the old wording as taken, as instructed.
+
+### handoff 2026-10-04 @ses_ef703be1affejUdFDEiwVTY34x (session: ses_ef703be1affejUdFDEiwVTY34x) — next: Coordinator reviews and merges (merge, do not squash); nothing left to implement on this branch.
+- branch: fix/bug-parity-invariant-restated-outside-carriers
+- open questions: File follow-ups for templates/docs/docs/convention.md:3 (flat parity, ships to every adopter) and agent-native.md:19,30; no capability-matrix mirror needed - suite green as-is.
