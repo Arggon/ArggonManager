@@ -158,3 +158,57 @@ While capturing the README samples I ran `npm --prefix <worktree> run arggon -- 
 ### handoff 2026-10-04 @ses_ef703fae0ffeWMIXzKu8aOors8 (session: ses_ef703fae0ffeWMIXzKu8aOors8) — next: Review PR #640 round 2 (CI green, all 8 gates green); merge do-not-squash, then flip the item to done. The rename item can then claim.
 - branch: feat/task-adapter-orphan-reaping
 - open questions: Acked orphans are now REAPED (per your call); ack re-baselines the checksum so curated-then-acked is indistinguishable - made loud in doctor/init instead. Open: whether that deserves a hard stop or a…
+
+### 2026-10-04 @ses_ef703fae0ffeWMIXzKu8aOors8
+## Review round 3 — the acknowledged case is now opt-in behind `x-tracker.reap-acked-orphans`
+
+PR #640 @ `34b92ebc` (branch merged with `origin/main`, no force-push). **CI: `cli` / `tasks-validate` / `ui-smoke` green on the first run** — no `child-boot-failed` rerun needed this time. Item left `in_progress`, nothing merged, templates untouched.
+
+### Why refuse-with-flag, and not the two options you and I first considered
+
+All three of us converged on the same fact from different directions: `adopt --ack` re-records the recorded checksum **from disk** (`adopt.ts:733`), so for an acknowledged entry a match proves only *unchanged since the ack* — never *arggon wrote exactly these bytes* — and nothing recorded can separate "unedited" from "curated then acked" (the generated marker survives hand edits too). That single limit decides the policy:
+
+- **Reap by default** (round 2, your first instruction): deletes an adopter's curated agent file. Data loss in the one place the repo cares most — never-overwrite. Rejected.
+- **Refuse always** (my round-2 "safe reading"): never loses content, but it also never clears the dead agent for exactly the repos that adopted properly — and `.opencode/agents/*.md` is auto-discovered, so the file stays **dispatchable**. That defeats ADR 0021 §6.2a′, which gates the rename on reaping. Rejected as a migration blocker, not as unsafe.
+- **Refuse by default, arm to widen** (what shipped): the unknowable case is the operator's explicit choice; the default cannot lose content, and arming still unblocks the migration. Same shape as `x-tracker.allow-steal` — default refused, arming explicit — which is the precedent you named.
+
+| case | action |
+| --- | --- |
+| unacknowledged + bytes match the baseline | **reap automatically** — unambiguously our fossil |
+| acknowledged + bytes match, **unarmed** | **report only, never deleted**; the reason names the flag *and* the manual alternative |
+| acknowledged + bytes match, **armed** | **reap**, and the reason still names `(acknowledged baseline, adopt --ack)` so the record shows a sanctioned file removed deliberately |
+| bytes **differ**, either flavour | **refuse, always** — a known edit, not an unknowable one |
+
+### What changed
+
+- **kernel** (`lib/src/convention.ts`): `TrackerConfig.reapAckedOrphans` + the parser branch, rejecting a non-boolean by name like every other `x-tracker` option; unknown nested keys stay ignored.
+- **classifier** (`cli/src/docs.ts`): the flag threads through the one decision path, read **once per plan** from the tree so `init` and `doctor` cannot disagree; an unreadable config resolves to UNARMED — the parser is the loud layer (`arggon validate` names the key), that read is the floor behind it. The policy comment now carries the full reasoning, so the next reader cannot "fix" it on the false premise.
+- **reasons**: unarmed refusal → "NOT deleted by default … Delete it by hand, or set `x-tracker.reap-acked-orphans: true`"; armed reap → names the baseline *and* the arming; edited → "refused; your edits are never deleted, **whatever the reaping flag says**". No message claims a blanket "never deletes" while arming a path that does, or vice versa.
+- **docs**: `docs/agents.md` (policy in DELETES/REFUSES form + the limitation, "read this before fixing it"), `docs/convention.md` §Tracker hygiene (official-options list, representative YAML, its own meaning bullet, parse-error sentence), `docs/json-output.md` (both the reaping-family bullet and the `reapRefused` row), `README.md` (init re-run bullet + the `doctor --agents` verdict line). All five state the checksum limitation plainly.
+- **bundle**: `lib/src/convention.ts` is inlined into the committed plugin, so the regenerated `opencode/plugins/arggon/index.bundle.ts` is committed — `check:plugin` gates those bytes.
+
+### Tests that prove all three rows (29 in the file now)
+
+- `does NOT delete an UNARMED acknowledged orphan, and says why + how to arm` — asserts the file survives, the refusal names `NOT deleted by default`, the flag and `Delete it by hand`, and the provenance survives so arming later reaps exactly that file.
+- `REAPS an armed acknowledged orphan whose bytes are unchanged (the migration case)` — reason names the ack **and** `reap-acked-orphans: true`.
+- `reads the arming from the tree ONCE — doctor and init cannot disagree` — the same orphan flips `refuse`→`reap` in `doctor --agents` when the flag lands.
+- `refuses an acknowledged orphan whose bytes changed after the ack, ARMED OR NOT` — looped over both states, and asserts the reason does **not** even mention the flag.
+- `REFUSES an unacknowledged orphan whose bytes changed since generation` — the unacked flavour of the same branch.
+- `a malformed arming value is reported by validate and deletes nothing` — **verified, not assumed**: I expected init to fail loudly on a malformed value; it does not. `arggon validate` is the loud layer (exit 1, names the key), while init's own state read degrades to an empty set on an unparseable convention file — pre-existing, and the safe direction (nothing is deleted). The test pins the pair.
+- Plus the flag's parse contract in `cli/src/acceptance-convention.test.ts`: absent → `null`, `true`/`false` read, non-boolean → parse error naming the key, unknown nested key ignored.
+
+### Gates (re-run after the last edit, then again after the `origin/main` merge)
+| gate | expected | observed |
+| --- | --- | --- |
+| `npm run build` | clean | ok — 42 modules, 464796 bytes (bundle grew: the kernel option is inlined) |
+| `npm run arggon -- validate` | ok, 0 warnings | `arggon validate: ok (0 warning(s), convention v5)` (also post-merge) |
+| `npm run arggon -- spec validate` | ok | `ok (34 doc(s), 5 warning(s))` — 5 pre-existing DOC_NUMBER_COLLISION |
+| `npm run arggon -- spec analyze` | no NEW findings | `10 finding(s) across 21 spec(s)` — unchanged from baseline |
+| `npx prettier --check` on all 10 touched files | clean | `All matched files use Prettier code style!` |
+| `npm test` | green | `Test Files 128 passed (128) · Tests 2657 passed (2657)` |
+| `npm run check:plugin` | no bundle drift | exit 0 **after committing the regenerated bundle** (it legitimately changed — I caught this rather than reporting a false green) |
+| `npm run smoke:native-start-cold` | pass | `smoke:native-start-cold passed` |
+
+### One adjacent observation, not acted on
+
+`init --force` re-scaffolds `.convention.yml` from a fixed template string, which drops the **whole** `x-tracker` block — so a forced re-scaffold would silently disarm this flag (and `allow-steal`, and `strict-*`). Pre-existing, affects every `x-tracker` key, and it errs in the safe direction here (reaping stops, nothing is deleted). Reporting rather than fixing it: widening `init --force` to preserve the block is its own item and your call.
