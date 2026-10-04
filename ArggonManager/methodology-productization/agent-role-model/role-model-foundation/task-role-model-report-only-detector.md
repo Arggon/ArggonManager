@@ -112,3 +112,46 @@ The checklist's `sync --json` classification box contradicts spec-promotion-poli
 ### handoff 2026-10-04 @ses_ef74306c7ffeyb24EIcXcBGIoM (session: ses_ef74306c7ffeyb24EIcXcBGIoM) — next: Review PR #637 (merge, do not squash), then flip the item to done after merge verification
 - branch: feat/task-role-model-report-only-detector
 - open questions: Payload fields ungated while the finding is gated by x-tracker.product-acceptance — agree?; story-only scope OK?; case-folded self-accepted OK?; convention.md x-tracker sentence needs product-accepta…
+
+### 2026-10-04 @ses_ef74306c7ffeyb24EIcXcBGIoM
+verdict: approve
+
+**Follow-up on PR #637** — the blocking gap (the `x-tracker.product-acceptance` option was implemented but undocumented in the file that defines the `x-tracker` contract) is closed. One file changed: `ArggonManager/docs/convention.md` §Tracker hygiene, in three places:
+
+1. **The official-options prose** now reads `…`strict-worktree-writes` (single-writer enforcement), and `product-acceptance` (product-acceptance recording)`.
+2. **The representative YAML** gained `product-acceptance: true` alongside the other three.
+3. **A new bullet** states what arming means, in one place: the record is an ordinary comment on the item (`accept: approve | accept: changes-requested`, optional scope, then the evidence) — human-written prose, never schema, no flag writes it; unset/`false` keeps every adopter **silent** while `report --json`/`show --json` still carry the additive `acceptance` field (`none` when nothing was recorded) and only `spec analyze` reports (the report-only `MISSING-PRODUCT-ACCEPTANCE` finding); arming is the act of saying the project HAS a product owner and wants the record, so a project without one is compliant by default and is never nagged; **report-only either way** — no transition consults it, no command refuses because of it, CI never fails on it; attribution (`self-accepted`), never authentication, because the tracker has no identity layer.
+4. **The parse-error sentence** now enumerates `product-acceptance` among the `x-tracker` keys that must be `true`/`false`. The "unknown nested keys are ignored (ignore-unknown, forward compat)" rule is **untouched**.
+
+## Rebase outcome — and a constraint that changed the plan
+
+`git fetch && git rebase origin/main` (f2163380, PR #636) applied **cleanly, zero conflicts**: #636 edited `convention.md` prose my change does not overlap, and its three new `bug-*` items are unrelated to my files.
+
+**The rebase then could not be pushed**: the seam denies force-push in *every* spelling (`git push --force-with-lease` → `Permission denied: shell`), and a rebased branch is not fast-forwardable. I therefore took the fallback you named — undid the rebase and **`git merge origin/main`** instead (`ort` strategy, **also zero conflicts**), which pushes fast-forward. Net effect for you: the PR carries one merge commit (`9efbcf0f`) rather than a linear replay. Nothing was force-pushed and no history was lost; the rebased attempt was a local-only branch, verified byte-identical in content, and deleted after the merge landed.
+
+**Plugin bundle: no regeneration was needed.** `opencode/plugins/argdon/index.bundle.ts` — #636 did not change any bundle-inlined module, so both sides' bundle bytes are identical; the merge kept it untouched and `npm run check:plugin` exits 0. It carries my kernel code (10 matches for `classifyAcceptance`/`productAcceptance`/`MISSING-PRODUCT-ACCEPTANCE`). The conflict risk I flagged earlier did not materialise.
+
+## Gates — expected vs observed (post-merge, from the item worktree)
+
+| Gate | Expected | Observed |
+| --- | --- | --- |
+| `npm run arggon -- validate` | `ok (0 warning(s), convention v5)` | **identical**, exit 0 |
+| `npm run arggon -- spec validate` | `ok`, only the 5 pre-existing `DOC_NUMBER_COLLISION` warnings | **identical**: `arggon spec: ok (34 doc(s), 5 warning(s))`, exit 0 |
+| `npm run arggon -- spec analyze` | no NEW finding for this spec; repo unarmed ⇒ bucket empty | **identical**: `10 finding(s) across 21 spec(s)`, exit 0 (`--json` buckets: `ambiguity 5, consistency 5, decisions 0, productAcceptance 0`) |
+| `npx prettier --check` (convention.md + json-output.md + ADR 0021) | formatted | **"All matched files use Prettier code style!"** |
+| `npm run build` | clean tsc + regenerated bundle | exit 0; `build:plugin — 42 modules inlined, 464371 bytes` |
+| `npm run check:plugin` | exit 0 (committed bundle == deterministic build) | **exit 0**, and `git status` shows **no** bundle diff |
+| `npm test` | green | **127 files / 2625 tests passed**, 0 failed (2625 vs 2624 before the rebase: #636 added one test) |
+| `gh pr checks 637` | all green | **cli pass (6m6s) · tasks-validate pass (29s) · ui-smoke pass (2m11s)**; `mergeStateStatus: CLEAN`, `mergeable: MERGEABLE` |
+
+I did not re-run `npm run smoke:native-start-cold` this round (it is not in this round's gate list and takes several minutes); the kernel is byte-unchanged by this follow-up, which touches one markdown file.
+
+## One finding worth filing (not filed by me — your call)
+
+**No test guards the `x-tracker` option list against doc drift.** I grepped: `cli/src/convention.test.ts` and the rest assert parsing behaviour, never the prose that enumerates the options. That is exactly why this gap survived a green CI on PR #637 — the implementation, the parse-error test and the convention doc can disagree and everything stays green. A structural guard (the option list in `convention.md` §Tracker hygiene derived from `TrackerConfig`'s keys, the way `tools/ast-grep` and the ast-grep rules already work) would make the next option impossible to ship undocumented. Owner: whoever owns `cli/src` conventions; I did not file it because it is outside this item's scope and you asked for findings, not items.
+
+## Untouched, as instructed
+
+`agents.md`, `engineering.md`, `README.md`, `skills/**`, `templates/**`, `smoke/**` — no edits. No tracker item other than this one. The struck-through `sync --json` checklist row is left **exactly** as I wrote it (you are adjudicating it). Item **not** flipped to `done`; PR **not** merged.
+
+**Merge, do not squash** — the branch carries tracker auto-commits.
