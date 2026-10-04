@@ -8,6 +8,7 @@ labels: [cli, adapters, safety]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
+depends_on: [task-spec-agent-rename-migration]
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-adapter-orphan-reaping.md
