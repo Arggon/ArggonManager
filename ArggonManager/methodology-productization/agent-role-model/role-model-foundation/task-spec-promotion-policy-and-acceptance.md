@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-spec-promotion-policy-and-acceptance
 title: "Spec: the promotion-policy tier table and the `accept:` product-acceptance convention (ADR 0021 §3-§4)"
 assignee: arggon-coordinator
@@ -10,7 +10,6 @@ labels: [methodology, spec, roles]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
-claimed_at: "2026-10-04T20:35:22.462Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-spec-promotion-policy-and-acceptance
 ---
 <!--
