@@ -58,3 +58,24 @@ amendment, the pattern ADR 0020 already uses twice.
 - [x] `npx prettier --check` clean; `arggon validate` ok
 - [x] Follow-ups filed and gated: `task-spec-agent-role-contracts` → `task-agent-role-contracts-seam` (depends on this role table landing first), with `task-wire-role-model-carriers` extended to carry the authoritative table
 - [x] Impact class: **Behavioral** (an agent's operating contract changes) — ADR 0016 channel named in the PR
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+verdict: approve
+
+PR #628 merged as `8d3b185d`; auto-done flipped this item to `done` (#629).
+Gates run in the item worktree before merge (expected vs observed):
+
+- `npx prettier --check` on the ADR → clean
+- `npx vitest run cli/src/adr-index-parity.test.ts` → 7 passed (index row untouched, still `Accepted`)
+- `arggon validate` → `ok (0 warning(s), convention v5)`
+- `git diff --stat` → 1 file, +75 lines, entirely inside the header block above `## Context`
+- CI on #628 → `cli` pass, `tasks-validate` pass, `ui-smoke` pass
+
+All nine acceptance boxes are ticked on this item.
+
+Process note for the next agent: a tracker mutation issued from the primary
+checkout auto-committed to local `main` while the work was merging, and the
+resulting rebase against `origin/main` conflicted with the auto-done flip on this
+same item file. Resolved by resetting to `origin/main` (the authoritative copy:
+ticked checklist, `status: done`) and re-recording this comment through
+`arggon comment` — never hand-merge a conflicted item file.
