@@ -111,3 +111,34 @@ Waves 2 and 3 are file-disjoint and may run in the same wave.
 - [ ] AC: no kernel rule, envelope, schema field, CLI flag or command changes; the capability matrix needs no row change
 - [ ] AC: the ADR 0021 §6.2a supersede is merged first or in the same PR — the record must not keep saying the rename is rejected
 - [ ] `arggon spec analyze` reports no NEW findings before this item is done
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+verdict: approve
+
+Spec written at `ArggonManager/docs/specs/spec-agent-rename-019.md` (status
+`proposed`; number 019 = next FREE after the 018 that merged as `e14dd75e`).
+
+Gates, expected vs observed:
+- `spec validate --file` → `ok (1 doc(s), 0 warning(s))`
+- `spec analyze` → 10 findings across 21 specs, all pre-existing; **0 name this spec** — the ADR 0017 hard gate holds
+- `prettier --check` → clean
+- link probe → **dead links: none** (first pass had `../../../docs/explorations/…`, one level too deep from `docs/specs/` — same slip as spec-018, caught by the same probe, fixed and re-probed)
+- `arggon validate` → `ok (0 warning(s), convention v5)`
+
+What the spec settles, beyond restating the scope already on the item:
+- **AC 2** binds `isReviewerDispatch`'s `/(^|:)arggon-reviewer$/` matcher to the
+  shipped reviewer id **by reading the id out of the shipped template** — so a
+  future rename that misses the hook fails CI instead of silently disarming the
+  reviewer's read-only window. That is the one failure mode in this migration that
+  is both silent and security-relevant.
+- **AC 6** adds a rule the scope had not: a *downgrade* (destination newer than the
+  installed templates) must report, never delete — otherwise an adopter who pins an
+  older arggon loses four agent files to a version that predates them.
+- **AC 8** is an end-to-end migration test on a fixture: generate a seam, remove a
+  template, assert `orphaned` for the old destinations and `missing` for none, reap
+  the unmodified ones, and prove a second `init` is a no-op.
+- The **worked example** required to close exploration-018's deferred spike is an
+  explicit acceptance clause, scoped to the agent half; the branch/PR model for
+  non-code repos is named out of scope with the reason.
+
+The checklist above is complete; the item flips `done` on merge.
