@@ -106,3 +106,10 @@ Checked and **correctly left alone**: `templates/docs/AGENTS.md:17` ("Subagents 
 ### handoff 2026-10-04 @ses_ef703be1affejUdFDEiwVTY34x (session: ses_ef703be1affejUdFDEiwVTY34x) — next: Coordinator reviews and merges (merge, do not squash); nothing left to implement on this branch.
 - branch: fix/bug-parity-invariant-restated-outside-carriers
 - open questions: File follow-ups for templates/docs/docs/convention.md:3 (flat parity, ships to every adopter) and agent-native.md:19,30; no capability-matrix mirror needed - suite green as-is.
+
+### 2026-10-04 @ses_ef703be1affejUdFDEiwVTY34x
+**PR: https://github.com/Arggon/ArggonManager/pull/638** — OPEN, MERGEABLE, base `main`, head `fix/bug-parity-invariant-restated-outside-carriers` (5 commits: claim + 2 item bookkeeping + the doc change; branch based on `main` tip `2bdaab69`, no rebase needed).
+
+**Merge, do not squash.** ADR 0016 impact class: **Advisory** — a dated status/annotation change to one ADR plus one corrected live doc sentence; no agent re-learns a rule, so no behavioral / upgrade-channel obligation.
+
+Diff vs `main`: 3 files — `docs/adr/0020-methodology-first-productization.md` (+21), `docs/claim.md` (+8/-1), this item file (checklist ticked + verdict/handoff).
