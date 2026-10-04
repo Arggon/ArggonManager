@@ -58,3 +58,21 @@ then the ADR 0017 hard gate.
 - [ ] AC: no permission, tool, capability-matrix, kernel, envelope or schema change — the contracts already enforce the roles structurally
 - [ ] AC: a non-software worked example for **at least one** full pass (claim → work → review → verify → done) proving the contracts read sanely for a non-software project — this is the check exploration-018's edge-case row deferred as a *spike item* ("branch/PR model evaluated for non-code repos")
 - [ ] `arggon spec analyze` reports no NEW findings before this item is done
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+Cancelled and folded into `task-spec-agent-rename-migration` (spec-019).
+
+Reason (PM call, 2026-10-04): the role-contract rewrite and the rename touch the
+**same seven files** — `templates/docs/opencode/agents/*.md` (4) and
+`templates/docs/zcode/arggon/agents/*.md` (3). Shipping them as two items means
+two passes over the same templates, two Behavioral releases, and a window in the
+wild where the ids and the contracts disagree. One spec, one migration, one release
+note.
+
+Nothing is lost: every acceptance criterion from this item moved verbatim into the
+seam implementation item `task-agent-role-contracts-seam`, whose scope now reads
+*rename + role contracts + domain-neutral language in one PR*.
+
+The domain-neutrality requirement itself (ADR 0021 §6.2) is unaffected and is
+carried as acceptance criteria in the rename spec and the seam item — including
+the non-software worked example that closes the spike exploration-018 deferred.
