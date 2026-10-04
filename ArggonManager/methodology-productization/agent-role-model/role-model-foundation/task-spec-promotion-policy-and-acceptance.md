@@ -1,15 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-spec-promotion-policy-and-acceptance
 title: "Spec: the promotion-policy tier table and the `accept:` product-acceptance convention (ADR 0021 §3-§4)"
+assignee: arggon-coordinator
+branch: feat/task-spec-promotion-policy-and-acceptance
 parent: role-model-foundation
 labels: [methodology, spec, roles]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
+claimed_at: "2026-10-04T20:35:22.462Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-spec-promotion-policy-and-acceptance
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-spec-promotion-policy-and-acceptance.md
   Leaves live only under a story. id is the filename stem: task-spec-promotion-policy-and-acceptance.
