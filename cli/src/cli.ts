@@ -1720,6 +1720,7 @@ spec
                 ambiguity: saved.result.ambiguity,
                 consistency: saved.result.consistency,
                 decisions: saved.result.decisions,
+                productAcceptance: saved.result.productAcceptance,
               },
               baseline: { file: saved.file, written: true, count: saved.snapshot.count },
             });
@@ -1748,6 +1749,7 @@ spec
                 ambiguity: cmp.result.ambiguity,
                 consistency: cmp.result.consistency,
                 decisions: cmp.result.decisions,
+                productAcceptance: cmp.result.productAcceptance,
               },
               baseline: {
                 file: cmp.file,
@@ -1777,6 +1779,7 @@ spec
               ambiguity: result.ambiguity,
               consistency: result.consistency,
               decisions: result.decisions,
+              productAcceptance: result.productAcceptance,
             },
           });
           return;

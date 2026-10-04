@@ -40,6 +40,7 @@ __arggonEdges.set("lib/src/import-issues.ts\u0000./items.js", "lib/src/items.ts"
 __arggonEdges.set("lib/src/import-issues.ts\u0000./paths.js", "lib/src/paths.ts")
 __arggonEdges.set("lib/src/import-issues.ts\u0000./tracker-commit.js", "lib/src/tracker-commit.ts")
 __arggonEdges.set("lib/src/import-issues.ts\u0000./update.js", "lib/src/update.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./acceptance.js", "lib/src/acceptance.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./atomic.js", "lib/src/atomic.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./cleanup.js", "lib/src/cleanup.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./comment.js", "lib/src/comment.ts")
@@ -94,12 +95,14 @@ __arggonEdges.set("lib/src/next.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./paths.js", "lib/src/paths.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./status.js", "lib/src/status.ts")
+__arggonEdges.set("lib/src/operations.ts\u0000./acceptance.js", "lib/src/acceptance.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./comment.js", "lib/src/comment.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./contract.js", "lib/src/contract.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./convention.js", "lib/src/convention.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./create.js", "lib/src/create.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./handoff.js", "lib/src/handoff.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./import-issues.js", "lib/src/import-issues.ts")
+__arggonEdges.set("lib/src/operations.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./json.js", "lib/src/json.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./list.js", "lib/src/list.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./next.js", "lib/src/next.ts")
@@ -116,6 +119,7 @@ __arggonEdges.set("lib/src/priority.ts\u0000./dates.js", "lib/src/dates.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./frontmatter.js", "lib/src/frontmatter.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./paths.js", "lib/src/paths.ts")
+__arggonEdges.set("lib/src/report.ts\u0000./acceptance.js", "lib/src/acceptance.ts")
 __arggonEdges.set("lib/src/report.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/report.ts\u0000./paths.js", "lib/src/paths.ts")
 __arggonEdges.set("lib/src/report.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
@@ -177,6 +181,88 @@ function __arggonRequire(id, from) {
   __arggonModules.get(resolved)(module.exports, (child) => __arggonRequire(child, resolved), module)
   return module.exports
 }
+
+__arggonModules.set("lib/src/acceptance.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ACCEPTANCE_CONTAINER_TYPES = exports.ACCEPTANCE_STATES = void 0;
+exports.parseAcceptances = parseAcceptances;
+exports.classifyAcceptance = classifyAcceptance;
+exports.containersMissingAcceptance = containersMissingAcceptance;
+exports.ACCEPTANCE_STATES = [
+    "accepted",
+    "changes-noted",
+    "none",
+    "self-accepted",
+];
+const COMMENT_HEADING = /^###\s+(\d{4}-\d{2}-\d{2})\s+@(\S+)/;
+const ACCEPTANCE_LINE = /^[ \t]*accept:[ \t]*(approve|changes-requested)(?=$|[ \t(])/i;
+function parseAcceptances(body) {
+    const acceptances = [];
+    let order = -1;
+    let current = null;
+    let seenInComment = false;
+    for (const line of body.split("\n")) {
+        if (/^###\s/.test(line)) {
+            order++;
+            const heading = COMMENT_HEADING.exec(line);
+            current = heading ? { date: heading[1], author: heading[2] } : null;
+            seenInComment = false;
+            continue;
+        }
+        if (current === null || seenInComment)
+            continue;
+        const match = ACCEPTANCE_LINE.exec(line);
+        if (!match)
+            continue;
+        const scope = line.slice(match.index + match[0].length).trim();
+        acceptances.push({
+            date: current.date,
+            order,
+            author: current.author,
+            value: match[1].toLowerCase(),
+            scope: scope.length > 0 ? scope : null,
+        });
+        seenInComment = true;
+    }
+    return acceptances;
+}
+function sameOwner(a, b) {
+    return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+function classifyAcceptance(body, assignee) {
+    let latest = null;
+    for (const acceptance of parseAcceptances(body)) {
+        if (latest === null ||
+            acceptance.date > latest.date ||
+            (acceptance.date === latest.date && acceptance.order > latest.order)) {
+            latest = acceptance;
+        }
+    }
+    if (!latest)
+        return "none";
+    if (latest.value === "changes-requested")
+        return "changes-noted";
+    if (assignee && sameOwner(latest.author, assignee))
+        return "self-accepted";
+    return "accepted";
+}
+exports.ACCEPTANCE_CONTAINER_TYPES = new Set(["story"]);
+function containersMissingAcceptance(items) {
+    const gaps = [];
+    for (const item of items) {
+        if (!exports.ACCEPTANCE_CONTAINER_TYPES.has(item.type))
+            continue;
+        if (item.status !== "done" && item.status !== "cancelled")
+            continue;
+        const state = classifyAcceptance(item.body, item.assignee);
+        if (state === "accepted")
+            continue;
+        gaps.push({ item, state });
+    }
+    return gaps.sort((a, b) => (a.item.id < b.item.id ? -1 : a.item.id > b.item.id ? 1 : 0));
+}
+})
 
 __arggonModules.set("lib/src/atomic.ts", (exports, require, module) => {
 "use strict";
@@ -852,6 +938,7 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
         allowSteal: null,
         strictGateBins: null,
         strictWorktreeWrites: null,
+        productAcceptance: null,
     };
     const generated = {};
     let generatedProjectName = null;
@@ -1001,6 +1088,13 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
                 tracker.strictWorktreeWrites = value === "true";
                 continue;
             }
+            if (key === "product-acceptance") {
+                if (value !== "true" && value !== "false") {
+                    throw new Error(`${sourcePath}: 'product-acceptance' must be a boolean (got ${JSON.stringify(value)})`);
+                }
+                tracker.productAcceptance = value === "true";
+                continue;
+            }
             if (key !== "auto-commit")
                 continue;
             if (value !== "true" && value !== "false") {
@@ -1143,6 +1237,7 @@ function readConventionConfig(dir) {
                 allowSteal: null,
                 strictGateBins: null,
                 strictWorktreeWrites: null,
+                productAcceptance: null,
             },
             import: { labelTypes: null },
             worktree: { postStart: null, postStartShell: null, env: null, services: null },
@@ -2409,9 +2504,9 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceUnchecked = exports.acceptanceRows = exports.acceptanceCriteria = exports.acceptanceComplete = exports.acceptanceBody = void 0;
 exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = void 0;
-exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeReleaseRefusal = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = void 0;
-exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = void 0;
+exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeReleaseRefusal = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = void 0;
+exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceBody", { enumerable: true, get: function () { return items_js_1.acceptanceBody; } });
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
@@ -2572,6 +2667,12 @@ Object.defineProperty(exports, "runSync", { enumerable: true, get: function () {
 var verdict_js_1 = require("./verdict.js");
 Object.defineProperty(exports, "classifyVerdicts", { enumerable: true, get: function () { return verdict_js_1.classifyVerdicts; } });
 Object.defineProperty(exports, "parseVerdicts", { enumerable: true, get: function () { return verdict_js_1.parseVerdicts; } });
+var acceptance_js_1 = require("./acceptance.js");
+Object.defineProperty(exports, "ACCEPTANCE_CONTAINER_TYPES", { enumerable: true, get: function () { return acceptance_js_1.ACCEPTANCE_CONTAINER_TYPES; } });
+Object.defineProperty(exports, "ACCEPTANCE_STATES", { enumerable: true, get: function () { return acceptance_js_1.ACCEPTANCE_STATES; } });
+Object.defineProperty(exports, "classifyAcceptance", { enumerable: true, get: function () { return acceptance_js_1.classifyAcceptance; } });
+Object.defineProperty(exports, "containersMissingAcceptance", { enumerable: true, get: function () { return acceptance_js_1.containersMissingAcceptance; } });
+Object.defineProperty(exports, "parseAcceptances", { enumerable: true, get: function () { return acceptance_js_1.parseAcceptances; } });
 var cleanup_js_1 = require("./cleanup.js");
 Object.defineProperty(exports, "CLEANUP_TERMINAL_STATUSES", { enumerable: true, get: function () { return cleanup_js_1.CLEANUP_TERMINAL_STATUSES; } });
 Object.defineProperty(exports, "classifyCleanupEntry", { enumerable: true, get: function () { return cleanup_js_1.classifyCleanupEntry; } });
@@ -3470,12 +3571,14 @@ exports.priorityOperation = priorityOperation;
 exports.syncOperation = syncOperation;
 exports.importIssuesOperation = importIssuesOperation;
 const node_path_1 = require("node:path");
+const acceptance_js_1 = require("./acceptance.js");
 const convention_js_1 = require("./convention.js");
 const contract_js_1 = require("./contract.js");
 const create_js_1 = require("./create.js");
 const comment_js_1 = require("./comment.js");
 const handoff_js_1 = require("./handoff.js");
 const import_issues_js_1 = require("./import-issues.js");
+const items_js_1 = require("./items.js");
 const json_js_1 = require("./json.js");
 const list_js_1 = require("./list.js");
 const next_js_1 = require("./next.js");
@@ -3525,6 +3628,7 @@ function showOperation(opts) {
         return succeed("show", {
             item: (0, contract_js_1.toContractWorkItem)(result.item, result.root),
             path: result.path,
+            acceptance: (0, acceptance_js_1.classifyAcceptance)((0, items_js_1.acceptanceBody)(result.item), result.item.assignee),
             ...(opts.body === true
                 ? { body: result.item.body, comments: result.allComments.map((c) => ({ ...c })) }
                 : { comments: result.comments.map((c) => ({ ...c })) }),
@@ -3943,6 +4047,7 @@ exports.runReport = runReport;
 exports.completedOf = completedOf;
 exports.formatReportTable = formatReportTable;
 exports.formatReportMarkdown = formatReportMarkdown;
+const acceptance_js_1 = require("./acceptance.js");
 const items_js_1 = require("./items.js");
 const paths_js_1 = require("./paths.js");
 const sanitize_js_1 = require("./sanitize.js");
@@ -3983,6 +4088,7 @@ function aggregateReport(items) {
                 type: story.type,
                 counts,
                 empty: leaves.length === 0,
+                acceptance: (0, acceptance_js_1.classifyAcceptance)(story.body, story.assignee),
             };
         });
         const totals = emptyCounts();

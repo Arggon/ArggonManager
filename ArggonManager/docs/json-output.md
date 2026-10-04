@@ -304,12 +304,24 @@ Failures use `error.code: "SPEC_FAILED"` (invalid slug, refusing to overwrite, m
 
 `spec analyze [--spec <path>]` (report-only ambiguity scan + spec ↔ tracker/plans consistency; default scope `ArggonManager/docs/specs/*.md`, one file with `--spec`) — **findings never fail the run**: `ok` is always `true` on a completed scan, even with findings. Structural failures (unreadable file) use `error.code: "SPEC_FAILED"` and exit code 1.
 
-| Field      | Type             | Notes                                                                                                                                                                      |
-| ---------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `scanned`  | `number`         | Spec documents scanned                                                                                                                                                     |
-| `findings` | `FindingsByArea` | `{ ambiguity: Finding[], consistency: Finding[], decisions: Finding[] }` — `decisions` is additive (spec-analyze-decision-gaps-013) and empty in `--spec` single-file mode |
+| Field      | Type             | Notes                                                                                                                                                                                                                                                                           |
+| ---------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scanned`  | `number`         | Spec documents scanned                                                                                                                                                                                                                                                          |
+| `findings` | `FindingsByArea` | `{ ambiguity: Finding[], consistency: Finding[], decisions: Finding[], productAcceptance: Finding[] }` — `decisions` is additive (spec-analyze-decision-gaps-013), `productAcceptance` is additive (the `accept:` detector, below); both are empty in `--spec` single-file mode |
 
-`Finding` is `{ file, kind, line?, severity, message }` — `file` posix, repo-relative; `severity` is `"info"` or `"warn"`; `line` (1-based, present when the finding is tied to a line) is reported against the full file including frontmatter. Kinds: `vague-quantifier`, `todo-marker`, `no-error-path`, `no-acceptance`, `untestable-acceptance` (ambiguity); `spec-orphaned`, `plan-spec-missing`, `duplicate-doc-number` (two documents sharing one number in `docs/adr/`, `docs/explorations/`, `docs/specs/` or `docs/plans/`; the same rule is a `DOC_NUMBER_COLLISION` warning in `spec validate`) (consistency); `DECISION-PENDING-EXPLORATION` (exploration whose Decision section records no ADR after 7 days), `STALE-PROPOSED-ADR` (ADR `- Status:` starting with `Proposed` with a `- Date:` older than 14 days), `SPEC-STATUS-DRIFT` (a `proposed` spec whose linked plan is `implemented`) (decisions — report-only, corpus mode only; baseline snapshots include them in the flat `findings` array).
+`Finding` is `{ file, kind, line?, severity, message }` — `file` posix, repo-relative; `severity` is `"info"` or `"warn"`; `line` (1-based, present when the finding is tied to a line) is reported against the full file including frontmatter. Kinds: `vague-quantifier`, `todo-marker`, `no-error-path`, `no-acceptance`, `untestable-acceptance` (ambiguity); `spec-orphaned`, `plan-spec-missing`, `duplicate-doc-number` (two documents sharing one number in `docs/adr/`, `docs/explorations/`, `docs/specs/` or `docs/plans/`; the same rule is a `DOC_NUMBER_COLLISION` warning in `spec validate`) (consistency); `DECISION-PENDING-EXPLORATION` (exploration whose Decision section records no ADR after 7 days), `STALE-PROPOSED-ADR` (ADR `- Status:` starting with `Proposed` with a `- Date:` older than 14 days), `SPEC-STATUS-DRIFT` (a `proposed` spec whose linked plan is `implemented`) (decisions — report-only, corpus mode only; baseline snapshots include them in the flat `findings` array); `MISSING-PRODUCT-ACCEPTANCE` (product acceptance — report-only, corpus mode only, and gated on arming, below).
+
+**`findings.productAcceptance` — the product-acceptance detector.** A container of the convention's scope (`story`) that reached `done`/`cancelled` with no recorded `accepted` decision, per the `acceptance` classification documented under [`show`](#acceptance--the-product-acceptance-convention-not-the-done-gate). Its `file` is the **item's** path (not a document), so it has no `line`. It fires **only** when the project has armed the convention:
+
+```yaml
+# ArggonManager/.convention.yml
+x-tracker:
+  product-acceptance: true # opt in; absent or false = silent
+```
+
+Arming follows the `x-tracker.allow-steal` precedent (`ArggonManager/docs/convention.md` §Tracker hygiene): absent or `false` is silent, a non-boolean value is a `.convention.yml` parse error that `arggon validate` reports, and unknown nested keys stay ignored. A project with no product owner is therefore compliant by default and never sees a finding — absence of one is the point, not a defect. `self-accepted` and `changes-noted` both count as gaps (the question is whether the decision is on the record); a late `accept: approve` clears the finding on the next run, and nothing backfills historical items.
+
+Report-only in every respect: findings never fail the run, no item is filed or mutated, no transition consults it, and `--spec <path>` (single-file mode) leaves the bucket empty like the others. A malformed `.convention.yml` degrades the detector to **unarmed** rather than failing the scan — `arggon validate` owns configuration errors. The bucket participates in `--baseline` like the others (a project that arms the convention will read these as NEW findings against a snapshot taken before arming).
 
 `spec analyze --save-baseline <file>` behaves like a plain analyze run plus an additive `baseline` field; the snapshot written to `<file>` is deterministic, committable JSON (`{ schemaVersion, conventionVersion, count, findings }` with findings sorted by file/kind/line/severity/message — no timestamps, byte-identical over unchanged specs).
 
@@ -527,32 +539,47 @@ Empty pool is success (`ok: true`, `suggestion: null`). Failures use `error.code
 
 Reads one item with bounded output ([ADR 0006](adr/0006-token-context-efficiency.md), spec `show-item-003`): progressive disclosure so agents never pay for an unbounded comment tail on every read. Pure read — never writes, exit 0 on success.
 
-| Field      | Type       | Notes                                                                                               |
-| ---------- | ---------- | --------------------------------------------------------------------------------------------------- |
-| `item`     | `WorkItem` | The item's frontmatter fields (contract shape)                                                      |
-| `path`     | `string`   | Absolute path of the item file                                                                      |
-| `comments` | `object[]` | The comments INCLUDED by this view, in document order: `{ date, author, lines }` (heading excluded) |
-| `body`     | `string`   | Only under `--body`: the item's verbatim markdown body; `comments` then carries ALL comments        |
+| Field        | Type       | Notes                                                                                                                                                              |
+| ------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `item`       | `WorkItem` | The item's frontmatter fields (contract shape)                                                                                                                     |
+| `path`       | `string`   | Absolute path of the item file                                                                                                                                     |
+| `acceptance` | `string`   | Additive within `schemaVersion: 1`. The item's report-only **product acceptance** state — `"accepted" \| "changes-noted" \| "none" \| "self-accepted"` (see below) |
+| `comments`   | `object[]` | The comments INCLUDED by this view, in document order: `{ date, author, lines }` (heading excluded)                                                                |
+| `body`       | `string`   | Only under `--body`: the item's verbatim markdown body; `comments` then carries ALL comments                                                                       |
 
 View selection: default is compact — frontmatter + the body's last 3 comments; `--tail-comments <n>` overrides the tail size; `--meta` drops `comments` entirely (frontmatter only); `--body` is the explicit unbounded opt-in (verbatim `body` + all `comments`). The MCP `arggon_show` tool (`id`, `meta`, `body`, `tail_comments`) returns the identical payload.
 
 Failures use `error.code: "SHOW_FAILED"` (unknown id, missing a tracker, unreadable items).
 
+#### `acceptance` — the product-acceptance convention (not the done gate)
+
+`acceptance` is a **classification, never a gate**, and it is not the acceptance **checkbox** contract. Two different conventions share a word:
+
+- **Product acceptance** (this field): the `accept: approve | accept: changes-requested` header line an operator writes as an ordinary `arggon comment` on a container. Prose on the item, never schema — there is no flag that writes it and no frontmatter field. States: `accepted` (the latest acceptance is an `approve`), `changes-noted` (it is a `changes-requested`), `none` (no acceptance comment), `self-accepted` (the latest `approve` was written by the item's own `assignee` — reported, never blocked; the tracker has no identity layer, so attribution is the only honest signal).
+- **Acceptance checkboxes**: the `- [ ]` / `- [x]` rows the done gate reads (`acceptance_complete`, `acceptance[]` on the board drawer below). Unrelated grammar, unrelated rule; neither one reads the other.
+
+Read from the item's canonical body, so the bounded comment tail cannot hide it — an acceptance filed as a comment (the default path, since `create` has no `--body` flag) is still classified. Carried on every view, `--meta` included. Reading the human (`arggon show`) view gains no field line: the acceptance is visible there as the item's own comment text, verbatim, exactly as before.
+
+Classification is defined once in the kernel (`lib/src/acceptance.ts`, `classifyAcceptance`), and every surface reads it — the CLI, the MCP adapter and the native tools all consume this one envelope.
+
 ### `report`
 
-| Field                 | Type                  | Notes                                                                                                   |
-| --------------------- | --------------------- | ------------------------------------------------------------------------------------------------------- |
-| `groups`              | `object[]`            | One entry per epic, lexicographic by id (same rows as the table)                                        |
-| `groups[].epic`       | `{id, title}`         | The epic                                                                                                |
-| `groups[].initiative` | `{id, title} \| null` | Parent initiative (null when absent)                                                                    |
-| `groups[].containers` | `object[]`            | One entry per story: `{id, title, type, counts, empty}`                                                 |
-| `groups[].totals`     | `counts`              | Sums over the epic's stories                                                                            |
-| `groups[].empty`      | `boolean`             | True when the epic has no stories                                                                       |
-| `trend`               | `object`              | Additive, present only with `--trend` (git-history mining)                                              |
-| `trend.weeks`         | `object[]`            | `{ week, completions }`, ascending ISO week ("2026-W37"), only weeks with >= 1 completion               |
-| `trend.cycleTime`     | `object[]`            | `{ type, avgDays, count }` per leaf type (task/bug/story), alphabetical; `avgDays` rounded to 1 decimal |
+| Field                              | Type                                                         | Notes                                                                                                                                                                        |
+| ---------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `groups`                           | `object[]`                                                   | One entry per epic, lexicographic by id (same rows as the table)                                                                                                             |
+| `groups[].epic`                    | `{id, title}`                                                | The epic                                                                                                                                                                     |
+| `groups[].initiative`              | `{id, title} \| null`                                        | Parent initiative (null when absent)                                                                                                                                         |
+| `groups[].containers`              | `object[]`                                                   | One entry per story: `{id, title, type, counts, empty, acceptance}`                                                                                                          |
+| `groups[].containers[].acceptance` | `"accepted" \| "changes-noted" \| "none" \| "self-accepted"` | Additive within `schemaVersion: 1`: the container's report-only product-acceptance state (`show`'s `acceptance`, same kernel classifier, read from the container's own body) |
+| `groups[].totals`                  | `counts`                                                     | Sums over the epic's stories                                                                                                                                                 |
+| `groups[].empty`                   | `boolean`                                                    | True when the epic has no stories                                                                                                                                            |
+| `trend`                            | `object`                                                     | Additive, present only with `--trend` (git-history mining)                                                                                                                   |
+| `trend.weeks`                      | `object[]`                                                   | `{ week, completions }`, ascending ISO week ("2026-W37"), only weeks with >= 1 completion                                                                                    |
+| `trend.cycleTime`                  | `object[]`                                                   | `{ type, avgDays, count }` per leaf type (task/bug/story), alphabetical; `avgDays` rounded to 1 decimal                                                                      |
 
 `counts` always carries all five statuses (`todo`, `in_progress`, `blocked`, `done`, `cancelled` — cancelled explicit, never lumped) plus `total`. Leafless stories report zeros with `empty: true`. Display-only: never writes. Failures use `error.code: "REPORT_FAILED"` (missing a tracker, unreadable items).
+
+`groups[].containers[].acceptance` is the `accept:` product-acceptance state documented under [`show`](#acceptance--the-product-acceptance-convention-not-the-done-gate): one bounded enum token per container, computed by the same kernel classifier (`classifyAcceptance`) from the container's own body. It is **not gated** on configuration — `none` is the honest answer for a project that never adopted the convention, and it is what makes the accepted ÷ terminal-container ratio computable. The opt-in `x-tracker.product-acceptance: true` arms only the `spec analyze` detector (a missing record becoming a _reported_ one). The human table (`format table`) is unchanged: no column, no marker.
 
 `--trend` mines git history (story-report-trend): a single `git log -p` pass over the tracker tree collects `+status:` frontmatter transitions per item file. Completions are first terminal transitions (`done`/`cancelled`) of ALL item types (initiative/epic/story/task/bug) bucketed by the ISO week of the commit's committer date, so story-driven projects get non-empty trends; cycle time is first `in_progress` claim → terminal in days, per leaf type (`task`/`bug`/`story` — containers stay excluded). Open items count as not-completed. `--since <YYYY-MM-DD>` (UTC) filters the considered window — transitions before it are ignored, so items completed before the window drop out entirely; an item whose claim predates the window completes without a measurable cycle time. `--since` requires `--trend`. Trend failures (non-git tree, `git log` errors) use `error.code: "TREND_FAILED"`; a tracker with no commits yet is not a failure and yields empty series.
 

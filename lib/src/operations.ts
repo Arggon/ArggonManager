@@ -18,6 +18,7 @@
  *   into a typed tool error without try/catch.
  */
 import { relative, sep } from "node:path";
+import { classifyAcceptance, type AcceptanceState } from "./acceptance.js";
 import { readConventionVersion } from "./convention.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate, type CreateOptions } from "./create.js";
@@ -28,6 +29,7 @@ import {
   type ImportIssuesOptions,
   type ImportIssuesResult,
 } from "./import-issues.js";
+import { acceptanceBody } from "./items.js";
 import { failEnvelope, successEnvelope, type JsonEnvelopeBase, type JsonError } from "./json.js";
 import { runList, type ListOptions } from "./list.js";
 import { runNext, type NextOptions } from "./next.js";
@@ -141,6 +143,18 @@ export type ShowPayload = {
   item: ContractWorkItem;
   path: string;
   /**
+   * Report-only product-acceptance state of THIS item, from the `accept:` header
+   * convention (ADR 0021 §4, `classifyAcceptance`):
+   * `accepted｜changes-noted｜none｜self-accepted` — one bounded enum token,
+   * additive within `schemaVersion: 1`, and read from the item's canonical body
+   * (so a bounded comment tail can never hide it).
+   *
+   * Carried on every view, `--meta` included: it is a classification, not
+   * prose, and it is what a caller needs before deciding whether a container's
+   * decision is on the record. It never gates the read.
+   */
+  acceptance: AcceptanceState;
+  /**
    * `--body` (or an MCP body request) includes the full body plus every
    * comment; the compact view includes only the bounded comment tail.
    */
@@ -156,6 +170,7 @@ export function showOperation(opts: ShowOptions): CommandOutcome<ShowPayload> {
       {
         item: toContractWorkItem(result.item, result.root),
         path: result.path,
+        acceptance: classifyAcceptance(acceptanceBody(result.item), result.item.assignee),
         ...(opts.body === true
           ? { body: result.item.body, comments: result.allComments.map((c) => ({ ...c })) }
           : { comments: result.comments.map((c) => ({ ...c })) }),

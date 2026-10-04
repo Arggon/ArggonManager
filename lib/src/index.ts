@@ -238,6 +238,19 @@ export type { SyncResult } from "./sync-types.js";
 export { classifyVerdicts, parseVerdicts } from "./verdict.js";
 export type { VerdictComment, VerdictState } from "./verdict.js";
 export {
+  ACCEPTANCE_CONTAINER_TYPES,
+  ACCEPTANCE_STATES,
+  classifyAcceptance,
+  containersMissingAcceptance,
+  parseAcceptances,
+} from "./acceptance.js";
+export type {
+  AcceptanceComment,
+  AcceptanceGap,
+  AcceptanceState,
+  AcceptanceValue,
+} from "./acceptance.js";
+export {
   CLEANUP_TERMINAL_STATUSES,
   classifyCleanupEntry,
   classifyReleaseEntry,
