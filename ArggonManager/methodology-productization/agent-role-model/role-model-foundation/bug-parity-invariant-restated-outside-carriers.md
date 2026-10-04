@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-parity-invariant-restated-outside-carriers
 title: "ADR 0020 §Decision.1 and docs/claim.md:99 still state the superseded parity invariant — live normative text left behind by the carrier wiring"
 assignee: arggon-coordinator
@@ -10,7 +10,6 @@ labels: [docs, methodology, roles]
 priority: p2
 created: "2026-10-04"
 updated: "2026-10-04"
-claimed_at: "2026-10-04T22:14:38.930Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-parity-invariant-restated-outside-carriers
 ---
 <!--
