@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr-0021-role-model-amendment
 title: "ADR 0021 amendment (§6.1-§6.2a): name the four agent roles, make the contracts domain-neutral, and record why the role ids stay stable"
 assignee: arggon-coordinator
@@ -10,7 +10,6 @@ labels: [docs, adr, roles, methodology]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
-claimed_at: "2026-10-04T18:58:52.403Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0021-role-model-amendment
 ---
 <!--
