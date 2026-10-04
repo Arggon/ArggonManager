@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-explore-agent-primary-role-model
 title: "Greenfield exploration: agent-primary role model and the promotion policy (ADR 0017 six-phase protocol)"
 assignee: arggon-coordinator
@@ -10,10 +10,8 @@ labels: [methodology, exploration]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
-claimed_at: "2026-10-04T16:42:02.027Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-explore-agent-primary-role-model
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-explore-agent-primary-role-model.md
   Leaves live only under a story. id is the filename stem: task-explore-agent-primary-role-model.
