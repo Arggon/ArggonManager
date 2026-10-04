@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-spec-agent-rename-migration
 title: "Spec: the agent rename migration (coordinator→delivery-lead, reviewer→standards-reviewer, worker→maker, prover→verifier) + orphan reaping for adopter trees"
+assignee: arggon-coordinator
+branch: feat/task-spec-agent-rename-migration
 parent: role-model-foundation
 labels: [methodology, spec, seam, migration]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
+claimed_at: "2026-10-04T20:51:56.148Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-spec-agent-rename-migration
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-spec-agent-rename-migration.md
