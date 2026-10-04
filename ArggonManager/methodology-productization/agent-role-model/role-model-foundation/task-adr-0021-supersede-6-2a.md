@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adr-0021-supersede-6-2a
 title: "Supersede ADR 0021 §6.2a: the product owner directs the agent rename; orphan reaping is the precondition that removes the objection §6.2a was based on"
+assignee: arggon-coordinator
+branch: feat/task-adr-0021-supersede-6-2a
 parent: role-model-foundation
 labels: [docs, adr, seam, migration]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
+claimed_at: "2026-10-04T20:15:31.932Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0021-supersede-6-2a
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-adr-0021-supersede-6-2a.md
@@ -55,10 +59,22 @@ and dissolved most of the objection:
 
 ## Acceptance
 
-- [ ] §6.2a carries a dated **superseded-by** amendment naming this item; its original text is left as taken (an ADR is superseded, never silently rewritten)
-- [ ] The amendment states the new ids — `arggon-delivery-lead`, `arggon-standards-reviewer`, `arggon-maker`, `arggon-verifier` — and the naming rule: **the id names the role, never the software title** (§6.2 applied to filenames); `arggon-product-manager` / `arggon-tech-lead` are rejected as ids and kept as non-normative analogues
-- [ ] The amendment records the orphan precondition explicitly: the rename does not ship before `task-adapter-orphan-reaping`, and reaping is checksum-guarded so an adopter-edited orphan is never deleted
-- [ ] The amendment records the hook-regex coupling as the migration's sharpest edge, with the obligation to add a test binding the gate's matcher to the shipped reviewer name
-- [ ] No other clause of §6.1/§6.2/§6.2b changes — the roles, the boundaries and the domain-neutrality clause stand as merged
-- [ ] `cli/src/adr-index-parity.test.ts` green; the index row stays `Accepted`
-- [ ] `npx prettier --check` clean; `arggon validate` ok
+- [x] §6.2a carries a dated **superseded-by** amendment naming this item; its original text is left as taken (an ADR is superseded, never silently rewritten)
+- [x] The amendment states the new ids — `arggon-delivery-lead`, `arggon-standards-reviewer`, `arggon-maker`, `arggon-verifier` — and the naming rule: **the id names the role, never the software title** (§6.2 applied to filenames); `arggon-product-manager` / `arggon-tech-lead` are rejected as ids and kept as non-normative analogues
+- [x] The amendment records the orphan precondition explicitly: the rename does not ship before `task-adapter-orphan-reaping`, and reaping is checksum-guarded so an adopter-edited orphan is never deleted
+- [x] The amendment records the hook-regex coupling as the migration's sharpest edge, with the obligation to add a test binding the gate's matcher to the shipped reviewer name
+- [x] No other clause of §6.1/§6.2/§6.2b changes — the roles, the boundaries and the domain-neutrality clause stand as merged
+- [x] `cli/src/adr-index-parity.test.ts` green; the index row stays `Accepted`
+- [x] `npx prettier --check` clean; `arggon validate` ok
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+verdict: approve
+
+Gates (expected vs observed, in the item worktree):
+- `npx prettier --check/--write` on the ADR → clean, no reflow needed
+- `npx vitest run cli/src/adr-index-parity.test.ts` → 7 passed (index row untouched, still `Accepted`)
+- `arggon validate` → `ok (0 warning(s), convention v5)`
+- All four clauses present and ordered: §6.2, §6.2a (now carrying its superseded note, text left as taken), §6.2a′ (the superseding amendment), §6.2b
+
+Not run: `npm test` — one markdown file changed, no code, and the suite that owns
+this corpus (`adr-index-parity`) was run directly.
