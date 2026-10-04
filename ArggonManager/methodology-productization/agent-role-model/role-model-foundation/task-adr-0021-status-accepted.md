@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adr-0021-status-accepted
 title: "ADR 0021 merged while its own status line still reads `Proposed` — flip file + index row to `Accepted` (ADR lifecycle, engineering.md §ADR process)"
+assignee: arggon-coordinator
+branch: feat/task-adr-0021-status-accepted
 parent: role-model-foundation
 labels: [docs, adr]
 priority: p2
 created: "2026-10-04"
 updated: "2026-10-04"
+claimed_at: "2026-10-04T17:30:35.977Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0021-status-accepted
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-adr-0021-status-accepted.md
