@@ -99,3 +99,10 @@ Two pre-existing drift points were updated, both intentional: the `counts` statu
 ### handoff 2026-10-04 @ses_ef703fae0ffeWMIXzKu8aOors8 (session: ses_ef703fae0ffeWMIXzKu8aOors8) — next: Review PR #640 (merge, do not squash); on merge flip the item to done. The rename item may then claim: orphaned status + guarded reap are in place.
 - branch: feat/task-adapter-orphan-reaping
 - open questions: Acked orphans are refused, not reaped (safe reading; spec silent). README doctor section still needs orphaned - parallel worker owns README.md.
+
+### 2026-10-04 @ses_ef703fae0ffeWMIXzKu8aOors8
+### AC 8 judgment — accepted, on the record (lead architect, 2026-10-04)
+
+Spec AC 8 says the end-to-end test must report `orphaned` for "the four old destinations" and create "the new ids". Both clauses describe the **rename**, which is a later item; this item is only its precondition, so neither the four old ids nor the new ids exist to be asserted here. The test therefore drives the same assertions at seam scale — a generated OpenCode seam, two agent templates removed from a copy of the installed package: `doctor --agents` reports `2 orphaned` and `0 missing`, `init` reaps the untouched one and refuses the edited one, and a second `init` is a no-op. Hardcoding "four old destinations" would have duplicated rename logic inside a reaping test and asserted a state this PR does not create.
+
+The checklist row now carries this reasoning inline. A second, complementary test covers the rename's own shape without the rename: the **real spawned CLI** on a tree whose `x-generated` records a template the install never shipped (exactly what a rename leaves behind) — reaped, reported in `reaped[]`, one human line, and idempotent on the next run.
