@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-role-model-report-only-detector
 title: "Report-only detector: `accept:` classification in `sync --json` + `spec analyze` finding for a container closed with no recorded acceptance"
 assignee: arggon-coordinator
@@ -10,7 +10,6 @@ labels: [methodology, cli, report-only]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
-claimed_at: "2026-10-04T21:05:06.089Z"
 depends_on: [task-spec-promotion-policy-and-acceptance]
 worktree_path: /home/arggon/Projects/ArggonManager-task-role-model-report-only-detector
 ---
@@ -49,7 +48,7 @@ gate again.
 ## Acceptance
 
 - [x] Depends on `task-spec-promotion-policy-and-acceptance` (ADR 0017 gate) landing first
-- [ ] ~~`sync --json` classifies a reconciled item as `accepted` / `changes-noted` / `none` from the `accept:` header~~ — **deliberately NOT built here; see the note below.** `sync` cannot carry this classification, so it landed on `report --json` (per container) + `show <id> --json` (per item), with the later-approve supersession
+- [x] **Acceptance classification shipped on `report --json` and `show --json`**, and the dated amendment to ADR 0021 §4 lands in this PR naming those surfaces — **coordinator adjudication**: spec-018 (accepted, `e14dd75e`) superseded this row's original `sync --json` wording, because `sync` classifies only items reconciled with an open PR (`lib/src/sync-command.ts:83`) and acceptance is container-level, so `sync` cannot carry it. `sync` is byte-identical, by design. All four states (`accepted`/`changes-noted`/`none`/`self-accepted`) and the supersede rule are implemented and tested. The worker struck this row rather than ticking it or silently redefining the AC — correct escalation, resolved here
 - [x] `self-accepted` is reported when the acceptance author equals the item's own assignee (forgery is expected and reported, never blocked)
 - [x] Additive `spec analyze` finding for a container closed with no recorded acceptance; report-only, never fails the run, no NEW-finding noise on a corpus with zero acceptances
 - [x] Report-only on every surface: no transition, no CI failure, no auto-filed item
