@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr-0021-supersede-6-2a
 title: "Supersede ADR 0021 §6.2a: the product owner directs the agent rename; orphan reaping is the precondition that removes the objection §6.2a was based on"
 assignee: arggon-coordinator
@@ -10,7 +10,6 @@ labels: [docs, adr, seam, migration]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
-claimed_at: "2026-10-04T20:15:31.932Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0021-supersede-6-2a
 ---
 <!--
