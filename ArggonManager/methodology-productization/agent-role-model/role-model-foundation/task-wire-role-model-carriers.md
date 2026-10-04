@@ -1,14 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-wire-role-model-carriers
 title: "Carrier wiring: supersede the parity invariant in agents.md/engineering.md/convention.md + README + both skill copies (ADR 0021 §1, §2, §6)"
+assignee: arggon-coordinator
+branch: feat/task-wire-role-model-carriers
 parent: role-model-foundation
 labels: [methodology, docs, roles]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
+claimed_at: "2026-10-04T21:05:02.955Z"
 depends_on: [task-spec-promotion-policy-and-acceptance]
+worktree_path: /home/arggon/Projects/ArggonManager-task-wire-role-model-carriers
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-wire-role-model-carriers.md
