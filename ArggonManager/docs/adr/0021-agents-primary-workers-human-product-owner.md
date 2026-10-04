@@ -11,6 +11,81 @@
 > "Proposed in a PR → Accepted when merged". The decision itself was taken when the
 > record was written; only the status line lagged the merge, so nothing below this
 > note is rewritten (`task-adr-0021-status-accepted`).
+>
+> **Amendment (2026-10-04, product owner directive): §6 is expanded — the roles are
+> named, and the shipped seam is brought in sync.** The decision below is unchanged;
+> this amendment adds §6.1 (the role model) and §6.2 (role ids are stable wire
+> names, not the role) to §6, and nothing above or below is rewritten. The four
+> shipped agent contracts were still written for a software-only loop while the
+> carriers declare the scope _"any project — not only software"_ (ADR 0020 §Decision
+> .1; `spec-methodology-adapters-017.md:16–18`), so the seam contradicted the
+> methodology it ships. Implementation is tracked under
+> `task-agent-role-contracts` (spec) → `task-agent-role-contracts-seam`, with the
+> authoritative role table landing in `task-wire-role-model-carriers`.
+>
+> ### §6.1 The role model
+>
+> | Shipped id           | Role                     | Software analogue              | Non-software analogue                     | Decides                                                                                                        |
+> | -------------------- | ------------------------ | ------------------------------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+> | _(human)_            | **Product Owner**        | Product owner / sponsor        | Same                                      | Direction, priority, acceptance, risk, release (§2)                                                            |
+> | `arggon-coordinator` | **Delivery lead (PM)**   | Product manager                | Project manager                           | What is built next and in what order; who is dispatched; tracker state; merge verification and the `done` flip |
+> | `arggon-reviewer`    | **Practice & standards** | Tech lead / software architect | Standards, methods, editorial, compliance | Whether a change is right by the project's own bar — structure, patterns, principles, scope; asks for refactor |
+> | `arggon-worker`      | **Maker**                | Programmer                     | Author, analyst, executor                 | Producing the change, keeping it on the item                                                                   |
+> | `arggon-prover`      | **Verifier**             | Manual QA                      | Independent checker / inspector           | Whether the delivered thing actually does what was specified, by executing the project's gates                 |
+>
+> Two boundaries this makes explicit, because the roles otherwise blur:
+>
+> 1. **Coordinator ≠ priority owner.** A product manager _sequences_ delivery; the
+>    product owner _sets_ the priority field. The coordinator recommends priority
+>    changes and owns wave planning, dispatch and tracker state — the PO's
+>    authority map in §2 is unchanged.
+> 2. **Prover reports, it does not rule.** "Manual QA" means checking the delivered
+>    thing against the specification and reporting observed-versus-expected. The
+>    existing rule that the prover does not _decide the verdict_ survives — the
+>    reviewer's judgment and the coordinator's merge call are unchanged — so the
+>    role gets its teeth without becoming an approver.
+>
+> ### §6.2 Domain neutrality is part of the role, not a courtesy
+>
+> A role is defined by **what it decides**, never by software artifacts. Every
+> contract states its gate in the project's own terms and gives the software case
+> only as a worked example: the verifier runs "the project's verification gates"
+> (in software: the test suite, lint, typecheck, build, and the blocking smoke of
+> ADR 0008); the reviewer's blocking bar is "the bar the project's engineering docs
+> declare" (in software: architecture, conventions, tests-travel-with-behavior,
+> docs-travel-with-code, the smoke gate). Today those prompts hard-code code nouns
+> — `tests travel with behavior`, `run the project gates (tests, lint, build)`,
+> "real-browser drive for UI changes" — which is the contradiction this amendment
+> closes. The invariant that survives every domain is the **acceptance contract**
+> on the item, not the tool that checks it.
+>
+> ### §6.2a The ids stay
+>
+> Renaming the shipped files (`arggon-coordinator` → `arggon-product-manager`, and so
+> on) was considered and **rejected**. The ids are wire names, not role names:
+> they are referenced ~320 times across ~130 files in this repo (generated
+> permission allow-lists, the ZCode plugin manifest and its agents, the capability
+> matrix, the wave smoke harness, the docs) and, decisively, they are **materialized
+> in every adopting repo**, where `arggon init` never overwrites and — per
+> `docs/agents.md` §Prerequisites, _"Selection never deletes… nothing on disk is
+> removed"_ — never removes a generated file whose template is gone. A rename would
+> therefore leave each adopter with a **fifth, orphaned agent file** that OpenCode
+> still auto-discovers and can still dispatch, alongside the new one, with no
+> supported way to reap it except a manual `init` plus hand deletion. A stable id
+> plus a changed role statement gets the same clarity for every reader and none of
+> that. The role is carried by the contract text and the role table in
+> `docs/engineering.md`; the id stays the thing permissions, manifests and existing
+> adopter files can keep pointing at. Supersede this amendment if the adopter cost
+> is judged worth paying.
+>
+> ### §6.2b What this amendment does not change
+>
+> No permission, tool, capability, kernel rule, envelope or schema change. The
+> coordinator's subagent allow-list, the reviewer's read-only contract and the
+> prover's no-mutation contract are already correct for these roles — they are
+> restated in role language, not re-decided. Behavioral impact class: agents must
+> re-learn their operating contract, so it ships through the ADR 0016 channel with
+> both skill copies byte-equal.
 
 ## Context
 
