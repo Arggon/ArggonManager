@@ -8,7 +8,7 @@ labels: [methodology, docs, roles]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
-depends_on: [task-spec-promotion-policy-and-acceptance, task-spec-agent-role-contracts]
+depends_on: [task-spec-promotion-policy-and-acceptance]
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-wire-role-model-carriers.md
