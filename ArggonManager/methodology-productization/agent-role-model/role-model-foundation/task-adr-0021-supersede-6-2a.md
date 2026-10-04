@@ -59,13 +59,13 @@ and dissolved most of the objection:
 
 ## Acceptance
 
-- [ ] §6.2a carries a dated **superseded-by** amendment naming this item; its original text is left as taken (an ADR is superseded, never silently rewritten)
-- [ ] The amendment states the new ids — `arggon-delivery-lead`, `arggon-standards-reviewer`, `arggon-maker`, `arggon-verifier` — and the naming rule: **the id names the role, never the software title** (§6.2 applied to filenames); `arggon-product-manager` / `arggon-tech-lead` are rejected as ids and kept as non-normative analogues
-- [ ] The amendment records the orphan precondition explicitly: the rename does not ship before `task-adapter-orphan-reaping`, and reaping is checksum-guarded so an adopter-edited orphan is never deleted
-- [ ] The amendment records the hook-regex coupling as the migration's sharpest edge, with the obligation to add a test binding the gate's matcher to the shipped reviewer name
-- [ ] No other clause of §6.1/§6.2/§6.2b changes — the roles, the boundaries and the domain-neutrality clause stand as merged
-- [ ] `cli/src/adr-index-parity.test.ts` green; the index row stays `Accepted`
-- [ ] `npx prettier --check` clean; `arggon validate` ok
+- [x] §6.2a carries a dated **superseded-by** amendment naming this item; its original text is left as taken (an ADR is superseded, never silently rewritten)
+- [x] The amendment states the new ids — `arggon-delivery-lead`, `arggon-standards-reviewer`, `arggon-maker`, `arggon-verifier` — and the naming rule: **the id names the role, never the software title** (§6.2 applied to filenames); `arggon-product-manager` / `arggon-tech-lead` are rejected as ids and kept as non-normative analogues
+- [x] The amendment records the orphan precondition explicitly: the rename does not ship before `task-adapter-orphan-reaping`, and reaping is checksum-guarded so an adopter-edited orphan is never deleted
+- [x] The amendment records the hook-regex coupling as the migration's sharpest edge, with the obligation to add a test binding the gate's matcher to the shipped reviewer name
+- [x] No other clause of §6.1/§6.2/§6.2b changes — the roles, the boundaries and the domain-neutrality clause stand as merged
+- [x] `cli/src/adr-index-parity.test.ts` green; the index row stays `Accepted`
+- [x] `npx prettier --check` clean; `arggon validate` ok
 
 ### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
 verdict: approve

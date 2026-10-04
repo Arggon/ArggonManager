@@ -61,6 +61,9 @@
 >
 > ### §6.2a The ids stay
 >
+> **Superseded 2026-10-04 — see §6.2a′ below.** The clause below is left exactly as
+> taken, because it is the reasoning that produced the reaping precondition.
+>
 > Renaming the shipped files (`arggon-coordinator` → `arggon-product-manager`, and so
 > on) was considered and **rejected**. The ids are wire names, not role names:
 > they are referenced ~320 times across ~130 files in this repo (generated
@@ -77,6 +80,55 @@
 > `docs/engineering.md`; the id stays the thing permissions, manifests and existing
 > adopter files can keep pointing at. Supersede this amendment if the adopter cost
 > is judged worth paying.
+>
+> ### §6.2a′ Superseding amendment — the rename proceeds, gated on reaping
+>
+> The product owner directs the rename (2026-10-04), so §6.2a is superseded. What it
+> got right survives as a **precondition** rather than a veto: the objection was
+> never that renaming is wrong, it was that renaming strands dispatchable orphans.
+>
+> **The new ids, and the rule that produced them.** The id names the **role**, never
+> the software title — §6.2 applied to filenames, so the rename cannot re-import the
+> software framing the same amendment removed.
+>
+> | old id               | new id                      | role (§6.1)          | software analogue (non-normative) |
+> | -------------------- | --------------------------- | -------------------- | --------------------------------- |
+> | `arggon-coordinator` | `arggon-delivery-lead`      | Delivery lead        | product manager                   |
+> | `arggon-reviewer`    | `arggon-standards-reviewer` | Practice & standards | tech lead / architect             |
+> | `arggon-worker`      | `arggon-maker`              | Maker                | programmer                        |
+> | `arggon-prover`      | `arggon-verifier`           | Verifier             | manual QA                         |
+>
+> `arggon-product-manager` and `arggon-tech-lead` were considered as ids and rejected:
+> they would name the analogue rather than the role. The software title stays in the
+> §6.1 table, where it belongs.
+>
+> **The precondition, and why it is now cheap.** The rename does not ship before
+> orphan reaping exists (`task-adapter-orphan-reaping`), and the inventory showed the
+> data it needs is data we already ship: every generated agent destination is recorded
+> in the tracker's `x-generated` block with its `template:` path and `checksum`
+> (`ArggonManager/.convention.yml:84–96`, `:170–183`), so an orphan is already
+> detectable with no new provenance — a destination whose recorded template is absent
+> from the installed package. Reaping is **checksum-guarded**: `doctor` reports
+> `orphaned`, `init` removes the file only when it is byte-identical to what was
+> generated, and an adopter-edited orphan is reported and never deleted. The
+> never-overwrite promise binds reaping exactly as it binds refresh.
+>
+> **The inventory, and its sharpest edge.** The blast radius is smaller than §6.2a
+> assumed: 7 path-coupled template files (4 OpenCode, 3 ZCode — the ZCode seam ships
+> no prover), 9 code files carrying string references, 57 markdown files, and
+> generated seam copies refreshed by `init`. The capability matrix needs **no**
+> change — its rows are per client, not per agent. The sharpest coupling is
+> `templates/docs/zcode/arggon/hooks/gate.mjs`: its `/(^|:)arggon-reviewer$/` matcher
+> opens the dispatch-scoped read-only window, so a rename that misses the regex
+> silently **disarms the reviewer backstop**. That is a security-relevant coupling
+> and it gets a test binding the gate's matcher to the shipped reviewer name.
+>
+> Scope, waves and gates: `task-spec-agent-rename-migration` (the spec, ADR 0017
+> gate) → reaping and rename in a single wave, because they are causally coupled
+> (reaping alone is dead code, the rename alone strands adopters) → then harnesses
+> and prose in disjoint waves. Nothing else in §6.1, §6.2 or §6.2b changes: the roles,
+> the two boundaries, the domain-neutrality clause and the "no
+> permission/tool/kernel/schema change" clause all stand as merged.
 >
 > ### §6.2b What this amendment does not change
 >
