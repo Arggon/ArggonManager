@@ -212,3 +212,7 @@ All three of us converged on the same fact from different directions: `adopt --a
 ### One adjacent observation, not acted on
 
 `init --force` re-scaffolds `.convention.yml` from a fixed template string, which drops the **whole** `x-tracker` block — so a forced re-scaffold would silently disarm this flag (and `allow-steal`, and `strict-*`). Pre-existing, affects every `x-tracker` key, and it errs in the safe direction here (reaping stops, nothing is deleted). Reporting rather than fixing it: widening `init --force` to preserve the block is its own item and your call.
+
+### handoff 2026-10-04 @ses_ef703fae0ffeWMIXzKu8aOors8 (session: ses_ef703fae0ffeWMIXzKu8aOors8) — next: Review PR #640 round 3 (CI green first run, all 8 gates green); merge do-not-squash, then flip the item to done.
+- branch: feat/task-adapter-orphan-reaping
+- open questions: Adjacent, unowned: init --force drops the whole x-tracker block (disarms this flag, allow-steal, strict-*); safe direction, worth its own item. Also: no CLI setter exists for reap-acked-orphans (conv…
