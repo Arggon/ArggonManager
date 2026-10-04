@@ -53,3 +53,27 @@ strand an orphaned, still-dispatchable fifth agent in each adopting tree.
 - [ ] `cli/src/init.test.ts` / `init-zcode.test.ts` green; capability matrix needs no row change (no capability changes)
 - [ ] `skills/arggon-cli/**` and `.agents/skills/arggon-cli/**` byte-equal if a reference changes (ADR 0016 channel, Behavioral class)
 - [ ] `arggon validate` + `npm test` green; `npx prettier --check` on every touched file
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+verdict: changes-requested (scope widened by PM sequencing, 2026-10-04)
+
+This item now carries **three** changes in **one PR**, because they are the same
+files and the same migration:
+
+1. **Rename** the seven agent files to their role ids (§6.2a′):
+   `arggon-coordinator` → `arggon-delivery-lead`,
+   `arggon-reviewer` → `arggon-standards-reviewer`, `arggon-worker` → `arggon-maker`,
+   `arggon-prover` → `arggon-verifier`
+2. **Role contracts** (§6.1) — each prompt opens with its role and cites the role table
+3. **Domain-neutral language** (§6.2) — gates named as what the project declares
+
+Splitting these would mean two passes over the same seven templates, two
+Behavioral releases, and a window where the ids and the contracts disagree.
+
+New dependencies: `task-spec-agent-rename-migration` (the folded spec) **and**
+`task-adapter-orphan-reaping` — the rename is forbidden from landing before reaping
+exists, or adopters keep a dispatchable orphan per old file (§6.2a′).
+
+Everything else in this checklist stands; the role-contract and domain-neutrality
+criteria from the cancelled `task-spec-agent-role-contracts` moved here verbatim.
