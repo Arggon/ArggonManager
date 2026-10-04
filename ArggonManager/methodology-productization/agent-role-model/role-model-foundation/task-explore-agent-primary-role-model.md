@@ -13,6 +13,7 @@ updated: "2026-10-04"
 claimed_at: "2026-10-04T16:42:02.027Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-explore-agent-primary-role-model
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-explore-agent-primary-role-model.md
   Leaves live only under a story. id is the filename stem: task-explore-agent-primary-role-model.
@@ -33,18 +34,20 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-explore-agent-primary-ro
 ## Notes
 
 ### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+
 ## Acceptance
 
-- [ ] Classified first per `skills/arggon-cli/references/exploration.md` Phase 0 (spike / bounded / greenfield) with the one-way ratchet recorded, including any mid-flight upgrade
-- [ ] Exploration recorded at `ArggonManager/docs/explorations/exploration-agent-primary-workers-019.md` from `templates/exploration-project.md`: classification, frontier-rounds log (one entry per round), edge-case table (12 dimensions), approaches considered, decision
-- [ ] Research recorded with **dated sources** (candidates / criteria / findings / recommendation) — external practice AND repo-internal citations with file:line
-- [ ] Every hunted edge case resolves to exactly one of: a spec acceptance criterion, an explicit non-goal, or a spike item — nothing stays unknown
-- [ ] One recommendation with its trade-offs; the rejected candidates say why they lose
-- [ ] Cross-cutting decision recorded as an ADR under `ArggonManager/docs/adr/` (Proposed) that links this exploration, with Status / Date / Deciders / Context / Decision / Consequences / Alternatives considered
-- [ ] Follow-up work filed as tracked `task`/`bug` items with context + acceptance checklists, `depends_on` wired so the ADR 0017 hard gate holds (no implementation task before a spec passes `spec analyze` with no NEW findings)
-- [ ] `arggon validate` and `arggon spec validate` green; PR opened with the methodology **impact class** stated (agents.md §Changing the methodology itself)
+- [x] Classified first per `skills/arggon-cli/references/exploration.md` Phase 0 (spike / bounded / greenfield) with the one-way ratchet recorded, including any mid-flight upgrade — **greenfield**, entered as bounded and upgraded mid-flight (see the doc's Classification section)
+- [x] Exploration recorded at `ArggonManager/docs/explorations/exploration-agent-primary-workers-019.md` from `templates/exploration-project.md`: classification, frontier-rounds log (one entry per round), edge-case table (12 dimensions), approaches considered, decision
+- [x] Research recorded with **dated sources** (candidates / criteria / findings / recommendation) — external practice AND repo-internal citations with file:line
+- [x] Every hunted edge case resolves to exactly one of: a spec acceptance criterion, an explicit non-goal, or a spike item — nothing stays unknown
+- [x] One recommendation with its trade-offs; the rejected candidates say why they lose
+- [x] Cross-cutting decision recorded as an ADR under `ArggonManager/docs/adr/` (Proposed) that links this exploration, with Status / Date / Deciders / Context / Decision / Consequences / Alternatives considered — `0021-agents-primary-workers-human-product-owner.md`
+- [x] Follow-up work filed as tracked `task`/`bug` items with context + acceptance checklists, `depends_on` wired so the ADR 0017 hard gate holds (no implementation task before a spec passes `spec analyze` with no NEW findings)
+- [ ] `arggon validate` and `arggon spec validate` green; PR opened with the methodology **impact class** stated (agents.md §Changing the methodology itself) — gates green and verified above; **ticked when the PR is open**
 
 ### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+
 verdict: approve
 
 Self-review evidence for the exploration record (all commands run in the item's
