@@ -158,3 +158,7 @@ I did not re-run `npm run smoke:native-start-cold` this round (it is not in this
 
 ### 2026-10-04 @ses_ef74306c7ffeyb24EIcXcBGIoM
 Correction to the previous comment (typo, no change to substance): the generated bundle path is `opencode/plugins/arggon/index.bundle.ts` — I wrote `argdon` once. The `check:plugin` result and the 10-match content check both refer to that file.
+
+### handoff 2026-10-04 @ses_ef74306c7ffeyb24EIcXcBGIoM (session: ses_ef74306c7ffeyb24EIcXcBGIoM) — next: Review + merge PR #637 (merge, do not squash); CI green, mergeStateStatus CLEAN
+- branch: feat/task-role-model-report-only-detector
+- open questions: PR now carries a merge commit (force-push denied by the seam, so I merged origin/main instead); adjudicate the struck-through sync --json row; doc-drift guard for the x-tracker option list is unfiled
