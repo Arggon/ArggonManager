@@ -165,3 +165,7 @@ rebuilds it, `npm test` green).
   (`release-please-config.json`, `skip-github-release`, conventional-commit
   sections), so the adopter-migration note lives in the commit body — that is what
   becomes the release entry.
+
+### handoff 2026-10-04 @ses_ef74390b4ffeZmQ20CTdt3vI10 (session: ses_ef74390b4ffeZmQ20CTdt3vI10) — next: Coordinator: review + merge (do not squash) the carriers PR; then unblock task-agent-role-contracts-seam (its prompts cite the new role table).
+- branch: feat/task-wire-role-model-carriers
+- open questions: ADR 0020 invariant block + docs/claim.md:99 still state the superseded one-axis rule — file/assign that (not mine); templates/docs/docs/engineering.md is software-locked for non-software adopters; di…
