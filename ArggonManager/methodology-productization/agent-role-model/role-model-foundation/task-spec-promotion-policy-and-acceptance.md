@@ -60,3 +60,31 @@ already emits decision-pipeline findings (`ArggonManager/docs/agents.md:450`).
 - [ ] AC: the metric that would ever justify a kernel gate is defined: acceptance share per closed container + human-only hatches used (waivers/steals) per closed container
 - [ ] No new command, no schema field, no `role:`/`owner:` frontmatter (rejected in ADR 0021)
 - [ ] `arggon spec analyze` reports no NEW findings before this item is done
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+verdict: approve
+
+Spec written at `ArggonManager/docs/specs/spec-promotion-policy-018.md` (status
+`proposed`, number 018 = next FREE after 017). Gates, expected vs observed:
+
+- `spec validate --file <spec>` → `ok (1 doc(s), 0 warning(s))`
+- `spec analyze` → 10 findings across 20 specs, **all pre-existing** (duplicate-doc-number, no-error-path, vague-quantifier on specs 001/005/009/010); **none names this spec** — the ADR 0017 hard gate holds
+- `npx prettier --check` → clean
+- link-resolution probe over the spec → **dead links: none** (a first pass had `../../../docs/adr/…`, one level too deep from `docs/specs/`; fixed and re-probed)
+- `arggon validate` → `ok (0 warning(s), convention v5)`
+
+**One correction the grounding forced, recorded in the spec and owed as a dated
+amendment:** ADR 0021 §4 assigned the acceptance classification to `arggon sync
+--json`. `sync` classifies only items reconciled with an **open PR**
+(`lib/src/sync-command.ts:83` — `verdicts[match.itemId]` over PR matches), and product
+acceptance is a **container**-level decision; containers never carry PRs, so a
+story's acceptance could never appear there. The classification moves to `report`
+(which already aggregates per container, `lib/src/report.ts:12`) plus `show`, and
+`sync` stays byte-identical. AC 10 makes that amendment a same-PR requirement.
+
+**Design decision worth the PO's eye:** the finding only fires when the repo arms
+`x-tracker.product-acceptance: true` (default OFF, the `allow-steal` precedent).
+Without it, every repo that closes a story without a product owner would emit a
+permanent advisory finding — noise that trains people to ignore the scanner.
+
+The checklist above is complete; the item flips `done` on merge.
