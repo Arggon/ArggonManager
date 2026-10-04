@@ -14,6 +14,7 @@ claimed_at: "2026-10-04T22:14:18.299Z"
 depends_on: [task-spec-agent-rename-migration]
 worktree_path: /home/arggon/Projects/ArggonManager-task-adapter-orphan-reaping
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-adapter-orphan-reaping.md
   Leaves live only under a story. id is the filename stem: task-adapter-orphan-reaping.
@@ -34,6 +35,7 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-adapter-orphan-reaping
 ## Notes
 
 ### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+
 ## Context
 
 Hard predecessor for the agent rename (`task-spec-agent-rename-migration`).
@@ -51,15 +53,15 @@ destination that disappears from a future template set.
 
 ## Acceptance
 
-- [ ] `doctor --agents` gains a **`orphaned`** status beside `present` / `acknowledged` / `acknowledged-drifted` / `adopter-edited` / `stale` / `missing` / `unverified`: an `x-generated` destination whose recorded `template` is absent from this arggon version
-- [ ] Each status still names what `init` would do (the existing contract), and `orphaned` names the remedy: `init` removes it, or the adopter deletes it by hand
-- [ ] `init` removes an orphan **only when its checksum still matches the recorded one** (unmodified since generation)
-- [ ] An **adopter-edited** orphan is reported and **never** deleted — the never-overwrite promise (`docs/agents.md` §Prerequisites) applies to reaping exactly as it does to refresh
-- [ ] Report-only is never enough to hide an action: a reaped orphan appears in the `--json` envelope (`reaped[]`/its own action family) and in human output; a refused one names the path and why
-- [ ] Idempotent: a second `init` reaps nothing and reports nothing outstanding
-- [ ] Dry-run (`init --dry-run`) previews the reaping without touching the tree
-- [ ] A test drives the real scenario: generate a seam, remove one template from the package, assert `doctor` says `orphaned` and `init` reaps the unmodified file but refuses the edited one
-- [ ] Never reaps a file outside the tracker-root repo, never reaps a path not recorded in `x-generated`, and never reaps anything whose destination is unknown to provenance
-- [ ] Kernel/report surfaces documented in the same PR (`docs/json-output.md`, `README.md` doctor section)
-- [ ] No schema change, no CLI flag removed; a flag is **added** only if the spec asks for an opt-out
-- [ ] `arggon validate` + `npm test` + `npx vitest run cli/src/doctor.test.ts cli/src/init.test.ts` green
+- [x] `doctor --agents` gains a **`orphaned`** status beside `present` / `acknowledged` / `acknowledged-drifted` / `adopter-edited` / `stale` / `missing` / `unverified`: an `x-generated` destination whose recorded `template` is absent from this arggon version
+- [x] Each status still names what `init` would do (the existing contract), and `orphaned` names the remedy: `init` removes it, or the adopter deletes it by hand
+- [x] `init` removes an orphan **only when its checksum still matches the recorded one** (unmodified since generation)
+- [x] An **adopter-edited** orphan is reported and **never** deleted — the never-overwrite promise (`docs/agents.md` §Prerequisites) applies to reaping exactly as it does to refresh
+- [x] Report-only is never enough to hide an action: a reaped orphan appears in the `--json` envelope (`reaped[]`/its own action family) and in human output; a refused one names the path and why
+- [x] Idempotent: a second `init` reaps nothing and reports nothing outstanding
+- [x] Dry-run (`init --dry-run`) previews the reaping without touching the tree
+- [x] A test drives the real scenario: generate a seam, remove one template from the package, assert `doctor` says `orphaned` and `init` reaps the unmodified file but refuses the edited one
+- [x] Never reaps a file outside the tracker-root repo, never reaps a path not recorded in `x-generated`, and never reaps anything whose destination is unknown to provenance
+- [~] Kernel/report surfaces documented in the same PR (`docs/json-output.md`, `README.md` doctor section) — `docs/json-output.md` done (init `reaped[]`/`reapRefused[]`, the `adapters`/`agents` blocks, the `plan[]` decision vocabulary, both samples); **the `README.md` doctor section is NOT in this PR** (a parallel worker owns `README.md`; reported, not filed)
+- [x] No schema change, no CLI flag removed; a flag is **added** only if the spec asks for an opt-out — no flag added (the spec asks for none); the additive test injection points `templatesDir`/`templatesRoot` are internal options, never CLI surface
+- [x] `arggon validate` + `npm test` + `npx vitest run cli/src/doctor.test.ts cli/src/init.test.ts` green
