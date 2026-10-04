@@ -27,3 +27,38 @@ updated: "2026-10-04"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+## Context
+
+ADR 0021 §6.2a rejected renaming the shipped agents, on one ground: `init` never
+deletes, so a rename leaves each adopter with a **dispatchable orphan** per old
+file. The product owner has directed the rename (2026-10-04), so §6.2a is
+superseded — but the ground it stood on is real and must be discharged first.
+
+The scope inventory (`task-spec-agent-rename-migration`) shrank the blast radius
+and dissolved most of the objection:
+
+- **7 template files** are path-coupled (4 OpenCode, 3 ZCode — no ZCode prover).
+- **9 code files** carry string references; the sharpest is
+  `templates/docs/zcode/arggon/hooks/gate.mjs:150` — `/(^\|:)arggon-reviewer$/`
+  opens the dispatch-scoped read-only window, so a rename that misses the regex
+  silently disarms the reviewer backstop. That coupling is security-relevant and
+  gets its own test.
+- **57 markdown files** carry prose references.
+- **The capability matrix needs no change** — its rows are per *client*, not per agent.
+- **The orphan problem is already solvable with data we ship**: every generated agent
+  destination is recorded in `x-generated` with its `template:` and `checksum`
+  (`ArggonManager/.convention.yml:84–96`, `:170–183`), so an orphan is a destination
+  whose template is gone. `task-adapter-orphan-reaping` turns that into a
+  `doctor` status plus a checksum-guarded reap that never deletes an adopter's edits.
+
+## Acceptance
+
+- [ ] §6.2a carries a dated **superseded-by** amendment naming this item; its original text is left as taken (an ADR is superseded, never silently rewritten)
+- [ ] The amendment states the new ids — `arggon-delivery-lead`, `arggon-standards-reviewer`, `arggon-maker`, `arggon-verifier` — and the naming rule: **the id names the role, never the software title** (§6.2 applied to filenames); `arggon-product-manager` / `arggon-tech-lead` are rejected as ids and kept as non-normative analogues
+- [ ] The amendment records the orphan precondition explicitly: the rename does not ship before `task-adapter-orphan-reaping`, and reaping is checksum-guarded so an adopter-edited orphan is never deleted
+- [ ] The amendment records the hook-regex coupling as the migration's sharpest edge, with the obligation to add a test binding the gate's matcher to the shipped reviewer name
+- [ ] No other clause of §6.1/§6.2/§6.2b changes — the roles, the boundaries and the domain-neutrality clause stand as merged
+- [ ] `cli/src/adr-index-parity.test.ts` green; the index row stays `Accepted`
+- [ ] `npx prettier --check` clean; `arggon validate` ok
