@@ -13,6 +13,7 @@ claimed_at: "2026-10-02T23:58:06.586Z"
 depends_on: [task-adapter-selection-flags, task-capability-matrix]
 worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-goal-mode
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-zcode-adapter/task-zcode-goal-mode.md
   Leaves live only under a story. id is the filename stem: task-zcode-goal-mode.
@@ -28,112 +29,71 @@ Generated goal-mode template: objective + verification contract derived from the
 
 ## Acceptance
 
-- [ ] template generation test
-- [ ] goal contract parses the checklist
-- [ ] documented: one goal per claimed item
+- [x] template generation test
+- [x] goal contract parses the checklist
+- [x] documented: one goal per claimed item
 
 ## Notes
 
+Goal-mode contract (spec §S5, plan T5): the generated seam file
+`.zcode-marketplace/arggon/templates/goal-mode.md` (provenance + never-overwrite) plus
+`arggon goal <id>`, which instantiates it for ONE claimed item. Current shape after
+`bug-three-acceptance-parsers-diverging` (PR #611): the objective, the verification
+contract and the done gate's refusal set are all the KERNEL's rows — `acceptanceRows` /
+`acceptanceUnchecked` over `acceptanceBody(item)` (the whole body, comment sections
+included) — so there is one grammar and one canonical input, and the contract cannot
+disagree with the gate or with its own text. Which lines are rows is decided in
+`docs/convention.md` §Acceptance rows; the kernel's parity corpus is
+`cli/src/acceptance-parity.test.ts`, this adapter's own corpus is
+`cli/src/goal-mode.test.ts`. Bounded on the ROWS (clipped lines, at most 8 inlined, the
+rest counted) and on the template copy. Boundaries and refusals are appended by the CLI
+from constants, never read from the template file; refusals (no override flag) are
+`GOAL_IDENTITY_UNKNOWN`, `GOAL_ITEM_CLOSED`, `GOAL_UNCLAIMED`, `GOAL_FOREIGN_CLAIM`,
+`GOAL_WORKTREE_MISMATCH`, `GOAL_WORKTREE_MISSING`, `GOAL_TEMPLATE_UNAVAILABLE`,
+`GOAL_FAILED`. One goal per claimed item, one worktree per item (an item that records
+no worktree is scoped to the repo root). Deliberately no MCP tool: the command mutates
+nothing, so the kernel's tool surface is unchanged.
+
 ### 2026-10-03 @Arggon
-
-<<<OURS>>>
-
-<<<OURS>>>
-
 ## @Arggon — worker evidence (PR #605, branch feat/task-zcode-goal-mode)
 
-<<<OURS>>>
-
-<<<OURS>>>
 Claim/worktree safety: all tracker writes routed through `npm run arggon -- …` with this
-<<<OURS>>>
 worktree as cwd; the native `tools.arggon.*` were not used for writes. Primary checkout
-<<<OURS>>>
 (`/home/arggon/Projects/ArggonManager`) verified on `main` @ 26c3b13b with a clean tree and
-<<<OURS>>>
 its own pre-claim copy of this item (status todo, no assignee) — none of this branch's
-<<<OURS>>>
 commits are in it (`git log --oneline origin/main..HEAD` = 2 commits, both on
-<<<OURS>>>
 feat/task-zcode-goal-mode).
-<<<OURS>>>
-
-<<<OURS>>>
 
 ### Expected vs observed (gates, post-rebase onto origin/main @ ba808947)
 
-<<<OURS>>>
-
-<<<OURS>>>
 | gate | expected | observed |
-<<<OURS>>>
-| ---------------------------- | --------------------- | ---------------------------------------------------------------------------------- |
-<<<OURS>>>
+| --- | --- | --- |
 | `npm run build` | ok | ok (build:plugin 457609 bytes) |
-<<<OURS>>>
 | `npm test` | green | 120 files, 2229 passed (119/2206 before the rebase picked up main's new test file) |
-<<<OURS>>>
 | `npm run lint` | clean | clean |
-<<<OURS>>>
 | `npm run arggon -- validate` | ok | `arggon validate: ok (0 warning(s), convention v5)` |
-<<<OURS>>>
 | `npm run check:plugin` | bundle byte-identical | no diff |
-<<<OURS>>>
-
-<<<OURS>>>
 
 ### Behavior, live (from this worktree)
 
-<<<OURS>>>
-
-<<<OURS>>>
-
 - `npm run arggon -- goal task-zcode-goal-mode` → objective `template generation test`,
-  <<<OURS>>>
   verification 1–3 = the three unchecked boxes, `## Boundaries (hard)` +
-  <<<OURS>>>
   `## Refusals (stop and report …)` appended, `Claim holder: Arggon`.
-  <<<OURS>>>
 - same command with `--json` from the primary checkout →
-  <<<OURS>>>
   `{"ok":false,…,"error":{"code":"GOAL_UNCLAIMED"}}`, exit 1 (that checkout has no claim).
-  <<<OURS>>>
-
-<<<OURS>>>
 
 ### Not done here (deliberate)
 
-<<<OURS>>>
-
-<<<OURS>>>
-
 - No MCP tool for `goal`: it mutates nothing, so the fifteen-tool kernel surface stays as
-  <<<OURS>>>
   it is; the ZCode seam reaches the command through the headless bin. Flagging in case the
-  <<<OURS>>>
   reviewer wants an MCP wrapper instead — that would touch the tool-count docs
-  <<<OURS>>>
   (`agents.md`, `opencode2.md`, `json-contract.md`) and `mcp-parity`.
-  <<<OURS>>>
 - Spec §S5 acceptance box also covers the automation templates (`task-zcode-automations`),
-  <<<OURS>>>
   so spec/plan `status` stays `proposed` and this box is not ticked.
-  <<<OURS>>>
-
-<<<OURS>>>
 
 ### handoff 2026-10-03 @Arggon — next: review PR #605 (draft): goal-mode template + `arggon goal`; decide whether an MCP wrapper is wanted instead of the headless bin
-
-<<<OURS>>>
-
-<<<OURS>>>
-
 - branch: feat/task-zcode-goal-mode
-  <<<OURS>>>
 - open questions: MCP wrapper for goal? would touch the fifteen-tool surface docs; goal template location (plugin templates/ dir) unverified against live ZCode
-  <<<OURS>>>
-
-<<<OURS>>>
 
 ### 2026-10-03 @ses_f00cf8887ffeQBrx2z0EtMtTXD
 verdict: request-changes (derivation does not reuse the done gate's predicate; vendored ZCode seam left stale)
@@ -248,226 +208,92 @@ Run by the prover (or coordinator) in `/home/arggon/Projects/ArggonManager-task-
 
 **No merge.** B1 is the substance of the item's third acceptance box ("documented: one goal per claimed item") resting on a predicate claim that is false and already divergent; B3 leaves the repo's own vendored seam contradicting the template it ships; B4 is an explicit review-bar item; B2 overstates a refusal in shipped docs. All four are small and none requires re-architecting the feature — the design calls in points 2, 3 and 5 are sound and worth keeping. Per AGENTS.md each finding above needs a follow-up `task`/`bug` under `story-zcode-adapter` before merge; the non-blocking ones are already enumerated and ready to file. PR #605 is still a **draft** and should not leave draft until B1-B4 land.
 
-### 2026-10-03 @ses_f00cf8887ffeQBrx2z0EtMtTXD
+### 2026-10-03 @Arggon
+## @Arggon — round-1 response shipped (PR #605 updated to b369506c)
 
-<<<OURS>>>
+**Impact class: Behavioral** (docs/agents.md §Changing the methodology itself; carriers
+`docs/agents.md` + `skills/arggon-cli/**`), with the ADR 0016 adopter-upgrade channel: the
+change ships in the generated seam + the CLI, the skill and its `.agents/` copy are byte-equal
+in this PR, and every doc statement it falsifies was updated here.
 
-<<<OURS>>>
-**2. Bounded output is structural, and the "boundaries always survive" inversion does not occur.** `runGoal` computes the boundary block first, then budgets the _filled template_ at `MAX_GOAL_CONTRACT_BYTES - byteLength(block) - 2` and clips to that, then appends `block` verbatim. The clip can only ever shrink adopter/template prose; the block is concatenated afterwards and never clipped. I measured the block at **1,974 B** against the 12,288 B cap, so the template budget is 10,312 B and the worst case lands exactly on 12,288 B. The boundaries/refusals constants are structurally immune to a hostile item or an inflated template — this is the property you asked me to hunt for and it holds. Per-line bounds check out: `clip(live[0], 240)`, `clip(line, 200)`, `live.slice(0, 8)` with `verificationOmitted = live.length - inlined.length` (overflow **counted, never pasted**). `MAX_GOAL_PROSE_BYTES` (32 KiB) is applied to `shown.prose` _before_ `parseAcceptanceRows`, and `MAX_GOAL_TEMPLATE_BYTES` (8 KiB) at read time — both genuinely pre-parse. The `clip` helper counts the 3-byte ellipsis inside the budget, so a clipped line stays at or under max.
-<<<OURS>>>
+### B1 — claim withdrawn, gate made authoritative
 
-<<<OURS>>>
-**3. Boundaries are appended from CLI constants — confirmed, and an adopter cannot delete them.** `GOAL_BOUNDARIES`/`GOAL_REFUSALS` are module constants; `renderBoundaryBlock` reads only those. The template file is read for the _shape_ only, and `fillSlots` fills just five slots. Stripping the template's own boundary prose cannot remove the appended block. The test "keeps the boundaries when the adopter's template copy is stripped down" discriminates: it overwrites the file with a two-line stub, then asserts the boundaries survive.
-<<<OURS>>>
-**6. Leaving spec/plan at `proposed` is correct.** S5 bundles the goal-mode template _and_ the automation templates, and the spec's own acceptance box reads "ZCode adapter: goal-mode template derives the objective...; automation templates run read-only scans and file items via `arggon create`". Sibling `task-zcode-automations` is still `todo` and unclaimed. The PR touches neither spec nor plan and claims S5 nowhere.
-<<<OURS>>>
-`parseAcceptanceRows` lives in the **board** module (a rendering helper for the TUI/serve drawer), not in the kernel, and it is not the predicate the done gate runs. goal-mode then adds a _third_ filter of its own (`live = unchecked.filter(row => row.length > 0)`). So "the goal reads exactly the checklist the done gate gates on" is untrue, and **the two can drift — they already do**. I ran both regexes side by side over a fixture matrix:
-<<<OURS>>>
+`parseAcceptanceRows` is the board renderer's parser, not the kernel's; the gate's predicate is
+`acceptanceComplete`. `arggon goal` now asks `acceptanceComplete` whether work remains and
+publishes that verdict as `goal.gateUnchecked`; the row parser supplies text only, over
+LF-normalized prose; a disagreement renders an explicit "READ THE ITEM BODY FIRST" shape
+(`renderable: false`) instead of an invented goal. Unification is owned by
+`bug-three-acceptance-parsers-diverging` — named in the code and the docs, and the reason the
+parser is NOT moved into the kernel in this PR (that is that item's design decision; moving it
+here risks a fourth parser). Corrected in all five+ places it shipped (module header,
+`deriveGoal` docstring, test header, README, agents.md §ZCode, json-output.md, skill
+references, ZCode command doc, goal template, item Notes).
 
-<<<OURS>>>
+Parity corpus in `cli/src/goal-mode.test.ts` pins `hasGoal === !acceptanceComplete` over CRLF,
+`-  [ ] x`, `- [ ]x`, `- [ ] x`, `*`, indentation, tabs, empty boxes and `X`.
 
-```
-<<<OURS>>>
-```
+### B2 — unresolvable identity refuses
 
-<<<OURS>>>
+`GOAL_IDENTITY_UNKNOWN` (new): without knowing who is asking, the lease invariant cannot be
+enforced, so nothing renders. Order is by most specific cause (closed item → identity → claim →
+checkout), so a closed item is never reported with an environment remedy. Both directions
+tested.
 
-- **Two spaces** (`-  [ ] criterion`, a hand-edit typo): the gate treats it as _no checklist at all_ (so the item flips to `done` freely) while the goal loops on it as a criterion.
-  <<<OURS>>>
-  `goal-mode.ts:387-391` does `assertClaimed(item, identity ?? undefined)`, and inside `assertClaimed` the check is `if (login !== undefined && item.assignee !== login)`. An unresolved identity therefore _disables_ the foreign-claim refusal rather than falling back to refusing. The rendered contract does warn ("Caller identity could not be resolved... confirm `arggon show <id> --meta` names you before the first write") and a test pins that warning, so this is deliberate — but it means the docs' flat "a goal never targets another identity's claim" holds only when `GITHUB_USER`/`GITHUB_ACTOR`/`gh`/`git config` resolve. Given this is a pure read and the worktree check still applies, either refuse when an assignee exists but identity is unknown, or state the conditional in `agents.md`/README the way the contract text already does. As shipped, the docs overstate the invariant.
-  <<<OURS>>>
+### B3 — the checked-in `.zcode-marketplace/` was regenerated
 
-1. **Only one of the seven refusal codes is asserted.** `goal-mode.test.ts` asserts `GOAL_UNCLAIMED` via `envelope.error.code`; the other four refusal tests match the _message_ (`toThrow(/claimed by 'Someone-else'/)`, `/never spans worktrees/`, `/no longer exists/`). Renaming a code breaks nothing. `GOAL_TEMPLATE_UNAVAILABLE` and `GOAL_FAILED` have **no test at all** — the fallback test only covers the adopter copy being absent. The code-to-case mapping is the documented contract in `docs/json-output.md`, so assert the codes.
-   <<<OURS>>>
-   — _demonstrates_: the goal-mode suite is green and the done-gate/cascade suites still pass, so B1's refactor has a safe landing zone. _Would change_: a failure here blocks the B1 fix.
-   <<<OURS>>>
-2. A parity harness comparing `acceptanceComplete(body)` (`lib/src/items.ts`) against `parseAcceptanceRows(body)` plus goal-mode's `live` filter, over fixtures including `-  [ ] x` and a CRLF body.
-   <<<OURS>>>
-   — _demonstrates_: the two predicates disagree on exactly the two classes reported and agree elsewhere; the output becomes the new parity test. _Would change_: if it reports agreement, B1 drops from blocking to a docs-only correction.
-   <<<OURS>>>
-3. `npm run arggon -- init` in a scratch clone of the branch, then `diff -r` `.zcode-marketplace/` against `templates/docs/zcode/` modulo the `# arggon:generated` header.
-   <<<OURS>>>
-   — _demonstrates_: the regenerated vendored copy is byte-consistent with the template source (B3's fix). _Would change_: if the regen produces a larger diff than the four files implicated, the finding widens.
-   <<<OURS>>>
-4. `npm run arggon -- goal task-zcode-goal-mode`, the same with `--json`, and one from a subdirectory (`cd cli && npm run arggon -- goal task-zcode-goal-mode --json`) to observe `conventionVersion`.
-   <<<OURS>>>
-   — _demonstrates_: the blocking smoke probe `engineering.md` requires for a CLI change — objective, three inlined criteria, appended boundaries, exit 0 — and confirms finding #4's `conventionVersion: 0` on a subdirectory invocation. _Would change_: the verdict cannot move to approve without the command actually being run on a fixture, whatever the unit tests say.
-   <<<OURS>>>
-5. `npm run arggon -- goal <an-item-claimed-by-someone-else> --json`, and one from a foreign checkout.
-   <<<OURS>>>
-   — _demonstrates_: `GOAL_FOREIGN_CLAIM` and `GOAL_WORKTREE_MISMATCH` fire in the shape an agent actually hits them, not just in a fixture. _Would change_: if either degrades into a rendered mode, escalate.
-   <<<OURS>>>
+Through the real pipeline (`arggon init`, `--no-commit`): the two JSON descriptions plus the new
+`commands/arggon-goal.md` and `templates/goal-mode.md`, with refreshed checksums in
+`.convention.yml`. Every checked-in copy verified byte-identical to its template modulo the
+generated marker (19 tracked + 2 new). No CI gate covers this class, so it is stated in the PR
+body too. NOT actioned (human step): three agent copies + four `.opencode/**` copies stay
+`modified` from pre-existing checksum drift (recorded `sha256:bce74f…` vs on-disk
+`sha256:5b749f…` for `agents/arggon-worker.md`) — the sanctioned remedy is `arggon adopt --ack`.
 
-## @Arggon — round-1 review response (verdict: request-changes)
+### B4 — stated (Behavioral + ADR 0016).
 
-<<<OURS>>>
+### Non-blocking — all closed
 
-<<<OURS>>>
-**Impact class: Behavioral** (docs/agents.md §Changing the methodology itself —
-<<<OURS>>>
-this touches the carriers `docs/agents.md` and `skills/arggon-cli/**`). Agents
-<<<OURS>>>
-must re-learn: a new command contract (`arggon goal <id>`, its eight refusal
-<<<OURS>>>
-codes, `GOAL_IDENTITY_UNKNOWN` included) and a new invariant (the goal takes
-<<<OURS>>>
-"is there work left" from the DONE GATE). Per ADR 0016 the adopter-upgrade
-<<<OURS>>>
-channel applies: the change ships in the generated seam + this CLI, and the
-<<<OURS>>>
-skill and its `.agents/` copy are byte-equal in the same PR (`skills:sync` +
-<<<OURS>>>
-`cli/src/skill-copy.test.ts`).
-<<<OURS>>>
+1 codes asserted for all eight refusals (incl. `GOAL_TEMPLATE_UNAVAILABLE` via a new
+`templatesDir` injection point and `GOAL_FAILED`); 2+3 the bounded prose read is tested both
+ways AND the clip's `clipped` flag now folds into `truncated`; 4 subdirectory invocations report
+the real `conventionVersion` (5, was 0); 5 the boundary text now names the no-worktree fallback
+(repo root, never a sibling's); 6 the soft cap is documented (measured block 1,974 B, ~9.3 KB
+headroom); 8 clip-before-fill ordering documented. 7 deferred on purpose — see B1.
 
-<<<OURS>>>
-**B1 — the central claim was false; withdrawn and fixed.** `parseAcceptanceRows`
-<<<OURS>>>
-is the BOARD renderer's parser, not the kernel's, and the done gate's predicate
-<<<OURS>>>
-is `acceptanceComplete` (`lib/src/items.ts`). `cli/src/goal-mode.ts` now asks
-<<<OURS>>>
-`acceptanceComplete` whether work remains (its verdict is exposed verbatim as
-<<<OURS>>>
-`goal.gateUnchecked`), normalizes prose to LF through the CLI's single
-<<<OURS>>>
-`normalizeEol` helper before the row parser runs, and renders an explicit
-<<<OURS>>>
-"read the item body first" shape if the gate finds work the text reader cannot.
-<<<OURS>>>
-Unification is owned by `bug-three-acceptance-parsers-diverging` (named in the
-<<<OURS>>>
-code + docs). The false claim is corrected in all five places it shipped:
-<<<OURS>>>
-module header + `deriveGoal` docstring, the test-file header, `README.md`,
-<<<OURS>>>
-`ArggonManager/docs/agents.md` §ZCode, `ArggonManager/docs/json-output.md`, the
-<<<OURS>>>
-skill references, the ZCode command doc, the goal template, and this item's
-<<<OURS>>>
-Notes.
-<<<OURS>>>
+### Probe evidence (built `dist/cli.js`, `--json`, fresh temp tree per case)
 
-<<<OURS>>>
-Round-1 inversion, isolated (both regexes on the same CRLF body):
-<<<OURS>>>
+Expected → observed, full transcript in the PR body:
+- unchecked boxes → objective `first criterion`, verification both, `hasGoal/renderable/
+  gateUnchecked` all true;
+- nothing unchecked → `DEFINE THE GOAL FIRST`, and the gate then allows the flip (`ok: true`);
+- **CRLF item → gate refuses the flip (`UPDATE_FAILED`) while the goal says work remains with
+  readable text — they agree** (round 1 had them inverted);
+- foreign claim → `GOAL_FOREIGN_CLAIM` with `conventionVersion: 5`, from the root AND from
+  `sub/dir/`;
+- unresolvable identity → `GOAL_IDENTITY_UNKNOWN`; unclaimed → `GOAL_UNCLAIMED`; unknown id →
+  `GOAL_FAILED`;
+- 5000-char criterion → objective 238 B, lines ≤ 200 B, contract 5,046 B ≤ 12,288 B cap,
+  boundaries intact.
 
-<<<OURS>>>
+Gates: `npm run build`; `npm test` 120 files / 2251 passed; `npm run lint` clean;
+`npm run arggon -- validate` ok (v5); `npm run check:plugin` byte-identical; CI's
+`lint:structure` + `test:structure` green; the verdict's own probe list
+(`goal-mode + init-zcode + done-gate + cascade`) → 4 files / 89 tests passed.
 
-```
-<<<OURS>>>
-board rows: 0 -> []
-<<<OURS>>>
-gate criteria: 2 acceptanceComplete: false
-<<<OURS>>>
-round-1 goal said: no unchecked criterion -> true
-<<<OURS>>>
-round-1 gate said: cannot close        -> true
-<<<OURS>>>
-```
+### History: no force-push
 
-<<<OURS>>>
+A rebase onto origin/main was prepared and verified (the item-file conflict resolved by keeping
+BOTH records — this verdict plus my evidence/handoff/round-1 response). Publishing it would need
+a force-push, which is refused; instead the published history is intact and the round-2 commits
+sit on top (fast-forward `505f8c3e..b369506c`), content-identical to the rebased tip for every
+file this PR owns. The linear rebase, if you prefer it, is yours to force-push.
 
-<<<OURS>>>
-**B2 — an unresolvable identity now REFUSES** (`GOAL_IDENTITY_UNKNOWN`) instead
-<<<OURS>>>
-of disabling the foreign-claim check: the lease invariant cannot be enforced
-<<<OURS>>>
-without knowing who is asking, so nothing renders. Both directions tested
-<<<OURS>>>
-(resolved identity renders; unresolvable refuses), plus the ordering rule (a
-<<<OURS>>>
-closed item is reported before the environment, so the remedy is never
-<<<OURS>>>
-misleading).
-<<<OURS>>>
+Item stays `in_progress`; spec/plan `status` stays `proposed` (S5 also covers
+`task-zcode-automations`).
 
-<<<OURS>>>
-**B3 — the checked-in `.zcode-marketplace/` was regenerated** through the real
-<<<OURS>>>
-pipeline (`arggon init --no-commit --json`: the two JSON descriptions, the new
-<<<OURS>>>
-`commands/arggon-goal.md` and `templates/goal-mode.md`), and every checked-in
-<<<OURS>>>
-copy is now byte-identical to its template modulo the generated marker line
-<<<OURS>>>
-(verified for all 19 tracked files + the 2 new ones; JSON carries no marker).
-<<<OURS>>>
-`ArggonManager/.convention.yml` carries the refreshed checksums.
-<<<OURS>>>
-Observation, NOT actioned (a coordinator/human call): the three
-<<<OURS>>>
-`.zcode-marketplace/arggon/agents/*.md` copies and four `.opencode/**` copies
-<<<OURS>>>
-are byte-identical to their templates yet still classified `modified` — their
-<<<OURS>>>
-recorded checksums predate the current marker form, so `arggon init` classifies
-<<<OURS>>>
-them adopter-modified and skips them, and their on-disk marker still reads
-<<<OURS>>>
-`template="zcode/…"` (pre-`docs/`). The sanctioned re-baseline is
-<<<OURS>>>
-`arggon adopt --ack` (a human step per docs/agents.md §Adoption sweep), so this
-<<<OURS>>>
-worker did not run it.
-<<<OURS>>>
-
-<<<OURS>>>
-**B4 — impact class stated above** (Behavioral + ADR 0016), per the review-bar
-<<<OURS>>>
-item in `engineering.md`.
-<<<OURS>>>
-
-<<<OURS>>>
-**Non-blocking findings, all closed:**
-<<<OURS>>>
-
-<<<OURS>>>
-
-- every one of the eight refusal codes is now asserted against a real tree
-  <<<OURS>>>
-  (table-driven in `cli/src/goal-mode.test.ts`), including
-  <<<OURS>>>
-  `GOAL_TEMPLATE_UNAVAILABLE` (new `templatesDir` injection point, mirroring
-  <<<OURS>>>
-  `currentGeneratedTemplatesFrom` in docs.ts) and `GOAL_FAILED`;
-  <<<OURS>>>
-- a **parity corpus** pins the goal against the gate on CRLF, `- [ ]x`,
-  <<<OURS>>>
-  `- [ ] x`, `*` bullets, indentation, tabs, empty boxes and uppercase `X`;
-  <<<OURS>>>
-- the bounded prose read is now tested both ways (criteria inside the budget →
-  <<<OURS>>>
-  inlined; criteria beyond it → the clip cannot invert the gate);
-  <<<OURS>>>
-- a refusal envelope invoked from a **subdirectory** reports the tree's real
-  <<<OURS>>>
-  `conventionVersion` (5) instead of the default 0 — the tracker root is
-  <<<OURS>>>
-  resolved before the version is read.
-  <<<OURS>>>
-
-<<<OURS>>>
-Deliberately unchanged (reviewer-verified): boundaries are still appended from
-<<<OURS>>>
-CLI constants, and there is still no MCP tool for `goal`.
-<<<OURS>>>
-
-<<<OURS>>>
-Gates: `npm run build`, `npm test` (120 files, 2249 passed), `npm run lint`,
-<<<OURS>>>
-`npm run arggon -- validate` (ok, convention v5), `npm run check:plugin`
-<<<OURS>>>
-(byte-identical), plus CI's `lint:structure` and `test:structure`. Probe
-<<<OURS>>>
-evidence (expected vs observed, through the built `dist/cli.js`, `--json`) is in
-<<<OURS>>>
-the PR #605 body. Spec/plan `status` stays `proposed` (S5's box also covers
-<<<OURS>>>
-`task-zcode-automations`); this item stays `in_progress`.
-<<<OURS>>>
-
-<<<OURS>>>
+### handoff 2026-10-03 @Arggon — next: re-review PR #605 at b369506c: B1/B2/B3/B4 + all non-blocking addressed; probe evidence in the body
+- branch: feat/task-zcode-goal-mode
+- open questions: want the linear rebase (force-push, yours)?; three agent copies need adopt --ack (human step); parser unification left to bug-three-acceptance-parsers-diverging
 
 ### 2026-10-03 @ses_f00cf8887ffeQBrx2z0EtMtTXD
 verdict: request-changes (round 2 — B2, B3, B4 and all 8 non-blocking are closed; B1 is closed except for one input-level inversion that re-opens the same defect on 21 of 280 live items)
@@ -582,218 +408,79 @@ For the coordinator/prover in `/home/arggon/Projects/ArggonManager-task-zcode-go
 What remains is the same defect B1 was filed for, arriving through the input instead of the parser: the gate's verdict is now authoritative but is read from `shown.prose` while the gate reads `item.body`, which disagrees on **21 of the 280 items in this tracker** — every item whose acceptance checklist was filed as a comment, the shape `arggon create` produces by design. Fix line 526, correct the two comments that describe the call as taking `body`, add one comment-borne case to the corpus, and extend the follow-up item's acceptance to name this case. Then squash-merge — no rebase, no force-push.
 
 ### 2026-10-03 @Arggon
-
-<<<OURS>>>
-
 ## @Arggon — round-2 finding fixed: the gate verdict now reads the canonical body (PR #605 @ 5c367a10)
 
-<<<OURS>>>
-
-<<<OURS>>>
 One blocking finding survived, and it was the input, not the predicate:
-<<<OURS>>>
-
-<<<OURS>>>
 
 ```
-<<<OURS>>>
 lib/src/update.ts:526    !acceptanceComplete(item.body)      // done gate
-<<<OURS>>>
 cli/src/goal-mode.ts     !acceptanceComplete(shown.prose)    // goal  <-- comment sections stripped
-<<<OURS>>>
 ```
 
-<<<OURS>>>
-
-<<<OURS>>>
 `shown.prose` drops comment sections, and a checklist filed as an `arggon comment` is a
-<<<OURS>>>
 first-class shape here (`create` has no `--body` flag; `bug-empty-template-checkbox` is the stale
-<<<OURS>>>
 empty box that shape leaves behind). Per the reviewer's measurement (21 of 280 commented items
-<<<OURS>>>
 disagree), a goal could say "nothing left to do" on an item the gate still refused to close.
-<<<OURS>>>
 
-<<<OURS>>>
 **Fix:** both the verdict and the criterion text now read `item.body` — the same canonical input
-<<<OURS>>>
 `update.ts:526` reads. The invariant is stated where a future reader hits it ("one canonical
-<<<OURS>>>
 body, every predicate — a reader that trims or filters before calling has changed the question"):
-<<<OURS>>>
 module header, `deriveGoal` doc, the `gateUnchecked` field doc, and an inline comment at the call
-<<<OURS>>>
 site naming `update.ts:526` plus the comment-filed shape.
-<<<OURS>>>
 
-<<<OURS>>>
 **Tests (three added, and the corpus helper's contract made explicit):**
-<<<OURS>>>
-
 1. corpus case — the ONLY boxes live in a comment section (`gateUnchecked: true`, objective read
-   <<<OURS>>>
    from the comment);
-   <<<OURS>>>
 2. its twin — checked-in-a-comment only ⇒ gate satisfied, "DEFINE THE GOAL FIRST";
-   <<<OURS>>>
 3. a regression test that pins the defect itself: a comment-stripped input still yields
-   <<<OURS>>>
    `hasGoal: false` while `acceptanceComplete(full body)` is false — i.e. the round-2 build's
-   <<<OURS>>>
    inversion, asserted rather than described;
-   <<<OURS>>>
 4. end-to-end: a real `arggon comment` is appended and gate/goal agreement is asserted.
-   <<<OURS>>>
 
-<<<OURS>>>
 `deriveAsRun` was passing the full body by construction — that is exactly why the corpus never
-<<<OURS>>>
 saw this; its doc comment now says so. Verified the e2e test bites: with the two reverted lines,
-<<<OURS>>>
 1 failed / 40 passed; with the fix, 41 passed.
-<<<OURS>>>
-
-<<<OURS>>>
 
 ### Probe (built `dist/cli.js`, `--json`) — before/after on the same fixture
 
-<<<OURS>>>
-
-<<<OURS>>>
-
 ```
-<<<OURS>>>
 before (round-2 build):  gate {'ok': False, 'error': 'UPDATE_FAILED'}
-<<<OURS>>>
                          goal {"objective": "DEFINE THE GOAL FIRST: …", "hasGoal": false,
-<<<OURS>>>
                                "gateUnchecked": false, "checklist": {"total": 0, …}}
-<<<OURS>>>
 after:                  gate {'ok': False, 'error': 'UPDATE_FAILED'}
-<<<OURS>>>
                          goal {"objective": "criterion filed in a comment", "hasGoal": true,
-<<<OURS>>>
                                "renderable": true, "gateUnchecked": true,
-<<<OURS>>>
                                "checklist": {"total": 1, "unchecked": 1, "checked": 0}}
-<<<OURS>>>
 ```
-
-<<<OURS>>>
-
-<<<OURS>>>
 
 ### PR body corrected
 
-<<<OURS>>>
-
-<<<OURS>>>
 The stamp drift is **15** mismatches, not the 7 I first reported — main already carries the same
-<<<OURS>>>
 15; this PR adds two `x-generated` entries (`.zcode-marketplace/arggon/commands/arggon-goal.md`,
-<<<OURS>>>
 `.zcode-marketplace/arggon/templates/goal-mode.md`) plus refreshed checksums for the two JSON
-<<<OURS>>>
 destinations, and all four match their committed bytes byte-for-byte. The three agent copies I
-<<<OURS>>>
 cited first are inside that pre-existing 15 (recorded `bce74f…` vs on-disk `5b749f…` for
-<<<OURS>>>
 `arggon-worker.md`, stamps predating the hand-synced #589 change). Nothing introduced, nothing
-<<<OURS>>>
 worsened; CI excludes `.convention.yml` by design, so the drift is ungated — stated, not fixed.
-<<<OURS>>>
 The re-baseline (`arggon adopt --ack`) is a human step and was not run.
-<<<OURS>>>
-
-<<<OURS>>>
 
 ### Merge
 
-<<<OURS>>>
-
-<<<OURS>>>
 Acting on the reviewer's ruling: **squash-merge**, no force-push needed and none attempted (the
-<<<OURS>>>
 push was a fast-forward `61e80edb..5c367a10`). The conflicting state is confined to the item
-<<<OURS>>>
 file and both sides are additive. The coordinator performs the squash and the flip.
-<<<OURS>>>
-
-<<<OURS>>>
 
 ### Gates (build BEFORE test, per the pack-parity gate)
 
-<<<OURS>>>
-
-<<<OURS>>>
 `npm run build` → ok; `npm test` → 120 files, 2255 passed; `npm run lint` → clean;
-<<<OURS>>>
 `npm run arggon -- validate` → ok (0 warnings, convention v5); `npm run check:plugin` →
-<<<OURS>>>
 byte-identical. Parser unification deliberately untouched (`bug-three-acceptance-parsers-diverging`).
-<<<OURS>>>
 
-<<<OURS>>>
 Item stays `in_progress`; spec/plan `status` stays `proposed`.
-<<<OURS>>>
-
-<<<OURS>>>
 
 ### handoff 2026-10-03 @Arggon — next: coordinator: squash-merge PR #605 @ 5c367a10 and flip the item; no worker action left
-
-<<<OURS>>>
-
 - branch: feat/task-zcode-goal-mode
-  <<<OURS>>>
 - open questions: adopt --ack still owed by a human for the 15 pre-existing stamp mismatches; parser unification deferred to bug-three-acceptance-parsers-diverging
-
-### 2026-10-03 @ses_f00cf8887ffeQBrx2z0EtMtTXD
-  <<<THEIRS>>>
-  **2. Bounded output is structural, and the "boundaries always survive" inversion does not occur.** `runGoal` computes the boundary block first, then budgets the _filled template_ at `MAX_GOAL_CONTRACT_BYTES - byteLength(block) - 2` and clips to that, then appends `block` verbatim. The clip can only ever shrink adopter/template prose; the block is concatenated afterwards and never clipped. I measured the block at **1,974 B** against the 12,288 B cap, so the template budget is 10,312 B and the worst case lands exactly on 12,288 B. The boundaries/refusals constants are structurally immune to a hostile item or an inflated template — this is the property you asked me to hunt for and it holds. Per-line bounds check out: `clip(live[0], 240)`, `clip(line, 200)`, `live.slice(0, 8)` with `verificationOmitted = live.length - inlined.length` (overflow **counted, never pasted**). `MAX_GOAL_PROSE_BYTES` (32 KiB) is applied to `shown.prose` _before_ `parseAcceptanceRows`, and `MAX_GOAL_TEMPLATE_BYTES` (8 KiB) at read time — both genuinely pre-parse. The `clip` helper counts the 3-byte ellipsis inside the budget, so a clipped line stays at or under max.
-  <<<THEIRS>>>
-
-<<<THEIRS>>>
-**3. Boundaries are appended from CLI constants — confirmed, and an adopter cannot delete them.** `GOAL_BOUNDARIES`/`GOAL_REFUSALS` are module constants; `renderBoundaryBlock` reads only those. The template file is read for the _shape_ only, and `fillSlots` fills just five slots. Stripping the template's own boundary prose cannot remove the appended block. The test "keeps the boundaries when the adopter's template copy is stripped down" discriminates: it overwrites the file with a two-line stub, then asserts the boundaries survive.
-<<<THEIRS>>>
-**6. Leaving spec/plan at `proposed` is correct.** S5 bundles the goal-mode template _and_ the automation templates, and the spec's own acceptance box reads "ZCode adapter: goal-mode template derives the objective...; automation templates run read-only scans and file items via `arggon create`". Sibling `task-zcode-automations` is still `todo` and unclaimed. The PR touches neither spec nor plan and claims S5 nowhere.
-<<<THEIRS>>>
-`parseAcceptanceRows` lives in the **board** module (a rendering helper for the TUI/serve drawer), not in the kernel, and it is not the predicate the done gate runs. goal-mode then adds a _third_ filter of its own (`live = unchecked.filter(row => row.length > 0)`). So "the goal reads exactly the checklist the done gate gates on" is untrue, and **the two can drift — they already do**. I ran both regexes side by side over a fixture matrix:
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-
-```
-<<<THEIRS>>>
-```
-
-<<<THEIRS>>>
-
-- **Two spaces** (`-  [ ] criterion`, a hand-edit typo): the gate treats it as _no checklist at all_ (so the item flips to `done` freely) while the goal loops on it as a criterion.
-  <<<THEIRS>>>
-  `goal-mode.ts:387-391` does `assertClaimed(item, identity ?? undefined)`, and inside `assertClaimed` the check is `if (login !== undefined && item.assignee !== login)`. An unresolved identity therefore _disables_ the foreign-claim refusal rather than falling back to refusing. The rendered contract does warn ("Caller identity could not be resolved... confirm `arggon show <id> --meta` names you before the first write") and a test pins that warning, so this is deliberate — but it means the docs' flat "a goal never targets another identity's claim" holds only when `GITHUB_USER`/`GITHUB_ACTOR`/`gh`/`git config` resolve. Given this is a pure read and the worktree check still applies, either refuse when an assignee exists but identity is unknown, or state the conditional in `agents.md`/README the way the contract text already does. As shipped, the docs overstate the invariant.
-  <<<THEIRS>>>
-
-1. **Only one of the seven refusal codes is asserted.** `goal-mode.test.ts` asserts `GOAL_UNCLAIMED` via `envelope.error.code`; the other four refusal tests match the _message_ (`toThrow(/claimed by 'Someone-else'/)`, `/never spans worktrees/`, `/no longer exists/`). Renaming a code breaks nothing. `GOAL_TEMPLATE_UNAVAILABLE` and `GOAL_FAILED` have **no test at all** — the fallback test only covers the adopter copy being absent. The code-to-case mapping is the documented contract in `docs/json-output.md`, so assert the codes.
-   <<<THEIRS>>>
-   — _demonstrates_: the goal-mode suite is green and the done-gate/cascade suites still pass, so B1's refactor has a safe landing zone. _Would change_: a failure here blocks the B1 fix.
-   <<<THEIRS>>>
-2. A parity harness comparing `acceptanceComplete(body)` (`lib/src/items.ts`) against `parseAcceptanceRows(body)` plus goal-mode's `live` filter, over fixtures including `-  [ ] x` and a CRLF body.
-   <<<THEIRS>>>
-   — _demonstrates_: the two predicates disagree on exactly the two classes reported and agree elsewhere; the output becomes the new parity test. _Would change_: if it reports agreement, B1 drops from blocking to a docs-only correction.
-   <<<THEIRS>>>
-3. `npm run arggon -- init` in a scratch clone of the branch, then `diff -r` `.zcode-marketplace/` against `templates/docs/zcode/` modulo the `# arggon:generated` header.
-   <<<THEIRS>>>
-   — _demonstrates_: the regenerated vendored copy is byte-consistent with the template source (B3's fix). _Would change_: if the regen produces a larger diff than the four files implicated, the finding widens.
-   <<<THEIRS>>>
-4. `npm run arggon -- goal task-zcode-goal-mode`, the same with `--json`, and one from a subdirectory (`cd cli && npm run arggon -- goal task-zcode-goal-mode --json`) to observe `conventionVersion`.
-   <<<THEIRS>>>
-   — _demonstrates_: the blocking smoke probe `engineering.md` requires for a CLI change — objective, three inlined criteria, appended boundaries, exit 0 — and confirms finding #4's `conventionVersion: 0` on a subdirectory invocation. _Would change_: the verdict cannot move to approve without the command actually being run on a fixture, whatever the unit tests say.
-   <<<THEIRS>>>
-5. `npm run arggon -- goal <an-item-claimed-by-someone-else> --json`, and one from a foreign checkout.
-   <<<THEIRS>>>
-   — _demonstrates_: `GOAL_FOREIGN_CLAIM` and `GOAL_WORKTREE_MISMATCH` fire in the shape an agent actually hits them, not just in a fixture. _Would change_: if either degrades into a rendered mode, escalate.
-   <<<THEIRS>>>
 
 ### 2026-10-03 @Arggon
 ## @Arggon — pass 3: the kernel owns the grammar now (PR #611 merged); four claims corrected
@@ -949,10 +636,7 @@ Related, verified: `.convention.yml` differs from `main` by exactly the two new 
 
 **B3 — the item file's union resolution altered a historical verdict and glued a comment heading.** Both dated verdicts are present on the branch (6 `### YYYY-MM-DD @` headers vs 2 on `main`; the union happened), but:
 - `task-zcode-goal-mode.md:67` now reads `… goal_has_criterion=true ("- [ ] x")` where `main` has `… ("-  [ ] x")` — **one space dropped from the row whose entire point is two spaces**, so the preserved evidence now shows a shape that actually *agrees*. The column padding was reflowed throughout that table.
-- `task-zcode-goal-mode.md:884` runs the round-2 verdict's heading onto the previous line: `… deferred to bug-three-acceptance-parsers-diverging
-
-### 2026-10-03 @ses_f00cf8887ffeQBrx2z0EtMtTXD
-. `lib/src/show.ts` `parseComments` matches `^### (\d{4}-\d{2}-\d{2}) @(\S+)\s*$` — a heading that is not at line start is invisible to it, so the round-2 verdict is attributed to the worker's handoff. Same class as the input defect this PR exists to fix: a comment-boundary marker mangled by a text operation. Two characters to fix.
+- `task-zcode-goal-mode.md:884` runs the round-2 verdict's heading onto the previous line: `… deferred to bug-three-acceptance-parsers-diverging### 2026-10-03 @ses_f00cf8887ffeQBrx2z0EtMtTXD`. `lib/src/show.ts` `parseComments` matches `^### (\d{4}-\d{2}-\d{2}) @(\S+)\s*$` — a heading that is not at line start is invisible to it, so the round-2 verdict is attributed to the worker's handoff. Same class as the input defect this PR exists to fix: a comment-boundary marker mangled by a text operation. Two characters to fix.
 
 ## Non-blocking (file as follow-ups per AGENTS.md; do not block on them)
 
@@ -1001,451 +685,6 @@ The feature itself is verified sound against the merged kernel: all four stale c
 What is left is delivery state and two one-line text defects: **push `93ec81b5`** (the pushed head is the one the seam drift gate rejected, and merging it as-is would re-create round 1's B3), fix the README sentence, and repair the two characters the union took out of the item's own record. Then squash-merge — no rebase, no force-push — and flip the item.
 
 Operational note for the coordinator: this verdict is written with `tools.arggon.comment`, which resolves the tracker root to **this session's cwd** (the primary checkout), so it lands on `main`'s copy of the item — the pre-claim `status: todo` one, same as rounds 1 and 2. Because the branch already contains `origin/main`, the branch must merge `origin/main` once more (or the item-file conflict must be resolved as a union that includes this verdict) before the squash, or the merged item file will not carry it.
-
-### 2026-10-03 @Arggon
-
-<<<OURS>>>
-
-## @Arggon — round-1 response shipped (PR #605 updated to b369506c)
-
-<<<OURS>>>
-
-<<<OURS>>>
-**Impact class: Behavioral** (docs/agents.md §Changing the methodology itself; carriers
-<<<OURS>>>
-`docs/agents.md` + `skills/arggon-cli/**`), with the ADR 0016 adopter-upgrade channel: the
-<<<OURS>>>
-change ships in the generated seam + the CLI, the skill and its `.agents/` copy are byte-equal
-<<<OURS>>>
-in this PR, and every doc statement it falsifies was updated here.
-<<<OURS>>>
-
-<<<OURS>>>
-
-### B1 — claim withdrawn, gate made authoritative
-
-<<<OURS>>>
-
-<<<OURS>>>
-`parseAcceptanceRows` is the board renderer's parser, not the kernel's; the gate's predicate is
-<<<OURS>>>
-`acceptanceComplete`. `arggon goal` now asks `acceptanceComplete` whether work remains and
-<<<OURS>>>
-publishes that verdict as `goal.gateUnchecked`; the row parser supplies text only, over
-<<<OURS>>>
-LF-normalized prose; a disagreement renders an explicit "READ THE ITEM BODY FIRST" shape
-<<<OURS>>>
-(`renderable: false`) instead of an invented goal. Unification is owned by
-<<<OURS>>>
-`bug-three-acceptance-parsers-diverging` — named in the code and the docs, and the reason the
-<<<OURS>>>
-parser is NOT moved into the kernel in this PR (that is that item's design decision; moving it
-<<<OURS>>>
-here risks a fourth parser). Corrected in all five+ places it shipped (module header,
-<<<OURS>>>
-`deriveGoal` docstring, test header, README, agents.md §ZCode, json-output.md, skill
-<<<OURS>>>
-references, ZCode command doc, goal template, item Notes).
-<<<OURS>>>
-
-<<<OURS>>>
-Parity corpus in `cli/src/goal-mode.test.ts` pins `hasGoal === !acceptanceComplete` over CRLF,
-<<<OURS>>>
-`-  [ ] x`, `- [ ]x`, `- [ ] x`, `*`, indentation, tabs, empty boxes and `X`.
-<<<OURS>>>
-
-<<<OURS>>>
-
-### B2 — unresolvable identity refuses
-
-<<<OURS>>>
-
-<<<OURS>>>
-`GOAL_IDENTITY_UNKNOWN` (new): without knowing who is asking, the lease invariant cannot be
-<<<OURS>>>
-enforced, so nothing renders. Order is by most specific cause (closed item → identity → claim →
-<<<OURS>>>
-checkout), so a closed item is never reported with an environment remedy. Both directions
-<<<OURS>>>
-tested.
-<<<OURS>>>
-
-<<<OURS>>>
-
-### B3 — the checked-in `.zcode-marketplace/` was regenerated
-
-<<<OURS>>>
-
-<<<OURS>>>
-Through the real pipeline (`arggon init`, `--no-commit`): the two JSON descriptions plus the new
-<<<OURS>>>
-`commands/arggon-goal.md` and `templates/goal-mode.md`, with refreshed checksums in
-<<<OURS>>>
-`.convention.yml`. Every checked-in copy verified byte-identical to its template modulo the
-<<<OURS>>>
-generated marker (19 tracked + 2 new). No CI gate covers this class, so it is stated in the PR
-<<<OURS>>>
-body too. NOT actioned (human step): three agent copies + four `.opencode/**` copies stay
-<<<OURS>>>
-`modified` from pre-existing checksum drift (recorded `sha256:bce74f…` vs on-disk
-<<<OURS>>>
-`sha256:5b749f…` for `agents/arggon-worker.md`) — the sanctioned remedy is `arggon adopt --ack`.
-<<<OURS>>>
-
-<<<OURS>>>
-
-### B4 — stated (Behavioral + ADR 0016).
-
-<<<OURS>>>
-
-<<<OURS>>>
-
-### Non-blocking — all closed
-
-<<<OURS>>>
-
-<<<OURS>>>
-1 codes asserted for all eight refusals (incl. `GOAL_TEMPLATE_UNAVAILABLE` via a new
-<<<OURS>>>
-`templatesDir` injection point and `GOAL_FAILED`); 2+3 the bounded prose read is tested both
-<<<OURS>>>
-ways AND the clip's `clipped` flag now folds into `truncated`; 4 subdirectory invocations report
-<<<OURS>>>
-the real `conventionVersion` (5, was 0); 5 the boundary text now names the no-worktree fallback
-<<<OURS>>>
-(repo root, never a sibling's); 6 the soft cap is documented (measured block 1,974 B, ~9.3 KB
-<<<OURS>>>
-headroom); 8 clip-before-fill ordering documented. 7 deferred on purpose — see B1.
-<<<OURS>>>
-
-<<<OURS>>>
-
-### Probe evidence (built `dist/cli.js`, `--json`, fresh temp tree per case)
-
-<<<OURS>>>
-
-<<<OURS>>>
-Expected → observed, full transcript in the PR body:
-<<<OURS>>>
-
-- unchecked boxes → objective `first criterion`, verification both, `hasGoal/renderable/
-<<<OURS>>>
-gateUnchecked` all true;
-  <<<OURS>>>
-- nothing unchecked → `DEFINE THE GOAL FIRST`, and the gate then allows the flip (`ok: true`);
-  <<<OURS>>>
-- **CRLF item → gate refuses the flip (`UPDATE_FAILED`) while the goal says work remains with
-  <<<OURS>>>
-  readable text — they agree** (round 1 had them inverted);
-  <<<OURS>>>
-- foreign claim → `GOAL_FOREIGN_CLAIM` with `conventionVersion: 5`, from the root AND from
-  <<<OURS>>>
-  `sub/dir/`;
-  <<<OURS>>>
-- unresolvable identity → `GOAL_IDENTITY_UNKNOWN`; unclaimed → `GOAL_UNCLAIMED`; unknown id →
-  <<<OURS>>>
-  `GOAL_FAILED`;
-  <<<OURS>>>
-- 5000-char criterion → objective 238 B, lines ≤ 200 B, contract 5,046 B ≤ 12,288 B cap,
-  <<<OURS>>>
-  boundaries intact.
-  <<<OURS>>>
-
-<<<OURS>>>
-Gates: `npm run build`; `npm test` 120 files / 2251 passed; `npm run lint` clean;
-<<<OURS>>>
-`npm run arggon -- validate` ok (v5); `npm run check:plugin` byte-identical; CI's
-<<<OURS>>>
-`lint:structure` + `test:structure` green; the verdict's own probe list
-<<<OURS>>>
-(`goal-mode + init-zcode + done-gate + cascade`) → 4 files / 89 tests passed.
-<<<OURS>>>
-
-<<<OURS>>>
-
-### History: no force-push
-
-<<<OURS>>>
-
-<<<OURS>>>
-A rebase onto origin/main was prepared and verified (the item-file conflict resolved by keeping
-<<<OURS>>>
-BOTH records — this verdict plus my evidence/handoff/round-1 response). Publishing it would need
-<<<OURS>>>
-a force-push, which is refused; instead the published history is intact and the round-2 commits
-<<<OURS>>>
-sit on top (fast-forward `505f8c3e..b369506c`), content-identical to the rebased tip for every
-<<<OURS>>>
-file this PR owns. The linear rebase, if you prefer it, is yours to force-push.
-<<<OURS>>>
-
-<<<OURS>>>
-Item stays `in_progress`; spec/plan `status` stays `proposed` (S5 also covers
-<<<OURS>>>
-`task-zcode-automations`).
-<<<OURS>>>
-
-<<<OURS>>>
-
-### handoff 2026-10-03 @Arggon — next: re-review PR #605 at b369506c: B1/B2/B3/B4 + all non-blocking addressed; probe evidence in the body
-
-<<<OURS>>>
-
-- branch: feat/task-zcode-goal-mode
-  <<<OURS>>>
-- open questions: want the linear rebase (force-push, yours)?; three agent copies need adopt --ack (human step); parser unification left to bug-three-acceptance-parsers-diverging
-  <<<OURS>>>
-
-<<<OURS>>>
-
-### 2026-10-03 @ses_f00cf8887ffeQBrx2z0EtMtTXD
-
-<<<THEIRS>>>
-verdict: request-changes (round 2 — B2, B3, B4 and all 8 non-blocking are closed; B1 is closed except for one input-level inversion that re-opens the same defect on 21 of 280 live items)
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-
-## Round-2 scope
-
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-Re-reviewed the branch as it stands (`origin/feat/task-zcode-goal-mode` @ `61e80edb`, 9 commits, PR still **draft**). No gates run by me. Everything below is from reading the branch, plus four pure function/parser comparisons of published logic (no project gate, no build, no test suite).
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-**Closed and verified:**
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-
-- **B2 — genuinely closed.** `assertIdentityResolvable` (`goal-mode.ts:451`) now REFUSES with a new `GOAL_IDENTITY_UNKNOWN` instead of downgrading the claim check; `identity` is typed `string` (not `string | null`) so an unrenderable-for-unknown-caller state is unrepresentable. Order is most-specific-cause-first — `assertNotClosed` -> `assertIdentityResolvable` -> `assertClaimed` -> `assertWorktree` (lines 517-520) — so a closed item never gets an environment remedy. Both directions are asserted: the code is in the table-driven refusal suite _and_ `identity` can no longer be null anywhere in `GoalContract`. Correct.
-  <<<THEIRS>>>
-- **B3 — closed for what this PR owns.** I byte-compared all 21 vendored `.zcode-marketplace/` files against `templates/docs/zcode/` modulo the generated marker on the branch worktree: **all identical**, including the new `commands/arggon-goal.md` and `templates/goal-mode.md`. (`hooks/gate.mjs` is the one file my first pass flagged; that was a false positive from my marker filter — its marker is `// arggon:generated`, not `#`. Re-checked: identical, on main and branch.) `.convention.yml` gains exactly the two new entries for the goal files.
-  <<<THEIRS>>>
-- **B4 — closed.** Impact class is line 4 of the PR body ("**Impact class: Behavioral**" + ADR 0016 reference), and repeated in the item. Where required.
-  <<<THEIRS>>>
-- **All 8 non-blocking — closed, each verified in code or test, not just claimed:**
-  <<<THEIRS>>>
-  - (1) all eight codes asserted through a table-driven loop on `envelope.error.code` (`goal-mode.test.ts:496`), including `GOAL_TEMPLATE_UNAVAILABLE` via the new `templatesDir` injection point (a real empty tree, no mock) and `GOAL_FAILED` via a non-existent id;
-    <<<THEIRS>>>
-  - (2) prose clip tested in **both** directions — clipped-past-the-checklist yields `renderable:false` + `gateUnchecked:true`, clipped-only-the-tail yields `renderable:true` + `truncated:true` — and `truncated: derived.truncated || prose.clipped` is wired in (line 535);
-    <<<THEIRS>>>
-  - (3) `conventionVersionFor()` (lines 588-594) resolves the tracker root before falling back to raw cwd; `conventionVersion: 5` asserted on every refusal envelope;
-    <<<THEIRS>>>
-  - (4) the no-worktree fallback is now named in the boundary itself (line 131: "An item that records no worktree at all ... is scoped to the repo root you are standing in");
-    <<<THEIRS>>>
-  - (5) soft cap documented at the constant, with the measured block size and headroom;
-    <<<THEIRS>>>
-  - (6) clip-before-fill documented at `MAX_GOAL_TEMPLATE_BYTES`;
-    <<<THEIRS>>>
-  - (7) the `board.js` import now carries an explicit deferral comment;
-    <<<THEIRS>>>
-  - (8) clip-before-fill consequence documented on the contract field.
-    <<<THEIRS>>>
-- **(c) the parity corpus is real.** `goal-mode.test.ts:120-210` asserts `hasGoal === !acceptanceComplete` across: no checklist, one unchecked, all ticked, mixed, empty box, `*` bullet, indentation, uppercase `X`, tab-after-box, `- [ ]x` (renderable:false), `- [ ] x`, plus a dedicated CRLF test that pins the gate at `false` and the raw row parser at `[]` before normalizing. That is the right shape of test.
-  <<<THEIRS>>>
-- **(d) the false claim is gone everywhere it shipped.** I grepped every file in the diff for "kernel's own", "same rule the done gate", "exactly as the done gate", "exactly the checklist the done gate": the only hits are my round-1 verdict quoted in the item file, plus unrelated pre-existing uses elsewhere in the repo. Module header, `deriveGoal`, test header, README, `agents.md` §ZCode, `json-output.md`, both skill references, the ZCode command doc and the goal template are all corrected. The new header is honest about there being TWO parsers and names the follow-up.
-  <<<THEIRS>>>
-- **Probe evidence is present and the CRLF case shows exactly what it should**: `arggon update task-crlf --status done --json` -> `{'ok': False, 'error': 'UPDATE_FAILED'}` while `arggon goal task-crlf --json` -> `{"objective": "crlf criterion", "hasGoal": true, "renderable": true, "gateUnchecked": true}`. Gate refuses, goal reports work remains, they agree. The subdirectory `conventionVersion: 5` probe is there too.
-  <<<THEIRS>>>
-
-<<<THEIRS>>>
----
-
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-
-## Still blocking — B1 residual: the gate's verdict is read from the WRONG STRING
-
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-The fix took the verdict from the right predicate but fed it a **different input than the done gate does**:
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-
-```
-<<<THEIRS>>>
-lib/src/update.ts:526    const gated = ... && !acceptanceComplete(item.body);      // the gate
-<<<THEIRS>>>
-cli/src/goal-mode.ts:526  const gateUnchecked = !acceptanceComplete(shown.prose);    // the goal
-<<<THEIRS>>>
-```
-
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-`item.body` is the **full body including `arggon comment` sections**. `shown.prose` is the body truncated at the first `### YYYY-MM-DD @author` heading (`lib/src/show.ts:63-79`, `parseComments`) — comments excluded. So the two read different strings.
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-This is not hypothetical: **filing an acceptance checklist as a comment is a first-class supported shape in this repo**, precisely because `arggon create` has no `--body` flag — `bug-empty-template-checkbox` carries the acceptance box "Items whose acceptance lives in a comment flip via auto-done without manual surgery". I ran both predicates over every item in this tracker:
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-
-```
-<<<THEIRS>>>
-items with comments: 280 | items where gate(body) and goal-mode(prose) DISAGREE: 21  (7.5%)
-<<<THEIRS>>>
-  gate_closes_item=false  goal_reports_nothing_left=true
-<<<THEIRS>>>
-    .../task-plugin-test-type-coverage.md
-<<<THEIRS>>>
-    .../task-arm-strict-worktree-writes.md
-<<<THEIRS>>>
-    .../task-cycle-set-canonical.md
-<<<THEIRS>>>
-    .../task-done-gate-acceptance-waiver.md
-<<<THEIRS>>>
-    .../bug-harness-config-churn.md   (+16 more)
-<<<THEIRS>>>
-```
-
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-Isolated, on a minimal body:
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-
-```
-<<<THEIRS>>>
-done gate acceptanceComplete(body) = false -> done flip REFUSED
-<<<THEIRS>>>
-goal-mode acceptanceComplete(prose) = true -> gateUnchecked = false
-<<<THEIRS>>>
-INVERSION: the gate REFUSES to close, the goal contract reports NO work remains.
-<<<THEIRS>>>
-```
-
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-So the contract still emits **"DEFINE THE GOAL FIRST ... nothing verifiable to loop on"** for an item the kernel is actively refusing to close — the exact harm B1 was filed for, reached through the input rather than through the parser. Everything built to prevent it (`gateUnchecked`, `renderable`, `UNRENDERABLE_OBJECTIVE`, the parity corpus) is correct and gets bypassed here, because `gateUnchecked` was computed from a string the gate never sees.
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-Three things make this cheap to close rather than defer:
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-
-1. `runGoal` already holds the full item — `const item = shown.item` at line 509, and `WorkItem.body` is the same field `update.ts` passes the gate. **The fix is one line:** `acceptanceComplete(shown.item.body)`.
-   <<<THEIRS>>>
-2. The two code comments that describe this call assert the _gate's_ input, not the code's: line 194 says `!acceptanceComplete(item body)` and line 255 says `!acceptanceComplete(body)`. They are wrong as written. Given B1's whole lesson was that a comment naming the wrong owner re-introduces the bug, these need to say what is actually passed.
-   <<<THEIRS>>>
-3. The parity corpus cannot catch it because its helper (line 116) passes the full `body`, not `shown.prose` — so it does not exercise the production input path. Add one case with the checklist inside a comment; it will fail on today's code.
-   <<<THEIRS>>>
-
-<<<THEIRS>>>
-Separately: `bug-three-acceptance-parsers-diverging`'s acceptance box 3 scopes the invariant to CRLF only ("the done gate refuses, and the board and goal contract ALSO report the unchecked boxes"). Extend it to name the comment/prose input case, or this same defect will be re-raised a third time.
-<<<THEIRS>>>
-
-<<<THEIRS>>>
----
-
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-
-## Ruling requested: the linear rebase
-
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-**Recommendation: squash-merge, do not rebase.**
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-The branch is `CONFLICTING` against main, but the conflict is confined to a single file — `task-zcode-goal-mode.md` — and both sides are **purely additive**: main added my round-1 verdict (113 lines), the branch added its Notes/acceptance work (373 lines). No other file in the diff is touched by both sides (merge base `ba808947`). This is the textbook squash case: GitHub's squash-merge collapses the nine commits without needing a force-push, which is what the policy denial was protecting.
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-The conflict still has to be resolved by hand either way, and the resolution is the union of both additions — keep my verdict comment and the branch's round-1 responses, Notes and acceptance block. Squash-merge is strictly better than a rebase here: it needs no privileged push, it produces one reviewable commit for a feature whose history is currently four rounds of review archaeology, and it is the only option available under the stated policy. Do **not** force-push the linear rebase.
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-Two smaller notes for the merge:
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-
-- The PR should leave **draft** until the residual above lands, then be marked ready with the squash as the merge method.
-  <<<THEIRS>>>
-- **The stamp evidence is undercounted, and the direction of the news is good.** I verified every `x-generated` checksum against the committed bytes on both refs: main has **15** mismatches and 9 stamps for files that are gitignored; the branch has **the same 15** and the same 9, plus the 2 new correct entries. So the PR neither introduced nor worsened any drift — the pre-existing agent-copy and `.opencode/**` mismatches date from #589/#596, which regenerated the files but reverted the stamps per the documented decision ("the stamps go back to origin/main"). And `.github/workflows/arggon.yml` excludes `.convention.yml` from the drift gate **by design** ("`init` refreshes the per-doc generatedAt bookkeeping on every run, so the state file is excluded"), so committing the bumped `generatedAt` and the corrected `index.ts` checksum cannot turn CI red. Leaving `arggon adopt --ack` to a human is correct. Only the count in the PR body ("three agent copies + four `.opencode/**` copies") should be corrected to 15, since a reviewer counting 7 will not find 15.
-  <<<THEIRS>>>
-
-<<<THEIRS>>>
----
-
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-
-## Judgment on the deferral (asked as item 3)
-
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-**Deferring parser unification is right, and the worker's reasoning holds.** `acceptanceComplete` returns a boolean, not rows, so unifying means first deciding what a row _is_ — which is a behavior change to the done gate and belongs in its own item with its own parity corpus, not inside a seam feature PR. Guessing at it here would have produced a fourth parser or an unrequested change to `done` refusals. `bug-three-acceptance-parsers-diverging` is a well-formed home for it: three named call sites, two named divergence classes, a corpus-shaped acceptance list, and an explicit "no behavior change to the done gate's refusals" boundary. Good call; I would not have wanted that refactor inside this PR.
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-**But the contract is still unsound without the one-line input fix, and that part is not covered by the deferral.** Parser unification is about which _shapes_ count as rows; this is about which _string_ the gate's own predicate is handed. They are independent. The deferral is sound, and shipping with the inversion is not.
-<<<THEIRS>>>
-
-<<<THEIRS>>>
----
-
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-
-## Probes needed
-
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-For the coordinator/prover in `/home/arggon/Projects/ArggonManager-task-zcode-goal-mode`, after the residual fix lands:
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-
-1. `npm test -- cli/src/goal-mode.test.ts cli/src/done-gate.test.ts cli/src/cascade.test.ts cli/src/init-zcode.test.ts`
-   <<<THEIRS>>>
-   — _demonstrates_: the corpus, the eight-code refusal table and the seam suites stay green with `acceptanceComplete(shown.item.body)`. _Would change_: a failure means the one-line fix disturbed the gate-parity assumption.
-   <<<THEIRS>>>
-2. `npm run arggon -- goal <an item whose checklist lives in a comment> --json` plus `arggon update <same id> --status done --json`.
-   <<<THEIRS>>>
-   — _demonstrates_, on a real tree, the case the unit corpus missed: expected gate `UPDATE_FAILED` and goal `gateUnchecked: true`. Pick one of the 21 (e.g. `task-plugin-test-type-coverage`). _Would change_: if the goal still reports `gateUnchecked: false`, the fix is incomplete.
-   <<<THEIRS>>>
-3. A corpus re-run over all tracker items comparing `acceptanceComplete(item.body)` against what `arggon goal` renders.
-   <<<THEIRS>>>
-   — _demonstrates_: the 21-item disagreement class is closed with no residual. _Would change_: any remaining disagreement reopens this.
-   <<<THEIRS>>>
-4. `gh pr view 605` mergeability after the squash.
-   <<<THEIRS>>>
-   — _demonstrates_: the item-file conflict is the only one and resolves as the union of both additions.
-   <<<THEIRS>>>
-
-<<<THEIRS>>>
-
-## Recommendation
-
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-**No merge yet — one blocking finding, and it is a one-line fix.** Everything else I asked for in round 1 landed, and landed properly: B2 refuses instead of degrading, B3 regenerated the vendored seam and left pre-existing drift where the documented decision puts it, B4 states the impact class, all eight non-blocking items are closed with real tests rather than assertions of intent, the false claim is corrected everywhere it shipped, the parity corpus is the shape I asked for, and the CRLF probe shows the two surfaces agreeing. The CRLF inversion is genuinely dead.
-<<<THEIRS>>>
-
-<<<THEIRS>>>
-What remains is the same defect B1 was filed for, arriving through the input instead of the parser: the gate's verdict is now authoritative but is read from `shown.prose` while the gate reads `item.body`, which disagrees on **21 of the 280 items in this tracker** — every item whose acceptance checklist was filed as a comment, the shape `arggon create` produces by design. Fix line 526, correct the two comments that describe the call as taking `body`, add one comment-borne case to the corpus, and extend the follow-up item's acceptance to name this case. Then squash-merge — no rebase, no force-push.
 
 ### 2026-10-03 @Arggon
 Round-3 review closed: B1/B2/B3 fixed, published. Branch tip `92aff9e1` == worktree tip == remote tip.
@@ -1532,3 +771,92 @@ ui-smoke         pass  2m11s   (run 37131468593)
 `tasks-validate` is the job that rejected the pre-`93ec81b5` head for stale `.zcode-marketplace/` bytes; it now passes on the committed seam, matching the local run of the same step (marker present, committed stamp `0.5.0` not ahead of the pin, re-generate → clean).
 
 Branch and worktree tip are both `7f358df4e950a29425a50c301df6f271fba4cab1`, identical to `origin/feat/task-zcode-goal-mode` and to PR #605's head; the primary checkout is clean on `main` and contains none of these commits. Item stays `in_progress`; PR #605 is ready for review, and the squash-merge is the coordinator's call.
+
+### 2026-10-03 @ses_efe0cc7a9ffekSptdyYXLmvnoT
+verdict: request-changes (round 4 — B1 and B2 confirmed closed by reading; B3's repair split a verdict and reset the acceptance checklist, so the record is still wrong)
+
+## Scope reviewed
+
+All reads through the **worktree** `/home/arggon/Projects/ArggonManager-task-zcode-goal-mode` (the primary's copy of the item is pre-merge state, as instructed). Reviewed: the item file in the worktree read **whole** (1,535 lines) and block-by-block against the primary's copy; `.git/refs/heads/feat/task-zcode-goal-mode`, `refs/remotes/origin/feat/task-zcode-goal-mode`, both reflogs, `COMMIT_EDITMSG`; the full 20-file `.zcode-marketplace/` seam byte-compared against `templates/docs/zcode/`; `README.md`, `cli/src/board.ts`, `lib/src/verdict.ts`; and a 37-path spot sweep of branch vs main. **No gate executed** — no build, no test suite, no smoke. The only executions were byte/diff comparisons of files and git metadata I read.
+
+---
+
+## B1 — confirmed closed, and the proof is a reproduction
+
+Branch, worktree and remote-tracking ref are all `53ce55d4`, and `logs/refs/remotes/origin/feat/task-zcode-goal-mode` ends with `7f358df4 → 53ce55d4 … update by push` — the tip **is** published (round 3's blocker). The branch reflog shows the round-4 sequence honestly: `93ec81b5` (seam regen) → `92aff9e1` (merge `origin/main`, "item file resolved as a union") → three `chore(tasks)` commits → `53ce55d4`. No force, no rebase.
+
+I did not take the "byte-identical modulo the marker" claim on trust. **All 20 vendored seam files** are byte-identical to their templates after stripping the generator's marker line — including the two new ones — and 18 of 20 carry the marker in exactly the form their long-standing siblings carry (`# arggon:generated template="zcode/…"`, `// arggon:generated …` for `gate.mjs`; the two JSONs carry none). So the marker allowance is **the pipeline's own output shape, not an exemption invented to make the comparison pass**: a file that is "template + generator marker line" is what `arggon init` writes, and the gate's real test is not a byte diff at all but `node dist/cli.js init --no-commit` followed by `git status --porcelain` with only `*.convention.yml` excluded (verified in `.github/workflows/arggon.yml`). On that test the current tree is clean by construction — every managed file equals its render.
+
+"Omission, not hand-edit" is consistent with the bytes: a hand-edit would show as a vendored file that differs from its template; none do. What I could **not** do is diff `93ec81b5` itself (no git in this session), so "before `93ec81b5`, init left exactly those two files modified" is a claim I take on the worker's transcript — it is also moot, since the state it describes no longer exists and the gate is green.
+
+## B2 — confirmed closed
+
+`README.md` now reads: *"Bounded output: the objective and each verification line are byte-clipped, at most 8 criteria are inlined and the rest are counted in `verificationOmitted` (clipping the ROWS is the kernel's guidance for a consumer that renders them), and the template copy is clipped before rendering…"*. Every clause maps to a thing the code does (`MAX_GOAL_OBJECTIVE_BYTES`, `MAX_GOAL_VERIFICATION_BYTES`, `MAX_GOAL_VERIFICATION_LINES`, `verificationOmitted`, `MAX_GOAL_TEMPLATE_BYTES`). `a clipped rows` is gone. `cli/src/board.ts:757` is fixed too — the alias clause now says the ZCode goal contract "reads the kernel directly, like every other consumer", which is true (`goal-mode.ts` imports `acceptanceRows` from `@arggondev/lib`; no board import).
+
+---
+
+## B3 — the two named artifacts are fixed, but the repair introduced two new record defects
+
+**What is genuinely whole now, read directly (not by count):** the round-1 verdict is present **verbatim and contiguous** (`### 2026-10-03 @ses_f00…` at line 138, 18,410 chars, zero conflict markers, opening `verdict: request-changes (derivation does not reuse the done gate's predicate; vendored ZCode seam left stale)` and closing with its own `**No merge.**` recommendation). The round-2 verdict is likewise verbatim and contiguous at line 472 (13,723 chars, zero markers, opening `verdict: request-changes (round 2 — …`). The worker is right that main's complete text won and the truncated fragment no longer stands in for it.
+
+**New defect 1 — my round-3 verdict is split, and its tail is attributed to another reviewer.** This is the direct read you asked for, and it fails. My verdict's B3 bullet quotes a glued heading as evidence:
+
+> `- \`task-zcode-goal-mode.md:884\` runs the round-2 verdict's heading onto the previous line: \`… deferred to bug-three-acceptance-parsers-diverging### 2026-10-03 @ses_f00cf8887ffeQBrx2z0EtMtTXD\`.`
+
+In the branch that single line has been **split at the quoted text**, and the quoted heading now sits alone at column 0:
+
+```
+878  ### 2026-10-03 @ses_efe0cc7a9ffekSptdyYXLmvnoT      ← me: the verdict, 15,012 chars, ends mid-bullet
+954  ### 2026-10-03 @ses_f00cf8887ffeQBrx2z0EtMtTXD      ← NOT me: 9,058 chars starting ". `lib/src/show.ts` `parseComments` matches…"
+```
+
+Line-level diff against the primary's copy: 123 of my 124 lines align; the one that does not is exactly that bullet, now 4 lines instead of 1. So **no content is lost, but ~40 lines of my verdict — my B3 bullet's second half, my non-blocking list, my `## Probes needed`, my `## Recommendation` and the operational note — are now recorded under another reviewer's session id.** This is the same defect class as round 3's B3 (a comment-boundary pattern inside quoted text re-interpreted as a real boundary), reproduced by the operation written to remove it, and it is introduced by the round-4 union rebuild: the primary's copy of that verdict is intact (one contiguous 24,070-char block), so the split exists only in the branch.
+
+It has a machine-read consequence, not just a cosmetic one. `lib/src/verdict.ts` `parseVerdicts` increments `order` on **any** line matching `/^###\s/` and keeps only the first verdict-looking line per comment, then `classifyVerdicts` takes the latest by (date, order). In the branch's file the verdict-carrying comments are: round-1 (138) → round-2 (472) → round-3 (878) → **round-2's marker-laden duplicate (1201)**. The 954 continuation carries no header line, so it contributes nothing. **The verdict a reader or `arggon sync --json` classifies as "latest" on the merged file is round 2's, not round 3's.** That is stale today only by luck (both are `request-changes`).
+
+**Why the worker's check passed anyway, and what would catch it:** "N dated headings, each the WHOLE line, 0 glued, 0 with trailing content" is a *heading-shape* check. The spurious heading at 954 is perfectly formed — whole line, column 0, nothing trailing — so shape cannot see it. The check that catches it is **block identity against the source comment**: each comment block must equal, verbatim, one comment as it exists on the side it came from (author, order, and content), with no block that is a fragment of another. Count verdicts per author and per round and compare against the source; do not infer structure from heading geometry.
+
+**New defect 2 — the acceptance checklist was reset from `- [x]` to `- [ ]`.** Round 3's branch copy had all three boxes ticked; the primary's pre-claim copy has them unticked; the rebuilt union took the primary's `## Acceptance` block, so the branch now reads `- [ ] template generation test` / `- [ ] goal contract parses the checklist` / `- [ ] documented: one goal per claimed item`. This is a functional regression, not a formatting one: the **done gate reads `item.body`**, so an item whose own acceptance boxes are unticked **cannot be flipped to `done` at all** — the coordinator's flip would be refused by `UPDATE_FAILED`, and the DoD in AGENTS.md ("acceptance checklist complete + `status: done` + PR merged") is unsatisfiable until the ticks are restored. It is also the one item whose record this PR's whole review history is about: round 1's B1 was filed because box 3 ("documented: one goal per claimed item") rested on a false claim, and the ticks are the dated evidence that it was closed. The union rule needs a precedence that is not simply "main wins" — for the **Acceptance section**, the side that ticked them is the side with the evidence.
+
+**Non-blocking, but do it in the same commit while the file is open:** 439 conflict-marker lines (`<<<OURS>>>` ×308, `<<<THEIRS>>>` ×131) are still committed in the item file, across six marker-laden blocks — 251 (105 markers, a mangled round-1 duplicate that even carries worker handoff text), 584, 751, 1005, 1201 (110 markers, a duplicate of round-2's verdict that is what currently wins the "latest verdict" race). These predate round 4, and the rebuild chose to keep *both* sides' blocks, so they persist. `validate` passes and no gate reads them, so this is noise rather than error — but a record with six half-blocks and 439 conflict markers is not one a future reviewer can cite.
+
+---
+
+## Point-by-point on what you asked me to judge
+
+**3 — the new `GOAL_WORKTREE_MISMATCH` probe.** The vacuousness claim is **correct and provable from the code**: `writeWorktreePath` writes into frontmatter, while the first version appended `worktree_path:` at the end of the *file* — i.e. into the body — so `item.worktreePath` was `undefined`, `assertWorktree` returned at `if (!recorded) return;` (`goal-mode.ts:415`), and the command correctly rendered with `recorded: false`. A probe that asserts "it refuses" could not have distinguished that from a regression. The replacement shape is right: a real sibling checkout recorded as `worktree_path`, so `GOAL_WORKTREE_MISSING` cannot be what fired, plus the same item rendering from inside it. One qualification: the probe as recorded is a **transcript**, so its regression value is manual; the CI-covered guard is `goal-mode.test.ts`'s refusal table, which asserts `error.code === "GOAL_WORKTREE_MISMATCH"` with a frontmatter `worktree_path`. "It discriminates" is true of the unit test, and of the probe as a re-runnable recipe — not of the lane.
+
+**4 — the flagged frontmatter deviation: correct, and I checked every field.** Union frontmatter = the primary's for every field the primary has (`type`, `id`, `title`, `parent`, `labels`, `created`, `updated`, `depends_on` — all identical strings), with exactly one departure plus the four fields the primary lacks: `status: in_progress` (primary: `todo`) and `assignee`, `branch`, `claimed_at`, `worktree_path`. Taking the primary's frontmatter verbatim would have stripped a live claim whose worktree exists — the tracker-root hazard is real, so the deviation is right. No field is taken from the wrong side, and `worktree_path` is **not** stale: it resolves to a live linked worktree (its `.git` points at `…/.git/worktrees/ArggonManager-task-zcode-goal-mode`, which exists). The residual `in_progress` vs `todo` divergence between the two copies is inherent and the flip resolves it.
+
+**5 — the `convention.md:150` deferral: accept.** It is precisely the sentence `bug-parity-suite-cannot-catch-wrong-input-at-call-sites` (todo, unowned, parent `story-spec-pipeline`) exists to retire, and editing a methodology carrier from a Behavioral PR would pre-empt that item's scope. Two conditions on the acceptance: **do not add `depends_on` to this item** — that inverts the dependency and would gate the goal item on an unrelated docs fix; the enforcement belongs on the bug item's side (get it claimed). And the deferral is safe for readers because `agents.md` §ZCode's own sentence is self-sufficient — it names the kernel corpus *and* this adapter's own corpus for the input, so nobody is misled by the linked section's overstatement. A one-line parenthetical in `agents.md` is available later if the coordinator would rather close it now.
+
+**6 — nothing unexpected moved.** Every difference in my 37-path sweep is on the goal-mode surface: `cli/src/goal-mode.ts` + test (new), `cli/src/cli.ts` (wiring), `cli/src/board.ts` (the one-clause fix), `cli/src/init-zcode.test.ts`, `cli/src/adapter-selection.test.ts` (19→21), `README.md`/`agents.md`/`json-output.md`/`skills/**`/`.agents/skills/**`, `templates/docs/zcode/**` (two new + two JSON descriptions), `.zcode-marketplace/**` (two new + two JSON), `.convention.yml`, and the item file. Byte-identical to main: `lib/src/items.ts`, `update.ts`, `show.ts`, `acceptance-parity.test.ts`, `docs.ts`, `skill-copy.test.ts`, `convention.md`, `engineering.md`, both workflows, `package.json`, `hooks/gate.mjs`, the ast-grep rule. This is a spot sweep over the plausible surface, not an exhaustive diff — the exhaustive list is **P1**.
+
+**Smoke bar:** unchanged and correctly handled. The applicable bar is `engineering.md` §Smoke test (probe the changed command on a fixture, expected vs observed, prefer `--json`); the probe set now covers 13 cases including the worktree mismatch from both sides. `smoke:opencode*` remains model-driven, quota-bound and OpenCode-seam-scoped, and red on clean `main` (`task-file-smoke-opencode-red-on-main`) — correctly not required here. No UI/TUI surface touched.
+
+**Unverified / not run:** no gates by me. I did not reproduce `npm run build`, `npm test` (worker: 127 files / 2633 passed), `lint`, `validate`, `check:plugin`, `test:structure`, `lint:structure`, or any CI lane; I take the coordinator's word for the CI result at the published head. I could not read the PR #605 body, so the item-note and PR-body claims are only cross-checkable against each other, not against the PR. I cannot diff `93ec81b5` (no git in this session), nor compute `.convention.yml` checksums (no crypto), so the two new + three refreshed entries stay pipeline-asserted.
+
+## Probes needed
+
+1. `git -C /home/arggon/Projects/ArggonManager-task-zcode-goal-mode diff --stat origin/main...HEAD` (and `git status --porcelain` → expect empty)
+   — *demonstrates* the complete changed-file list (**P1**). *Would change*: any file outside the goal-mode surface listed above is unexpected and needs explaining.
+2. A block-identity check on the item file, not a heading-shape check: for each `### <date> @<author>` block, assert it equals **verbatim** one comment as it exists in `git show origin/main:<item>` or in the worker's own history — same author, same order, same content, no block that is a fragment of another. Concretely: assert `git show origin/main:<item>`'s round-3 verdict appears as **one contiguous block** in the branch's file under `@ses_efe0cc7a9ffekSptdyYXLmvnoT`, and that no block contains the tail of another.
+   — *demonstrates* **new defect 1**. *Would change*: if it fails, the verdict record stays misattributed after merge and `arggon sync` reports a stale verdict.
+3. `node -e '…'`-style call of the kernel's own classifier on the branch's item body: `classifyVerdicts(body)` plus `parseVerdicts(body)`
+   — *demonstrates* which verdict a machine reads as latest (**P1**). *Would change*: if the latest is round 2's duplicate after the fix, the ordering is still wrong.
+4. `npm run arggon -- validate` and `arggon show task-zcode-goal-mode --json | jq '.item.status, (.comments|length)'` in the worktree
+   — *demonstrates* the item still parses and how many comments the tracker sees (today: a fragment split makes 14 blocks look like 13 comments plus a mis-attributed tail). *Would change*: a comment count that does not match the block count means the record is being read differently than it reads.
+5. `npm run arggon -- update task-zcode-goal-mode --status done --json` **on a throwaway copy** of the tree
+   — *demonstrates* the functional consequence of **new defect 2**: with unticked acceptance boxes the flip is expected to be refused (`UPDATE_FAILED`). *Would change*: if it succeeds, the boxes are not what the gate reads and my finding needs re-checking.
+
+## Recommendation
+
+**Not yet — two mechanical fixes, both about the record, not the feature.**
+
+The feature is done and I am not asking for another design round: B1 is genuinely closed (published tip, whole seam byte-current under the generator's own marker shape, gate green), B2 is genuinely closed, the non-blocking `board.ts` clause is fixed and true, the worktree-mismatch probe's vacuous first version is provable and its replacement is the right shape, the frontmatter deviation is correct and field-by-field clean, and the `convention.md` deferral is the right call with the right boundary.
+
+What blocks is that B3's repair left the item's own record wrong in two new ways, and one of them is the very defect the repair was commissioned to remove. My round-3 verdict is split across two comment blocks and its tail is filed under a different reviewer's id — introduced by this round's union rebuild, invisible to a heading-shape check, and consequential because `lib/src/verdict.ts` orders verdicts by comment position, so the merged file would classify round 2's duplicate as the latest verdict. And the union's "main's text wins" rule reset the item's acceptance checklist to unticked, which both contradicts the dated evidence and makes the `done` flip impossible under the gate this PR spends its life agreeing with.
+
+Fix: (1) rejoin the split verdict block under `@ses_efe0cc7a9ffekSptdyYXLmvnoT` and delete the spurious `### 2026-10-03 @ses_f00…` heading — and if the union rebuild is scripted, make it skip headings inside code spans; (2) re-tick the three acceptance boxes, giving the ticked side precedence for the Acceptance section; (3) while the file is open, strip the 439 conflict-marker lines and the six fragmentary duplicate blocks so the record is citable. Then squash-merge — no rebase, no force-push — and flip.
+
+Operational note, same as round 3: this verdict is written with `tools.arggon.comment`, which resolves the tracker root from this session's cwd (the primary checkout), so it lands on the primary's copy of the item. The branch must merge `origin/main` once more — or the item-file conflict must be resolved as a union that includes this verdict — before the squash, or the merged record will not carry it and will keep the split.
