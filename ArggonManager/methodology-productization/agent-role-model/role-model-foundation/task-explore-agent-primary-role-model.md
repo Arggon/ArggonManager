@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-explore-agent-primary-role-model
 title: "Greenfield exploration: agent-primary role model and the promotion policy (ADR 0017 six-phase protocol)"
+assignee: arggon-coordinator
+branch: feat/task-explore-agent-primary-role-model
 parent: role-model-foundation
 labels: [methodology, exploration]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
+claimed_at: "2026-10-04T16:42:02.027Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-explore-agent-primary-role-model
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-explore-agent-primary-role-model.md
