@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr-0021-status-accepted
 title: "ADR 0021 merged while its own status line still reads `Proposed` — flip file + index row to `Accepted` (ADR lifecycle, engineering.md §ADR process)"
 assignee: arggon-coordinator
@@ -10,7 +10,6 @@ labels: [docs, adr]
 priority: p2
 created: "2026-10-04"
 updated: "2026-10-04"
-claimed_at: "2026-10-04T17:30:35.977Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0021-status-accepted
 ---
 <!--
