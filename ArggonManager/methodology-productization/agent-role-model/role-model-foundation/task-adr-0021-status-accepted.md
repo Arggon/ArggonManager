@@ -27,3 +27,28 @@ updated: "2026-10-04"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+## Context
+
+ADR [0021](../../../docs/adr/0021-agents-primary-workers-human-product-owner.md)
+merged as `171f43b3` (PR #624, 2026-10-04) carrying `- Status: Proposed` plus the
+sentence *"becomes Accepted at PR merge, per the ADR lifecycle in
+`engineering.md:191`"*. That lifecycle says **Accepted when merged**, so after the
+merge the file contradicts its own text and a binding decision reads as
+non-binding.
+
+Same drift class as the open `bug-engineering-doc-stale-adr-statuses` (a status
+flip landed in the files but not the docs) and the c0cdd60b incident the ADR parity
+suite is built on. Filed rather than silently fixed: a wrong status in a reader's
+index is not recoverable from the link.
+
+## Acceptance
+
+- [ ] ADR 0021's `- Status:` line reads `Accepted`
+- [ ] Its header keeps a dated note that acceptance came from the merge of PR #624 (`171f43b3`, 2026-10-04) — an ADR is superseded, never silently rewritten (`engineering.md:191`)
+- [ ] **The `docs/adr/README.md` index row for 0021 flips in the same change** — `cli/src/adr-index-parity.test.ts` asserts the index status CLASS agrees with the file, so flipping one alone turns the suite red (the mirror image of the failure PR #624 hit)
+- [ ] `npx vitest run cli/src/adr-index-parity.test.ts` green (7 passed)
+- [ ] `npx prettier --check` on both files clean
+- [ ] `arggon validate` + `npm test` green; no other ADR touched, no row reordered
+- [ ] The exploration `exploration-agent-primary-workers-019` is **not** rewritten: its Decision wording ("Status: Proposed; becomes Accepted at PR merge") is accurate history of what was proposed
