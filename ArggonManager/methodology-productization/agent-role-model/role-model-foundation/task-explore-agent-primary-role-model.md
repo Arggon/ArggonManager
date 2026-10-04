@@ -44,7 +44,7 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-explore-agent-primary-ro
 - [x] One recommendation with its trade-offs; the rejected candidates say why they lose
 - [x] Cross-cutting decision recorded as an ADR under `ArggonManager/docs/adr/` (Proposed) that links this exploration, with Status / Date / Deciders / Context / Decision / Consequences / Alternatives considered — `0021-agents-primary-workers-human-product-owner.md`
 - [x] Follow-up work filed as tracked `task`/`bug` items with context + acceptance checklists, `depends_on` wired so the ADR 0017 hard gate holds (no implementation task before a spec passes `spec analyze` with no NEW findings)
-- [ ] `arggon validate` and `arggon spec validate` green; PR opened with the methodology **impact class** stated (agents.md §Changing the methodology itself) — gates green and verified above; **ticked when the PR is open**
+- [x] `arggon validate` and `arggon spec validate` green; PR opened with the methodology **impact class** stated (agents.md §Changing the methodology itself) — gates green and verified above; PR **#624** open, impact class stated as **Behavioral** in the description and here
 
 ### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
 
