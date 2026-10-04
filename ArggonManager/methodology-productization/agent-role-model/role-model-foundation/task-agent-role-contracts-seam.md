@@ -1,14 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-agent-role-contracts-seam
 title: "Seam: bring the four generated agent prompts + ZCode variants in sync with the role model and the domain-neutral contract (ADR 0021 §6.1-§6.2a)"
+assignee: arggon-coordinator
+branch: feat/task-agent-role-contracts-seam
 parent: role-model-foundation
 labels: [methodology, seam, roles]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
+claimed_at: "2026-10-04T23:52:10.835Z"
 depends_on: [task-wire-role-model-carriers, task-spec-agent-rename-migration, task-adapter-orphan-reaping]
+worktree_path: /home/arggon/Projects/ArggonManager-task-agent-role-contracts-seam
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-agent-role-contracts-seam.md
