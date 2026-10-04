@@ -3,13 +3,20 @@
 > **Methodology carrier (per [ADR 0020](./adr/0020-methodology-first-productization.md)).** This document is a carrier of the ArggonManager methodology — declared together with `ArggonManager/docs/agents.md`, `ArggonManager/docs/engineering.md`, `ArggonManager/docs/convention.md`, and the bundled `arggon-cli` skill.
 >
 > - **Scope:** any project — not only software.
-> - **Invariants:** humans and agents follow the same rules; state lives in git; discipline is enforceable; docs travel with code; never-steal / never-reopen.
+> - **Invariants:** work-loop parity: any human and any agent may claim, work, review, comment and merge under the same kernel rules and the same JSON contracts; state lives in git; discipline is enforceable; docs travel with code; never-steal / never-reopen, with authority asymmetric and named — the irreversible overrides stay product-owner powers, structurally human-only.
 > - **Version:** tracks the ArggonManager package version.
 > - **Upgrade channel:** methodology changes reach adopters through the adopter upgrade channel ([ADR 0016](./adr/0016-adopter-upgrade-channel.md)).
 
 ArggonManager stores work as Markdown files under the tracker root — `ArggonManager/`
 (legacy `tasks/` trees are auto-detected and keep working; see [Tracker layout
-(v5)](#tracker-layout-v5)). Humans and agents create, claim, and update items the same way: edit the file and commit.
+(v5)](#tracker-layout-v5)). Humans and agents create, claim, and update items the
+same way: edit the file and commit. That is **work-loop parity**
+([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §1) — the
+loop is identical for both sides. What is _asymmetric_ is authority, and it is
+named, not implied: the product owner sets `priority`, and four irreversible
+overrides are structurally human-only (the full map, with the structural gate
+behind each: [`ArggonManager/docs/engineering.md`](./engineering.md)
+§Roles and authority).
 
 **v0 fields and layout are locked.** See [Versioning](#versioning--forward-compatibility) for how unknown keys and future versions work.
 
@@ -300,7 +307,7 @@ Claims carry a **soft lease**: an ISO date-time `claimed_at` maintained by the C
 - **Cleared** automatically when the item leaves the claimed state: unclaim (`in_progress` → `todo`), terminal states, or `blocked` (a new lease starts on re-claim).
 - **Reporting only**: `claimed_at` never gates a transition and `validate` imposes no constraint on it. Items claimed before the field existed simply have no `claimed_at`.
 - **Staleness is advisory**: `arggon list --stale --older-than <duration>` (`<number><d|h|m>`, e.g. `7d`) surfaces claimed items whose lease started before the threshold. It filters reporting only — it never blocks work.
-- **Only humans may steal**: `arggon update <id> --steal --reason "<why>" --assignee <you>` is a supervised takeover of a claimed item. It requires a non-empty reason, refreshes `claimed_at`, and appends a dated note (`> stolen <date> by <you>: <reason>`) to the item body. It is double-gated at the CLI (bug-cli-steal-not-gated): the repo must arm `x-tracker.allow-steal: true` in the tracker `.convention.yml` (default: refused), and the invocation must run on an interactive terminal with a y/N confirmation — non-TTY callers are refused even when armed. Agent callers are refused by the playbook rules (`docs/agents.md`), exactly like `--force`.
+- **Only humans may steal**: `arggon update <id> --steal --reason "<why>" --assignee <you>` is a supervised takeover of a claimed item. It requires a non-empty reason, refreshes `claimed_at`, and appends a dated note (`> stolen <date> by <you>: <reason>`) to the item body. It is double-gated at the CLI (bug-cli-steal-not-gated): the repo must arm `x-tracker.allow-steal: true` in the tracker `.convention.yml` (default: refused), and the invocation must run on an interactive terminal with a y/N confirmation — non-TTY callers are refused even when armed. Agent callers are refused by the playbook rules (`docs/agents.md`), exactly like `--force`. Taking over another writer's claim is a **product-owner power** and one of the four irreversible ones ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §2) — a recorded authority split, not an undocumented exception to parity.
 
 Concurrency / conflict handling (refuse steal unless `--force`, unclaim recovery, stale reporting): see [`claim.md`](claim.md).
 
@@ -321,7 +328,7 @@ Concurrency / conflict handling (refuse steal unless `--force`, unclaim recovery
 ### Reopen / status policy
 
 - **`validate` ALLOWS** `done|cancelled` → `todo` (schema permits).
-- **Enforced (bug-reopen-ungated-cli):** agents are refused — the MCP layer via rules.ts, and the CLI via an interactive-terminal gate (`--status todo` on a `done`/`cancelled` item needs a y/N confirmation over TTY stdin; non-TTY callers are refused, no `--yes`, no config opt-in). Humans reopen by confirming at their terminal.
+- **Enforced (bug-reopen-ungated-cli):** agents are refused — the MCP layer via rules.ts, and the CLI via an interactive-terminal gate (`--status todo` on a `done`/`cancelled` item needs a y/N confirmation over TTY stdin; non-TTY callers are refused, no `--yes`, no config opt-in). Humans reopen by confirming at their terminal. Reopening a terminal item is a **product-owner power** ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §2).
 - No status rollup — parent status is independent of children.
 
 ### `blocked_reason`
@@ -453,8 +460,8 @@ CLI surface: `arggon update <id> --depends-on "a,b"` **replaces** the full list 
 
 ### Priority (v4)
 
-Every item type carries an optional judgment priority — the orchestrator sets it
-at filing time and `next` ranks by it (see ADR 0009 and
+Every item type carries an optional judgment priority — set at filing time and
+ranked on by `next` (who owns it: the **Owner** bullet below; see ADR 0009 and
 [exploration priority-model-008](../docs/explorations/exploration-priority-model-008.md)):
 
 ```yaml
@@ -471,6 +478,12 @@ priority: p1
   (highest label wins, all pN labels removed, non-priority labels kept,
   idempotent, never auto-commits). New code must not use `pN` labels for
   priority — the field is the only official carrier.
+- **Owner:** `priority` is the **product owner's** field ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md)
+  §2, §6.1). A delivery lead _sequences_ delivery — what is built next, in what
+  order — and recommends priority changes; the product owner sets the field.
+  Nothing in the kernel gates who may write it (any caller may), so this is
+  doctrine recorded here because `next` ranks by it and a wave plan must never be
+  mistaken for a priority call.
 
 ### Saved views (`x-views`)
 

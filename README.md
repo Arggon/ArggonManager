@@ -56,7 +56,7 @@ Each item is a Markdown file with **YAML frontmatter** (status and other fields)
 
 1. **Repo is source of truth** — if it’s not in git, it isn’t the plan
 2. **Files over forms** — an `.md` is the ticket
-3. **Same rules for humans and agents**
+3. **One work loop for humans and agents, named authority for the product owner**
 4. **Simple & self-hostable** — open, lightweight, no lock-in
 
 ## The methodology
@@ -64,13 +64,17 @@ Each item is a Markdown file with **YAML frontmatter** (status and other fields)
 ArggonManager's process — find → claim → work → review → merge → done, carried by the docs below, with specs, plans, ADRs, explorations and playbooks — is the product.
 
 - **Scope:** any project — not only software.
-- **Invariants:** humans and agents follow the same rules; state lives in git; discipline is enforceable; docs travel with code; never-steal / never-reopen.
+- **Invariants:** work-loop parity: any human and any agent may claim, work, review, comment and merge under the same kernel rules and the same JSON contracts; state lives in git; discipline is enforceable; docs travel with code; never-steal / never-reopen, with authority asymmetric and named — the irreversible overrides stay product-owner powers, structurally human-only.
 - **Version:** tracks the ArggonManager package version; changes reach adopters through the [adopter upgrade channel](ArggonManager/docs/adr/0016-adopter-upgrade-channel.md) ([ADR 0020](ArggonManager/docs/adr/0020-methodology-first-productization.md)).
+
+**Roles, not job titles** ([ADR 0021](ArggonManager/docs/adr/0021-agents-primary-workers-human-product-owner.md) §6.1): agents are the primary workers, and every agent role is named by **what it decides** — **delivery lead** (sequences work, dispatches, owns tracker state), **practice & standards** (whether a change is right by the project's own bar), **maker** (produces the change), **verifier** (executes the project's verification gates and reports observed-versus-expected; it does not decide the verdict). The human in the loop is the **product owner**, and its authority is bounded and named: direction and priority, product acceptance, risk waiver, claim takeover, release — the last four irreversible steps are structurally human-only.
+
+**The promotion policy** ([ADR 0021](ArggonManager/docs/adr/0021-agents-primary-workers-human-product-owner.md) §3): product-owner review is tiered by blast radius, so no leaf waits on a human — `task`/`bug` leaves are agent-self-certified (the default), `story` containers may carry a recorded `accept:` approval, and the irreversible powers stay gated. A repo with no product owner is compliant by default and never blocked.
 
 The carriers, one hop from here:
 
 - [Agent playbook](ArggonManager/docs/agents.md)
-- [Engineering conventions](ArggonManager/docs/engineering.md)
+- [Engineering conventions](ArggonManager/docs/engineering.md) — §Roles and authority (role table, authority map, human-only powers) and §Review bar (bars, tiers, verdict and acceptance conventions)
 - [Task convention](ArggonManager/docs/convention.md)
 - [arggon-cli skill](skills/arggon-cli/SKILL.md)
 
