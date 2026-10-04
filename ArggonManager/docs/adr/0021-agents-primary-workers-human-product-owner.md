@@ -1,10 +1,16 @@
 # 0021 Agents as primary workers, humans as product owner
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-04
 - Deciders: product owner (Gonzalo), coordinator/architect (Arggon)
 - Input: [exploration-agent-primary-workers-019](../explorations/exploration-agent-primary-workers-019.md) (2026-10-04)
 - Methodology impact class: **Behavioral** (agents must re-learn something) — reaches adopters through the ADR 0016 channel
+
+> Status note (2026-10-04): flipped from Proposed to Accepted on the merge of PR #624
+> (`171f43b3`) — the ADR lifecycle in `docs/engineering.md` §ADR process is
+> "Proposed in a PR → Accepted when merged". The decision itself was taken when the
+> record was written; only the status line lagged the merge, so nothing below this
+> note is rewritten (`task-adr-0021-status-accepted`).
 
 ## Context
 
