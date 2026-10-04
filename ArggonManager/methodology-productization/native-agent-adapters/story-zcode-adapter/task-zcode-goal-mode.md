@@ -940,3 +940,7 @@ acceptanceComplete(item.body): true (rows=3, unchecked=0)
 ```
 
 This comment carries no verdict line, so it does not enter the verdict race — the counts above are the record at `de288031` plus this comment, nothing else changed.
+
+### handoff 2026-10-04 @Arggon — next: coordinator: squash-merge PR #605 (head below, ready for review, gates green) then flip the item
+- branch: feat/task-zcode-goal-mode
+- open questions: convention.md:150 left to open bug-parity-suite-cannot-catch-wrong-input-at-call-sites (no depends_on added); 15 pre-existing stamp mismatches await human arggon adopt --ack
