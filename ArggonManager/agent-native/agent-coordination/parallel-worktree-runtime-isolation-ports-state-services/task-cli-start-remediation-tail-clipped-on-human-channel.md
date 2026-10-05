@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-cli-start-remediation-tail-clipped-on-human-channel
 title: "CLI channel: `startNotAttempted`/worktreeRemediation appends the remedy AFTER the kernel detail, so MAX_HUMAN_ERROR_CHARS head-clip still eats it at worst case"
+assignee: arggon-delivery-lead
+branch: feat/task-cli-start-remediation-tail-clipped-on-human-channel
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [cli, native-seam]
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-05"
+claimed_at: "2026-10-05T18:29:40.885Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-cli-start-remediation-tail-clipped-on-human-channel
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-cli-start-remediation-tail-clipped-on-human-channel.md
