@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-adapter-orphan-reaping
 title: "Reap orphaned generated adapter files: `doctor` reports `orphaned` when an x-generated destination's template is gone; `init` removes it only when unmodified"
+assignee: arggon-coordinator
 parent: role-model-foundation
 labels: [cli, adapters, safety]
 priority: p1

@@ -1,14 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-agent-role-contracts-seam
 title: "Seam: bring the four generated agent prompts + ZCode variants in sync with the role model and the domain-neutral contract (ADR 0021 §6.1-§6.2a)"
+assignee: arggon-coordinator
+branch: feat/task-agent-role-contracts-seam
 parent: role-model-foundation
 labels: [methodology, seam, roles]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-04"
+claimed_at: "2026-10-04T23:52:10.835Z"
 depends_on: [task-wire-role-model-carriers, task-spec-agent-rename-migration, task-adapter-orphan-reaping]
+worktree_path: /home/arggon/Projects/ArggonManager-task-agent-role-contracts-seam
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-agent-role-contracts-seam.md
@@ -97,3 +101,57 @@ A stale id in a carrier is worse than a stale id in prose: the carriers are what
 adopter's agents read as the contract. It also keeps
 `task-agent-identity-claim-discipline` honest — it must not tell agents to claim as an
 id that no longer ships.
+
+### 2026-10-05 @coordinator
+verdict: approve
+
+Closes the seam migration in one PR: **rename + role contracts + domain-neutral gate language** (ADR 0021 §6.1/§6.2/§6.2a′, spec-agent-rename-019). PR #641 — **merge, do not squash**.
+
+### The rename
+
+`arggon-coordinator` → `arggon-delivery-lead` · `arggon-reviewer` → `arggon-standards-reviewer` · `arggon-worker` → `arggon-maker` · `arggon-prover` → `arggon-verifier` (7 templates via `git mv`; history follows).
+
+Each prompt opens with `**Role: <role>.**` + what it decides and cites `docs/engineering.md` §Roles and authority instead of duplicating it; `description:` carries the role (what a dispatcher shows); gates are now "the gates this project declares" / "the blocking bar the project's engineering docs declare", each keeping ONE software worked example; both boundaries (delivery lead ≠ priority owner, verifier reports-does-not-rule) are stated in the contracts. Identity discipline (§5, folded in): claim as the **role id**, never the PO's login, with the why and the `@me` note.
+
+Carriers refreshed in the same PR: `docs/engineering.md` role table, `docs/agents.md` §Orchestration, `skills/arggon-cli/references/orchestration.md` (+ byte-equal `.agents` copy), README, opencode playbook.
+
+### AC 2 / AC 3 — the drift guards (both derived, never restated)
+
+- **AC 2**: `init-zcode.test.ts` reads the reviewer id out of the **shipped template** (identified by the verdict channel in its `tools:` allowlist) and asserts the gate's own `isReviewerDispatch` matcher matches it, plain and plugin-qualified, and matches **no other** shipped agent. *Verified by breaking it:* reverting the matcher to `arggon-reviewer` → 3 failures, incl. `the gate matches arggon-reviewer but the shipped reviewer is arggon-standards-reviewer`. The behavioural gate probes now derive the same id.
+- **AC 3**: the delivery lead's `subagent` allow-list is pinned to exactly the shipped subagent ids (from the templates dir; `mode: primary` = the lead) + `explore`. *Verified by breaking it:* dropping `arggon-verifier` from the list fails; keeping a stale `arggon-worker` entry fails.
+- **AC 12**: the whole deny set pinned per role (action + named resource) — dropping `arggon_branch` from the verifier fails. Allow-lists stay with AC 3.
+
+### Gates — expected vs observed
+
+| gate | expected | observed |
+| --- | --- | --- |
+| `npm run build` | ok | ok |
+| `arggon validate` | ok, 0 warnings | `ok (0 warning(s), convention v5)` |
+| `arggon spec validate` | ok | `ok (34 doc(s), 5 warning(s))` — pre-existing doc-number collisions |
+| `arggon spec analyze` | no NEW findings | `10 finding(s) across 21 spec(s)` — byte-identical to `main` (re-ran on a stashed tree to prove it) |
+| `prettier --check` (43 touched files) | clean | `All matched files use Prettier code style!` |
+| `npm test` | green | **2661 passed / 128 files, 0 failed** (after `npm run build`) |
+| `npm run check:plugin` | bundle current | clean — regenerated, committed, re-run after the last edit |
+| `npm run smoke:native-start-cold` | passed | passed |
+| `npm run smoke:opencode:wave` (AC 9) | passed on the new ids | **`passed — 2 fixture(s), 0 failures`** |
+| CI drift gate (`init` + porcelain) | clean | clean |
+
+Wave detail: reviewer edit denied, maker cannot nest, lead launches `explore`/`arggon-maker`/`arggon-standards-reviewer` and is denied `general`, two foreground makers in disjoint worktrees, **both claims stamped with a role id**, reviewer verdicts on both items (vacuous-match guard green), local merges, done flips, validate green, accounting exported.
+
+### Two things the reviewer should know
+
+1. **The wave's first run failed 50/50 on `AI.Error.QuotaExceeded: Go usage limit exceeded`** — present in **all 13** session transcripts, i.e. the harness's pinned default model (`opencode-go/deepseek-v4-flash`) is out of quota, not a code fault. Re-ran with `OPENCODE_WAVE_MODEL=opencode-go/space-bunny-free` → green. The committed default is unchanged.
+2. **This repo's generated seam is TRACKED, not gitignored** (contrary to the briefing): `.opencode/` + `.zcode-marketplace/` are committed, and CI's drift gate regenerates them and requires byte-equality. So the six old destinations were reaped by hand after verifying each is byte-identical to what its old template generated (`doctor` refuses them — their recorded checksums predate a re-stamp), their stale `x-generated` entries dropped as `init` instructs, and **`.opencode/agents/arggon-prover.md` deleted outright** — it has no provenance entry (the filed `bug-prover-agent-has-no-x-generated-entry`), so neither `init` nor the reap can see it, and leaving it would have stranded a fifth still-dispatchable agent on the pre-rename contract.
+
+### Findings reported, not filed (coordinator's call)
+
+- **ADR 0021 §5 still lists the old ids** (`arggon-coordinator, arggon-worker, arggon-reviewer, arggon-prover`) as what agents claim as. It is now factually wrong, and §6.2a′ is the amendment that supersedes the naming. ADRs are not mine — needs a status note or a §5 refresh.
+- **`cli/src/docs.ts:990`** names `.opencode/agents/arggon-coordinator.md` as the stranded-file example; one-token comment fix, file is not mine.
+- **`templates/docs/AGENTS.md:17`** (the *generated* AGENTS.md) still says "a coordinator assigns each item to a subagent … the coordinator (lead architect) code-reviews". No id, so nothing contradicts the seam, but the role word is pre-rename. File is not mine.
+- **Historical claims keep their old ids.** Every `assignee: arggon-coordinator` on the 525 tracked items is now a retired id. Data, not drift; worth a line in the release note so adopters are not surprised.
+- **Harness observation (not a failure, not from this change):** the wave's "the probe file was never created" check is model-dependent — on one run the reviewer wrote it with `shell` (`echo probe > reviewer-write.txt`), which it is *designed* to have; `edit * deny` is not a filesystem sandbox. The permission-layer check (`no edit/write/patch tool call`) passed on that same run and is the deterministic one.
+- **Scope I extended** (flagged in the PR): the command templates' `agent:` frontmatter (a dispatch pointer — leaving it would make `/arggon-review` dispatch a non-existent agent), `cli/src/adapter-orphan-reaping.test.ts` (`dropTemplate` asserts the template exists, so the rename breaks it outright), and the wave's claim assertion (it pinned `assignee: arggon-maker-*`, encoding the older "each maker claims itself" expectation this PR's claim-before-dispatch contract supersedes — now asserts the identity doctrine instead).
+
+### handoff 2026-10-05 @coordinator (session: ses_ef6aa92bcffeaB2GIFj8EdtG5i) — next: Review and merge PR #641 (merge, do not squash); the item is complete and must not be flipped to done by me
+- branch: feat/task-agent-role-contracts-seam
+- open questions: ADR 0021 §5 still lists the old ids as what agents claim as (not mine to edit); cli/src/docs.ts:990 example path and templates/docs/AGENTS.md:17 role word are stale too. Historical claims keep retire…

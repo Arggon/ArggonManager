@@ -71,15 +71,15 @@ Nothing below is a second rule set: every role calls the same kernel through the
 
 A role is defined by **what it decides**, never by the artifacts it touches (ADR 0021 §6.2) — that is what makes the table readable in a project that is not software. The middle column is a mapping for readers who know the software vocabulary; it is **non-normative** and never a requirement.
 
-| Shipped id           | Role                     | Software analogue _(non-normative)_ | Non-software analogue                     | Decides                                                                                                        |
-| -------------------- | ------------------------ | ----------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| _(human)_            | **Product Owner**        | Product owner / sponsor             | Same                                      | Direction, priority, acceptance, risk, release (§Authority map)                                                |
-| `arggon-coordinator` | **Delivery lead**        | Product manager                     | Project manager                           | What is built next and in what order; who is dispatched; tracker state; merge verification and the `done` flip |
-| `arggon-reviewer`    | **Practice & standards** | Tech lead / software architect      | Standards, methods, editorial, compliance | Whether a change is right by the project's own bar — structure, patterns, principles, scope; asks for refactor |
-| `arggon-worker`      | **Maker**                | Programmer                          | Author, analyst, executor                 | Producing the change, keeping it on the item                                                                   |
-| `arggon-prover`      | **Verifier**             | Manual QA                           | Independent checker / inspector           | Whether the delivered thing does what was specified — by executing the project's verification gates            |
+| Shipped id                  | Role                     | Software analogue _(non-normative)_ | Non-software analogue                     | Decides                                                                                                        |
+| --------------------------- | ------------------------ | ----------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| _(human)_                   | **Product Owner**        | Product owner / sponsor             | Same                                      | Direction, priority, acceptance, risk, release (§Authority map)                                                |
+| `arggon-delivery-lead`      | **Delivery lead**        | Product manager                     | Project manager                           | What is built next and in what order; who is dispatched; tracker state; merge verification and the `done` flip |
+| `arggon-standards-reviewer` | **Practice & standards** | Tech lead / software architect      | Standards, methods, editorial, compliance | Whether a change is right by the project's own bar — structure, patterns, principles, scope; asks for refactor |
+| `arggon-maker`              | **Maker**                | Programmer                          | Author, analyst, executor                 | Producing the change, keeping it on the item                                                                   |
+| `arggon-verifier`           | **Verifier**             | Manual QA                           | Independent checker / inspector           | Whether the delivered thing does what was specified — by executing the project's verification gates            |
 
-The **ids are wire names**, not role names: permissions, plugin manifests and existing adopter files keep pointing at them (ADR 0021 §6.2a′ schedules the rename to role-named ids, gated on orphan reaping). The role — what a role decides — is what this table states.
+The **id names the role**, never the software title and never the process verb (ADR 0021 §6.2a′): the rename landed with `orphaned` detection and the checksum-guarded reap as its precondition, so a role's id, its contract and its file name are one thing. These ids are also what permissions, the plugin manifests and the gate's dispatch matcher point at — and what an adopter's tree materializes, where an edited file is kept and never overwritten (`agents.md` §Prerequisites).
 
 Two boundaries this makes explicit, because the roles otherwise blur (ADR 0021 §6.1):
 
@@ -90,18 +90,18 @@ Two boundaries this makes explicit, because the roles otherwise blur (ADR 0021 �
 
 Bounded and named (ADR 0021 §2). No new authority is granted to any agent by this table.
 
-| Decision                           | Owner             | Enforced today                                                                    |
-| ---------------------------------- | ----------------- | --------------------------------------------------------------------------------- |
-| Direction and priority             | **product owner** | recorded as `priority`; decided by a person                                       |
-| Product acceptance of a container  | **product owner** | recorded as an `accept:` comment (§Review bar → Product acceptance); never a gate |
-| Accepting residual risk            | **product owner** | ADR 0015 waiver — human-only, no agent parameter                                  |
-| Taking over another writer's claim | **product owner** | `--steal` — armed config (`x-tracker.allow-steal`) + TTY confirmation             |
-| Publishing a release               | **product owner** | human-pushed version bump (spec-release-pipeline-015 AC 7)                        |
-| Exploring, specifying, planning    | agent             | the loop, unchanged                                                               |
-| Implementing, testing, docs        | agent             | the loop, unchanged                                                               |
-| Reviewing and proving              | agent             | reviewer (read-only) / prover (no mutation) split (`agents.md` §Orchestration)    |
-| Verifying merges, flipping `done`  | agent             | delivery lead; the done gate still holds (ADR 0015)                               |
-| Filing follow-up work              | agent             | the delivery lead consolidates and files (`agents.md` §Orchestration)             |
+| Decision                           | Owner             | Enforced today                                                                                               |
+| ---------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| Direction and priority             | **product owner** | recorded as `priority`; decided by a person                                                                  |
+| Product acceptance of a container  | **product owner** | recorded as an `accept:` comment (§Review bar → Product acceptance); never a gate                            |
+| Accepting residual risk            | **product owner** | ADR 0015 waiver — human-only, no agent parameter                                                             |
+| Taking over another writer's claim | **product owner** | `--steal` — armed config (`x-tracker.allow-steal`) + TTY confirmation                                        |
+| Publishing a release               | **product owner** | human-pushed version bump (spec-release-pipeline-015 AC 7)                                                   |
+| Exploring, specifying, planning    | agent             | the loop, unchanged                                                                                          |
+| Implementing, testing, docs        | agent             | the loop, unchanged                                                                                          |
+| Reviewing and proving              | agent             | `arggon-standards-reviewer` (read-only) / `arggon-verifier` (no mutation) split (`agents.md` §Orchestration) |
+| Verifying merges, flipping `done`  | agent             | delivery lead; the done gate still holds (ADR 0015)                                                          |
+| Filing follow-up work              | agent             | the delivery lead consolidates and files (`agents.md` §Orchestration)                                        |
 
 **The four irreversible powers are human-only, structurally — not undocumented exceptions** (ADR 0021 §1/§2; every row keeps the gate it already had, and this table grants nothing):
 
