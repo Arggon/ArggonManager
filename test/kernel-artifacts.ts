@@ -42,7 +42,11 @@
 import { chmodSync, lstatSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { artifactFingerprint, KERNEL_ARTIFACTS } from "../cli/src/test-spawn.js";
+import {
+  artifactFingerprint,
+  KERNEL_ARTIFACTS,
+  KernelArtifactDriftError,
+} from "../cli/src/test-spawn.js";
 
 /** Repo root, derived from this file (`<repo>/test/`). */
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -238,17 +242,14 @@ export default function globalSetup(): () => void {
     const after = fingerprintNow();
     restore();
     if (after !== before) {
-      throw new Error(
-        [
-          "[kernel-artifacts] kernel artifact drift across the suite (not an assertion failure)",
-          `  before[${before}]`,
-          `  after [${after}]`,
-          "  a suite lane rebuilt the repo's built artifacts in place. The freeze above",
-          `  covers ${frozenDirs().join(", ")} on POSIX, so a write that landed came from`,
-          "  outside it. Build into your own temp root instead (see freshCloneCopy in",
-          "  cli/src/pack-fixtures.ts), and fix the writer, not the reader.",
-        ].join("\n"),
-      );
+      // The SAME named class a single spawn raises, so the class has one name
+      // however it was observed. Vitest exits non-zero on a throwing teardown,
+      // so this fails the run rather than printing a note nobody reads.
+      throw new KernelArtifactDriftError({
+        cwd: repoRoot,
+        drift: `before[${before}] after[${after}]`,
+        scope: "suite",
+      });
     }
   };
 }

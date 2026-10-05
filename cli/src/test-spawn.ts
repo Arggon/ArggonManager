@@ -274,25 +274,42 @@ export class SpawnHarnessError extends Error {
  * `test/kernel-artifacts.ts` (those files are read-only for the duration of the
  * suite), so a raise here means the write bypassed the freeze — a root-owned
  * build, a `chmod`u+w slip, or a platform without POSIX modes.
+ *
+ * The same class is what the suite-wide check throws (`scope: "suite"`), so the
+ * class has one name whether a single spawn or the whole run saw the move.
  */
+
+/** Where a drift was observed: one child, or the run as a whole. */
+export type KernelArtifactDriftScope = "child" | "suite";
 export class KernelArtifactDriftError extends Error {
   readonly argv: string[];
   readonly cwd: string;
   readonly drift: string;
+  /** `child` when one spawn saw it; `suite` for the whole-run check. */
+  readonly scope: KernelArtifactDriftScope;
 
-  constructor(init: { argv: string[]; cwd: string; drift: string }) {
-    const { argv, cwd, drift } = init;
+  constructor(init: {
+    argv?: string[];
+    cwd: string;
+    drift: string;
+    scope?: KernelArtifactDriftScope;
+  }) {
+    const argv = init.argv ?? [];
+    const { cwd, drift } = init;
+    const scope = init.scope ?? "child";
     super(
       [
-        "[arggon-test-spawn] kernel artifact drift (not an assertion failure)",
-        "the repo's built artifacts were REWRITTEN while this child ran:",
+        `[arggon-test-spawn] kernel artifact drift (not an assertion failure) [${scope}]`,
+        `the repo's built artifacts were REWRITTEN ${
+          scope === "suite" ? "during the run" : "while this child ran"
+        }:`,
         `  ${drift}`,
-        `  child: node ${argv.join(" ")}`,
+        ...(scope === "child" ? [`  child: node ${argv.join(" ")}`] : []),
         `  cwd: ${cwd}`,
-        "  another suite lane rebuilt lib/dist or dist in place. The suite freezes",
-        "  those files for the duration of the run (test/kernel-artifacts.ts), so a",
-        "  write that landed anyway came from outside the freeze. Build into your own",
-        "  temp root instead (see freshCloneCopy in cli/src/pack-fixtures.ts).",
+        "  a suite lane rebuilt lib/dist or dist in place. The suite freezes those",
+        "  files for the duration of the run (test/kernel-artifacts.ts), so a write",
+        "  that landed anyway came from outside the freeze. Build into your own temp",
+        "  root instead (see freshCloneCopy in cli/src/pack-fixtures.ts).",
         "  fix the writer, not the reader.",
       ].join("\n"),
     );
@@ -300,6 +317,7 @@ export class KernelArtifactDriftError extends Error {
     this.argv = argv;
     this.cwd = cwd;
     this.drift = drift;
+    this.scope = scope;
   }
 }
 
