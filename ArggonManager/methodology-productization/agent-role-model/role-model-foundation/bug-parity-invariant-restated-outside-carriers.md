@@ -9,8 +9,7 @@ parent: role-model-foundation
 labels: [docs, methodology, roles]
 priority: p2
 created: "2026-10-04"
-updated: "2026-10-04"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-parity-invariant-restated-outside-carriers
+updated: "2026-10-05"
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-parity-invariant-restated-outside-carriers.md

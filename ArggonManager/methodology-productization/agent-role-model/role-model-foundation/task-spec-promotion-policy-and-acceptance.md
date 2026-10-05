@@ -9,8 +9,7 @@ parent: role-model-foundation
 labels: [methodology, spec, roles]
 priority: p1
 created: "2026-10-04"
-updated: "2026-10-04"
-worktree_path: /home/arggon/Projects/ArggonManager-task-spec-promotion-policy-and-acceptance
+updated: "2026-10-05"
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-spec-promotion-policy-and-acceptance.md

@@ -9,9 +9,8 @@ parent: role-model-foundation
 labels: [methodology, docs, roles]
 priority: p1
 created: "2026-10-04"
-updated: "2026-10-04"
+updated: "2026-10-05"
 depends_on: [task-spec-promotion-policy-and-acceptance]
-worktree_path: /home/arggon/Projects/ArggonManager-task-wire-role-model-carriers
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-wire-role-model-carriers.md

@@ -9,8 +9,7 @@ parent: role-model-foundation
 labels: [docs, adr, seam, migration]
 priority: p1
 created: "2026-10-04"
-updated: "2026-10-04"
-worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0021-supersede-6-2a
+updated: "2026-10-05"
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-adr-0021-supersede-6-2a.md

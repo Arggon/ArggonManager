@@ -10,7 +10,6 @@ labels: [methodology, exploration, evaluation]
 priority: p2
 created: "2026-10-05"
 updated: "2026-10-05"
-worktree_path: /home/arggon/Projects/ArggonManager-task-explore-autoharness-autocontext-autocompact
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/external-harness-evaluation/task-explore-autoharness-autocontext-autocompact.md
