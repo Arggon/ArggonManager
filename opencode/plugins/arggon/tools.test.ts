@@ -42,9 +42,21 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { MAX_GATE_BINS, MAX_MISSING_DEPENDENCIES, parseFrontmatter, runCreate, runUpdate } from "@arggondev/lib";
+import {
+  MAX_GATE_BINS,
+  MAX_MISSING_DEPENDENCIES,
+  MAX_PREP_STEPS,
+  parseFrontmatter,
+  prepareWorktreeDependencies,
+  runCreate,
+  runUpdate,
+} from "@arggondev/lib";
 import { runInit } from "../../../cli/src/init.js";
 import { tickAcceptance, tickAllAcceptance } from "../../../test/acceptance.js";
+// Ordering assertions go through assertOrder, never a bare `indexOf`
+// comparison: `-1 < n` makes a renamed clause pass as if it were still
+// ordered (bug-vacuous-substring-ordering-assertions).
+import { assertOrder } from "../../../test/assert-order.js";
 import {
   ARGON_TOOL_NAMESPACE,
   ARGON_TOOL_NAMESPACE_DESCRIPTION,
@@ -1038,6 +1050,37 @@ function addNativeManifest(dir: string, manifest: Record<string, unknown>): void
   git(dir, ["commit", "-qm", "test: declare dependencies"]);
 }
 
+/**
+ * Commit `count` workspace packages on the fixture and link each into the
+ * PRIMARY's install, so the shared preparation receipt records one build step
+ * per package (bug-native-steps-truncated-flag-dropped). The kernel discovers
+ * workspace packages through install symlinks that resolve into the checkout
+ * and whose relative path also exists in the worktree — so both the committed
+ * packages and the (uncommitted) links are needed.
+ *
+ * The packages declare no entry file and no `build` script: every decision is
+ * still recorded (`no-build-script`) without a build ever running, so the log
+ * overflows on the package COUNT rather than on build time.
+ */
+function addPrepLogWorkspacePackages(dir: string, count: number): void {
+  const scope = join(dir, "node_modules", "@scope");
+  mkdirSync(scope, { recursive: true });
+  for (let index = 0; index < count; index += 1) {
+    const pkgDir = join(dir, "packages", `pkg-${index}`);
+    mkdirSync(pkgDir, { recursive: true });
+    writeFileSync(
+      join(pkgDir, "package.json"),
+      `${JSON.stringify({ name: `@scope/pkg-${index}`, version: "1.0.0", private: true }, null, 2)}\n`,
+      "utf8",
+    );
+    symlinkSync(pkgDir, join(scope, `pkg-${index}`), "dir");
+  }
+  // Only the packages are tracked: the primary's install is never staged (the
+  // worktree link farm mirrors whatever is there at start time).
+  git(dir, ["add", "packages"]);
+  git(dir, ["commit", "-qm", "test: declare workspace packages"]);
+}
+
 /** Install a real (never bypassed) dependency-requiring pre-commit gate. */
 function setNativePreCommitHook(dir: string, script: string): void {
   const hook = join(dir, ".git", "hooks", "pre-commit");
@@ -1672,6 +1715,102 @@ describe("worktree domain tools (W4)", () => {
     expect(preparation.truncated).toBe(true);
   });
 
+  /**
+   * The capped preparation log on the NATIVE seam, driven past the kernel's own
+   * `MAX_PREP_STEPS` (bug-native-steps-truncated-flag-dropped).
+   *
+   * The defect this pins: the kernel caps the log at 16 entries and SAYS so
+   * (`stepsTruncated`), but the native projection folded only its own 32-name
+   * cap into the shared flag — a cap that cannot fire through the kernel's
+   * smaller one. So more than 16 preparation decisions arrived as a shortened
+   * list with no flag, presented as the whole log.
+   *
+   * The mirror is asserted against the kernel, not against this seam's own
+   * arithmetic, and the log is compared with the CLI on a twin fixture carrying
+   * the same packages — the same kernel event on both surfaces. The CLI's
+   * envelope forwards `prepSteps` but not the kernel's flag (`cli/src/start.ts`
+   * assigns `prepSteps = prepared.steps`; `cli/src/cli.ts` forwards only
+   * `prepSteps`), so the CLI-side mirror is a reported follow-up, not asserted
+   * here as either present or absent.
+   */
+  it("mirrors the kernel's capped preparation log instead of re-deriving it (CLI parity on the same kernel event)", async () => {
+    const nativeDir = seedGitTree("arggon-preplog-a-");
+    const cliDir = seedGitTree("arggon-preplog-b-");
+    // More preparation decisions than the kernel's cap: the link, one step per
+    // workspace package, and the gate-bin verdict.
+    addPrepLogWorkspacePackages(nativeDir, MAX_PREP_STEPS);
+    addPrepLogWorkspacePackages(cliDir, MAX_PREP_STEPS);
+    const { domain } = fakeDomain(nativeDir);
+    const defs = worktreeDefinitions(nativeDir, domain);
+
+    const output = (await tool(defs, "start").execute({
+      id: "task-rate-limit",
+      assignee: "smoke",
+    })).output as Record<string, unknown>;
+    const worktreePath = String(output.worktreePath);
+    const preparation = output.preparation as Record<string, unknown>;
+
+    expect(output.ok).toBe(true);
+    expect(preparation.install).toBe("linked");
+    // The shortened list AND the flag that says it is shortened. Before the fix
+    // the flag was absent here: `steps` had 16 entries, `stepsTruncated`
+    // undefined, and nothing said the tail was missing.
+    expect(preparation.steps).toHaveLength(MAX_PREP_STEPS);
+    expect(preparation.stepsTruncated).toBe(true);
+    // Additive on top of the named mirror: the shared flag names it too, so a
+    // caller watching only that one still learns the log is not the whole log.
+    expect(preparation.truncated).toBe(true);
+    // The dropped tail is the gate-bin verdict: the log is full before the
+    // probe runs, so the list is honest about a decision it never recorded.
+    const steps = preparation.steps as Array<Record<string, unknown>>;
+    expect(steps.filter((entry) => entry.step === "build")).toHaveLength(MAX_PREP_STEPS - 1);
+    expect(steps.some((entry) => entry.step === "gate-bins")).toBe(false);
+
+    // The kernel is the authority the mirror reads: a second receipt for the
+    // same worktree agrees on the cap AND the flag, so the projection reports
+    // the kernel's decision rather than a coincidence.
+    const kernelReceipt = prepareWorktreeDependencies(nativeDir, worktreePath);
+    expect(kernelReceipt.steps).toHaveLength(MAX_PREP_STEPS);
+    expect(kernelReceipt.stepsTruncated).toBe(true);
+
+    // CLI parity on the same kernel event: the twin fixture carries the same
+    // packages, and the same shortened log comes back — entry for entry. The
+    // CLI twin needs a push target (a fresh-worktree CLI start always pushes).
+    const cliRemote = join(dirname(cliDir), `${basename(cliDir)}-remote.git`);
+    git(dirname(cliRemote), ["init", "--bare", "-q", cliRemote]);
+    git(cliRemote, ["config", "maintenance.auto", "false"]);
+    git(cliDir, ["remote", "add", "origin", cliRemote]);
+    const cliProc = runCli(["start", "task-rate-limit", "--worktree", "--assignee", "smoke"], cliDir);
+    expect(cliProc.status, cliProc.stderr || cliProc.stdout).toBe(0);
+    const cli = JSON.parse(cliProc.stdout) as Record<string, unknown>;
+    expect(cli.prepSteps).toHaveLength(MAX_PREP_STEPS);
+    expect(cli.prepSteps).toEqual(preparation.steps);
+  });
+
+  it("keeps an uncapped preparation log unflagged (the mirror reports the kernel, not a cap of its own)", async () => {
+    const dir = seedGitTree("arggon-preplog-c-");
+    // One package, under the cap: the kernel records every decision and sets no
+    // flag, so this surface must not invent one (a flag nobody set would be a
+    // second, disagreeing account of the same event — the defect's other half).
+    addPrepLogWorkspacePackages(dir, 1);
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    const output = (await tool(defs, "start").execute({
+      id: "task-rate-limit",
+      assignee: "smoke",
+    })).output as Record<string, unknown>;
+    const preparation = output.preparation as Record<string, unknown>;
+
+    expect(preparation.steps).toEqual([
+      { step: "link", outcome: "farm-created" },
+      { step: "build", outcome: "no-build-script", pkg: "@scope/pkg-0" },
+      { step: "gate-bins", outcome: "all-worktree" },
+    ]);
+    expect(preparation.stepsTruncated).toBeUndefined();
+    expect(preparation.truncated).toBeUndefined();
+  });
+
   it("keeps the worktree and reports a skipped claim commit when the gate fails, then retries on attach", async () => {
     const dir = seedGitTree();
     setNativePreCommitHook(dir, '#!/bin/sh\necho "native gate: missing dependency" >&2\nexit 1\n');
@@ -1916,11 +2055,13 @@ describe("worktree domain tools (W4)", () => {
     expect(message).toContain("The worktree was kept at");
     expect(message).toContain("npm ci");
     expect(message).toContain("Preparation ran:");
-    const firstNamedIndex = message.indexOf(firstEntry);
-    expect(firstNamedIndex).toBeGreaterThan(-1);
-    expect(message.indexOf("The worktree was kept at")).toBeLessThan(firstNamedIndex);
-    expect(message.indexOf("npm ci")).toBeLessThan(firstNamedIndex);
-    expect(message.indexOf("Preparation ran:")).toBeLessThan(firstNamedIndex);
+    // Each clause must lead the first named bin AND be present: the three bare
+    // `indexOf` comparisons this replaces compared -1 when a clause stopped
+    // matching, which passes against any positive index
+    // (bug-vacuous-substring-ordering-assertions).
+    assertOrder(message, "The worktree was kept at", firstEntry);
+    assertOrder(message, "npm ci", firstEntry);
+    assertOrder(message, "Preparation ran:", firstEntry);
     // Negative control: the message is pinned at the cap and the LAST named
     // entry is gone — the test cannot pass on a merely longer message.
     expect(message.length).toBe(2048);
@@ -2104,17 +2245,13 @@ describe("worktree domain tools (W4)", () => {
     // the named bins (the evidence the clip starts eating last).
     expect(message).toContain("The worktree was kept at");
     expect(message).toContain("it attaches to the existing worktree and retries the claim commit");
-    const firstNamedIndex = message.indexOf(firstEntry);
-    expect(firstNamedIndex).toBeGreaterThan(-1);
-    expect(message.indexOf("it attaches to the existing worktree and retries the claim commit")).toBeLessThan(
-      firstNamedIndex,
-    );
+    assertOrder(message, "it attaches to the existing worktree and retries the claim commit", firstEntry);
     // The kernel refusal's OWN remedy must survive too
     // (task-strictgatebinfailure-tail-clipped-by-head-clip): it used to trail
     // the named list, so at this worst case the head-clip ate the only fix and
     // left the diagnosis alone. It now leads, inside the kept head window.
     expect(message).toContain("npm ci");
-    expect(message.indexOf("npm ci")).toBeLessThan(firstNamedIndex);
+    assertOrder(message, "npm ci", firstEntry);
     // Negative control: pinned at the cap, last named entry gone.
     expect(message.length).toBe(2048);
     expect(message).not.toContain(sorted[sorted.length - 1]);
@@ -2379,14 +2516,14 @@ describe("worktree domain tools (W4)", () => {
     expect(message).toContain("10 tracked files were modified after that claim");
     // ORDER is the pinned contract, not the prose: every actionable clause
     // precedes the named-file list, which is the only thing allowed to clip.
-    const firstFile = message.indexOf(paths[0]);
-    expect(firstFile).toBeGreaterThan(-1);
     for (const clause of [
       "takeOverWorktree: true",
       "arggon-claim.json",
       "A plain re-run cannot clear this",
     ]) {
-      expect(message.indexOf(clause)).toBeLessThan(firstFile);
+      // Every clause is REQUIRED here: a silently-renamed clause used to
+      // answer -1 and pass as "ordered before the list".
+      assertOrder(message, clause, paths[0]);
     }
     // The clip really did bite (otherwise this test would pass vacuously on a
     // message that simply got longer).

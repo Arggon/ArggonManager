@@ -47,6 +47,10 @@ import {
   MAX_CLAIM_TAKEOVERS,
   MAX_CLAIM_WRITE_NAMES,
 } from "./worktree.js";
+// Ordering assertions go through assertOrder, never a bare `indexOf`
+// comparison: `-1 < n` makes a renamed clause pass as if it were still ordered
+// (bug-vacuous-substring-ordering-assertions).
+import { assertOrder } from "../../test/assert-order.js";
 
 const roots: string[] = [];
 
@@ -792,11 +796,9 @@ describe("strictGateBinFailure (task-start-gate-strict-mode)", () => {
     );
     expect(message).toContain(firstEntry);
     // The remedy leads the diagnosis AND precedes the FIRST named bin, not
-    // merely the last one.
-    expect(message.indexOf("npm ci")).toBeLessThan(
-      message.indexOf("x-tracker.strict-gate-bins is set"),
-    );
-    expect(message.indexOf("npm ci")).toBeLessThan(message.indexOf(firstEntry));
+    // merely the last one. assertOrder pins presence too: a reworded clause
+    // used to make the bare `indexOf` comparison answer -1 < n and pass.
+    assertOrder(message, "npm ci", "x-tracker.strict-gate-bins is set", firstEntry);
     // …and the whole named list still trails, last bin included.
     expect(message.endsWith(`${lastEntry}.`)).toBe(true);
 
@@ -1320,7 +1322,7 @@ describe("claim stamp: single-writer detection (task-single-writer-worktree-enfo
     expect(refusal).toContain(
       'rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"',
     );
-    expect(refusal.indexOf("--take-over-worktree")).toBeLessThan(refusal.indexOf('rm "$(git -C'));
+    assertOrder(refusal, "--take-over-worktree", 'rm "$(git -C');
   });
 
   it("puts every remedy BEFORE the named-file list, so the 2000-char human clip cannot cut them", () => {
@@ -1341,11 +1343,9 @@ describe("claim stamp: single-writer detection (task-single-writer-worktree-enfo
       }) ?? "";
     // Remedies first: both must precede the FIRST named path, not merely the
     // last one.
-    const firstFile = refusal.indexOf(files[0]!);
-    expect(firstFile).toBeGreaterThan(0);
-    expect(refusal.indexOf("--take-over-worktree")).toBeLessThan(firstFile);
-    expect(refusal.indexOf("confirm no live writer")).toBeLessThan(firstFile);
-    expect(refusal.indexOf('rm "$(git -C')).toBeLessThan(firstFile);
+    assertOrder(refusal, "--take-over-worktree", files[0]!);
+    assertOrder(refusal, "confirm no live writer", files[0]!);
+    assertOrder(refusal, 'rm "$(git -C', files[0]!);
     // The evidence is still all there, last.
     expect(refusal).toContain("(and 14 more)");
     expect(refusal).toContain(`Files modified after that claim: ${files.join(", ")}`);

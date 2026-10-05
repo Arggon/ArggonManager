@@ -2182,6 +2182,16 @@ type NativePreparationReceipt = {
   /** Bounded preparation log (bug-start-install-ordering), as reported by the kernel. */
   steps?: NativePrepStep[]
   /**
+   * The kernel's own "entries were dropped" decision for that log, MIRRORED
+   * verbatim (bug-native-steps-truncated-flag-dropped). The kernel caps the log
+   * at `MAX_PREP_STEPS = 16`, so a longer run reaches this surface ALREADY
+   * shortened; re-deriving the flag from a cap of this surface's own could
+   * never fire through the kernel's smaller one, and the shortened list was
+   * handed over as if it were the whole log. It also folds into the shared
+   * `truncated` flag, so a capped log is never read as complete on either flag.
+   */
+  stepsTruncated?: true
+  /**
    * Worktree env contract receipt (spec worktree-env-contract-016), forwarded
    * from the kernel when the caller requested env preparation (every
    * `start --worktree` run does).
@@ -2317,6 +2327,13 @@ type NativeCommitResult = {
  * per-name character bound is re-applied, like every other name in the receipt,
  * and a kernel-side truncation is folded into the shared `truncated` flag so a
  * capped list is never passed off as the whole set.
+ *
+ * The one flag the kernel SETS is mirrored, never recomputed
+ * (bug-native-steps-truncated-flag-dropped): `stepsTruncated` says the kernel's
+ * own `MAX_PREP_STEPS` (16) log dropped entries. Deriving it here from a cap of
+ * this function's own (32) cannot fire through the kernel's smaller one, so the
+ * shortened list was reported as complete; the mirror keeps both surfaces on the
+ * kernel's decision, and the fold into `truncated` is additive on top of it.
  */
 function boundedPreparation(input: {
   ready: boolean
@@ -2329,6 +2346,8 @@ function boundedPreparation(input: {
   missingDependenciesTotal: number
   gateBins?: NativeGateBinResolution[]
   steps?: NativePrepStep[]
+  /** The kernel's own log-truncation decision; mirrored, never re-derived. */
+  stepsTruncated?: true
   env?: NativeEnvReceipt
   claim?: NativeClaimReceipt
 }): NativePreparationReceipt {
@@ -2356,7 +2375,12 @@ function boundedPreparation(input: {
   })
   // The kernel owns discovery and its own cap (MAX_PREP_STEPS = 16, below this
   // function's MAX_NATIVE_PREPARATION_NAMES); only the per-string bound is
-  // re-applied, and an over-cap kernel log folds into the shared truncation.
+  // re-applied. The 32-name slice stays as defense in depth — a hand-built
+  // receipt is the only way it can fire through the kernel — while the
+  // kernel's OWN decision about dropping entries is mirrored, never recomputed
+  // from that slice (below): the length comparison cannot see a kernel-side
+  // drop, so deriving the flag from it is what let a shortened log be read as
+  // the whole log.
   const steps = (input.steps ?? []).slice(0, MAX_NATIVE_PREPARATION_NAMES).map((entry) => {
     const bounded: NativePrepStep = {
       // A kernel-produced phase token from a fixed three-value set: passed
@@ -2369,6 +2393,10 @@ function boundedPreparation(input: {
     }
     return bounded
   })
+  // The kernel's own "the log was capped" decision (bug-native-steps-truncated-flag-dropped).
+  // Mirrored verbatim, and only ever true when the kernel set it: a flag invented
+  // here would be a second, disagreeing account of the same event.
+  const kernelDroppedSteps = input.stepsTruncated === true
   // Env contract fragment (spec worktree-env-contract-016): projected, not
   // re-derived — the kernel owns the check and the six-key shape.
   const env = input.env === undefined ? undefined : boundedEnvReceipt(input.env)
@@ -2379,6 +2407,10 @@ function boundedPreparation(input: {
   const claim =
     input.claim === undefined ? undefined : boundedClaimReceipt(input.claim)
   const truncated =
+    // The kernel's capped log folds in here too, so a caller watching only the
+    // shared flag still learns the log is not the whole log (additive on top of
+    // the named `stepsTruncated` mirror, never a replacement for it).
+    kernelDroppedSteps ||
     input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
     input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
     (input.steps?.length ?? 0) > steps.length ||
@@ -2408,6 +2440,7 @@ function boundedPreparation(input: {
     missingDependenciesTotal: input.missingDependenciesTotal,
     gateBins,
     ...(steps.length > 0 ? { steps } : {}),
+    ...(kernelDroppedSteps ? { stepsTruncated: true as const } : {}),
     ...(env !== undefined ? { env } : {}),
     ...(claim !== undefined ? { claim } : {}),
     ...(truncated ? { truncated: true } : {}),

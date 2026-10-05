@@ -27,7 +27,13 @@
  *      pinned init would then rewrite committed content. Both directions are
  *      driven here — a seam newer than the pin goes GREEN, a seam whose bytes
  *      differ from its own generator's goes RED, and the messages name the
- *      generator that disagrees.
+ *      generator that disagrees. The lag assertion is driven on both sides of
+ *      the `package.json`-vs-pin question too (a fixture whose `package.json`
+ *      version equals the pin still goes RED): it never reads `package.json`,
+ *      which is why the repo-side predicate's old `pin !== pkgVersion` conjunct
+ *      could not be pasted in here to "close the gap" — see
+ *      `cli/src/ci-seam-pin.test.ts` and `ArggonManager/docs/ci.md`
+ *      §Where the rule of record lives.
  *
  * The shipped install step is `npm install -g "arggon-manager@$ARGGON_VERSION"`
  * (task-ci-recipe-published-one-liner): registry install, no clone. Its TEXT
@@ -59,6 +65,10 @@ import { CONVENTION_VERSION } from "@arggondev/lib";
 import { checksumOf } from "./docs.js";
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
 import { runCli } from "./test-spawn.js";
+// Ordering assertions go through assertOrder, never a bare `indexOf`
+// comparison: `-1 < n` makes a renamed clause pass as if it were still
+// ordered (bug-vacuous-substring-ordering-assertions).
+import { assertOrder } from "../../test/assert-order.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const WORKFLOW_TEMPLATE = join(root, "templates/docs/github/workflows/arggon.yml");
@@ -163,9 +173,11 @@ function normalize(raw: string, dir: string): string {
  * parses the TEMPLATE, so a hand-divide of the two copies (a predicate edited in
  * one, an exclusion dropped in the other) shipped unnoticed — and the reviewer of
  * PR #607 found a real semantic divergence in the pin-lag rule because of it.
- * `cli/src/ci-seam-pin.test.ts` is the OTHER two-copy pair (shell vs TS
- * predicate, tracked as bug-ci-seam-pin-shell-vs-test-copy-divergence); this is
- * the workflow pair.
+ * The OTHER two-copy pair (the shell clause vs the `pinLagsSeam()` predicate in
+ * `cli/src/ci-seam-pin.test.ts`) is closed: they are one rule, held together by
+ * a parity test that EXECUTES the clause lifted from both copies below
+ * (bug-ci-seam-pin-shell-vs-test-copy-divergence). This block is the workflow
+ * pair — template vs the committed copy.
  */
 describe("workflow parity: template vs the copy CI runs", () => {
   const COMMITTED_WORKFLOW = join(root, ".github/workflows/arggon.yml");
@@ -205,10 +217,9 @@ describe("workflow parity: template vs the copy CI runs", () => {
         "node dist/cli.js init --no-commit",
       );
       // The pinned-lag assertion owns the lag case: it has to precede the diff it
-      // would otherwise be reported as.
-      expect(drift.indexOf("lags the committed arggon seam")).toBeLessThan(
-        drift.indexOf("git status --porcelain"),
-      );
+      // would otherwise be reported as — and both clauses must be PRESENT, which
+      // the bare `indexOf` comparison it replaces could not say.
+      assertOrder(drift, "lags the committed arggon seam", "git status --porcelain");
     }
   });
 });
@@ -411,10 +422,7 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     expect(bootstrap).toContain("npm run build");
     expect(bootstrap).toContain("node dist/cli.js init --no-commit");
     expect(drift).toContain("node dist/cli.js init --no-commit");
-    expect(drift.indexOf("lags the committed arggon seam")).toBeGreaterThan(-1);
-    expect(drift.indexOf("lags the committed arggon seam")).toBeLessThan(
-      drift.indexOf("git status --porcelain"),
-    );
+    assertOrder(drift, "lags the committed arggon seam", "git status --porcelain");
     // The recipe is an init-vendored artifact: it must ship in the tarball
     // (the installed package is what `init` reads its templates from).
     const recipe = "templates/docs/github/workflows/arggon.yml";
@@ -641,13 +649,19 @@ process.stdout.write("fixture branch generator: init --no-commit\\n");
    * Git fixture holding that seam, shaped either as the seam's own source
    * (selfHosted: the arggon package name + the CLI entry point + a built bin)
    * or as an adopter repo (anything else — the pinned release is its only
-   * generator).
+   * generator). `pkgVersion`/`stamp` override the two version inputs the
+   * pinned-lag assertion compares, so a fixture can reproduce a specific
+   * (pin, package.json, stamps) triple.
    */
-  function seedSeam(dir: string, selfHosted: boolean): void {
+  function seedSeam(
+    dir: string,
+    selfHosted: boolean,
+    opts: { pkgVersion?: string; stamp?: string } = {},
+  ): void {
     const name = selfHosted ? "arggon-manager" : "adopter-demo";
     writeFileSync(
       join(dir, "package.json"),
-      `${JSON.stringify({ name, version: "0.1.0", private: true }, null, 2)}\n`,
+      `${JSON.stringify({ name, version: opts.pkgVersion ?? "0.1.0", private: true }, null, 2)}\n`,
     );
     const seam = seamNewerThanPin();
     if (selfHosted) {
@@ -667,7 +681,10 @@ process.stdout.write("fixture branch generator: init --no-commit\\n");
     // assertion reads.
     writeFileSync(join(dir, "AGENTS.md"), `${AGENTS_MARKER}\n# adopter repo\n`);
     mkdirSync(join(dir, "ArggonManager"), { recursive: true });
-    writeFileSync(join(dir, "ArggonManager", ".convention.yml"), stateFile(binVersion, seam));
+    writeFileSync(
+      join(dir, "ArggonManager", ".convention.yml"),
+      stateFile(opts.stamp ?? binVersion, seam),
+    );
     writeFileSync(join(dir, ".mcp.json"), seam);
     initFixtureRepo(dir);
     expect(git(["add", "--", "."], dir).status).toBe(0);
@@ -788,6 +805,26 @@ process.stdout.write("fixture branch generator: init --no-commit\\n");
     writeFileSync(statePath, stateFile(binVersion, seamNewerThanPin()));
     expect(git(["commit", "-am", "re-pin"], branch).status).toBe(0);
     expect(runStep(DRIFT_STEP, branch).status).toBe(0);
+
+    // Direction 3b — the one input where the shipped clause and the repo-side
+    // `pinLagsSeam()` used to disagree (bug-ci-seam-pin-shell-vs-test-copy-divergence):
+    // the SAME lag, on a repo whose `package.json` version EQUALS the pin. That is
+    // this repo's mid-cycle shape and, for any adopter, the shape their version
+    // lands in whenever it coincides with the pin literal. The clause still fires
+    // — it never reads `package.json` — and that is precisely why the TS
+    // predicate's old `pin !== package.json` conjunct could NOT be pasted into the
+    // shell copy to "close the gap": pasted in, this repo would go green while the
+    // pinned init rewrites committed content, i.e. #527 with the gate off.
+    // `cli/src/ci-seam-pin.test.ts` asserts the TS predicate agrees on this exact
+    // triple by EXECUTING the clause this step runs.
+    const coincident = mkdtemp("arggon-headless-coincident-");
+    seedSeam(coincident, true, { pkgVersion: binVersion, stamp: "99.0.0" });
+    const coincidentLag = runStep(DRIFT_STEP, coincident);
+    expect(coincidentLag.status, `${coincidentLag.stdout}\n${coincidentLag.stderr}`).not.toBe(0);
+    expect(coincidentLag.stdout).toContain(
+      `ARGGON_VERSION (${binVersion}) lags the committed arggon seam (99.0.0)`,
+    );
+    expect(coincidentLag.stdout).toContain("bump ARGGON_VERSION to 99.0.0");
 
     // A missing build is an error, never a silent fall back to the pinned
     // release — that fall back IS the bug (it strips the branch's own content
