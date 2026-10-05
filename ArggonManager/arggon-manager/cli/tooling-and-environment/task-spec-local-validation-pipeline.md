@@ -9,6 +9,7 @@ created: "2026-10-05"
 updated: "2026-10-05"
 depends_on: [task-adr-local-validation-pipeline]
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-spec-local-validation-pipeline.md
   Leaves live only under a story. id is the filename stem: task-spec-local-validation-pipeline.
@@ -22,7 +23,7 @@ depends_on: [task-adr-local-validation-pipeline]
 
 Follows [`task-adr-local-validation-pipeline`](task-adr-local-validation-pipeline.md);
 exploration of record
-[`exploration-local-validation-pipeline-023`](../../../../docs/explorations/exploration-local-validation-pipeline-023.md).
+[`exploration-local-validation-pipeline-023`](../../../docs/explorations/exploration-local-validation-pipeline-023.md).
 
 The exploration is **thinking, not building**; this is where its hunted edge cases
 become acceptance criteria. Its edge-case table already resolved every dimension to one
