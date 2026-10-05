@@ -25,13 +25,18 @@
 >
 > ### §6.1 The role model
 >
-> | Shipped id           | Role                     | Software analogue              | Non-software analogue                     | Decides                                                                                                        |
-> | -------------------- | ------------------------ | ------------------------------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-> | _(human)_            | **Product Owner**        | Product owner / sponsor        | Same                                      | Direction, priority, acceptance, risk, release (§2)                                                            |
-> | `arggon-coordinator` | **Delivery lead (PM)**   | Product manager                | Project manager                           | What is built next and in what order; who is dispatched; tracker state; merge verification and the `done` flip |
-> | `arggon-reviewer`    | **Practice & standards** | Tech lead / software architect | Standards, methods, editorial, compliance | Whether a change is right by the project's own bar — structure, patterns, principles, scope; asks for refactor |
-> | `arggon-worker`      | **Maker**                | Programmer                     | Author, analyst, executor                 | Producing the change, keeping it on the item                                                                   |
-> | `arggon-prover`      | **Verifier**             | Manual QA                      | Independent checker / inspector           | Whether the delivered thing actually does what was specified, by executing the project's gates                 |
+> | Shipped id _(2026-10-04)_ | Role                     | Software analogue              | Non-software analogue                     | Decides                                                                                                        |
+> | ------------------------- | ------------------------ | ------------------------------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+> | _(human)_                 | **Product Owner**        | Product owner / sponsor        | Same                                      | Direction, priority, acceptance, risk, release (§2)                                                            |
+> | `arggon-coordinator`      | **Delivery lead (PM)**   | Product manager                | Project manager                           | What is built next and in what order; who is dispatched; tracker state; merge verification and the `done` flip |
+> | `arggon-reviewer`         | **Practice & standards** | Tech lead / software architect | Standards, methods, editorial, compliance | Whether a change is right by the project's own bar — structure, patterns, principles, scope; asks for refactor |
+> | `arggon-worker`           | **Maker**                | Programmer                     | Author, analyst, executor                 | Producing the change, keeping it on the item                                                                   |
+> | `arggon-prover`           | **Verifier**             | Manual QA                      | Independent checker / inspector           | Whether the delivered thing actually does what was specified, by executing the project's gates                 |
+>
+> **Amendment (2026-10-05):** the "Shipped id" column records the ids **as shipped
+> on 2026-10-04**; §6.2a′ below renamed all four. The rows are left exactly as this
+> amendment wrote them and the column header says so. The live table is
+> `docs/engineering.md` §Roles and authority → The role table.
 >
 > Two boundaries this makes explicit, because the roles otherwise blur:
 >
@@ -138,6 +143,43 @@
 > restated in role language, not re-decided. Behavioral impact class: agents must
 > re-learn their operating contract, so it ships through the ADR 0016 channel with
 > both skill copies byte-equal.
+>
+> ### Amendment (2026-10-05, `bug-adr-0021-s5-lists-retired-agent-ids`): the retired agent ids are restated at the shipped ids
+>
+> §6.2a′ decided the rename and PR #641 shipped it (`db8f9821`, 2026-10-04), but
+> this record's own references were left naming the **retired** ids. §5 therefore
+> still told agents what to claim as in ids that no agent file, permission
+> allow-list or plugin manifest answers to any more — a record stating something
+> factually false about the very artifacts it governs. §6.2a′'s mapping table stays
+> the single source: `arggon-coordinator` → `arggon-delivery-lead`,
+> `arggon-reviewer` → `arggon-standards-reviewer`, `arggon-worker` → `arggon-maker`,
+> `arggon-prover` → `arggon-verifier`.
+>
+> Restated at the shipped ids, each with a dated note at its own site saying what
+> it said before: **§2**'s three authority-map rows, **§5**'s id list, **§6**'s
+> "prover", and the **§6.1** column header (the ids it lists stay as the 2026-10-04
+> amendment wrote them, for the same reason §6.2a is left as taken).
+>
+> Deliberately **not** changed:
+>
+> - **The decisions.** §1, §2's owner column, §3, §4 and §5's rule all stand.
+>   Nothing here re-decides anything: §5 already said an agent claims as a shipped
+>   **role** id and never as the product owner's login; the rename only changed
+>   which ids ship.
+> - **Dated amendments left as taken** — §6.1's table rows (only its column header
+>   is dated), §6.2's and §6.2b's role prose ("the prover's no-mutation contract"),
+>   and §6.2a's rejected clause: each records what was decided on 2026-10-04, and
+>   §6.2a is the standing precedent for leaving that text exactly where it stands.
+> - **§6.2a′'s inventory** — the `/(^|:)arggon-reviewer$/` gate matcher, "the ZCode
+>   seam ships no prover" — a record of the pre-rename tree it surveyed. The matcher
+>   now names the shipped reviewer id and a test binds the two.
+> - **Role nouns in prose** ("the coordinator recommends…", "the reviewer's
+>   judgment"): the roles outlived the ids, and `docs/engineering.md`
+>   §Roles and authority carries the live phrasing.
+>
+> No shipped template, permission, tool or schema changes with this note — the four
+> ids and the corrected carriers shipped in PR #641. This repairs the record they
+> are governed by.
 
 ## Context
 
@@ -205,18 +247,29 @@ no new command, schema field or private surface is introduced.
 
 ### 2. The authority map (bounded, named)
 
-| Decision                           | Owner             | Enforcement today                                                   |
-| ---------------------------------- | ----------------- | ------------------------------------------------------------------- |
-| Direction and priority             | **product owner** | recorded as `priority`; decided by a person                         |
-| Product acceptance of a container  | **product owner** | recorded as an `accept:` comment (below)                            |
-| Accepting residual risk            | **product owner** | ADR 0015 waiver — human-only, no agent parameter                    |
-| Taking over another writer's claim | **product owner** | `--steal` — armed config + TTY confirmation                         |
-| Publishing a release               | **product owner** | human-pushed version bump (`spec-release-pipeline-015.md` AC 7)     |
-| Exploring, specifying, planning    | agent             | the loop, unchanged                                                 |
-| Implementing, testing, docs        | agent             | the loop, unchanged                                                 |
-| Reviewing and proving              | agent             | reviewer (read-only) / prover (no mutation) split (`agents.md:293`) |
-| Verifying merges, flipping `done`  | agent             | coordinator; the done gate still holds (ADR 0015)                   |
-| Filing follow-up work              | agent             | coordinator consolidates and files (`agents.md:308`)                |
+| Decision                           | Owner             | Enforcement today                                                                                            |
+| ---------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| Direction and priority             | **product owner** | recorded as `priority`; decided by a person                                                                  |
+| Product acceptance of a container  | **product owner** | recorded as an `accept:` comment (below)                                                                     |
+| Accepting residual risk            | **product owner** | ADR 0015 waiver — human-only, no agent parameter                                                             |
+| Taking over another writer's claim | **product owner** | `--steal` — armed config + TTY confirmation                                                                  |
+| Publishing a release               | **product owner** | human-pushed version bump (`spec-release-pipeline-015.md` AC 7)                                              |
+| Exploring, specifying, planning    | agent             | the loop, unchanged                                                                                          |
+| Implementing, testing, docs        | agent             | the loop, unchanged                                                                                          |
+| Reviewing and proving              | agent             | `arggon-standards-reviewer` (read-only) / `arggon-verifier` (no mutation) split (`agents.md` §Orchestration) |
+| Verifying merges, flipping `done`  | agent             | delivery lead; the done gate still holds (ADR 0015)                                                          |
+| Filing follow-up work              | agent             | the delivery lead consolidates and files (`agents.md` §Orchestration)                                        |
+
+> **Amendment (2026-10-05, `bug-adr-0021-s5-lists-retired-agent-ids`): the three
+> agent rows are restated at the shipped ids.** As first written they read "reviewer
+> (read-only) / prover (no mutation)" (`agents.md:293`), "coordinator" and
+> "coordinator consolidates and files" (`agents.md:308`) — the pre-rename ids of
+> §6.2a′. They now name `arggon-standards-reviewer`, `arggon-verifier` and the
+> delivery lead, matching `docs/engineering.md` §Roles and authority → Authority map.
+> The two row citations move from line numbers to §Orchestration because the rename
+> moved those lines, and a line number into a moving file is the same drift in
+> smaller clothes. **No authority changes**: every row keeps the owner and the
+> enforcement it had.
 
 The four irreversible powers keep their existing structural gates. No new authority
 is granted to any agent.
@@ -294,19 +347,31 @@ accept: approve
 
 ### 5. Agent identity
 
-Agents claim as their shipped role id — `arggon-coordinator`, `arggon-worker`,
-`arggon-reviewer`, `arggon-prover` — never as the product owner's login. The schema
-already permits it: `assignee` is documented as "GitHub login **or agent id**"
-(`convention.md:168`). This is doctrine, not migration, and it ends the conflation
-that makes agent work look like human ownership in `list --assignee @me`,
-stale-claim reports and CODEOWNERS review routing.
+Agents claim as their shipped role id — `arggon-delivery-lead`, `arggon-maker`,
+`arggon-standards-reviewer`, `arggon-verifier` — never as the product owner's
+login. The schema already permits it: `assignee` is documented as "GitHub login
+**or agent id**" (`convention.md:168`). This is doctrine, not migration, and it
+ends the conflation that makes agent work look like human ownership in
+`list --assignee @me`, stale-claim reports and CODEOWNERS review routing.
+
+> **Amendment (2026-10-05, `bug-adr-0021-s5-lists-retired-agent-ids`): the id list
+> is restated at the shipped ids.** As first written it read `arggon-coordinator`,
+> `arggon-worker`, `arggon-reviewer`, `arggon-prover` — the ids §6.2a′ renamed and
+> PR #641 shipped, so this section had agents claiming as ids no seam materializes.
+> The decision is untouched: a shipped **role** id, never the product owner's
+> login. §6.2a′'s mapping table is the single source for the ids, and the live role
+> table is `docs/engineering.md` §Roles and authority.
 
 ### 6. The review-bar role table is remapped
 
 `docs/engineering.md:12` and the review-bar section headers stop naming human job
-titles for work the agents perform. Architect / reviewer / prover / QA become agent
+titles for work the agents perform. Architect / reviewer / verifier / QA become agent
 roles; product acceptance becomes the product owner's, with §3's tiers deciding
 which items ever reach them.
+
+> **Amendment (2026-10-05, `bug-adr-0021-s5-lists-retired-agent-ids`): "prover" is
+> restated as "verifier".** §6.2a′ renamed that id; the remap it describes is the
+> verifier's. "Architect / reviewer" are role nouns that outlived the ids.
 
 ## Consequences
 

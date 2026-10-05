@@ -987,10 +987,12 @@ export function compareArggonVersions(a: string | undefined, b: string): number 
  *    reaped only when the repo arms the flag: the default cannot destroy
  *    sanctioned content, while arming still lets an adopted adopter clear a
  *    dead agent — which the agent rename depends on (ADR 0021 §6.2a′ gates it
- *    on reaping, and a stranded `.opencode/agents/arggon-coordinator.md` stays
- *    dispatchable). Refusing outright would push exactly that chore onto the
- *    repos that adopted properly; reaping by default would delete their curated
- *    files. The flag is the choice.
+ *    on reaping). The case that matters is a destination the rename RETIRED,
+ *    not a live one: stranded, `.opencode/agents/arggon-coordinator.md` is
+ *    still dispatched as an agent, and no current template generates it (its
+ *    successor is `arggon-delivery-lead.md`). Refusing outright would push
+ *    exactly that chore onto the repos that adopted properly; reaping by
+ *    default would delete their curated files. The flag is the choice.
  *  - An entry whose bytes DIFFER is refused regardless of arming: that is a
  *    known edit, not an unknowable one.
  */
