@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-explore-autoharness-autocontext-autocompact
 title: "Stack exploration: can ArggonManager adopt AutoHarness / AutoContext / AutoCompact?"
 assignee: arggon-coordinator
@@ -10,7 +10,6 @@ labels: [methodology, exploration, evaluation]
 priority: p2
 created: "2026-10-05"
 updated: "2026-10-05"
-claimed_at: "2026-10-05T02:13:46.579Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-explore-autoharness-autocontext-autocompact
 ---
 <!--
