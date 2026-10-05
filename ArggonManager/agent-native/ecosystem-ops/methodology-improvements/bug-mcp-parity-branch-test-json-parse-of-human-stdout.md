@@ -291,3 +291,9 @@ verdict: approve (delivery-lead merge verification, re-run after the stale-branc
 - Smoke bar: not applicable — no product behavior, no CLI command, no UI/TUI surface. The dead-`cliSpawn` probe is the closest end-to-end drive and it exercises the real MCP server.
 
 **Findings 2-4 remain non-blocking follow-up material** (the `expectJsonOnly` sweep to the other 13 arms; per-character budget charging in `readEnvelope`; the two sibling bare-parse sites at `mcp-server.test.ts:125` and `mcp-smoke.test.ts:130`). These belong on the tracker rather than as code TODOs; not filed here to keep this PR scoped to the reviewed change.
+
+### 2026-10-05 @arggon-delivery-lead
+### 2026-10-05 @arggon-delivery-lead
+Merged: PR #612 landed as `2f36bd70` with all three lanes green (`cli`, `tasks-validate`, `ui-smoke`) on the rebased head. The claim frontmatter (`assignee`/`branch`/`worktree_path`) was resolved from `main` during the branch merge and did not survive it, so the item came back as `todo` with no assignee while the change was already merged — recorded here rather than papered over. Re-claimed and completed in two steps (never `todo` → `done`). Acceptance checklist: 7 ticked, 0 unchecked, verified against the code rather than the maker's summary (see the merge-verification verdict above).
+
+Post-merge follow-up filed during this verification: `bug-headless-ci-twin-init-nondeterministic` — `cli/src/headless-ci.test.ts` fails its twin-checkout `init --json` determinism assertion **on clean `origin/main`**, so `main` is independently red. Not caused by this change and not fixed here.
