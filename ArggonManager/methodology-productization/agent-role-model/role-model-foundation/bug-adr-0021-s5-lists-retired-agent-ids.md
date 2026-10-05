@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-adr-0021-s5-lists-retired-agent-ids
 title: "ADR 0021 §5 still lists the four retired agent ids as what agents claim as — factually wrong since PR #641"
+assignee: arggon-delivery-lead
+branch: fix/bug-adr-0021-s5-lists-retired-agent-ids
 parent: role-model-foundation
 labels: [docs, adr, roles]
 priority: p2
 created: "2026-10-05"
 updated: "2026-10-05"
+claimed_at: "2026-10-05T22:48:10.713Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-adr-0021-s5-lists-retired-agent-ids
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-adr-0021-s5-lists-retired-agent-ids.md
