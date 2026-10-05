@@ -239,3 +239,7 @@ Neither the flag nor `npm_config_ignore_scripts` (either case) changes npm 10. S
 **Docs updated to the new mechanism:** CONTRIBUTING.md now says headless-ci packs a private copy, and records that `--ignore-scripts` is not the mechanism on any npm major, with the 10.9.4-vs-12.0.2 measurement — that trap is what hid the writer, and the next lane will hit it.
 
 One thing I did **not** do: I have not run PR #647's `cli` job myself (no merge authority, and the push is what triggers it). Push is next; if the lane is still red there, the freeze may be refusing a writer I have not found — the reproduction recipe above is fast enough to iterate on (`PATH=/tmp/opencode/npm10bin:$PATH npx vitest run cli/src/headless-ci.test.ts`, ~40s to failure).
+
+### handoff 2026-10-05 @ses_ef23980f2ffepEv8vQ3eD3FnJO (session: ses_ef23980f2ffepEv8vQ3eD3FnJO) — next: Pushed c1d8741a/e5bc593a; check PR #647 cli lane - if still red, bisect writers with PATH=/tmp/opencode/npm10bin:$PATH
+- branch: fix/bug-test-suite-lib-dist-rebuild-race
+- open questions: npm-10 shim lives in /tmp/opencode/npm10bin (not durable) - make it a repo script?; item title still says five files rebuild lib/dist - rename?
