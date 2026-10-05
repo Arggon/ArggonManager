@@ -79,6 +79,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -548,6 +549,21 @@ function runTail(result: RunResult): string {
   return lines.slice(-10).join("\n");
 }
 
+/** One YAML frontmatter scalar from a work-item file, unquoted. */
+function frontmatterField(body: string, field: string): string | undefined {
+  const match = new RegExp(`^${field}:\\s*(.+)$`, "m").exec(body);
+  return match?.[1]?.trim().replace(/^["']|["']$/g, "");
+}
+
+/** Longest common prefix of a non-empty string list (the shared id namespace). */
+function longestCommonPrefix(values: string[]): string {
+  return values.reduce((common, value) => {
+    let i = 0;
+    while (i < common.length && i < value.length && common[i] === value[i]) i++;
+    return common.slice(0, i);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // T12 — permission probes
 // ---------------------------------------------------------------------------
@@ -779,6 +795,15 @@ function waveFixture(): { fixture: Fixture; chain: WaveChain } | undefined {
 function assertWavePhase2(f: Fixture, chain: WaveChain, result: RunResult): void {
   const events = eventsOf(result);
   const calls = subagentCalls(events);
+  // The shipped role ids, derived from the fixture's own generated agents (the
+  // same derivation the CLI tests use): a claim must carry one of THESE.
+  const roleIds = readdirSync(f.path(".opencode/agents"))
+    .filter((file) => file.endsWith(".md"))
+    .map((file) => file.replace(/\.md$/, ""));
+  check("the fixture shipped the four role agents", roleIds.length === 4, roleIds.join(", "));
+  // Their common prefix IS the shipped agent namespace (`arggon-`): derived,
+  // never restated, so the identity check below cannot outlive a rename.
+  const roleIdPrefix = longestCommonPrefix(roleIds);
   const workerCalls = calls.filter((call) => call.agent === "arggon-maker");
   const workers = workerCalls.filter((call) => call.status === "completed");
   check(
@@ -823,9 +848,20 @@ function assertWavePhase2(f: Fixture, chain: WaveChain, result: RunResult): void
     check(`feat/${task.id} is pushed to origin`, remote.length > 0, remote);
     const item = f.git(["show", `feat/${task.id}:${task.path}`]).stdout;
     check(
-      `${task.id} is claimed (in_progress + assignee) on its branch`,
-      /status: in_progress/.test(item) && /assignee: arggon-maker-/.test(item),
+      `${task.id} is claimed (in_progress + worktree recorded) on its branch`,
+      /status: in_progress/.test(item) && /worktree_path: /.test(item),
       item.slice(0, 300),
+    );
+    // Identity discipline (ADR 0021 §5): the claim is stamped with a SHIPPED
+    // ROLE ID, never the product owner's login — a claim identifies its writer,
+    // and the writer is not the owner. Two writers on two items may suffixed
+    // ids (`arggon-maker-a`/`-b`), so the bar is the shipped id NAMESPACE,
+    // derived from the fixture's own agents: a human login cannot satisfy it.
+    const assignee = frontmatterField(item, "assignee") ?? "";
+    check(
+      `${task.id} carries a role-id assignee (not a human login)`,
+      assignee.startsWith(roleIdPrefix) && assignee.length > roleIdPrefix.length,
+      `assignee: ${assignee} — shipped roles: ${roleIds.join(", ")} (prefix ${roleIdPrefix})`,
     );
     check(
       `${task.id} carries the worker comment and handoff`,
