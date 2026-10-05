@@ -11,7 +11,9 @@ Greenfield record (the six-phase protocol, `skills/arggon-cli/references/explora
 — ADR 0017). Thinking is the deliverable: nothing here is implemented.
 
 **The short answer.** Every gate the required `cli` check runs already exists as a
-single npm script, so a local pipeline is **composition, not new machinery** — but
+single npm script — 9 of the job's 10 runnable steps are npm scripts (8 gates plus
+`npm ci`, which is setup), and only the version guard is not — so a local pipeline is
+**composition, not new machinery** — but
 measurement shows a local run is _not_ equivalent to CI, in two specific and
 different ways (a stale `lib/dist` produces a false red; one required gate silently
 runs a weaker leg locally than in CI). So the decision is not "which runner" but
@@ -214,8 +216,9 @@ emit `EBADENGINE` on the supported-but-below range — for a script runner that 
 what `&&` does.
 
 **4. The gates are already one-to-one with scripts, so the real work is the ordering —
-and the ordering is what CI's `build` protects.** Ground: 10 of 11 steps map to a
-script; only the PR-scoped version guard has no local entry point, and its logic is
+and the ordering is what CI's `build` protects.** Ground: of the 10 runnable steps in the
+required `cli` job, **9 are npm scripts** (8 gates plus `npm ci`, which is setup); only
+the PR-scoped version guard is not, and its logic is
 already covered by `cli/version-guard.test.ts`. Conversely the _one_ thing CI does that
 a naive local pipeline would not is `npm ci` → `prepare` → `build` **before** test. The
 measured consequence of omitting it is a false red: `1 failed / 2691 passed`, with

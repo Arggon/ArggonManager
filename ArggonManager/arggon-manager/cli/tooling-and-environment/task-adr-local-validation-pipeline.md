@@ -26,8 +26,9 @@ Exploration of record:
 
 The demand: a **fully local** validation pipeline that does not depend on GitHub
 Actions. The exploration's ground (measured 2026-10-05) is that the work is
-**composition, not new machinery** — 10 of the 11 steps in the required `cli` job
-already map one-to-one onto an npm script — so the real decision is **where the gate
+**composition, not new machinery** — of the 10 runnable steps in the required `cli` job,
+**9 are already npm scripts** (8 gates plus `npm ci`), and the one that is not, the
+version guard, already has its own local test — so the real decision is **where the gate
 list lives** and **what a local run is allowed to claim**, because measurement shows
 local is not equivalent to CI in two different ways:
 

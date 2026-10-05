@@ -55,8 +55,9 @@ profile is printed**, since the `opencode` binary's presence changes a gate's st
 - [ ] Every one of the criteria in the Context above appears as a numbered acceptance
       criterion with an observable expected-vs-observed form
 - [ ] The spec states the **ordered lane list** and each lane maps to exactly one
-      existing npm script (10 of 11 `cli`-job steps today; the PR-scoped version guard
-      is explicitly CI-only because it needs a PR base SHA)
+      existing npm script (today: 8 gates of the required `cli` job are npm scripts, and
+      `npm ci` is setup; the PR-scoped version guard is explicitly CI-only because it
+      needs a PR base SHA)
 - [ ] The spec names the CI-only gates the local verdict **cannot** cover — the
       version guard, the seam pinned-lag assertion, publishing — so a green local run is
       never read as a green CI run
