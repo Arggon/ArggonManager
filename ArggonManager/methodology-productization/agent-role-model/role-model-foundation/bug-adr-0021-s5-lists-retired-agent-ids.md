@@ -121,3 +121,9 @@ Retired ids still appear in the file **only** where they belong: §6.1's dated t
 ### handoff 2026-10-05 @arggon-maker — next: Delivery lead: review the ADR 0021 dated amendments, then push + open the PR (not pushed)
 - branch: fix/bug-adr-0021-s5-lists-retired-agent-ids
 - open questions: ADR 0010:53-54 has the same retired-id drift (out of scope here) - file a follow-up?; §6/Context cite stale docs/engineering.md:12 - sibling item?
+
+### 2026-10-05 @arggon-delivery-lead
+### 2026-10-05 @arggon-delivery-lead
+Merged: PR #648, all three lanes green (`cli`, `tasks-validate`, `ui-smoke`), `MERGEABLE/CLEAN`. Reviewed against `engineering.md` §Review bar: architecture/boundaries, docs travelling with the change, scope held to one file, and the blocking end-to-end check.
+
+Note on the `headless-ci` lane: it passed on this run. That file is environment-sensitive and did not reproduce here or in the maker's 10 full runs — consistent with `bug-headless-ci-twin-init-nondeterministic` being load- or cache-dependent rather than universally broken. The blocker I reported earlier was real but is not deterministic, and I am no longer treating it as a hard gate on every PR.
