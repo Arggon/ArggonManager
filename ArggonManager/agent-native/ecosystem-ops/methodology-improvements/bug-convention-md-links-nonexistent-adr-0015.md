@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: blocked
 id: bug-convention-md-links-nonexistent-adr-0015
 title: "convention.md links a nonexistent ADR 0015 path, and that one dead link is what keeps PR #618's link-resolution rule scoped to 1 of 4 carriers"
 assignee: arggon-delivery-lead
@@ -9,7 +9,7 @@ parent: methodology-improvements
 labels: [docs]
 created: "2026-10-03"
 updated: "2026-10-05"
-claimed_at: "2026-10-05T22:48:13.979Z"
+blocked_reason: "Link fix merged (PR #649); acceptance box 2 (widen #618's link-resolution rule from 1 carrier to all four) is undelivered by design — it belongs to the unmerged, owner-claimed #618, and `skills/arggon-cli/**` cannot join the carrier list at all until its markdown files carry real ./adr/ links. Not waivable by an agent. Unblocks when #618 merges and the widening lands."
 worktree_path: /home/arggon/Projects/ArggonManager-bug-convention-md-links-nonexistent-adr-0015
 ---
 <!--
