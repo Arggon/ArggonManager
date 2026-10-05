@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: blocked
 id: bug-adr-0023-ships-unindexed-blocks-every-pr
 title: "ADR 0023 ships unindexed, so `cli/src/adr-index-parity.test.ts` is red on `main` and the `cli` lane fails on every PR regardless of its diff"
 assignee: arggon-delivery-lead
@@ -8,7 +8,7 @@ parent: methodology-improvements
 labels: [docs, adr, ci-blocking, tests]
 created: "2026-10-05"
 updated: "2026-10-05"
-claimed_at: "2026-10-05T21:29:00.347Z"
+blocked_reason: "The ADR 0023 index row is merged (b2da0329) and `adr-index-parity.test.ts` is 7/7, but acceptance box 4 (\"`npm test` green, so the `cli` lane is honestly green on `main`\") cannot be honestly ticked: `cli/src/headless-ci.test.ts:849` still fails, pre-existing and unrelated, filed as `bug-headless-ci-twin-init-nondeterministic`. Not waivable by an agent (`--waive` is human-only) and not ticked over. Unblocks when that bug is fixed; the substantive work here is already on `main`."
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-adr-0023-ships-unindexed-blocks-every-pr.md
