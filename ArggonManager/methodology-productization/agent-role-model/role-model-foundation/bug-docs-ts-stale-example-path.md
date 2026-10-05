@@ -150,3 +150,7 @@ Neither mirrors the docs.ts note (independent envelope examples), so not a doc-s
 Committed without `--no-verify`; the pre-commit gate ran (`arggon validate: ok` in the hook output). Staged explicit paths only.
 
 Item left `status: in_progress` — not flipped to `done` (delivery lead's call after merge).
+
+### handoff 2026-10-05 @ses_ef1ad3ccbffe6ACtjjOZJJHx84 (session: ses_ef1ad3ccbffe6ACtjjOZJJHx84) — next: Lead: review f3ae6d77 + f030e6b4, open the PR against main (no squash, per repo convention), and decide the json-output.md follow-up
+- branch: fix/bug-docs-ts-stale-example-path
+- open questions: I did NOT swap the retired id for a shipped one — a live destination has a template, so it can never be an orphan; flagged RETIRED + named successor instead. Agree? Also: file the json-output.md stal…
