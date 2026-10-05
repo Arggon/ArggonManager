@@ -100,10 +100,117 @@ visible on the read receipt rather than only on the refusal.
 
 ## Acceptance
 
-- [ ] A tracker write issued from a session working in a worktree lands in that worktree's branch, or is refused with the resolved-vs-expected mismatch named — never silently commits to the primary checkout
-- [ ] The resolved tracker root is visible in a read receipt (`show --json` and/or the native equivalent), so an agent can detect the mismatch without guessing
-- [ ] `.arggon.env` per-worktree identity (`ARGGON_WORKTREE_PATH` / `ARGGON_STATE_DIR`) is consulted when resolving, so a worktree session cannot bind to the primary
-- [ ] A regression test drives the native surface from a worktree cwd and asserts the write lands in the worktree's branch (and one that asserts the refusal/visibility path)
-- [ ] `docs/agents.md` §Orchestration (and the worker's operating rules) no longer rely on `session_move` as the mitigation, since it demonstrably does not rebind the tracker root
+- [x] A tracker write issued from a session working in a worktree lands in that worktree's branch, or is refused with the resolved-vs-expected mismatch named — never silently commits to the primary checkout
+- [x] The resolved tracker root is visible in a read receipt (`show --json` and/or the native equivalent), so an agent can detect the mismatch without guessing
+- [x] `.arggon.env` per-worktree identity (`ARGGON_WORKTREE_PATH` / `ARGGON_STATE_DIR`) is consulted when resolving, so a worktree session cannot bind to the primary
+- [x] A regression test drives the native surface from a worktree cwd and asserts the write lands in the worktree's branch (and one that asserts the refusal/visibility path)
+- [x] `docs/agents.md` §Orchestration (and the worker's operating rules) no longer rely on `session_move` as the mitigation — **the stated reason is corrected**: `session_move` demonstrably DOES rebind (measured in this fix's own session, §Context); what it is not is a guarantee, and the docs now carry the corrected finding plus a one-read verification step and the new guard.
 
 ## Notes
+
+### Acceptance evidence — expected vs observed, per box
+
+Fix: `opencode/plugins/arggon/index.ts` (+ regenerated bundle) and
+`opencode/plugins/arggon/tools.test.ts`, plus docs. **No `lib/src` change**: the
+kernel's `findTasksDir`/`repoRootFromTasks` already walk up from the `cwd` they
+are handed, so the defect was entirely on the native side, as with
+`bug-native-tools-commit-to-primary-checkout`.
+
+**Box 1 — a write lands in the worktree's branch, or is refused with the
+resolved-vs-expected mismatch named; never silently commits to the primary.**
+Expected: from a session NOT in the worktree, `comment`/`update`/`handoff`/
+`branch` are refused with both checkouts named, and both checktrees are
+byte-identical afterwards. Observed: all four throw `ArgonToolError` with
+`code: TRACKER_ROOT_MISMATCH` and envelope `{ok: false, error: {code:
+TRACKER_ROOT_MISMATCH}}`; after the refused batch the primary HEAD is unchanged,
+`git status --porcelain` is `""`, and `itemBytes()` in both the primary and the
+worktree does not contain the comment text. The refusal message leads with the
+code, then the resolved checkout, then every declared one with its source, then
+both remedies. From a session correctly IN the worktree the same `comment`
+reports a hash that is the worktree HEAD on `fix/task-rate-limit`, with the
+primary HEAD and item bytes untouched. Tests: `"refuses a tracker write whose
+resolved checkout is not the declared worktree"`, `"refuses every writing tool,
+not just comment"`, `"names both the resolved and the expected checkout in the
+refusal"`, `"reads .arggon.env at the resolved checkout and lands the write on
+its branch"`.
+
+**Box 2 — the resolved root is visible in a read receipt.** Expected: `show`
+answers with the checkout it bound to, and a mismatch is observable without a
+write. Observed: the read returns `trackerRoot: <resolved primary>` and
+`trackerRootMismatch: {resolved, declared: [<worktree>], sources:
+["process.env"]}` with `ok: true` — a read is never refused. In the correct
+worktree case it returns `trackerRoot: <worktree>` plus the full
+`trackerWorktree` identity read from disk (`source` = the `.arggon.env` path,
+`path`, `id`, `item`, `branch`, `stateDir`, `cacheDir`). Deliberately additive
+only when a worktree is involved: a plain checkout declares nothing, so the
+envelope is byte-identical to the CLI's — which is what keeps the
+`native tool outputs mirror the CLI --json envelopes` suite green (it pins 8
+read cases plus 10 native-vs-CLI stdout byte comparisons; an always-on field
+broke 24 tests on the first attempt and was the reason the rule is conditional).
+Test: `"reports the mismatch on a READ instead of refusing it, and shows the
+resolved root"`, `"never refuses a plain checkout that declares nothing, and
+stays byte-identical to the CLI"`.
+
+**Box 3 — `.arggon.env` per-worktree identity is consulted when resolving.**
+Expected: the documented keys are read, from disk and from `process.env`, and a
+worktree session cannot bind to the primary. Observed: `findWorktreeEnv` reads
+at the resolved directory and up to 8 parents; `readWorktreeEnv` yields the
+exact documented identity from a contract file and `undefined` for a missing,
+oversized (>8 KB), malformed or identity-free one; `processWorktreeIdentity`
+reads only the documented keys. The on-disk half refuses on its own with no
+environment involved: a `.arggon.env` at the resolved directory naming
+`/somewhere/else/repo-task-rate-limit` makes the write refuse with that path in
+the message and the worktree HEAD unchanged. Tests: `"refuses a write when the
+.arggon.env beside the session names another worktree"`, `"reads the documented
+keys from an env file and ignores everything else"`, `"declares nothing for a
+missing, oversized or identity-free file"`, `"finds the contract above the
+directory it resolved, but stops at the walk's bound"`, `"reads the process
+declaration only from the documented keys"`.
+
+**Box 4 — a regression test driving the native surface from a worktree cwd.**
+Expected: the write-lands-in-the-worktree case and the refusal/visibility case,
+both over a real `git worktree add -b` checkout. Observed: the new describe
+`"tracker-root binding against the declared worktree identity"` (8 tests) plus
+`"worktree identity parsing"` (5 tests), 13 new tests, over a real linked
+worktree whose `.arggon.env` is written in `lib/src/worktree.ts`'s exact key
+order and unquoted format. **Negative control**: neutralizing
+`trackerRootMismatch` (returning `undefined` early) fails 5 of the 8 — the
+refusal tests, because the call then resolves `ok: true` into the primary
+instead of throwing — and the 3 that still pass are precisely the ones pinning
+deliberately unchanged behavior (plain checkout not refused, unreadable env
+degrades, correct-worktree case unaffected). Restored and re-verified green.
+
+**Box 5 — docs no longer rely on `session_move`.** Observed:
+`docs/agents.md` §Orchestration previously said only "`opencode.session_move`
+follows the session where the work lives". It now states that `session_move`
+carries tracker writes onto the item branch AND that a moved session is not a
+guarantee, with two worker rules: (1) after moving, one `show --meta` must
+answer with the claimed state — if it answers `todo`/no assignee the session is
+still on the primary; (2) never rely on the write to report where it landed, and
+use `trackerRoot`/`trackerWorktree`/`trackerRootMismatch` to detect the
+disagreement. `docs/opencode2.md` gains the corrected finding with the
+two-read measurement table, the binding rule, both declaration sources, the
+narrowness argument and the receipt-field table. `docs/json-output.md` gains the
+native-only receipt rows. **The item's stated reason was wrong and is corrected
+rather than repeated** — see §Context; writing "session_move does not rebind"
+into the methodology would have been a durable false claim.
+
+**Gates, all re-run after the final edit, from this worktree.**
+`npm test` → **128 files / 2693 tests passed**; `npm run lint` → clean;
+`npm run build` → lib build + tsc ×3 + `build:plugin` clean; `npm run
+check:plugin` → bundle regenerated, `git diff --exit-code` exit 0;
+`npm run test:structure` → 5/5 PASS (`acceptance-rows-use-kernel`,
+`native-tools-use-shared-seam`, `ordering-assertions-use-assert-order`,
+`tracker-mutations-use-kernel`, `tracker-rename-destination-use-kernel`);
+`npm run lint:structure` → ast-grep scan clean; `npm run arggon -- validate
+--json` → `{"ok":true,…,"errors":[],"warnings":[]}`.
+
+Not verified, honestly: the **real-runtime leg** (`npm run smoke:opencode`,
+`smoke:opencode:wave`, `smoke:native-start-cold`) was not run — they are
+model-driven and timing-sensitive and must not run beside a loaded machine. The
+in-process suite models the V2 tool context exactly. Note this change makes the
+seam read `process.env`, so the plugin suite now clears and restores the five
+worktree env keys for hermeticity (a developer who exported
+`ARGGON_WORKTREE_PATH` by sourcing a `.arggon.env` would otherwise have made
+every unrelated case bind to that worktree); the smoke harnesses would need the
+same treatment before they are next run.
