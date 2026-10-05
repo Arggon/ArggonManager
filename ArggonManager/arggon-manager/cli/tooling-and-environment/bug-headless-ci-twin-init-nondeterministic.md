@@ -8,7 +8,6 @@ labels: [tests, ci, determinism]
 created: "2026-10-05"
 updated: "2026-10-05"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-headless-ci-twin-init-nondeterministic.md
   Leaves live only under a story. id is the filename stem: bug-headless-ci-twin-init-nondeterministic.
@@ -57,3 +56,23 @@ holding down, consistent with the item's neighbours in this story.
       whether it is load- or ordering-dependent
 
 ## Notes
+
+### 2026-10-05 @arggon-delivery-lead
+Measured trigger found while grounding exploration-local-validation-pipeline-023 (2026-10-05), offered as a lead — **not** a second report of the same defect, and not a claim about the root cause.
+
+Reproduced on clean `main` in the primary checkout, no branch edits:
+
+1. `npx vitest run` with **no prior build** → `Test Files 1 failed | 128 passed (129)` / `Tests 1 failed | 2691 passed (2692)`, duration 90.24 s. The failing assertion is the twin comparison this item already names: `cli/src/headless-ci.test.ts:857` — `expect(normalize(initA.stdout, twinA)).toBe(normalize(initB.stdout…))`.
+2. `npm run build` → exit 0 in 24 s, and `git status --porcelain` afterwards is **empty** (so the committed plugin bundle is in sync; not a bundle-drift effect).
+3. `npx vitest run cli/src/headless-ci.test.ts` → `Test Files 1 passed (1)` / `Tests 7 passed (7)` in 18.9 s.
+
+So the divergence this item describes is **reproducible purely from a stale `lib/dist`** — the one twin runs a packed tarball built from fresh source and the other resolves the kernel through the checkout's existing build, and the two `init --json` envelopes then disagree. That is a concrete, cheap reproducer where the item's acceptance list currently only has an open root-cause question.
+
+It also answers one of the item's acceptance bullets — *what keeps this test from failing in CI*: `ci.yml` runs `npm ci` (whose `prepare` lifecycle is `npm run build`) **before** `npm run test`, so both twins start from the same freshly built source. CI is green here because of the **build-before-test ordering**, not because the twin comparison is inherently deterministic.
+
+Two consequences worth folding into the fix:
+
+- The **ordering dependency is written down nowhere a machine reads.** `bug-test-suite-lib-dist-rebuild-race` (now `done`) fixed the parallel *rebuild* race; what remains is that `build` must precede `test`, and only the workflow YAML carries that knowledge.
+- This is the second gate today that a local run gets **wrong for a non-real reason** — the other is `smoke:native-start-cold`, filed as `bug-native-start-cold-ci-skips-move-leg`.
+
+Not proposed as a resolution here: the root cause is still the item's to own. `exploration-local-validation-pipeline-023` only records that a local pipeline must treat `build` as a mandatory first lane because omitting it is a measured false red.
