@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-convention-md-links-nonexistent-adr-0015
 title: "convention.md links a nonexistent ADR 0015 path, and that one dead link is what keeps PR #618's link-resolution rule scoped to 1 of 4 carriers"
+assignee: arggon-delivery-lead
+branch: fix/bug-convention-md-links-nonexistent-adr-0015
 parent: methodology-improvements
 labels: [docs]
 created: "2026-10-03"
-updated: "2026-10-03"
+updated: "2026-10-05"
+claimed_at: "2026-10-05T22:48:13.979Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-convention-md-links-nonexistent-adr-0015
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-convention-md-links-nonexistent-adr-0015.md
