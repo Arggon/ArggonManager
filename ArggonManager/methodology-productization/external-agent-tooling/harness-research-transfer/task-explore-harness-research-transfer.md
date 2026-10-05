@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-explore-harness-research-transfer
 title: "Spike: what do the AutoHarness / AutoContext / AutoCompact papers change for ArggonManager? (corrects exploration-020's candidate set)"
+assignee: arggon-coordinator
+branch: feat/task-explore-harness-research-transfer
 parent: harness-research-transfer
 labels: [methodology, exploration, research]
 priority: p2
 created: "2026-10-05"
 updated: "2026-10-05"
+claimed_at: "2026-10-05T03:05:23.978Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-explore-harness-research-transfer
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-explore-harness-research-transfer.md
