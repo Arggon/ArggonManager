@@ -154,3 +154,9 @@ Item left `status: in_progress` — not flipped to `done` (delivery lead's call 
 ### handoff 2026-10-05 @ses_ef1ad3ccbffe6ACtjjOZJJHx84 (session: ses_ef1ad3ccbffe6ACtjjOZJJHx84) — next: Lead: review f3ae6d77 + f030e6b4, open the PR against main (no squash, per repo convention), and decide the json-output.md follow-up
 - branch: fix/bug-docs-ts-stale-example-path
 - open questions: I did NOT swap the retired id for a shipped one — a live destination has a template, so it can never be an orphan; flagged RETIRED + named successor instead. Agree? Also: file the json-output.md stal…
+
+### 2026-10-05 @arggon-delivery-lead
+### 2026-10-05 @arggon-delivery-lead
+Merged: PR #650, all three lanes green (`cli`, `tasks-validate`, `ui-smoke`), `MERGEABLE/CLEAN`. Reviewed against `engineering.md` §Review bar: architecture/boundaries, docs travelling with the change, scope held to one file, and the blocking end-to-end check.
+
+Note on the `headless-ci` lane: it passed on this run. That file is environment-sensitive and did not reproduce here or in the maker's 10 full runs — consistent with `bug-headless-ci-twin-init-nondeterministic` being load- or cache-dependent rather than universally broken. The blocker I reported earlier was real but is not deterministic, and I am no longer treating it as a hard gate on every PR.
