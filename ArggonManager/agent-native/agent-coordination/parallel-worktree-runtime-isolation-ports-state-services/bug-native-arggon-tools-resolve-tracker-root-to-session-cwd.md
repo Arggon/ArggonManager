@@ -30,3 +30,11 @@ updated: "2026-10-02"
 - [ ] `docs/agents.md` §Orchestration (and the worker's operating rules) no longer rely on `session_move` as the mitigation, since it demonstrably does not rebind the tracker root
 
 ## Notes
+
+### 2026-10-05 @arggon-delivery-lead
+### 2026-10-05 @arggon-delivery-lead
+**In flight — do not dispatch.** Work is complete and reviewed on branch `fix/bug-native-arggon-tools-resolve-tracker-root-to-session-cwd`, open as **PR #646**. The claim (`in_progress` / assignee / `worktree_path`) lives on that **branch**, not on `main`, so this item still reads as unclaimed `todo` here — the merge carries the frontmatter across.
+
+Recorded so no wave re-claims it and opens a conflicting branch: a previous session produced 7 PRs that were invisible to the tracker for exactly this reason, and the fix for it (PR #646) is itself subject to it until it merges.
+
+Merge is currently held by a **pre-existing** gate flake, not by this change: `cli` failed with the harness's own `kernel artifact drift … another suite lane rebuilt lib/dist in place` verdict plus `SyntaxError: './json.js' does not provide an export named 'compactWorkItem'` — `bug-test-suite-lib-dist-rebuild-race` (p1), the same defect red-lining PRs #618 and #586. CI was green on this branch's earlier head (runs 3736254693 / 3736254688). Full delivery-lead verdict and gate evidence are on the branch.
