@@ -182,9 +182,10 @@ Requires **Node.js 22.12+** (needed by vitest 5 in the dev toolchain; `engines` 
 
 Root install; two packages — the CLI in `cli/`, the kernel in `lib/`
 ([ADR 0013](ArggonManager/docs/adr/0013-lib-package-split.md)). `npm run build`
-builds the kernel first, then the root; build before `npm test` (the tests that
-spawn the CLI resolve `@arggondev/lib` through `lib/dist` — see
-[CONTRIBUTING.md](CONTRIBUTING.md)):
+builds the kernel first, then the root; build before `npm test` (the suites that
+exercise the **built** kernel, and any CLI run outside the test harness, resolve
+`@arggondev/lib` through `lib/dist`; the test harness itself resolves the kernel
+source — see [CONTRIBUTING.md](CONTRIBUTING.md)):
 
 ```bash
 npm install
