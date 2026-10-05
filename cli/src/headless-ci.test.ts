@@ -63,6 +63,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CONVENTION_VERSION } from "@arggondev/lib";
 import { checksumOf } from "./docs.js";
+import { freshCloneCopy } from "./pack-fixtures.js";
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
 import { runCli } from "./test-spawn.js";
 // Ordering assertions go through assertOrder, never a bare `indexOf`
@@ -236,6 +237,8 @@ describePacked("headless bootstrap + CI (packed install)", () => {
   let binVersion = "";
   /** Adopter-shaped fixture (git repo without a tracker). */
   let fixture = "";
+  /** Private copy of this checkout, carrying its build output; the pack cwd. */
+  let packClone = "";
   /** The shipped workflow's step bodies, by name. */
   let steps = new Map<string, string>();
 
@@ -275,26 +278,31 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     prefix = mkdtemp("arggon-headless-prefix-");
     const packsDir = join(runnerTemp, "packs");
     mkdirSync(packsDir, { recursive: true });
-    for (const cwd of [join(root, "lib"), root]) {
-      // bug-cli-spawn-suites-exit-1-flake: `--ignore-scripts` is load-bearing,
-      // not a speed-up. `npm pack` in the repo ROOT runs the `prepare`
-      // lifecycle (`npm run build`), and this loop runs with vitest's other
-      // forks live: four `tsc` passes then rewrite every file of `lib/dist` and
-      // `dist` IN PLACE (tsc does not skip byte-identical output, so each file
-      // is `open(O_TRUNC)` + write), for ~1s of wall clock. Every other lane's
-      // spawned child ESM-loads those exact files — the CLI's own sources are
-      // transpiled in memory, but `@arggondev/lib` resolves to `lib/dist` — so
-      // a child linking the graph inside that window reads a half-written
-      // module and dies in Node's loader before the CLI ever runs. That was
-      // three CI flakes that all printed a bare `expected 1 to be +0` (PR #571
-      // run 36960202458 `handoff --session`, PR #576 `adopt --ack`, PR #573 run
-      // 36966932103 `arggon init`); a measured full-suite run rewrites 141
-      // artifact files across two such windows. The bytes under test must be
-      // the ones `npm run build` already produced (the assertions above are
-      // the build-before-test precondition), so skipping the rebuild is exactly
-      // what this gate means: pack the built tree, never rebuild it under the
-      // suite. `pack-contents.test.ts` does build on purpose — but in a fresh
-      // clone copy that owns its own `lib/`: same repo, opposite discipline.
+    // bug-test-suite-lib-dist-rebuild-race: pack a COPY of this checkout, seeded
+    // with its build output, never the checkout itself. `--ignore-scripts` is
+    // kept (it is free on npm >= 12) but it is NOT the mechanism: npm 10 — the
+    // major on the CI runner — runs the root `prepare` from `npm pack` anyway,
+    // so this lane rebuilt `lib/dist` AND `dist` in place under every other
+    // lane's readers on every CI run. Measured on npm 10.9.4: `npm pack
+    // --ignore-scripts` in the checkout emits `> prepare > npm run build`; the
+    // same command on npm 12.0.2 does not. That is the one writer the
+    // suite-wide freeze refuses, which is how it was found: PR #647's `cli` job
+    // failed with `TS5033 … lib/dist/*.d.ts: EACCES`.
+    packClone = mkdtemp("arggon-headless-packclone-");
+    freshCloneCopy(root, packClone, true);
+    for (const cwd of [join(packClone, "lib"), packClone]) {
+      // bug-cli-spawn-suites-exit-1-flake: this loop used to run with the
+      // checkout as its cwd, on the strength of `--ignore-scripts`. Measured on
+      // npm 10.9.4 that flag does not stop `npm pack` from running the root
+      // `prepare`, so four `tsc` passes rewrote every file of `lib/dist` and
+      // `dist` IN PLACE (tsc does not skip byte-identical output) for ~10s of
+      // wall clock, with vitest's other forks live. Every other lane's spawned
+      // child ESM-loaded those exact files, which is the reported flake class.
+      // The copy above is the mechanism now; the flag only keeps npm >= 12 from
+      // rebuilding the copy. The bytes under test are still the ones `npm run
+      // build` produced (the assertions above are the build-before-test
+      // precondition, and the copy is seeded from those outputs), so skipping
+      // the rebuild is exactly what this gate means.
       const packed = spawnSync(
         "npm",
         ["pack", "--ignore-scripts", "--pack-destination", packsDir],
