@@ -28,3 +28,4 @@ Files: `NNNN-short-title.md` (four-digit number, kebab title).
 | [0020](./0020-methodology-first-productization.md)            | Methodology-first productization with per-agent native adapters                                                | Accepted                               |
 | [0021](./0021-agents-primary-workers-human-product-owner.md)  | Agents as primary workers, humans as product owner: role model, promotion policy, recorded acceptance          | Accepted                               |
 | [0022](./0022-decline-autoharness-autocontext-autocompact.md) | External agent tooling: decline AutoHarness / AutoContext / AutoCompact, steal the lesson-store idea           | Proposed                               |
+| [0023](./0023-ci-wall-clock.md)                               | CI wall clock: concurrency groups, duration-aware sharding, and the `cli` required check                       | Proposed                               |

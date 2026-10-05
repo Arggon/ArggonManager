@@ -10,6 +10,7 @@ created: "2026-10-05"
 updated: "2026-10-05"
 claimed_at: "2026-10-05T21:29:00.347Z"
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-adr-0023-ships-unindexed-blocks-every-pr.md
   Leaves live only under a story. id is the filename stem: bug-adr-0023-ships-unindexed-blocks-every-pr.
@@ -21,10 +22,47 @@ claimed_at: "2026-10-05T21:29:00.347Z"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+ADR 0023 (`0023-ci-wall-clock.md`, `- Status: Proposed`) landed in the ADR directory **without a matching row** in `ArggonManager/docs/adr/README.md`. It is the only ADR in the corpus with zero index rows.
+
+The consequence is out of proportion to the cause: `cli/src/adr-index-parity.test.ts` is part of the `cli` lane's required checks, and its _"indexes every ADR file exactly once (no ADR ships unindexed)"_ case asserts a count of exactly 1 per file. So the `cli` lane is **red on every PR regardless of its diff**, and a green run is impossible to obtain honestly.
+
+Verified on clean `main`, before this fix:
+
+```
+$ grep -c "0023" ArggonManager/docs/adr/README.md
+0
+$ npx vitest run cli/src/adr-index-parity.test.ts
+ × indexes every ADR file exactly once (no ADR ships unindexed)
+ + "0023-ci-wall-clock.md: 0 index row(s), expected exactly 1"
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed (7)
+```
+
+Found by the maker delivering `bug-test-suite-lib-dist-rebuild-race` on 2026-10-05, while running that item's mandatory ≥5-consecutive-green-full-runs check. Every one of its five runs carried **this** single failure and **zero** race-class occurrences — the race it was sent to fix was already gone, and this unrelated red test was hiding behind it. The maker correctly reported it rather than fixing it out of scope.
+
+**Why this is worth more than the flake it was masking:** a permanently-red `cli` lane trains everyone to re-run instead of read, and it hides real failures — which is exactly what happened to the `lib/dist` race this session.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [x] ADR 0023 has exactly one index row, and the row's status cell classifies the same way the
+      ADR's own `- Status:` line does (`Proposed`)
+- [x] `cli/src/adr-index-parity.test.ts` green — all cases, not just the row-count one
+- [x] `prettier --check` clean on `ArggonManager/docs/adr/README.md` (the table is column-aligned)
+- [ ] `npm test` green, so the `cli` lane is honestly green on `main` and a later red run means
+      something — **NOT met, and not mine to tick**: `cli/src/headless-ci.test.ts:849`
+      (`packed-bin --json envelopes are byte-identical to the checkout CLI`) still fails on
+      `main`. It is pre-existing, unrelated, and filed as `bug-headless-ci-twin-init-nondeterministic`.
+      Observed `Test Files 1 failed | 127 passed (128); Tests 1 failed | 2679 passed (2680)` after
+      this fix — down from two red tests to one. The ADR parity lane is honestly green; the
+      `cli` lane as a whole is not yet.
+- [x] The gap that let an ADR ship unindexed is considered: **the parity test already catches
+      this exactly**, so the missing step is not detection but the obligation to run the lane
+      before declaring an ADR landed. The ADR process (`docs/engineering.md` §ADR process)
+      already says a status flip belongs in the same PR; an unindexed ADR is the same class of
+      drift. No new hook is proposed — a hook that duplicates a required lane is worse than the
+      habit it replaces. Recorded here as the answer rather than left implicit.
+- [x] Not bundled with unrelated ADR index work: `task-adr-index-parity-does-not-check-titles`
+      (#620) is the product owner's live claim and pins the **Title** column — untouched here,
+      deliberately
 
 ## Notes
