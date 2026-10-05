@@ -13,7 +13,6 @@ updated: "2026-10-05"
 claimed_at: "2026-10-05T20:33:42.754Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-test-suite-lib-dist-rebuild-race
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-test-suite-lib-dist-rebuild-race.md
   Leaves live only under a story. id is the filename stem: bug-test-suite-lib-dist-rebuild-race.
@@ -159,3 +158,7 @@ list as originally filed on 2026-10-04 is preserved verbatim in this file's git 
 (`c1e0e339`) and differs from the canonical one only in the corrections recorded above:
 the writer set is empty on this branch (closed by #580), the reader set was the live half,
 and the run is not fully green because of an unrelated pre-existing failure.
+
+### handoff 2026-10-05 @ses_ef23980f2ffepEv8vQ3eD3FnJO (session: ses_ef23980f2ffepEv8vQ3eD3FnJO) — next: Merge review of fadfbd79/cbc55e91/230cd4d1; route bug-adr-index-parity (pre-existing red on main) before re-running the cli lane
+- branch: fix/bug-test-suite-lib-dist-rebuild-race
+- open questions: Item title says five files rebuild lib/dist; untrue on this branch (closed by #580) - rename or accept?; headless-ci.test.ts:849 twin-init flake not observed in 5 runs
