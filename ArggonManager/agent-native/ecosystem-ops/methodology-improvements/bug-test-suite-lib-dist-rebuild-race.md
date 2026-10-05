@@ -162,3 +162,31 @@ and the run is not fully green because of an unrelated pre-existing failure.
 ### handoff 2026-10-05 @ses_ef23980f2ffepEv8vQ3eD3FnJO (session: ses_ef23980f2ffepEv8vQ3eD3FnJO) — next: Merge review of fadfbd79/cbc55e91/230cd4d1; route bug-adr-index-parity (pre-existing red on main) before re-running the cli lane
 - branch: fix/bug-test-suite-lib-dist-rebuild-race
 - open questions: Item title says five files rebuild lib/dist; untrue on this branch (closed by #580) - rename or accept?; headless-ci.test.ts:849 twin-init flake not observed in 5 runs
+
+### 2026-10-05 @ses_ef23980f2ffepEv8vQ3eD3FnJO
+### 2026-10-05 @maker (arggon-maker)
+Maker evidence for the review — commands run, expected vs observed.
+
+**Mechanism, verified by measurement (not by reading).**
+- `mv lib/dist /tmp/… && mv dist /tmp/…` then `npx vitest run cli/src/acceptance-parity.test.ts cli/src/board-parity.test.ts` → expected a build-independent in-process suite; observed **284 passed** with both build outputs absent.
+- Same state, `npx vitest run cli/src/build-info.test.ts` → expected a child to be build-independent too; observed `ERR_MODULE_NOT_FOUND … node_modules/@arggondev/lib/dist/index.js`, classified by the harness as `child-boot-failed`.
+- From inside a child, `import.meta.resolve("@arggondev/lib")` → `…/lib/dist/index.js` without the hook, `…/lib/src/index.ts` with it.
+
+**Correction: the filed writer set does not exist on this branch.** With `chmod -R a-w lib/dist dist`, a full `npm test` passed every suite except one pre-existing unrelated failure — so no test writes those paths. The `npm pack` class was closed by #580; lib-build/pack-contents/headless-ci each build into a private fresh-clone copy. The hazard was the READ side with no writer, one build-under-test away from the flake.
+
+**Fix** — isolation, no retry, no swallowed error:
+- reader: `cliNodeArgs()` adds an in-thread `module.registerHooks` resolve hook (feature-detected, `module.register` fallback) so harness children load the kernel SOURCE, like vitest already does in-process. Cost: 10 spawns 1.579s before vs 1.578s after; zero stderr. Wired into `runCli`, `spawnNodeCli`, mcp-parity, mcp-server, config-race, e2e/board.smoke.spec.ts.
+- writer: `test/kernel-artifacts.ts` (second globalSetup) makes `lib/dist/` + `dist/` read-only for the run. Observed: a write attempt throws and the bytes are untouched; modes are restored on teardown and on `process.on("exit")`.
+- drift promoted: `KernelArtifactDriftError`, per child (even when the child succeeded — the silent case) and from the teardown with `scope: "suite"`. Observed end to end: a teardown raise exits vitest **1** with the class name + before/after fingerprint.
+
+**Deterministic reproduction** (`cli/src/kernel-isolation.test.ts`): a writer process truncates the kernel module, signals, then HOLDS it — outcome depends on argv, not timing. Pre-fix argv → `does not provide an export named 'loadItems'`; harness argv → links, exit 0, empty stderr.
+
+**Gates, all executed:**
+- `npm test` ×5 consecutive on cbc55e91: 76.9s / 81.2s / 82.8s / 84.0s / 83.6s. Every run: **the same single failure**, `cli/src/adr-index-parity.test.ts` (0023-ci-wall-clock.md: 0 index rows). Pre-change baseline run: same failure, 84.09s, 2679 passed. Now 2690 passed (+11 new), no new failures. Race-class occurrences across all five logs: **0**.
+- `npm run lint` → clean. `npm run test:structure` → 5 passed. `npm run lint:structure` → clean. `npm run build` → ok. `npm run check:plugin` → ok, no bundle drift. `npm run arggon -- validate --json` → `{"ok":true,…,"errors":[],"warnings":[]}`. `npx prettier --check` → clean on every touched file.
+
+**Two things for the lead:**
+1. `cli/src/adr-index-parity.test.ts` is red on `origin/main` (`git show origin/main:ArggonManager/docs/adr/README.md | grep -c 0023` → 0; the ADR shipped in 66035a4a). Not fixed here — separate defect, and it blocks every PR's cli lane, not just the three this race blocked.
+2. The item title's writer set is untrue on this branch. Correction is recorded in `## Context`; the title is left for you (tracker framing is yours).
+
+**Disclosed non-additive edits:** one line in `test-spawn.test.ts`'s existing SpawnHarnessError case now builds its representative argv with `cliNodeArgs` (what a real spawn runs — not weaker); `vitest.config.ts` gained a second globalSetup; `CONTRIBUTING.md`/`README.md` documented the old resolution and now describe the new one. `measure.test.ts`'s production-shape pin and the `--ignore-scripts` gate are untouched.
