@@ -81,6 +81,14 @@ export type FailJsonOptions = {
   message: string;
   code?: string;
   conventionVersion?: number;
+  /**
+   * Extra top-level fields merged into the failure envelope (additive, opt-in,
+   * `schemaVersion: 1`). A failure that OBSERVED data a machine can act on
+   * carries it here instead of only prose in `error.message` — the same
+   * reason `successEnvelope` takes a payload. Omitted by every caller that has
+   * nothing to say, so no existing failure envelope changes shape.
+   */
+  payload?: Record<string, unknown>;
 };
 
 /** Build the `ok: false` envelope object (does not print; shared with MCP). */
@@ -94,6 +102,7 @@ export function failEnvelope(opts: FailJsonOptions): Record<string, unknown> {
     schemaVersion: JSON_SCHEMA_VERSION,
     conventionVersion: opts.conventionVersion ?? CONVENTION_VERSION_DEFAULT,
     command: opts.command,
+    ...(opts.payload ?? {}),
     error,
   };
 }
