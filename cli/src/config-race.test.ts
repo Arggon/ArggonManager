@@ -26,7 +26,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { CONVENTION_VERSION, readConventionConfig } from "@arggondev/lib";
 import { runInit } from "./init.js";
-import { nodeImportArgs } from "./test-spawn.js";
+import { cliNodeArgs } from "./test-spawn.js";
 import { removeFixtureTree } from "./test-tmp.js";
 
 const TIMEOUT_MS = 120_000;
@@ -151,7 +151,7 @@ async function probe(dir: string, driver: string, label: string, keepPad: boolea
   const readers = startReaders(yml, stopFile, READERS);
   const results = await Promise.all(
     Array.from({ length: WRITERS }, () =>
-      runChild([...nodeImportArgs(driver), dir, String(ITERATIONS)]),
+      runChild([...cliNodeArgs(driver), dir, String(ITERATIONS)]),
     ),
   );
   writeFileSync(stopFile, "");

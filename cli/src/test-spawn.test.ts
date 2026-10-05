@@ -5,7 +5,10 @@ import { describe, expect, it } from "vitest";
 import {
   classifySpawnFailure,
   cliEntryPath,
+  cliNodeArgs,
   EnvelopeReadError,
+  KernelArtifactDriftError,
+  kernelSourceHookPath,
   nodeImportArgs,
   readEnvelope,
   runCli,
@@ -252,7 +255,9 @@ describe("spawn failure classification (bug-cli-spawn-suites-exit-1-flake)", () 
     // next occurrence of the CI flake is diagnosable from the test output alone.
     const err = new SpawnHarnessError({
       kind: "child-boot-failed",
-      argv: [...nodeImportArgs(cliEntryPath()), "--json", "list"],
+      // The representative argv is the harness one, so the rendered diagnostic
+      // shows what a real spawn would have run.
+      argv: [...cliNodeArgs(cliEntryPath()), "--json", "list"],
       cwd: repoRoot,
       outcome: outcome({ status: 1, stderr: BOOT_FAILURE_STDERR }),
       artifactDrift: "before[lib/dist/index.js=6001:1] after[lib/dist/index.js=0:2]",
@@ -283,6 +288,85 @@ describe("spawn failure classification (bug-cli-spawn-suites-exit-1-flake)", () 
     expect(
       stripComments(readFileSync(join(repoRoot, "cli/src/pack-contents.test.ts"), "utf8")),
     ).toContain('"pack", "--dry-run", "--json"');
+  });
+});
+
+/**
+ * bug-test-suite-lib-dist-rebuild-race gate: the READER side of the shared-build
+ * isolation, complementing the `--ignore-scripts` writer gate above.
+ *
+ * `lib/dist` is frozen for the run (`test/kernel-artifacts.ts`), so a writer can
+ * no longer produce the race. That is only half of it: a child that resolves the
+ * kernel through `node_modules` reads the artifact at all, so any writer that
+ * gets past the freeze (root, `chmod -R u+w`, a platform without POSIX modes)
+ * is one broken child away from the original flake. `cliNodeArgs` removes the
+ * read: the child loads `lib/src`, which nothing rebuilds.
+ *
+ * So the pin is on the argv, in two directions:
+ *   - the harness itself must never build a child argv the old way, and
+ *   - no test may spawn a CLI child with the bare source-run argv.
+ *
+ * The exemption is deliberate and narrow: `cli/src/lib-build.test.ts` spawns the
+ * CLI of a PRIVATE fresh-clone copy against that copy's own `dist`, which is the
+ * gate that exercises the built kernel for real (the reason the alias-to-source
+ * exists at all). Nothing else may name a CLI entry through `nodeImportArgs`.
+ */
+describe("spawned children resolve the kernel from source (bug-test-suite-lib-dist-rebuild-race)", () => {
+  // Assembled at runtime so this gate's own pattern cannot match itself (the
+  // precedent the wrapper scan sets with WRAPPER_REF above).
+  const CLI_ENTRY_ARGV = new RegExp(
+    ["nodeImportArgs", "\\(\\s*(cliEntryPath\\(\\)|cli\\b|cliEntry\\b)"].join(""),
+  );
+
+  it("the harness builds every child argv with the kernel-source hook", () => {
+    const code = stripComments(readFileSync(join(repoRoot, "cli/src/test-spawn.ts"), "utf8"));
+    // `nodeImportArgs` stays as an exported helper (production's shape, see
+    // cli/src/measure.ts) but the harness must not CALL it: the one remaining
+    // occurrence in this file is the helper's own declaration.
+    expect(code.match(/nodeImportArgs\(/g) ?? []).toHaveLength(1);
+    expect(code).toContain("export function nodeImportArgs(");
+    // Both spawn paths (runCli and spawnNodeCli) spread the hooked argv.
+    expect(code.match(/\[\.\.\.cliNodeArgs\(\), \.\.\.args\]/g) ?? []).toHaveLength(2);
+    expect(existsSync(kernelSourceHookPath())).toBe(true);
+    // The entry is last in both shapes: measureBudget and the loader contract
+    // read the position, not the whole argv.
+    expect(cliNodeArgs("entry.ts").at(-1)).toBe("entry.ts");
+  });
+
+  it("no test spawns a CLI child through the bare source-run argv", () => {
+    const offenders: string[] = [];
+    for (const rel of SCANNED) {
+      for (const file of walkTestFiles(join(repoRoot, rel))) {
+        if (file.endsWith("lib-build.test.ts")) continue; // private copy's dist
+        const code = stripComments(readFileSync(file, "utf8"));
+        // A CLI entry named through nodeImportArgs: `cliEntryPath()`, a `cli`
+        // const, or an `cliEntry` parameter. Driver scripts (which import no
+        // kernel) pass a bare filename and are untouched.
+        if (CLI_ENTRY_ARGV.test(code)) {
+          offenders.push(file.slice(repoRoot.length + 1));
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("drift is a named failure of its own, not a footnote on somebody else's error", () => {
+    // The reported class was report-only: it surfaced only when a reader was
+    // unlucky enough to die, as an unrelated SyntaxError. A writer is a defect
+    // whether or not it broke somebody, so it now has its own name.
+    const err = new KernelArtifactDriftError({
+      argv: [...cliNodeArgs(cliEntryPath()), "--json", "list"],
+      cwd: repoRoot,
+      drift: "before[lib/dist/index.js=6001:1] after[lib/dist/index.js=0:2]",
+    });
+    expect(err.name).toBe("KernelArtifactDriftError");
+    expect(err).toBeInstanceOf(Error);
+    expect(err.drift).toContain("before[");
+    expect(err.message).toContain("REWRITTEN");
+    expect(err.message).toContain("not an assertion failure");
+    // The two instructions that matter: where a build belongs, and whose bug it is.
+    expect(err.message).toContain("freshCloneCopy");
+    expect(err.message).toContain("fix the writer, not the reader");
   });
 });
 

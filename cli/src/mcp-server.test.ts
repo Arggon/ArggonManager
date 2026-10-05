@@ -18,7 +18,7 @@ import { arggonVersion } from "./docs.js";
 import { runInit } from "./init.js";
 import { tickAcceptance } from "../../test/acceptance.js";
 import { deriveDefaultCliSpawn, runMcpServer } from "./mcp-server.js";
-import { nodeImportArgs, tsxLoaderPath } from "./test-spawn.js";
+import { cliNodeArgs, tsxLoaderPath } from "./test-spawn.js";
 
 /**
  * CLI re-entry for the spawn tools (ADR 0014): tests inject the same tsx +
@@ -294,7 +294,7 @@ describe("mcp server", () => {
     spawned.cwd = repoDir;
     // A fresh client keeps the dispatch surface clean; the spawn spec drives
     // the real CLI through tsx, exactly like the parity harness.
-    spawned.start({ cliSpawn: { command: process.execPath, args: nodeImportArgs(cliEntry) } });
+    spawned.start({ cliSpawn: { command: process.execPath, args: cliNodeArgs(cliEntry) } });
     const result = await spawned.request("tools/call", {
       name: "arggon_branch",
       arguments: { id: "task-rate-limit" },
@@ -354,7 +354,7 @@ describe("mcp server", () => {
   it("arggon_branch surfaces a kernel failure as a tool error without killing the session", async () => {
     const spawned = new McpTestClient();
     spawned.cwd = repoDir;
-    spawned.start({ cliSpawn: { command: process.execPath, args: nodeImportArgs(cliEntry) } });
+    spawned.start({ cliSpawn: { command: process.execPath, args: cliNodeArgs(cliEntry) } });
     const result = await spawned.request("tools/call", {
       name: "arggon_branch",
       arguments: { id: "task-missing" },

@@ -26,8 +26,8 @@ import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
 import {
   cliEntryPath,
+  cliNodeArgs,
   EnvelopeReadError,
-  nodeImportArgs,
   readEnvelope,
   runCli as runCliBase,
   type EnvelopeSurface,
@@ -262,8 +262,12 @@ function gitInit(dir: string): void {
  * The spawn tools (branch/cleanup/start) re-enter the CLI through the same
  * spec the CLI side of these tests uses — inside vitest, the default argv
  * derivation deliberately refuses to guess, so the spec is injected.
+ *
+ * `cliNodeArgs` (not `nodeImportArgs`): this child imports the kernel, so it
+ * resolves it from source like every other CLI child — the built `lib/dist` is
+ * frozen for the run (bug-test-suite-lib-dist-rebuild-race).
  */
-const CLI_SPAWN = { cliSpawn: { command: process.execPath, args: nodeImportArgs(cliEntryPath()) } };
+const CLI_SPAWN = { cliSpawn: { command: process.execPath, args: cliNodeArgs() } };
 
 describe("CLI <-> MCP parity", () => {
   it("create produces the same envelope through both entry points", async () => {
