@@ -7,6 +7,16 @@ created: 2026-10-04
 
 # Exploration: Can ArggonManager adopt AutoHarness / AutoContext / AutoCompact? (autoharness-autocontext-autocompact-020)
 
+> **SUPERSEDED (2026-10-05) — kept as the record of a wrong question, not as evidence.**
+> Every registry fact below is accurate _about the registries_ and irrelevant _to the
+> question_: the packages share these names with the papers **by coincidence**. The names
+> denoted three **research papers** — AutoHarness (arXiv:2603.03329v1, Google DeepMind),
+> AutoContext (arXiv:2510.02369v3, ByteDance + NUS), AutoCompact (arXiv:2610.02163v1, SMU /
+> NTU / Harvard) — which the product owner supplied on 2026-10-05. The decision landed in
+> ADR 0022 survives on its own terms (see its amendment), but **do not cite the candidate
+> table or the findings below.** Corrected record:
+> [exploration-harness-research-transfer-021](exploration-harness-research-transfer-021.md).
+
 Spike record: compare the candidates below, cite dated sources, and record a
 recommendation. The decision itself lands in an ADR
 (`ArggonManager/docs/adr/`) — link it under Decision. A technology playbook

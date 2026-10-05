@@ -57,19 +57,19 @@ was about the wrong artifacts and must be superseded, not quietly left standing.
 
 ## Acceptance
 
-- [ ] Classified first, with the ratchet recorded
-- [ ] Each paper read from source (arXiv HTML), its **method** recorded — not its abstract
-- [ ] For each: what it claims, measured on what, and **what it does not claim**
-- [ ] Compared against what the methodology **already owns**, naming the specific substrate
+- [x] Classified first, with the ratchet recorded
+- [x] Each paper read from source (arXiv HTML), its **method** recorded — not its abstract
+- [x] For each: what it claims, measured on what, and **what it does not claim**
+- [x] Compared against what the methodology **already owns**, naming the specific substrate
       (the kernel's refusal layer, ADR 0006's context budget, the smoke harnesses) — the
       interesting question is where a paper's contribution is *already* ours
-- [ ] The honest read on transferability: a research result on games/benchmarks is not a
+- [x] The honest read on transferability: a research result on games/benchmarks is not a
       spec for our loop, and the record says which of these three could ever be more than an idea
-- [ ] Records that exploration-020's candidate set was the **wrong artifacts** and supersedes
+- [x] Records that exploration-020's candidate set was the **wrong artifacts** and supersedes
       it explicitly — ADR 0022 amended, not left to mislead the next reader
-- [ ] One recommendation with trade-offs; follow-ups filed as tracked items
-- [ ] `arggon validate` + `spec validate` green; PR opened with the methodology impact class
-- [ ] `arggon spec analyze` reports no NEW finding naming this item
+- [x] One recommendation with trade-offs; follow-ups filed as tracked items
+- [x] `arggon validate` + `spec validate` green; PR opened with the methodology impact class
+- [x] `arggon spec analyze` reports no NEW finding naming this item
 
 ### 2026-10-05 @ses_ef83b74e6ffeC6D8RVXoC2u06K
 verdict: approve
