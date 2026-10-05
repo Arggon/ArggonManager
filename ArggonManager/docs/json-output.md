@@ -56,6 +56,36 @@ Human success lines are display-sanitized too (task-success-stdout-sanitize, add
 
 Empty success stays `ok: true` (e.g. future `list` with no items → `items: []`).
 
+### Tracker-root binding (native surface only)
+
+The CLI resolves the tracker root by walking up from its own `process.cwd()`, so
+it has one candidate and never has to choose. The **native** `tools.arggon.*`
+surface resolves per call from the calling session's directory, which means it
+can hold two candidates against each other: the checkout it resolved into, and
+the per-worktree identity the caller declares. That reconciliation is
+native-only (full rule, sources and evidence: [`docs/opencode2.md`](./opencode2.md)
+§Where every native tool resolves the tracker root).
+
+Present **only when a worktree is involved** — a worktree identity was found at
+the resolved checkout, or a declared worktree disagreed with it. A plain
+checkout gets the CLI's bytes unchanged, which is what keeps the
+native-mirrors-CLI byte-parity invariant (ADR 0011) holding. Additive within
+`schemaVersion: 1`; no bump.
+
+| Field                 | Type     | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `trackerRoot`         | `string` | The absolute **checkout** the tracker root resolved from (the tracker dir's parent — the same kind of thing a worktree identity names, so the two are comparable). Always present alongside `trackerWorktree` or `trackerRootMismatch`.                                                                                                                                                                                                                                                     |
+| `trackerWorktree`     | `object` | The identity read from the resolved checkout's `.arggon.env` (spec [worktree-env-contract-016](specs/spec-worktree-env-contract-016.md)): `{ source, path?, id?, item?, branch?, stateDir?, cacheDir? }` in the documented key order. `source` is the `.arggon.env` path, or the literal `"process.env"` when the worktree session sourced that file. All of `ARGGON_WORKTREE_ID`, `ARGON_ITEM`, `ARGGON_WORKTREE_BRANCH`, `ARGGON_STATE_DIR` and `ARGGON_CACHE_DIR` are read and reported. |
+| `trackerRootMismatch` | `object` | `{ resolved, declared[], sources[] }` — the checkout the call bound to, every worktree the caller declared, and where each declaration came from. On a **read** this is reported (reads are never refused); on a **write** it is refused instead, with `error.code: "TRACKER_ROOT_MISMATCH"`.                                                                                                                                                                                               |
+
+No declaration anywhere (no `.arggon.env`, no sourced env) means no expectation,
+so nothing is refused and none of these fields appear — the guard is narrow on
+purpose so it cannot wedge correct work. Identity is compared by **path only**,
+never by `ARGGON_WORKTREE_ID`: a long-lived host can carry a stale id from an
+earlier worktree session while sitting at the right path. Reading the contract is
+never fatal — a missing, unreadable, oversized or identity-free file declares
+nothing.
+
 ---
 
 ## Shared types
