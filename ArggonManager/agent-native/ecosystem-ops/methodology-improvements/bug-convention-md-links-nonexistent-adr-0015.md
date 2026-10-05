@@ -12,7 +12,6 @@ updated: "2026-10-05"
 claimed_at: "2026-10-05T22:48:13.979Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-convention-md-links-nonexistent-adr-0015
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-convention-md-links-nonexistent-adr-0015.md
   Leaves live only under a story. id is the filename stem: bug-convention-md-links-nonexistent-adr-0015.
@@ -76,3 +75,11 @@ Acceptance:
 - [ ] The adopter template copy of `convention.md` gets the same treatment — if the dead link is only in the repo copy, the template is clean and that must be stated, not assumed
 
 Note: the ADR **index** parity test (`cli/src/adr-index-parity.test.ts`) pins one `README.md` row per ADR and does not read prose links, so nothing catches this today.
+
+### 2026-10-05 @arggon-delivery-lead
+### 2026-10-05 @arggon-delivery-lead
+Merged: PR #649, all three lanes green, `MERGEABLE/CLEAN`. The **link fix** is done and merged: `convention.md:131` now points at `./adr/0015-done-gate-acceptance-waiver.md`. The ADR **number was right** and the filename was stale, so no ADR was renamed and no reference elsewhere needed sweeping.
+
+**Left `blocked`, not `done`, because acceptance box 2 is genuinely undelivered:** widening #618's link-resolution rule from 1 carrier to all four is not this item's to land — #618 is the product owner's live claim and is unmerged. The maker measured the widening rather than guessing it: `engineering.md`, `agents.md` and `convention.md` now pass **3/3** (so the carrier list widens with one constant), while `skills/arggon-cli/**` **cannot** be added as-is because all 7 of its markdown files have zero `./adr/` links and the suite's vacuity guard fails on each — it needs real ADR links inside `arggon:generated` blocks, which is separate work.
+
+**Also noted:** the reporter's `### 2026-10-03 @Arggon` comment quotes the original 5-box acceptance verbatim, so the body now carries two checklists — the real one in `## Acceptance` and the quoted historical one inside the comment. The done gate counts `- [ ]` **anywhere in the body**, so those quoted boxes would block the flip independently of box 2. Filed as `bug-done-gate-counts-checkboxes-inside-comment-blocks` — I have not isolated whether that is the gate's actual rule or a second contributing cause, and the item is worth filing either way.
