@@ -88,3 +88,15 @@ Two consequences worth folding into the fix:
 - This is the second gate today that a local run gets **wrong for a non-real reason** — the other is `smoke:native-start-cold`, filed as `bug-native-start-cold-ci-skips-move-leg`.
 
 Not proposed as a resolution here: the root cause is still the item's to own. `exploration-local-validation-pipeline-023` only records that a local pipeline must treat `build` as a mandatory first lane because omitting it is a measured false red.
+
+### 2026-10-05 @arggon-delivery-lead
+### 2026-10-05 @arggon-delivery-lead
+**This bug's premise was wrong and I am retracting it. `main` is green.**
+
+Verified on the primary checkout after a full `npm run build`: **129 files / 2692 tests passed**. `cli/src/headless-ci.test.ts` is **7/7**.
+
+**Real cause: a stale `dist/cli.js`, not twin nondeterminism.** The assertion compares the *packed* bin (ships whatever `dist/cli.js` exists) against the *checkout* CLI (runs from `lib/src` via `tsx`). The envelopes differed in one place — the packed side lacked `"reaped":[]` / `"reapRefused":[]`. Running only `npm run build --workspace @arggondev/lib` rebuilds `lib/dist` but **not** `dist/cli.js`, which is exactly what I had done. Full build → 7/7.
+
+**Cost of the false signal, stated plainly:** I reported "main is independently red" across several item bodies and PR reviews, and it sent two makers chasing a defect that does not exist. The lesson is recorded in the rewritten Context and Acceptance: a lane failure that reads like a product bug must be checked against build state **before** it is filed as a product defect.
+
+Acceptance is rewritten around what is real: make the stale-`dist/` precondition **report itself** rather than surfacing as a byte-for-byte envelope diff, and say `npm run build` (not the lib-only build) wherever a worktree sync is documented. #647 covered the **library** build; the CLI's own `dist/` was never in scope there.
