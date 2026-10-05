@@ -6,6 +6,21 @@
 - Input: [exploration-autoharness-autocontext-autocompact-020](../explorations/exploration-autoharness-autocontext-autocompact-020.md) (2026-10-04)
 - Methodology impact class: **Advisory** — no carrier rule, command, gate or adapter changes
 
+> **Amendment (2026-10-05, `task-explore-harness-research-transfer`): the evidence base is
+> SUPERSEDED; the decision is RETAINED.** The product owner supplied the actual research on
+> 2026-10-05 — **AutoHarness** (arXiv:2603.03329v1, Google DeepMind), **AutoContext**
+> (arXiv:2510.02369v3, ByteDance + NUS), **AutoCompact** (arXiv:2610.02163v1, SMU / NTU /
+> Harvard). These are three papers, not a vendor stack. Everything in **Context** below
+> describes npm packages that merely share the papers' names; those registry facts remain
+> true and are irrelevant to the question. **Do not cite this record's evidence.**
+>
+> The **Decision** stands on its own terms: the "second executor / second loop" argument is
+> about _executors_, and a research finding proposes no executor — adopting a finding runs
+> code inside the existing loop, under the existing roles. What is superseded is the
+> candidate list and the reasoning that depended on package identity. Corrected record:
+> [exploration-harness-research-transfer-021](../explorations/exploration-harness-research-transfer-021.md).
+> Exploration-020 is retained as the record of a wrong question, not as evidence.
+
 ## Context
 
 The product owner asked (2026-10-04) whether ArggonManager can adopt **AutoHarness /
