@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-docs-ts-stale-example-path
 title: cli/src/docs.ts orphan-reaping example path is stale — the example names a destination the rename removed
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [docs, cli]
 priority: p3
 created: "2026-10-05"
 updated: "2026-10-05"
-claimed_at: "2026-10-05T22:48:17.271Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-docs-ts-stale-example-path
 ---
 <!--
