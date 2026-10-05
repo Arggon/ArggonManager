@@ -27,6 +27,7 @@ import {
   strictGateBinFailure,
   type GateBinResolution,
 } from "@arggondev/lib";
+import { assertOrder } from "../../test/assert-order.js";
 import { runInit } from "./init.js";
 import {
   linkNodeModules,
@@ -390,9 +391,7 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
    * entry) — the same fixture #597's kernel-side test builds for the native
    * seam's 2048 clip.
    */
-  function worstCaseFixture(
-    shape: "pathological" | "typical" = "pathological",
-  ): {
+  function worstCaseFixture(shape: "pathological" | "typical" = "pathological"): {
     bins: GateBinResolution[];
     names: string[];
     entry: (name: string) => string;
@@ -433,14 +432,10 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
             "node_modules",
             ".bin",
           );
-    const names = Array.from(
-      { length: MAX_GATE_BINS },
-      (_, index) =>
-        shape === "typical"
-          ? ["tsx", "vitest", "prettier", "eslint", "ast-grep", "tsc", "npm-run-all", "c8"][
-              index
-            ]!
-          : `worktree-gate-binary-number-${index}-with-a-very-long-name-for-the-clip`,
+    const names = Array.from({ length: MAX_GATE_BINS }, (_, index) =>
+      shape === "typical"
+        ? ["tsx", "vitest", "prettier", "eslint", "ast-grep", "tsc", "npm-run-all", "c8"][index]!
+        : `worktree-gate-binary-number-${index}-with-a-very-long-name-for-the-clip`,
     );
     const bins: GateBinResolution[] = names.map((name) => ({
       name,
@@ -547,13 +542,11 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
     expect(clipped).toContain(`re-run \`arggon start ${ID} --worktree\``);
     expect(clipped).toContain("To discard it instead");
     expect(clipped).toContain("Fix: run `npm ci` in ");
-    // ...with the ordering still intact inside the kept window (needles
-    // presence-checked first, or the comparison is vacuous)...
-    expect(clipped.indexOf(`arggon start ${ID} --worktree`)).toBeGreaterThanOrEqual(0);
-    expect(clipped.indexOf(firstEntry)).toBeGreaterThanOrEqual(0);
-    expect(clipped.indexOf(`arggon start ${ID} --worktree`)).toBeLessThan(
-      clipped.indexOf(firstEntry),
-    );
+    // ...with the ordering still intact inside the kept window. `assertOrder`
+    // makes each clause's presence a precondition of the comparison, so a
+    // clause renamed out from under the test fails loudly instead of answering
+    // -1 and passing vacuously (bug-vacuous-substring-ordering-assertions).
+    assertOrder(clipped, `arggon start ${ID} --worktree`, firstEntry);
     // ...and so does the head of the evidence.
     expect(clipped).toContain(firstEntry);
     // Negative control: the TAIL named bin is what the clip ate (it is present
@@ -571,9 +564,7 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
    * that actually creates the worktree), and its detail is a short pre-commit
    * hook line, so the whole composition fits once the list is bounded.
    */
-  function worstCaseCommitGateFailure(
-    shape: "pathological" | "typical" = "pathological",
-  ): {
+  function worstCaseCommitGateFailure(shape: "pathological" | "typical" = "pathological"): {
     message: string;
     firstEntry: string;
     lastEntry: string;
@@ -601,32 +592,23 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
 
   it("leads the committing-claim report with BOTH fixes, then the evidence, then the discard hint", () => {
     const { message, firstEntry, lastEntry, names } = worstCaseCommitGateFailure();
-    const exactFix = message.indexOf("Exact fix for the observed resolution");
-    const readiness = message.indexOf("Readiness: the gate binaries do not resolve");
-    const discard = message.indexOf("To discard it instead");
-    const namedBin = message.indexOf(firstEntry);
-    const detail = message.indexOf("gate: deliberate failure");
-    // Presence before comparison: an absent needle is -1 and `-1 < n` always
-    // passes, which is exactly how a substring-ordering assertion goes vacuous.
-    for (const [label, index] of [
-      ["exact fix", exactFix],
-      ["readiness", readiness],
-      ["discard", discard],
-      ["first named bin", namedBin],
-      ["detail", detail],
-    ] as const) {
-      expect(index, `${label} needle must be present`).toBeGreaterThanOrEqual(0);
-    }
-
     // The order that matters: generic fix → EXACT fix → evidence → discard
     // hint → raw detail. Pre-fix the exact fix came LAST, past the whole list.
-    expect(message.indexOf("The pre-commit gate (or the git commit itself) failed")).toBeLessThan(
-      exactFix,
+    // `assertOrder` makes each clause's PRESENCE a precondition of the
+    // comparison, so a clause renamed out from under the test fails loudly
+    // instead of answering -1 and passing vacuously. The inline presence-check
+    // loop this replaces was only a weaker local version of the same guard: it
+    // proved each needle present, then re-derived the order with bare `indexOf`
+    // comparisons — the exact shape `test/assert-order.ts` documents.
+    assertOrder(
+      message,
+      "The pre-commit gate (or the git commit itself) failed",
+      "Exact fix for the observed resolution",
+      "Readiness: the gate binaries do not resolve",
+      firstEntry,
+      "To discard it instead",
+      "gate: deliberate failure",
     );
-    expect(exactFix).toBeLessThan(readiness);
-    expect(readiness).toBeLessThan(namedBin);
-    expect(namedBin).toBeLessThan(discard);
-    expect(discard).toBeLessThan(detail);
     // Every clause is verbatim, including the exact fix's own command…
     expect(message).toContain(
       `Exact fix for the observed resolution: run \`npm ci\` in ${worstCaseFixture().worktreePath}, then re-run \`arggon start ${ID} --worktree\``,
@@ -710,7 +692,10 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
       createBranch: true,
       step: "committing the claim (pre-commit gate)",
       err: new Error("gate: deliberate failure"),
-      readiness: { hasInstall: true, gateBins: [{ name, source: "path", path: join(longPath, name) }] },
+      readiness: {
+        hasInstall: true,
+        gateBins: [{ name, source: "path", path: join(longPath, name) }],
+      },
     });
     expect(message).toContain("The pre-commit gate (or the git commit itself) failed inside");
     expect(message).toContain("Exact fix for the observed resolution");
