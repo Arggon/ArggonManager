@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-test-suite-lib-dist-rebuild-race
 title: "`npm test` can fail spuriously: five test files rebuild `lib/dist` while vitest runs files in parallel, so a spawned CLI child imports a half-written kernel module"
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [tests, ci-blocking, tooling]
 priority: p1
 created: "2026-10-04"
 updated: "2026-10-05"
-claimed_at: "2026-10-05T20:33:42.754Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-test-suite-lib-dist-rebuild-race
 ---
 <!--
