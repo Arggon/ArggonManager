@@ -1,13 +1,14 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-mcp-parity-branch-test-json-parse-of-human-stdout
 title: "mcp-parity \"branch checks out identically\" test JSON.parses a CLI line that can be the human \"arggon branch …\" success message, not the --json envelope"
+assignee: arggon-delivery-lead
 parent: methodology-improvements
 labels: [tests, mcp, ci-blocking]
 priority: p1
 created: "2026-10-02"
-updated: "2026-10-03"
+updated: "2026-10-05"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-mcp-parity-branch-test-json-parse-of-human-stdout.md
@@ -24,10 +25,13 @@ updated: "2026-10-03"
 
 ## Acceptance
 
-- [ ] The test parses the JSON envelope robustly (find the envelope in stdout, or assert both surfaces are JSON-only in this mode) so a human success line cannot produce a bare `SyntaxError`
-- [ ] A failing assertion names WHICH surface produced the bad output (CLI vs MCP) and echoes the raw text, so the next occurrence is diagnosable in one read
-- [ ] The test still asserts real parity — do not weaken it into "both parse somehow"; a genuine CLI/MCP divergence must still fail
-- [ ] The fix is in the test/harness (the reader), not a change to `arggon branch` output, unless the human line is genuinely wrong for `--json` mode — if so, file that separately
+> Ticked by the coordinator at merge; the worker's evidence rows were appended under a `### Added while working` comment header, which the tracker stores as history rather than as this section. Evidence for each box is in the coordinator comment dated 2026-10-03 and in the round-2 reviewer verdict.
+
+
+- [x] The test parses the JSON envelope robustly (find the envelope in stdout, or assert both surfaces are JSON-only in this mode) so a human success line cannot produce a bare `SyntaxError`
+- [x] A failing assertion names WHICH surface produced the bad output (CLI vs MCP) and echoes the raw text, so the next occurrence is diagnosable in one read
+- [x] The test still asserts real parity — do not weaken it into "both parse somehow"; a genuine CLI/MCP divergence must still fail
+- [x] The fix is in the test/harness (the reader), not a change to `arggon branch` output, unless the human line is genuinely wrong for `--json` mode — if so, file that separately
 
 ## Notes
 
@@ -35,7 +39,6 @@ updated: "2026-10-03"
 - branch: main
 - open questions: cascade.test.ts spawnJson null-on-empty-stdout + `void err;` is a SEPARATE defect; file it? Suggested: use shared SpawnHarnessError/readEnvelope classification.
 
-### 2026-10-03 @ses_efea22f4affeuwm0UHxi45fb2I
 ### 2026-10-03 @arggon-reviewer
 verdict: approve (findings below are non-blocking; one merge precondition: rebase the duplicate tracker commits off this branch)
 
@@ -117,3 +120,179 @@ git log --oneline main..HEAD -- '*.md'                 # after rebase: no bug-th
 ```
 
 **Merge: recommended**, after rebase (finding 1). No product change, gates green in CI and locally, tests discriminate against the old code, and the two deferrals (flake trigger, `cascade.test.ts`) are correctly scoped and tracked. Findings 2-4 are follow-up material, not merge blockers.
+
+### Added while working
+
+- [x] Sweep the whole parity file for the same fragility: the 3 remaining bare `JSON.parse(cliProc.stdout)` sites (the validate-failure, report-`--since` and errors-match arms) now read through `readCli(..., false)`; every comparison goes through `expectSameEnvelope`, which names both sides and echoes both payloads
+- [x] The MCP transport read treats the first `data` chunk as a whole frame (`output.on("data", …) => JSON.parse(chunk)`) — a `tools/list` response spanning two chunks would hand it a truncated frame. Now accumulates to a newline, per the newline-delimited JSON-RPC contract (ADR 0014)
+- [x] Keep the JSON-only `--json` contract asserted on both surfaces (`expectJsonOnly`) so the locate-the-envelope fallback cannot absorb a product that prints a success line in `--json` mode
+
+## Notes
+
+**Product change: none.** Acceptance box 4 was checked after verifying the CLI's
+`--json` path, not assumed — the human line is genuinely not wrong for `--json`
+mode, so there is nothing to file separately.
+
+**Where the fix lives.** `readEnvelope` + `EnvelopeReadError` in
+cli/src/test-spawn.ts (the repo's existing shared harness-helper module, already
+the home of `classifySpawnFailure`/`SpawnHarnessError` and their pinning tests),
+consumed by cli/src/mcp-parity.test.ts. `readEnvelope` parses the whole text
+first (the contract), then LOCATES the envelope object in surrounding text, and
+otherwise raises with surface, command, `isError`, stdout and stderr attached. It
+locates and never invents: text containing no JSON object still raises, so a
+surface that produced no result cannot read as a passing parity run.
+
+**Not weakened.** Parity is still envelope equality. Malformed envelopes still
+raise. A genuine divergence still fails — the new
+`a surface that emitted no envelope fails by name, and a real divergence still
+fails parity` case asserts both halves: a dead spawn raises `EnvelopeReadError`
+naming `MCP`/`arggon_branch`/`isError: true`, and two surfaces that both emit
+envelopes but disagree fail `expectSameEnvelope` with "envelope mismatch".
+
+**The `cascade.test.ts` sibling (PR #611) is a SEPARATE defect — not fixed
+here.** Evidence: `spawnJson` (cli/src/cascade.test.ts:556-573) resolves `null`
+on EMPTY stdout and `void err;` discards stderr entirely, so `round 0: null` is
+"the child produced no output", not a lost update. An `update --json` failure
+still writes an `ok:false` envelope to stdout, so a null can only mean the child
+never got that far — a spawn/load failure. That is the same underlying trigger
+as this item's, but a DIFFERENT symptom class and a different assertion (a bare
+`toMatchObject` on a possibly-`null` value, with no producer named), in a
+different helper. Same rule, same fix shape, different file — so it is reported
+to the coordinator rather than folded in. Note its `expect(flip, \`round
+${round}: …\`)`DOES carry a message, which is why that failure was already
+readable in one line; the gap there is the discarded stderr, not the assertion.
+Recommend filing:`cascade.test.ts`spawnJson resolves null on empty stdout and
+discards stderr, so a spawn-lane failure reads as "null" instead of its cause —
+it should use the shared`SpawnHarnessError`/`readEnvelope` classification.
+
+**Evidence (expected vs observed).**
+
+| Probe                                                                              | Expected                | Observed                                                                |
+| ---------------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------------- |
+| Repro probe, dead `cliSpawn`                                                       | CI `SyntaxError` string | `Unexpected token 'a', "arggon bra"... is not valid JSON` — exact match |
+| Parity suite ×20, pre-fix                                                          | intermittent failure    | 20/20 pass (cannot reproduce the flake in isolation)                    |
+| Parity branch+cleanup ×20, post-fix                                                | 0 failures              | 20/20 pass                                                              |
+| `mcp-parity.test.ts` ×3 post-fix                                                   | 0 failures              | 18 passed each                                                          |
+| `cascade.test.ts` sibling ×20                                                      | to characterise         | 20/20 pass (flake not reproducible in isolation)                        |
+| Full `npm test` ×3 (post-rebase)                                                   | 0 failures              | 122 files / 2286 tests passed, 3/3                                      |
+| `npm run lint` / `validate` / `check:plugin` / `test:structure` / `lint:structure` | clean                   | all clean (build ran first)                                             |
+
+Pre-fix flake NOT reproduced in 20 isolated iterations — reported as such rather
+than claimed as fixed-by-construction. What IS pinned is the diagnosability: the
+old symptom is now a regression case.
+
+### 2026-10-03 @Arggon
+Evidence — bug-mcp-parity-branch-test-json-parse-of-human-stdout (PR #612)
+
+## Root cause reproduced: the text was NOT a human success line
+
+The item title guessed that `arggon branch …` printed its human line ahead of the
+envelope. It does not, and I verified rather than assumed: `branch`/`cleanup` gate
+their whole stdout on `jsonEnabled` (cli/src/cli.ts:2250-2283, 2544-2621) and
+`runBranch`'s git calls all pipe stdout (cli/src/branch.ts:43-55).
+
+It was the MCP server's own tool-LEVEL error sentence: `spawnedOutcome`
+(mcp-server.ts:905-935) throws `arggon <command> did not emit a JSON envelope
+(<why>): <stderr>` when the spawned child emits nothing parsable, `dispatch`'s
+catch makes that `isError: true` + the sentence as text, and `mcpCall` ran
+`JSON.parse` on it at line 72 — before the caller could read `isError`.
+
+Probe (throwaway test, deleted; dead `cliSpawn` entry):
+  expected: the CI SyntaxError string
+  observed: "arggon branch did not emit a JSON envelope (exit code 1): …"
+            JSON.parse -> Unexpected token 'a', "arggon bra"... is not valid JSON
+            => byte-exact match with CI. `"arggon cle"` is the same shape.
+No product change; the CLI's --json path is correct.
+
+## Gates (cwd = this worktree; `npm run build` ran first)
+
+| Command | Expected | Observed |
+| --- | --- | --- |
+| `npm run build` | clean | clean |
+| `npm test` x3 | 0 failures | 122 files / 2286 tests passed, 3/3 |
+| `npm run lint` | clean | clean |
+| `npm run arggon -- validate` | ok | ok (0 warnings, convention v5) |
+| `npm run check:plugin` | no diff | no diff |
+| `npm run test:structure` | pass | 3 passed, 0 failed |
+| `npm run lint:structure` | clean | clean |
+
+## Flake reproduction: attempted, NOT achieved
+
+| Probe | Expected | Observed |
+| --- | --- | --- |
+| parity branch+cleanup x20, PRE-fix | intermittent | 20/20 pass |
+| parity branch+cleanup x20, POST-fix | 0 failures | 20/20 pass |
+| `mcp-parity.test.ts` x3, post-fix | 0 failures | 18 passed each |
+| `cascade.test.ts` sibling x20 | characterise | 20/20 pass |
+
+The pre-fix flake did not reproduce in 20 isolated iterations (it fired under
+full-suite CI load), so I am NOT claiming it fixed-by-construction. What is pinned
+is the diagnosability: the old symptom is a regression case that now fails with
+the surface, command, isError flag and raw text attached.
+
+## PR #611 sibling — SEPARATE defect, reported not fixed
+
+`cascade.test.ts` `spawnJson` (lines 556-573) resolves `null` on EMPTY stdout and
+discards stderr via `void err;`. Since `update --json` still writes an `ok:false`
+envelope on failure, a `null` can only mean the child never produced one — a
+spawn/load failure, not a lost update. Same trigger as this item, different
+symptom class and different helper, so not folded in. Suggest filing:
+"cascade.test.ts spawnJson resolves null on empty stdout and discards stderr, so
+a spawn-lane failure reads as `null` instead of its cause — use the shared
+SpawnHarnessError/readEnvelope classification."
+
+## Notes
+
+- `readEnvelope`/`EnvelopeReadError` live in cli/src/test-spawn.ts, the existing
+  shared harness module (already home to classifySpawnFailure/SpawnHarnessError).
+- Parity NOT weakened: envelopes must still be equal, malformed envelopes still
+  raise, and `expectJsonOnly` asserts the strict --json JSON-only contract on both
+  surfaces so the locate-the-envelope fallback cannot absorb a product printing a
+  success line in --json mode.
+- Also hardened in the sweep: the MCP transport read treated the first `data`
+  chunk as a whole frame, so a tools/list response spanning two chunks would have
+  fed JSON.parse a truncated frame; it now accumulates to a newline (ADR 0014).
+
+### 2026-10-03 @ses_efea22f4affeuwm0UHxi45fb2I
+
+### 2026-10-03 @Arggon
+Coordinator note on the checklist shape before merge: the worker's evidence rows were appended under a `### Added while working` comment header, which the tracker records as HISTORY rather than as the acceptance section — so the four original boxes are still unticked and the done gate would (correctly) refuse. Ticking them here with the evidence each was verified against, drawn from the worker's own record and the round-2 reviewer verdict on this item (not re-derived by me).
+
+- **Box 1 — robust envelope read.** `readEnvelope` in `cli/src/test-spawn.ts` parses the WHOLE text first (the contract), then locates an envelope inside surrounding text, and otherwise raises `EnvelopeReadError` naming surface, command, `isError`, stdout and stderr. The bare `SyntaxError` from the old bare `JSON.parse` can no longer surface. The strict contract is not lost: `expectJsonOnly` still asserts JSON-only stdout on BOTH surfaces, on the two arms that failed.
+- **Box 2 — a failure names the surface.** `readEnvelope` names which surface, which command, and whether `isError` was set, and echoes both stdout and stderr; `expectSameEnvelope` names both sides and echoes both payloads. One read is enough to diagnose the next occurrence.
+- **Box 3 — parity is not weakened.** The new case FAILS against the old code (bare `SyntaxError` from inside the helper, before any caller could read `isError`), and half (b) of the test still asserts that a genuine CLI/MCP divergence fails `expectSameEnvelope`.
+- **Box 4 — no product change, and that is the correct call.** Verified rather than waved through: `branch` and `cleanup` gate their entire stdout on `jsonEnabled` (`cli/src/cli.ts:2250-2283` and `:2594-2621`), so in `--json` mode `successJson`/`failJson` are the only writers, and `runBranch`'s git pipes do not reach stdout. The text that actually broke the parity test was the MCP server's OWN tool-level error sentence. So the fix belongs in the harness, and there is nothing separate to file.
+
+**Scope the worker was honest about, unchanged by this tick:** the load-dependent TRIGGER is not fixed — 20 pre-fix iterations all passed, it only fires under full-suite CI load. That is tracked separately as `bug-cli-spawn-suites-exit-1-flake`, and this item fixes the reader so the next occurrence is diagnosable instead of a bare `SyntaxError`. The `cascade.test.ts` `null`-on-empty-stdout sibling is a different helper with a different symptom and is filed as `bug-test-spawn-spawnjson-null-drops-stderr`.
+
+One merge precondition from the review is satisfied: the duplicate `bug-three-acceptance-parsers-diverging` verdict commits are off this branch (rebased), and the current merge is a union that keeps main's authoritative frontmatter plus every comment block from both sides.
+
+### 2026-10-05 @arggon-delivery-lead
+verdict: approve (delivery-lead merge verification, re-run after the stale-branch catch-up)
+
+**Why this verdict exists:** this item sat at `todo` with no assignee, branch or `worktree_path` while its work sat in a worktree and an open PR (#612). That is the tracker-blindness described by `bug-native-arggon-tools-resolve-tracker-root-to-session-cwd` — the native tools resolve the tracker root from process cwd, so a session working inside a worktree writes its tracker state into the primary checkout. Reconciliation was the prerequisite to merging, not new work.
+
+**Finding 1 (the named merge precondition) is discharged by the branch itself, not waived.** `486c6fc3` is a "merge origin/main (item file union) + acceptance ticks with evidence" and `2e9ec5eb` restores the round-2 approve verdict; the two duplicate `chore(tasks): commented bug-three-acceptance-parsers-diverging` commits are absent from `git log origin/main..HEAD`. Evidence, not assertion.
+
+**Staleness catch-up.** The branch was 230 commits behind `origin/main`. `git diff --stat <merge-base>..origin/main` over `cli/src/test-spawn.ts`, `cli/src/test-spawn.test.ts` and `cli/src/mcp-parity.test.ts` returned **empty** — the product diff carried no conflict surface, as the reviewer predicted. Conflicts were confined to this item file and were genuine two-sided unions (main's reviewer verdict vs the branch's maker evidence); both sides were concatenated, 0 markers left.
+
+**Acceptance verified by reading the code, not the maker's summary:**
+- box 1 — `readEnvelope` (`cli/src/test-spawn.ts:335-372`) tries whole text, then per-line, then balanced-brace candidates, and raises rather than inventing a result.
+- box 2 — `EnvelopeReadError` (`:238-266`) carries `readonly surface: EnvelopeSurface`; the message emits `surface: <CLI|MCP> (<command>) produced no JSON envelope` plus `--- <surface> stdout ---` and `--- <surface> stderr ---`. Names the surface and echoes raw text: met.
+- box 3 — parity is not weakened: `expectSameEnvelope` (`cli/src/mcp-parity.test.ts:181`) still throws `CLI <-> MCP envelope mismatch` and is called on every arm (12 call sites); `expectJsonOnly` (`:207`) keeps the strict JSON-only assertion so the locate-the-envelope fallback cannot absorb a success line.
+- box 4 — no product change: the only non-`.test.ts` file in the diff is `cli/src/test-spawn.ts`, the shared **test harness** module (already home to `classifySpawnFailure`/`SpawnHarnessError`), not shipped product code. `git diff --name-only origin/main..HEAD -- 'cli/src/*' 'lib/src/*'` shows no other source file. Nothing to file separately.
+
+**Gates — executed, expected vs observed:**
+- `npx vitest run cli/src/test-spawn.test.ts cli/src/mcp-parity.test.ts` → expected 34 pass; **observed 2 files / 34 tests passed**.
+- First run was **19 failed / 15 passed**, and the cause was environmental rather than the change: the worktree's `lib/dist` was 230 commits stale, so the spawned child CLI died with `SyntaxError: The requested module '@arggondev/lib' does not provide an export named 'containersMissingAcceptance'` (`cli/src/spec.ts:16`). Remedy applied: `npm run build --workspace @arggondev/lib` in the worktree → green.
+- **Gap worth recording:** the `start` receipt reported `ready: true` with `install: "existing"` and `builtWorkspaces: []`. A reused install on an *attached* worktree is not rebuilt, so the readiness receipt does not cover a stale `lib/dist` — `ready: true` did not mean the gate could actually boot the CLI. Same failure signature as `bug-test-suite-lib-dist-rebuild-race`.
+- `npm test` (full) → **1 failed | 127 passed (128) files; 1 failed | 2668 passed (2669) tests**. The single failure is `cli/src/headless-ci.test.ts:849` (twin-checkout `init --json` determinism) and is **not this branch's**: the branch never touches that file, and it fails identically in the primary checkout on clean `origin/main` (`1 failed | 6 passed (7)`). Filed as `bug-headless-ci-twin-init-nondeterministic` under `tooling-and-environment` — `main` is red on its own, independent of this item.
+- Smoke bar: not applicable — no product behavior, no CLI command, no UI/TUI surface. The dead-`cliSpawn` probe is the closest end-to-end drive and it exercises the real MCP server.
+
+**Findings 2-4 remain non-blocking follow-up material** (the `expectJsonOnly` sweep to the other 13 arms; per-character budget charging in `readEnvelope`; the two sibling bare-parse sites at `mcp-server.test.ts:125` and `mcp-smoke.test.ts:130`). These belong on the tracker rather than as code TODOs; not filed here to keep this PR scoped to the reviewed change.
+
+### 2026-10-05 @arggon-delivery-lead
+### 2026-10-05 @arggon-delivery-lead
+Merged: PR #612 landed as `2f36bd70` with all three lanes green (`cli`, `tasks-validate`, `ui-smoke`) on the rebased head. The claim frontmatter (`assignee`/`branch`/`worktree_path`) was resolved from `main` during the branch merge and did not survive it, so the item came back as `todo` with no assignee while the change was already merged — recorded here rather than papered over. Re-claimed and completed in two steps (never `todo` → `done`). Acceptance checklist: 7 ticked, 0 unchecked, verified against the code rather than the maker's summary (see the merge-verification verdict above).
+
+Post-merge follow-up filed during this verification: `bug-headless-ci-twin-init-nondeterministic` — `cli/src/headless-ci.test.ts` fails its twin-checkout `init --json` determinism assertion **on clean `origin/main`**, so `main` is independently red. Not caused by this change and not fixed here.

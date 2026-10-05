@@ -6,6 +6,13 @@
  *
  * The gate script is exercised as a real child process against the GENERATED
  * file (not the template): init output is the artifact adopters run.
+ *
+ * The dispatch-scoped backstop is additionally bound to the SHIPPED ids by
+ * reading them out of the templates (spec-agent-rename-019 AC 2): the gate
+ * matches an agent name as a string, so a rename that misses its matcher does
+ * not fail loudly — it silently stops opening the read-only window. Both the
+ * matcher and the id are derived here; neither is restated, so the pairing
+ * cannot drift.
  */
 import { spawnSync } from "node:child_process";
 import {
@@ -17,10 +24,9 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCreate, runUpdate } from "@arggondev/lib";
-import { runGoal } from "./goal-mode.js";
 import { runInit } from "./init.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -34,17 +40,22 @@ function mkdtempSync(prefix: string): string {
   return dir;
 }
 
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+/** The shipped templates (the source init materializes the seam from). */
+const shipped = {
+  agentsDir: join(repoRoot, "templates/docs/zcode/arggon/agents"),
+  reviewCommand: join(repoRoot, "templates/docs/zcode/arggon/commands/arggon-review.md"),
+  gate: join(repoRoot, "templates/docs/zcode/arggon/hooks/gate.mjs"),
+};
+
 const MARKET_ROOT = ".zcode-marketplace";
 const PLUGIN_ROOT = `${MARKET_ROOT}/arggon`;
-/** The goal-mode contract template (`arggon goal <id>` instantiates it). */
-const GOAL_TEMPLATE = `${PLUGIN_ROOT}/templates/goal-mode.md`;
 const COMMANDS = [
   "adopt",
   "adr",
   "board",
   "done",
   "explore",
-  "goal",
   "handoff",
   "next",
   "playbook",
@@ -58,6 +69,18 @@ function initTree(): string {
   const dir = mkdtempSync(join(tmpdir(), "arggon-zcode-"));
   runInit({ dir, force: false });
   return dir;
+}
+
+/**
+ * The shipped standards-reviewer id, DERIVED from the gate's own matcher
+ * (AC 2): the behavioural probes below must keep working whatever the id is
+ * called, so restating it here would only add a second place to forget.
+ */
+function shippedReviewerId(): string {
+  const src = readFileSync(join(repoRoot, "templates/docs/zcode/arggon/hooks/gate.mjs"), "utf8");
+  const match = /\/\(\^\|:\)([a-z-]+)\$\//.exec(src);
+  expect(match, "the gate's isReviewerDispatch matcher must stay greppable").not.toBeNull();
+  return match![1]!;
 }
 
 /** Run the generated gate script with a JSON stdin payload. */
@@ -83,13 +106,14 @@ describe("zcode plugin seam generation", () => {
       `${PLUGIN_ROOT}/.zcode-plugin/plugin.json`,
       `${PLUGIN_ROOT}/hooks/hooks.json`,
       `${PLUGIN_ROOT}/hooks/gate.mjs`,
-      GOAL_TEMPLATE,
       ...COMMANDS.map((c) => `${PLUGIN_ROOT}/commands/arggon-${c}.md`),
-      ...["coordinator", "reviewer", "worker"].map((a) => `${PLUGIN_ROOT}/agents/arggon-${a}.md`),
+      // The shipped agent set, derived: a new role must be generated because the
+      // template exists, not because this list remembers it.
+      ...readdirSync(shipped.agentsDir).map((a) => `${PLUGIN_ROOT}/agents/${a}`),
     ]) {
       expect(existsSync(join(dir, ...rel.split("/"))), rel).toBe(true);
     }
-    expect(readdirSync(join(dir, PLUGIN_ROOT, "commands"))).toHaveLength(13);
+    expect(readdirSync(join(dir, PLUGIN_ROOT, "commands"))).toHaveLength(12);
     expect(readdirSync(join(dir, PLUGIN_ROOT, "agents"))).toHaveLength(3);
   });
 
@@ -136,7 +160,7 @@ describe("zcode plugin seam generation", () => {
       expect(body, name).not.toContain("tools.arggon.");
     }
     const reviewer = readFileSync(join(dir, PLUGIN_ROOT, "commands/arggon-review.md"), "utf8");
-    expect(reviewer).toContain("arggon:arggon-reviewer");
+    expect(reviewer).toContain(`arggon:${shippedReviewerId()}`);
   });
 
   it("never overwrites an adopter-modified seam file (provenance decision table)", () => {
@@ -152,62 +176,50 @@ describe("zcode plugin seam generation", () => {
     expect(readFileSync(dest, "utf8")).toEqual(adopted);
     expect((result.skipped ?? []).some((s) => s.includes("arggon-next.md"))).toBe(true);
   });
-
-  it("never overwrites an adopter-edited goal-mode template either", () => {
-    const dir = initTree();
-    const dest = join(dir, ...GOAL_TEMPLATE.split("/"));
-    const adopted = "---\ndescription: my own goal template\n---\nmine.\n";
-    expect(readFileSync(dest, "utf8")).not.toEqual(adopted);
-    writeFileSync(dest, adopted, "utf8");
-    const result = runInit({ dir, force: false });
-    expect(readFileSync(dest, "utf8")).toEqual(adopted);
-    expect((result.skipped ?? []).some((s) => s.includes("templates/goal-mode.md"))).toBe(true);
-  });
-});
-
-describe("zcode goal-mode template (task-zcode-goal-mode)", () => {
-  it("is generated with provenance and the slots `arggon goal` fills", () => {
-    const dir = initTree();
-    const template = readFileSync(join(dir, ...GOAL_TEMPLATE.split("/")), "utf8");
-    // Frontmatter-first destination: the marker sits INSIDE the frontmatter.
-    expect(template.startsWith("---\n# arggon:generated")).toBe(true);
-    expect(template).toContain('template="zcode/arggon/templates/goal-mode.md"');
-    for (const slot of [
-      "{{ITEM_ID}}",
-      "{{GOAL_OBJECTIVE}}",
-      "{{GOAL_VERIFICATION}}",
-      "{{WORKTREE_PATH}}",
-      "{{BRANCH}}",
-    ]) {
-      expect(template, slot).toContain(slot);
-    }
-    // The hard boundaries are NOT a slot: the CLI appends them, so an adopter
-    // edit of this file cannot drop them from a rendered contract.
-    expect(template).not.toContain("{{GOAL_BOUNDARIES}}");
-  });
-
-  it("is instantiated from a claimed item's checklist, not hand-written", () => {
-    const dir = initTree();
-    runCreate({ cwd: dir, type: "initiative", title: "Launch" });
-    runCreate({ cwd: dir, type: "epic", title: "Platform", parent: "launch" });
-    runCreate({ cwd: dir, type: "story", title: "Seam", parent: "platform", id: "story-seam" });
-    const { id } = runCreate({
-      cwd: dir,
-      type: "task",
-      title: "Goal template",
-      parent: "story-seam",
-      id: "goal-template",
-    });
-    runUpdate({ cwd: dir, id, status: "in_progress", assignee: "Arggon" });
-    const { contract, goal } = runGoal({ cwd: dir, id, login: "Arggon" });
-    expect(goal.objective.length).toBeGreaterThan(0);
-    expect(goal.template).toBe("adopter");
-    expect(contract).toContain("## Boundaries (hard)");
-    expect(contract).not.toMatch(/\{\{[A-Z_]+\}\}/);
-  });
 });
 
 describe("zcode gate script (reviewer backstop + global git gates)", () => {
+  // AC 2 (spec-agent-rename-019): the shipped reviewer id cannot drift from the
+  // gate's matcher. The matcher is a STRING in a security-relevant path — rename
+  // the agent, miss the regex, and the dispatch-scoped read-only window stops
+  // opening with no failure anywhere: the reviewer's backstop silently disarms.
+  // Both sides are read from the shipped templates, so this test fails CI on a
+  // rename that does not update the gate (and on a gate that outlives its id).
+  it("the reviewer backstop's matcher follows the shipped reviewer id (AC 2: no silent disarm)", () => {
+    const dir = initTree();
+    const agentsDir = join(dir, PLUGIN_ROOT, "agents");
+    const ids = readdirSync(agentsDir)
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => {
+        const body = readFileSync(join(agentsDir, f), "utf8");
+        return {
+          id: /^name:\s*(\S+)/m.exec(body)![1]!,
+          // The reviewer is the one whose toolset carries the verdict channel.
+          isReviewer: body.includes("mcp__arggon__arggon_comment"),
+        };
+      });
+    const reviewers = ids.filter((a) => a.isReviewer);
+    expect(reviewers, "exactly one generated agent carries the verdict channel").toHaveLength(1);
+
+    // The gate watches exactly that id — a rename that misses the matcher fails
+    // HERE (silently disarmed backstop) instead of in an adopter's session.
+    const watched = shippedReviewerId();
+    expect(watched).toBe(reviewers[0]!.id);
+    // The plugin-qualified spelling the Agent tool actually sends.
+    expect(new RegExp(`(^|:)${watched}$`).test(`arggon:${reviewers[0]!.id}`)).toBe(true);
+    // And no other shipped agent may satisfy it — the window is per-reviewer.
+    for (const other of ids.filter((a) => !a.isReviewer)) {
+      expect(new RegExp(`(^|:)${watched}$`).test(other.id), other.id).toBe(false);
+    }
+  });
+
+  it("the shipped review command dispatches the id the gate matches (AC 2)", () => {
+    const command = readFileSync(shipped.reviewCommand, "utf8");
+    expect(command, "the review command must dispatch the id the gate watches").toContain(
+      `arggon:${shippedReviewerId()}`,
+    );
+  });
+
   it("denies force push and --no-verify for every session", () => {
     const dir = initTree();
     for (const command of [
@@ -249,7 +261,7 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
       {
         session_id: "w1",
         tool_name: "Agent",
-        tool_input: { subagent_type: "arggon:arggon-worker" },
+        tool_input: { subagent_type: "arggon:arggon-maker" },
       },
     ]) {
       const r = gate(dir, "pre", payload);
@@ -260,12 +272,13 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
   it("marks a reviewer dispatch and denies mutations until it returns", () => {
     const dir = initTree();
     const session = "coord-1";
+    const reviewerId = shippedReviewerId();
     // Dispatch begins: the gate marks the session.
     expect(
       gate(dir, "pre", {
         session_id: session,
         tool_name: "Agent",
-        tool_input: { subagent_type: "arggon:arggon-reviewer" },
+        tool_input: { subagent_type: `arggon:${reviewerId}` },
       }).status,
     ).toBe(0);
     // While the dispatch is in flight: read-only + verdict channel only.
@@ -326,7 +339,7 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
       gate(dir, "post", {
         session_id: session,
         tool_name: "Agent",
-        tool_input: { subagent_type: "arggon:arggon-reviewer" },
+        tool_input: { subagent_type: `arggon:${reviewerId}` },
       }).status,
     ).toBe(0);
     expect(
@@ -341,7 +354,7 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
     const reviewer = {
       session_id: session,
       tool_name: "Agent",
-      tool_input: { subagent_type: "arggon-reviewer" },
+      tool_input: { subagent_type: shippedReviewerId() },
     };
     expect(gate(dir, "pre", reviewer).status).toBe(0);
     expect(gate(dir, "pre", reviewer).status).toBe(0);
@@ -365,7 +378,7 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
       gate(dir, "pre", {
         session_id: session,
         tool_name: "Agent",
-        tool_input: { subagent_type: "arggon:arggon-reviewer" },
+        tool_input: { subagent_type: `arggon:${shippedReviewerId()}` },
       }).status,
     ).toBe(0);
     expect(

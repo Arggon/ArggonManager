@@ -26,11 +26,12 @@ file — read the one that matches the task **before** acting:
 | `references/json-contract.md` | **JSON contract**: `--json` envelopes, error codes, filters, output surfaces, native tools, MCP                                                  |
 | `references/methodology.md`   | **Methodology**: what the work needs — spec, plan, ADR, exploration, playbook, runbook — and the quality bar                                     |
 | `references/exploration.md`   | **Greenfield exploration**: the six-phase protocol — classify, stance, ground, frontier rounds, edge-case hunt, artifacts + hard gate (ADR 0017) |
-| `references/orchestration.md` | **Orchestration**: coordinator/subagent waves, review bar, smoke gate, worktrees                                                                 |
+| `references/orchestration.md` | **Orchestration**: the four agent roles (named by what they decide), coordinator/subagent waves, review bar, smoke gate, worktrees               |
 | `references/pitfalls.md`      | **Pitfalls**: claim, cascade, tracker-merge and commit-staging traps                                                                             |
 
-The full workflow rules are `ArggonManager/docs/agents.md`; the review bar is
-`ArggonManager/docs/engineering.md`.
+The full workflow rules are `ArggonManager/docs/agents.md`; the review bar, the
+role table and the named (asymmetric) authority are
+`ArggonManager/docs/engineering.md` §Roles and authority / §Review bar.
 
 ## Native surface (OpenCode V2)
 
