@@ -10,7 +10,6 @@ labels: [methodology, exploration, research]
 priority: p2
 created: "2026-10-05"
 updated: "2026-10-05"
-worktree_path: /home/arggon/Projects/ArggonManager-task-explore-harness-research-transfer
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-explore-harness-research-transfer.md
