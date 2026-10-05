@@ -70,6 +70,18 @@ export type TrackerConfig = {
    */
   allowSteal: boolean | null;
   /**
+   * Orphan-reaping arming from `x-tracker.reap-acked-orphans`
+   * (task-adapter-orphan-reaping). `null` (unset) and `false` both mean an
+   * ACKNOWLEDGED orphan is never deleted: `adopt --ack` re-records the checksum
+   * from disk, so for an acknowledged entry a checksum match proves only
+   * "unchanged since the ack" — provenance cannot separate "unedited" from
+   * "curated, then acked", and the second is the adopter's content. Only an
+   * explicit `true` lets `arggon init` reap that middle case (the agent-rename
+   * migration needs acked adopters to be able to clear a dead agent file).
+   * The default therefore cannot lose work; arming is the documented choice.
+   */
+  reapAckedOrphans: boolean | null;
+  /**
    * Strict start gate from `x-tracker.strict-gate-bins`
    * (task-start-gate-strict-mode). `null` (unset) and `false` both keep start
    * report-only (the documented honest-receipt design: the claim commit stays
@@ -91,6 +103,16 @@ export type TrackerConfig = {
    * observation, mirroring `strict-gate-bins`.
    */
   strictWorktreeWrites: boolean | null;
+  /**
+   * Product-acceptance recording from `x-tracker.product-acceptance` (ADR 0021
+   * §4, spec promotion-policy-018). `null` (unset) and `false` both leave every
+   * surface exactly as it is today: the `accept:` convention is still parsed and
+   * reported on `report --json` / `show --json` (additive fields, read-only),
+   * but the `spec analyze` detector stays silent. Only an explicit `true` arms
+   * the report-only `MISSING-PRODUCT-ACCEPTANCE` finding — arming is the act of
+   * saying "this project has a product owner and wants the record".
+   */
+  productAcceptance: boolean | null;
 };
 
 /** `x-import` namespaced extension options (task-import-type-mapping). */
@@ -322,8 +344,10 @@ export function parseConventionConfig(
   const tracker: TrackerConfig = {
     autoCommit: null,
     allowSteal: null,
+    reapAckedOrphans: null,
     strictGateBins: null,
     strictWorktreeWrites: null,
+    productAcceptance: null,
   };
   const generated: Record<string, GeneratedEntry> = {};
   let generatedProjectName: string | null = null;
@@ -455,9 +479,11 @@ export function parseConventionConfig(
       // Namespaced extension: unknown nested keys are ignored (ignore-unknown),
       // the official options are `auto-commit` (tracker hygiene), `allow-steal`
       // (claim-steal arming, bug-cli-steal-not-gated), `strict-gate-bins`
-      // (strict start gate, task-start-gate-strict-mode), and
+      // (strict start gate, task-start-gate-strict-mode),
       // `strict-worktree-writes` (single-writer enforcement,
-      // task-single-writer-worktree-enforcement).
+      // task-single-writer-worktree-enforcement), `product-acceptance`
+      // (product-acceptance recording, ADR 0021 §4) and `reap-acked-orphans`
+      // (orphan-reaping arming, task-adapter-orphan-reaping).
       if (key === "allow-steal") {
         if (value !== "true" && value !== "false") {
           throw new Error(
@@ -483,6 +509,24 @@ export function parseConventionConfig(
           );
         }
         tracker.strictWorktreeWrites = value === "true";
+        continue;
+      }
+      if (key === "product-acceptance") {
+        if (value !== "true" && value !== "false") {
+          throw new Error(
+            `${sourcePath}: 'product-acceptance' must be a boolean (got ${JSON.stringify(value)})`,
+          );
+        }
+        tracker.productAcceptance = value === "true";
+        continue;
+      }
+      if (key === "reap-acked-orphans") {
+        if (value !== "true" && value !== "false") {
+          throw new Error(
+            `${sourcePath}: 'reap-acked-orphans' must be a boolean (got ${JSON.stringify(value)})`,
+          );
+        }
+        tracker.reapAckedOrphans = value === "true";
         continue;
       }
       if (key !== "auto-commit") continue;
@@ -550,9 +594,7 @@ export function parseConventionConfig(
       }
       if (key === "env") {
         if (value !== "true" && value !== "false") {
-          throw new Error(
-            `${sourcePath}: 'env' must be a boolean (got ${JSON.stringify(value)})`,
-          );
+          throw new Error(`${sourcePath}: 'env' must be a boolean (got ${JSON.stringify(value)})`);
         }
         worktree.env = value === "true";
         continue;
@@ -667,8 +709,10 @@ export function readConventionConfig(dir: string): ConventionConfig {
       tracker: {
         autoCommit: null,
         allowSteal: null,
+        reapAckedOrphans: null,
         strictGateBins: null,
         strictWorktreeWrites: null,
+        productAcceptance: null,
       },
       import: { labelTypes: null },
       worktree: { postStart: null, postStartShell: null, env: null, services: null },

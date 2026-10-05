@@ -96,7 +96,14 @@ The flow (both gates are required):
 
 ## Claiming (playbook)
 
-Agents and humans follow the same rules:
+Claiming follows **work-loop parity**: any human and any agent claims under the
+same rules, the same kernel and the same JSON contracts. Authority is **asymmetric
+and named** — a small set of decisions belongs to the product owner, and the
+irreversible ones are structurally human-only
+([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §1). The one
+that reaches this page is rule 2: taking over another writer's claim (`--steal`) is
+a product-owner power. The full authority map lives in
+[`engineering.md`](engineering.md) §Roles and authority.
 
 1. Claim before starting (`--status in_progress --assignee <you>`).
 2. Do not steal; unclaim or use `--force` only when coordinated. Unclaiming a claim that created a worktree also releases it (`arggon cleanup --release <id>`) — see §Unclaim recovery.

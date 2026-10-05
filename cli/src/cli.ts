@@ -309,6 +309,11 @@ program
                 skipped: result.skipped,
                 restored: result.restored,
                 conventionPath: result.conventionPath,
+                // Reaping family (task-adapter-orphan-reaping), previewed from
+                // the identical plan: what the run would remove and what it
+                // would keep, each refusal naming its reason.
+                reaped: result.reaped,
+                reapRefused: result.reapRefused,
                 ...(result.proposals ? { proposals: proposalPayload(result.proposals) } : {}),
                 // Same block a real run reports (task-adapter-selection-flags):
                 // the dry run classifies the identical plan, so these numbers
@@ -349,6 +354,11 @@ program
               skipped: result.skipped,
               restored: result.restored,
               conventionPath: result.conventionPath,
+              // Reaping family (task-adapter-orphan-reaping), never folded into
+              // the create/update/skip counts: a deletion is its own action, and
+              // a refusal names its path and reason.
+              reaped: result.reaped,
+              reapRefused: result.reapRefused,
               ...(result.proposals ? { proposals: proposalPayload(result.proposals) } : {}),
               // Per-artifact adapter selection outcome (task-adapter-selection-flags,
               // additive): written/skipped per adapter destination with reasons.
@@ -1720,6 +1730,7 @@ spec
                 ambiguity: saved.result.ambiguity,
                 consistency: saved.result.consistency,
                 decisions: saved.result.decisions,
+                productAcceptance: saved.result.productAcceptance,
               },
               baseline: { file: saved.file, written: true, count: saved.snapshot.count },
             });
@@ -1748,6 +1759,7 @@ spec
                 ambiguity: cmp.result.ambiguity,
                 consistency: cmp.result.consistency,
                 decisions: cmp.result.decisions,
+                productAcceptance: cmp.result.productAcceptance,
               },
               baseline: {
                 file: cmp.file,
@@ -1777,6 +1789,7 @@ spec
               ambiguity: result.ambiguity,
               consistency: result.consistency,
               decisions: result.decisions,
+              productAcceptance: result.productAcceptance,
             },
           });
           return;
@@ -2976,7 +2989,36 @@ function printInitDryRun(result: InitDryRunResult): void {
   if (result.plan.length === 0) {
     console.log("  (nothing to do — tree already up to date)");
   }
+  // The reaping family (task-adapter-orphan-reaping) already appears in the
+  // table above as one `orphan-reap` / `orphan-refused` row per file, so this is
+  // only the tally that makes the two buckets legible at a glance.
+  if (result.reaped.length > 0 || result.reapRefused.length > 0) {
+    console.log(
+      `  orphan reaping: ${result.reaped.length} to remove, ` +
+        `${result.reapRefused.length} to keep (one row each above)`,
+    );
+  }
   console.log("nothing was written (dry run)");
+}
+
+/**
+ * Human lines for the reaping family (task-adapter-orphan-reaping): one line
+ * per file, split by action so a removal and a refusal can never read alike —
+ * a deletion that hid inside a count would be indistinguishable from a refresh.
+ */
+function printInitReaps(
+  reaped: readonly string[],
+  refused: readonly { dest: string; template: string; reason: string }[],
+): void {
+  for (const dest of reaped) {
+    console.log(`arggon init: reaped orphaned file: ${sanitizeHumanError(dest)}`);
+  }
+  for (const row of refused) {
+    console.log(
+      `arggon init: kept orphaned file: ${sanitizeHumanError(row.dest)} — ` +
+        `${sanitizeHumanError(row.reason)}`,
+    );
+  }
 }
 
 /**
@@ -3049,6 +3091,7 @@ function printInitHuman(result: InitResult): void {
         `arggon init: kept adopter-modified docs: ${result.skipped.length} file(s) (--backup archives and regenerates)`,
       );
     }
+    printInitReaps(result.reaped, result.reapRefused);
     printInitAdapters(result.adapters);
     const commitLine = formatCommitLine(result.commit);
     if (commitLine && result.commit?.committed) console.log(`arggon init: ${commitLine}`);
@@ -3080,6 +3123,7 @@ function printInitHuman(result: InitResult): void {
       `  - kept adopter-modified docs (never overwritten): ${sanitizeHumanError(result.skipped.join(", "))}`,
     );
   }
+  printInitReaps(result.reaped, result.reapRefused);
   printInitAdapters(result.adapters);
   console.log("Next:");
   console.log(

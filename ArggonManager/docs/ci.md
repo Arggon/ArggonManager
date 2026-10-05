@@ -167,13 +167,41 @@ it is what adopters vendor and what the parity test in
 `cli/src/headless-ci.test.ts` holds `.github/workflows/arggon.yml` to (same rule,
 same generator predicate, `uses:` SHA pins excepted). The pin-lag rule has a
 second implementation, the `pinLagsSeam()` predicate in
-`cli/src/ci-seam-pin.test.ts` — the repo-side guard that runs in the `cli` job.
-The two are deliberately **not** the same predicate today: the test adds a
-`pin !== pkgVersion` conjunct the shell copy lacks, so the release window
-(`pin == stamps`, `package.json` already bumped) stays green in the test. Treat
-that as known, tracked skew
-(`bug-ci-seam-pin-shell-vs-test-copy-divergence`), not as one rule with two
-spellings; only the workflow copy decides `tasks-validate`.
+`cli/src/ci-seam-pin.test.ts` — the repo-side guard that runs in the `cli` job,
+so the same invariant fails on a local run instead of only in CI. **They are one
+rule, not two spellings**: `pinLagsSeam()` is the TypeScript transcription of
+the drift step's pinned-lag clause, and a parity test **executes that clause** —
+lifted out of both workflow copies, never remembered — against the predicate over
+a corpus covering every state the release runbook passes through (the verdict
+table in `cli/src/ci-seam-pin.test.ts`) plus the one input where the two once
+disagreed. Editing one and leaving the other is a red test that names the input,
+not a silent skew.
+
+**What the rule does not read: `package.json`.** The clause compares the pin
+against the newest committed `arggonVersion` stamp and nothing else. That is the
+decision, not an omission (`bug-ci-seam-pin-shell-vs-test-copy-divergence`): the
+repo-side predicate used to add a `pin !== package.json` conjunct, and it was
+wrong twice over.
+
+1. No documented state of the release flow needs it — the release window
+   (`pin == stamps`, `package.json` already bumped) is green without it, which is
+   what that conjunct claimed to buy.
+2. It silenced the #527 signal in exactly the state the clause exists to catch: a
+   stamp newer than the pin while `package.json` equals the pin. Reachable
+   whenever a contributor's installed `arggon` is newer than their branch's
+   `package.json` and they run `arggon init` — and then the pinned install really
+   would rewrite committed content.
+
+It could not have been closed by pasting the conjunct into the shell copy, which
+is the direction the finding suggested. The clause runs in every adopter's repo
+too, and an adopter's `package.json` version is unrelated to arggon releases: any
+adopter whose version coincides with the pin literal would have had the #527 gate
+switch off for them and shipped the outage silently. Both surfaces now witness the
+deciding input — the predicate in `cli/src/ci-seam-pin.test.ts` (which executes
+the shipped clause) and the clause itself, driven verbatim end to end in
+`cli/src/headless-ci.test.ts`. Byte equality of the seam against the pin, and a
+pin sitting _ahead_ of the stamps, stay out of scope for both; see [What the
+branch-local comparison gives up](#which-generator-the-gate-compares-against).
 
 The pin is a literal on purpose and stays one: deriving it from `package.json`
 would install the bumped version between the release runbook's step-1 bump and

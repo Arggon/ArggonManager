@@ -3,13 +3,20 @@
 > **Methodology carrier (per [ADR 0020](./adr/0020-methodology-first-productization.md)).** This document is a carrier of the ArggonManager methodology — declared together with `ArggonManager/docs/agents.md`, `ArggonManager/docs/engineering.md`, `ArggonManager/docs/convention.md`, and the bundled `arggon-cli` skill.
 >
 > - **Scope:** any project — not only software.
-> - **Invariants:** humans and agents follow the same rules; state lives in git; discipline is enforceable; docs travel with code; never-steal / never-reopen.
+> - **Invariants:** work-loop parity: any human and any agent may claim, work, review, comment and merge under the same kernel rules and the same JSON contracts; state lives in git; discipline is enforceable; docs travel with code; never-steal / never-reopen, with authority asymmetric and named — the irreversible overrides stay product-owner powers, structurally human-only.
 > - **Version:** tracks the ArggonManager package version.
 > - **Upgrade channel:** methodology changes reach adopters through the adopter upgrade channel ([ADR 0016](./adr/0016-adopter-upgrade-channel.md)).
 
 ArggonManager stores work as Markdown files under the tracker root — `ArggonManager/`
 (legacy `tasks/` trees are auto-detected and keep working; see [Tracker layout
-(v5)](#tracker-layout-v5)). Humans and agents create, claim, and update items the same way: edit the file and commit.
+(v5)](#tracker-layout-v5)). Humans and agents create, claim, and update items the
+same way: edit the file and commit. That is **work-loop parity**
+([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §1) — the
+loop is identical for both sides. What is _asymmetric_ is authority, and it is
+named, not implied: the product owner sets `priority`, and four irreversible
+overrides are structurally human-only (the full map, with the structural gate
+behind each: [`ArggonManager/docs/engineering.md`](./engineering.md)
+§Roles and authority).
 
 **v0 fields and layout are locked.** See [Versioning](#versioning--forward-compatibility) for how unknown keys and future versions work.
 
@@ -300,7 +307,7 @@ Claims carry a **soft lease**: an ISO date-time `claimed_at` maintained by the C
 - **Cleared** automatically when the item leaves the claimed state: unclaim (`in_progress` → `todo`), terminal states, or `blocked` (a new lease starts on re-claim).
 - **Reporting only**: `claimed_at` never gates a transition and `validate` imposes no constraint on it. Items claimed before the field existed simply have no `claimed_at`.
 - **Staleness is advisory**: `arggon list --stale --older-than <duration>` (`<number><d|h|m>`, e.g. `7d`) surfaces claimed items whose lease started before the threshold. It filters reporting only — it never blocks work.
-- **Only humans may steal**: `arggon update <id> --steal --reason "<why>" --assignee <you>` is a supervised takeover of a claimed item. It requires a non-empty reason, refreshes `claimed_at`, and appends a dated note (`> stolen <date> by <you>: <reason>`) to the item body. It is double-gated at the CLI (bug-cli-steal-not-gated): the repo must arm `x-tracker.allow-steal: true` in the tracker `.convention.yml` (default: refused), and the invocation must run on an interactive terminal with a y/N confirmation — non-TTY callers are refused even when armed. Agent callers are refused by the playbook rules (`docs/agents.md`), exactly like `--force`.
+- **Only humans may steal**: `arggon update <id> --steal --reason "<why>" --assignee <you>` is a supervised takeover of a claimed item. It requires a non-empty reason, refreshes `claimed_at`, and appends a dated note (`> stolen <date> by <you>: <reason>`) to the item body. It is double-gated at the CLI (bug-cli-steal-not-gated): the repo must arm `x-tracker.allow-steal: true` in the tracker `.convention.yml` (default: refused), and the invocation must run on an interactive terminal with a y/N confirmation — non-TTY callers are refused even when armed. Agent callers are refused by the playbook rules (`docs/agents.md`), exactly like `--force`. Taking over another writer's claim is a **product-owner power** and one of the four irreversible ones ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §2) — a recorded authority split, not an undocumented exception to parity.
 
 Concurrency / conflict handling (refuse steal unless `--force`, unclaim recovery, stale reporting): see [`claim.md`](claim.md).
 
@@ -321,7 +328,7 @@ Concurrency / conflict handling (refuse steal unless `--force`, unclaim recovery
 ### Reopen / status policy
 
 - **`validate` ALLOWS** `done|cancelled` → `todo` (schema permits).
-- **Enforced (bug-reopen-ungated-cli):** agents are refused — the MCP layer via rules.ts, and the CLI via an interactive-terminal gate (`--status todo` on a `done`/`cancelled` item needs a y/N confirmation over TTY stdin; non-TTY callers are refused, no `--yes`, no config opt-in). Humans reopen by confirming at their terminal.
+- **Enforced (bug-reopen-ungated-cli):** agents are refused — the MCP layer via rules.ts, and the CLI via an interactive-terminal gate (`--status todo` on a `done`/`cancelled` item needs a y/N confirmation over TTY stdin; non-TTY callers are refused, no `--yes`, no config opt-in). Humans reopen by confirming at their terminal. Reopening a terminal item is a **product-owner power** ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §2).
 - No status rollup — parent status is independent of children.
 
 ### `blocked_reason`
@@ -453,8 +460,8 @@ CLI surface: `arggon update <id> --depends-on "a,b"` **replaces** the full list 
 
 ### Priority (v4)
 
-Every item type carries an optional judgment priority — the orchestrator sets it
-at filing time and `next` ranks by it (see ADR 0009 and
+Every item type carries an optional judgment priority — set at filing time and
+ranked on by `next` (who owns it: the **Owner** bullet below; see ADR 0009 and
 [exploration priority-model-008](../docs/explorations/exploration-priority-model-008.md)):
 
 ```yaml
@@ -471,6 +478,12 @@ priority: p1
   (highest label wins, all pN labels removed, non-priority labels kept,
   idempotent, never auto-commits). New code must not use `pN` labels for
   priority — the field is the only official carrier.
+- **Owner:** `priority` is the **product owner's** field ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md)
+  §2, §6.1). A delivery lead _sequences_ delivery — what is built next, in what
+  order — and recommends priority changes; the product owner sets the field.
+  Nothing in the kernel gates who may write it (any caller may), so this is
+  doctrine recorded here because `next` ranks by it and a wave plan must never be
+  mistaken for a priority call.
 
 ### Saved views (`x-views`)
 
@@ -505,7 +518,7 @@ x-playbooks:
 
 ### Tracker hygiene (`x-tracker`)
 
-`x-tracker` is the official namespaced extension for tracker-hygiene options (story-tracker-hygiene). It is a mapping of option names to values; the official options today are `auto-commit`, `allow-steal` (claim-steal arming, see Stealing), `strict-gate-bins` (strict start gate), and `strict-worktree-writes` (single-writer enforcement):
+`x-tracker` is the official namespaced extension for tracker-hygiene options (story-tracker-hygiene). It is a mapping of option names to values; the official options today are `auto-commit`, `allow-steal` (claim-steal arming, see Stealing), `strict-gate-bins` (strict start gate), `strict-worktree-writes` (single-writer enforcement), `product-acceptance` (product-acceptance recording), and `reap-acked-orphans` (orphan-reaping arming, see below):
 
 ```yaml
 version: 3
@@ -513,6 +526,8 @@ x-tracker:
   auto-commit: false
   strict-gate-bins: true
   strict-worktree-writes: true
+  product-acceptance: true
+  reap-acked-orphans: true
 ```
 
 - Tracker mutations — `create`, `comment`, `adopt` (task + story files), `cleanup --prune` (cleared `worktree_path` records) — commit their own mutated files by default as `chore(tasks): <verb> <id>` (verbs: `created`/`commented`/`adopted`/`pruned`). Staging is surgical (`git add -- <path>` only): the user's pre-existing dirty files are never swept into the tool's commit. Mutated paths matched by `.gitignore` are skipped and reported in the additive `commit.ignored` array — never force-added; one ignored path would otherwise abort `git add` after staging the rest, leaving a dirty index (bug-init-ignored-artifacts-dirty-commit).
@@ -523,7 +538,9 @@ x-tracker:
 - **Claim stamp and single-writer detection (task-single-writer-worktree-enforcement, exploration 017 F12; decided in [ADR 0019](adr/0019-worktree-runtime-isolation.md) decision point 4):** every `start --worktree` writes a claim stamp — `arggon-claim.json` inside the worktree's **git dir** (never in the work tree: it cannot dirty `git status`, block `git worktree remove`, or need a cleanup step) — recording the owning identity (the calling session id on the native tools, the resolved assignee on the CLI), the item, the branch, the claim timestamp, and the surface. On an **attach**, the previous stamp is read before it is replaced: a DIFFERENT identity plus tracked files whose mtimes are NEWER than the stamped claim is reported as a named, bounded warning (`claim.foreignWrites` on both surfaces; `note: single-writer check — …` in the human CLI output). The observation means "written during the stamped owner's window, by the owner or by a concurrent writer — the attacher cannot tell which"; it is deliberately bounded (one `git status --porcelain` plus one `stat` per dirty path, at most 10 paths named with an exact total — the porcelain probe must return the line RAW: its leading status columns are positional, so a trimmed probe silently reads every path one character off and disarms the detection) and best-effort (a missing or corrupt stamp — pre-feature worktrees, a plain directory — degrades to no detection and never blocks the claim). Detection covers the UNCOMMITTED collision window; foreign work that was already committed is history, not a live second writer. A fired detection never re-stamps the worktree: the stamped owner stays, so every retry re-detects against the same evidence and the strict gate cannot unlock itself. When that owner is gone (crashed session), recovery is the deliberate take-over below, or the documented manual step — confirm no live writer, then `rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"`. A stamp is also reaped when its CLAIM is released: `arggon cleanup --release <id>` (native `tools.arggon.cleanup({ release })`, bug-unclaim-leaves-worktree-record-without-reaper) removes the recorded worktree, deletes its branch, reaps a start-created `.arggon.env` and the stamp, and clears the `worktree_path` record — the inverse of `start --worktree` for a claim that was dropped. Unclaiming (`update --status todo`) never releases on its own: `update` is frontmatter-only (it is the call that CLEARS a `worktree_path` record), so it reports the surviving footprint as the additive `claimFootprint` receipt (`{ worktreePath, release: { cli, native } }` — no `branch`: the unclaim already cleared the item's field, and the release reads the branch from the worktree itself) and names the release path. A release is refused while the item is still claimed — **unconditionally**; `--take-over-worktree` / `take_over_worktree` does NOT bypass it (a re-claimed item has a live owner, and nothing durable here records an override). It is also refused when the stamp names another identity whose window shows a live writer, and when the worktree carries uncommitted or untracked content (`blockingPaths`/`blockingTotal`) — that last refusal happens during classification, BEFORE anything is reaped, so a failed release leaves the stamp and the env file standing and the next attempt keeps its evidence; the stamp itself is reaped only AFTER an observed removal. `--take-over-worktree` / `take_over_worktree` is the audited hatch for a presumed-dead stamped owner on an UNCLAIMED item and the only thing that forces the removal; without a release it is refused.
 - **Deliberate take-over of a dead owner (task-strict-attach-dead-owner-hatch):** when the stamped session is gone, `start --worktree --take-over-worktree` is the designed recovery. It applies ONLY to an attach whose detection fired (same identity, no newer tracked writes, or no prior stamp: nothing to take over, the flag is a no-op and the run is byte-identical to the default), re-stamps the worktree with the calling identity, and records a dated take-over: on the receipt as `claim.takeOver` (`{ at, by, replacedIdentity, replacedClaimedAt, replaced, files, total }` — the replaced stamp in full, plus the same evidence the detection saw) and in the new stamp as a bounded `takeovers` chain (the newest 5 entries, carried forward by every later write, one entry per taker). The fired evidence deliberately moves out of `claim.foreignWrites` on a take-over, so the armed strict gate below is resolved by the authorized replacement and needs no special case; nothing is hidden — the same owner, claim time and newer files are in the receipt, the chain is in the stamp, and the CLI prints `note: single-writer take-over — …`. The flag is explicit and opt-in, never time-based: a stale-stamp window was rejected because it silently steals a long-but-live session's dirty work. An unwritable git dir degrades the take-over to an unrecorded one (`stamped: false` plus a warning) and never blocks the claim. It requires `--worktree`; without it the flag is rejected (`START_FAILED`), because a plain start writes no stamp to take over.
 - `x-tracker.strict-worktree-writes: true` arms the single-writer gate: the SAME observation — the worktree stamped by a different session, with tracked files modified after that claim — HARD-FAILS the attach before the claim update (the item file is not mutated; `claimCommit.reason: "strict worktree-write gate refused"` on the native surface), naming the stamped owner, the claim time, and the newer files. The worktree is kept, and the remediation is coordination (the stamped session may simply be mid-task — that is the F12 incident seen from outside), not deletion: re-run `start --worktree` to attach once resolved. The refusal message names the two dead-owner recovery paths, both conditional on confirming the stamped session is gone: the audited `start --worktree --take-over-worktree`, then the manual `rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"`. Unset or `false` keeps the report-only default byte-identical (the warning never blocks). As with `strict-gate-bins`, the flag changes the CONSEQUENCE, never the observation; the owner's own re-attach (same identity, stamp refreshed) never fires either gate.
-- Unknown nested keys inside `x-tracker` are ignored (ignore-unknown, forward compat); a scalar `x-tracker` value or an `auto-commit`/`allow-steal`/`strict-gate-bins`/`strict-worktree-writes` value that is not `true`/`false` is a parse error.
+- `x-tracker.product-acceptance: true` arms the **product-acceptance record** ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §4): whether a container's work was accepted is written as an ordinary comment on the item — `accept: approve` or `accept: changes-requested` (optionally followed by a short scope), then the evidence list — so the record is human-written prose, never schema, and no flag writes it. Unset or `false` keeps every adopter **silent**: `arggon report --json` (per container) and `arggon show <id> --json` (per item) still carry the acceptance state as an additive `acceptance` field — `accepted` / `changes-noted` / `none` / `self-accepted`, `none` when nothing was recorded — and only `arggon spec analyze` goes quiet on a terminal container closed with no recorded acceptance (the report-only `MISSING-PRODUCT-ACCEPTANCE` finding). Arming is the act of saying the project HAS a product owner and wants the record: a project without one is compliant by default and is never nagged about a role it does not have. **Report-only either way** — no transition consults it, no command refuses because of it, and CI never fails on it; an acceptance is attributed (`self-accepted` when its author is the container's own assignee), never authenticated, because the tracker has no identity layer.
+- `x-tracker.reap-acked-orphans: true` arms reaping of **acknowledged orphans** (task-adapter-orphan-reaping). An _orphan_ is a destination recorded in `x-generated` whose `template:` is absent from the installed arggon version — init can neither refresh nor keep generating it, yet the file is on disk (and, under an auto-discovered seam directory, still dispatchable). `arggon doctor --agents` reports each one as `orphaned`; `arggon init` then **deletes** it only when it is inside the repo root, is a regular file (never a directory, never a symlink), was recorded by no newer arggon (a downgrade reports instead of deleting), and its bytes are unchanged since the recorded baseline. Bytes that DIFFER are refused always: that is a known edit, and your edits are never deleted. The middle case — **acknowledged** and unchanged — is refused by default and reaped only when this flag is armed: `arggon adopt --ack` acks every entry and re-records its checksum from disk, so for an acknowledged entry a matching checksum proves only _unchanged since the ack_, never _arggon wrote exactly these bytes_ — provenance cannot separate "unedited" from "curated, then acked". Arming is how an adopted adopter clears a dead agent file across a release that renamed its template (ADR 0021 §6.2a′ gates the agent rename on reaping); the default is the side that cannot lose content. Unset or `false` keeps every acknowledged orphan on disk, reported in `init --json`'s `reapRefused[]` with the reason and the flag named. An armed reap still names the ack in its reason, so the record says a sanctioned file was removed deliberately.
+- Unknown nested keys inside `x-tracker` are ignored (ignore-unknown, forward compat); a scalar `x-tracker` value or an `auto-commit`/`allow-steal`/`strict-gate-bins`/`strict-worktree-writes`/`product-acceptance`/`reap-acked-orphans` value that is not `true`/`false` is a parse error.
 - The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
 
 ### Import type mapping (`x-import`)

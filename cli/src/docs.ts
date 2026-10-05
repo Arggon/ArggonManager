@@ -1,9 +1,11 @@
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
   renameSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
@@ -12,6 +14,7 @@ import {
   TRACKER_DIR_NAME,
   conventionPathForLayout,
   parseGeneratedProjectName,
+  readConventionConfig,
   readGeneratedProjectName,
   readGeneratedState,
   trackerAt,
@@ -64,6 +67,9 @@ export { OPENCODE_CONFIG_CANDIDATES };
  *     (pre-provenance file)                         → adopter-modified: skip
  *     by default (`modified[]` + `skipped[]`); with `backup`, move the file
  *     to backup/<YYYY-MM-DD>/<dest> first, then regenerate (`backedUp[]`)
+ *   - recorded template gone from this version        → orphaned: reap only
+ *     when the bytes are still exactly as generated (`reaped[]`); report and
+ *     keep otherwise (`reapRefused[]`) — see `planOrphanReaps`
  *
  * The checksum covers the exact written bytes (marker included), so any
  * adopter edit — even one that keeps the marker — flips the file to
@@ -128,6 +134,16 @@ export type GenerateDocsOptions = {
    * nothing deleted.
    */
   agents?: readonly AgentId[];
+  /**
+   * Templates root override (task-adapter-orphan-reaping): the package
+   * `templates/` dir this run generates from AND measures the current template
+   * set against. Defaults to the bundled dir; tests point it at a mutable
+   * fixture copy to simulate a destination whose template was removed from the
+   * install (the orphan case). Same injection point doctor's `templatesRoot`
+   * already has, for the same reason — the product never sets it, so the
+   * pack-vs-checkout envelope parity is untouched.
+   */
+  templatesDir?: string;
 };
 
 export type DocsResult = {
@@ -141,6 +157,16 @@ export type DocsResult = {
   backedUp: string[];
   /** Docs left untouched this run (adopter-owned, never overwritten). */
   skipped: string[];
+  /**
+   * Orphaned destinations REMOVED this run (task-adapter-orphan-reaping): an
+   * `x-generated` destination whose recorded template is gone from this version
+   * AND whose bytes still match the recorded checksum. Its own action family —
+   * never folded into `created`/`updated`/`modified`/`skipped`, because a
+   * deletion is not a write and must not read like one.
+   */
+  reaped: string[];
+  /** Orphaned destinations left in place, each with its refusal reason. */
+  reapRefused: OrphanReapDecision[];
 };
 
 /**
@@ -164,7 +190,20 @@ export type DocsPlanDecision =
    * operator can see what the selection left alone.
    */
   | "agent-not-selected"
-  | "project-name-unrecoverable";
+  | "project-name-unrecoverable"
+  /**
+   * Orphan reaping (task-adapter-orphan-reaping, spec-agent-rename-019 §The
+   * precondition): the destination's recorded template no longer exists in this
+   * version, so init can neither refresh nor keep generating it.
+   * `orphan-reap` REMOVES it — only when the bytes are unchanged since the
+   * recorded baseline (acknowledged or not: see `classifyOrphan`'s policy
+   * comment); `orphan-refused` reports it and leaves it alone (an edit since the
+   * recorded baseline, a downgrade, a non-regular file, a path outside the repo,
+   * or a destination that is not on disk). The two are separate decisions so the
+   * plan says which one happened instead of collapsing into one row.
+   */
+  | "orphan-reap"
+  | "orphan-refused";
 
 export type DocsPlanEntry = {
   dest: string;
@@ -191,8 +230,41 @@ export type DocsPlan = {
   modified: string[];
   backedUp: string[];
   skipped: string[];
+  /** Destinations a real run would REMOVE (unmodified orphans), sorted. */
+  reaped: string[];
+  /** Destinations a real run would keep, each with its refusal reason. */
+  reapRefused: OrphanReapDecision[];
   /** Pending provenance-state rewrite (present only when the state file exists). */
   stateWrite?: { path: string; content: string };
+};
+
+/**
+ * The reaping decision for one `x-generated` destination whose recorded
+ * template is absent from this version's template set
+ * (task-adapter-orphan-reaping; spec-agent-rename-019 §The precondition).
+ *
+ * An orphan is the failure mode that makes "init never deletes" unsafe for a
+ * rename: the destination's template is gone, so init can neither refresh nor
+ * keep generating it, yet the file is still on disk and — for a seam file under
+ * an auto-discovered directory — still DISPATCHABLE. This type is the one place
+ * that decision is made; `init` acts on it and `doctor --agents` reports it, so
+ * the two can never disagree about what would happen.
+ */
+export type OrphanReapDecision = {
+  /** Destination path (posix, relative to the tree root) as recorded in state. */
+  dest: string;
+  /** Recorded template id — the one this version no longer ships. */
+  template: string;
+  /** The adapter seam that owns the destination, or null for a plain doc. */
+  agent: AgentId | null;
+  /**
+   * `reap` removes it; `refuse` reports it and leaves the file in place.
+   * Never anything in between — no third "maybe" value, because a deletion
+   * decision that reads as optional is not a decision.
+   */
+  action: "reap" | "refuse";
+  /** Why — the reason init gives the operator (human output + `--json`). */
+  reason: string;
 };
 
 /**
@@ -851,18 +923,279 @@ function utcDate(now: Date): string {
 }
 
 /**
+ * `0.10.0` vs `0.9.0` → 1; equal → 0; absent, prerelease or otherwise
+ * non-numeric → `null`. Used for the downgrade guard below, where an
+ * UNDECIDABLE comparison must refuse rather than guess.
+ */
+export function compareArggonVersions(a: string | undefined, b: string): number | null {
+  const parse = (v: string | undefined): number[] | null => {
+    if (v === undefined || v === "") return null;
+    // Prerelease/build metadata stops the numeric comparison (0.5.0-rc.1 vs
+    // 0.5.0): undecidable here, and the caller refuses rather than guessing.
+    if (v.includes("-") || v.includes("+")) return null;
+    const parts = v.trim().replace(/^v/, "").split(".");
+    if (parts.length === 0 || parts.some((p) => !/^\d+$/.test(p))) return null;
+    return parts.map((p) => Number.parseInt(p, 10));
+  };
+  const left = parse(a);
+  const right = parse(b);
+  if (left === null || right === null) return null;
+  const len = Math.max(left.length, right.length);
+  for (let i = 0; i < len; i++) {
+    const l = left[i] ?? 0;
+    const r = right[i] ?? 0;
+    if (l !== r) return l < r ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
+ * Is this orphan safe to remove — and if not, why not? The single reap
+ * classifier, called by {@link planOrphanReaps}.
+ *
+ * Action and reason are decided TOGETHER on purpose: a refusal the operator
+ * cannot attribute is a silent failure, and two parallel functions (one for the
+ * verdict, one for the words) can drift until a refusal is reported with the
+ * reason of a reap. Every branch REFUSES by default — reaping is the only
+ * destructive action this product takes on an adopter's tree, so it must be the
+ * conclusion of several independent checks, each able to veto:
+ *
+ *  1. **inside the repo root** — a recorded dest is repo-relative, so
+ *     `../../elsewhere` must never resolve to a delete;
+ *  2. **a regular file** — a directory, a symlink or a vanished file is never
+ *     reaped. `lstat`, not `stat`: a symlink must be REFUSED, never followed.
+ *  3. **not a downgrade** — an entry recorded by a NEWER arggon is missing from
+ *     this install's template set for the wrong reason: the operator's arggon is
+ *     behind, and deleting the file would destroy a current-generation
+ *     artifact. An undecidable version comparison refuses too.
+ *  4. **byte-identical to the recorded checksum** — the adopter has not changed
+ *     it since the baseline it was recorded against. This is the OWNERSHIP test,
+ *     and it is exactly as strong as the recorded baseline it compares against.
+ *
+ * **The acknowledged middle case, and why it is opt-in** (the adopt-vs-reap
+ * policy; `reapAckedOrphans` is `x-tracker.reap-acked-orphans`, the same
+ * default-refused shape as `x-tracker.allow-steal`):
+ *
+ *  - `runAdoptAck` iterates EVERY `x-generated` entry, so a repo that adopted
+ *    properly carries `acknowledged: true` on its `.opencode/agents/*.md`.
+ *  - …and it RE-BASELINES the recorded checksum from the on-disk bytes. So for an
+ *    acknowledged entry, "matches the recorded checksum" proves only **unchanged
+ *    since the ack** — not "arggon wrote these exact bytes". A file the adopter
+ *    CURATED and then acked matches too, and nothing in the recorded state
+ *    separates the two (the generated marker survives hand edits as well).
+ *  - Therefore a matching **acknowledged** orphan is refused by default and
+ *    reaped only when the repo arms the flag: the default cannot destroy
+ *    sanctioned content, while arming still lets an adopted adopter clear a
+ *    dead agent — which the agent rename depends on (ADR 0021 §6.2a′ gates it
+ *    on reaping, and a stranded `.opencode/agents/arggon-coordinator.md` stays
+ *    dispatchable). Refusing outright would push exactly that chore onto the
+ *    repos that adopted properly; reaping by default would delete their curated
+ *    files. The flag is the choice.
+ *  - An entry whose bytes DIFFER is refused regardless of arming: that is a
+ *    known edit, not an unknowable one.
+ */
+function classifyOrphan(opts: {
+  root: string;
+  dest: string;
+  entry: GeneratedEntry;
+  version: string;
+  /** `x-tracker.reap-acked-orphans`; see the policy note above. */
+  reapAckedOrphans: boolean;
+}): { action: "reap" | "refuse"; reason: string } {
+  const { root, dest, entry, version } = opts;
+  const rootAbs = resolve(root);
+  const abs = resolve(root, ...dest.split("/"));
+  if (abs !== rootAbs && !abs.startsWith(rootAbs + sep)) {
+    return {
+      action: "refuse",
+      reason:
+        "recorded destination resolves OUTSIDE the repo root — refused; fix the x-generated entry by hand",
+    };
+  }
+  let st: ReturnType<typeof lstatSync>;
+  try {
+    st = lstatSync(abs);
+  } catch {
+    return {
+      action: "refuse",
+      reason:
+        "not on disk — nothing to reap; the x-generated entry is stale bookkeeping (drop the entry by hand)",
+    };
+  }
+  if (st.isDirectory()) {
+    return {
+      action: "refuse",
+      reason: "destination is a directory — refused; init reaps regular generated files only",
+    };
+  }
+  if (!st.isFile()) {
+    return {
+      action: "refuse",
+      reason:
+        "destination is not a regular file (symlink or special file) — refused; nothing was followed",
+    };
+  }
+  const recordedNewer = compareArggonVersions(entry.arggonVersion, version);
+  if (recordedNewer !== null && recordedNewer > 0) {
+    return {
+      action: "refuse",
+      reason:
+        `recorded by a NEWER arggon (${entry.arggonVersion} > ${version}) — your install is ` +
+        "behind, so the absent template is not a removal: upgrade arggon (reported, not reaped)",
+    };
+  }
+  let disk: string;
+  try {
+    disk = readFileSync(abs, "utf8");
+  } catch {
+    return {
+      action: "refuse",
+      reason: "unreadable — refused; init cannot prove the bytes are unmodified",
+    };
+  }
+  if (!entry.checksum) {
+    return {
+      action: "refuse",
+      reason: "no recorded checksum — refused; provenance cannot prove the bytes are as generated",
+    };
+  }
+  // EOL-tolerant, like every other provenance comparison
+  // (bug-crlf-provenance-breakage): a git-smudged CRLF working tree is
+  // untouched, never adopter-edited — so it is reapable, not merely reported.
+  if (!checksumMatches(entry.checksum, disk)) {
+    return {
+      action: "refuse",
+      reason:
+        "adopter-edited since the recorded baseline — refused; your edits are never deleted, " +
+        "whatever the reaping flag says. Delete the file by hand if the template is really gone",
+    };
+  }
+  if (entry.acknowledged && !opts.reapAckedOrphans) {
+    // The unknowable case, refused by default. The reason carries BOTH routes
+    // out — do it by hand now, or arm the flag for future runs — so an operator
+    // who wanted the deletion is never left hunting for the switch.
+    return {
+      action: "refuse",
+      reason:
+        "acknowledged baseline (arggon adopt --ack) and unchanged since the ack — NOT deleted by " +
+        "default: the ack re-records the checksum from disk, so provenance cannot tell 'unedited' " +
+        "from 'curated then acked'. Delete it by hand, or set `x-tracker.reap-acked-orphans: true` " +
+        "to let `arggon init` reap it",
+    };
+  }
+  return {
+    action: "reap",
+    // An acknowledged reap is named here on purpose, both the baseline it is
+    // judged against and the arming that allowed it: the audit trail must say a
+    // sanctioned file was removed DELIBERATELY, in `doctor --agents` before the
+    // run and on the human line of the run itself.
+    reason:
+      `template ${entry.template} is gone from this arggon version and the bytes are unchanged ` +
+      `since they were recorded${entry.acknowledged ? " (acknowledged baseline, `adopt --ack`; reaped because `x-tracker.reap-acked-orphans: true` is armed)" : ""} ` +
+      "— reaped; restore the template (or pin the old arggon) to keep it",
+  };
+}
+
+/**
+ * Every `x-generated` destination whose recorded template this version does not
+ * ship, with the reaping decision for each (task-adapter-orphan-reaping;
+ * spec-agent-rename-019 §The precondition).
+ *
+ * The provenance this needs already ships: each destination is recorded with
+ * its `template:` and `checksum`, so an orphan is detectable with NO new data
+ * and no marker convention — a destination whose recorded template is absent
+ * from the CURRENT template set. That is also why this iterates the STATE
+ * rather than the seam: the current template set cannot produce an orphan by
+ * definition.
+ *
+ * Shared by `planGenerateDocs` (which acts on it) and `doctor --agents` (which
+ * reports it), so the two surfaces can never disagree about the same file.
+ */
+export function planOrphanReaps(opts: {
+  /** Tree root; every decision is contained inside it. */
+  root: string;
+  /** Provenance state (`x-generated`), verbatim. */
+  state: Record<string, GeneratedEntry>;
+  /** Templates dir defining the CURRENT template set (defaults to the bundle). */
+  templatesDir?: string;
+  /** This arggon version (defaults to `arggonVersion()`). */
+  version?: string;
+  /** Tracker layout (destinations are layout-shaped; template ids are not). */
+  layout?: TrackerLayout;
+  /**
+   * Arming for the acknowledged middle case (`x-tracker.reap-acked-orphans`).
+   * `undefined` reads the tree's own tracker config ONCE per call, so the run
+   * and the report can never see different arming. An unreadable config
+   * resolves to UNARMED — the defensive floor under the parser, which rejects a
+   * non-boolean `x-tracker` value outright (so a real run stops and names the
+   * key rather than quietly taking the default).
+   */
+  reapAckedOrphans?: boolean;
+}): OrphanReapDecision[] {
+  const version = opts.version ?? arggonVersion();
+  const current = new Set(
+    currentGeneratedTemplatesFrom(opts.templatesDir ?? bundledTemplatesDir(), opts.layout).map(
+      (t) => t.template,
+    ),
+  );
+  const reapAckedOrphans = opts.reapAckedOrphans ?? reapAckedOrphansArmed(opts.root);
+  const out: OrphanReapDecision[] = [];
+  for (const [dest, entry] of Object.entries(opts.state)) {
+    // Reachable ONLY through recorded provenance: a destination with no entry is
+    // somebody's own file, never a reap candidate.
+    if (!entry || current.has(entry.template)) continue;
+    const decision = {
+      root: opts.root,
+      dest,
+      entry,
+      version,
+      reapAckedOrphans,
+    };
+    out.push({
+      dest,
+      template: entry.template,
+      agent: agentForTemplate(entry.template),
+      ...classifyOrphan(decision),
+    });
+  }
+  return out.sort((a, b) => a.dest.localeCompare(b.dest));
+}
+
+/**
+ * Is this repo ARMED to reap ACKNOWLEDGED orphans
+ * (`x-tracker.reap-acked-orphans: true`)? Read once per plan and tolerant by
+ * construction: no convention file, no key, and an unreadable config all mean
+ * UNARMED — the default that cannot lose the adopter's content. Same shape as
+ * `x-tracker.allow-steal`: arming is explicit, the default is the safe side.
+ * (In a real run the parser gets there first and refuses a non-boolean value by
+ * name, so this catch is the floor for a caller that passes state explicitly.)
+ */
+function reapAckedOrphansArmed(root: string): boolean {
+  try {
+    return readConventionConfig(root).tracker.reapAckedOrphans === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Pure planner (task-init-dry-run-plan): computes the full per-destination
  * decision table WITHOUT touching the filesystem — no files, no backup dir,
  * no state mutation. Shared by `generateDocs` (plan, then apply) and init's
  * `--dry-run` preview, so there is exactly one decision implementation.
  */
 export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
-  const packageRootDir = resolve(bundledTemplatesDir(), "..");
+  // Test injection point (task-adapter-orphan-reaping): a mutable fixture copy
+  // of `templates/`, so a test can simulate a template leaving the install
+  // without touching the real bundle. Defaults to the bundle, like every
+  // production caller.
+  const templatesDir = opts.templatesDir ?? bundledTemplatesDir();
+  const packageRootDir = resolve(templatesDir, "..");
   const bundledSources = BUNDLED_SOURCES.map((s) => ({
     ...s,
     src: resolve(packageRootDir, ...s.source.split("/")),
   }));
-  const docsSrc = resolve(bundledTemplatesDir(), "docs");
+  const docsSrc = resolve(templatesDir, "docs");
   if (!existsSync(docsSrc)) {
     throw new Error(`Bundled doc templates not found at ${docsSrc}`);
   }
@@ -1119,18 +1452,32 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
   // Missing bundle source (e.g. stripped packaging): skip silently — docs
   // generation must never fail because an optional bundle is absent.
 
-  // Template removed from the bundle: the `x-generated` entry is orphaned
-  // (doctor reports the same destinations as `stale`). Informational only —
-  // a real run leaves the entry exactly as it is.
-  const generatedDests = new Set(currentGeneratedTemplates({ layout }).map((t) => t.dest));
-  for (const dest of Object.keys(prevState)) {
-    if (!generatedDests.has(dest)) {
-      entries.push({
-        dest,
-        decision: "stale",
-        reason: "template no longer generated — x-generated entry is orphaned",
-      });
-    }
+  // Template removed from this version's bundle: the `x-generated` entry is
+  // ORPHANED — init can neither refresh nor keep generating a destination whose
+  // template is gone, yet the file is still on disk (and, under an
+  // auto-discovered seam directory, still dispatchable). The decision comes from
+  // the ONE classifier (`planOrphanReaps`) that `doctor --agents` also reads, so
+  // the report and the run cannot disagree.
+  //
+  // A reaped destination also loses its provenance entry: the file is gone, and
+  // leaving the entry behind would make every later run plan the same reap
+  // against a destination that no longer exists (which is what idempotence is).
+  // A REFUSED orphan keeps its entry — nothing changed on disk, so the
+  // provenance that describes it stays true.
+  const reaps = planOrphanReaps({
+    root: opts.root,
+    state: prevState,
+    templatesDir,
+    layout,
+    version,
+  });
+  for (const reap of reaps) {
+    entries.push({
+      dest: reap.dest,
+      decision: reap.action === "reap" ? "orphan-reap" : "orphan-refused",
+      reason: reap.reason,
+    });
+    if (reap.action === "reap") delete nextState[reap.dest];
   }
 
   const applied = entries.filter((e) => e.write !== undefined);
@@ -1163,6 +1510,11 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
       )
       .map((e) => e.dest)
       .sort(),
+    // The reaping family, kept OUT of every bucket above: a deletion is not a
+    // write, and `orphan-refused` is not a skip (nothing adopter-owned was
+    // declined — the orphan was never arggon's to keep).
+    reaped: reaps.filter((r) => r.action === "reap").map((r) => r.dest),
+    reapRefused: reaps.filter((r) => r.action === "refuse"),
   };
   // Record the provenance state whenever the convention file exists (init
   // writes it before generating). Outside init (bare generateDocs on a dir
@@ -1187,11 +1539,26 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
 
 /**
  * Apply a pure plan (task-init-dry-run-plan): exactly the writes a real run
- * performs — archive-then-write per destination plus the pending state
- * rewrite — and nothing else. `generateDocs` = plan + apply.
+ * performs — archive-then-write per destination, the reaping an `orphan-reap`
+ * row decided, plus the pending state rewrite — and nothing else.
+ * `generateDocs` = plan + apply.
+ *
+ * The reap is the one destructive step, so it is deliberately narrow: only an
+ * `orphan-reap` row (which the classifier produced after proving the path is
+ * inside the repo, a regular file, not a downgrade, and byte-identical to the
+ * recorded checksum) is removed, and `rmSync` runs
+ * WITHOUT `recursive` — so a destination that turned into a directory between
+ * plan and apply fails loudly instead of being removed recursively. `force`
+ * only swallows the already-gone case, which keeps a re-run idempotent.
  */
 export function applyDocsPlan(root: string, plan: DocsPlan): DocsResult {
+  const reaped: string[] = [];
   for (const e of plan.entries) {
+    if (e.decision === "orphan-reap") {
+      rmSync(join(root, ...e.dest.split("/")), { force: true });
+      reaped.push(e.dest);
+      continue;
+    }
     if (e.write === undefined) continue;
     if (e.backupDest !== undefined) {
       const backupAbs = join(root, ...e.backupDest.split("/"));
@@ -1213,6 +1580,8 @@ export function applyDocsPlan(root: string, plan: DocsPlan): DocsResult {
     modified: plan.modified,
     backedUp: plan.backedUp,
     skipped: plan.skipped,
+    reaped: reaped.sort(),
+    reapRefused: plan.reapRefused,
   };
 }
 

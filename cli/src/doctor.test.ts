@@ -645,13 +645,13 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     writeFileSync(join(dir, "opencode.jsonc"), SEAM_CONFIG, "utf8");
     mkdirSync(join(dir, ".opencode", "agents"), { recursive: true });
     mkdirSync(join(dir, ".opencode", "commands"), { recursive: true });
-    // The planted seam mirrors a fresh `init`, prover included
+    // The planted seam mirrors a fresh `init`, verifier included
     // (task-prover-agent-reviewer-split).
     for (const name of [
-      "arggon-coordinator",
-      "arggon-worker",
-      "arggon-reviewer",
-      "arggon-prover",
+      "arggon-delivery-lead",
+      "arggon-maker",
+      "arggon-standards-reviewer",
+      "arggon-verifier",
     ]) {
       writeFileSync(join(dir, ".opencode", "agents", `${name}.md`), "---\n---\n", "utf8");
     }
@@ -689,8 +689,13 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(result.opencode.v1).toEqual({ findings: [], truncated: false });
     expect(result.opencode.artifacts).toEqual({
       config: true,
-      // task-prover-agent-reviewer-split: the prover is part of the seam now.
-      agents: ["arggon-coordinator", "arggon-prover", "arggon-reviewer", "arggon-worker"],
+      // task-prover-agent-reviewer-split: the verifier is part of the seam now.
+      agents: [
+        "arggon-delivery-lead",
+        "arggon-maker",
+        "arggon-standards-reviewer",
+        "arggon-verifier",
+      ],
       commands: [
         "arggon-adopt",
         "arggon-adr",
@@ -795,8 +800,13 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(result.opencode.v1).toEqual({ findings: [], truncated: false });
     expect(result.opencode.artifacts).toEqual({
       config: true,
-      // task-prover-agent-reviewer-split: the prover is part of the seam now.
-      agents: ["arggon-coordinator", "arggon-prover", "arggon-reviewer", "arggon-worker"],
+      // task-prover-agent-reviewer-split: the verifier is part of the seam now.
+      agents: [
+        "arggon-delivery-lead",
+        "arggon-maker",
+        "arggon-standards-reviewer",
+        "arggon-verifier",
+      ],
       commands: ["arggon-done", "arggon-handoff", "arggon-next", "arggon-start"],
       skills: [],
       truncated: false,
