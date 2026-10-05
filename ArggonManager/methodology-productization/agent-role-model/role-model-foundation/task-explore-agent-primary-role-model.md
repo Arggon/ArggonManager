@@ -71,3 +71,37 @@ follow-ups with acceptance checklists and deps.
 
 Remaining for the human: merge the PR (which is what flips ADR 0021 to Accepted
 per the ADR lifecycle) and, if they accept the decision, claim the spec item.
+
+### 2026-10-05 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+### 2026-10-04 — the story is shipped; what to know next
+
+The role model decided in this exploration is now **in the artifacts**, not just in the record:
+
+| PR | What |
+| --- | --- |
+| `171f43b3` (#624) | exploration 019 + ADR 0021 |
+| `7e835483` (#626) | ADR 0021 → Accepted |
+| `8d3b185d` (#628) | §6.1 the four roles · §6.2 domain neutrality |
+| `f1fe2d46` (#630) | §6.2a superseded — rename authorised, gated on reaping |
+| `e14dd75e` (#632) | spec-018 promotion policy + `accept:` convention |
+| `9fbb81d4` (#634) | spec-019 the rename migration |
+| `f2163380` (#636) | role model wired into the carriers |
+| `0c271bc2` (#637) | acceptance surfaces + `spec analyze` finding |
+| `28251eb2` (#638) | ADR 0020 amendment + `claim.md` corrected |
+| `fe6f0063` (#640) | adapter orphan reaping |
+| `db8f9821` (#641) | **the rename**: 7 templates, gate regex bound by test, harness proof |
+
+Shipped agent ids: `arggon-delivery-lead`, `arggon-standards-reviewer`, `arggon-maker`,
+`arggon-verifier`. Zero retired ids remain in the carriers or the skill.
+
+**Seven follow-ups are filed, none blocking:** `bug-parity-invariant-restated-outside-carriers`
+(done), `bug-adopter-engineering-template-software-locked`, `bug-x-tracker-option-list-has-no-doc-drift-guard`,
+`bug-init-force-drops-x-tracker-block`, `bug-prover-agent-has-no-x-generated-entry`,
+`bug-adr-0021-s5-lists-retired-agent-ids`, `bug-docs-ts-stale-example-path`,
+`bug-wave-probe-file-check-model-dependent`, plus `bug-test-suite-lib-dist-rebuild-race` and
+`bug-skill-exploration-reference-fails-prettier` under other parents.
+
+**Next step for the PO:** the acceptance convention only reports when a repo arms
+`x-tracker.product-acceptance: true` (default off, zero noise). Arm it in this repo when you
+want container acceptance on the record — that is the one switch that turns the product-owner
+role from doctrine into measurement.
