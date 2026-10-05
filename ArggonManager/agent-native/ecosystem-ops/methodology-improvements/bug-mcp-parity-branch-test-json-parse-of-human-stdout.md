@@ -265,3 +265,27 @@ Coordinator note on the checklist shape before merge: the worker's evidence rows
 **Scope the worker was honest about, unchanged by this tick:** the load-dependent TRIGGER is not fixed — 20 pre-fix iterations all passed, it only fires under full-suite CI load. That is tracked separately as `bug-cli-spawn-suites-exit-1-flake`, and this item fixes the reader so the next occurrence is diagnosable instead of a bare `SyntaxError`. The `cascade.test.ts` `null`-on-empty-stdout sibling is a different helper with a different symptom and is filed as `bug-test-spawn-spawnjson-null-drops-stderr`.
 
 One merge precondition from the review is satisfied: the duplicate `bug-three-acceptance-parsers-diverging` verdict commits are off this branch (rebased), and the current merge is a union that keeps main's authoritative frontmatter plus every comment block from both sides.
+
+### 2026-10-05 @arggon-delivery-lead
+verdict: approve (delivery-lead merge verification, re-run after the stale-branch catch-up)
+
+**Why this verdict exists:** this item sat at `todo` with no assignee, branch or `worktree_path` while its work sat in a worktree and an open PR (#612). That is the tracker-blindness described by `bug-native-arggon-tools-resolve-tracker-root-to-session-cwd` — the native tools resolve the tracker root from process cwd, so a session working inside a worktree writes its tracker state into the primary checkout. Reconciliation was the prerequisite to merging, not new work.
+
+**Finding 1 (the named merge precondition) is discharged by the branch itself, not waived.** `486c6fc3` is a "merge origin/main (item file union) + acceptance ticks with evidence" and `2e9ec5eb` restores the round-2 approve verdict; the two duplicate `chore(tasks): commented bug-three-acceptance-parsers-diverging` commits are absent from `git log origin/main..HEAD`. Evidence, not assertion.
+
+**Staleness catch-up.** The branch was 230 commits behind `origin/main`. `git diff --stat <merge-base>..origin/main` over `cli/src/test-spawn.ts`, `cli/src/test-spawn.test.ts` and `cli/src/mcp-parity.test.ts` returned **empty** — the product diff carried no conflict surface, as the reviewer predicted. Conflicts were confined to this item file and were genuine two-sided unions (main's reviewer verdict vs the branch's maker evidence); both sides were concatenated, 0 markers left.
+
+**Acceptance verified by reading the code, not the maker's summary:**
+- box 1 — `readEnvelope` (`cli/src/test-spawn.ts:335-372`) tries whole text, then per-line, then balanced-brace candidates, and raises rather than inventing a result.
+- box 2 — `EnvelopeReadError` (`:238-266`) carries `readonly surface: EnvelopeSurface`; the message emits `surface: <CLI|MCP> (<command>) produced no JSON envelope` plus `--- <surface> stdout ---` and `--- <surface> stderr ---`. Names the surface and echoes raw text: met.
+- box 3 — parity is not weakened: `expectSameEnvelope` (`cli/src/mcp-parity.test.ts:181`) still throws `CLI <-> MCP envelope mismatch` and is called on every arm (12 call sites); `expectJsonOnly` (`:207`) keeps the strict JSON-only assertion so the locate-the-envelope fallback cannot absorb a success line.
+- box 4 — no product change: the only non-`.test.ts` file in the diff is `cli/src/test-spawn.ts`, the shared **test harness** module (already home to `classifySpawnFailure`/`SpawnHarnessError`), not shipped product code. `git diff --name-only origin/main..HEAD -- 'cli/src/*' 'lib/src/*'` shows no other source file. Nothing to file separately.
+
+**Gates — executed, expected vs observed:**
+- `npx vitest run cli/src/test-spawn.test.ts cli/src/mcp-parity.test.ts` → expected 34 pass; **observed 2 files / 34 tests passed**.
+- First run was **19 failed / 15 passed**, and the cause was environmental rather than the change: the worktree's `lib/dist` was 230 commits stale, so the spawned child CLI died with `SyntaxError: The requested module '@arggondev/lib' does not provide an export named 'containersMissingAcceptance'` (`cli/src/spec.ts:16`). Remedy applied: `npm run build --workspace @arggondev/lib` in the worktree → green.
+- **Gap worth recording:** the `start` receipt reported `ready: true` with `install: "existing"` and `builtWorkspaces: []`. A reused install on an *attached* worktree is not rebuilt, so the readiness receipt does not cover a stale `lib/dist` — `ready: true` did not mean the gate could actually boot the CLI. Same failure signature as `bug-test-suite-lib-dist-rebuild-race`.
+- `npm test` (full) → **1 failed | 127 passed (128) files; 1 failed | 2668 passed (2669) tests**. The single failure is `cli/src/headless-ci.test.ts:849` (twin-checkout `init --json` determinism) and is **not this branch's**: the branch never touches that file, and it fails identically in the primary checkout on clean `origin/main` (`1 failed | 6 passed (7)`). Filed as `bug-headless-ci-twin-init-nondeterministic` under `tooling-and-environment` — `main` is red on its own, independent of this item.
+- Smoke bar: not applicable — no product behavior, no CLI command, no UI/TUI surface. The dead-`cliSpawn` probe is the closest end-to-end drive and it exercises the real MCP server.
+
+**Findings 2-4 remain non-blocking follow-up material** (the `expectJsonOnly` sweep to the other 13 arms; per-character budget charging in `readEnvelope`; the two sibling bare-parse sites at `mcp-server.test.ts:125` and `mcp-smoke.test.ts:130`). These belong on the tracker rather than as code TODOs; not filed here to keep this PR scoped to the reviewed change.
