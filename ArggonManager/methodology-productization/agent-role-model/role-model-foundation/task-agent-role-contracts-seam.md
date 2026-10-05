@@ -48,15 +48,15 @@ strand an orphaned, still-dispatchable fifth agent in each adopting tree.
 
 ## Acceptance
 
-- [ ] Depends on `task-spec-agent-role-contracts` (ADR 0017 gate) **and** `task-wire-role-model-carriers` (the role table must exist before the prompts cite it)
-- [ ] `templates/docs/opencode/agents/arggon-{coordinator,worker,reviewer,prover}.md` each open with their role (Delivery lead / Practice & standards / Maker / Verifier) plus a one-line pointer to the role table in `docs/engineering.md`
-- [ ] Software-locked nouns replaced by the project's own terms, each keeping one software example: worker "tests travel with behavior" → "evidence travels with the change; run the gates the project declares"; reviewer "probe evidence for CLI changes, real-browser drive for UI" → "the blocking bar the project's engineering docs declare"; prover "suites import the kernel's built output" → "a gate may need its project's build step first"
-- [ ] The `description:` frontmatter of each prompt carries the role, since that is what a dispatcher shows
-- [ ] The ZCode agent variants (`templates/docs/zcode/arggon/agents/`) carry the same roles in ZCode frontmatter
-- [ ] Permission blocks unchanged; a test pins that the four ids, their `mode` and their least-privilege denials survive the rewrite
-- [ ] `cli/src/init.test.ts` / `init-zcode.test.ts` green; capability matrix needs no row change (no capability changes)
-- [ ] `skills/arggon-cli/**` and `.agents/skills/arggon-cli/**` byte-equal if a reference changes (ADR 0016 channel, Behavioral class)
-- [ ] `arggon validate` + `npm test` green; `npx prettier --check` on every touched file
+- [x] Depends on `task-wire-role-model-carriers` (the role table must exist before the prompts cite it) — satisfied; `task-spec-agent-role-contracts` was cancelled and folded into `task-spec-agent-rename-migration` (spec-019)
+- [x] `templates/docs/opencode/agents/arggon-{coordinator,worker,reviewer,prover}.md` each open with their role (Delivery lead / Practice & standards / Maker / Verifier) plus a one-line pointer to the role table in `docs/engineering.md`
+- [x] Software-locked nouns replaced by the project's own terms, each keeping one software example: worker "tests travel with behavior" → "evidence travels with the change; run the gates the project declares"; reviewer "probe evidence for CLI changes, real-browser drive for UI" → "the blocking bar the project's engineering docs declare"; prover "suites import the kernel's built output" → "a gate may need its project's build step first"
+- [x] The `description:` frontmatter of each prompt carries the role, since that is what a dispatcher shows
+- [x] The ZCode agent variants (`templates/docs/zcode/arggon/agents/`) carry the same roles in ZCode frontmatter
+- [x] Permission blocks unchanged; a test pins that the four ids, their `mode` and their least-privilege denials survive the rewrite
+- [x] `cli/src/init.test.ts` / `init-zcode.test.ts` green; capability matrix needs no row change (no capability changes)
+- [x] `skills/arggon-cli/**` and `.agents/skills/arggon-cli/**` byte-equal if a reference changes (ADR 0016 channel, Behavioral class)
+- [x] `arggon validate` + `npm test` green; `npx prettier --check` on every touched file
 
 ### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
 ### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
@@ -92,10 +92,10 @@ The carrier wiring landed a **role table carrying the old ids** in
 the rename must refresh them **in the same PR** or the carriers will contradict the
 seam:
 
-- [ ] `docs/engineering.md` role table: the **Shipped id** column becomes the four new ids
-- [ ] `skills/arggon-cli/references/orchestration.md`: the four-row table plus the two surrounding sentences naming the old ids
-- [ ] `skills/arggon-cli/**` and `.agents/skills/arggon-cli/**` stay byte-equal
-- [ ] `docs/agents.md` §Orchestration agent list and the review-bar headings use the new ids
+- [x] `docs/engineering.md` role table: the **Shipped id** column becomes the four new ids
+- [x] `skills/arggon-cli/references/orchestration.md`: the four-row table plus the two surrounding sentences naming the old ids
+- [x] `skills/arggon-cli/**` and `.agents/skills/arggon-cli/**` stay byte-equal
+- [x] `docs/agents.md` §Orchestration agent list and the review-bar headings use the new ids
 
 A stale id in a carrier is worse than a stale id in prose: the carriers are what every
 adopter's agents read as the contract. It also keeps
@@ -155,3 +155,41 @@ Wave detail: reviewer edit denied, maker cannot nest, lead launches `explore`/`a
 ### handoff 2026-10-05 @coordinator (session: ses_ef6aa92bcffeaB2GIFj8EdtG5i) — next: Review and merge PR #641 (merge, do not squash); the item is complete and must not be flipped to done by me
 - branch: feat/task-agent-role-contracts-seam
 - open questions: ADR 0021 §5 still lists the old ids as what agents claim as (not mine to edit); cli/src/docs.ts:990 example path and templates/docs/AGENTS.md:17 role word are stale too. Historical claims keep retire…
+
+### 2026-10-05 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+verdict: approve (coordinator, 2026-10-04) — PR #641 merged `db8f9821`
+
+The migration is complete: **54 files, +1683/−1082**, all three CI lanes green including
+the seam drift gate that regenerates the committed `.opencode/` and `.zcode-marketplace/`
+copies and byte-compares them.
+
+**Verified by me on the merged branch, not taken on report:**
+- new ids present in all four carriers/skills (`agents.md` 5 · `engineering.md` 5 ·
+  `references/orchestration.md` 5 · `README.md` 2), and **zero** occurrences of the four old
+  ids remaining in `agents.md`, `engineering.md`, `orchestration.md` — so no carrier names an
+  id that no longer ships
+- `adapters/` untouched → the capability matrix needs no row change, as the spec predicted
+- `cli/src/skill-copy.test.ts` → **8 passed**, so `skills/` and `.agents/skills/` are byte-equal
+- `arggon validate` → ok, 0 warnings
+
+**The two drift guards are real and derived, which is the whole point:**
+- **AC 2** — `init-zcode.test.ts` greps `gate.mjs` for its own `isReviewerDispatch` matcher and
+  cross-checks it against the reviewer id **derived from the shipped template** (identified by
+  its verdict channel, no literal anywhere). Reverting the matcher to `arggon-reviewer` fails
+  three assertions, so the silent security failure cannot recur.
+- **AC 3** — the allow-list is pinned to the shipped subagent ids, derived from the templates
+  with `mode: primary` identifying the lead.
+
+**The wave-harness assertion was strengthened, not weakened** — worth stating because it is the
+kind of change a reviewer should distrust. It no longer pins `assignee: arggon-maker-a`: it
+asserts the assignee falls inside the **role-id namespace derived from the fixture's own agents**
+and is longer than the prefix, so a human login cannot satisfy it. Generalized and derived.
+
+**My briefing error, corrected by the worker:** I said the generated seam was gitignored. It is
+not — `.opencode/` and `.zcode-marketplace/` are tracked and CI byte-compares them. That is why
+the six old destinations were reaped by hand after proving each byte-identical, and why
+`.opencode/agents/arggon-prover.md` had to be deleted outright: it carries **no `x-generated`
+entry**, so no tool could see it, and leaving it would have stranded a fifth dispatchable agent
+on the pre-rename contract. I checked the deletion myself — the committed copy differed from its
+template by exactly one provenance marker line, so it carried no adopter edits. The root cause is
+already filed as `bug-prover-agent-has-no-x-generated-entry` (open).
