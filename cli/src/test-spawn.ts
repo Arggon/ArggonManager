@@ -203,6 +203,176 @@ export class SpawnHarnessError extends Error {
 }
 
 /**
+ * Which entry point produced a text a test is about to read as a `--json`
+ * envelope. Carried into every reader failure so the next occurrence names CLI
+ * vs MCP instead of leaving the reader to guess
+ * (bug-mcp-parity-branch-test-json-parse-of-human-stdout).
+ */
+export type EnvelopeSurface = "CLI" | "MCP";
+
+/**
+ * A stream a test wanted to read as a `--json` envelope, with enough context to
+ * name the failure. `isError` is the MCP tool-error flag: a tool-level error
+ * carries a human sentence where an envelope would be, and that flag is the one
+ * piece of evidence that says so.
+ */
+export type EnvelopeReadInit = {
+  surface: EnvelopeSurface;
+  /** The operation, e.g. `arggon branch` or `arggon_branch`. */
+  command: string;
+  text: string;
+  /** The same run's stderr, when there is one (CLI child). */
+  stderr?: string;
+  /** MCP tool-result `isError`; omitted for a CLI child. */
+  isError?: boolean;
+};
+
+/**
+ * A surface produced text that is not a `--json` envelope — no JSON object could
+ * be located in it. Thrown (never returned) precisely so it is distinguishable
+ * from an assertion diff: the surface, the raw text and the run's stderr all
+ * survive into the test output, replacing the bare
+ * `SyntaxError: Unexpected token 'a', "arggon bra"...` that three guesses and a
+ * bisect used to be needed for.
+ */
+export class EnvelopeReadError extends Error {
+  readonly surface: EnvelopeSurface;
+  readonly command: string;
+  readonly text: string;
+  readonly stderr: string;
+  readonly isError: boolean | null;
+
+  constructor(init: EnvelopeReadInit) {
+    const { surface, command, text } = init;
+    const stderr = init.stderr ?? "";
+    const isError = init.isError ?? null;
+    const detail: string[] = [
+      `surface: ${surface} (${command}) produced no JSON envelope`,
+      `tool-level error: ${isError === null ? "n/a (not an MCP tool result)" : String(isError)}`,
+    ];
+    if (isError === true) {
+      detail.push(
+        `  the MCP server raised a TOOL ERROR, so this text is its diagnostic message,`,
+        `  not an envelope — the underlying spawn reported no result.`,
+      );
+    }
+    detail.push(
+      `--- ${surface} stdout ---\n${clipForMessage(text)}`,
+      `--- ${surface} stderr ---\n${stderr.trim() ? clipForMessage(stderr) : "(empty)"}`,
+    );
+    super(`[arggon-test-spawn] unreadable envelope\n${detail.join("\n")}`);
+    this.name = "EnvelopeReadError";
+    this.surface = surface;
+    this.command = command;
+    this.text = text;
+    this.stderr = stderr;
+    this.isError = isError;
+  }
+}
+
+/** Raw-text budget inside a reader failure (head — that is where the noise is). */
+const ENVELOPE_ECHO_CHARS = 2000;
+
+/**
+ * Clip to {@link ENVELOPE_ECHO_CHARS}, keeping the HEAD: the offending line is
+ * the one ahead of the envelope, which is the whole diagnosis.
+ */
+function clipForMessage(text: string, max = ENVELOPE_ECHO_CHARS): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= max) return trimmed === "" ? "(empty)" : trimmed;
+  return `${trimmed.slice(0, max)}\n… (${trimmed.length - max} more characters)`;
+}
+
+/** Whole lines and brace candidates tried while locating an envelope. */
+const ENVELOPE_SCAN_BUDGET = 2000;
+
+/**
+ * The balanced `{…}` slice starting at `start`, or null when it never closes.
+ * Only `"` opens a JSON string — a human line's apostrophe must not be able to
+ * swallow the rest of the scan.
+ */
+function balancedObjectSlice(text: string, start: number): string | null {
+  let depth = 0;
+  let inString = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]!;
+    if (inString) {
+      if (ch === "\\") i++;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}" && --depth === 0) return text.slice(start, i + 1);
+  }
+  return null;
+}
+
+/** A JSON object parsed out of candidate text, or null. */
+function parseEnvelopeObject(candidate: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(candidate);
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export type ReadEnvelope = {
+  envelope: Record<string, unknown>;
+  /**
+   * True when the WHOLE trimmed text was the envelope — the documented `--json`
+   * contract (one JSON object on stdout). False means the reader had to look
+   * past other text to find it, which a test can assert on when it wants the
+   * strict JSON-only contract rather than just a parsable envelope.
+   */
+  exact: boolean;
+};
+
+/**
+ * Read one `--json` envelope out of a surface's output.
+ *
+ * Whole-text parse first (that is the contract, and it is what every current
+ * caller emits). Failing that, LOCATE the envelope object inside surrounding
+ * text — a human success line ahead of the envelope, or a tool-error sentence in
+ * place of one, must not turn into a bare `SyntaxError`. When no object is
+ * found the caller gets {@link EnvelopeReadError}, naming the surface, the
+ * command, the MCP tool-error flag and both raw streams.
+ *
+ * Two granularities, both tried in order and both cheap: whole lines (`emitJson`
+ * writes one object plus a newline, so the envelope IS a line), then brace
+ * candidates inside a line for the shape where a human prefix shares the
+ * envelope's line.
+ *
+ * The fallback locates; it never invents. Text with no JSON object in it still
+ * raises, so a surface that produced no result cannot be mistaken for a passing
+ * parity run.
+ */
+export function readEnvelope(init: EnvelopeReadInit): ReadEnvelope {
+  const trimmed = init.text.trim();
+  const whole = parseEnvelopeObject(trimmed);
+  if (whole) return { envelope: whole, exact: true };
+  const lines = trimmed.split("\n");
+  let budget = ENVELOPE_SCAN_BUDGET;
+  for (const line of lines) {
+    if (budget-- <= 0) break;
+    const found = parseEnvelopeObject(line.trim());
+    if (found) return { envelope: found, exact: false };
+  }
+  for (const line of lines) {
+    for (let i = line.indexOf("{"); i >= 0; i = line.indexOf("{", i + 1)) {
+      if (budget-- <= 0) break;
+      const slice = balancedObjectSlice(line, i);
+      const found = slice === null ? null : parseEnvelopeObject(slice);
+      if (found) return { envelope: found, exact: false };
+    }
+  }
+  throw new EnvelopeReadError(init);
+}
+
+/**
  * Sync-spawn the real CLI: `node --import <tsx loader> cli/src/cli.ts <args>`
  * (bug-row-table-flake). `cwd` defaults to the vitest process cwd; `options`
  * are passed straight to `spawnSync` (env, input, timeout, …).

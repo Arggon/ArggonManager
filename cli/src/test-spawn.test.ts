@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 import {
   classifySpawnFailure,
   cliEntryPath,
+  EnvelopeReadError,
   nodeImportArgs,
+  readEnvelope,
   runCli,
   SpawnHarnessError,
   tsxLoaderPath,
@@ -281,5 +283,164 @@ describe("spawn failure classification (bug-cli-spawn-suites-exit-1-flake)", () 
     expect(
       stripComments(readFileSync(join(repoRoot, "cli/src/pack-contents.test.ts"), "utf8")),
     ).toContain('"pack", "--dry-run", "--json"');
+  });
+});
+
+/**
+ * bug-mcp-parity-branch-test-json-parse-of-human-stdout gate: a test that reads
+ * a surface's output as a `--json` envelope must never surface a bare
+ * `SyntaxError` from `JSON.parse`.
+ *
+ * CI captured exactly this on PR #610 (a docs-only change), twice, in
+ * `mcp-parity.test.ts`:
+ *
+ *   SyntaxError: Unexpected token 'a', "arggon bra"... is not valid JSON
+ *     ❯ mcp-parity.test.ts:72:25
+ *   SyntaxError: Unexpected token 'a', "arggon cle"... is not valid JSON
+ *
+ * The text was NOT a human success line from the CLI: `arggon branch --json`
+ * and `arggon cleanup --json` write the envelope and nothing else. It was the
+ * MCP server's own tool-LEVEL error sentence (`spawnedOutcome` in
+ * `cli/src/mcp-server.ts` throws `arggon <command> did not emit a JSON envelope
+ * (…)` when a spawned child died before printing one), and the parity helper
+ * parsed the tool result before the caller could read `isError`. The product
+ * message is reproduced verbatim below, because the whole point of this gate is
+ * that a reader no longer needs three guesses to identify it.
+ */
+describe("envelope reading (bug-mcp-parity-branch-test-json-parse-of-human-stdout)", () => {
+  const ENVELOPE = '{"ok":true,"schemaVersion":1,"conventionVersion":5,"command":"branch"}';
+
+  it("reads the contract shape exactly, and reports that it was exact", () => {
+    const read = readEnvelope({ surface: "CLI", command: "arggon branch", text: `${ENVELOPE}\n` });
+    expect(read.envelope).toEqual({
+      ok: true,
+      schemaVersion: 1,
+      conventionVersion: 5,
+      command: "branch",
+    });
+    expect(read.exact).toBe(true);
+  });
+
+  it("reads an envelope that a human line precedes, on its own line or not", () => {
+    // The shape acceptance box 1 asks for: a human success line must not be able
+    // to turn a parsable stream into a SyntaxError.
+    for (const text of [
+      `arggon branch: task task-rate-limit -> feat/rate-limit (created)\n${ENVELOPE}\n`,
+      `arggon branch: task task-rate-limit -> feat/rate-limit (created) ${ENVELOPE}`,
+    ]) {
+      const read = readEnvelope({ surface: "CLI", command: "arggon branch", text });
+      expect(read.envelope.command).toBe("branch");
+      // Found by locating, not by taking the whole text: the strict JSON-only
+      // contract is still assertable by a test that wants it.
+      expect(read.exact).toBe(false);
+    }
+  });
+
+  it("is not fooled by an apostrophe or a brace in the human line ahead of it", () => {
+    const read = readEnvelope({
+      surface: "CLI",
+      command: "arggon branch",
+      text: `arggon branch: can't attach 'fix/x' { id: task-rate-limit }\n${ENVELOPE}\n`,
+    });
+    expect(read.envelope.command).toBe("branch");
+    expect(read.exact).toBe(false);
+  });
+
+  it("raises a named, surface-tagged error for the MCP tool-error text, not a SyntaxError", () => {
+    // The CI-captured shape, byte-for-byte in its opening.
+    const text =
+      "arggon branch did not emit a JSON envelope (exit code 1): " +
+      "Cannot find module '/nonexistent/nope.js'";
+    let raised: unknown;
+    try {
+      readEnvelope({ surface: "MCP", command: "arggon_branch", text, isError: true });
+    } catch (err) {
+      raised = err;
+    }
+    expect(raised).toBeInstanceOf(EnvelopeReadError);
+    const err = raised as EnvelopeReadError;
+    expect(err.name).toBe("EnvelopeReadError");
+    expect(err.surface).toBe("MCP");
+    expect(err.command).toBe("arggon_branch");
+    expect(err.isError).toBe(true);
+    // One read has to be enough: which surface, that it was a tool error, and
+    // the raw text itself.
+    expect(err.message).toContain("surface: MCP (arggon_branch) produced no JSON envelope");
+    expect(err.message).toContain("tool-level error: true");
+    expect(err.message).toContain("TOOL ERROR");
+    expect(err.message).toContain("did not emit a JSON envelope (exit code 1)");
+    // Not the old symptom: no bare JSON.parse SyntaxError escapes any more.
+    expect(err.message).not.toContain("is not valid JSON");
+  });
+
+  it("fails when the envelope is genuinely malformed, and echoes the raw text", () => {
+    const cases = [
+      { label: "truncated", text: '{"ok":true,"schemaVers' },
+      { label: "not json at all", text: "arggon: error: no tracker root found" },
+      { label: "empty", text: "" },
+      { label: "json but not an object", text: "[1,2,3]" },
+      { label: "prose that merely mentions json", text: "expected {ok:true} but got nothing" },
+    ];
+    for (const { label, text } of cases) {
+      expect(() => readEnvelope({ surface: "CLI", command: "arggon branch", text }), label).toThrow(
+        EnvelopeReadError,
+      );
+    }
+    const err = (() => {
+      try {
+        readEnvelope({
+          surface: "CLI",
+          command: "arggon branch",
+          text: '{"ok":true,"schemaVers',
+          stderr: "SyntaxError: Unexpected end of JSON input",
+        });
+        return null;
+      } catch (e) {
+        return e as EnvelopeReadError;
+      }
+    })();
+    expect(err?.message).toContain('{"ok":true,"schemaVers');
+    expect(err?.message).toContain("SyntaxError: Unexpected end of JSON input");
+    // No stderr is stated, not left blank.
+    expect(
+      (() => {
+        try {
+          readEnvelope({ surface: "CLI", command: "arggon cleanup", text: "boom" });
+          return "";
+        } catch (e) {
+          return (e as EnvelopeReadError).message;
+        }
+      })(),
+    ).toContain("--- CLI stderr ---\n(empty)");
+  });
+
+  it("clips an oversized stream but keeps the head, where the noise is", () => {
+    // No envelope anywhere in it, so the scan runs out and reports.
+    const huge = `${"x".repeat(5000)}\narggon branch: still going`;
+    const err = (() => {
+      try {
+        readEnvelope({ surface: "MCP", command: "arggon_cleanup", text: huge });
+        return null;
+      } catch (e) {
+        return e as EnvelopeReadError;
+      }
+    })();
+    expect(err).toBeInstanceOf(EnvelopeReadError);
+    expect(err?.message).toContain("more characters)");
+    // The head is what the message carries; the tail is not echoed.
+    expect(err?.message).not.toContain("still going");
+  });
+
+  it("still finds the envelope behind a long human preamble", () => {
+    // The scan is budgeted, so a preamble long enough to push the envelope past
+    // the budget would silently report "no envelope" — pin that it does not.
+    const preamble = Array.from({ length: 400 }, (_v, i) => `warning ${i}: continuing`).join("\n");
+    const read = readEnvelope({
+      surface: "CLI",
+      command: "arggon branch",
+      text: `${preamble}\n${ENVELOPE}\n`,
+    });
+    expect(read.envelope.command).toBe("branch");
+    expect(read.exact).toBe(false);
   });
 });
