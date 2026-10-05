@@ -13,7 +13,6 @@ updated: "2026-10-05"
 claimed_at: "2026-10-05T22:48:17.271Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-docs-ts-stale-example-path
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-docs-ts-stale-example-path.md
   Leaves live only under a story. id is the filename stem: bug-docs-ts-stale-example-path.
@@ -101,3 +100,53 @@ Gates (all on `fix/bug-docs-ts-stale-example-path`, after `npm run build`): `npm
 `npm run test:structure` 5 passed / 0 failed; `npm run lint:structure` clean; `npm run build` ok;
 `npm run check:plugin` clean; `npm run arggon -- validate` ok (0 warnings, convention v5);
 `prettier --check cli/src/docs.ts` clean.
+
+### 2026-10-05 @ses_ef1ad3ccbffe6ACtjjOZJJHx84
+## Maker evidence — branch `fix/bug-docs-ts-stale-example-path` @ `f3ae6d77`
+
+**Changed (2 files):** `cli/src/docs.ts` (the fix, JSDoc only) + this item file (checklist + notes).
+
+### The substantive call: I did NOT swap the retired id for a live one
+Acceptance criterion 1 as written ('the four shipped agent ids are the natural choice') would have made the docs WORSE, so I took criterion 2 instead. Evidence:
+
+- `.opencode/agents/arggon-coordinator.md` **was a real generated destination** — `git log --diff-filter=ADR -- '.opencode/agents/*'` shows it added in `7122c8c1` and renamed away in `0d1571e0`.
+- The note's subject is exactly that case: 'clear a **dead agent** — which the agent rename depends on (ADR 0021 §6.2a′ gates it on reaping)'.
+- A shipped id (e.g. `arggon-delivery-lead.md`) still HAS its template, so it can never be an orphan, so it can never be 'stranded' — the swapped sentence would contradict itself and teach readers the wrong definition of orphan.
+- Precedent for leaving it: `task-agent-role-contracts-seam.md:147` called this a 'one-token comment fix'; the one token was not the id, it was the missing 'this is retired' marker.
+
+The example is kept and disambiguated instead — flagged `RETIRED`, with its live successor named:
+> The case that matters is a destination the rename RETIRED, not a live one: stranded, `.opencode/agents/arggon-coordinator.md` is still dispatched as an agent, and no current template generates it (its successor is `arggon-delivery-lead.md`).
+
+Mapping verified against ADR 0021 §6.2a′. 'No current template generates it' verified against `templates/docs/opencode/agents/` (4 files) and `templates/docs/zcode/arggon/agents/` (3 files) — neither holds a retired id. Comment 8 → 10 lines, wrap held ≤77 cols.
+
+### Occurrences: exactly ONE in the file
+`grep -n 'arggon-coordinator|arggon-worker|arggon-reviewer' cli/src/docs.ts` → 1 hit (line 990). The file's other two `.opencode/agents/` mentions (`:385` `x.md` placeholder, `:980` `*.md` glob) were already current. Not a fallback/literal — it is JSDoc prose on `classifyOrphan`, never read by code.
+
+### Generated mirrors: none moved (and here is why, explicitly)
+- `README.md:222` mirrors the same policy but names **no agent id** ('Arming is how an adopted repo clears a dead agent across a rename') — already rename-proof, needed nothing.
+- No skill reference carries a retired id (`.agents/skills/arggon-cli/**` absent from a repo-wide `arggon-coordinator` grep).
+- `check:plugin` clean ⇒ `cli/src/docs.ts` is NOT inlined into `opencode/plugins/arggon/index.bundle.ts` (`grep -c` = 0, bundle diff empty after rebuild). So no bundle regeneration is owed.
+- **No template to fix:** `json-output.md` is not template-generated.
+
+### FOUND, NOT FIXED — recommend filing as a separate bug (out of my scope)
+`ArggonManager/docs/json-output.md` carries retired ids as live `doctor` example values:
+- `:806` `"agents": ["arggon-coordinator", "arggon-reviewer", "arggon-worker"]`
+- `:916` `{"path": ".opencode/agents/arggon-coordinator.md", "status": "adopter-edited"}`
+
+Neither mirrors the docs.ts note (independent envelope examples), so not a doc-surface mirror of mine. The file is **hand-maintained, not generated** — absent from `templates/docs/docs/` and from the convention's managed-doc set, so there is no template to fix instead. `:916`'s `adopter-edited` is now impossible for that path (template gone ⇒ orphan status, not adopter-edited). `:806` additionally needs a real answer to the 4-vs-3 OpenCode/ZCode shipped-agent asymmetry. Left untouched deliberately rather than growing this diff.
+
+### Gates — all run after `npm run build`, on this branch
+| gate | result |
+|---|---|
+| `npm test` | **128 files / 2680 tests passed** (the filed `bug-headless-ci-twin-init-nondeterministic` flake did NOT reproduce on this run) |
+| `npm run lint` | clean, no output |
+| `npm run test:structure` | `5 passed; 0 failed` |
+| `npm run lint:structure` | clean, no findings |
+| `npm run build` | ok (lib + tsc ×3 + postbuild) |
+| `npm run check:plugin` | clean, empty bundle diff |
+| `npm run arggon -- validate` | `ok (0 warning(s), convention v5)` |
+| `prettier --check cli/src/docs.ts` | `All matched files use Prettier code style!` |
+
+Committed without `--no-verify`; the pre-commit gate ran (`arggon validate: ok` in the hook output). Staged explicit paths only.
+
+Item left `status: in_progress` — not flipped to `done` (delivery lead's call after merge).
