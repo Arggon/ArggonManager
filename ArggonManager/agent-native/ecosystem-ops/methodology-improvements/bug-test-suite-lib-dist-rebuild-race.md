@@ -243,3 +243,21 @@ One thing I did **not** do: I have not run PR #647's `cli` job myself (no merge 
 ### handoff 2026-10-05 @ses_ef23980f2ffepEv8vQ3eD3FnJO (session: ses_ef23980f2ffepEv8vQ3eD3FnJO) — next: Pushed c1d8741a/e5bc593a; check PR #647 cli lane - if still red, bisect writers with PATH=/tmp/opencode/npm10bin:$PATH
 - branch: fix/bug-test-suite-lib-dist-rebuild-race
 - open questions: npm-10 shim lives in /tmp/opencode/npm10bin (not durable) - make it a repo script?; item title still says five files rebuild lib/dist - rename?
+
+### 2026-10-05 @arggon-delivery-lead
+### 2026-10-05 @arggon-delivery-lead
+verdict: approve (second pass — the first pass was request-changes)
+
+**Merged:** PR #647 as `fa8b8072`, `cli` / `tasks-validate` / `ui-smoke` all green.
+
+**The first pass caught a real regression.** The read-only freeze broke `headless-ci.test.ts` on CI with `EACCES` on every emitted file, while **4 consecutive local runs were fully green** (129 files / 2691). Warm runs could not see it.
+
+**The corrected diagnosis is the substantive part, and it corrects this lead's own account too.** The variable is not coldness — it is **the npm major**. `npm pack --ignore-scripts` runs `prepare > npm run build` (four `tsc` passes rewriting `lib/dist` + `dist` in place) on **npm 10.9.4**, which is what CI uses, and does **no lifecycle at all** on **npm 12**, which is what the maker had locally. So `headless-ci`'s pack *was* the writer the original item named — live on every CI run, invisible locally. The maker's earlier "no writer exists" correction was itself wrong, and the freeze is precisely what disproved it; that is now corrected on the item. It also falsifies my own framing: I told it the repo's `tsc` was non-incremental and that coldness "provably could not be the variable" — true, and beside the point.
+
+The fix keeps the invariant rather than weakening it: `pack-fixtures.ts` seeds a **private clone with this checkout's build output** (so the packed bytes are still the bytes under test) and makes the copy writable; `headless-ci` packs that clone. Two bugs were found by running, not reading — `cpSync` preserves the source mode, so the clone inherited the frozen `0444` files; and a `makeWritable` that tested the **read** bit (`0o400`) instead of the **write** bit (`0o200`) silently fixed nothing. The `--ignore-scripts` pin in `test-spawn.test.ts` was **wrong, not merely outdated**, so it was corrected rather than deleted — it now pins the pack cwd (never the checkout) and that the seed is a copy, never a link. `CONTRIBUTING.md` records that `--ignore-scripts` is not the mechanism on any npm major, because that trap is what hid the writer.
+
+**Gates — evidence that discriminates:** 5 consecutive full runs **under npm 10.9.4** (CI's major), exit 0 each, 129 files / 2692 passed, **0 race-class occurrences**; plus 3 on npm 12, a cold-tree run, and 6 runs of the rebuilt lane. The guard still bites: reverting **only** the pack cwd reproduces the failure under npm 10 (exit 1, 82 × `EACCES`), then restored. `lint` clean · `test:structure` 5/0 · `lint:structure` clean · `build` ok · `check:plugin` no drift · `arggon validate` ok · prettier clean.
+
+**Two honest non-claims.** The npm-10 shim lives in `/tmp/opencode/npm10bin` and is **not durable** — without a way to run CI's npm major locally, this class is invisible locally, which is the real lesson and is not recorded anywhere yet. And the item's **title still names five suites rebuilding `lib/dist`** when the real writer was one, surviving only on npm 10; renaming is tracker framing, so it is left to the product owner.
+
+**Not absorbed:** `bug-headless-ci-twin-init-nondeterministic` — it lives inside the lane this change alters, so 6 runs under npm 10 were spent confirming it does not fire (`normalize()` covers it). Its defect is untouched.
