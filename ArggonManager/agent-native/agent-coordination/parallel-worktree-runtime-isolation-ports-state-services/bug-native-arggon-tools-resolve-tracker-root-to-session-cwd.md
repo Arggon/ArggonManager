@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-native-arggon-tools-resolve-tracker-root-to-session-cwd
 title: "Native `tools.arggon.*` resolve the tracker root from the process cwd, so a worker editing a worktree silently commits tracker mutations into the primary checkout (session_move does NOT rebind them)"
+assignee: arggon-delivery-lead
+branch: fix/bug-native-arggon-tools-resolve-tracker-root-to-session-cwd
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [native-seam, worktree, hygiene]
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-05"
+claimed_at: "2026-10-05T18:50:55.962Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-native-arggon-tools-resolve-tracker-root-to-session-cwd
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-native-arggon-tools-resolve-tracker-root-to-session-cwd.md
