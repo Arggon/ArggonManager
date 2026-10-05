@@ -190,17 +190,17 @@ const byDest = (a: string, b: string): number => a.localeCompare(b);
 
 /** The four shipped OpenCode agents — the seam a rename would strand. */
 const OPENCODE_AGENTS = [
-  ".opencode/agents/arggon-coordinator.md",
-  ".opencode/agents/arggon-reviewer.md",
-  ".opencode/agents/arggon-worker.md",
-  ".opencode/agents/arggon-prover.md",
+  ".opencode/agents/arggon-delivery-lead.md",
+  ".opencode/agents/arggon-standards-reviewer.md",
+  ".opencode/agents/arggon-maker.md",
+  ".opencode/agents/arggon-verifier.md",
 ];
 
 describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
   it("reaps an unmodified orphan and attributes it to the seam that generated it", () => {
     const templates = installedPackage();
     const dir = primed(templates);
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     const rows = planOrphanReaps({
       root: dir,
       state: readGeneratedState(dir),
@@ -208,10 +208,10 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
     });
     // Exactly the dropped template's destination — an adopter's own agent file
     // is not a reap candidate, and no other destination moved status.
-    expect(rows.map((r) => r.dest)).toEqual([".opencode/agents/arggon-worker.md"]);
-    const row = decisionFor(rows, ".opencode/agents/arggon-worker.md");
+    expect(rows.map((r) => r.dest)).toEqual([".opencode/agents/arggon-maker.md"]);
+    const row = decisionFor(rows, ".opencode/agents/arggon-maker.md");
     expect(row.action).toBe("reap");
-    expect(row.template).toBe("docs/opencode/agents/arggon-worker.md");
+    expect(row.template).toBe("docs/opencode/agents/arggon-maker.md");
     // Attribution is by the RECORDED template id, so the orphan still files
     // itself under the agent whose seam produced it.
     expect(row.agent).toBe("opencode");
@@ -238,7 +238,9 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
     const templates = installedPackage();
     const dir = primed(templates);
     // An agent-shaped file with NO provenance: exactly the pre-init adopter tree.
-    const own = ".opencode/agents/arggon-delivery-lead.md";
+    // Deliberately NOT one of the shipped ids — a name the product generates has
+    // provenance by definition, so the fixture must be one nobody ships.
+    const own = ".opencode/agents/team-helper.md";
     writeFileSync(join(dir, ...own.split("/")), "# hand written\n", "utf8");
     const rows = planOrphanReaps({
       root: dir,
@@ -255,13 +257,13 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
   it("refuses an adopter-edited orphan and names the reason (never-overwrite binds reaping)", () => {
     const templates = installedPackage();
     const dir = primed(templates);
-    const victim = ".opencode/agents/arggon-worker.md";
+    const victim = ".opencode/agents/arggon-maker.md";
     writeFileSync(
       join(dir, ...victim.split("/")),
       `${readFileSync(join(dir, ...victim.split("/")), "utf8")}\nADOPTER EDIT\n`,
       "utf8",
     );
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     const row = decisionFor(
       planOrphanReaps({ root: dir, state: readGeneratedState(dir), templatesDir: templates }),
       victim,
@@ -280,9 +282,9 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
     // unless the repo arms it.
     const templates = installedPackage();
     const dir = primed(templates);
-    const victim = ".opencode/agents/arggon-worker.md";
+    const victim = ".opencode/agents/arggon-maker.md";
     ackEntry(dir, victim);
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     const row = decisionFor(
       planOrphanReaps({ root: dir, state: readGeneratedState(dir), templatesDir: templates }),
       victim,
@@ -300,19 +302,19 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
     expect(result.reapRefused.map((r) => r.dest)).toEqual([victim]);
     expect(existsIn(dir, victim)).toBe(true);
     // Its provenance survives too, so arming later reaps exactly this file.
-    expect(readGeneratedState(dir)[victim]?.template).toBe("docs/opencode/agents/arggon-worker.md");
+    expect(readGeneratedState(dir)[victim]?.template).toBe("docs/opencode/agents/arggon-maker.md");
   });
 
   it("REAPS an armed acknowledged orphan whose bytes are unchanged (the migration case)", () => {
     // Armed (`x-tracker.reap-acked-orphans: true`) is how an adopted adopter
     // clears a dead agent: ADR 0021 §6.2a′ gates the rename on reaping, and a
-    // stranded `.opencode/agents/arggon-coordinator.md` stays dispatchable.
+    // stranded `.opencode/agents/arggon-maker.md` stays dispatchable.
     const templates = installedPackage();
     const dir = primed(templates);
-    const victim = ".opencode/agents/arggon-worker.md";
+    const victim = ".opencode/agents/arggon-maker.md";
     ackEntry(dir, victim);
     setTrackerOption(dir, "reap-acked-orphans", "true");
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     const row = decisionFor(
       planOrphanReaps({ root: dir, state: readGeneratedState(dir), templatesDir: templates }),
       victim,
@@ -332,9 +334,9 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
   it("reads the arming from the tree ONCE — doctor and init cannot disagree", () => {
     const templates = installedPackage();
     const dir = primed(templates);
-    const victim = ".opencode/agents/arggon-worker.md";
+    const victim = ".opencode/agents/arggon-maker.md";
     ackEntry(dir, victim);
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     const unarmed = runDoctor({ cwd: dir, agents: true, templatesRoot: templates }).agents!;
     expect(verdictFor(unarmed, victim).action).toBe("refuse");
     setTrackerOption(dir, "reap-acked-orphans", "true");
@@ -348,7 +350,7 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
     for (const armed of [false, true]) {
       const templates = installedPackage();
       const dir = primed(templates);
-      const victim = ".opencode/agents/arggon-worker.md";
+      const victim = ".opencode/agents/arggon-maker.md";
       ackEntry(dir, victim);
       if (armed) setTrackerOption(dir, "reap-acked-orphans", "true");
       writeFileSync(
@@ -356,7 +358,7 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
         `${readFileSync(join(dir, ...victim.split("/")), "utf8")}\nPOST-ACK EDIT\n`,
         "utf8",
       );
-      dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+      dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
       const row = decisionFor(
         planOrphanReaps({ root: dir, state: readGeneratedState(dir), templatesDir: templates }),
         victim,
@@ -381,10 +383,10 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
     // read as the floor behind it.
     const templates = installedPackage();
     const dir = primed(templates);
-    const victim = ".opencode/agents/arggon-worker.md";
+    const victim = ".opencode/agents/arggon-maker.md";
     ackEntry(dir, victim);
     setTrackerOption(dir, "reap-acked-orphans", "maybe");
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     const validated = runCli(["validate"], dir);
     expect(validated.status).toBe(1);
     expect(validated.stdout).toContain("'reap-acked-orphans' must be a boolean");
@@ -396,7 +398,7 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
       root: dir,
       state: {
         [victim]: {
-          template: "docs/opencode/agents/arggon-worker.md",
+          template: "docs/opencode/agents/arggon-maker.md",
           checksum: "",
           arggonVersion: "0.5.0",
           generatedAt: "2026-10-01T00:00:00.000Z",
@@ -413,13 +415,13 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
     // generation checksum, which the ack never touched.
     const templates = installedPackage();
     const dir = primed(templates);
-    const victim = ".opencode/agents/arggon-worker.md";
+    const victim = ".opencode/agents/arggon-maker.md";
     writeFileSync(
       join(dir, ...victim.split("/")),
       `${readFileSync(join(dir, ...victim.split("/")), "utf8")}\nADOPTER EDIT\n`,
       "utf8",
     );
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     const row = decisionFor(
       planOrphanReaps({ root: dir, state: readGeneratedState(dir), templatesDir: templates }),
       victim,
@@ -431,9 +433,9 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
   it("refuses a downgrade: a template absent only because THIS install is older", () => {
     const templates = installedPackage();
     const dir = primed(templates);
-    const victim = ".opencode/agents/arggon-worker.md";
+    const victim = ".opencode/agents/arggon-maker.md";
     setStateField(dir, victim, "arggonVersion", '"99.0.0"');
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     const row = decisionFor(
       planOrphanReaps({ root: dir, state: readGeneratedState(dir), templatesDir: templates }),
       victim,
@@ -480,7 +482,7 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
     // A SYMLINK pointing at a file inside the tree: reaping it must unlink
     // nothing, so it is refused rather than followed.
     const asLink = ".opencode/agents/arggon-ghost-link.md";
-    symlinkSync(join(dir, ".opencode/agents/arggon-worker.md"), join(dir, ...asLink.split("/")));
+    symlinkSync(join(dir, ".opencode/agents/arggon-maker.md"), join(dir, ...asLink.split("/")));
     addStateEntry(
       dir,
       asLink,
@@ -500,7 +502,7 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
     const result = runInit({ dir, force: false, full: true, templatesDir: templates });
     expect(lstatSync(join(dir, ...asDir.split("/"))).isDirectory()).toBe(true);
     expect(lstatSync(join(dir, ...asLink.split("/"))).isSymbolicLink()).toBe(true);
-    expect(existsIn(dir, ".opencode/agents/arggon-worker.md")).toBe(true);
+    expect(existsIn(dir, ".opencode/agents/arggon-maker.md")).toBe(true);
     expect(result.reaped).toEqual([]);
     expect(result.reapRefused.map((r) => r.dest).sort(byDest)).toEqual(
       [asDir, asLink].sort(byDest),
@@ -510,9 +512,9 @@ describe("orphan reaping: the decision (one classifier, both surfaces)", () => {
   it("refuses a destination that is not on disk (nothing to reap, and it says so)", () => {
     const templates = installedPackage();
     const dir = primed(templates);
-    const victim = ".opencode/agents/arggon-worker.md";
+    const victim = ".opencode/agents/arggon-maker.md";
     rmSync(join(dir, ...victim.split("/")));
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     const row = decisionFor(
       planOrphanReaps({ root: dir, state: readGeneratedState(dir), templatesDir: templates }),
       victim,
@@ -538,9 +540,9 @@ describe("doctor --agents: the orphaned status", () => {
     const templates = installedPackage();
     const dir = primed(templates);
     // Two agents lose their template; one of the two files is adopter-edited.
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
-    dropTemplate(templates, "docs/opencode/agents/arggon-reviewer.md");
-    const edited = ".opencode/agents/arggon-reviewer.md";
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-standards-reviewer.md");
+    const edited = ".opencode/agents/arggon-standards-reviewer.md";
     writeFileSync(
       join(dir, ...edited.split("/")),
       `${readFileSync(join(dir, ...edited.split("/")), "utf8")}\nADOPTER EDIT\n`,
@@ -557,7 +559,7 @@ describe("doctor --agents: the orphaned status", () => {
     for (const other of ["claude", "zcode"] as const) {
       expect(report.agents.find((a) => a.agent === other)!.counts.orphaned).toBe(0);
     }
-    const reapable = opencode.files.find((f) => f.path === ".opencode/agents/arggon-worker.md")!;
+    const reapable = opencode.files.find((f) => f.path === ".opencode/agents/arggon-maker.md")!;
     expect(reapable.status).toBe("orphaned");
     expect(reapable.reap).toEqual({
       action: "reap",
@@ -572,7 +574,7 @@ describe("doctor --agents: the orphaned status", () => {
   it("names the remedy on the agent line and one line per refused orphan", () => {
     const templates = installedPackage();
     const dir = primed(templates);
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     const text = formatDoctorReport(
       runDoctor({ cwd: dir, agents: true, templatesRoot: templates }),
     );
@@ -585,11 +587,11 @@ describe("doctor --agents: the orphaned status", () => {
   it("stays report-only: a full read reaps nothing", () => {
     const templates = installedPackage();
     const dir = primed(templates);
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     const before = readdirDeep(dir);
     runDoctor({ cwd: dir, agents: true, templatesRoot: templates });
     expect(readdirDeep(dir)).toEqual(before);
-    expect(existsIn(dir, ".opencode/agents/arggon-worker.md")).toBe(true);
+    expect(existsIn(dir, ".opencode/agents/arggon-maker.md")).toBe(true);
   });
 
   it("a plain (non-adapter) orphan gets a human hint too — init deletes it", () => {
@@ -613,25 +615,25 @@ describe("init: the guarded reap", () => {
   it("--dry-run previews the reaping without touching the tree", () => {
     const templates = installedPackage();
     const dir = primed(templates);
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     const before = readdirDeep(dir);
     const stateBefore = readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8");
     const preview = dryRunInit({ dir, force: false, full: true, templatesDir: templates });
-    expect(preview.reaped).toEqual([".opencode/agents/arggon-worker.md"]);
+    expect(preview.reaped).toEqual([".opencode/agents/arggon-maker.md"]);
     expect(preview.reapRefused).toEqual([]);
     // The plan row is there too, so the per-destination table shows the removal.
-    const row = preview.plan.find((e) => e.dest === ".opencode/agents/arggon-worker.md")!;
+    const row = preview.plan.find((e) => e.dest === ".opencode/agents/arggon-maker.md")!;
     expect(row.decision).toBe("orphan-reap");
     // NOTHING was written: the file and its provenance are still there.
     expect(readdirDeep(dir)).toEqual(before);
     expect(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")).toBe(stateBefore);
-    expect(existsIn(dir, ".opencode/agents/arggon-worker.md")).toBe(true);
+    expect(existsIn(dir, ".opencode/agents/arggon-maker.md")).toBe(true);
   });
 
   it("the real CLI's dry run names the reap without repeating or performing it", () => {
     const dir = tempDir();
     runInit({ dir, force: false, full: true });
-    const victim = ".opencode/agents/arggon-worker.md";
+    const victim = ".opencode/agents/arggon-maker.md";
     setRecordedTemplate(dir, victim, "docs/opencode/agents/arggon-retired.md");
     const proc = runCli(["init", "--dry-run", dir], repoRoot);
     expect(proc.status).toBe(0);
@@ -647,9 +649,9 @@ describe("init: the guarded reap", () => {
   it("removes the unmodified orphan, keeps the edited one, and drops only the reaped entry", () => {
     const templates = installedPackage();
     const dir = primed(templates);
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
-    dropTemplate(templates, "docs/opencode/agents/arggon-reviewer.md");
-    const edited = ".opencode/agents/arggon-reviewer.md";
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-standards-reviewer.md");
+    const edited = ".opencode/agents/arggon-standards-reviewer.md";
     writeFileSync(
       join(dir, ...edited.split("/")),
       `${readFileSync(join(dir, ...edited.split("/")), "utf8")}\nADOPTER EDIT\n`,
@@ -657,31 +659,33 @@ describe("init: the guarded reap", () => {
     );
     const result = runInit({ dir, force: false, full: true, templatesDir: templates });
     // Its own action family — never folded into the create/update/skip buckets.
-    expect(result.reaped).toEqual([".opencode/agents/arggon-worker.md"]);
-    expect(result.created).not.toContain(".opencode/agents/arggon-worker.md");
-    expect(result.updated).not.toContain(".opencode/agents/arggon-worker.md");
-    expect(result.modified).not.toContain(".opencode/agents/arggon-worker.md");
-    expect(result.skipped).not.toContain(".opencode/agents/arggon-worker.md");
-    expect(existsIn(dir, ".opencode/agents/arggon-worker.md")).toBe(false);
+    expect(result.reaped).toEqual([".opencode/agents/arggon-maker.md"]);
+    expect(result.created).not.toContain(".opencode/agents/arggon-maker.md");
+    expect(result.updated).not.toContain(".opencode/agents/arggon-maker.md");
+    expect(result.modified).not.toContain(".opencode/agents/arggon-maker.md");
+    expect(result.skipped).not.toContain(".opencode/agents/arggon-maker.md");
+    expect(existsIn(dir, ".opencode/agents/arggon-maker.md")).toBe(false);
     // The refusal names the path AND why.
     expect(result.reapRefused).toHaveLength(1);
     expect(result.reapRefused[0]!.dest).toBe(edited);
-    expect(result.reapRefused[0]!.template).toBe("docs/opencode/agents/arggon-reviewer.md");
+    expect(result.reapRefused[0]!.template).toBe(
+      "docs/opencode/agents/arggon-standards-reviewer.md",
+    );
     expect(result.reapRefused[0]!.reason).toContain("adopter-edited");
     expect(existsIn(dir, edited)).toBe(true);
     // Provenance follows the file: the reaped destination's entry is gone, the
     // kept one still describes the bytes that are on disk.
     const state = readGeneratedState(dir);
-    expect(state[".opencode/agents/arggon-worker.md"]).toBeUndefined();
-    expect(state[edited]?.template).toBe("docs/opencode/agents/arggon-reviewer.md");
+    expect(state[".opencode/agents/arggon-maker.md"]).toBeUndefined();
+    expect(state[edited]?.template).toBe("docs/opencode/agents/arggon-standards-reviewer.md");
   });
 
   it("is idempotent: a second run reaps nothing and reports nothing outstanding", () => {
     const templates = installedPackage();
     const dir = primed(templates);
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     const first = runInit({ dir, force: false, full: true, templatesDir: templates });
-    expect(first.reaped).toEqual([".opencode/agents/arggon-worker.md"]);
+    expect(first.reaped).toEqual([".opencode/agents/arggon-maker.md"]);
     const second = runInit({ dir, force: false, full: true, templatesDir: templates });
     expect(second.reaped).toEqual([]);
     expect(second.reapRefused).toEqual([]);
@@ -702,10 +706,10 @@ describe("init: the guarded reap", () => {
   it("keeps reporting a refused orphan on every run (the adopter's, still named)", () => {
     const templates = installedPackage();
     const dir = primed(templates);
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     writeFileSync(
-      join(dir, ...".opencode/agents/arggon-worker.md".split("/")),
-      `${readFileSync(join(dir, ...".opencode/agents/arggon-worker.md".split("/")), "utf8")}\nEDIT\n`,
+      join(dir, ...".opencode/agents/arggon-maker.md".split("/")),
+      `${readFileSync(join(dir, ...".opencode/agents/arggon-maker.md".split("/")), "utf8")}\nEDIT\n`,
       "utf8",
     );
     const run1 = runInit({ dir, force: false, full: true, templatesDir: templates });
@@ -713,26 +717,28 @@ describe("init: the guarded reap", () => {
     expect(run1.reapRefused).toHaveLength(1);
     // Same behaviour as any adopter-owned file: reported every run, never touched.
     expect(run2.reapRefused.map((r) => r.dest)).toEqual(run1.reapRefused.map((r) => r.dest));
-    expect(existsIn(dir, ".opencode/agents/arggon-worker.md")).toBe(true);
+    expect(existsIn(dir, ".opencode/agents/arggon-maker.md")).toBe(true);
   });
 
   it("carries the reaping family in --json and never folds it into the counts", () => {
     const templates = installedPackage();
     const dir = primed(templates);
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
     writeFileSync(
-      join(dir, ...".opencode/agents/arggon-reviewer.md".split("/")),
-      `${readFileSync(join(dir, ...".opencode/agents/arggon-reviewer.md".split("/")), "utf8")}\nEDIT\n`,
+      join(dir, ...".opencode/agents/arggon-standards-reviewer.md".split("/")),
+      `${readFileSync(join(dir, ...".opencode/agents/arggon-standards-reviewer.md".split("/")), "utf8")}\nEDIT\n`,
       "utf8",
     );
-    dropTemplate(templates, "docs/opencode/agents/arggon-reviewer.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-standards-reviewer.md");
     const preview = dryRunInit({ dir, force: false, full: true, templatesDir: templates });
     // A removal is not a write: the create/replace/skip counts do not see it.
-    expect(preview.created).not.toContain(".opencode/agents/arggon-worker.md");
-    expect(preview.updated).not.toContain(".opencode/agents/arggon-worker.md");
-    expect(preview.skipped).not.toContain(".opencode/agents/arggon-worker.md");
-    expect(preview.reaped).toEqual([".opencode/agents/arggon-worker.md"]);
-    expect(preview.reapRefused.map((r) => r.dest)).toEqual([".opencode/agents/arggon-reviewer.md"]);
+    expect(preview.created).not.toContain(".opencode/agents/arggon-maker.md");
+    expect(preview.updated).not.toContain(".opencode/agents/arggon-maker.md");
+    expect(preview.skipped).not.toContain(".opencode/agents/arggon-maker.md");
+    expect(preview.reaped).toEqual([".opencode/agents/arggon-maker.md"]);
+    expect(preview.reapRefused.map((r) => r.dest)).toEqual([
+      ".opencode/agents/arggon-standards-reviewer.md",
+    ]);
 
     // The real CLI cannot have a template removed from its install, so this
     // asserts the additive envelope fields exist on a healthy run (exit 0).
@@ -765,9 +771,9 @@ describe("end-to-end: a template leaves the installed package (AC 8)", () => {
 
     // 2. The package drops two agent templates — what the rename does to every
     //    adopter: the old destinations are now un-refreshable.
-    dropTemplate(templates, "docs/opencode/agents/arggon-worker.md");
-    dropTemplate(templates, "docs/opencode/agents/arggon-reviewer.md");
-    const edited = ".opencode/agents/arggon-reviewer.md";
+    dropTemplate(templates, "docs/opencode/agents/arggon-maker.md");
+    dropTemplate(templates, "docs/opencode/agents/arggon-standards-reviewer.md");
+    const edited = ".opencode/agents/arggon-standards-reviewer.md";
     writeFileSync(
       join(dir, ...edited.split("/")),
       `${readFileSync(join(dir, ...edited.split("/")), "utf8")}\nADOPTER EDIT\n`,
@@ -787,17 +793,20 @@ describe("end-to-end: a template leaves the installed package (AC 8)", () => {
         .filter((f) => f.status === "orphaned")
         .map((f) => f.path)
         .sort(),
-    ).toEqual([".opencode/agents/arggon-reviewer.md", ".opencode/agents/arggon-worker.md"]);
+    ).toEqual([
+      ".opencode/agents/arggon-maker.md",
+      ".opencode/agents/arggon-standards-reviewer.md",
+    ]);
 
     // 4. init removes the untouched orphan and REFUSES the edited one.
     const result = runInit({ dir, force: false, full: true, templatesDir: templates });
-    expect(result.reaped).toEqual([".opencode/agents/arggon-worker.md"]);
+    expect(result.reaped).toEqual([".opencode/agents/arggon-maker.md"]);
     expect(result.reapRefused.map((r) => r.dest)).toEqual([edited]);
-    expect(existsIn(dir, ".opencode/agents/arggon-worker.md")).toBe(false);
+    expect(existsIn(dir, ".opencode/agents/arggon-maker.md")).toBe(false);
     expect(existsIn(dir, edited)).toBe(true);
 
     // 5. The survivors are still healthy: init never damaged the rest of the seam.
-    for (const dest of OPENCODE_AGENTS.filter((d) => d !== ".opencode/agents/arggon-worker.md")) {
+    for (const dest of OPENCODE_AGENTS.filter((d) => d !== ".opencode/agents/arggon-maker.md")) {
       expect(existsIn(dir, dest), `${dest} survives the reap`).toBe(true);
     }
 
@@ -816,7 +825,7 @@ describe("end-to-end: a template leaves the installed package (AC 8)", () => {
     // point, no fixture copy — the shipped binary, end to end.
     const dir = tempDir();
     runInit({ dir, force: false, full: true });
-    const victim = ".opencode/agents/arggon-worker.md";
+    const victim = ".opencode/agents/arggon-maker.md";
     setRecordedTemplate(dir, victim, "docs/opencode/agents/arggon-retired.md");
 
     const dry = runCli(["--json", "init", "--dry-run", dir], repoRoot);
@@ -842,7 +851,7 @@ describe("end-to-end: a template leaves the installed package (AC 8)", () => {
   it("names an edited orphan in the real CLI's --json and human output", () => {
     const dir = tempDir();
     runInit({ dir, force: false, full: true });
-    const victim = ".opencode/agents/arggon-worker.md";
+    const victim = ".opencode/agents/arggon-maker.md";
     setRecordedTemplate(dir, victim, "docs/opencode/agents/arggon-retired.md");
     writeFileSync(
       join(dir, ...victim.split("/")),

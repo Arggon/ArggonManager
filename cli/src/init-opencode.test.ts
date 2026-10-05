@@ -33,6 +33,23 @@ function mkdtempSync(prefix: string): string {
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
+/**
+ * Every mutating tracker tool, in its native spelling. The reviewer and the
+ * verifier deny all of them in both the native and the MCP spelling; the maker
+ * denies only `create` (it reports findings back rather than filing them).
+ */
+const MUTATING_TRACKER_TOOLS = [
+  "create",
+  "update",
+  "handoff",
+  "start",
+  "branch",
+  "cleanup",
+  "priority",
+  "sync",
+  "import_issues",
+];
+
 function runCli(args: string[], cwd: string = repoRoot) {
   return runCliBase(args, cwd);
 }
@@ -43,15 +60,15 @@ function tempDir(): string {
 
 /** Files the OpenCode seam must create on a fresh init (opencode-seam-010). */
 const SEAM_AGENTS = [
-  ".opencode/agents/arggon-coordinator.md",
-  ".opencode/agents/arggon-worker.md",
-  ".opencode/agents/arggon-reviewer.md",
+  ".opencode/agents/arggon-delivery-lead.md",
+  ".opencode/agents/arggon-maker.md",
+  ".opencode/agents/arggon-standards-reviewer.md",
   // task-prover-agent-reviewer-split: execution evidence has its own role.
-  // The prover RUNS gates (shell allowed) and never touches the tree or history
-  // (edit/subagent/tracker writes/git history writes denied in its frontmatter);
-  // the reviewer's contract stops instructing itself to run suites and hands
-  // probes back under `## Probes needed` instead.
-  ".opencode/agents/arggon-prover.md",
+  // The verifier RUNS gates (shell allowed) and never touches the tree or
+  // history (edit/subagent/tracker writes/git history writes denied in its
+  // frontmatter); the standards reviewer's contract stops instructing itself
+  // to run suites and hands probes back under `## Probes needed` instead.
+  ".opencode/agents/arggon-verifier.md",
 ];
 const SEAM_COMMANDS = [
   ".opencode/commands/arggon-next.md",
@@ -154,73 +171,148 @@ describe("opencode seam: fresh init", () => {
   it("agents and commands are frontmatter-first with the YAML provenance marker", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    const worker = readFileSync(join(dir, ".opencode/agents/arggon-worker.md"), "utf8");
+    const maker = readFileSync(join(dir, ".opencode/agents/arggon-maker.md"), "utf8");
     expect(
-      worker.startsWith('---\n# arggon:generated template="opencode/agents/arggon-worker.md"\n'),
+      maker.startsWith('---\n# arggon:generated template="opencode/agents/arggon-maker.md"\n'),
     ).toBe(true);
-    expect(worker).not.toContain("<!-- arggon:generated");
-    expect(worker).toContain("mode: subagent");
+    expect(maker).not.toContain("<!-- arggon:generated");
+    expect(maker).toContain("mode: subagent");
     const review = readFileSync(join(dir, ".opencode/commands/arggon-review.md"), "utf8");
     expect(
       review.startsWith('---\n# arggon:generated template="opencode/commands/arggon-review.md"\n'),
     ).toBe(true);
-    expect(review).toContain("agent: arggon-reviewer");
+    expect(review).toContain("agent: arggon-standards-reviewer");
     expect(review).toContain("subagent: true");
   });
 
-  it("agents deny nested subagents and the reviewer denies edits (W4 probes)", () => {
+  // AC 12 (spec-agent-rename-019): the rename changes permission RESOURCE
+  // NAMES only. This is the whole deny surface as it stands after the rewrite,
+  // one entry per shipped role, so a dropped deny, an added deny or a widened
+  // resource fails here — the kind of edit a role-contract rewrite invites by
+  // accident. Allow-lists are deliberately NOT pinned: AC 3 derives them, and
+  // the primary's only allow-list is that one.
+  const GIT_HISTORY_DENIES = [
+    "shell:git commit",
+    "shell:git push",
+    "shell:git merge",
+    "shell:git rebase",
+  ];
+  const TRACKER_WRITE_DENIES = [
+    // native spelling: `<namespace>_<tool>` for all nine mutating tools
+    ...MUTATING_TRACKER_TOOLS.map((tool) => `arggon_${tool}`),
+    // MCP spelling: `<server>_<tool>`, which the seam denies for the three the
+    // MCP surface exposed when the rule was written. Pinned as shipped — the
+    // rename must not quietly widen or narrow it (AC 12 is unchanged IN KIND).
+    "arggon_arggon_create",
+    "arggon_arggon_update",
+    "arggon_arggon_handoff",
+  ];
+  const PERMISSION_CONTRACT: Record<string, string[]> = {
+    // one nesting level, and no tracker writes of its own — the maker reports
+    // findings to the delivery lead instead of filing them.
+    "arggon-maker": ["subagent", "arggon_create", "arggon_arggon_create"].sort(),
+    // read-only: edit, no nesting, every mutating tracker tool in both
+    // spellings, and the four git history verbs.
+    "arggon-standards-reviewer": [
+      "edit",
+      "subagent",
+      ...TRACKER_WRITE_DENIES,
+      ...GIT_HISTORY_DENIES,
+    ].sort(),
+    // the mirror image: shell IS the role (no shell deny), but edit, nesting,
+    // every tracker write and the history verbs are denied exactly as on the
+    // standards reviewer.
+    "arggon-verifier": ["edit", "subagent", ...TRACKER_WRITE_DENIES, ...GIT_HISTORY_DENIES].sort(),
+  };
+
+  it("the permission deny set is unchanged in kind across the rewrite (AC 12)", () => {
+    const shippedDir = join(repoRoot, "templates/docs/opencode/agents");
+    const files = readdirSync(shippedDir).filter((f) => f.endsWith(".md"));
+    expect(files, "the seam ships four roles (spec non-goals: no fifth agent)").toHaveLength(4);
+    for (const file of files) {
+      const body = readFileSync(join(shippedDir, file), "utf8");
+      // A "*" resource pins the action alone (`edit`); a named one pins the
+      // pair (`shell:git commit`) — so a widened resource string fails too.
+      const denies = [...body.matchAll(/action: (\S+)\s+resource: "?([^"\n]+?)"?\s+effect: deny/g)]
+        .map((m) => (m[2] === "*" ? m[1]! : `${m[1]}:${m[2]!.replace(/\*$/, "")}`))
+        .sort();
+      const role = file.replace(/\.md$/, "");
+      if (/^mode:\s*primary$/m.test(body)) {
+        // The delivery lead's deny surface is the subagent catch-all; its
+        // allow-list is AC 3's business.
+        expect(denies, `${role}: the lead gates nothing but subagent nesting`).toEqual([
+          "subagent",
+        ]);
+        continue;
+      }
+      const expected = PERMISSION_CONTRACT[role];
+      expect(expected, `${role} has no pinned permission contract`).toBeDefined();
+      expect(denies, `${role}: the deny set changed in kind`).toEqual(expected);
+    }
+  });
+
+  it("agents deny nested subagents and the standards reviewer denies edits (W4 probes)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    const worker = readFileSync(join(dir, ".opencode/agents/arggon-worker.md"), "utf8");
-    const reviewer = readFileSync(join(dir, ".opencode/agents/arggon-reviewer.md"), "utf8");
-    // One nesting level: workers and reviewers never launch subagents.
-    expect(worker).toMatch(/action: subagent\s+resource: "\*"\s+effect: deny/);
+    const maker = readFileSync(join(dir, ".opencode/agents/arggon-maker.md"), "utf8");
+    const reviewer = readFileSync(
+      join(dir, ".opencode/agents/arggon-standards-reviewer.md"),
+      "utf8",
+    );
+    // One nesting level: makers and standards reviewers never launch subagents.
+    expect(maker).toMatch(/action: subagent\s+resource: "\*"\s+effect: deny/);
     expect(reviewer).toMatch(/action: subagent\s+resource: "\*"\s+effect: deny/);
     expect(reviewer).toMatch(/action: edit\s+resource: "\*"\s+effect: deny/);
   });
 
-  it("the prover runs gates; the reviewer only reads and hands probes back (task-prover-agent-reviewer-split)", () => {
+  it("the verifier runs gates; the standards reviewer only reads and hands probes back (task-prover-agent-reviewer-split)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    const reviewer = readFileSync(join(dir, ".opencode/agents/arggon-reviewer.md"), "utf8");
-    const prover = readFileSync(join(dir, ".opencode/agents/arggon-prover.md"), "utf8");
+    const reviewer = readFileSync(
+      join(dir, ".opencode/agents/arggon-standards-reviewer.md"),
+      "utf8",
+    );
+    const verifier = readFileSync(join(dir, ".opencode/agents/arggon-verifier.md"), "utf8");
 
     // The reviewer's contract stops sending it to the terminal for evidence.
     expect(reviewer).not.toContain("read, run tests and inspect freely");
     expect(reviewer).toContain("Do not execute gates");
     expect(reviewer).toContain("Probes needed");
 
-    // The prover is shell-capable — that is the role — but never a writer of
+    // The verifier is shell-capable — that is the role — but never a writer of
     // the tree, the history, the tracker or other agents.
-    expect(prover).not.toMatch(/action: shell\s+resource: "\*"/);
+    expect(verifier).not.toMatch(/action: shell\s+resource: "\*"/);
     for (const command of ["git commit\\*", "git push\\*", "git merge\\*", "git rebase\\*"]) {
-      expect(prover, command).toMatch(new RegExp(`resource: "${command}"\\s+effect: deny`));
+      expect(verifier, command).toMatch(new RegExp(`resource: "${command}"\\s+effect: deny`));
     }
-    expect(prover).toMatch(/action: edit\s+resource: "\*"\s+effect: deny/);
-    expect(prover).toMatch(/action: subagent\s+resource: "\*"\s+effect: deny/);
+    expect(verifier).toMatch(/action: edit\s+resource: "\*"\s+effect: deny/);
+    expect(verifier).toMatch(/action: subagent\s+resource: "\*"\s+effect: deny/);
     for (const action of ["arggon_update", "arggon_start", "arggon_cleanup"]) {
-      expect(prover, action).toMatch(
+      expect(verifier, action).toMatch(
         new RegExp(`action: ${action}\\s+resource: "\\*"\\s+effect: deny`),
       );
     }
     // The evidence contract a verdict depends on: expected vs observed, and the
     // boundary of what a green gate does not prove.
-    expect(prover).toContain("expected:");
-    expect(prover).toContain("observed:");
-    expect(prover).toContain("does NOT prove");
-    expect(prover).toContain("Never post to the tracker");
+    expect(verifier).toContain("expected:");
+    expect(verifier).toContain("observed:");
+    expect(verifier).toContain("does NOT prove");
+    expect(verifier).toContain("Never post to the tracker");
   });
 
   it("agents deny tracker mutations at the tool level, native and MCP spellings (W4 probe)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    const worker = readFileSync(join(dir, ".opencode/agents/arggon-worker.md"), "utf8");
-    const reviewer = readFileSync(join(dir, ".opencode/agents/arggon-reviewer.md"), "utf8");
+    const maker = readFileSync(join(dir, ".opencode/agents/arggon-maker.md"), "utf8");
+    const reviewer = readFileSync(
+      join(dir, ".opencode/agents/arggon-standards-reviewer.md"),
+      "utf8",
+    );
     // Probe-verified on real V2 sessions: a native tool action is the
     // normalized `<namespace>_<tool>` (namespace `arggon`), an MCP tool action
     // the normalized `<server>_<tool>` (server `arggon`, tools `arggon_*`).
     for (const action of ["arggon_create", "arggon_arggon_create"]) {
-      expect(worker, action).toMatch(
+      expect(maker, action).toMatch(
         new RegExp(`action: ${action}\\s+resource: "\\*"\\s+effect: deny`),
       );
     }
@@ -244,17 +336,20 @@ describe("opencode seam: fresh init", () => {
     }
     // arggon_comment is the reviewer's one tracker write: never denied.
     expect(reviewer).not.toMatch(/action: arggon_comment|action: arggon_arggon_comment/);
-    expect(worker).not.toMatch(
+    expect(maker).not.toMatch(
       /action: arggon_comment|action: arggon_update|action: arggon_handoff|action: arggon_arggon_comment|action: arggon_arggon_update|action: arggon_arggon_handoff/,
     );
     // W4 review: the reviewer cannot run the worktree lifecycle either.
     expect(reviewer).not.toMatch(/action: arggon_comment|action: arggon_arggon_comment/);
   });
 
-  it("the reviewer never mutates history: minimal shell gates (W4)", () => {
+  it("the standards reviewer never mutates history: minimal shell gates (W4)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    const reviewer = readFileSync(join(dir, ".opencode/agents/arggon-reviewer.md"), "utf8");
+    const reviewer = readFileSync(
+      join(dir, ".opencode/agents/arggon-standards-reviewer.md"),
+      "utf8",
+    );
     for (const resource of ["git commit*", "git push*", "git merge*", "git rebase*"]) {
       expect(reviewer, resource).toMatch(
         new RegExp(`action: shell\\s+resource: "${resource.replace("*", "\\*")}"\\s+effect: deny`),
@@ -264,70 +359,104 @@ describe("opencode seam: fresh init", () => {
     expect(reviewer).not.toMatch(/resource: "git (status|diff|log|show)/);
   });
 
-  it("the coordinator subagent allow-list stays explicit (W4 default)", () => {
+  it("the delivery lead subagent allow-list stays explicit (W4 default)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    const coordinator = readFileSync(join(dir, ".opencode/agents/arggon-coordinator.md"), "utf8");
-    expect(coordinator).toMatch(/action: subagent\s+resource: "\*"\s+effect: deny/);
-    for (const agent of ["arggon-worker", "arggon-reviewer", "explore"]) {
-      expect(coordinator, agent).toMatch(
+    const lead = readFileSync(join(dir, ".opencode/agents/arggon-delivery-lead.md"), "utf8");
+    expect(lead).toMatch(/action: subagent\s+resource: "\*"\s+effect: deny/);
+    for (const agent of ["arggon-maker", "arggon-standards-reviewer", "explore"]) {
+      expect(lead, agent).toMatch(
         new RegExp(`action: subagent\\s+resource: ${agent}\\s+effect: allow`),
       );
     }
   });
 
-  it("the coordinator contract claims through native start BEFORE dispatch (task-coordinator-claims-through-native-start)", () => {
+  // AC 3 (spec-agent-rename-019): the allow-list is resource NAMES, so the
+  // rename could leave it naming ids that no longer ship — the lead would then
+  // be denied every subagent it is supposed to delegate to, with no failure
+  // anywhere. Both sides are derived from the shipped templates: the ids from
+  // the templates dir, the allow-list from the lead's own frontmatter. Adding a
+  // role without allow-listing it (or allow-listing one twice) fails here.
+  it("the allow-list cannot drift from the shipped subagent ids (AC 3)", () => {
+    const shippedDir = join(repoRoot, "templates/docs/opencode/agents");
+    const shipped = readdirSync(shippedDir)
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => ({
+        id: f.replace(/\.md$/, ""),
+        isPrimary: /^mode:\s*primary$/m.test(readFileSync(join(shippedDir, f), "utf8")),
+      }));
+    const primaries = shipped.filter((a) => a.isPrimary);
+    expect(primaries, "exactly one shipped agent is the primary").toHaveLength(1);
+    const leadId = primaries[0]!.id;
+
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const lead = readFileSync(join(dir, ".opencode/agents", `${leadId}.md`), "utf8");
+    // Every shipped subagent is dispatchable, plus the read-only `explore`
+    // agent — which ships with the client, not with us, so it is named here.
+    const expected = [...shipped.filter((a) => a.id !== leadId).map((a) => a.id), "explore"].sort();
+    const allowed = [...lead.matchAll(/action: subagent\s+resource: (\S+)\s+effect: allow/g)].map(
+      (m) => m[1]!,
+    );
+    expect(allowed.sort(), "the lead's allow-list must be exactly the shipped subagents").toEqual(
+      expected,
+    );
+    // …and the catch-all deny is still there, so an unlisted id is refused.
+    expect(lead).toMatch(/action: subagent\s+resource: "\*"\s+effect: deny/);
+    // The lead never delegates to itself.
+    expect(allowed).not.toContain(leadId);
+  });
+
+  it("the delivery lead contract claims through native start BEFORE dispatch (task-coordinator-claims-through-native-start)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     // Whitespace-flattened so the pins survive any re-wrap of the prose: the
     // contract is a prompt, its wording is not formatting.
-    const coordinator = readFileSync(
-      join(dir, ".opencode/agents/arggon-coordinator.md"),
+    const lead = readFileSync(
+      join(dir, ".opencode/agents/arggon-delivery-lead.md"),
       "utf8",
     ).replace(/\s+/g, " ");
     // The claim duty exists at all — this is the step the template used to
-    // omit entirely, which left coordinators hand-rolling worktrees on items
+    // omit entirely, which left delivery leads hand-rolling worktrees on items
     // that stayed `todo`/unclaimed.
-    expect(coordinator).toContain("**Claim before dispatch.**");
+    expect(lead).toContain("**Claim before dispatch.**");
     // …through the NATIVE start with the worktree flag, not the headless CLI
     // and not a bare `update --status in_progress` (that claims no worktree).
-    expect(coordinator).toMatch(
-      /tools\.arggon\.start\(\{\s*id,\s*assignee:[^}]*worktree: true\s*\}\)/,
-    );
-    expect(coordinator).not.toMatch(/arggon start <id>/);
-    // ORDERING: the claim duty precedes the worker-launch duty, so a
-    // coordinator that reads the duties top-down claims first.
+    expect(lead).toMatch(/tools\.arggon\.start\(\{\s*id,\s*assignee:[^}]*worktree: true\s*\}\)/);
+    expect(lead).not.toMatch(/arggon start <id>/);
+    // ORDERING: the claim duty precedes the maker-launch duty, so a delivery
+    // lead that reads the duties top-down claims first.
     assertOrder(
-      coordinator,
+      lead,
       "**Claim before dispatch.**",
-      "**One worker per item, one worktree per worker.**",
+      "**One maker per item, one worktree per maker.**",
     );
     // The worktree path in the launch prompt is the item's RECORDED path.
-    expect(coordinator).toContain("worktree_path` on the item");
-    expect(coordinator).toContain("as recorded on the item");
-    // Prohibitions: no hand-rolled worktree, no worker-first claim, no idle
+    expect(lead).toContain("worktree_path` on the item");
+    expect(lead).toContain("as recorded on the item");
+    // Prohibitions: no hand-rolled worktree, no maker-first claim, no idle
     // claim — each phrased so a regex cannot pass on a negated quote.
-    expect(coordinator).toContain("Never hand-roll `git worktree add` for a claim");
-    expect(coordinator).toContain("never dispatch a worker as the first claimant");
-    expect(coordinator).toContain("never claim an item you are not dispatching");
+    expect(lead).toContain("Never hand-roll `git worktree add` for a claim");
+    expect(lead).toContain("never dispatch a maker as the first claimant");
+    expect(lead).toContain("never claim an item you are not dispatching");
     // A start refusal is evidence, not a retry (native refusal semantics).
-    expect(coordinator).toContain("refusal is evidence, not a retry");
+    expect(lead).toContain("refusal is evidence, not a retry");
     // Router, not a second carrier: the full contract stays in the playbook.
-    expect(coordinator).toContain("`ArggonManager/docs/agents.md` §Orchestration");
+    expect(lead).toContain("`ArggonManager/docs/agents.md` §Orchestration");
     // Pre-existing duty drift the same review caught: background children
-    // outlive a headless run, and the prover role #583 shipped must be both
+    // outlive a headless run, and the verifier role #583 shipped must be both
     // mentioned (duty 4) and dispatchable (allow-list, per docs/agents.md).
-    expect(coordinator).toContain("Launch them **foreground**");
-    expect(coordinator).not.toContain("foreground or background");
-    expect(coordinator).toContain("arggon-prover");
-    expect(coordinator).toMatch(/action: subagent\s+resource: arggon-prover\s+effect: allow/);
+    expect(lead).toContain("Launch them **foreground**");
+    expect(lead).not.toContain("foreground or background");
+    expect(lead).toContain("arggon-verifier");
+    expect(lead).toMatch(/action: subagent\s+resource: arggon-verifier\s+effect: allow/);
   });
 
-  it("the docs carrier keeps the claim duty the coordinator template summarizes", () => {
+  it("the docs carrier keeps the claim duty the delivery lead template summarizes", () => {
     // task-coordinator-claims-through-native-start: the template is a summary,
     // `ArggonManager/docs/agents.md` §Orchestration carries the rules. The two
     // must not drift into contradicting each other (the template used to omit
-    // the claim entirely, the playbook used to assign it to the worker).
+    // the claim entirely, the playbook used to assign it to the maker).
     const flat = readFileSync(join(repoRoot, "ArggonManager/docs/agents.md"), "utf8").replace(
       /\s+/g,
       " ",
@@ -355,26 +484,26 @@ describe("opencode seam: fresh init", () => {
     expect(skill).toContain("**Claim before dispatch:**");
     expect(skill).toContain("worktree: true");
     expect(skill).not.toContain("Claim **your** item (`in_progress` + assignee)");
-    // 2. the worker contract: dispatched means already-claimed, never re-claim
-    const worker = flat("templates/docs/opencode/agents/arggon-worker.md");
-    expect(worker).toContain("Your item is **already claimed**");
-    expect(worker).toContain("never re-claim");
-    expect(worker).toContain("`ArggonManager/docs/agents.md` §Orchestration");
-    expect(worker).not.toContain("Claim your item (`tools.arggon.update`");
-    // 3. the ZCode coordinator router (MCP spelling, same duty)
-    const zcode = flat("templates/docs/zcode/arggon/agents/arggon-coordinator.md");
+    // 2. the maker contract: dispatched means already-claimed, never re-claim
+    const maker = flat("templates/docs/opencode/agents/arggon-maker.md");
+    expect(maker).toContain("Your item is **already claimed**");
+    expect(maker).toContain("never re-claim");
+    expect(maker).toContain("`ArggonManager/docs/agents.md` §Orchestration");
+    expect(maker).not.toContain("Claim your item (`tools.arggon.update`");
+    // 3. the ZCode delivery-lead router (MCP spelling, same duty)
+    const zcode = flat("templates/docs/zcode/arggon/agents/arggon-delivery-lead.md");
     expect(zcode).toContain("**Claim before dispatch.**");
     expect(zcode).toContain("worktree: true");
     expect(zcode).not.toContain("Claim **your** item");
-    // 3b. the ZCode worker contract (the fifth carrier the review's list missed)
-    const zcodeWorker = flat("templates/docs/zcode/arggon/agents/arggon-worker.md");
-    expect(zcodeWorker).toContain("Your item is **already claimed**");
-    expect(zcodeWorker).toContain("never re-claim");
-    expect(zcodeWorker).not.toContain("Claim your item (`arggon_update`");
+    // 3b. the ZCode maker contract (the fifth carrier the review's list missed)
+    const zcodeMaker = flat("templates/docs/zcode/arggon/agents/arggon-maker.md");
+    expect(zcodeMaker).toContain("Your item is **already claimed**");
+    expect(zcodeMaker).toContain("never re-claim");
+    expect(zcodeMaker).not.toContain("Claim your item (`arggon_update`");
     // The agent DESCRIPTION is a carrier too — "claims exactly one item" is what
-    // told a reader the worker is the claimant.
-    expect(worker).not.toContain("claims exactly one item");
-    expect(zcodeWorker).not.toContain("claims exactly one item");
+    // told a reader the maker is the claimant.
+    expect(maker).not.toContain("claims exactly one item");
+    expect(zcodeMaker).not.toContain("claims exactly one item");
     // 4. this repo's own AGENTS.md — the bare-update claim bullet and the
     // hand-rolled `git worktree add` bullet are what every session here loads.
     const agents = flat("AGENTS.md");
@@ -416,8 +545,8 @@ describe("opencode seam: fresh init", () => {
     runInit({ dir, force: false });
     const config = readConventionConfig(dir);
     expect(config.generated["opencode.jsonc"]?.template).toBe("docs/opencode.jsonc");
-    expect(config.generated[".opencode/agents/arggon-coordinator.md"]?.template).toBe(
-      "docs/opencode/agents/arggon-coordinator.md",
+    expect(config.generated[".opencode/agents/arggon-delivery-lead.md"]?.template).toBe(
+      "docs/opencode/agents/arggon-delivery-lead.md",
     );
     expect(config.generated[".opencode/commands/arggon-next.md"]?.template).toBe(
       "docs/opencode/commands/arggon-next.md",
@@ -457,7 +586,7 @@ describe("opencode seam: conditional config", () => {
         expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
       }
       // The rest of the seam is still generated.
-      expect(body.created).toContain(".opencode/agents/arggon-worker.md");
+      expect(body.created).toContain(".opencode/agents/arggon-maker.md");
       expect(readConventionConfig(dir).generated["opencode.jsonc"]).toBeUndefined();
     });
   }
@@ -637,26 +766,26 @@ describe("opencode seam: provenance on re-runs", () => {
   it("re-runs refresh untouched seam files and skip adopter-modified ones", () => {
     const dir = tempDir();
     runCli(["init", dir, "--json"]);
-    const agentPath = join(dir, ".opencode/agents/arggon-worker.md");
+    const agentPath = join(dir, ".opencode/agents/arggon-maker.md");
     const original = readFileSync(agentPath, "utf8");
     // Untouched: a second run reports it as updated (regenerated silently).
     const second = runCli(["init", dir, "--json"]);
     const secondBody = JSON.parse(second.stdout) as { updated: string[]; modified: string[] };
-    expect(secondBody.updated).toContain(".opencode/agents/arggon-worker.md");
+    expect(secondBody.updated).toContain(".opencode/agents/arggon-maker.md");
     expect(secondBody.modified).toEqual([]);
     // Adopter-modified: kept as-is and reported.
     writeFileSync(agentPath, `${original}\n<!-- mine -->\n`, "utf8");
     const third = runCli(["init", dir, "--json"]);
     const thirdBody = JSON.parse(third.stdout) as { modified: string[]; skipped: string[] };
-    expect(thirdBody.modified).toContain(".opencode/agents/arggon-worker.md");
-    expect(thirdBody.skipped).toContain(".opencode/agents/arggon-worker.md");
+    expect(thirdBody.modified).toContain(".opencode/agents/arggon-maker.md");
+    expect(thirdBody.skipped).toContain(".opencode/agents/arggon-maker.md");
     expect(readFileSync(agentPath, "utf8")).toBe(`${original}\n<!-- mine -->\n`);
   });
 
   it("--backup round-trips a modified seam file (archive + regenerate)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    const rel = ".opencode/agents/arggon-worker.md";
+    const rel = ".opencode/agents/arggon-maker.md";
     const dest = join(dir, ...rel.split("/"));
     const original = readFileSync(dest, "utf8");
     const edited = `${original}\nADOPTER EDIT\n`;
@@ -907,13 +1036,15 @@ describe("opencode seam: methodology commands and skill references (W5)", () => 
       const fields = frontmatter(rel);
       expect(fields.description, rel).toBeTruthy();
       if (fields.agent !== undefined) {
-        expect(["arggon-coordinator", "arggon-reviewer"], rel).toContain(fields.agent);
+        expect(["arggon-delivery-lead", "arggon-standards-reviewer"], rel).toContain(fields.agent);
       }
       if (fields.subagent !== undefined) expect(fields.subagent, rel).toBe("true");
     }
-    expect(frontmatter(".opencode/commands/arggon-done.md").agent).toBe("arggon-coordinator");
-    expect(frontmatter(".opencode/commands/arggon-adopt.md").agent).toBe("arggon-coordinator");
-    expect(frontmatter(".opencode/commands/arggon-review.md").agent).toBe("arggon-reviewer");
+    expect(frontmatter(".opencode/commands/arggon-done.md").agent).toBe("arggon-delivery-lead");
+    expect(frontmatter(".opencode/commands/arggon-adopt.md").agent).toBe("arggon-delivery-lead");
+    expect(frontmatter(".opencode/commands/arggon-review.md").agent).toBe(
+      "arggon-standards-reviewer",
+    );
     expect(frontmatter(".opencode/commands/arggon-review.md").subagent).toBe("true");
   });
 

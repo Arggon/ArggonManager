@@ -8,26 +8,26 @@
  * halves of W4:
  *
  *   T12 — permission probes on the generated agents:
- *   1. reviewer    — `arggon-reviewer` cannot perform an edit: the runtime
+ *   1. reviewer    — `arggon-standards-reviewer` cannot perform an edit: the runtime
  *                    removes `edit`/`write`/`patch` from its tool catalog
  *                    (`permissions: edit * deny`) and the probe file is never
  *                    created. Read/shell stay available for the review.
- *   2. worker      — `arggon-worker` cannot launch a subagent: the `subagent`
+ *   2. worker      — `arggon-maker` cannot launch a subagent: the `subagent`
  *                    tool is absent (nesting stays at one level).
- *   3. coordinator — `arggon-coordinator` launches `explore`, `arggon-worker`
- *                    and `arggon-reviewer` (allow-list) but `general` fails
+ *   3. coordinator — `arggon-delivery-lead` launches `explore`, `arggon-maker`
+ *                    and `arggon-standards-reviewer` (allow-list) but `general` fails
  *                    with `Permission denied: subagent`.
  *
  *   T13 — scripted end-to-end wave, driven by one coordinator session:
  *   4. plan       — coordinator reads the tracker and plans a file-disjoint wave.
- *   5. delegate   — coordinator launches TWO `arggon-worker` subagents in ONE
+ *   5. delegate   — coordinator launches TWO `arggon-maker` subagents in ONE
  *                    message, foreground, each claiming its item via
  *                    `arggon start --worktree` and working its own worktree.
  *                    Foreground is required: a background subagent notifies the
  *                    parent later, but `opencode run` exits when the assistant
  *                    turn ends, so background children would end the headless
  *                    run before their work exists.
- *   6. review     — one `arggon-reviewer` subagent reviews both branches and
+ *   6. review     — one `arggon-standards-reviewer` subagent reviews both branches and
  *                    posts verdicts on the items via `arggon comment`.
  *   7. merge/done — coordinator merges both branches into the fixture main
  *                    locally (the local merge IS the merge here), ticks the
@@ -559,15 +559,15 @@ function permissionFixture(): Fixture {
   check("permission fixture: init exits 0", init.status === 0, runTail(init));
   check(
     "permission fixture: generated agents exist",
-    existsSync(f.path(".opencode/agents/arggon-reviewer.md")) &&
-      existsSync(f.path(".opencode/agents/arggon-worker.md")) &&
-      existsSync(f.path(".opencode/agents/arggon-coordinator.md")),
+    existsSync(f.path(".opencode/agents/arggon-standards-reviewer.md")) &&
+      existsSync(f.path(".opencode/agents/arggon-maker.md")) &&
+      existsSync(f.path(".opencode/agents/arggon-delivery-lead.md")),
   );
   return f;
 }
 
 function scenarioReviewerEditDenied(f: Fixture): void {
-  scenario("permissions: arggon-reviewer cannot edit (edit deny)");
+  scenario("permissions: arggon-standards-reviewer cannot edit (edit deny)");
   const result = f.runPrompt(
     "perm-reviewer-edit",
     [
@@ -575,7 +575,7 @@ function scenarioReviewerEditDenied(f: Fixture): void {
       "If the write/edit tool is unavailable or denied, do not create the file by any other means and say exactly: NO_EDIT_TOOL.",
       "Then, on a new line, list the exact names of every tool available to you, comma-separated.",
     ].join("\n"),
-    { agent: "arggon-reviewer" },
+    { agent: "arggon-standards-reviewer" },
   );
   const events = eventsOf(result);
   const calls = toolCalls(events);
@@ -602,7 +602,7 @@ function scenarioReviewerEditDenied(f: Fixture): void {
 }
 
 function scenarioWorkerSubagentDenied(f: Fixture): void {
-  scenario("permissions: arggon-worker cannot launch a subagent (no nesting)");
+  scenario("permissions: arggon-maker cannot launch a subagent (no nesting)");
   const result = f.runPrompt(
     "perm-worker-subagent",
     [
@@ -610,7 +610,7 @@ function scenarioWorkerSubagentDenied(f: Fixture): void {
       "If the subagent tool is unavailable or denied, say exactly: NO_SUBAGENT_TOOL.",
       "Do not do anything else.",
     ].join("\n"),
-    { agent: "arggon-worker" },
+    { agent: "arggon-maker" },
   );
   const events = eventsOf(result);
   const nested = subagentCalls(events);
@@ -663,7 +663,7 @@ function scenarioCoordinatorLaunch(
             "Then reply with one short line containing the subagent's reply.",
           ];
     last = f.runPrompt(attempt === 1 ? label : `${label}-retry`, prompt.join("\n"), {
-      agent: "arggon-coordinator",
+      agent: "arggon-delivery-lead",
     });
     const calls = subagentCalls(eventsOf(last));
     allCalls = allCalls.concat(calls);
@@ -708,22 +708,25 @@ function wavePlanPrompt(): string {
 
 function waveDelegatePrompt(f: Fixture, chain: WaveChain): string {
   return [
-    "PHASE 2 — delegate both items to workers NOW.",
+    "PHASE 2 — delegate both items to makers NOW.",
     "",
-    "Launch BOTH workers in ONE message with two subagent tool calls, FOREGROUND (never background: true — the headless run must wait for their results; a background notification would end this run early).",
+    "Launch BOTH makers in ONE message with two subagent tool calls, FOREGROUND (never background: true — the headless run must wait for their results; a background notification would end this run early).",
     "",
-    "Use agent arggon-worker for both. Each worker prompt must be self-contained and instruct exactly:",
-    `- Step 1: run: arggon start <item-id> --worktree --assignee <login> --json   (workdir ${f.dir}) and read worktreePath from the JSON output.`,
+    "Use agent arggon-maker for both. Each maker prompt must be self-contained and instruct exactly:",
+    `- Step 1: run: arggon start <item-id> --worktree --assignee <agent-role-id> --json   (workdir ${f.dir}) and read worktreePath from the JSON output.`,
     "- Step 2: inside that worktree (use the shell tool's workdir), create the single acceptance file with exactly the acceptance content.",
     "- Step 3: run: arggon validate   from the worktree (must be green).",
     `- Step 4: from the worktree: git add <file> && git commit -m "feat(<item-id>): create <file>" then git push -u origin feat/<item-id>.`,
     '- Step 5: from the worktree run: arggon comment <item-id> "<evidence: file, commit, validation>" and arggon handoff <item-id> --next "<next step>".',
     "- Rules: stay in the worktree, stage explicit paths only, NEVER flip the item to done, never merge, never reopen anything.",
     "",
-    `Worker A: item ${chain.alpha.id}, acceptance file ${chain.alpha.file} containing exactly: ${chain.alpha.content}, assignee arggon-worker-a.`,
-    `Worker B: item ${chain.beta.id}, acceptance file ${chain.beta.file} containing exactly: ${chain.beta.content}, assignee arggon-worker-b.`,
+    // Identity discipline (ADR 0021 §5): an agent claims as its role id, never
+    // as a human login. The two claims are distinguished by suffix because they
+    // are two writers of two items — not two roles.
+    `Maker A: item ${chain.alpha.id}, acceptance file ${chain.alpha.file} containing exactly: ${chain.alpha.content}, assignee arggon-maker-a.`,
+    `Maker B: item ${chain.beta.id}, acceptance file ${chain.beta.file} containing exactly: ${chain.beta.content}, assignee arggon-maker-b.`,
     "",
-    "After both workers return, reply with one line per worker: item id, branch, worktree path, commit hash, push result.",
+    "After both makers return, reply with one line per maker: item id, branch, worktree path, commit hash, push result.",
   ].join("\n");
 }
 
@@ -734,7 +737,7 @@ function waveReviewPrompt(f: Fixture, chain: WaveChain): string {
     `  Then POST THE VERDICT from that worktree: arggon comment ${task.id} "review verdict: <merge|no-merge> — findings in severity order, evidence, what was verified, what could not be".`,
   ];
   return [
-    "PHASE 3 — review both branches with ONE arggon-reviewer subagent launch (foreground, single subagent call; never background).",
+    "PHASE 3 — review both branches with ONE arggon-standards-reviewer subagent launch (foreground, single subagent call; never background).",
     "",
     "The reviewer prompt must be self-contained and instruct exactly:",
     ...perItem(chain.alpha),
@@ -776,10 +779,10 @@ function waveFixture(): { fixture: Fixture; chain: WaveChain } | undefined {
 function assertWavePhase2(f: Fixture, chain: WaveChain, result: RunResult): void {
   const events = eventsOf(result);
   const calls = subagentCalls(events);
-  const workerCalls = calls.filter((call) => call.agent === "arggon-worker");
+  const workerCalls = calls.filter((call) => call.agent === "arggon-maker");
   const workers = workerCalls.filter((call) => call.status === "completed");
   check(
-    "phase 2 launched two arggon-worker subagents, completed",
+    "phase 2 launched two arggon-maker subagents, completed",
     workers.length === 2,
     JSON.stringify(calls),
   );
@@ -821,7 +824,7 @@ function assertWavePhase2(f: Fixture, chain: WaveChain, result: RunResult): void
     const item = f.git(["show", `feat/${task.id}:${task.path}`]).stdout;
     check(
       `${task.id} is claimed (in_progress + assignee) on its branch`,
-      /status: in_progress/.test(item) && /assignee: arggon-worker-/.test(item),
+      /status: in_progress/.test(item) && /assignee: arggon-maker-/.test(item),
       item.slice(0, 300),
     );
     check(
@@ -839,7 +842,9 @@ function assertWavePhase3(
   preReview: Map<string, string>,
 ): void {
   const events = eventsOf(result);
-  const reviewerCalls = subagentCalls(events).filter((call) => call.agent === "arggon-reviewer");
+  const reviewerCalls = subagentCalls(events).filter(
+    (call) => call.agent === "arggon-standards-reviewer",
+  );
   const reviewers = reviewerCalls.filter((call) => call.status === "completed");
   check(
     "phase 3 reviewer subagent completed",
@@ -917,11 +922,11 @@ function scenarioContextAccounting(f: Fixture, chain: WaveChain, runtimeVersion:
   scenario("context accounting: injected item block + per-worker token totals");
   const prompt = "Reply with exactly: CTX. Do not use any tools.";
   const withBlock = f.runPrompt("accounting-with-block", prompt, {
-    agent: "arggon-worker",
+    agent: "arggon-maker",
     overrides: { ARGON_ITEM: chain.alpha.id },
   });
   const withoutBlock = f.runPrompt("accounting-without-block", prompt, {
-    agent: "arggon-worker",
+    agent: "arggon-maker",
   });
   const injectionsWith = contextInjections(withBlock.stderr);
   const injectionsWithout = contextInjections(withoutBlock.stderr);
@@ -963,7 +968,7 @@ function scenarioContextAccounting(f: Fixture, chain: WaveChain, runtimeVersion:
 function scenarioWorkerSessionStats(f: Fixture, result: RunResult): void {
   scenario("context accounting: real per-worker child-session tokens");
   const workers = subagentCalls(eventsOf(result)).filter(
-    (call) => call.agent === "arggon-worker" && call.status === "completed",
+    (call) => call.agent === "arggon-maker" && call.status === "completed",
   );
   for (const call of workers) {
     const sessionID = subagentSessionId(call);
@@ -1006,8 +1011,8 @@ function main(): void {
   scenarioReviewerEditDenied(permissions);
   scenarioWorkerSubagentDenied(permissions);
   scenarioCoordinatorLaunch(permissions, "explore", "completed");
-  scenarioCoordinatorLaunch(permissions, "arggon-worker", "completed");
-  scenarioCoordinatorLaunch(permissions, "arggon-reviewer", "completed");
+  scenarioCoordinatorLaunch(permissions, "arggon-maker", "completed");
+  scenarioCoordinatorLaunch(permissions, "arggon-standards-reviewer", "completed");
   scenarioCoordinatorLaunch(permissions, "general", "denied");
 
   // T13 — scripted wave: one coordinator session, four phases.
@@ -1017,7 +1022,7 @@ function main(): void {
   } else {
     const { fixture: f, chain } = wave;
     scenario("wave: phase 1 — coordinator plans by file-disjointness");
-    const plan = f.runPrompt("wave-1-plan", wavePlanPrompt(), { agent: "arggon-coordinator" });
+    const plan = f.runPrompt("wave-1-plan", wavePlanPrompt(), { agent: "arggon-delivery-lead" });
     const planText = textOf(eventsOf(plan));
     check("plan phase ran", plan.status === 0, runTail(plan));
     check(
@@ -1042,7 +1047,7 @@ function main(): void {
     } else {
       scenario("wave: phase 2 — two workers, foreground, own worktrees");
       const delegate = f.runPrompt("wave-2-delegate", waveDelegatePrompt(f, chain), {
-        agent: "arggon-coordinator",
+        agent: "arggon-delivery-lead",
         session: sessionID,
       });
       check("delegate phase ran", delegate.status === 0, runTail(delegate));
@@ -1057,7 +1062,7 @@ function main(): void {
         ]),
       );
       const review = f.runPrompt("wave-3-review", waveReviewPrompt(f, chain), {
-        agent: "arggon-coordinator",
+        agent: "arggon-delivery-lead",
         session: sessionID,
       });
       check("review phase ran", review.status === 0, runTail(review));
@@ -1065,7 +1070,7 @@ function main(): void {
 
       scenario("wave: phase 4 — merge verification and done flips");
       const merge = f.runPrompt("wave-4-merge", waveMergePrompt(chain), {
-        agent: "arggon-coordinator",
+        agent: "arggon-delivery-lead",
         session: sessionID,
       });
       assertWavePhase4(f, chain, merge);

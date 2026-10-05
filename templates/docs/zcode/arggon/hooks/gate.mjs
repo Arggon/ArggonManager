@@ -12,8 +12,11 @@
  *
  * Reviewer backstop: ZCode hook input carries `session_id` + `tool_input` but
  * no agent identity, and ZCode has no per-agent permission DSL — so the gate
- * marks the session when a subagent dispatch names the plugin's reviewer
- * (`arggon-reviewer`, optionally plugin-qualified) and, while the dispatch is
+ * marks the session when a subagent dispatch names the plugin's standards
+ * reviewer (`arggon-standards-reviewer`, optionally plugin-qualified — pinned
+ * to the shipped id by cli/src/init-zcode.test.ts, which reads the id out of
+ * `templates/docs/zcode/arggon/agents/` and asserts this matcher matches it)
+ * and, while the dispatch is
  * in flight (PreToolUse(Agent) → PostToolUse(Agent)), denies for that session:
  * Write/Edit, mutating `arggon` shell invocations, git history commands, and
  * the mutating `mcp__arggon__*` tools. The reviewer keeps the read tools and
@@ -75,7 +78,10 @@ const REVIEWER_SHELL_GATES = [
 
 /** Global gates: every session, every mode of work (W4 seam defaults). */
 const GLOBAL_SHELL_GATES = [
-  { re: /\bgit\b[^;&|]*\spush\b(?=[^;&|]*\s(?:--force\b|-f[a-z]*|\+\S))/, why: "force push (git push --force / -f<letters>, incl. -fu / refspec-plus +ref)" },
+  {
+    re: /\bgit\b[^;&|]*\spush\b(?=[^;&|]*\s(?:--force\b|-f[a-z]*|\+\S))/,
+    why: "force push (git push --force / -f<letters>, incl. -fu / refspec-plus +ref)",
+  },
   { re: /\bgit\b[^;&|]*\scommit\b[^;&|]*--no-verify\b/, why: "git commit --no-verify" },
 ];
 
@@ -133,21 +139,17 @@ function writeMarker(input, count) {
     rmSync(statePath(input), { force: true });
     return;
   }
-  writeFileSync(
-    statePath(input),
-    JSON.stringify({ count, ts: Date.now() }),
-    "utf8",
-  );
+  writeFileSync(statePath(input), JSON.stringify({ count, ts: Date.now() }), "utf8");
 }
 
 function reviewerActive(input) {
   return readMarker(input) > 0;
 }
 
-/** True for the plugin's reviewer agent id, plain or plugin-qualified. */
+/** True for the plugin's standards-reviewer agent id, plain or plugin-qualified. */
 function isReviewerDispatch(input) {
   const type = input?.tool_input?.subagent_type;
-  return typeof type === "string" && /(^|:)arggon-reviewer$/.test(type);
+  return typeof type === "string" && /(^|:)arggon-standards-reviewer$/.test(type);
 }
 
 function bashCommand(input) {
@@ -170,7 +172,9 @@ function pre(input) {
     }
     if (reviewerActive(input)) {
       if (MUTATING_ARGGON_WORDS.test(command)) {
-        deny("a reviewer dispatch is in flight — tracker mutations are denied (post the verdict with arggon_comment)");
+        deny(
+          "a reviewer dispatch is in flight — tracker mutations are denied (post the verdict with arggon_comment)",
+        );
       }
       for (const gate of REVIEWER_SHELL_GATES) {
         if (gate.re.test(command)) deny(`reviewer dispatch in flight — ${gate.why} is denied`);
@@ -186,7 +190,9 @@ function pre(input) {
   }
   if (MUTATING_MCP_TOOLS.has(tool)) {
     if (reviewerActive(input)) {
-      deny(`a reviewer dispatch is in flight — ${tool} is denied (read with arggon_show, post the verdict with arggon_comment)`);
+      deny(
+        `a reviewer dispatch is in flight — ${tool} is denied (read with arggon_show, post the verdict with arggon_comment)`,
+      );
     }
     allow();
   }

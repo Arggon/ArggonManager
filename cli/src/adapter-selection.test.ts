@@ -142,7 +142,7 @@ describe("adapter selection: registry", () => {
   it("classifies each agent's seam by template id and nothing else", () => {
     // The opencode seam: config + agents + commands + the vendored plugin pair.
     expect(BY_AGENT.opencode).toContain("opencode.jsonc");
-    expect(BY_AGENT.opencode).toContain(".opencode/agents/arggon-worker.md");
+    expect(BY_AGENT.opencode).toContain(".opencode/agents/arggon-maker.md");
     expect(BY_AGENT.opencode).toContain(".opencode/plugins/arggon/index.ts");
     // zcode: the whole vendored marketplace, nothing outside it.
     expect(BY_AGENT.zcode.some((d) => d.startsWith(".zcode-marketplace/"))).toBe(true);
@@ -327,7 +327,7 @@ describe("adapter selection: init flag matrix", () => {
     // disturb the selected one.
     const dropped = ".zcode-marketplace/marketplace.json";
     rmSync(join(dir, ...dropped.split("/")));
-    const selected = ".opencode/agents/arggon-worker.md";
+    const selected = ".opencode/agents/arggon-maker.md";
     const keptBytes = readFileSync(join(dir, ...selected.split("/")), "utf8");
 
     const rerun = runInit({ dir, force: false, agents: "opencode" });
@@ -449,7 +449,7 @@ describe("doctor --agents: per-agent report", () => {
   it("reports an adopter-edited file as adopter-edited, never as stale", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    const victim = ".opencode/agents/arggon-worker.md";
+    const victim = ".opencode/agents/arggon-maker.md";
     writeFileSync(
       join(dir, ...victim.split("/")),
       `${readFileSync(join(dir, ...victim.split("/")), "utf8")}\nADOPTER EDIT\n`,
@@ -466,13 +466,13 @@ describe("doctor --agents: per-agent report", () => {
 
   it("reports a file with NO provenance state as adopter-edited, never as stale (F1)", () => {
     // The pre-init adopter tree — the exact case this feature targets: a repo
-    // that already had `.opencode/agents/arggon-coordinator.md` of its own when
+    // that already had `.opencode/agents/arggon-delivery-lead.md` of its own when
     // arggon first saw it. `docs.ts` classifies "on disk with no provenance
     // state" as adopter-modified and NEVER refreshes it, so `stale` (which
     // promises "arggon init would refresh it") would send the operator to a
     // command that cannot work.
     const dir = tempDir();
-    const own = ".opencode/agents/arggon-coordinator.md";
+    const own = ".opencode/agents/arggon-delivery-lead.md";
     mkdirSync(join(dir, ...own.split("/").slice(0, -1)), { recursive: true });
     writeFileSync(join(dir, ...own.split("/")), "# the adopter's own agent\n", "utf8");
     runInit({ dir, force: false });
@@ -497,8 +497,8 @@ describe("doctor --agents: per-agent report", () => {
   it("reports an acknowledged file as acknowledged, and an edit after the ack as acknowledged-drifted (F2b)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    const acked = ".opencode/agents/arggon-reviewer.md";
-    const edited = ".opencode/agents/arggon-worker.md";
+    const acked = ".opencode/agents/arggon-standards-reviewer.md";
+    const edited = ".opencode/agents/arggon-maker.md";
     // `adopt --ack` records the CURRENT bytes as the sanctioned baseline; the
     // reviewer observed that it acks EVERY state entry, so this is the NORMAL
     // state of a fully-adopted tree, not an edge case.
@@ -666,7 +666,7 @@ describe("adapter selection: never-overwrite and refusal", () => {
   it("never overwrites an adopter-edited generated file in ANY default mode", () => {
     const dir = tempDir();
     runInit({ dir, force: false, agents: "opencode" });
-    const victim = ".opencode/agents/arggon-worker.md";
+    const victim = ".opencode/agents/arggon-maker.md";
     const adopterEdit = `${readFileSync(join(dir, ...victim.split("/")), "utf8")}\nADOPTER EDIT\n`;
     writeFileSync(join(dir, ...victim.split("/")), adopterEdit, "utf8");
 
@@ -695,7 +695,7 @@ describe("adapter selection: never-overwrite and refusal", () => {
   it("reports `init --backup` on an adopter-edited file as `replaced`, not `skipped` (F3)", () => {
     const dir = tempDir();
     runInit({ dir, force: false, agents: "opencode" });
-    const victim = ".opencode/agents/arggon-worker.md";
+    const victim = ".opencode/agents/arggon-maker.md";
     const adopterEdit = `${readFileSync(join(dir, ...victim.split("/")), "utf8")}\nADOPTER EDIT\n`;
     writeFileSync(join(dir, ...victim.split("/")), adopterEdit, "utf8");
 

@@ -53,12 +53,13 @@ const TIER1_DOCS = [
   // .arggon.env so a fresh scaffold never tracks the per-worktree env file.
   ".gitignore",
   ".mcp.json",
-  ".opencode/agents/arggon-coordinator.md",
+  ".opencode/agents/arggon-delivery-lead.md",
   // task-prover-agent-reviewer-split: execution evidence is its own agent, and
-  // init emits the agents alphabetically (coordinator, prover, reviewer, worker).
-  ".opencode/agents/arggon-prover.md",
-  ".opencode/agents/arggon-reviewer.md",
-  ".opencode/agents/arggon-worker.md",
+  // init emits the agents alphabetically (delivery-lead, maker,
+  // standards-reviewer, verifier).
+  ".opencode/agents/arggon-maker.md",
+  ".opencode/agents/arggon-standards-reviewer.md",
+  ".opencode/agents/arggon-verifier.md",
   ".opencode/commands/arggon-adopt.md",
   ".opencode/commands/arggon-adr.md",
   ".opencode/commands/arggon-done.md",
@@ -77,9 +78,9 @@ const TIER1_DOCS = [
   // ADR 0014 (task-zcode-plugin-seam): the ZCode plugin seam is tier-1 —
   // marketplace catalog + the vendored declarative plugin.
   ".zcode-marketplace/arggon/.zcode-plugin/plugin.json",
-  ".zcode-marketplace/arggon/agents/arggon-coordinator.md",
-  ".zcode-marketplace/arggon/agents/arggon-reviewer.md",
-  ".zcode-marketplace/arggon/agents/arggon-worker.md",
+  ".zcode-marketplace/arggon/agents/arggon-delivery-lead.md",
+  ".zcode-marketplace/arggon/agents/arggon-maker.md",
+  ".zcode-marketplace/arggon/agents/arggon-standards-reviewer.md",
   ".zcode-marketplace/arggon/commands/arggon-adopt.md",
   ".zcode-marketplace/arggon/commands/arggon-adr.md",
   ".zcode-marketplace/arggon/commands/arggon-board.md",
