@@ -13,6 +13,7 @@ updated: "2026-10-05"
 claimed_at: "2026-10-05T22:48:17.271Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-docs-ts-stale-example-path
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-docs-ts-stale-example-path.md
   Leaves live only under a story. id is the filename stem: bug-docs-ts-stale-example-path.
@@ -33,6 +34,7 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-docs-ts-stale-example-pat
 ## Notes
 
 ### 2026-10-05 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+
 ## Context
 
 Found reviewing PR #641: `cli/src/docs.ts` (~line 990) carries a stale example path in the
@@ -42,6 +44,60 @@ reader cannot tell an example from a live value.
 
 ## Acceptance
 
-- [ ] The example names a destination that exists in the current templates (the four shipped agent ids are the natural choice)
-- [ ] If the string is a **fallback/literal** rather than an example, say so in the comment — ambiguity here is the defect
-- [ ] `npm run check:plugin` green if the bundle inlines this file; `npm test` green; prettier clean
+- [x] The example names a destination that exists in the current templates (the four shipped agent ids are the natural choice)
+- [x] If the string is a **fallback/literal** rather than an example, say so in the comment — ambiguity here is the defect
+- [x] `npm run check:plugin` green if the bundle inlines this file; `npm test` green; prettier clean
+
+### 2026-10-05 @arggon-maker — resolution: ambiguity fixed, not the id swapped
+
+**One occurrence**, not several: `grep -n 'arggon-coordinator|arggon-worker|arggon-reviewer' cli/src/docs.ts`
+returns exactly one hit — line 990, in the JSDoc policy note of `classifyOrphan`. The other two
+`.opencode/agents/` mentions in the file (`:385` `.opencode/agents/x.md`, `:980`
+`.opencode/agents/*.md`) are placeholder/glob and were already current.
+
+**The string is an EXAMPLE, not a fallback/literal** — it is JSDoc prose on
+`classifyOrphan`, never read by code. So criterion 2 applies and the fix is to resolve the
+ambiguity, per the item Context ("a reader cannot tell an example from a live value").
+
+**I did not swap the id to a live one, and that is the substantive call.** `.opencode/agents/arggon-coordinator.md`
+was a REAL generated destination (`git log --diff-filter=ADR`: added `7122c8c1`, renamed away in
+`0d1571e0`), and the paragraph's subject is exactly a destination the rename _removed_ — "clear a
+dead agent — which the agent rename depends on (ADR 0021 §6.2a′ gates it on reaping)". Substituting a
+shipped id (`arggon-delivery-lead.md` and friends) would make the sentence self-contradictory: a
+live destination still has its template, so it can never be an orphan, so it can never be
+"stranded". The retired id is the only class of path this note is about. Acceptance criterion 1
+read literally would have made the docs worse.
+
+Instead the example is now marked retired **and** names its live successor, so the reader can no
+longer mistake it for a current destination:
+
+> The case that matters is a destination the rename RETIRED, not a live one: stranded,
+> `.opencode/agents/arggon-coordinator.md` is still dispatched as an agent, and no current template
+> generates it (its successor is `arggon-delivery-lead.md`).
+
+Mapping verified against ADR 0021 §6.2a′ (`arggon-coordinator` → `arggon-delivery-lead`); the
+"no current template generates it" claim verified against `templates/docs/opencode/agents/` (4 files)
+and `templates/docs/zcode/arggon/agents/` (3 files) — neither contains a retired id. Comment grew 8 → 10
+lines, wrapping held at ≤77 cols to match the surrounding note.
+
+**Generated mirrors: none to move.** The same policy is mirrored in `README.md:222`, but it names no
+agent id at all — it says "Arming is how an adopted repo clears a dead agent across a rename" — so it
+was already immune to rename drift and needed no change. No skill reference carries a retired id
+(`.agents/skills/arggon-cli/**` absent from the repo-wide `arggon-coordinator` grep).
+`check:plugin` confirms `cli/src/docs.ts` is **not** inlined into
+`opencode/plugins/arggon/index.bundle.ts` (`grep -c` = 0; bundle diff empty after rebuild).
+
+**Found, NOT fixed (out of my scope — recommend filing):** `ArggonManager/docs/json-output.md` carries
+retired ids as live `doctor` example values — `:806`
+`"agents": ["arggon-coordinator", "arggon-reviewer", "arggon-worker"]` and `:916`
+`{"path": ".opencode/agents/arggon-coordinator.md", "status": "adopter-edited"}`. Neither is a mirror
+of the `docs.ts` note (independent envelope examples), and that file is **hand-maintained, not
+template-generated** — it is absent from `templates/docs/docs/` and from the convention's managed-doc
+set, so there is no template to fix instead. `:806` also needs a real answer to the 4-vs-3 OpenCode/ZCode
+shipped-agent asymmetry, which is its own change. Left untouched deliberately.
+
+Gates (all on `fix/bug-docs-ts-stale-example-path`, after `npm run build`): `npm test` 128 files /
+2680 tests passed (the filed `headless-ci` flake did not reproduce on this run); `npm run lint` clean;
+`npm run test:structure` 5 passed / 0 failed; `npm run lint:structure` clean; `npm run build` ok;
+`npm run check:plugin` clean; `npm run arggon -- validate` ok (0 warnings, convention v5);
+`prettier --check cli/src/docs.ts` clean.
