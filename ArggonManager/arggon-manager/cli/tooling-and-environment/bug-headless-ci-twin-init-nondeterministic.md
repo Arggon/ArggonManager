@@ -2,7 +2,7 @@
 type: bug
 status: todo
 id: bug-headless-ci-twin-init-nondeterministic
-title: "`cli/src/headless-ci.test.ts` twin-checkout determinism assertion fails on clean `main`: two fresh `init --no-commit` checkouts of the same source produce different stdout"
+title: Stale `dist/cli.js` in a worktree surfaces as a false parity failure in `cli/src/headless-ci.test.ts` — the twin behaviour is deterministic; the precondition is not reported
 parent: tooling-and-environment
 labels: [tests, ci, determinism]
 created: "2026-10-05"
@@ -19,41 +19,53 @@ updated: "2026-10-05"
 
 ## Context
 
-Found during delivery-lead merge verification of PR #612
-(`fix/bug-mcp-parity-branch-test-json-parse-of-human-stdout`), 2026-10-05.
+> **Corrected 2026-10-05 — the original premise below was wrong.** This item was filed believing
+> `main` was independently red. **It is not.** `main` is fully green: **129 files / 2692 tests
+> passed** on the primary checkout after a full `npm run build`. The original diagnosis — "two
+> fresh `init` checkouts of the same source produce different stdout" — is **refuted**.
 
-`npm test` on that branch reported `Test Files 1 failed | 127 passed (128)` /
-`Tests 1 failed | 2668 passed (2669)`. The failing assertion is
-`cli/src/headless-ci.test.ts:849`:
+**The real cause: a stale `dist/cli.js` in the worktree. Not nondeterminism.**
 
-```ts
-const initB = runCheckoutCli(["--json", "init", "--no-commit"], twinB…);
-expect(initB.status, initB.stderr).toBe(initA.status);
-expect(normalize(initA.stdout, twinA)).toBe(normalize(initB.stdout…));
-```
+The failing assertion is `cli/src/headless-ci.test.ts:849` — `packed-bin --json envelopes are
+byte-identical to the checkout CLI` — which compares the **packed** bin against the **checkout** CLI.
+The two envelopes differed in exactly one place: the packed envelope lacked `"reaped":[]` and
+`"reapRefused":[]`, fields the source has emitted since the orphan-reaping work landed.
 
-**It is NOT caused by that PR.** Verified, not assumed: the branch does not
-touch `cli/src/headless-ci.test.ts` (`git diff --name-only origin/main..HEAD |
-grep headless` → empty), and the same test fails identically in the **primary
-checkout on clean `origin/main`**: `Test Files 1 failed (1) | Tests 1 failed |
-6 passed (7)`.
+That is a **build-state** difference, not a nondeterministic one. `runPacked` ships whatever
+`dist/cli.js` exists, while the checkout CLI runs from `lib/src` via `tsx`. Running only
+`npm run build --workspace @arggondev/lib` — which rebuilds `lib/dist` but **not** `dist/cli.js` —
+left the packed side stale and the assertion red. Reproduced and re-diagnosed:
 
-So `main` is currently red on its own — a latent defect that no gate has been
-holding down, consistent with the item's neighbours in this story.
+| worktree | build run | `headless-ci.test.ts` |
+|---|---|---|
+| `…-task-zcode-goal-mode` | `build --workspace @arggondev/lib` only | 1 failed / 6 passed |
+| `…-task-zcode-goal-mode` | full `npm run build` | **7 passed** |
+| primary checkout | full `npm run build` | **7 passed** |
+
+The twin behaviour is deterministic. The *test* is sensitive to build state, and nothing in the run
+says so — it surfaces as a parity mismatch, which reads like a product bug. That mis-signal sent
+this lead and two makers chasing a defect that does not exist, and it produced the false claim
+"main is red" repeated across several item bodies this session.
+
+**Why it still matters.** The lane is green, but the precondition is real, and it is the same class
+`bug-test-suite-lib-dist-rebuild-race` addressed — except #647 covered the **library** build, not the
+CLI's own `dist/cli.js`. A fresh worktree still ships a `dist/` that can be stale relative to
+`lib/src`, and `npm test` reports nothing until a parity assertion trips over it.
 
 ## Acceptance
 
-- [ ] Root-caused: which field(s) of the `init --json` envelope differ between two
-      fresh checkouts of the same source (likely a path/timestamp/absolute-dir leak
-      that `normalize` does not cover)
-- [ ] Fixed at the source (the non-deterministic producer), not by widening
-      `normalize` until it stops noticing
-- [ ] `npm test` green on a clean `main` checkout, with this file included
-- [ ] `cli/src/headless-ci.test.ts` reviewed for other twin comparisons that could
-      mask the same class — fix every occurrence, not just the first
-- [ ] Recorded whether `main` was red here before (i.e. is CI currently green on
-      main?); if CI is green, explain what keeps this test from failing there and
-      whether it is load- or ordering-dependent
+- [ ] The stale-`dist/` precondition is **reported**, not inferred from a parity failure — via
+      `doctor`-style state, a skip-with-reason, or an assertion that names "packed bin is stale vs
+      checkout CLI" as a cause distinct from "the two envelopes disagree"
+- [ ] `npm run build` (not `--workspace @arggondev/lib`) is what the docs, `CONTRIBUTING.md` and any
+      maker dispatch prompt say to run after a worktree sync — the partial build is the trap
+- [ ] The assertion distinguishes the two failures, so the next occurrence is diagnosable in one
+      read instead of a byte-for-byte envelope diff
+- [ ] `test/kernel-artifacts.ts` (from #647) considered: it fingerprints `dist/` too, so a stale
+      `dist/` is at least detectable — decide whether it should also **refuse to start** on one
+- [x] `npm test` green on a clean `main` checkout, with this file included — **met**: 129 files /
+      2692 passed
+- [x] The original twin-nondeterminism hypothesis tested and **refuted**, with the real cause named
 
 ## Notes
 
