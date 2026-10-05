@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-docs-ts-stale-example-path
 title: cli/src/docs.ts orphan-reaping example path is stale — the example names a destination the rename removed
+assignee: arggon-delivery-lead
+branch: fix/bug-docs-ts-stale-example-path
 parent: role-model-foundation
 labels: [docs, cli]
 priority: p3
 created: "2026-10-05"
 updated: "2026-10-05"
+claimed_at: "2026-10-05T22:48:17.271Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-docs-ts-stale-example-path
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-docs-ts-stale-example-path.md
