@@ -79,3 +79,16 @@ second place with nothing tying the two together.
 - [ ] The guard covers `templates/docs/docs/engineering.md`, `agents.md`, `convention.md`, `AGENTS.md` and `README.md` as one set — the whole template family — rather than the single file that happened to break
 - [ ] ADR 0016 upgrade-channel note: an **existing** adopter's copy is not refreshed by `init` (never-overwrite), so the corrected template only reaches **new** trees. Say in the release notes that adopters must reconcile their own copies, and decide whether `init --propose` should carry it
 - [ ] Cross-checked against `templates/docs/docs/AGENTS.md:17` and `templates/docs/docs/viewer-spike.md` — the work-loop-parity statements there are still correct under the two-axis rule and must be left alone
+
+### 2026-10-05 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+### 2026-10-04 @coordinator — one more file added (from PR #641's review)
+
+`templates/docs/AGENTS.md:17` carries a **pre-rename role word**, so the adopter template family
+sweep now has a fourth member. Add it to this item's file set and to the guard clause:
+
+- [ ] `templates/docs/AGENTS.md:17` uses the shipped role vocabulary (ADR 0021 §6.1) rather than the pre-rename wording
+- [ ] The existing guard row ("the whole template family, not the file that happened to break") now covers `engineering.md`, `agents.md`, `convention.md`, `AGENTS.md`, `README.md`
+
+Note for whoever picks this up: PR #641 renamed the ids the *shipped* seam generates. The
+**adopter templates** are a separate copy and were deliberately out of that PR's scope — which
+is why this item exists.
