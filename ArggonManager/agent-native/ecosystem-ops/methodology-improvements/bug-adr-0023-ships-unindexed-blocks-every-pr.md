@@ -10,7 +10,6 @@ created: "2026-10-05"
 updated: "2026-10-05"
 claimed_at: "2026-10-05T21:29:00.347Z"
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-adr-0023-ships-unindexed-blocks-every-pr.md
   Leaves live only under a story. id is the filename stem: bug-adr-0023-ships-unindexed-blocks-every-pr.
@@ -66,3 +65,13 @@ Found by the maker delivering `bug-test-suite-lib-dist-rebuild-race` on 2026-10-
       deliberately
 
 ## Notes
+
+### 2026-10-05 @arggon-delivery-lead
+### 2026-10-05 @arggon-delivery-lead
+Done inline (doctrine: a one-line doc fix is trivial work, not a maker dispatch — `docs/agents.md` §Orchestration). `b2da0329` adds the ADR 0023 index row on `main`; `adr-index-parity.test.ts` is 7/7.
+
+**Found because a maker refused to tick a box it could not honestly tick.** `bug-test-suite-lib-dist-rebuild-race` requires ≥5 consecutive green full runs; all five carried this one failure and **zero** race-class occurrences — the `lib/dist` race was already gone, and this unrelated red test was masking it. A permanently-red `cli` lane is worse than the flake it hid, because it teaches re-run-instead-of-read.
+
+**Scope note:** `task-adr-index-parity-does-not-check-titles` (#620) is the product owner's live claim and pins the **Title** column; deliberately not touched or bundled.
+
+**Still red on `main`, and therefore not ticked:** `cli/src/headless-ci.test.ts:849` (`packed-bin --json envelopes are byte-identical to the checkout CLI`) — pre-existing, unrelated, filed as `bug-headless-ci-twin-init-nondeterministic`. Observed after this fix: `1 failed | 2679 passed (2680)`, down from two red tests to one. So the `cli` lane is still not honestly green, and PRs will keep red-lining on that one file until it is fixed.
