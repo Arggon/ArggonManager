@@ -271,23 +271,49 @@ describe("spawn failure classification (bug-cli-spawn-suites-exit-1-flake)", () 
     expect(err.message).toContain("does not provide an export named 'assertParentEdge'");
   });
 
-  it("the in-repo pack passes --ignore-scripts so it cannot rebuild lib/dist under the suite", () => {
-    // The cause, pinned at the one lane whose cwd IS the repo.
-    // Deliberately NOT a repo-wide "no unguarded pack" scan: lib-build and
-    // pack-contents run `npm run build` / `npm pack` on purpose and are safe
-    // precisely because their cwd is a fresh clone copy that owns its own
-    // `lib/` — and which cwd an argv literal carries cannot be decided
-    // statically, so a blanket ban would delete real coverage. This pins the
-    // flag on the only lane whose lifecycle scripts reach the artifact every
-    // other lane is reading.
+  it("the checkout is never a pack cwd, so no pack can rebuild the shared lib/dist", () => {
+    // The cause, pinned where it actually lives — and corrected.
+    //
+    // This gate used to assert only that the in-repo `npm pack` passed
+    // `--ignore-scripts`, on the belief that the flag stops the root `prepare`.
+    // It does not, on the npm major CI runs: measured on npm 10.9.4,
+    // `npm pack --ignore-scripts` in this checkout still emits
+    // `> prepare > npm run build` and rewrites every file of `lib/dist` and
+    // `dist` in place with vitest's other forks live. The flag is kept (it is
+    // free on npm >= 12) but the mechanism is the pack cwd, so that is what is
+    // pinned here.
+    //
+    // Deliberately NOT a repo-wide "no pack" ban: lib-build and pack-contents
+    // pack on purpose and are safe precisely because their cwd is a private
+    // copy that owns its own `lib/`. What must never come back is the CHECKOUT
+    // as a pack cwd, and in the one lane that packs it that is one grep away.
     const code = stripComments(readFileSync(join(repoRoot, "cli/src/headless-ci.test.ts"), "utf8"));
     const packs = [...code.matchAll(/"pack",([^[\]]*)\]/g)].map((m) => m[1]!);
     expect(packs.length).toBeGreaterThan(0);
     expect(packs.filter((argv) => !argv.includes("--ignore-scripts"))).toEqual([]);
+    // The cwd is the seeded private copy, built from THIS checkout's build
+    // output, so the packed bytes are still the ones under test.
+    expect(code).toContain("freshCloneCopy(root, packClone, true)");
+    expect(code).toContain('join(packClone, "lib"), packClone');
+    // The checkout itself is not a pack cwd any more.
+    expect(code).not.toContain('join(root, "lib"), root');
     // The clone-copy lane keeps its build — opposite discipline, still covered.
     expect(
       stripComments(readFileSync(join(repoRoot, "cli/src/pack-contents.test.ts"), "utf8")),
     ).toContain('"pack", "--dry-run", "--json"');
+  });
+
+  it("the pack clone is seeded from this checkout, so the packed bytes are the ones under test", () => {
+    // The copy is only honest if it carries the build output: both directories
+    // are gitignored, so a plain clone has none and the tarball would ship
+    // without `dist/cli.js`.
+    const fixtures = stripComments(
+      readFileSync(join(repoRoot, "cli/src/pack-fixtures.ts"), "utf8"),
+    );
+    expect(fixtures).toContain('const BUILD_OUTPUT_DIRS = ["lib/dist", "dist"] as const;');
+    // A copy, never a link: a link would put the shared artifact back in play.
+    expect(fixtures).toContain("cpSync(from, to, { recursive: true });");
+    expect(fixtures).not.toContain("symlinkSync(from");
   });
 });
 

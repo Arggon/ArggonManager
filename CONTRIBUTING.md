@@ -56,9 +56,10 @@ source, and so do the children the shared harness spawns — `runCli` /
 `cliNodeArgs` in `cli/src/test-spawn.ts`) that points the specifier at
 `lib/src/index.ts`, exactly like the in-process alias. The suites that
 deliberately exercise a **built** artifact still need it — `cli/src/lib-build.test.ts`
-(which builds a private fresh-clone copy), `cli/src/headless-ci.test.ts` (packs
-this checkout), and the build-info and plugin-parity gates — and each says so with
-an actionable message when it is missing. CI runs `npm ci` → `npm run build` →
+(which builds a private fresh-clone copy), `cli/src/headless-ci.test.ts` (packs a
+private copy of this checkout, seeded with its build output), and the build-info
+and plugin-parity gates — and each says so with an actionable message when it is
+missing. CI runs `npm ci` → `npm run build` →
 `npm test` ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 For the same reason the suite makes this checkout's build outputs (`lib/dist/`,
@@ -69,8 +70,16 @@ half-written module and surfacing as an unrelated
 `SyntaxError: ... does not provide an export named ...` in a _different_ lane
 (`bug-test-suite-lib-dist-rebuild-race`). A build a suite needs belongs in a temp
 root it owns — `freshCloneCopy` in `cli/src/pack-fixtures.ts` is the shared way to
-get one. Anything that moves a watched artifact anyway fails the run as
-`KernelArtifactDriftError`.
+get one (`withBuild` seeds the copy with this checkout's build output, and makes
+it writable: `cpSync` preserves the source's read-only mode). Anything that moves
+a watched artifact anyway fails the run as `KernelArtifactDriftError`.
+
+`npm pack --ignore-scripts` is **not** that mechanism, on any npm major: measured
+on npm 10.9.4 (what the CI runner ships) the flag does not stop `npm pack` from
+running the root `prepare`, so a pack whose cwd is the checkout rebuilds
+`lib/dist` and `dist` in place under every other lane's readers. npm 12 does skip
+it, which is why this hid for so long — a warm local run on npm 12 cannot see it.
+The pack cwd is the mechanism; the flag is kept because it is free on npm >= 12.
 
 `arggon start <id> --worktree` prepares a fresh worktree for the project gate
 and for worktree-local resolution: when the primary checkout has a
