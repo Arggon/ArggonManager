@@ -1,13 +1,15 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-mcp-parity-branch-test-json-parse-of-human-stdout
 title: "mcp-parity \"branch checks out identically\" test JSON.parses a CLI line that can be the human \"arggon branch …\" success message, not the --json envelope"
+assignee: arggon-delivery-lead
 parent: methodology-improvements
 labels: [tests, mcp, ci-blocking]
 priority: p1
 created: "2026-10-02"
-updated: "2026-10-03"
+updated: "2026-10-05"
+claimed_at: "2026-10-05T18:28:41.654Z"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-mcp-parity-branch-test-json-parse-of-human-stdout.md
