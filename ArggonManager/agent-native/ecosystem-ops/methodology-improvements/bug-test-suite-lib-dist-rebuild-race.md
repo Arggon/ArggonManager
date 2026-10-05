@@ -13,7 +13,6 @@ updated: "2026-10-05"
 claimed_at: "2026-10-05T20:33:42.754Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-test-suite-lib-dist-rebuild-race
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-test-suite-lib-dist-rebuild-race.md
   Leaves live only under a story. id is the filename stem: bug-test-suite-lib-dist-rebuild-race.
@@ -206,3 +205,37 @@ Maker evidence for the review — commands run, expected vs observed.
 2. The item title's writer set is untrue on this branch. Correction is recorded in `## Context`; the title is left for you (tracker framing is yours).
 
 **Disclosed non-additive edits:** one line in `test-spawn.test.ts`'s existing SpawnHarnessError case now builds its representative argv with `cliNodeArgs` (what a real spawn runs — not weaker); `vitest.config.ts` gained a second globalSetup; `CONTRIBUTING.md`/`README.md` documented the old resolution and now describe the new one. `measure.test.ts`'s production-shape pin and the `--ignore-scripts` gate are untouched.
+
+### 2026-10-05 @ses_ef23980f2ffepEv8vQ3eD3FnJO
+### 2026-10-05 @maker (arggon-maker)
+request-changes addressed. HEAD `e5bc593a`; the blocker fix is `c1d8741a`.
+
+**You were right that the freeze broke a legitimate lane, and you were right that my cold evidence was missing. The variable is not coldness — it is the npm major.**
+
+Measured, same command, same tree, in the checkout:
+| npm | `npm pack --ignore-scripts` |
+| --- | --- |
+| 10.9.4 (CI) | `> prepare > npm run build`, ~15s — four `tsc` passes rewrite every file of `lib/dist` + `dist` in place |
+| 12.0.2 (my local dev) | no lifecycle, 0.5s |
+
+Neither the flag nor `npm_config_ignore_scripts` (either case) changes npm 10. So `headless-ci`'s pack **was** the writer the filed item named, on every CI run, invisible on npm 12 — and `--ignore-scripts` was a gate that did not gate. I could not see it because my local npm is 12: my `chmod -R a-w` experiment measured "no writer" only on the major that skips the lifecycle. My earlier "no writer exists" correction was wrong; it is corrected on the item.
+
+**Reproduced your finding locally in ~40s** by putting CI's npm major first on PATH (`/tmp/opencode/npm10bin` → 10.9.4): `PATH=… npm10bin npx vitest run cli/src/headless-ci.test.ts` fails with the PR #647 error verbatim (82 × `EACCES` on `lib/dist/*`, at headless-ci.test.ts:303); the same command on npm 12 passes in 8s.
+
+**The fix — your option (b), the legitimate builder builds outside the frozen root.** I did not exempt it, and I did not drop the freeze:
+- `freshCloneCopy(root, into, withBuild)` seeds a private clone with *this checkout's* build output, so the packed bytes are still the ones under test (the build-before-pack precondition assertions still read the checkout, unchanged), then makes the copy writable — `cpSync` preserves the source mode, and mid-suite the source is the frozen 0444 output, so the clone inherited read-only files and npm 10's prepare died inside it. Both of those were found by running the thing, not by reading it: my first `makeWritable` tested the READ bit (`0o400`) instead of the WRITE bit (`0o200`) and silently fixed nothing.
+- `headless-ci` packs that clone. `--ignore-scripts` stays (free on npm ≥ 12); the pack cwd is now the mechanism, and the gate says so.
+- The old gate is corrected, not deleted: it now pins the pack cwd (the checkout must never be one) and adds a pin that the seed is a copy, never a link.
+
+**Your four asks, with evidence:**
+1. *Isolation without breaking a legitimate builder* — done as above; the invariant is stronger than before, not weaker: no suite may write the shared build, and the one suite that legitimately builds does it in a private root.
+2. *Cold re-verification* — `rm -rf lib/dist dist` (no prebuilt output, no build cache: this repo's tsc is not incremental, so there is no tsbuildinfo to clear), `npm run build`, then the lane + both freeze gates under npm 10: **35 passed**. Full-suite cold run also green.
+3. *The guard still bites* — two proofs. (a) The refusal test (`refuses a writer outright, in the lane that writes`) passes in every run. (b) Reverting **only** the pack cwd on the final code and re-running under npm 10 reproduces the failure: exit 1, 82 × `EACCES`, 5 skipped. Restored, tree clean.
+4. *≥5 green runs* — **5 consecutive full runs under npm 10.9.4** (the CI major): exit 0 each, `129 passed (129)` / `2692 passed (2692)`. Plus 3 consecutive on npm 12, a cold-tree run, and 6 consecutive runs of the rebuilt lane. Race-class occurrences (`does not provide an export named` / `KernelArtifactDriftError` / `EACCES`) across all five npm-10 logs: **0**. Box 5 is now ticked on that evidence.
+5. *`bug-headless-ci-twin-init-nondeterministic`* — checked, not absorbed. The twin parity test is inside the lane I changed (packed bin vs checkout CLI), so I ran it 6× under npm 10: **7 passed every time**, no assertion failure. My change alters the packed bin's provenance (a clone seeded with the same build output, rebuilt in place by npm 10), and that is the one thing that could have perturbed a volatile-bytes parity assertion; the `normalize()` hash/datetime scrubbing covers it and it did not fire. Not touching that item's defect.
+
+**Gates, all executed on the final tree:** `npm run lint` clean · `npm run test:structure` 5 passed · `npm run lint:structure` clean · `npm run build` ok · `npm run check:plugin` ok, no bundle drift · `npm run arggon -- validate --json` `{"ok":true,…,"errors":[],"warnings":[]}` · `npx prettier --check` clean on every touched file.
+
+**Docs updated to the new mechanism:** CONTRIBUTING.md now says headless-ci packs a private copy, and records that `--ignore-scripts` is not the mechanism on any npm major, with the 10.9.4-vs-12.0.2 measurement — that trap is what hid the writer, and the next lane will hit it.
+
+One thing I did **not** do: I have not run PR #647's `cli` job myself (no merge authority, and the push is what triggers it). Push is next; if the lane is still red there, the freeze may be refusing a writer I have not found — the reproduction recipe above is fast enough to iterate on (`PATH=/tmp/opencode/npm10bin:$PATH npx vitest run cli/src/headless-ci.test.ts`, ~40s to failure).
