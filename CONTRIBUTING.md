@@ -49,12 +49,28 @@ Two npm packages make up this repo:
   resolves through `node_modules` to `lib/dist`.
 
 `npm run build` builds the kernel first, then the root. **Build before running
-the suite** (and after any `lib/**` change): the tests that drive surfaces in
-process do not need the build (vitest resolves `@arggondev/lib` to the kernel
-source), but the tests that spawn the real CLI resolve it through
-`node_modules` → `lib/dist`, so without a build they fail with
-`ERR_MODULE_NOT_FOUND`. CI runs `npm ci` → `npm run build` → `npm test`
-([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+the suite** (and after any `lib/**` change). Tests that drive surfaces in
+process do not need the build: vitest resolves `@arggondev/lib` to the kernel
+source, and so do the children the shared harness spawns — `runCli` /
+`spawnNodeCli` pass a resolve hook (`test/kernel-source-resolve.mjs`, wired by
+`cliNodeArgs` in `cli/src/test-spawn.ts`) that points the specifier at
+`lib/src/index.ts`, exactly like the in-process alias. The suites that
+deliberately exercise a **built** artifact still need it — `cli/src/lib-build.test.ts`
+(which builds a private fresh-clone copy), `cli/src/headless-ci.test.ts` (packs
+this checkout), and the build-info and plugin-parity gates — and each says so with
+an actionable message when it is missing. CI runs `npm ci` → `npm run build` →
+`npm test` ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+
+For the same reason the suite makes this checkout's build outputs (`lib/dist/`,
+`dist/`) **read-only for the duration of a run**
+(`test/kernel-artifacts.ts`): a suite that rebuilds them in place now fails with
+EACCES in the lane that wrote, instead of handing a concurrently linking child a
+half-written module and surfacing as an unrelated
+`SyntaxError: ... does not provide an export named ...` in a _different_ lane
+(`bug-test-suite-lib-dist-rebuild-race`). A build a suite needs belongs in a temp
+root it owns — `freshCloneCopy` in `cli/src/pack-fixtures.ts` is the shared way to
+get one. Anything that moves a watched artifact anyway fails the run as
+`KernelArtifactDriftError`.
 
 `arggon start <id> --worktree` prepares a fresh worktree for the project gate
 and for worktree-local resolution: when the primary checkout has a
@@ -71,10 +87,11 @@ worktree-local install is still the npm-native alternative: `npm ci`, or
 `x-worktree.post-start: npm ci` in `ArggonManager/.convention.yml`, reifies the
 workspace links locally and its `prepare` builds them.
 
-Rebuild after changing `lib/`: the worktree's spawned CLI and the tests that
-launch it resolve `@arggondev/lib` through `node_modules` → `lib/dist`
-(`npm run build --workspace @arggondev/lib`), and the flip means the worktree's own
-build is what runs.
+Rebuild after changing `lib/` (`npm run build --workspace @arggondev/lib`): the
+suites that exercise the built kernel, the pre-commit gate, and any CLI run
+**outside** the test harness — `arggon measure`'s source run, an installed bin —
+resolve `@arggondev/lib` through `node_modules` → `lib/dist`, and the flip means
+the worktree's own build is what runs.
 
 ### Structural architecture checks (dev-only)
 

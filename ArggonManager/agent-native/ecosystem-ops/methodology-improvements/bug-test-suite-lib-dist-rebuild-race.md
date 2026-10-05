@@ -13,6 +13,7 @@ updated: "2026-10-05"
 claimed_at: "2026-10-05T20:33:42.754Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-test-suite-lib-dist-rebuild-race
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-test-suite-lib-dist-rebuild-race.md
   Leaves live only under a story. id is the filename stem: bug-test-suite-lib-dist-rebuild-race.
@@ -24,15 +25,104 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-test-suite-lib-dist-rebui
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+The flake: a spawned CLI child died inside Node's ESM loader with
+`SyntaxError: The requested module './json.js' does not provide an export named 'compactWorkItem'`,
+in a lane that had changed nothing relevant. The missing export name varied per
+occurrence (`priorityRank`, `loadItems`, `runValidate`, …) because it varied with
+which half-written module the child reached first.
+
+**The asymmetry in the filed mechanism is real, and it is the whole cause.**
+Verified on this branch (`cbc55e91`) by measurement, not by reading:
+
+- With `lib/dist` and `dist` moved aside, 284 in-process assertions still passed —
+  `vitest.config.ts` aliases `@arggondev/lib` to `lib/src/index.ts`, so an
+  in-process test never reads a build.
+- A spawned child does not inherit that alias (`tsx` does not read the vitest
+  config). With the same directories absent it died with
+  `ERR_MODULE_NOT_FOUND ... node_modules/@arggondev/lib/dist/index.js`, and from
+  inside a child `import.meta.resolve("@arggondev/lib")` returns
+  `…/lib/dist/index.js`.
+
+So the comment's promise ("a run never depends on a previous `npm run build`")
+held in-process and was false for every spawned child, and the one directory a
+suite is expected to rebuild was the one every child was linking.
+
+**Correction to the filed premise — no test rebuilds the shared build on this
+branch.** The `npm pack` class was already closed by #580 (`--ignore-scripts`,
+gated in `cli/src/test-spawn.test.ts`), and the suites that legitimately build
+(`lib-build`, `pack-contents`, `headless-ci`) each build into a private
+fresh-clone copy that owns its own `lib/`. Proven by experiment: with `lib/dist`
+and `dist` made read-only (`chmod -R a-w`), a full `npm test` passed every suite
+except one pre-existing, unrelated failure — nothing in the suite writes those
+paths. The hazard was a read with no writer, one new build-under-test away from
+the flake; the fix therefore removes the read **and** makes a write impossible,
+so the class cannot recur either way.
+
+**A separate defect, found on the way, not fixed here (delivery lead to route):**
+`cli/src/adr-index-parity.test.ts` fails on `origin/main` — ADR
+`0023-ci-wall-clock.md` shipped in `66035a4a` with no row in
+`ArggonManager/docs/adr/README.md`. It is the only red test in the `cli` lane
+and it blocks every PR, not just the ones this race blocked.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [x] Reproduced deterministically: a test that runs the build concurrently with a child-CLI
+      suite fails on the stale-export shape — `cli/src/kernel-isolation.test.ts` starts a
+      writer process that truncates the kernel module, signals, then **holds** it, so the
+      outcome depends on the argv and not on timing: the pre-fix argv dies with
+      `does not provide an export named 'loadItems'` and the harness argv links fine.
+      (`artifactDrift` is not the repro handle here: it needs a real rebuild of the _shared_
+      artifact, which is exactly what the fix forbids. It is now the named failure instead.)
+- [x] Fixed by **isolation, not by retry** — two halves, no rerun and no swallowed error:
+      children spawned through the harness load the kernel **source**
+      (`cliNodeArgs` → `test/kernel-source-resolve.mjs`, wired into `runCli`,
+      `spawnNodeCli`, `mcp-parity`, `mcp-server`, `config-race`, the e2e board spec), and
+      `test/kernel-artifacts.ts` makes `lib/dist/` + `dist/` read-only for the run, so a
+      rebuild fails with EACCES in the lane that wrote. The suites that need a build still
+      build into their own temp root (`freshCloneCopy`).
+- [x] `cli/src/{lib-build,plugin-copy,pack-contents,start,test-spawn}.test.ts` reviewed for the
+      same pattern, and every occurrence fixed rather than the first — plus the ones the
+      filed list missed: `config-race`, `mcp-parity`, `mcp-server`, `headless-ci`,
+      `prose-format`, `e2e/board.smoke.spec.ts`, `labs/`. `plugin-copy` and `start` never
+      built (`start` injects `runBuild` fakes); `headless-ci` already packs with
+      `--ignore-scripts`. Zero CLI children on the shared build remain, and
+      `cli/src/test-spawn.test.ts` scans the test trees to keep it that way. The one
+      documented exemption is `lib-build.test.ts`, which exercises a private copy's `dist`
+      on purpose.
+- [x] The harness's existing `artifactDrift` diagnostic is promoted to a **named failure** when it
+      fires during a suite — `KernelArtifactDriftError`, raised per child (even when the child
+      produced a result, which was the silent case) and again from the global teardown with
+      `scope: "suite"`; verified end to end that a teardown raise exits the run non-zero with
+      the class name and the before/after fingerprint.
+- [ ] `npm test` run **repeatedly** (≥5 consecutive full runs) green — **NOT MET, and not
+      tickable as written.** 5 consecutive full runs on `cbc55e91`: 76.9s / 81.2s / 82.8s /
+      84.0s / 83.6s, each with the _same single_ failure,
+      `cli/src/adr-index-parity.test.ts` (ADR 0023 unindexed), which reproduces on
+      `origin/main` without this branch (`git show origin/main:ArggonManager/docs/adr/README.md`
+      has 0 rows for 0023) and in the pre-change baseline run. The race class itself:
+      **0 occurrences of `does not provide an export named` / `KernelArtifactDriftError`
+      across all five logs.** Test totals moved 2679 → 2690 passed (+11 new: 8 in
+      `kernel-isolation.test.ts`, 3 in `test-spawn.test.ts`), no new failures. Suite duration
+      is unchanged (pre-change baseline 84.09s).
+- [x] `arggon validate` ok; no snapshot or gate weakened to make the suite pass — `arggon
+  validate: ok (0 warning(s), convention v5)`; no snapshot touched; the existing
+      `--ignore-scripts` gate and `measure.test.ts`'s production-shape pin are untouched;
+      three gates were **added** (argv wiring, CLI-child scan, drift error). Disclosed
+      non-additive edits: one line inside `test-spawn.test.ts`'s existing
+      `SpawnHarnessError` case now builds its representative argv with `cliNodeArgs`
+      (more representative, not weaker — it is what a real spawn runs), and
+      `vitest.config.ts` gained a second `globalSetup`.
+- [x] If the correct fix is structural (one build, many suites — e.g. a globalSetup that builds
+      once and forbids per-suite rebuilds), prefer that over five local patches — done
+      structurally: one shared harness hook (`cliNodeArgs`) covers every child in the repo, and
+      `test/kernel-artifacts.ts` is the "forbid per-suite rebuilds" gate, enforced by mode
+      rather than by convention. Verified: a write attempt is refused (`EACCES`) with the bytes
+      untouched, and the modes are restored on the exit path.
 
 ## Notes
 
 ### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+
 ## Context
 
 Found while merging PR #638 (a markdown-only diff), whose `cli` job failed with:
@@ -63,15 +153,9 @@ spend the diagnosis again. It has now cost two sessions.
 
 ## Acceptance
 
-- [ ] Reproduced deterministically: a test that runs the build concurrently with a child-CLI
-      suite fails on the stale-export shape (the harness's `artifactDrift` is the handle)
-- [ ] Fixed by **isolation, not by retry**: the suites that need a build build into their own
-      temp root (or the child processes read a build the suite owns), so no test mutates the
-      shared `lib/dist` another test is reading
-- [ ] `cli/src/{lib-build,plugin-copy,pack-contents,start,test-spawn}.test.ts` reviewed for the same pattern, and every occurrence fixed rather than the first
-- [ ] The harness's existing `artifactDrift` diagnostic is promoted to a **named failure** when it fires during a suite, so this class reports itself instead of surfacing as an unrelated SyntaxError
-- [ ] `npm test` run **repeatedly** (≥5 consecutive full runs) green — a race fix that is not
-      demonstrated to hold across runs is not a fix
-- [ ] `arggon validate` ok; no snapshot or gate weakened to make the suite pass
-- [ ] If the correct fix is structural (one build, many suites — e.g. a globalSetup that builds
-      once and forbids per-suite rebuilds), prefer that over five local patches
+Superseded: the canonical checklist is the one in `## Acceptance` above, kept there because
+a ticked box and its evidence belong with the item rather than inside a dated record. The
+list as originally filed on 2026-10-04 is preserved verbatim in this file's git history
+(`c1e0e339`) and differs from the canonical one only in the corrections recorded above:
+the writer set is empty on this branch (closed by #580), the reader set was the live half,
+and the run is not fully green because of an unrelated pre-existing failure.
