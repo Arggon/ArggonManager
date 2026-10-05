@@ -72,3 +72,14 @@ generated context artifact.
       `spec analyze`
 - [ ] `arggon validate` green; PR opened. Impact class **Advisory**
 - [ ] `spec validate` + `spec analyze` green, with no NEW finding naming this item
+
+### 2026-10-05 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+Correction to the Context comment above: the ADR 0017 link resolves to the wrong
+filename. Correct path from this item's directory:
+
+`../../../docs/adr/0017-greenfield-exploration-gate.md`
+
+(not `…0017-greenfield-work-exploration-first.md`). The item's argument is unchanged.
+
+Other links in the Context comment resolve: `exploration-harness-research-transfer-021.md`
+and `adr/0022-decline-autoharness-autocontext-autocompact.md` both exist.
