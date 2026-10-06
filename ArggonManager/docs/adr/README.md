@@ -37,3 +37,4 @@ numbering, the status and the row order.
 | [0023](./0023-ci-wall-clock.md)                               | CI wall clock: concurrency groups, duration-aware sharding, and the `cli` required check                       | Proposed                               |
 | [0024](./0024-adopter-friction-channel.md)                    | Adopter friction channel                                                                                       | Accepted                               |
 | [0025](./0025-done-gate-live-acceptance-section.md)           | Done gate scope: the live `## Acceptance` section, and no contract means no flip                               | Proposed                               |
+| [0026](./0026-owner-decision-brief.md)                        | The bounded plain-language decision brief: how a delivery lead brings a decision to the product owner          | Proposed                               |
