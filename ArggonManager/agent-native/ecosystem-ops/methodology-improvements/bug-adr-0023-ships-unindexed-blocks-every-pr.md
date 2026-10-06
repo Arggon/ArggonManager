@@ -1,14 +1,14 @@
 ---
 type: bug
-status: blocked
+status: in_progress
 id: bug-adr-0023-ships-unindexed-blocks-every-pr
 title: "ADR 0023 ships unindexed, so `cli/src/adr-index-parity.test.ts` is red on `main` and the `cli` lane fails on every PR regardless of its diff"
 assignee: arggon-delivery-lead
 parent: methodology-improvements
 labels: [docs, adr, ci-blocking, tests]
 created: "2026-10-05"
-updated: "2026-10-05"
-blocked_reason: "The ADR 0023 index row is merged (b2da0329) and `adr-index-parity.test.ts` is 7/7, but acceptance box 4 (\"`npm test` green, so the `cli` lane is honestly green on `main`\") cannot be honestly ticked: `cli/src/headless-ci.test.ts:849` still fails, pre-existing and unrelated, filed as `bug-headless-ci-twin-init-nondeterministic`. Not waivable by an agent (`--waive` is human-only) and not ticked over. Unblocks when that bug is fixed; the substantive work here is already on `main`."
+updated: "2026-10-06"
+claimed_at: "2026-10-06T10:40:33.971Z"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-adr-0023-ships-unindexed-blocks-every-pr.md
@@ -47,13 +47,19 @@ Found by the maker delivering `bug-test-suite-lib-dist-rebuild-race` on 2026-10-
       ADR's own `- Status:` line does (`Proposed`)
 - [x] `cli/src/adr-index-parity.test.ts` green — all cases, not just the row-count one
 - [x] `prettier --check` clean on `ArggonManager/docs/adr/README.md` (the table is column-aligned)
-- [ ] `npm test` green, so the `cli` lane is honestly green on `main` and a later red run means
-      something — **NOT met, and not mine to tick**: `cli/src/headless-ci.test.ts:849`
-      (`packed-bin --json envelopes are byte-identical to the checkout CLI`) still fails on
-      `main`. It is pre-existing, unrelated, and filed as `bug-headless-ci-twin-init-nondeterministic`.
-      Observed `Test Files 1 failed | 127 passed (128); Tests 1 failed | 2679 passed (2680)` after
-      this fix — down from two red tests to one. The ADR parity lane is honestly green; the
-      `cli` lane as a whole is not yet.
+- [x] `npm test` green, so the `cli` lane is honestly green on `main` and a later red run means
+      something — **met 2026-10-06**, and the reason it read as unmet was stale. This box sat
+      unticked on the strength of `cli/src/headless-ci.test.ts:849` still failing; that no longer
+      holds. Re-verified on `main` at `bbe1f4eb` after a **full** `npm run build` (not
+      `--workspace @arggondev/lib`, which leaves the CLI's own `dist/` stale and would fake the
+      very red being checked):
+      `npx vitest run cli/src/headless-ci.test.ts` → **7 passed (7)**, and
+      `npm run test` → **131 files / 2768 tests passed**, 0 failed. The `cli` required check on
+      `main` is `SUCCESS`. The `cli` lane is honestly green.
+      Note the trap this sat in: `bug-headless-ci-twin-init-nondeterministic` is real and still
+      open, but it is a **build-state precondition** that a full build satisfies. Reading its open
+      status as proof that this box was unmet conflated "the defect is unfixed" with "the symptom
+      is present" — the same false-signal class that item's own Context warns about.
 - [x] The gap that let an ADR ship unindexed is considered: **the parity test already catches
       this exactly**, so the missing step is not detection but the obligation to run the lane
       before declaring an ADR landed. The ADR process (`docs/engineering.md` §ADR process)
@@ -67,7 +73,9 @@ Found by the maker delivering `bug-test-suite-lib-dist-rebuild-race` on 2026-10-
 ## Notes
 
 ### 2026-10-05 @arggon-delivery-lead
+
 ### 2026-10-05 @arggon-delivery-lead
+
 Done inline (doctrine: a one-line doc fix is trivial work, not a maker dispatch — `docs/agents.md` §Orchestration). `b2da0329` adds the ADR 0023 index row on `main`; `adr-index-parity.test.ts` is 7/7.
 
 **Found because a maker refused to tick a box it could not honestly tick.** `bug-test-suite-lib-dist-rebuild-race` requires ≥5 consecutive green full runs; all five carried this one failure and **zero** race-class occurrences — the `lib/dist` race was already gone, and this unrelated red test was masking it. A permanently-red `cli` lane is worse than the flake it hid, because it teaches re-run-instead-of-read.
