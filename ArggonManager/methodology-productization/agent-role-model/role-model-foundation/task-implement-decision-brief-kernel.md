@@ -131,3 +131,23 @@ The two `arggon: warning: commit skipped: ... native gate: missing dependency` l
 **Merge.** Clean against the project's review bar: architecture/boundaries, conventions, tests-that-discriminate travel with the behavior, docs travel with the code, scope stays on the item, report/sync byte-identical, never-a-gate asserted by a real test. F1 is the only defect and is non-blocking.
 
 Process note (delivery lead's call, not a code finding): the item frontmatter still reads `status: todo`, `assignee: null`, `worktree_path: null` despite the claim commit — flip it on merge per §5.
+
+### 2026-10-06 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-06 @arggon-delivery-lead
+
+**verdict: approve — merge when CI is green.**
+
+The standards reviewer returned **approve with no blocking findings**, and I independently verified the two claims I said I would check rather than taking them on trust:
+
+- **AC 4 scope width** — `unansweredDecisionBriefFindings` applies no status filter and does not import the acceptance detector's container set; it delegates to `itemsWithUnansweredBrief`, which fires solely on `state === open`. This was the trap most likely to be copied by analogy from `MISSING-PRODUCT-ACCEPTANCE`, and it was avoided.
+- **AC 2 assignee** — `classifyDecisionBrief(body, assignee)` takes the assignee and both call sites pass `item.assignee` (`lib/src/operations.ts:187`, `lib/src/brief.ts:217`).
+
+I also ran the parser directly rather than reading the tests: `decided` / `self-decided` / unassigned classify correctly, a one-option `decide:` reads `open`, `decides:` does not match, and a handoff-style heading does not match.
+
+**Gates I ran myself** (worktree at b2233b67): `validate` ok; `spec analyze` **10 findings, none new**; `test:structure` 5/5; `lint:structure` clean; **full `npm run test` 133 files / 2837 passed**; `check:plugin` no drift. The two `commit skipped: … native gate: missing dependency` warnings are **pre-existing on main** (I ran the suite there: identical warning, 132 files / 2803 tests), so they are not this change's.
+
+**One non-blocking defect fixed here rather than filed:** the reviewer's F1, a nested code span in `docs/json-output.md`'s `decision_brief` row where `decided: <the chosen option, or `other`` closed the span early and rendered a stray double-backtick. `prose-format.test.ts` misses it because prettier is byte-stable on the line. Fixed in d884b8fb — the `other` case is now its own sentence, which also says out loud that it is a first-class reply rather than a footnote.
+
+**Scope discipline confirmed:** `report.ts` and `sync-command.ts` are untouched, so the spec's byte-identity promise holds; the human `arggon show` view gains no field line (AC 3); and the plugin bundle is a mechanical regeneration, enforced by `check:plugin`.
+
+Nothing to file: the reviewer's single non-blocking finding is fixed in this PR, and no finding required a decision ADR 0026 did not make.
