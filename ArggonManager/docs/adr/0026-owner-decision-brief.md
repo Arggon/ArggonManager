@@ -1,15 +1,18 @@
 # 0026 The bounded plain-language decision brief: how a delivery lead brings a decision to the product owner
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 - Deciders: product owner (Gonzalo), delivery lead (Arggon)
 - Input: [exploration-owner-decision-brief-025](../explorations/exploration-owner-decision-brief-025.md) (2026-10-06)
 - Methodology impact class: **Behavioral** (agents must re-learn something) — reaches adopters through the ADR 0016 channel
 
-> Status note (2026-10-06): shipped **Proposed**, per `docs/engineering.md`
-> §ADR process ("Proposed in a PR → Accepted when merged") and this project's
-> precedent (ADR 0022, 0023, 0025). Flip to `Accepted` on merge or in an explicit
-> accept commit; nothing below this note is rewritten afterwards.
+> Status note (2026-10-06): shipped **Proposed** in PR #659 and flipped to
+> **Accepted** in the merge commit `cbf9656c`, per `docs/engineering.md` §ADR
+> process ("Proposed in a PR → Accepted when merged"). The flip is carried in the
+> merge commit deliberately: ADR 0022, 0023 and 0025 are all merged while still
+> reading `Proposed`, the drift tracked as
+> `bug-adr-status-drift-merged-adr-proposed`. Nothing below this note is
+> rewritten.
 
 ## Context
 

@@ -13,6 +13,7 @@ updated: "2026-10-06"
 claimed_at: "2026-10-06T14:01:55.152Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0026-owner-decision-brief
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-adr-0026-owner-decision-brief.md
   Leaves live only under a story. id is the filename stem: task-adr-0026-owner-decision-brief.
@@ -38,7 +39,7 @@ history, not the contract the done gate reads). PR #659.
 - [x] The **routing rule** is normative (which decisions owe a brief) and the "brief on every decision" rejection is recorded under Alternatives
 - [x] The **reversal condition** is recorded verbatim, falsifiable, with both limbs
 - [x] Exploration 025's Decision section links this ADR (closes the exploration-vs-ADR gap `task-exploration-decision-records` exists to prevent)
-- [ ] ADR lifecycle honored: Proposed in the PR, Accepted on merge — never rewritten in place afterwards
+- [x] ADR lifecycle honored: Proposed in the PR, Accepted on merge — never rewritten in place afterwards
 
 Box 8 is deliberately left unticked by the maker. Its first half ships in this PR
 (Status `Proposed`, plus the status note recording the lifecycle); its second half
@@ -131,6 +132,7 @@ No `skills/`, `.agents/skills/`, `templates/`, `.opencode/` or `cli/` file was t
 - open questions: Should the acceptance boxes be ticked by the lead or left for merge verification?
 
 ### 2026-10-06 @arggon-maker
+
 **Change request addressed — commit `e2023c1a` on `feat/task-adr-0026-owner-decision-brief`, PR #659 left open.**
 
 All four blocking findings and all five non-blocking ones are fixed, all as prose in files already in the PR. Every finding was re-verified against the tree before I edited; two of them were confirmed by re-fetching the cited source rather than trusting the review.
@@ -168,16 +170,17 @@ Every quotation in both files re-checked against its source, and reported rather
 
 ### Gates — command → expected → observed
 
-| Gate | Expected | Observed |
-| --- | --- | --- |
-| `npx prettier --check` (4 files) | clean and stable | `--write` reported **all 4 unchanged**; `--check` then green |
-| `npm run arggon -- validate` | `ok:true` | `ok (0 warning(s), convention v5)` |
-| `npx vitest run cli/src/adr-index-parity.test.ts` | 9/9 | **9 passed** |
-| `npm run test:structure` | 5/5 | **5 passed; 0 failed** |
-| `npm run lint:structure` | no findings | no findings |
+| Gate                                              | Expected         | Observed                                                     |
+| ------------------------------------------------- | ---------------- | ------------------------------------------------------------ |
+| `npx prettier --check` (4 files)                  | clean and stable | `--write` reported **all 4 unchanged**; `--check` then green |
+| `npm run arggon -- validate`                      | `ok:true`        | `ok (0 warning(s), convention v5)`                           |
+| `npx vitest run cli/src/adr-index-parity.test.ts` | 9/9              | **9 passed**                                                 |
+| `npm run test:structure`                          | 5/5              | **5 passed; 0 failed**                                       |
+| `npm run lint:structure`                          | no findings      | no findings                                                  |
 
 `ArggonManager/docs/adr/README.md` needed no edit: the H1 is unchanged, so the verbatim row and its `Proposed` status still hold. Three files changed, 104 insertions / 45 deletions. Nothing merged, no `done` flip, and no `Accepted` written.
 
 ### handoff 2026-10-06 @arggon-maker — next: Re-review e2023c1a, then merge; in the merge commit flip Status to Accepted AND tick acceptance box 8
+
 - branch: feat/task-adr-0026-owner-decision-brief
 - open questions: Is leaving box 8 unticked right, or do you want all eight ticked now?; the exploration's intro paragraph still says each item 'asks the product owner' — left as written since the lead filed it; needs…
