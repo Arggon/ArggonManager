@@ -10,7 +10,6 @@ labels: [methodology, roles, adr]
 priority: p0
 created: "2026-10-06"
 updated: "2026-10-06"
-worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0026-owner-decision-brief
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-adr-0026-owner-decision-brief.md

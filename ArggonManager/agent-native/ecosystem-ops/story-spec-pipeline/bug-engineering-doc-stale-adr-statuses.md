@@ -9,7 +9,6 @@ parent: story-spec-pipeline
 labels: [docs, adr]
 created: "2026-10-03"
 updated: "2026-10-06"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-engineering-doc-stale-adr-statuses
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-engineering-doc-stale-adr-statuses.md

@@ -9,7 +9,6 @@ parent: story-spec-pipeline
 labels: [tracker-schema, validate]
 created: "2026-10-03"
 updated: "2026-10-06"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-validate-does-not-check-frontmatter-present
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-validate-does-not-check-frontmatter-present.md

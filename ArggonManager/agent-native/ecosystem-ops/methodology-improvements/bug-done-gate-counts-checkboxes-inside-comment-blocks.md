@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: [done-gate, tracker-schema, tests]
 created: "2026-10-05"
 updated: "2026-10-06"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-done-gate-counts-checkboxes-inside-comment-blocks
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-done-gate-counts-checkboxes-inside-comment-blocks.md

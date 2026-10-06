@@ -11,7 +11,6 @@ priority: p0
 created: "2026-10-06"
 updated: "2026-10-06"
 depends_on: [task-adr-0026-owner-decision-brief]
-worktree_path: /home/arggon/Projects/ArggonManager-task-spec-owner-decision-brief
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-spec-owner-decision-brief.md

@@ -10,7 +10,6 @@ labels: [methodology, adopters]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-06"
-worktree_path: /home/arggon/Projects/ArggonManager-task-explore-adopter-feedback-channel
 ---
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-explore-adopter-feedback-channel.md
