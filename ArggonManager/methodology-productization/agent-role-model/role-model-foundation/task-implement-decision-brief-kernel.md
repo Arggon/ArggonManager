@@ -82,3 +82,7 @@ GATES (command -> expected -> observed)
 - npm run check:plugin -> no drift -> no drift
 
 BUILD-REGENERATED FILE: opencode/plugins/arggon/index.bundle.ts is modified because the kernel entry changed; it is staged in the commit. No node_modules staged (git status verified before/after).
+
+### handoff 2026-10-06 @ses_eedebf8d6ffe8pvs9Yk2jnK5WS (session: ses_eedebf8d6ffe8pvs9Yk2jnK5WS) — next: Delivery lead: review PR #662 (https://github.com/Arggon/ArggonManager/pull/662), then merge and flip item to done.
+- branch: feat/task-implement-decision-brief-kernel
+- open questions: None blocking. Note: the spec's §Boundary assigns the dated ADR 0026 amendment naming show to the carriers item (task-wire-decision-brief-carriers), not this one; AC 16 for this item is only docs/jso…
