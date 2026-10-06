@@ -1,15 +1,20 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-spec-owner-decision-brief
 title: "Spec: the decision-brief convention, its answer grammar, and the unanswered-brief report-only finding (exploration 025 edge cases as acceptance criteria)"
+assignee: arggon-delivery-lead
+branch: feat/task-spec-owner-decision-brief
 parent: role-model-foundation
 labels: [methodology, roles, spec]
 priority: p0
 created: "2026-10-06"
 updated: "2026-10-06"
+claimed_at: "2026-10-06T14:47:11.367Z"
 depends_on: [task-adr-0026-owner-decision-brief]
+worktree_path: /home/arggon/Projects/ArggonManager-task-spec-owner-decision-brief
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-spec-owner-decision-brief.md
   Leaves live only under a story. id is the filename stem: task-spec-owner-decision-brief.
@@ -25,11 +30,22 @@ depends_on: [task-adr-0026-owner-decision-brief]
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+<!-- The live contract (ADR 0025): the done gate reads THIS section, not the dated comment blocks below. -->
+
+- [x] `ArggonManager/docs/specs/spec-owner-decision-brief-021.md` written from `templates/spec.md`, specifying the six brief fields, the `decide:`/`decided:` answer grammar, and the routing rule
+- [x] **Every** row of exploration 025's edge-case table is carried — as an acceptance criterion, an explicit non-goal, or an obligation owned by `task-wire-decision-brief-carriers`; no row is left "unknown"
+- [x] The report-only finding is specified: `UNANSWERED-DECISION-BRIEF` for a `decide:` header with no later `decided:`, mirroring `MISSING-PRODUCT-ACCEPTANCE`, **opt-in under the existing `x-tracker.product-acceptance`** and never CI-failing — with its deliberate scope (any item type, any status while `open`) stated so the sibling's terminal-container shape is not copied by analogy
+- [x] The spec states the promotion-policy tiers are unchanged, so product-owner touchpoints per shipped change do not rise
+- [x] `arggon spec validate` green and `arggon spec analyze` reports **no NEW findings** (10 on `main` → 10 on the branch, identical kinds, none in this file) — the ADR 0017 gate for `task-wire-decision-brief-carriers`
+- [x] The two obligations this spec assigns to `task-wire-decision-brief-carriers` — the dated ADR 0026 amendment and the software worked example — are **live acceptance rows on that item**, so neither can drop silently
+- [x] **Plan — resolved, not owed as a separate artifact.** The original wording asked for a plan doc "with ordered tasks and `depends_on`". That purpose is already met by the tracker graph: `task-wire-decision-brief-carriers` carries the ordered work and `depends_on: [task-spec-owner-decision-brief]`, and the two sub-obligations above are rows on it. A separate plan file would restate the same order in a second place — the "one home" objection ADR 0026 §Alternatives records. **Struck with this reason rather than left unticked**, so the done gate is not bypassed by an unmet box: the departure is deliberate, written down, and was open to review
 
 ## Notes
 
+<!-- The lead's original filing, kept as history. NOT the contract — see the live section above. -->
+
 ### 2026-10-06 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+
 Gated behind `task-adr-0026-owner-decision-brief` (the ADR decides; this specifies it). **ADR 0017 hard gate: this spec must pass `arggon spec analyze` with no NEW findings before any implementation task is claimed** — including `task-wire-decision-brief-carriers`.
 
 Every row of exploration 025's edge-case table becomes an acceptance criterion, so nothing stays "unknown". The non-obvious ones:
@@ -42,7 +58,20 @@ Every row of exploration 025's edge-case table becomes an acceptance criterion, 
 - **Domain neutrality** — every field named in the project's own terms; software is the worked example, never the vocabulary (ADR 0021 §6.2).
 - **Upgrade** — `init --propose` delivers it; both skill copies stay byte-equal in the same PR.
 
-## Acceptance
+### Acceptance (superseded — the lead's original filing, kept as history)
+
+<!--
+  Demoted from `## Acceptance` on 2026-10-06. Written into a comment as a heading,
+  it created a SECOND top-level `## Acceptance` in the body, so the live contract
+  stayed a template placeholder while this draft shadowed it — and the done gate
+  reads the live section (ADR 0025). Same filing error as on the ADR and carriers
+  items. The live section at the top of this file is authoritative.
+
+  The last row is deliberately NOT carried into the live section as written: the
+  plan's purpose is served by the tracker graph (task-wire-decision-brief-carriers
+  with its depends_on and its rows), and the live section records that departure
+  with its reason instead of leaving an unmet box.
+-->
 
 - [ ] `ArggonManager/docs/specs/spec-<owner-decision-brief>-NNN.md` written from `templates/spec.md`, with the six brief fields, the answer grammar, and the routing rule specified
 - [ ] **Every** row of exploration 025's edge-case table appears as an acceptance criterion, an explicit non-goal, or a tracked spike — an adversarial re-pass finds no "unknown"
@@ -52,12 +81,13 @@ Every row of exploration 025's edge-case table becomes an acceptance criterion, 
 - [ ] Plan filed with ordered tasks and `depends_on`, per `references/methodology.md`
 
 ### 2026-10-06 @ses_eee50c3c2ffea91lEKg6KhytwM
+
 Spec landed as `ArggonManager/docs/specs/spec-owner-decision-brief-021.md` (NNN 021: 020 is the highest existing spec, so 021 is the next free number — verified with `ls | sort`, not assumed). PR #660, one commit `2451727e`, no squash. Branch `feat/task-spec-owner-decision-brief`.
 
 **The two questions ADR 0026 left open, answered**
 
-1. *Which read-only surface reports an unanswered brief* → `show <id> --json` gains an additive `decision_brief` field (`none｜open｜decided｜self-decided`) and `spec analyze` gains one report-only finding `UNANSWERED-DECISION-BRIEF`, mirroring `MISSING-PRODUCT-ACCEPTANCE` under the **existing** `x-tracker.product-acceptance` arming (no new config key). `report --json` and `sync --json` stay byte-identical: `sync` classifies only items reconciled with an open PR (`lib/src/sync-command.ts:81–83`) — the same correction ADR 0021's dated amendment records at 0021:323–347 — and `report` aggregates per container (`lib/src/report.ts:13`) while a brief is item-level and often lives on a leaf. Justified in the spec's §"The read-only surface".
-2. *Where the carrier text lives* → `task-wire-decision-brief-carriers`; the spec's §"Boundary with the carriers item" lists what that item will do and what it must not re-decide.
+1. _Which read-only surface reports an unanswered brief_ → `show <id> --json` gains an additive `decision_brief` field (`none｜open｜decided｜self-decided`) and `spec analyze` gains one report-only finding `UNANSWERED-DECISION-BRIEF`, mirroring `MISSING-PRODUCT-ACCEPTANCE` under the **existing** `x-tracker.product-acceptance` arming (no new config key). `report --json` and `sync --json` stay byte-identical: `sync` classifies only items reconciled with an open PR (`lib/src/sync-command.ts:81–83`) — the same correction ADR 0021's dated amendment records at 0021:323–347 — and `report` aggregates per container (`lib/src/report.ts:13`) while a brief is item-level and often lives on a leaf. Justified in the spec's §"The read-only surface".
+2. _Where the carrier text lives_ → `task-wire-decision-brief-carriers`; the spec's §"Boundary with the carriers item" lists what that item will do and what it must not re-decide.
 
 **Gates (command → expected → observed)**
 
@@ -73,19 +103,20 @@ Spec landed as `ArggonManager/docs/specs/spec-owner-decision-brief-021.md` (NNN 
 
 **Ambiguity found in ADR 0026, reported not resolved by invention**
 
-- The ADR names the surface question but does not say whether the *classification* also rides `report`. I chose `show` + `spec analyze` and left `report` unchanged, with the reasoning stated in the spec. A maker could reasonably have added a container row; that is now a documented choice, not an open question.
+- The ADR names the surface question but does not say whether the _classification_ also rides `report`. I chose `show` + `spec analyze` and left `report` unchanged, with the reasoning stated in the spec. A maker could reasonably have added a container row; that is now a documented choice, not an open question.
 - `self-decided` is **my** state name. ADR 0026 §2 mandates attribution-only but never names a state; I mirrored `self-accepted` because the sibling precedent is exactly this case. Flagged in the spec's §States as mirroring, so a reviewer can reject the name without unpicking the design.
 - ADR 0026 §8's two reversal limbs are **not computable** from anything this spec adds: limb (a) needs answer latency (a comment-date difference) and limb (b) needs a count of decisions made outside briefs, which no surface records. Recorded as an explicit "not established" non-answer in the spec rather than a metric invented here.
 
 **Not done (yours):** item not flipped to `done`, PR not merged. `task-wire-decision-brief-carriers` remains `todo` and gated — its `depends_on` already lists this item.
 
 ### 2026-10-06 @ses_eee50c3c2ffea91lEKg6KhytwM
+
 Spec landed as `ArggonManager/docs/specs/spec-owner-decision-brief-021.md` (NNN 021: 020 is the highest existing spec, so 021 is the next free number — verified with `ls | sort`, not assumed). PR #660, one commit `2451727e`, no squash. Branch `feat/task-spec-owner-decision-brief`.
 
 **The two questions ADR 0026 left open, answered**
 
-1. *Which read-only surface reports an unanswered brief* → `show <id> --json` gains an additive `decision_brief` field (`none｜open｜decided｜self-decided`) and `spec analyze` gains one report-only finding `UNANSWERED-DECISION-BRIEF`, mirroring `MISSING-PRODUCT-ACCEPTANCE` under the **existing** `x-tracker.product-acceptance` arming (no new config key). `report --json` and `sync --json` stay byte-identical: `sync` classifies only items reconciled with an open PR (`lib/src/sync-command.ts:81–83`) — the same correction ADR 0021's dated amendment records at 0021:323–347 — and `report` aggregates per container (`lib/src/report.ts:13`) while a brief is item-level and often lives on a leaf. Justified in the spec's §"The read-only surface".
-2. *Where the carrier text lives* → `task-wire-decision-brief-carriers`; the spec's §"Boundary with the carriers item" lists what that item will do and what it must not re-decide.
+1. _Which read-only surface reports an unanswered brief_ → `show <id> --json` gains an additive `decision_brief` field (`none｜open｜decided｜self-decided`) and `spec analyze` gains one report-only finding `UNANSWERED-DECISION-BRIEF`, mirroring `MISSING-PRODUCT-ACCEPTANCE` under the **existing** `x-tracker.product-acceptance` arming (no new config key). `report --json` and `sync --json` stay byte-identical: `sync` classifies only items reconciled with an open PR (`lib/src/sync-command.ts:81–83`) — the same correction ADR 0021's dated amendment records at 0021:323–347 — and `report` aggregates per container (`lib/src/report.ts:13`) while a brief is item-level and often lives on a leaf. Justified in the spec's §"The read-only surface".
+2. _Where the carrier text lives_ → `task-wire-decision-brief-carriers`; the spec's §"Boundary with the carriers item" lists what that item will do and what it must not re-decide.
 
 **Gates (command → expected → observed)**
 
@@ -101,7 +132,7 @@ Spec landed as `ArggonManager/docs/specs/spec-owner-decision-brief-021.md` (NNN 
 
 **Ambiguity found in ADR 0026, reported not resolved by invention**
 
-- The ADR names the surface question but does not say whether the *classification* also rides `report`. I chose `show` + `spec analyze` and left `report` unchanged, with the reasoning stated in the spec. A maker could reasonably have added a container row; that is now a documented choice, not an open question.
+- The ADR names the surface question but does not say whether the _classification_ also rides `report`. I chose `show` + `spec analyze` and left `report` unchanged, with the reasoning stated in the spec. A maker could reasonably have added a container row; that is now a documented choice, not an open question.
 - `self-decided` is **my** state name. ADR 0026 §2 mandates attribution-only but never names a state; I mirrored `self-accepted` because the sibling precedent is exactly this case. Flagged in the spec's §States as mirroring, so a reviewer can reject the name without unpicking the design.
 - ADR 0026 §8's two reversal limbs are **not computable** from anything this spec adds: limb (a) needs answer latency (a comment-date difference) and limb (b) needs a count of decisions made outside briefs, which no surface records. Recorded as an explicit "not established" non-answer in the spec rather than a metric invented here.
 - ADR 0026 §1 says the `decide:` header "may carry a short scope in parentheses" but does not give a brief example; the `decided:` example at §2:113–117 is the only worked header. My §Synopsis brief example therefore follows the ADR's own non-software vocabulary (§7:243–244) rather than reconstructing a form the ADR never wrote down.
@@ -109,36 +140,38 @@ Spec landed as `ArggonManager/docs/specs/spec-owner-decision-brief-021.md` (NNN 
 **Not done (yours):** item not flipped to `done`, PR not merged. `task-wire-decision-brief-carriers` remains `todo` and gated — its `depends_on` already lists this item.
 
 ### handoff 2026-10-06 @ses_eee50c3c2ffea91lEKg6KhytwM (session: ses_eee50c3c2ffea91lEKg6KhytwM) — next: Review + merge PR #660 (spec owner-decision-brief-021), then claim task-wire-decision-brief-carriers
+
 - branch: feat/task-spec-owner-decision-brief
 - open questions: Report-or-show for report? (chose show+analyze, report unchanged); 'self-decided' state name is mine, ADR 0026 names no state; ADR 0026 §8 reversal limbs not computable from this spec's fields
 
 ### 2026-10-06 @arggon-standards-reviewer
+
 verdict: request-changes
 
 Reviewed read-only in `/home/arggon/Projects/ArggonManager-task-spec-owner-decision-brief` at `2451727e` (one file, +416). All four reported defects are real; three are blocking, the fourth (register) I rule **not a defect**. I found four more in the same class. Gates are green and the spec introduces no NEW analyze finding, so the ADR 0017 gate for `task-wire-decision-brief-carriers` is satisfied on its own terms — but the convention this spec specifies is taught wrongly in the one example every reader will copy, and that has to be right before carriers propagate it into `agents.md`/`engineering.md`/both skill copies.
 
 # Gates — re-run by me in the worktree (at your instruction)
 
-| Command (cwd = worktree) | Expected | Observed |
-| --- | --- | --- |
-| `npm run arggon -- validate --json` | `ok:true`, no errors/warnings | `{"ok":true,…,"errors":[],"warnings":[]}` — convention v5 |
-| `npm run arggon -- spec validate` | ok, no new warnings | `arggon spec: ok (37 doc(s), 5 warning(s))` — all 5 are pre-existing `DOC_NUMBER_COLLISION` in `exploration-cheap-path-to-prod-001`, `plan-deps-001`, `plan-release-pipeline-015`, `spec-deps-001`, `spec-release-pipeline-015`. Main reads **36 docs / 5 warnings**, so this file adds one doc and zero warnings |
-| `npm run arggon -- spec analyze` (worktree) | no NEW findings | **10 findings across 23 specs** — 5 `duplicate-doc-number`, 2 `no-error-path`, 3 `vague-quantifier` |
-| same, on `main` (baseline) | 10 | **10 findings across 22 specs** — identical kinds and counts. **10 → 10, no NEW finding, none in this file.** The hard gate for `task-wire-decision-brief-carriers` is cleared |
-| `… spec analyze --spec ArggonManager/docs/specs/spec-owner-decision-brief-021.md` | clean | `arggon spec analyze: clean (1 spec(s) scanned)` |
-| `npx prettier --check <file>` | clean | `All matched files use Prettier code style!` |
-| `npm run test:structure` | green | `test result: ok. 5 passed; 0 failed` |
-| `npm run lint:structure` | clean | no rule hits |
-| extra: `npx vitest run spec-doc-numbers spec-analyze adr-index-parity adr-status-doc-contract init-docs prose-format` (not in your list — the docs-reading tests, the real risk for a new numbered doc) | green | 6 files, 91 tests passed |
+| Command (cwd = worktree)                                                                                                                                                                                | Expected                      | Observed                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run arggon -- validate --json`                                                                                                                                                                     | `ok:true`, no errors/warnings | `{"ok":true,…,"errors":[],"warnings":[]}` — convention v5                                                                                                                                                                                                                                                         |
+| `npm run arggon -- spec validate`                                                                                                                                                                       | ok, no new warnings           | `arggon spec: ok (37 doc(s), 5 warning(s))` — all 5 are pre-existing `DOC_NUMBER_COLLISION` in `exploration-cheap-path-to-prod-001`, `plan-deps-001`, `plan-release-pipeline-015`, `spec-deps-001`, `spec-release-pipeline-015`. Main reads **36 docs / 5 warnings**, so this file adds one doc and zero warnings |
+| `npm run arggon -- spec analyze` (worktree)                                                                                                                                                             | no NEW findings               | **10 findings across 23 specs** — 5 `duplicate-doc-number`, 2 `no-error-path`, 3 `vague-quantifier`                                                                                                                                                                                                               |
+| same, on `main` (baseline)                                                                                                                                                                              | 10                            | **10 findings across 22 specs** — identical kinds and counts. **10 → 10, no NEW finding, none in this file.** The hard gate for `task-wire-decision-brief-carriers` is cleared                                                                                                                                    |
+| `… spec analyze --spec ArggonManager/docs/specs/spec-owner-decision-brief-021.md`                                                                                                                       | clean                         | `arggon spec analyze: clean (1 spec(s) scanned)`                                                                                                                                                                                                                                                                  |
+| `npx prettier --check <file>`                                                                                                                                                                           | clean                         | `All matched files use Prettier code style!`                                                                                                                                                                                                                                                                      |
+| `npm run test:structure`                                                                                                                                                                                | green                         | `test result: ok. 5 passed; 0 failed`                                                                                                                                                                                                                                                                             |
+| `npm run lint:structure`                                                                                                                                                                                | clean                         | no rule hits                                                                                                                                                                                                                                                                                                      |
+| extra: `npx vitest run spec-doc-numbers spec-analyze adr-index-parity adr-status-doc-contract init-docs prose-format` (not in your list — the docs-reading tests, the real risk for a new numbered doc) | green                         | 6 files, 91 tests passed                                                                                                                                                                                                                                                                                          |
 
 Every claim in your brief about the maker's evidence is confirmed. I ran these myself rather than routing them to the verifier, which is outside my role's remit — treat them as reviewer-observed, not verifier-grade; say the word and I'll hand the list to the verifier instead.
 
 # Blocking
 
-**B1 — the brief is attributed to the product owner, and the prose never corrects it (line 80).** Your finding #1 is *worse* than you stated, and that makes it more blocking, not less. `### 2026-10-06 @gonzalo` heads the `decide:` brief. ADR 0026 §Decision (0026:71–73) is explicit — "a bounded, plain-language **decision brief**, written by the **delivery lead** **on the item** as a comment headed `decide:`, answered by the product owner with a comment headed `decided:`". I grepped the whole file for any other statement of authorship: **there is none.** Line 130 says field 5 is "written by the lead", line 132 the default is "what the lead will do", line 143 "the lead's own recommended option", line 222 the lead decides everything else — but nothing anywhere says the brief comment itself is authored by the lead. So line 80 is not contradicted by the prose; it is the spec's *only* statement of who writes a brief, and it states the inverse. Fix both: attribute the brief to the lead (the repo's lead handle is `@Arggon` — `verdict.ts`/`acceptance.ts` fixtures and every `### handoff … @Arggon` heading use it), and add one clause to §The record (line 105) — "written by the delivery lead for one reader whose vocabulary is not assumed; answered by the product owner" — so the example is not the sole carrier of the rule.
+**B1 — the brief is attributed to the product owner, and the prose never corrects it (line 80).** Your finding #1 is _worse_ than you stated, and that makes it more blocking, not less. `### 2026-10-06 @gonzalo` heads the `decide:` brief. ADR 0026 §Decision (0026:71–73) is explicit — "a bounded, plain-language **decision brief**, written by the **delivery lead** **on the item** as a comment headed `decide:`, answered by the product owner with a comment headed `decided:`". I grepped the whole file for any other statement of authorship: **there is none.** Line 130 says field 5 is "written by the lead", line 132 the default is "what the lead will do", line 143 "the lead's own recommended option", line 222 the lead decides everything else — but nothing anywhere says the brief comment itself is authored by the lead. So line 80 is not contradicted by the prose; it is the spec's _only_ statement of who writes a brief, and it states the inverse. Fix both: attribute the brief to the lead (the repo's lead handle is `@Arggon` — `verdict.ts`/`acceptance.ts` fixtures and every `### handoff … @Arggon` heading use it), and add one clause to §The record (line 105) — "written by the delivery lead for one reader whose vocabulary is not assumed; answered by the product owner" — so the example is not the sole carrier of the rule.
 Note the second-order damage: with both blocks authored by `@gonzalo`, the synopsis either shows the owner authoring her own brief (inverting the convention) **or** the owner answering a question she asked — which is exactly the case `self-decided` exists to flag. Both readings are wrong, so the example cannot be read charitably.
 
-**B2 — `decided: option B (the second wave)` names an option the brief never offered (line 93).** Confirmed. The brief's options (line 84–85) are "A keep one supplier" / "B add a second supplier". "The second wave" appears nowhere in the file. Root cause is visible: lines 91–95 are a verbatim copy of ADR 0026 §2:113–117, where the fragment floats unmoored above no question and the mismatch is invisible; pasted under a concrete brief it becomes a lesson in the wrong answer grammar — a scope note that resolves to nothing. Fix by writing an answer that answers *this* brief, and treat the ADR's §2 fragment as what it is: an illustration of header shape, not a model answer.
+**B2 — `decided: option B (the second wave)` names an option the brief never offered (line 93).** Confirmed. The brief's options (line 84–85) are "A keep one supplier" / "B add a second supplier". "The second wave" appears nowhere in the file. Root cause is visible: lines 91–95 are a verbatim copy of ADR 0026 §2:113–117, where the fragment floats unmoored above no question and the mismatch is invisible; pasted under a concrete brief it becomes a lesson in the wrong answer grammar — a scope note that resolves to nothing. Fix by writing an answer that answers _this_ brief, and treat the ADR's §2 fragment as what it is: an illustration of header shape, not a model answer.
 
 **B3 — the answer's reasoning contradicts option B's stated consequence (line 94).** Confirmed, and no charitable reading rescues it. Option B is "we pay more each year" (line 85); the answer says B "is the only option that does not spend the thing we are short of". Nothing in the brief names what we are short of, so the clause is unanchored too — and under any reading of "spend", A is the option that adds no spend. Either the answer is wrong or the brief is; as written it teaches a brief whose recommendation contradicts its own reasoning.
 
@@ -165,7 +198,7 @@ Note the second-order damage: with both blocks authored by `@gonzalo`, the synop
 
 # Your ruling request #4 — the register is **not** a defect. Accept it.
 
-Deciding with the ADR's words, not taste. ADR 0026 §7 has three separate sentences doing three jobs: the **rule** (0026:241) is "every field is named in the project's own terms"; the **model of that rule** (0026:242–244) is the supplier phrasing — "'a second supplier for the same part', 'the price we pay each year', 'what a customer sees if it is wrong'"; and the **constraint on the software example** (0026:245–247) is about *where it may appear* — "it appears in carriers as an example only, never as the convention's own language". Nothing in §7 requires the software register to be the spec's synopsis, and "the convention's own language" is the six field names plus the `decide:`/`decided:` tokens — all of which this spec keeps neutral. A brief's *content* is not the convention's language. So a supplier-register worked example is consistent with §7's letter, and §Domain neutrality (246–252) declares the choice in the ADR's own words, which is the rejectable form §7 asks for. Your instinct was right and the maker's counter-argument holds in substance: the software case is owed **in the carriers**, exactly as ADR 0026 §7:246 says. The one thing wrong here is not the choice but the claim — see non-blocking #2. (The maker's note that ADR 0026 §1 never gave a brief-example header is accurate: §2:113–117 is the only worked header in the ADR, and it is the defective fragment in B2/B3. That is worth a dated amendment to the ADR too, or the defect propagates.)
+Deciding with the ADR's words, not taste. ADR 0026 §7 has three separate sentences doing three jobs: the **rule** (0026:241) is "every field is named in the project's own terms"; the **model of that rule** (0026:242–244) is the supplier phrasing — "'a second supplier for the same part', 'the price we pay each year', 'what a customer sees if it is wrong'"; and the **constraint on the software example** (0026:245–247) is about _where it may appear_ — "it appears in carriers as an example only, never as the convention's own language". Nothing in §7 requires the software register to be the spec's synopsis, and "the convention's own language" is the six field names plus the `decide:`/`decided:` tokens — all of which this spec keeps neutral. A brief's _content_ is not the convention's language. So a supplier-register worked example is consistent with §7's letter, and §Domain neutrality (246–252) declares the choice in the ADR's own words, which is the rejectable form §7 asks for. Your instinct was right and the maker's counter-argument holds in substance: the software case is owed **in the carriers**, exactly as ADR 0026 §7:246 says. The one thing wrong here is not the choice but the claim — see non-blocking #2. (The maker's note that ADR 0026 §1 never gave a brief-example header is accurate: §2:113–117 is the only worked header in the ADR, and it is the defective fragment in B2/B3. That is worth a dated amendment to the ADR too, or the defect propagates.)
 
 # Does the spec re-decide anything ADR 0026 decided?
 
@@ -186,9 +219,9 @@ No. It specifies, and on the three points it did choose it declared itself, gave
 
 # Domain neutrality (ADR 0021 §6.2, ADR 0026 §7)
 
-**No software noun is load-bearing in the convention.** The convention's own language in this spec is the `decide:`/`decided:` tokens, the six field names (119–134), the routing rule, and the four state tokens — all neutral, all comparable to `verdict:`/`accept:` and `accepted｜changes-noted｜none｜self-accepted`. The synopsis's *content* is supplier/customer and survives the non-technical reader; the `arggon …` lines at 97–101 name this project's surfaces, which is what a surface list is. Two things to know rather than fix:
+**No software noun is load-bearing in the convention.** The convention's own language in this spec is the `decide:`/`decided:` tokens, the six field names (119–134), the routing rule, and the four state tokens — all neutral, all comparable to `verdict:`/`accept:` and `accepted｜changes-noted｜none｜self-accepted`. The synopsis's _content_ is supplier/customer and survives the non-technical reader; the `arggon …` lines at 97–101 name this project's surfaces, which is what a surface list is. Two things to know rather than fix:
 
-- **Line 216–218 and 225 are the one project-relative element**: the routing rule's content is defined by reference to *this* project's ADR 0021 §2 rows and names `priority`, `accept:`, the ADR 0015 waiver, the claim-takeover gate and the human-pushed release. An adopting project has no ADR 0021 §2, so the rule needs restating per adopter — which is why §Boundary line 263 and the carriers item's AC 1 both require the authority map to be restated as unchanged. Inherited verbatim from ADR 0026 §5:197–210, so nothing new is broken here, but it is the spot a non-software adopter will trip on.
+- **Line 216–218 and 225 are the one project-relative element**: the routing rule's content is defined by reference to _this_ project's ADR 0021 §2 rows and names `priority`, `accept:`, the ADR 0015 waiver, the claim-takeover gate and the human-pushed release. An adopting project has no ADR 0021 §2, so the rule needs restating per adopter — which is why §Boundary line 263 and the carriers item's AC 1 both require the authority map to be restated as unchanged. Inherited verbatim from ADR 0026 §5:197–210, so nothing new is broken here, but it is the spot a non-software adopter will trip on.
 - **`CI` at 307 and 266, `repository` at 307/334** are software-flavoured in AC text where the Invariants say it neutrally ("no automated check fails on one", line 44). Nits; not worth a round trip on their own.
 
 # Verified by reading vs. not verified
@@ -213,6 +246,7 @@ What it changes: if B1–B4's fixes shift the finding count above 10, the ADR 00
 **Merge recommendation: no-merge.** Blocking B1–B4 plus non-blocking 1–5 are all in the single file this PR adds; the fix is one editing pass and no re-design. Re-review after that pass is a diff read, not a re-analysis.
 
 ### 2026-10-06 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+
 ### 2026-10-06 @arggon-delivery-lead
 
 **verdict: request-changes (4 blocking, all in one file) — do not merge yet.**
@@ -221,13 +255,13 @@ The standards reviewer's mechanical pass confirmed three of the four defects I f
 
 ## The register question — ruled: the non-software example stays
 
-I was wrong. ADR 0026 §7's rule is "every field is named in the project's own terms", and **its own model of that rule is the supplier phrasing**; the software constraint is about *where* software may appear — "in carriers … never as the convention's own language". The convention's own language is the six field names and the two header tokens, all of them neutral. A non-software worked example demonstrates §7 rather than violating it.
+I was wrong. ADR 0026 §7's rule is "every field is named in the project's own terms", and **its own model of that rule is the supplier phrasing**; the software constraint is about _where_ software may appear — "in carriers … never as the convention's own language". The convention's own language is the six field names and the two header tokens, all of them neutral. A non-software worked example demonstrates §7 rather than violating it.
 
 **But the maker's accompanying claim is false and must go:** the spec asserts the software case "appears once" in it. It appears **not at all**. That is the one substantive thing about the register question, and a false claim about coverage is worse than a missing example.
 
 ## Blocking
 
-- **B1 — the Synopsis example attributes the brief to the product owner** (line 80: the decide: brief is headed @gonzalo). **Worse than I framed it:** the reviewer's grep found there is **no other authorship statement anywhere in the spec**, so that line is not contradicted by the prose — it is the spec's *only* claim about who writes a brief, and it is inverted. With both blocks on @gonzalo, the example reads either as the owner authoring her own brief or as the owner answering her own question — the exact case self-decided exists to flag. Fix: attribute the brief to the delivery lead, and **say in the record section that the lead authors it** (ADR 0026 §1), so prose and example agree.
+- **B1 — the Synopsis example attributes the brief to the product owner** (line 80: the decide: brief is headed @gonzalo). **Worse than I framed it:** the reviewer's grep found there is **no other authorship statement anywhere in the spec**, so that line is not contradicted by the prose — it is the spec's _only_ claim about who writes a brief, and it is inverted. With both blocks on @gonzalo, the example reads either as the owner authoring her own brief or as the owner answering her own question — the exact case self-decided exists to flag. Fix: attribute the brief to the delivery lead, and **say in the record section that the lead authors it** (ADR 0026 §1), so prose and example agree.
 - **B2 — the answer's scope is absent from the question.** The decided: line reads "option B (the second wave)" while the brief's options are "A keep one supplier" / "B add a second supplier". "The second wave" is residue from another draft. An answer naming a scope the question never offered teaches the wrong answer grammar.
 - **B3 — the answer's reasoning contradicts the brief's own option B.** "The only option that does not spend the thing we are short of" — option B is chosen precisely because it spends more. If the point is illustrating an owner overriding the recommendation, it must say so and reason coherently.
 
