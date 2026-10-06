@@ -56,3 +56,18 @@ Two load-bearing constraints, both from the exploration's findings:
 - [ ] The **reversal condition** is recorded verbatim, falsifiable, with both limbs
 - [ ] Exploration 025's Decision section links this ADR (closes the exploration-vs-ADR gap `task-exploration-decision-records` exists to prevent)
 - [ ] ADR lifecycle honored: Proposed in the PR, Accepted on merge — never rewritten in place afterwards
+
+### 2026-10-06 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-06 @arggon-delivery-lead
+
+Priority provenance: **`p0` set by the product owner on 2026-10-06** ("this is top priority. Let's start working on this."), after reading exploration 025. Recorded because ADR 0021 §6.1 boundary 1 makes the `priority` field the product owner's and the lead's call is sequencing only — the field, not the recommendation, is what carries their decision here.
+
+**Delivery sequencing (mine, not the priority call).** The chain is strictly causal, so it runs as three single-item waves, not a parallel wave:
+
+1. **W1 — this item (ADR 0026).** The decision is already taken and recorded in exploration 025's Recommendation; the ADR is the record of it. Nothing before it can be written.
+2. **W2 — `task-spec-owner-decision-brief`.** Specifies the convention and turns exploration 025's edge-case table into acceptance criteria.
+3. **W3 — `task-wire-decision-brief-carriers`.** **Blocked by the ADR 0017 hard gate**: no claim until W2's spec passes `arggon spec analyze` with no NEW findings.
+
+File-disjointness is not the constraint here — causality is: each item consumes the previous item's artifact, so overlapping waves would be a race, not a wave. They are still separate worktrees, one maker each.
+
+**Watch for in W3:** it is Behavioral, so both skill copies must land byte-equal in the same PR and the ADR 0016 release note must name the change. There is a standing item for the drift-gate interaction (`bug-seam-drift-gate-blocks-new-generated-seam-content`) — a PR adding new generated seam content fails the drift gate until a release + re-pin, so W3 must be checked against that before it is opened, not after it goes red.
