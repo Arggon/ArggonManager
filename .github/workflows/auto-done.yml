@@ -6,9 +6,18 @@ name: auto-done
 # change to main. Only the legal in_progress -> done transition is performed;
 # anything else (unclaimed items, containers, unknown ids) is skipped with a
 # warning annotation. The done gate (task-done-gate-acceptance-waiver, ADR
-# 0015) refuses the flip for an item whose acceptance checklist still has
-# unchecked boxes — tolerated the same way: a warning annotation and continue,
-# never a red flip run. Acceptance checklists stay a human/agent responsibility.
+# 0015; scoped by ADR 0025) refuses the flip for an item whose live
+# `## Acceptance` section is not a complete acceptance contract — tolerated the
+# same way: a warning annotation and continue, never a red flip run. Acceptance
+# checklists stay a human/agent responsibility.
+#
+# The refusal classifier is cli/auto-done-refusal.mjs (bug-done-gate-counts-
+# checkboxes-inside-comment-blocks, review finding 1), which keys on the
+# kernel's `error.code` + the gate's shared `cannot mark '<id>' done:` prefix.
+# It was a `grep -q "unchecked boxes"` here until ADR 0025's second refusal
+# reason (`no-live-contract`) stopped matching it and started annotating as
+# "failed unexpectedly". Do not inline a message match: one place, unit-tested
+# by cli/auto-done-refusal.test.ts.
 # Context: ArggonManager/arggon-manager/cli/story-github/task-auto-done-on-merge.md
 
 on:
@@ -71,6 +80,12 @@ jobs:
           git checkout main
           git reset --hard origin/main
           changed=0
+          # Classify a refused flip: `expected` = the done gate refused it
+          # (either ADR 0025 reason), `unexpected` = anything else. Reads the
+          # captured output, so it never re-runs the CLI.
+          classify_refusal() {
+            printf '%s' "$1" | node cli/auto-done-refusal.mjs --output - 2>/dev/null || echo unexpected
+          }
           for id in $IDS; do
             status="$(node dist/cli.js list --json | jq -r --arg id "$id" '.items[] | select(.id == $id) | .status')"
             case "$status" in
@@ -82,18 +97,23 @@ jobs:
                 # not merged when this run checked out main) stops the cascade
                 # — recorded as a cascadeSkipped entry with reason
                 # subtree-open naming the blocking sibling.
-                if out="$(node dist/cli.js update "$id" --status done --json)"; then
+                # 2>&1: the refusal envelope is on stdout under --json, but a
+                # crash or a non-envelope failure prints to stderr — capture both
+                # so the classifier sees whatever the command actually said.
+                if out="$(node dist/cli.js update "$id" --status done --json 2>&1)"; then
                   cascade="$(printf '%s' "$out" | jq -r '(.autoCompleted // []) | join(",")' 2>/dev/null || true)"
                   skipped="$(printf '%s' "$out" | jq -r '(.cascadeSkipped // []) | map("\(.id):\(.reason)") | join(",")' 2>/dev/null || true)"
                   echo "$id (PR #$PR): in_progress -> done (cascade: ${cascade:-none}${skipped:+; skipped: $skipped})"
                   changed=1
-                elif printf '%s' "$out" | grep -q "unchecked boxes"; then
-                  # Done gate (task-done-gate-acceptance-waiver, ADR 0015): the
-                  # kernel refuses the flip while the item body carries unchecked
-                  # acceptance checkboxes. Tolerate it like the skipped-todo case
-                  # below — a warning annotation for a human (tick the checklist
-                  # or waive), never a red flip run for an unticked checklist.
-                  echo "::warning::$id: flip refused by the done gate — the acceptance checklist in the item body still has unchecked boxes (tick them, or mark done manually with arggon update $id --status done --waive \"<reason>\")"
+                elif [ "$(classify_refusal "$out")" = "expected" ]; then
+                  # Done gate (task-done-gate-acceptance-waiver, ADR 0015/0025):
+                  # the kernel refuses the flip while the item's LIVE
+                  # `## Acceptance` section is not a complete contract — either
+                  # an unticked criterion there, or no criterion published there
+                  # at all. Tolerate it like the skipped-todo case below — a
+                  # warning annotation for a human (complete the live section or
+                  # waive), never a red flip run.
+                  echo "::warning::$id: flip refused by the done gate — the live '## Acceptance' section is not a complete acceptance contract, so nothing was flipped (record and tick the criteria there, or mark done manually with arggon update $id --status done --waive \"<reason>\")"
                 else
                   echo "::warning::$id: update failed unexpectedly (output: ${out:-empty})"
                 fi
@@ -173,13 +193,16 @@ jobs:
                     rstatus="$(node dist/cli.js list --json | jq -r --arg id "$rid" '.items[] | select(.id == $id) | .status')"
                     case "$rstatus" in
                       in_progress)
-                      if out2="$(node dist/cli.js update "$rid" --status done --json)"; then
+                      if out2="$(node dist/cli.js update "$rid" --status done --json 2>&1)"; then
                         cascade2="$(printf '%s' "$out2" | jq -r '(.autoCompleted // []) | join(",")' 2>/dev/null || true)"
                         skipped2="$(printf '%s' "$out2" | jq -r '(.cascadeSkipped // []) | map("\(.id):\(.reason)") | join(",")' 2>/dev/null || true)"
                         echo "$rid (redo, PR #$PR): in_progress -> done (cascade: ${cascade2:-none}${skipped2:+; skipped: $skipped2})"
                         changed2=1
-                      elif printf '%s' "$out2" | grep -q "unchecked boxes"; then
-                        echo "::warning::$rid (redo): flip refused by the done gate — the acceptance checklist in the item body still has unchecked boxes (tick them, or mark done manually with arggon update $rid --status done --waive \"<reason>\")"
+                      elif [ "$(classify_refusal "$out2")" = "expected" ]; then
+                        # Same classifier as the main loop (defined above):
+                        # ADR 0025's `no-live-contract` reason must annotate as a
+                        # gate refusal here too, not as a failed update.
+                        echo "::warning::$rid (redo): flip refused by the done gate — the live '## Acceptance' section is not a complete acceptance contract, so nothing was flipped (record and tick the criteria there, or mark done manually with arggon update $rid --status done --waive \"<reason>\")"
                       else
                         echo "::warning::$rid: redo update failed unexpectedly (output: ${out2:-empty})"
                       fi

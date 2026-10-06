@@ -12,6 +12,7 @@ updated: "2026-10-06"
 claimed_at: "2026-10-06T11:00:45.778Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-done-gate-counts-checkboxes-inside-comment-blocks
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-done-gate-counts-checkboxes-inside-comment-blocks.md
   Leaves live only under a story. id is the filename stem: bug-done-gate-counts-checkboxes-inside-comment-blocks.
@@ -32,11 +33,12 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-done-gate-counts-checkbox
 ## Notes
 
 ### 2026-10-06 @arggon-maker
+
 ## Gate evidence — the live `## Acceptance` section, and the no-contract refusal
 
-**Rule implemented for "no live criteria" (the decision the brief left open): zero criteria in the live section, and nothing else.** Not "absent", not "empty after trim", not "template-placeholder" as three separate checks — one predicate, `liveAcceptanceCriteria(liveSection).length === 0`, so absent / empty / whitespace-only / `<!-- … -->` placeholder / bare-`- [ ]`-only all reduce to the same refusal. It is the only reading that cannot be satisfied by accident: each of the three plausible definitions has a fourth spelling beside it (a renamed `## Acceptance mapping`; a section holding only `\u00a0`; a section holding only bare boxes), and any of them becomes a free pass. Two further reasons it is the right one, both measured on this tree: a fresh `arggon create` scaffold (the placeholder comment) would otherwise be the *default* flippable item, and 40 open items in this tracker have their real criteria ticked in dated comments — exactly the vacuous-success shape.
+**Rule implemented for "no live criteria" (the decision the brief left open): zero criteria in the live section, and nothing else.** Not "absent", not "empty after trim", not "template-placeholder" as three separate checks — one predicate, `liveAcceptanceCriteria(liveSection).length === 0`, so absent / empty / whitespace-only / `<!-- … -->` placeholder / bare-`- [ ]`-only all reduce to the same refusal. It is the only reading that cannot be satisfied by accident: each of the three plausible definitions has a fourth spelling beside it (a renamed `## Acceptance mapping`; a section holding only `\u00a0`; a section holding only bare boxes), and any of them becomes a free pass. Two further reasons it is the right one, both measured on this tree: a fresh `arggon create` scaffold (the placeholder comment) would otherwise be the _default_ flippable item, and 40 open items in this tracker have their real criteria ticked in dated comments — exactly the vacuous-success shape.
 
-**Why "the live body is the contract" rather than "the newest comment is the contract":** there is no timestamp a body carries that distinguishes a comment recording a *past* obligation from one reporting a *new* one. `### <date> @author` is append-only history by format, so the block is history; a comment-supplied `## Acceptance` cannot stand in for a missing live section (tested).
+**Why "the live body is the contract" rather than "the newest comment is the contract":** there is no timestamp a body carries that distinguishes a comment recording a _past_ obligation from one reporting a _new_ one. `### <date> @author` is append-only history by format, so the block is history; a comment-supplied `## Acceptance` cannot stand in for a missing live section (tested).
 
 **Where the scan changed:** `lib/src/items.ts` gained `liveAcceptanceRegion` / `liveAcceptanceRows` / `liveAcceptanceCriteria` / `liveAcceptanceUnchecked` / `acceptanceGate` beside `acceptanceRows` (comment blocks stripped BEFORE the section is located, so a `## Acceptance` pasted inside a comment cannot become the contract). `lib/src/update.ts` (the `→ done` rule) consults `acceptanceGate`; `lib/src/import-issues.ts` asks the same predicate before offering its waiver. `acceptanceRows`/`acceptanceCriteria`/`acceptanceComplete` keep their whole-body meaning for the acceptance-aware container cascade and for renderers, so history stays visible. The verdict consumers were re-pointed so none can contradict the gate: the board drawer's `acceptance_complete` and the ZCode goal contract's `gateUnchecked` (+ its criteria rows, and a separate rendered contract for the no-contract case, because "nothing left to loop on" means opposite things for a satisfied contract and a missing one). Containers stay exempt.
 
@@ -44,13 +46,13 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-done-gate-counts-checkbox
 
 Four mutations of `lib/src/items.ts`, each rebuilt with the FULL `npm run build` and run over `done-gate` + `goal-mode` + `acceptance-parity` (347 tests in those three files):
 
-| mutation | failing / total | defect | control | trap | no-criteria shapes | bare-box | comment-filed | nested `###` | live fuzz |
-|---|---|---|---|---|---|---|---|---|---|
-| baseline (unmutated) | 0 / 347 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS |
-| **M1** pre-fix gate (whole body) | **237** / 347 | **FAIL** | PASS | **FAIL** | **FAIL** | **FAIL** | **FAIL** | **FAIL** | **FAIL** |
-| **M2** naive scoping (no no-live-contract half) | **235** / 347 | PASS | PASS | **FAIL** | **FAIL** | **FAIL** | **FAIL** | **FAIL** | **FAIL** |
-| **M3** bare `- [ ]` counted as a criterion | **33** / 347 | PASS | PASS | PASS | **FAIL** | **FAIL** | PASS | PASS | **FAIL** |
-| **M4** comment blocks not excluded | **9** / 347 | **FAIL** | PASS | **FAIL** | PASS | PASS | PASS | **FAIL** | **FAIL** |
+| mutation                                        | failing / total | defect   | control | trap     | no-criteria shapes | bare-box | comment-filed | nested `###` | live fuzz |
+| ----------------------------------------------- | --------------- | -------- | ------- | -------- | ------------------ | -------- | ------------- | ------------ | --------- |
+| baseline (unmutated)                            | 0 / 347         | PASS     | PASS    | PASS     | PASS               | PASS     | PASS          | PASS         | PASS      |
+| **M1** pre-fix gate (whole body)                | **237** / 347   | **FAIL** | PASS    | **FAIL** | **FAIL**           | **FAIL** | **FAIL**      | **FAIL**     | **FAIL**  |
+| **M2** naive scoping (no no-live-contract half) | **235** / 347   | PASS     | PASS    | **FAIL** | **FAIL**           | **FAIL** | **FAIL**      | **FAIL**     | **FAIL**  |
+| **M3** bare `- [ ]` counted as a criterion      | **33** / 347    | PASS     | PASS    | PASS     | **FAIL**           | **FAIL** | PASS          | PASS         | **FAIL**  |
+| **M4** comment blocks not excluded              | **9** / 347     | **FAIL** | PASS    | **FAIL** | PASS               | PASS     | PASS          | **FAIL**     | **FAIL**  |
 
 Reading of that table, since "a test that passes with and without the fix is not evidence": the **defect** test fails only under M1 and M4 (the two mutations that restore whole-body reading); the **trap** test fails under M1, M2 and M4 — M2 is the naive-scoping false pass this fix exists to prevent; the **negative control** (unticked box in the LIVE section, all comment boxes ticked) passes under EVERY mutation, which is correct: it does not depend on the scoping decision, so it is the control, not evidence. The bare-box carve-out is pinned by M3 alone. The new `acceptance-parity` fuzz compares `acceptanceGate` against an independently written oracle over 40 000 generated bodies (901 allowed / 36 367 no-live-contract / 2 732 unchecked-live-criteria, non-vacuity asserted in all three directions) and it caught a real disagreement while being written — the ORDER of "strip comments, then find the section" — which is now pinned on both sides. The board-drawer test fails under M2 as well (checked separately: 1 / 100).
 
@@ -58,25 +60,28 @@ Expected → observed for the five required cases (all end-to-end through `runUp
 
 ### Gates (all run in this worktree)
 
-| gate | expected | observed |
-|---|---|---|
-| `npm run build` (full) | exit 0 | exit 0, `build:plugin` 42 modules / 476 897 bytes |
-| `npm run test` | pass | **131 files / 2784 tests passed**, exit 0 |
-| `npm run arggon -- validate` | ok | `arggon validate: ok (0 warning(s), convention v5)`, exit 0 |
-| `npm run check:plugin` | bundle in sync | exit 0 after the bundle was committed (it exits 1 while the regenerated bundle is uncommitted — that is the gate working) |
-| `npm run lint` | clean | exit 0 |
-| `npm run skills:sync` | skill copies byte-equal | 7 files synced; no drift |
+| gate                         | expected                | observed                                                                                                                  |
+| ---------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `npm run build` (full)       | exit 0                  | exit 0, `build:plugin` 42 modules / 476 897 bytes                                                                         |
+| `npm run test`               | pass                    | **131 files / 2784 tests passed**, exit 0                                                                                 |
+| `npm run arggon -- validate` | ok                      | `arggon validate: ok (0 warning(s), convention v5)`, exit 0                                                               |
+| `npm run check:plugin`       | bundle in sync          | exit 0 after the bundle was committed (it exits 1 while the regenerated bundle is uncommitted — that is the gate working) |
+| `npm run lint`               | clean                   | exit 0                                                                                                                    |
+| `npm run skills:sync`        | skill copies byte-equal | 7 files synced; no drift                                                                                                  |
 
 **Blast radius, measured over the 482 claimable leaves:** pre-fix 117 refused → 5 unblocked (`bug-validate-does-not-check-frontmatter-present`, `bug-engineering-doc-stale-adr-statuses`, plus `bug-harness-config-churn`, `task-done-gate-acceptance-waiver` already `done`, and `bug-seam-drift-gate-blocks-new-generated-seam-content` `todo`) and 189 refused: 133 new `no-live-contract` (47 open, 40 of them the vacuous-success shape) + 56 `unchecked-live-criteria` (29 open). **The cost is real and is the lead's call:** acceptance criteria must now be authored into the live `## Acceptance` section, and `arggon create` still has no `--body` flag, so the first write is a hand-edit of the item file. 121 tests across 17 suites flipped red under the new half; they are arranged through the shared helper `test/acceptance.ts` (`satisfyAcceptance` / `satisfyAllAcceptance`, renamed from `tickAcceptance` because it now also PUBLISHES a live criterion when the section has none) plus three fixtures that needed the arrange call. That churn is the change's honest cost, not a side effect: every done-flip test in the tree now carries an acceptance contract.
 
 **Both blocked items are honest.** `bug-validate-does-not-check-frontmatter-present` (5 ticked live criteria, evidence in a 2026-10-03 block) and `bug-engineering-doc-stale-adr-statuses` (4 ticked, the spec/plan-009 case explicitly decided and recorded) each read `acceptanceGate → { gated: false }` now. I did not flip either status, and did not touch their dated blocks. Note for the lead: **this item's own live `## Acceptance` section is still the template placeholder**, so it is refused as `no-live-contract` until the criteria are transcribed — I did not tick or transcribe any box, per instructions.
 
 ### handoff 2026-10-06 @arggon-maker — next: Lead: review + merge; decide whether to accept the no-live-contract half's friction (create --body as follow-up)
+
 - branch: fix/bug-done-gate-counts-checkboxes-inside-comment-blocks
 - open questions: Author criteria in the live section now required (create has no --body); container cascade deliberately left whole-body
 
 ### 2026-10-06 @Arggon
+
 ### 2026-10-06 @arggon-standards-reviewer
+
 verdict: request-changes (two in-scope fixes: the auto-done refusal classifier and the ADR 0025 measured claim)
 
 Read against `docs/engineering.md` §Review bar and `docs/convention.md` §Done gate, on `git diff origin/main...HEAD` (three-dot). Two findings block; everything else — the design, the consumers, the evidence, the docs, the scope, the bundle — passes, and finding 2 below actually **strengthens** the design under review.
@@ -94,7 +99,8 @@ The cost argument as briefed is wrong in a way that helps the change: the "40 op
 **F3 (process) — the deferred cascade scoping is not filed.** ADR 0025 §Alternatives defers "apply the same scoping to the container cascade", and `story-ci-wall-clock` is a live instance of exactly that defect (vetoed on comment history alone, `liveCriteria=0` / `wholeUnchecked=5`). `docs/engineering.md` §Definition of done 6 requires deferred follow-ups as tracker items, not ADR prose. No such item exists in the tree. Ask: file it under `methodology-improvements` before merge.
 
 **Non-blocking, verified good:**
-- **Test discrimination.** `acceptance-parity.test.ts:641-711` asserts `acceptanceGate(body)` equals an independently written oracle over 40 000 bodies *and* floors all three buckets (`> 500` each; observed 901 / 36 367 / 2 732), so it is not a counting-only oracle. I re-ran the same corpus shape against a deliberately wrong locate-then-strip variant: 4 714 disagreements, so the fuzz genuinely constrains the strip-then-locate ordering it was written to pin. The done-gate tests carry their negative control and their trap as separate assertions.
+
+- **Test discrimination.** `acceptance-parity.test.ts:641-711` asserts `acceptanceGate(body)` equals an independently written oracle over 40 000 bodies _and_ floors all three buckets (`> 500` each; observed 901 / 36 367 / 2 732), so it is not a counting-only oracle. I re-ran the same corpus shape against a deliberately wrong locate-then-strip variant: 4 714 disagreements, so the fuzz genuinely constrains the strip-then-locate ordering it was written to pin. The done-gate tests carry their negative control and their trap as separate assertions.
 - **Docs/index.** ADR 0025 row exists in `adr/README.md` with status class `Proposed`, matching `- Status: Proposed`; the 0015 row's `Accepted (amended by 0025)` qualifier is within the documented class-comparison rule, and `declaredStatus()` still reads `Accepted` through the inserted blockquote. `convention.md` §Done gate, `agents.md` §5, `json-output.md` (both refusal messages verbatim), `methodology.md`, `pitfalls.md` all carry the new rule. ADR 0025 is behavioural and names the ADR 0016 upgrade channel, per §Docs.
 - **Bundle.** `opencode/plugins/arggon/index.bundle.ts` is a true regeneration: `buildPluginBundle(root)` returns code byte-identical to the committed file (42 modules, 476 897 bytes). Not a hand edit.
 - **Scope.** All 36 files accounted for: 4 kernel, 2 consumers, 1 bundle, 7 docs + 2 ADR, 2 skill references, 1 shared test helper, 17 test suites. Nothing unrelated rode along.
@@ -102,6 +108,7 @@ The cost argument as briefed is wrong in a way that helps the change: the "40 op
 **Unverified (verifier's job, not mine):** I did not run the mutation matrix M1–M4 or the gate suite; I read the tests and re-derived the corpus counts with read-only `tsx` scripts against `lib/src`.
 
 ## Probes needed
+
 - `npx tsx` reproduction of F1/F2 from the worktree root (already run read-only by me; re-run for the record):
   - F1: `node -e 'const m="cannot mark \x27x\x27 done: the item\x27s live \x27## Acceptance\x27 section has no acceptance criteria (…)"; console.log(m.includes("unchecked boxes"))'` → expect `false`; expected-vs-observed for the workflow annotation is then self-evident.
   - F2: over the 482 leaves, count leaves with live criteria all ticked yet `acceptanceComplete === false` (expect 5), and leaves with `liveAcceptanceCriteria === 0` yet pre-fix refused (expect 61).
@@ -109,21 +116,22 @@ The cost argument as briefed is wrong in a way that helps the change: the "40 op
 - `npm run arggon -- validate` and `npm run check:plugin` — the bundle and tracker-tree claims I verified by reading/regenerating, but the gate is the verifier's.
 
 ### 2026-10-06 @Arggon
+
 ## Correction to the blast-radius numbers in my 2026-10-06 evidence comment and in ADR 0025 Context
 
 The standards review (commit 97ce5fcf) is right that my numbers were inverted, and it is right about the direction: the rule **relabels** the no-live-criteria population, it does not unblock it, and the genuinely unblocked set is small. My evidence comment above claimed "40 open items in this tracker have their real criteria ticked in dated comments". **That is false**: measured over the same 482 claimable leaves, those 40 open leaves carry 223 criterion rows and **zero** ticked ones. They were already refused before the change, for the right reason, and only the label moved.
 
 Re-measured from the shipped kernel (read-only `tsx` over `loadItems`, pre-fix `!acceptanceComplete(body)` vs post-fix `acceptanceGate(body).gated`):
 
-| population (482 claimable leaves, 117 pre-fix refused) | count | effect of this change |
-|---|---|---|
-| live criteria present and ALL ticked | 5 | **UNBLOCKED** (2 merged `main`-green blockers + 3) |
-| NO live criteria (absent / empty / placeholder) | 56 | **RELABELLED** `unchecked-live-criteria` -> `no-live-contract`; still refused |
-| live criteria present, some unticked | 56 | unchanged, same refusal reason |
+| population (482 claimable leaves, 117 pre-fix refused) | count | effect of this change                                                         |
+| ------------------------------------------------------ | ----- | ----------------------------------------------------------------------------- |
+| live criteria present and ALL ticked                   | 5     | **UNBLOCKED** (2 merged `main`-green blockers + 3)                            |
+| NO live criteria (absent / empty / placeholder)        | 56    | **RELABELLED** `unchecked-live-criteria` -> `no-live-contract`; still refused |
+| live criteria present, some unticked                   | 56    | unchanged, same refusal reason                                                |
 
 Open leaves only (79): pre-refused -> post-refused 69 (40 relabelled + 29 unchanged), pre-allowed -> post-refused **7**, pre-refused -> post-allowed **3**. The 7 are scaffolds with **zero criterion rows anywhere in the body** — exactly the vacuous-success shape decision 2 exists to refuse, so refusing them is the rule working, not a regression. All 56 no-live-criteria leaves carry their unticked boxes in dated comment blocks and nowhere else (checked against the kernel's own comment-block rule, not a reimplementation).
 
-**Where the "61" came from, since both my comment and the ADR cited a number that does not exist in that shape:** the 61 is the count of leaves that were pre-fix refused **and have a live section with criteria** (5 + 56) — a population that contains both the unblocked and the unchanged, so it described neither. Corrected in `ArggonManager/docs/adr/0025-0025…` → `ArggonManager/docs/adr/0025-done-gate-live-acceptance-section.md` Context and Consequences; the honest per-population table above replaces it. Correcting it **strengthens** the ADR: the measured fallback comparison (67 disagreements, all already `done`, zero open leaves) shows the comment-record fallback rescues nothing, so the cost of decision 2 is the visible 7 items and the labelled 40 — not a large hidden number.
+**Where the "61" came from, since both my comment and the ADR cited a number that does not exist in that shape:** the 61 is the count of leaves that were pre-fix refused **and have a live section with criteria** (5 + 56) — a population that contains both the unblocked and the unchanged, so it described neither. Corrected in [`ArggonManager/docs/adr/0025-done-gate-live-acceptance-section.md`](../../../docs/adr/0025-done-gate-live-acceptance-section.md) (Context and Consequences); the honest per-population table above replaces it. Correcting it **strengthens** the ADR: the measured fallback comparison (67 disagreements, all already `done`, zero open leaves) shows the comment-record fallback rescues nothing, so the cost of decision 2 is the visible 7 items and the labelled 40 — not a large hidden number.
 
 Also recorded, per `docs/engineering.md` §Definition of done 6: the cascade-scoping deferral is carried by the filed item **`task-cascade-whole-body-acceptance-defers-this-defect`**, not by ADR prose. I confirmed its live instance myself: `story-ci-wall-clock` is cascade-vetoed on comment history alone (`liveCriteria=0`, `wholeUnchecked=5`). I did not file it, nor `task-create-needs-a-body-flag-to-author-a-live-contract` or `task-migrate-7-leaves-with-no-live-acceptance-contract` — all three were filed by the delivery lead.
 

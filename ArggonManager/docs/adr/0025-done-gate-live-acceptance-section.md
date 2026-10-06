@@ -16,14 +16,35 @@ item body (`acceptanceComplete`). Two measured consequences, both from
    appends a dated `### <date> @<author>` block to the body, and `arggon create`
    has no `--body` flag — so a checklist filed as a comment is the _default_ path
    for a new item, and comment blocks quote criteria verbatim, unticked. Every
-   such box was counted as an open obligation. On this repo's tracker, 61 leaves
-   whose live acceptance was already satisfied were refused solely because a
-   dated block carried the original unticked criteria — including two merged,
-   verified, `main`-green items (`bug-validate-does-not-check-frontmatter-present`,
-   `bug-engineering-doc-stale-adr-statuses`) that could not be completed at all.
+   such box was counted as an open obligation. Measured over this repo's 482
+   claimable leaves (117 refused before this decision), the pre-fix refusal
+   population splits three ways, and only one of the three is unblocked:
+
+   - **5 leaves are unblocked** by scoping — their live `## Acceptance` is
+     present and already fully ticked, and the pre-fix refusal came only from
+     unticked boxes in dated comment blocks. Two are merged, verified,
+     `main`-green items (`bug-validate-does-not-check-frontmatter-present`,
+     5 ticked live criteria + 5 unticked comment boxes;
+     `bug-engineering-doc-stale-adr-statuses`, 4 ticked + 1 unticked) that could
+     not be completed at all.
+   - **56 leaves publish no live criteria at all** (section absent, empty, or
+     still the template placeholder — the shape `create` scaffolds). They were
+     refused before this decision and are refused after it: scoping does not
+     unblock them, decision 2 **relabels** them `no-live-contract`. All 56 carry
+     unticked boxes in dated comment blocks and nowhere else — which is why they
+     are the population the relabel acts on, not the population the scoping
+     rescues.
+   - **56 leaves keep an unticked criterion in their live section.** They stay
+     refused, for the same reason, and decision 2 does not touch them.
+
    Worse, the rule was not even self-consistent: whether an item could flip
    depended on whether its comment record happened to contain an unticked box, so
    two items with identical live acceptance got opposite verdicts.
+
+   The cost runs the other way and is named in Consequences: scoping plus the
+   missing-contract refusal **newly refuses 7 open leaves** — the scaffolds with
+   zero criterion rows anywhere in the body, which decision 2 turns from a free
+   pass into a loud refusal.
 
 2. **Scoping alone would have been worse.** Restricting the scan to the live
    section fixes (1) and opens a vacuity: an item whose live `## Acceptance` is
@@ -86,9 +107,16 @@ honour it.
   hand-edit of the item file (or a `create --body` in a later change).
 - Freshly scaffolded items are no longer flippable until one criterion is
   written. That is the point of decision 2, and it is enforced loudly: the
-  refusal names the section, the shape, and the two remedies.
-- Historical unticked boxes stop being obligations, so items whose criteria live
-  in comments become completable without rewriting that history.
+  refusal names the section, the shape, and the two remedies. Measured cost:
+  **7 open leaves** — the ones with zero criterion rows anywhere — go from
+  flippable to refused; 40 more open leaves keep their refusal but under the
+  `no-live-contract` label instead of `unchecked-live-criteria`; 3 open leaves
+  are unblocked.
+- Historical unticked boxes stop being obligations, so an item whose live
+  criteria are already ticked completes without rewriting that history — the 5
+  leaves named in Context. An item whose criteria live ONLY in comments is
+  **not** among them: it has no contract to satisfy and is refused under
+  decision 2 until the criteria are written into the live section.
 - Behavioural change: agents must re-learn "the live section is the contract"
   before flipping `done`, and every consumer of the gate's verdict reads the new
   predicate. Reaches adopters through the adopter upgrade channel
@@ -117,4 +145,11 @@ honour it.
   force-push is denied, and it destroys the evidence that the criteria were met.
 - **Apply the same scoping to the container cascade.** Deferred: containers are
   exempt from this gate by ADR 0015, so it is a separate decision with its own
-  blast radius, not a side effect of this one.
+  blast radius, not a side effect of this one. Filed as
+  `task-cascade-whole-body-acceptance-defers-this-defect` — the deferral is
+  carried by that item, not by this paragraph
+  (`docs/engineering.md` §Definition of done 6). It is a live defect, not a
+  hypothetical: `story-ci-wall-clock` is vetoed by the cascade on comment history
+  alone (`liveCriteria=0`, five whole-body unticked boxes), so a container whose
+  live section is empty cannot auto-complete for the same reason a leaf cannot
+  flip.
