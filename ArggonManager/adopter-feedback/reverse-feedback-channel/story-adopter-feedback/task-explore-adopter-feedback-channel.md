@@ -793,3 +793,61 @@ ADR 0024 ships **`Status: Proposed`** with its `Status note`; no status flipped,
 ### handoff 2026-10-06 @Arggon — next: Merge PR #586, then flip ADR 0024 to Accepted together with its docs/adr/README.md row in ONE commit, then release task-friction-capture-command (T1).
 - branch: feat/task-explore-adopter-feedback-channel
 - open questions: Accept the forced renumber (0021->0024 / spec 018->020 / exploration 019->024) or overrule the id? 0024 row uses the verbatim H1 - confirm rather than pre-empting task-decide-adr-0021-index-title-edi…
+
+### 2026-10-06 @ses_ef169b774ffddLlcycmzGGeU5Q
+### 2026-10-06 @arggon-delivery-lead
+
+Merge verification for PR #586 — **merged as `12df1ee0`**, then **ADR 0024 accepted on merge** as `3d612032`. `main` green on both (`cli` + `ui-smoke` success).
+
+**Both of the maker's open questions are settled, and one of my own instructions was wrong.**
+
+### My brief was wrong on two counts, and the maker caught both
+
+1. **I said M1–M4 were outstanding.** They were already closed before dispatch, in `258bdfc9` / `8b2c5e1b` / `5eeb61ba`. I briefed off the round-2 verdict dated 2026-10-03 without checking whether the branch had moved past it — and it had. The maker verified each closure by reading rather than trusting my summary, which is the only reason this is a non-event.
+2. **My "take main's ADR 0021" instruction was not executable.** Main's `0021` is a *different ADR* — `0021-agents-primary-workers-human-product-owner.md`, accepted in `171f43b3` (#624). Merging `main` produced **two ADR files numbered `0021`**, which `adr-index-parity.test.ts` caught immediately ("numbering: position 22 is 0021, expected 0022").
+
+**That collision is the original B1 defect recurring**, in a new place: the branch independently wrote an ADR 0021 while `main` independently wrote and accepted its own. It is now tracked by number, not by name.
+
+### Settled: the forced renumber is accepted
+
+The maker renumbered under the precedent this branch's own first Numbering note already records — *the branch's side renumbers, because renumbering `main` would touch an accepted ADR*:
+
+| Was | Now |
+|---|---|
+| ADR `0021-adopter-friction-channel` | **`0024`** |
+| spec `018` | **`020`** |
+| exploration `019` | **`024`** |
+| plan `018` | unchanged — main's plans stop at `017` |
+
+I verified every next-free id independently against `origin/main`: adr tail 0021–0023 → **0024**; specs 016–019 → **020**; explorations 021–023 → **024**. On the branch the ADR corpus is **0001–0024, gapless, no duplicates**. Main's own ADR 0021 is **untouched** and still `Accepted`.
+
+### Settled: verbatim H1 for the 0024 index row — confirmed correct
+
+The maker used the ADR's verbatim H1 rather than adding an `- Index title:` declaration. That is right twice over: `adr-index-parity.test.ts` 9/9 green proves the row and the heading agree, and it deliberately does **not** pre-empt the open decision in `task-decide-adr-0021-index-title-editorial-vs-verbatim` for a second ADR.
+
+### Gates on the merged tree, expected → observed
+
+`build` ✅ full · `test` ✅ **130 files / 2761 tests** · `validate` ✅ ok, 0 warnings · `spec validate` ✅ ok, 36 docs, exactly 5 `DOC_NUMBER_COLLISION`, none naming this chain · `adr-index-parity` ✅ 9/9 · `merge-tree` ✅ exit 0 · **prettier two-pass: pass1→2 and pass2→3 both zero md5 changes** · 19 rows all `ArggonManager/`, zero `D` · `index.bundle.ts` byte-identical to `origin/main`.
+
+The `cli.test.ts` stale-install failure from 2 days ago **did not reproduce** on the merged tree — confirmed a stale red, nothing to fix.
+
+### ADR 0024 acceptance, and why both sides moved together
+
+`docs/adr/README.md` now carries a `0024` row, and ADR 0024 shipped `Proposed`. The parity suite's `statusClass` (`adr-index-parity.test.ts:191`) asserts the row's status class agrees with the ADR's own `- Status:` line, so `3d612032` flipped **both in one commit**. Flipping either alone turns `main` red. That is the repo's own two-step precedent (0020 landed Proposed, accepted later in `ecedac02`). Verified: 9/9 green, and the 3 other `Proposed` rows (0019/0022/0023) untouched.
+
+### 🔴 T1 must NOT be released — and `main` is already failing its own gate
+
+`npm run arggon -- spec analyze --baseline ArggonManager/spec-analyze-baseline.json` on **`main`** right now:
+
+```
+5 new, 1 resolved, 5 unchanged, 10 total
+real exit code: 1
+```
+
+All 5 NEW are `[duplicate-doc-number]`: exploration-001, plan-001, plan-015, spec-001, spec-015. **None are caused by this PR** — they are main's own pre-existing collisions, absent from the committed baseline because they predate it. Already tracked as `task-release-pipeline-baseline-new-collisions` → `task-renumber-colliding-doc-numbers`.
+
+But that item describes a *future* wave exiting 1. The fact is stronger and now recorded: **`main` exits 1 today.** And it has a second consequence that item does not record — the ADR 0017 gate for this chain requires zero NEW, so per the reviewer's instruction (`release task-friction-capture-command (T1) only after the renumber lands and probe 4 reports zero NEW findings`), **T1 stays unreleased until those 5 are triaged.** The renumber condition is now met; the zero-NEW condition is not.
+
+### Still open on this item
+
+The `done` flip is not available for the same reason as `bug-validate-does-not-check-frontmatter-present`: this item's real acceptance lives inside dated `## Notes` blocks and `bug-done-gate-counts-checkboxes-inside-comment-blocks` counts unticked boxes anywhere in the body. Merged, verified, and deliberately not `done`.
