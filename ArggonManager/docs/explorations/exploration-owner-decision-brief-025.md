@@ -105,18 +105,23 @@ if it comes, has nowhere durable to live.
 ### Three live cases in this repository, measured
 
 The three open decision items below are the shape of the problem, not
-hypotheticals. Each is `todo`, unassigned, and each asks the product owner for a
-technical judgement while recording **no recommendation and no plain-language
-statement of what the choice costs**:
+hypotheticals. Each is `todo` and unassigned, and each records **no
+recommendation and no plain-language statement of what the choice costs**:
 
-| Item                                                     | What it asks the product owner to decide                                                                       | Plain-language statement present?                                                      | Recommendation recorded? |
+| Item                                                     | The open decision                                                                                              | Plain-language statement present?                                                      | Recommendation recorded? |
 | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------ |
 | `task-decide-codebase-memory-default-discovery`          | Whether a specific MCP server becomes the agents' default code-discovery aid                                   | no — the body is about star counts and registry metadata                               | no                       |
 | `task-decide-adr-0021-index-title-editorial-vs-verbatim` | Whether an ADR index row stays editorial (needs a `- Index title:` declaration) or copies its heading verbatim | no — reads as a file-format detail                                                     | no                       |
 | `task-arm-strict-worktree-writes`                        | Whether to arm `x-tracker.strict-worktree-writes` or keep the report-only default                              | partially — it is a decision item, not a bug, and states the choice in mechanism terms | no                       |
 
-The third is the tell: it is a **flip-the-switch-or-leave-it** decision, written
-so that only someone who already knows the flag can answer it.
+**These items do not address the product owner.** That is the finding, not a
+detail: they sit in the tracker with no recommendation and no request, which is
+what a question with no home looks like from the inside. Two of the three would
+not even owe a brief under the routing rule this exploration recommends — they are
+reversible, local calls an agent can make and record — so they are evidence for
+the **gap**, not a backlog of pending owner decisions. The third is the tell: a
+**flip-the-switch-or-leave-it** choice written so that only someone who already
+knows the mechanism can answer it.
 
 The repository already cares that a decision is _recorded_ rather than lost:
 `task-exploration-decision-records` (done) introduced a canonical no-ADR marker
