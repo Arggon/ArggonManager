@@ -107,3 +107,24 @@ The cost argument as briefed is wrong in a way that helps the change: the "40 op
   - F2: over the 482 leaves, count leaves with live criteria all ticked yet `acceptanceComplete === false` (expect 5), and leaves with `liveAcceptanceCriteria === 0` yet pre-fix refused (expect 61).
 - `npm run build && npx vitest run cli/src/done-gate.test.ts cli/src/goal-mode.test.ts cli/src/acceptance-parity.test.ts cli/src/board.test.ts` in the worktree — confirms the suites that carry the F1/F2 blast radius are green on the head that will merge.
 - `npm run arggon -- validate` and `npm run check:plugin` — the bundle and tracker-tree claims I verified by reading/regenerating, but the gate is the verifier's.
+
+### 2026-10-06 @Arggon
+## Correction to the blast-radius numbers in my 2026-10-06 evidence comment and in ADR 0025 Context
+
+The standards review (commit 97ce5fcf) is right that my numbers were inverted, and it is right about the direction: the rule **relabels** the no-live-criteria population, it does not unblock it, and the genuinely unblocked set is small. My evidence comment above claimed "40 open items in this tracker have their real criteria ticked in dated comments". **That is false**: measured over the same 482 claimable leaves, those 40 open leaves carry 223 criterion rows and **zero** ticked ones. They were already refused before the change, for the right reason, and only the label moved.
+
+Re-measured from the shipped kernel (read-only `tsx` over `loadItems`, pre-fix `!acceptanceComplete(body)` vs post-fix `acceptanceGate(body).gated`):
+
+| population (482 claimable leaves, 117 pre-fix refused) | count | effect of this change |
+|---|---|---|
+| live criteria present and ALL ticked | 5 | **UNBLOCKED** (2 merged `main`-green blockers + 3) |
+| NO live criteria (absent / empty / placeholder) | 56 | **RELABELLED** `unchecked-live-criteria` -> `no-live-contract`; still refused |
+| live criteria present, some unticked | 56 | unchanged, same refusal reason |
+
+Open leaves only (79): pre-refused -> post-refused 69 (40 relabelled + 29 unchanged), pre-allowed -> post-refused **7**, pre-refused -> post-allowed **3**. The 7 are scaffolds with **zero criterion rows anywhere in the body** — exactly the vacuous-success shape decision 2 exists to refuse, so refusing them is the rule working, not a regression. All 56 no-live-criteria leaves carry their unticked boxes in dated comment blocks and nowhere else (checked against the kernel's own comment-block rule, not a reimplementation).
+
+**Where the "61" came from, since both my comment and the ADR cited a number that does not exist in that shape:** the 61 is the count of leaves that were pre-fix refused **and have a live section with criteria** (5 + 56) — a population that contains both the unblocked and the unchanged, so it described neither. Corrected in `ArggonManager/docs/adr/0025-0025…` → `ArggonManager/docs/adr/0025-done-gate-live-acceptance-section.md` Context and Consequences; the honest per-population table above replaces it. Correcting it **strengthens** the ADR: the measured fallback comparison (67 disagreements, all already `done`, zero open leaves) shows the comment-record fallback rescues nothing, so the cost of decision 2 is the visible 7 items and the labelled 40 — not a large hidden number.
+
+Also recorded, per `docs/engineering.md` §Definition of done 6: the cascade-scoping deferral is carried by the filed item **`task-cascade-whole-body-acceptance-defers-this-defect`**, not by ADR prose. I confirmed its live instance myself: `story-ci-wall-clock` is cascade-vetoed on comment history alone (`liveCriteria=0`, `wholeUnchecked=5`). I did not file it, nor `task-create-needs-a-body-flag-to-author-a-live-contract` or `task-migrate-7-leaves-with-no-live-acceptance-contract` — all three were filed by the delivery lead.
+
+Unchanged by this round: the gate's decision logic (`liveAcceptanceCriteria(...) === 0` as the single no-contract predicate, the bare-box carve-out, the container exemption). No status flipped, no acceptance box ticked — this item's own live `## Acceptance` is still the template placeholder and still refuses as `no-live-contract`, which is the lead's to populate after merge.
