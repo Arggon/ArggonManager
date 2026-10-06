@@ -9,7 +9,6 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [native-seam, worktree, hygiene]
 created: "2026-10-02"
 updated: "2026-10-06"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-native-arggon-tools-resolve-tracker-root-to-session-cwd
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-native-arggon-tools-resolve-tracker-root-to-session-cwd.md
