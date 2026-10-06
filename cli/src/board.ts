@@ -3,7 +3,7 @@ import { relative, resolve, sep } from "node:path";
 import {
   STATUSES,
   acceptanceBody,
-  acceptanceComplete,
+  acceptanceGate,
   acceptanceRows,
   aggregateReport,
   buildStatusIndex,
@@ -694,10 +694,13 @@ export type BoardDetailPayload = {
     /** Rows beyond `MAX_DETAIL_ACCEPTANCE_ROWS` were omitted from the list above. */
     acceptance_truncated: boolean;
     /**
-     * The DONE GATE's verdict on the canonical body, verbatim
-     * (`acceptanceComplete(acceptanceBody(item))`) — false means the `--status
-     * done` flip is refused. Carried because the row list above is byte-bounded
-     * for the browser, so a clipped list must never read as "nothing left".
+     * The DONE GATE's verdict, verbatim (`!acceptanceGate(acceptanceBody(item)).gated`)
+     * — false means the `--status done` flip is refused, for either reason the
+     * gate has: an unticked criterion in the live `## Acceptance` section, or no
+     * criterion published there at all. Carried because the row list above is
+     * byte-bounded for the browser and covers the WHOLE body (history included),
+     * so neither the list nor the clip can be read as the verdict
+     * (bug-done-gate-counts-checkboxes-inside-comment-blocks).
      */
     acceptance_complete: boolean;
     comments: Array<{ date: string; author: string; text: string; truncated: boolean }>;
@@ -816,7 +819,7 @@ function detailPayloadOf(
       prose_truncated: prose.truncated,
       acceptance: acceptance.slice(0, MAX_DETAIL_ACCEPTANCE_ROWS),
       acceptance_truncated: acceptance.length > MAX_DETAIL_ACCEPTANCE_ROWS,
-      acceptance_complete: acceptanceComplete(acceptanceBody(kernelItem)),
+      acceptance_complete: !acceptanceGate(acceptanceBody(kernelItem)).gated,
       comments,
       hidden_comments: bounded.allComments.length - bounded.comments.length,
       dependencies,

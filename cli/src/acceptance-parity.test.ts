@@ -21,15 +21,23 @@
  *
  * What is asserted, for every corpus shape:
  *
- *   1. PARITY — the gate's verdict and every consumer's unchecked-row count
- *      agree, i.e. `uncheckedRows(body).length > 0` <=> `!acceptanceComplete(body)`.
- *      That is the invariant the whole item exists for.
+ *   1. PARITY — the ROW question is shared: every consumer returns the same rows,
+ *      and `acceptanceRows`/`acceptanceCriteria`/`acceptanceComplete` keep their
+ *      documented whole-body identities (`acceptanceComplete is exactly
+ *      no unchecked criteria` is asserted over the whole corpus).
  *   2. ONE ANSWER — every consumer returns the same row list for the same body.
- *   3. NO REFUSAL CHANGE — the gate's verdict equals the PRE-FIX regex
- *      (`[^\s]` after the box), over the whole corpus and over a seeded fuzz.
- *      Unifying the parsers may not add or remove a refusal.
- *   4. THE CANONICAL BODY — a checklist that lives only in a COMMENT section
- *      is still seen, because `acceptanceBody` is the only sanctioned input.
+ *   3. THE GATE'S OWN RULE — the done flip is decided by `acceptanceGate` over the
+ *      item's LIVE `## Acceptance` section (dated comment blocks are history), and
+ *      this suite compares it against an INDEPENDENT oracle of that rule over the
+ *      whole corpus plus a structured fuzz. The oracle replaced the pre-fix
+ *      whole-body regex when `bug-done-gate-counts-checkboxes-inside-comment-blocks`
+ *      scoped the gate: that change deliberately moves the refusal set (history is
+ *      no longer an obligation, a missing contract now is), so "the refusal set is
+ *      unchanged" is no longer a property worth asserting — "the refusal set is
+ *      EXACTLY the documented rule" is, and that is what an oracle can prove.
+ *   4. THE CANONICAL BODY — every reader gets `acceptanceBody`'s bytes, never a
+ *      reader's clipped prose, so the gate and the renderers cannot diverge on the
+ *      input.
  *
  * `opencode/plugins/arggon/board.ts` reads items off disk, so its parity is
  * asserted end-to-end against a real tracker fixture in the second describe;
@@ -43,8 +51,12 @@ import {
   acceptanceBody,
   acceptanceComplete,
   acceptanceCriteria,
+  acceptanceGate,
   acceptanceRows,
   acceptanceUnchecked,
+  liveAcceptanceCriteria,
+  liveAcceptanceRows,
+  liveAcceptanceUnchecked,
   findTasksDir,
   loadItems,
   showBoundedParts,
@@ -226,11 +238,80 @@ function corpusBodies(): Array<{ name: string; body: string }> {
 // The pre-fix parsers, kept as ORACLES (never called by production code)
 // ---------------------------------------------------------------------------
 
-/** `lib/src/items.ts` before this fix, verbatim — the refusal-set oracle. */
+/** `lib/src/items.ts` before this fix, verbatim — the pre-scoping refusal-set oracle. */
 function preFixGate(body: string): boolean {
   const criteria = [...body.matchAll(/^[ \t]*[-*] \[( |x|X)\][ \t]*[^\s]/gm)];
   if (criteria.length === 0) return true;
   return criteria.every((match) => match[1] !== " ");
+}
+
+/**
+ * The live `## Acceptance` region, derived INDEPENDENTLY of the kernel
+ * (bug-done-gate-counts-checkboxes-inside-comment-blocks).
+ *
+ * Written from the RULE, not from the source, so agreement is evidence:
+ *
+ *   1. a comment block starts at `### <YYYY-MM-DD> @author` or `### Waiver <…>`
+ *      and runs to the NEXT such heading or the end of the body — a nested
+ *      `### Acceptance` inside a comment does not end it;
+ *   2. THEN the region is everything after the FIRST `## Acceptance` heading up
+ *      to the next heading of rank 1 or 2; absent => no contract.
+ *
+ * The ORDER is part of the rule, not an implementation detail: a `## Acceptance`
+ * heading that lives inside a comment block is removed by step 1 and is
+ * therefore not a contract at all. The structured fuzz below found this by
+ * disagreeing with the kernel until the oracle was ordered the same way — which
+ * is the reason the fuzz exists.
+ *
+ * Split on the LineTerminator set, like the kernel's row parser, so a CR / U+2028
+ * body needs no separate rule here either.
+ */
+function liveRegionOracle(body: string): string {
+  const live: string[] = [];
+  let inComment = false;
+  for (const line of body.split(/[\n\r\u2028\u2029]/)) {
+    if (/^###[ \t]+(?:\d{4}-\d{2}-\d{2}[ \t]+@|Waiver\b)/.test(line)) inComment = true;
+    if (!inComment) live.push(line);
+  }
+  let start = -1;
+  for (let i = 0; i < live.length; i += 1) {
+    // Case-insensitive, like the kernel's own heading rule.
+    if (/^##[ \t]+acceptance[ \t]*$/i.test(live[i] ?? "")) {
+      start = i + 1;
+      break;
+    }
+  }
+  if (start === -1) return "";
+  const kept: string[] = [];
+  for (const line of live.slice(start)) {
+    if (/^#{1,2}[ \t]/.test(line)) break;
+    kept.push(line);
+  }
+  return kept.join("\n");
+}
+
+/**
+ * The gate's documented rule as an ORACLE verdict — the shape `acceptanceGate`
+ * returns, computed without touching the kernel's implementation.
+ */
+function oracleCriteria(region: string): Array<{ checked: boolean }> {
+  // Line-by-line, NOT a `/…/gm` regex: `^` under `m` anchors after `\n` only, so
+  // a `/m` oracle would silently see no rows in the CR / U+2028 / U+2029 bodies
+  // this suite exists to cover — the very blindness review F1 was about.
+  const found: Array<{ checked: boolean }> = [];
+  for (const line of region.split(/[\n\r\u2028\u2029]/)) {
+    const match = /^[ \t]*[-*] \[( |x|X)\][ \t]*\S/.exec(line);
+    if (match) found.push({ checked: match[1] !== " " });
+  }
+  return found;
+}
+
+function liveGateOracle(body: string): { gated: boolean; reason?: string } {
+  const criteria = oracleCriteria(liveRegionOracle(body));
+  if (criteria.length === 0) return { gated: true, reason: "no-live-contract" };
+  return criteria.every((row) => row.checked)
+    ? { gated: false }
+    : { gated: true, reason: "unchecked-live-criteria" };
 }
 
 /** `cli/src/board.ts` before this fix, verbatim — the CRLF-blind oracle. */
@@ -322,9 +403,9 @@ describe("acceptance parity corpus (bug-three-acceptance-parsers-diverging)", ()
     const board = parseAcceptanceRows(acceptanceBody({ body }));
     const pane = tuiRows(acceptanceBody({ body }));
 
-    // (1) PARITY — the gate's verdict is exactly "some consumer row is an
-    // unchecked criterion". This is the invariant: a consumer can never say
-    // "nothing unchecked" while the gate refuses.
+    // (1) PARITY — the whole-body question is shared: "some consumer row is an
+    // unchecked criterion" is exactly `!acceptanceComplete(body)`. A consumer can
+    // never say "nothing unchecked" while that question says otherwise.
     expect(gateUnchecked > 0).toBe(!gateComplete);
     expect(uncheckedFromRows(board) > 0).toBe(!gateComplete);
     expect(uncheckedFromRows(pane) > 0).toBe(!gateComplete);
@@ -333,8 +414,22 @@ describe("acceptance parity corpus (bug-three-acceptance-parsers-diverging)", ()
     expect(board).toEqual(acceptanceRows(body));
     expect(pane).toEqual(acceptanceCriteria(body));
 
-    // (3) NO REFUSAL CHANGE — the gate still refuses exactly what it refused.
-    expect(gateComplete).toBe(preFixGate(body));
+    // (3) THE GATE'S OWN RULE — the done flip is decided by the LIVE section
+    // (dated comment blocks are history), so its verdict is compared against the
+    // independent oracle below rather than against the pre-fix whole-body regex
+    // (bug-done-gate-counts-checkboxes-inside-comment-blocks).
+    expect(acceptanceGate(body)).toEqual(liveGateOracle(body));
+    // …and the live rows are `acceptanceRows` over the independently-derived
+    // region, so no second row parser can hide behind the extractor.
+    expect(liveAcceptanceRows(body)).toEqual(acceptanceRows(liveRegionOracle(body)));
+    expect(liveAcceptanceCriteria(body)).toEqual(
+      acceptanceRows(liveRegionOracle(body)).filter((row) => row.criterion),
+    );
+    expect(liveAcceptanceUnchecked(body).map((row) => row.text)).toEqual(
+      acceptanceRows(liveRegionOracle(body))
+        .filter((row) => row.criterion && !row.checked)
+        .map((row) => row.text),
+    );
   });
 
   it("the gate refuses on a body terminated by ANY LineTerminator (review F1)", () => {
@@ -543,6 +638,78 @@ describe("acceptance parity corpus (bug-three-acceptance-parsers-diverging)", ()
         `(${((refusals / bodies) * 100).toFixed(1)}%)`,
     );
   });
+
+  it("fuzzes the LIVE-section rule against the oracle, with both refusals exercised", () => {
+    // The whole-body fuzz above proves the ROW grammar is unchanged; this one
+    // proves the SCOPING rule is exactly what the docs say
+    // (bug-done-gate-counts-checkboxes-inside-comment-blocks). Bodies are built
+    // from the fragments that decide the region — the heading, its rank, dated
+    // comment headings (including the waiver shape and a nested `### Acceptance`
+    // inside a comment), rows of every tick/indent/text shape, and all five
+    // LineTerminators — because a rule that is wrong in a way only a heading or a
+    // comment boundary can express is invisible to a row-only fuzz.
+    const rand = mulberry32(0x11ce_5eed);
+    const pick = <T>(values: readonly T[]): T => values[Math.floor(rand() * values.length)];
+    const headings = [
+      "# Title",
+      "## Context",
+      "## Acceptance",
+      "## acceptance",
+      "## Notes",
+      "### 2026-10-03 @worker",
+      "### Waiver 2026-10-03",
+      "### Acceptance",
+      "## Acceptance criteria",
+      "",
+      "prose",
+    ];
+    const rows = [
+      "- [ ] a criterion",
+      "- [x] done",
+      "- [X] done too",
+      "- [ ]",
+      "  - [ ] indented",
+      "* [ ] starred",
+      "- [ ]x glued",
+      "-  [ ] two spaces",
+      "- [ ]\u00a0nbsp",
+      "```",
+      "> quoted - [ ] not a row",
+    ];
+    const eols = ["\n", "\r\n", "\r", "\u2028", "\u2029"];
+    const bodies = 40_000;
+    const counts = { noContract: 0, unchecked: 0, allows: 0 };
+    for (let i = 0; i < bodies; i += 1) {
+      const lines = 1 + Math.floor(rand() * 8);
+      let body = "";
+      for (let k = 0; k < lines; k += 1) {
+        body += rand() < 0.4 ? pick(headings) : pick(rows);
+        body += pick(eols);
+      }
+      const verdict = acceptanceGate(body);
+      expect(verdict, JSON.stringify(body)).toEqual(liveGateOracle(body));
+      // The live rows are the kernel's row parser over the oracle's region: no
+      // second parser can hide behind the extractor.
+      expect(liveAcceptanceRows(body), JSON.stringify(body)).toEqual(
+        acceptanceRows(liveRegionOracle(body)),
+      );
+      if (!verdict.gated) counts.allows += 1;
+      else if (verdict.reason === "no-live-contract") counts.noContract += 1;
+      else counts.unchecked += 1;
+    }
+    // Non-vacuity in all three directions, with absolute floors: a fuzz that
+    // never reaches a verdict, or only ever reaches one of them, proves nothing
+    // (the previous harness in this file asserted a count that was always 0 —
+    // see the 200k generator's comment).
+    expect(counts.allows).toBeGreaterThan(500);
+    expect(counts.noContract).toBeGreaterThan(500);
+    expect(counts.unchecked).toBeGreaterThan(500);
+    console.log(
+      `[acceptance-parity] live-section fuzz: ${bodies} bodies — ` +
+        `${counts.allows} allowed, ${counts.noContract} refused (no live contract), ` +
+        `${counts.unchecked} refused (unchecked live criteria)`,
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -606,7 +773,14 @@ function trackerWith(): string {
 }
 
 describe("acceptance parity over real items (bug-three-acceptance-parsers-diverging)", () => {
-  it("the gate and every consumer reach the same verdict for every item", () => {
+  // What this describe pins is the RENDERING question — every consumer lists the
+  // item's rows as written, whole body, history included — and that it is one
+  // parser's answer. The DONE GATE asks a narrower question since
+  // `bug-done-gate-counts-checkboxes-inside-comment-blocks` (the live `##
+  // Acceptance` section, comment blocks excluded), so `acceptanceComplete` is not
+  // its verdict any more; `acceptanceGate` is, and the corpus above compares that
+  // against the oracle over every shape.
+  it("every consumer renders one parser's rows for every item", () => {
     const root = trackerWith();
     const items = loadItems(findTasksDir(root));
     expect(items.length).toBeGreaterThanOrEqual(6);
@@ -732,10 +906,19 @@ describe("acceptance parity over the LIVE tracker (bug-three-acceptance-parsers-
     const disagreements: string[] = [];
     let commentStripped = 0;
     let gated = 0;
+    let liveAllowed = 0;
+    let liveNoContract = 0;
+    let liveUnchecked = 0;
     for (const item of items) {
       const canonical = acceptanceBody(item);
       const gateComplete = acceptanceComplete(canonical);
       if (!gateComplete) gated += 1;
+      // The gate's own verdict, and the three-way breakdown of its refusals — the
+      // numbers a reviewer of this change wants re-runnable rather than remembered.
+      const live = acceptanceGate(canonical);
+      if (!live.gated) liveAllowed += 1;
+      else if (live.reason === "no-live-contract") liveNoContract += 1;
+      else liveUnchecked += 1;
 
       const board = parseAcceptanceRows(canonical);
       const pane = tuiRows(canonical);
@@ -762,13 +945,45 @@ describe("acceptance parity over the LIVE tracker (bug-three-acceptance-parsers-
     // question than the gate did.
     expect(disagreements).toEqual([]);
     console.log(
-      `[acceptance-parity] live: ${items.length} items, ${gated} blocked by the gate, ` +
+      `[acceptance-parity] live: ${items.length} items, ${gated} with an unchecked box anywhere, ` +
         `${commentStripped} would disagree if a reader stripped comment sections`,
+    );
+    console.log(
+      `[acceptance-parity] live gate: ${liveAllowed} allowed, ${liveUnchecked} refused ` +
+        `(unchecked live criteria), ${liveNoContract} refused (no live contract)`,
     );
     // Sanity: the live corpus really does contain blocked items, or the
     // assertion above would be vacuous.
     expect(gated).toBeGreaterThan(0);
     expect(tasksDir.length).toBeGreaterThan(0);
+    // Both directions of the scoped gate are reachable in this tree, and the gate
+    // is strictly NARROWER than the whole-body question it replaced: history is no
+    // longer an obligation. A tracker where scoping changed nothing would mean the
+    // corpus cannot see this change at all.
+    expect(liveAllowed).toBeGreaterThan(0);
+    expect(liveNoContract).toBeGreaterThan(0);
+    expect(liveUnchecked).toBeGreaterThan(0);
+    expect(liveAllowed + liveUnchecked + liveNoContract).toBe(items.length);
+    expect(liveUnchecked).toBeLessThan(gated);
+  });
+
+  it("the gate's scoped verdict is reachable in this tree: the corpus is not vacuous", () => {
+    // The shape this change exists for, measured on this repo's own tracker:
+    // items the PRE-FIX gate refused only because a dated comment carries unticked
+    // boxes. Each must now flip — that is the defect, and it is live here, not
+    // hypothetical.
+    const tasksDir = findTasksDir(REPO_ROOT);
+    const unblocked = loadItems(tasksDir).filter((item) => {
+      // The gate only applies to the claimable leaves.
+      if (item.type !== "task" && item.type !== "bug") return false;
+      if (acceptanceComplete(acceptanceBody(item))) return false;
+      return acceptanceGate(acceptanceBody(item)).gated === false;
+    });
+    expect(unblocked.length).toBeGreaterThanOrEqual(1);
+    console.log(
+      `[acceptance-parity] live tracker: ${unblocked.length} items the pre-fix gate refused ` +
+        `only on comment history (e.g. ${unblocked[0]?.id})`,
+    );
   });
 
   it("a comment-filed checklist is reachable: the corpus is not vacuous", () => {

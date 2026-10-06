@@ -433,9 +433,12 @@ export interface AcceptanceBodySource {
  * ## The invariant: one question, one input
  *
  * The done gate's refusal and every rendered "acceptance" list are the SAME
- * question asked of the SAME bytes, so they are answered by one parser
- * (`acceptanceRows` / `acceptanceCriteria` / `acceptanceComplete`) over one
- * input — this accessor.
+ * question asked of the SAME bytes, so they are answered by one parser over one
+ * input — this accessor. The gate's own question is scoped to the live
+ * `## Acceptance` section (`acceptanceGate`, below), and the scoping happens
+ * INSIDE that predicate, on the canonical body: narrowing the INPUT at a call
+ * site is the mistake, narrowing the question the predicate asks is the fix
+ * (bug-done-gate-counts-checkboxes-inside-comment-blocks).
  *
  * **Never pass a reader-derived string to an acceptance predicate.** A reader
  * that trims, clips, byte-caps, strips HTML comments or strips COMMENT
@@ -521,10 +524,194 @@ export function acceptanceUnchecked(body: string): AcceptanceRow[] {
  * must never wedge the done gate or the cascade. Real (text-bearing)
  * unchecked boxes still gate strictly.
  *
- * This is the DONE GATE (ADR 0015). Its refusal set is the contract every
- * other consumer is measured against; unifying the parsers must never change
- * it, so this function is specified as `!acceptanceUnchecked(body).length`.
+ * The WHOLE-BODY question, and that is a deliberate split rather than a leftover:
+ * the acceptance-aware container cascade asks exactly this ("does this
+ * container's own body still carry an open obligation?"), and containers are
+ * exempt from the done gate precisely so the same contract is never enforced
+ * twice on one item. The `→ done` flip on a claimable leaf asks the narrower,
+ * LIVE question instead — `acceptanceGate`, which scopes to the `##
+ * Acceptance` section and refuses an item that publishes no criteria at all
+ * (bug-done-gate-counts-checkboxes-inside-comment-blocks). Both are one parser
+ * (`acceptanceRows`) over one input (`acceptanceBody`); they differ in which
+ * bytes are the question, and that difference is stated in
+ * `ArggonManager/docs/convention.md` §Done gate.
  */
 export function acceptanceComplete(body: string): boolean {
   return acceptanceUnchecked(body).length === 0;
+}
+
+// ---------------------------------------------------------------------------
+// The LIVE acceptance contract — the region the done gate reads
+// (bug-done-gate-counts-checkboxes-inside-comment-blocks)
+// ---------------------------------------------------------------------------
+
+/**
+ * The live acceptance heading: a level-2 ATX heading whose whole text is
+ * `Acceptance`, case-insensitively.
+ *
+ * Exact on purpose. Every template in the tree writes exactly `## Acceptance`,
+ * and the section name is the ADDRESS of the contract: a fuzzy match could
+ * scope the gate onto prose that merely starts with the word (`## Acceptance
+ * mapping`, `## Acceptance audit (the boxes vs this diff)`), which would let a
+ * non-contract section answer the question. An item that names its acceptance
+ * section something else has published no live contract, which the gate reports
+ * as such instead of guessing.
+ *
+ * Trailing whitespace is tolerated because the LineTerminator split below
+ * already removed `\r`, so a CRLF body needs no separate rule.
+ */
+const ACCEPTANCE_HEADING = /^##[ \t]+acceptance[ \t]*$/i;
+
+/**
+ * A heading of rank 1 or 2 — the live section ends at the next one. Rank 3
+ * (`###`) does NOT end it: a dated comment block may carry its own `###`
+ * subheadings, and `## Acceptance` sections legitimately hold `###` prose.
+ */
+const SECTION_END_HEADING = /^#{1,2}[ \t]/;
+
+/**
+ * A comment block heading, in the two shapes the kernel writes:
+ * `### <YYYY-MM-DD> @<author>` (`runComment`, `runHandoff`) and
+ * `### Waiver <date>` (the ADR 0015 waiver). Mirrors `acceptance.ts`'s
+ * `COMMENT_HEADING`; a hand-written `### Gates` is NOT a comment block.
+ */
+const COMMENT_BLOCK_HEADING = /^###[ \t]+(?:\d{4}-\d{2}-\d{2}[ \t]+@|Waiver\b)/;
+
+/**
+ * The body with every dated comment block removed — history stripped, live
+ * prose kept.
+ *
+ * A block runs from its comment heading to the NEXT comment-shaped heading or the
+ * end of the body, and **not** to the next `###`: a reporter who pastes a whole
+ * item shape into a comment brings its own `### Acceptance` heading with it, and
+ * that nested content is comment text, not a live section. A non-comment `###`
+ * outside any block (`### Gates` under a live section) opens nothing. Comment
+ * headings are append-only and normally sit after the live sections, so stripping
+ * FIRST is also what keeps a `## Acceptance` pasted inside a comment from being
+ * read as the contract at all.
+ *
+ * Not fence-aware, deliberately: `acceptanceRows` counts a `- [ ]` inside a
+ * fenced block as a row (pinned by `cli/src/acceptance-parity.test.ts`), so
+ * tracking fences here would be a second grammar for one document.
+ */
+function withoutCommentBlocks(body: string): string {
+  const out: string[] = [];
+  let inComment = false;
+  for (const line of body.split(ACCEPTANCE_LINE_BREAK)) {
+    // Only a COMMENT-SHAPED heading opens a block. A nested `### Acceptance`
+    // inside a comment does not close it — that is the whole point — so this test
+    // must never reset `inComment` back to false.
+    if (COMMENT_BLOCK_HEADING.test(line)) inComment = true;
+    if (!inComment) out.push(line);
+  }
+  return out.join("\n");
+}
+
+/**
+ * The item's LIVE acceptance section: the body of its `## Acceptance` heading
+ * up to the next rank-1/rank-2 heading, with dated comment blocks removed
+ * (bug-done-gate-counts-checkboxes-inside-comment-blocks).
+ *
+ * `null` when the item has no such section — the "no live contract" shape, which
+ * the done gate refuses rather than reading as "nothing left to do" (an absent
+ * section and an empty one are the same fact: no criteria are published).
+ *
+ * Why this is the gate's input and not a reader's: a dated comment block is
+ * append-only history that is never edited, so an unticked box inside one is a
+ * record of what the criteria WERE, not an open obligation. Before this, the
+ * gate counted `- [ ]` anywhere in the body, so whether an item could reach
+ * `done` depended on whether its history happened to contain unticked boxes:
+ * two items with identical live acceptance got opposite verdicts, and an item
+ * whose criteria are recorded in a dated comment could never be completed.
+ * The live section is the contract; the comment record is history.
+ *
+ * Pure; O(lines). Takes the canonical body (`acceptanceBody(item)`), like every
+ * other acceptance consumer.
+ */
+export function liveAcceptanceRegion(body: string): string | null {
+  const lines = withoutCommentBlocks(body).split(ACCEPTANCE_LINE_BREAK);
+  let start = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (ACCEPTANCE_HEADING.test(lines[i]!)) {
+      start = i + 1;
+      break;
+    }
+  }
+  if (start === -1) return null;
+  const region: string[] = [];
+  for (let i = start; i < lines.length; i += 1) {
+    const line = lines[i]!;
+    if (SECTION_END_HEADING.test(line)) break;
+    region.push(line);
+  }
+  return region.join("\n");
+}
+
+/**
+ * The acceptance rows of the LIVE section, in document order — the same row
+ * parser over the section the gate reads. `[]` when there is no live section
+ * (renderers fall back to {@link acceptanceRows} over the whole body, which
+ * keeps an item's history visible).
+ */
+export function liveAcceptanceRows(body: string): AcceptanceRow[] {
+  const region = liveAcceptanceRegion(body);
+  return region === null ? [] : acceptanceRows(region);
+}
+
+/** The live section's criteria rows — the ones the done flip is judged on. */
+export function liveAcceptanceCriteria(body: string): AcceptanceRow[] {
+  return liveAcceptanceRows(body).filter((row) => row.criterion);
+}
+
+/** The live section's unchecked criteria — exactly what refuses the done flip. */
+export function liveAcceptanceUnchecked(body: string): AcceptanceRow[] {
+  return liveAcceptanceCriteria(body).filter((row) => !row.checked);
+}
+
+/** Why the done gate refuses a flip. Both reasons are waivable (ADR 0015). */
+export type AcceptanceGateRefusal = "unchecked-live-criteria" | "no-live-contract";
+
+/** The gate's answer: it flips, or it refuses for one of exactly two reasons. */
+export type AcceptanceGateVerdict =
+  { gated: false } | { gated: true; reason: AcceptanceGateRefusal };
+
+/**
+ * THE done gate's verdict (ADR 0015, scoped by
+ * bug-done-gate-counts-checkboxes-inside-comment-blocks) over one item body.
+ *
+ * Two refusals, and the second is the half that keeps the first honest:
+ *
+ * 1. `unchecked-live-criteria` — the live `## Acceptance` section carries at
+ *    least one criterion and one is unticked. This is the refusal the gate has
+ *    always made, minus the boxes that live in append-only comment history.
+ * 2. `no-live-contract` — the live section publishes NO criterion at all: the
+ *    section is absent, empty, or still the `<!-- … -->` template placeholder.
+ *
+ * Refusal 2 exists because scoping alone trades one lie for a worse one. An
+ * item whose live section is the untouched template, while its real criteria sit
+ * ticked in dated comments, would otherwise reach `done` with no acceptance
+ * contract whatsoever — vacuous success, the defect class this repo already
+ * tracks (`bug-verification-regex-matching-nothing`,
+ * `bug-wave-probe-file-check-model-dependent`). "No criterion" is decided by
+ * {@link liveAcceptanceCriteria} being empty, which is the one rule that cannot
+ * be satisfied by accident: an absent heading, a whitespace-only section, the
+ * template placeholder comment and a section of bare `- [ ]` scaffold rows all
+ * reduce to it.
+ *
+ * A bare `- [ ]` row is still NOT an unmet criterion
+ * (bug-empty-template-checkbox): it never appears in
+ * {@link liveAcceptanceUnchecked} and never produces refusal 1. A section whose
+ * only rows are bare placeholders carries no criteria, so it refuses with
+ * refusal 2 — for having no contract, never for an unfinished box.
+ *
+ * Not a `validate` rule and not a container rule: the acceptance-aware cascade
+ * keeps asking {@link acceptanceComplete} the whole-body question (containers
+ * are exempt from this gate), and renderers keep listing whole-body rows.
+ */
+export function acceptanceGate(body: string): AcceptanceGateVerdict {
+  const criteria = liveAcceptanceCriteria(body);
+  if (criteria.length === 0) return { gated: true, reason: "no-live-contract" };
+  return liveAcceptanceUnchecked(body).length === 0
+    ? { gated: false }
+    : { gated: true, reason: "unchecked-live-criteria" };
 }

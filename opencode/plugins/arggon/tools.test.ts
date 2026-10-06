@@ -52,7 +52,7 @@ import {
   runUpdate,
 } from "@arggondev/lib";
 import { runInit } from "../../../cli/src/init.js";
-import { tickAcceptance, tickAllAcceptance } from "../../../test/acceptance.js";
+import { satisfyAcceptance, satisfyAllAcceptance } from "../../../test/acceptance.js";
 // Ordering assertions go through assertOrder, never a bare `indexOf`
 // comparison: `-1 < n` makes a renamed clause pass as if it were still
 // ordered (bug-vacuous-substring-ordering-assertions).
@@ -138,9 +138,13 @@ function seedInto(dir: string): void {
     parent: "story-login",
     id: "rate-limit",
   });
-  // Done gate (task-done-gate-acceptance-waiver, ADR 0015): these suites flip
-  // the leaf done for tool/lifecycle rules, so arrange a satisfied contract.
-  tickAllAcceptance(dir);
+  // Done gate (task-done-gate-acceptance-waiver, ADR 0015; scoped by
+  // bug-done-gate-counts-checkboxes-inside-comment-blocks): these suites flip the
+  // leaf done for tool/lifecycle rules, so arrange a satisfied LIVE contract.
+  // Committed, because suites below merge branches back into this tree and git
+  // refuses a merge that would overwrite a dirty file.
+  satisfyAllAcceptance(dir);
+  commitIfRepo(dir, "arrange live acceptance");
 }
 
 function seedTree(prefix = "arggon-w2-"): string {
@@ -217,6 +221,22 @@ function trackerSnapshot(dir: string): Record<string, string> {
 function git(dir: string, args: string[]): void {
   const proc = spawnSync("git", args, { cwd: dir, encoding: "utf8", timeout: 30_000 });
   expect(proc.status, proc.stderr).toBe(0);
+}
+
+/**
+ * Commit only when `dir` IS a git repo. The arrange helpers below edit item
+ * files, and suites that merge a branch back into the fixture need those edits
+ * committed — while the envelope-parity fixtures are plain directories, where a
+ * commit is not merely unnecessary but fatal.
+ */
+function commitIfRepo(dir: string, message: string): void {
+  const inside = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], {
+    cwd: dir,
+    encoding: "utf8",
+  });
+  if (inside.status !== 0) return;
+  git(dir, ["add", "-A"]);
+  git(dir, ["commit", "-qm", message]);
 }
 
 /**
@@ -3929,7 +3949,7 @@ describe("worktree domain tools (W4)", () => {
     const { domain, calls } = fakeDomain(dir);
     const defs = worktreeDefinitions(dir, domain);
     runCreate({ cwd: dir, type: "task", title: "Second task", parent: "story-login", id: "second" });
-    tickAcceptance(dir, "task-second");
+    satisfyAcceptance(dir, "task-second");
 
     // Candidate A: removed through the domain, end to end.
     const started = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
@@ -4015,7 +4035,7 @@ describe("worktree domain tools (W4)", () => {
       git(dir, ["merge", "--no-ff", branch, "-m", "Merge PR (stubbed)"]);
     }
     runCreate({ cwd: dir, type: "task", title: "Second task", parent: "story-login", id: "second" });
-    tickAcceptance(dir, "task-second");
+    satisfyAcceptance(dir, "task-second");
     for (const [id, branch] of [
       ["task-rate-limit", branches[0]],
       ["task-second", branches[1]],
@@ -4090,7 +4110,7 @@ describe("worktree domain tools (W4)", () => {
     const { domain, calls } = fakeDomain(dir);
     const lifecycle = worktreeDefinitions(dir, domain);
     runCreate({ cwd: dir, type: "task", title: "Second task", parent: "story-login", id: "second" });
-    tickAcceptance(dir, "task-second");
+    satisfyAcceptance(dir, "task-second");
 
     // Candidate A: removable end to end. Its removal is OBSERVED, and the step
     // that follows (the branch lookup) has no catch of its own, so a failure
@@ -4761,7 +4781,10 @@ describe("native cleanup reaps declared Compose projects (ADR 0019 layer 2, task
   function addItems(dir: string, ids: string[]): void {
     for (const id of ids) {
       runCreate({ cwd: dir, type: "task", title: `Task ${id}`, parent: "story-login", id });
-      tickAcceptance(dir, `task-${id}`);
+      satisfyAcceptance(dir, `task-${id}`);
+      // Committed for the same reason as `seedInto`: the reap cases merge a
+      // feature branch into this tree, which git refuses over a dirty file.
+      commitIfRepo(dir, `arrange live acceptance: ${id}`);
     }
   }
 

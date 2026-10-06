@@ -35,12 +35,14 @@ lean. A 40-line spec beats a 4-page one nobody reads.
   writing code. If project docs disagree with what you're about to do, fix the
   docs in the same PR or file a blocking follow-up — never fork silently.
 - **Tests are part of the change** when behavior changes; run the full suite plus
-  lint/typecheck gates the project defines, and keep every acceptance checkbox in
-  the item body honest — the done gate enforces it (ADR 0015): a task/bug with
-  unchecked boxes refuses `--status done` unless a HUMAN passes
-  `--waive "<reason>"` (recorded in the body). That checklist is the **domain
-  invariant**: it is what the project declares as done, whatever it checks it
-  with.
+  lint/typecheck gates the project defines, and keep the acceptance checklist in
+  the item's LIVE `## Acceptance` section honest — the done gate enforces it
+  (ADR 0015, scoped by ADR 0025): a task/bug whose live section has an unticked
+  criterion, or publishes no criterion at all, refuses `--status done` unless a
+  HUMAN passes `--waive "<reason>"` (recorded in the body). Boxes inside dated
+  comment blocks are history, not the contract: transcribe criteria into the live
+  section, never tick history. That checklist is the **domain invariant**: it is
+  what the project declares as done, whatever it checks it with.
 - **Docs travel with code:** any change that makes a doc statement false updates
   that doc in the same PR (change-type → doc mapping in `ArggonManager/docs/agents.md`
   §Documentation maintenance).

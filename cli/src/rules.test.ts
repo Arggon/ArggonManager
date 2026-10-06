@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { assertUpdateRules, runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "./init.js";
-import { tickAcceptance } from "../../test/acceptance.js";
+import { satisfyAcceptance } from "../../test/acceptance.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -48,7 +48,7 @@ function completedTask(): { dir: string; id: string } {
   runUpdate({ cwd: dir, id, status: "in_progress", assignee: "Arggon", now: NOW });
   // Done gate (task-done-gate-acceptance-waiver, ADR 0015): tick the contract
   // so the flip under test is the unwaived path.
-  tickAcceptance(dir, id);
+  satisfyAcceptance(dir, id);
   runUpdate({ cwd: dir, id, status: "done", now: NOW });
   return { dir, id };
 }
@@ -140,7 +140,7 @@ describe("runUpdate agent rules (MCP entry point)", () => {
   it("still lets agents do legal work: claim and complete", () => {
     const { dir, id } = primedTask();
     runUpdate({ cwd: dir, id, status: "in_progress", assignee: "agent-x", agent: true, now: NOW });
-    tickAcceptance(dir, id);
+    satisfyAcceptance(dir, id);
     runUpdate({ cwd: dir, id, status: "done", agent: true, now: NOW });
     expect(() => runUpdate({ cwd: dir, id, status: "todo", agent: true, now: NOW })).toThrow(
       /agents must not reopen done items/,
@@ -150,7 +150,7 @@ describe("runUpdate agent rules (MCP entry point)", () => {
   it("human callers keep the old semantics (reopen and force-steal work)", () => {
     const { dir, id } = primedTask();
     runUpdate({ cwd: dir, id, status: "in_progress", assignee: "alice", now: NOW });
-    tickAcceptance(dir, id);
+    satisfyAcceptance(dir, id);
     runUpdate({ cwd: dir, id, status: "done", now: NOW });
     runUpdate({ cwd: dir, id, status: "todo", now: NOW });
     runUpdate({ cwd: dir, id, status: "in_progress", assignee: "bob", force: true, now: NOW });

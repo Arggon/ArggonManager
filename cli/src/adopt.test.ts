@@ -37,7 +37,7 @@ import { runDoctor } from "./doctor.js";
 import { assertOrder } from "../../test/assert-order.js";
 
 import { runInit } from "./init.js";
-import { tickAcceptance } from "../../test/acceptance.js";
+import { satisfyAcceptance } from "../../test/acceptance.js";
 import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -178,7 +178,7 @@ describe("runAdopt: task creation", () => {
     const dir = seedTree();
     runAdopt({ cwd: dir });
     runUpdate({ cwd: dir, id: ADOPT_TASK_ID, status: "in_progress", assignee: "adopt-bot" });
-    tickAcceptance(dir, ADOPT_TASK_ID);
+    satisfyAcceptance(dir, ADOPT_TASK_ID);
     runUpdate({ cwd: dir, id: ADOPT_TASK_ID, status: "done", unassign: true });
     expect(() => runAdopt({ cwd: dir })).toThrow(/already exists \(done\)/);
   });
@@ -718,7 +718,7 @@ describe("runAdoptAck: x-generated baseline refresh (task-adopt-checksum-refresh
     const dir = seedTree();
     runAdopt({ cwd: dir });
     runUpdate({ cwd: dir, id: ADOPT_TASK_ID, status: "in_progress", assignee: "adopt-bot" });
-    tickAcceptance(dir, ADOPT_TASK_ID);
+    satisfyAcceptance(dir, ADOPT_TASK_ID);
     runUpdate({ cwd: dir, id: ADOPT_TASK_ID, status: "done", unassign: true });
     const result = runAdoptAck({ cwd: dir });
     expect(result.count).toBe(GENERATED_DOC_COUNT);

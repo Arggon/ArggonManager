@@ -1,6 +1,8 @@
 # 0015 Done gate: enforce acceptance-checklist completeness on the terminal flip, with an explicit waiver
 
 - Status: Accepted
+
+> Amendment (2026-10-06): [ADR 0025](./0025-done-gate-live-acceptance-section.md) amends decision 1 below. The gate now reads the item's LIVE `## Acceptance` section (dated comment blocks excluded) and refuses the flip when that section publishes no criterion at all. Everything else here — the waiver as the single human-only escape, the MCP refusal, the container exemption, the tolerance for automation — is unchanged. Nothing below this line is rewritten, per the ADR lifecycle.
 > Status note (2026-10-01): flipped from "Proposed (Accepted on merge)" — landed via PR #442 (commit c801aea6, kernel done gate + `--waive`); shipped and documented in CHANGELOG 0.4.1. The status line had lagged the merge.
 
 - Date: 2026-09-29

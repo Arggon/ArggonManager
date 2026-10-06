@@ -46,15 +46,25 @@ export {
   acceptanceBody,
   acceptanceComplete,
   acceptanceCriteria,
+  acceptanceGate,
   acceptanceRows,
   acceptanceUnchecked,
   itemsById,
+  liveAcceptanceCriteria,
+  liveAcceptanceRegion,
+  liveAcceptanceRows,
+  liveAcceptanceUnchecked,
   loadItems,
   softTryLoadItem,
   tryLoadItem,
   walkTasksTree,
 } from "./items.js";
-export type { AcceptanceBodySource, AcceptanceRow } from "./items.js";
+export type {
+  AcceptanceBodySource,
+  AcceptanceGateRefusal,
+  AcceptanceGateVerdict,
+  AcceptanceRow,
+} from "./items.js";
 export {
   numberField,
   parseFrontmatter,
