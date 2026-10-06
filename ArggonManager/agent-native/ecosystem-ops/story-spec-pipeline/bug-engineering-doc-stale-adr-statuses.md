@@ -12,6 +12,7 @@ updated: "2026-10-03"
 claimed_at: "2026-10-03T12:47:53.140Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-engineering-doc-stale-adr-statuses
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-engineering-doc-stale-adr-statuses.md
   Leaves live only under a story. id is the filename stem: bug-engineering-doc-stale-adr-statuses.
@@ -27,7 +28,29 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-engineering-doc-stale-adr
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [x] `docs/engineering.md` no longer describes ADR 0003 as Proposed (it is Accepted); check its whole
+      ADR-status reference list, not just line 230
+- [x] Sweep the docs tree for ADR status claims against the actual files — the index drift recurred at
+      least three times (05b31fb6 fixed 0014-0017; c0cdd60b left 0002-0004; now this)
+- [x] State in the ADR process section that an ADR status change must update every surface describing
+      it, so the sweep is not manual next time
+- [x] **Decide the spec/plan 009 case explicitly — decided 2026-10-06 by the delivery lead.** The dated
+      record is **correct as history**; the statements are not current-tense claims and must not be
+      edited. Reasoning: both statements sit inside dated decision records, and a dated block is a
+      snapshot of what was believed then, not a claim about now. ADR 0010's own status has since moved
+      on ("Partially superseded by 0011 (§2/§3) + layout superseded by 0012"), which is exactly what a
+      snapshot records. The current, authoritative status lives in `docs/adr/*.md` and the ADR index —
+      the same delete-don't-correct decision PR #618 made for `engineering.md`, and the same
+      dated-comments-are-verbatim / live-body-is-current-state boundary the PR #586 review ruled on.
+      Rewriting a dated record would also destroy the evidence that the drift was caught rather than
+      inherited. The _rule_ making the register authoritative is tracked as
+      `task-adr-index-title-rule-unwritten-in-engineering-md` — this box records the decision, that
+      item carries the carrier sentence.
+
+Evidence for each box is recorded under `## Notes`. The four criteria are transcribed here from the
+2026-10-03 block; those originals are left verbatim as history, and
+`bug-done-gate-counts-checkboxes-inside-comment-blocks` — which counts `- [ ]` anywhere in a body,
+including dated comments — is why this section was empty until now.
 
 ## Notes
 
@@ -160,46 +183,51 @@ cwd `/home/arggon/Projects/ArggonManager-bug-engineering-doc-stale-adr-statuses`
 Unverified by me: every execution claim above; the worker's five reverted simulations (their expected-vs-observed messages and sha256 reverts are recorded on the item but I did not reproduce them); the prettier-convergence claim; and CI for any head after the F1/F2 edits.
 
 ### 2026-10-03 @Arggon
+
 ### 2026-10-03 @Arggon
+
 Round 1 addressed · commit aa86f434 · PR #618 · branch unchanged.
 
 **Merged `origin/main` first** (was 18 behind). The item file conflicted — the verdict landed on main while my ticked boxes lived only on this branch. Resolved as a **union**: main's frontmatter, my ticked acceptance list, and every `###` block from both sides (my worker comment + handoff, and the reviewer's full verdict). No partial claim block; `validate` ok.
 
 **The reviewer's three probes, run first, all confirmed — I did not assume them:**
 
-| Probe | Predicted | Observed |
-|---|---|---|
-| 1 (F3) trailing restatement after the link | 4/4 pass = hole | **4/4 pass** — confirmed invisible |
-| 2 (F1) widen `CARRIERS` to three | rule 1 passes on all three, rule 2 fails once on the 0015 link | **exactly that** — 1 failed / 7 passed, `convention.md: links ./adr/0015-done-gate.md, which does not exist — docs/adr/0015-done-gate-acceptance-waiver.md does` |
-| 3 (F2) narrow region to pre-link prose | all green = unpinned | **4/4 pass** — confirmed unpinned |
+| Probe                                      | Predicted                                                      | Observed                                                                                                                                                         |
+| ------------------------------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 (F3) trailing restatement after the link | 4/4 pass = hole                                                | **4/4 pass** — confirmed invisible                                                                                                                               |
+| 2 (F1) widen `CARRIERS` to three           | rule 1 passes on all three, rule 2 fails once on the 0015 link | **exactly that** — 1 failed / 7 passed, `convention.md: links ./adr/0015-done-gate.md, which does not exist — docs/adr/0015-done-gate-acceptance-waiver.md does` |
+| 3 (F2) narrow region to pre-link prose     | all green = unpinned                                           | **4/4 pass** — confirmed unpinned                                                                                                                                |
 
 **F1 — fixed by widening, not by softening the sentence.** The constant is now split:
 
 - `STATUS_CARRIERS` = `engineering.md`, `agents.md`, `convention.md` (rule 1). All three were clean on the field, so the reviewer's "zero cost today" read was right.
 - `LINK_CARRIERS` = `engineering.md` only (rule 2), because `convention.md:124`'s dead ADR 0015 link is still broken in the merged tree — that item is filed but not merged. Re-verified after the merge.
 
-`:193` now ends in an explicit coverage statement instead of an unqualified "fails a PR whose carrier": **"Coverage: status restatement in `engineering.md`, `agents.md`, `convention.md`; link resolution in `engineering.md`."** — so the doc is *true*, not approximately true, and it says out loud why the link rule is narrower.
+`:193` now ends in an explicit coverage statement instead of an unqualified "fails a PR whose carrier": **"Coverage: status restatement in `engineering.md`, `agents.md`, `convention.md`; link resolution in `engineering.md`."** — so the doc is _true_, not approximately true, and it says out loud why the link rule is narrower.
 
 **F1's second half — the gate.** The doc sentence and the two arrays are the same fact stated twice, so a new test reads the coverage statement back out of `engineering.md` and asserts it names exactly the carriers the rules iterate. Verified in both directions:
+
 - narrow `STATUS_CARRIERS` to one → `rule 1: doc vs constant: expected [ Array(3) ] to deeply equal [ 'ArggonManager/docs/engineering.md' ]`
 - soften the **doc** (drop `agents.md`/`convention.md` from the sentence) → `expected [ 'ArggonManager/docs/engineering.md' ] to deeply equal [ Array(3) ]`
 
 Delimiters are ASCII on purpose (`**Coverage: status restatement in ` … `; link resolution in ` … `**`): my first attempt parsed an em dash and I could not get the needle and the prose to agree on the codepoint through the shell — a parse that fragile would fail for reasons no reader could act on. An explicit coverage line is also better prose than burying the scope in a long sentence.
 
 **F2 — all three shapes pinned in the premise guards.** Added, alongside the existing before-the-link case: inside the link text, after the link, a clause that must NOT be read (`… [ADR 0011](…) is the contract, and a change is accepted only once it is explicitly recorded.` → `[]`), and that ADR 0001 does not inherit ADR 0003's word across a `·`. Discriminating, confirmed:
+
 - strip the trailing window → fails on the after-the-link assertion
 - strip the link text from the head → fails on the inside-the-link-text assertion
-Each half now fails on its own, so neither can be narrowed away silently.
+  Each half now fails on its own, so neither can be narrowed away silently.
 
 **F3 — closed, not documented as a limit.** `adrReferences` now builds each reference's region from prose + link text + one trailing clause. The trailing clause stops at a sentence end, comma or list delimiter (`TAIL_STOPS`), because an unbounded window would run to end-of-line and `agents.md:473` continues for hundreds of characters past its ADR links — a window that wide would report prose with nothing to do with any ADR's status. The reviewer's probe 1 now **fails loudly**: `engineering.md: labels ADR 0003 "Proposed" — docs/adr/0003-milestone-field.md says "Accepted"; carriers link to an ADR, they do not restate its status`.
 
 **End-to-end on the newly covered carriers** (previously a green lane):
+
 - `(Proposed)` after ADR 0012's link in `agents.md` → caught, message carries 0012's real Accepted status
 - `(Proposed)` after ADR 0016's link in `convention.md` → caught, same shape
 
 **Original five simulations re-run, all still loud** (each reverted, sha256 verified against the pre-simulation backup afterwards): A `0003 (Proposed)` before the link → caught · B `0008 (superseded by ADR 0011)` → caught with 0008's real Accepted status + its date note · C inside the link text → caught · D after the link → caught (new) · E renumbered `0020`→`0021` → `links ./adr/0021-methodology-first-productization.md, which does not exist`. Clean tree 7/7.
 
-**Impact class unchanged: Advisory.** No rule, gate, command contract or pipeline step; the suite still runs inside the existing `npm test`. The reviewer's nit stands as recorded — `:193` is a new *authoring* rule and reads Behavioral under `agents.md:476`'s wording — and the answer is unchanged: `skills/arggon-cli/references/methodology.md:61` points at §ADR process rather than copying it, so the Behavioral obligations are already met and nothing was hand-copied.
+**Impact class unchanged: Advisory.** No rule, gate, command contract or pipeline step; the suite still runs inside the existing `npm test`. The reviewer's nit stands as recorded — `:193` is a new _authoring_ rule and reads Behavioral under `agents.md:476`'s wording — and the answer is unchanged: `skills/arggon-cli/references/methodology.md:61` points at §ADR process rather than copying it, so the Behavioral obligations are already met and nothing was hand-copied.
 
 **Not touched, per the round-1 instruction:** the delete-don't-correct decision, §Related's pointer to the index as the register, the file-scope note in the test header, both sibling doc-contract tests, and the four swept findings now owned by `task-engineering-doc-restates-more-drifted-facts` / `bug-convention-md-links-nonexistent-adr-0015` (including the reviewer's added `README.md:177` instance). The 0015 link is still broken in this tree, so the two-constant split stays until that lands.
 
@@ -208,23 +236,26 @@ Each half now fails on its own, so neither can be narrowed away silently.
 Left `in_progress` — completion is the coordinator's call after merge.
 
 ### handoff 2026-10-03 @Arggon (session: ses_efe310c5effeaOs8Nra70sfiUu) — next: Coordinator re-reviews PR #618 (aa86f434) for F1/F2/F3 and merges; then flip the item to done. Box 2 (spec/plan 009) still theirs to decide.
+
 - branch: fix/bug-engineering-doc-stale-adr-statuses
 - open questions: Impact class still argued Advisory while the reviewer reads :193 as a new authoring rule (Behavioral); nothing to sync either way. LINK_CARRIERS widens when bug-convention-md-links-nonexistent-adr-00…
 
 ### 2026-10-03 @reviewer
+
 ### 2026-10-03 @reviewer (round 2)
+
 verdict: request-changes (one record item — no code change; F1/F2/F3 all closed and approved)
 
 Re-reviewed by reading the amended head `aa86f434`: the full suite (375 lines), the §ADR process + §Related diff, the item file after the union merge, and `gh pr checks`. I ran no gates.
 
-**Bottom line: the code and the doc are approved as they stand.** F1 is fixed by widening rather than softening, F2 is fixed with assertions that are genuinely coupled to the half each claims, and F3 is closed rather than documented. What remains is the PR *record*: the impact class is wrong under the spec's own trigger, and `agents.md:478` makes that a change request by name. It is a two-line edit to the PR description plus an item comment, needs no commit and no gate re-run, and I will not re-review code.
+**Bottom line: the code and the doc are approved as they stand.** F1 is fixed by widening rather than softening, F2 is fixed with assertions that are genuinely coupled to the half each claims, and F3 is closed rather than documented. What remains is the PR _record_: the impact class is wrong under the spec's own trigger, and `agents.md:478` makes that a change request by name. It is a two-line edit to the PR description plus an item comment, needs no commit and no gate re-run, and I will not re-review code.
 
 ---
 
-**1. The coverage-parity test is not another tautology — verified by reading, both directions.** `it("covers exactly the carriers the §ADR process sentence says it covers")` (:315-329) compares **two independent artifacts**: the doc side is parsed out of `engineering.md` (`paragraphWith` → the single blank-line-delimited paragraph containing `**Coverage: status restatement in `, then the slice between the two anchors, then every backticked `*.md` in it, prefixed to `ArggonManager/docs/`), and the code side is the two array literals the `it.each` loops actually iterate (:81-85, :97). Neither is derived from the other, so PR #615's shape — a registry constant asserted only against documents — does not apply: the arrays are the suite's real iteration set, so the doc cannot drift from what runs. Direction A: drop `agents.md` from `STATUS_CARRIERS` → doc still yields 3 → `toEqual` fails. Direction B: drop it from the sentence → array still 3 → fails. Deleting the sentence fails loudly at :236-239 (`expected exactly one paragraph containing …`) with a message naming the anchor. I also checked the window cannot pick up an unrelated list: the only other backticked `.md` in that paragraph is ``docs/adr/*.md``, and it sits **before** the anchor, outside both slices. Two limits, neither blocking: it checks *agreement*, not *completeness* — a 4th carrier added to `agents.md:473`'s list would not be caught here (note for whenever a carrier is added); and if `; link resolution in ` were deleted, `indexOf` returns -1, rule 1's slice drops only the last character and still compares equal while rule 2's slice goes nonsense and fails — loud but cryptic, so `expect(linkFrom).toBeGreaterThan(from)` would be the cheap hardening.
+**1. The coverage-parity test is not another tautology — verified by reading, both directions.** `it("covers exactly the carriers the §ADR process sentence says it covers")` (:315-329) compares **two independent artifacts**: the doc side is parsed out of `engineering.md` (`paragraphWith` → the single blank-line-delimited paragraph containing `**Coverage: status restatement in `, then the slice between the two anchors, then every backticked `*.md` in it, prefixed to `ArggonManager/docs/`), and the code side is the two array literals the `it.each` loops actually iterate (:81-85, :97). Neither is derived from the other, so PR #615's shape — a registry constant asserted only against documents — does not apply: the arrays are the suite's real iteration set, so the doc cannot drift from what runs. Direction A: drop `agents.md` from `STATUS_CARRIERS` → doc still yields 3 → `toEqual` fails. Direction B: drop it from the sentence → array still 3 → fails. Deleting the sentence fails loudly at :236-239 (`expected exactly one paragraph containing …`) with a message naming the anchor. I also checked the window cannot pick up an unrelated list: the only other backticked `.md` in that paragraph is `docs/adr/*.md`, and it sits **before** the anchor, outside both slices. Two limits, neither blocking: it checks _agreement_, not _completeness_ — a 4th carrier added to `agents.md:473`'s list would not be caught here (note for whenever a carrier is added); and if `; link resolution in ` were deleted, `indexOf` returns -1, rule 1's slice drops only the last character and still compares equal while rule 2's slice goes nonsense and fails — loud but cryptic, so `expect(linkFrom).toBeGreaterThan(from)` would be the cheap hardening.
 
 **2. The trailing clause is bounded, and the bound holds on the real corpus.** `TAIL_STOPS = /[·|,
-]|\.\s/`, `tail = line.slice(end, until).split(TAIL_STOPS)[0]` where `until` is the next link's `(` or end of line (:182-183). I listed every `./adr/NNNN-…` link in the three carriers with the 70 characters that follow and checked each window by hand: no status word falls inside any of them. `agents.md:473` — the line the worker cites — behaves as claimed: ADR 0011's tail is `")), and "` (stops at the comma) and ADR 0016's tail is ` defines how changes reach adopting repos` (stops at the `". "` before the several-hundred-character continuation). The clause this PR added to :232 (`**each ADR's status lives in its own \`- Status:\` line**`) sits behind a `·`, so it is not read as a claim about ADR 0008 — and it would be harmless regardless, since `Status` is not in `STATUS_WORDS`. Both false-positive guards have teeth **against over-reading**, which is the right direction for them: :291-296 fails if the comma/sentence bound is dropped (the word "accepted" would enter the window); :299-306 fails if `·` leaves `TAIL_STOPS` (ADR 0001 would inherit 0003's word). Neither would fail if the window were narrowed — correct behaviour for a guard of this kind, and I checked they are not vacuous in the current state.
+]|\.\s/`, `tail = line.slice(end, until).split(TAIL_STOPS)[0]` where `until` is the next link's `(` or end of line (:182-183). I listed every `./adr/NNNN-…` link in the three carriers with the 70 characters that follow and checked each window by hand: no status word falls inside any of them. `agents.md:473` — the line the worker cites — behaves as claimed: ADR 0011's tail is `")), and "` (stops at the comma) and ADR 0016's tail is ` defines how changes reach adopting repos` (stops at the `". "` before the several-hundred-character continuation). The clause this PR added to :232 (`**each ADR's status lives in its own \`- Status:\` line**`) sits behind a `·`, so it is not read as a claim about ADR 0008 — and it would be harmless regardless, since `Status`is not in`STATUS_WORDS`. Both false-positive guards have teeth **against over-reading**, which is the right direction for them: :291-296 fails if the comma/sentence bound is dropped (the word "accepted" would enter the window); :299-306 fails if `·`leaves`TAIL_STOPS` (ADR 0001 would inherit 0003's word). Neither would fail if the window were narrowed — correct behaviour for a guard of this kind, and I checked they are not vacuous in the current state.
 
 **3. F2's independence claim holds.** :287 `one("- x: [ADR 0003 (Proposed)](./adr/0003-milestone-field.md)")` → `["Proposed"]` depends on the head slice running to `at` (the `(` of the target), which is where the link text lives; strip it and the label is `"- x:"` → `[]` → fails. :288 `one("- x: [ADR 0003](./adr/0003-milestone-field.md) (Proposed)")` → `["Proposed"]` depends on the tail; force `tail = ""` and the label is `"- x:"` → `[]` → fails. Each assertion fails in exactly the state its partner half is missing, and neither passes in both states. (My round-1 probe 3 observed 4/4 pass with the region narrowed — that was the round-1 file; the post-fix confirmation of both halves is listed under Probes because it is the worker's claim, not mine.)
 
@@ -232,7 +263,7 @@ Re-reviewed by reading the amended head `aa86f434`: the full suite (375 lines), 
 
 **5. All five simulations are mutations the scanner must catch, and none can pass for an unrelated reason.** Structurally: a carrier edit can only fail this file through rule 1 or rule 2. The premise tests read synthetic strings, and the parity test reads the doc's coverage line — none of the five touches either, so no simulation can "pass" by satisfying an unrelated assertion. Spot-checked individually: A and B put a vocabulary word in a head/tail position (`STATUS_WORDS` is the same list as the `STATUS_CLASSES` constant in `cli/src/adr-index-parity.test.ts`); C is link text; D is the new tail window; E renumbers the target so `existsSync(resolve(docsDir, "./adr/0021-…"))` is false while `0021` is absent from the directory. The two new end-to-end checks (agents.md ADR 0012, convention.md ADR 0016) are D on the newly covered carriers — and I traced both carriers by hand for false positives in the new window (§2). "Clean tree 7/7" is consistent with the file's shape: 2 premise + 1 parity + 3 rule-1 (one per carrier) + 1 rule-2.
 
-**6. Impact class — my call: it is Behavioral, and the record must say so.** `agents.md:476` triggers Behavioral on "agents must re-learn something: **a rule**, a gate, a command contract, a pipeline step", and `:193` is a rule authors must follow: "A carrier (`agents.md`, this file, `convention.md`, `skills/arggon-cli/**`) … never restates that ADR's status." The duty is not the one the PR argues was already required — `:71`/`:212` forced authors to *keep the restatement accurate*, which means editing the status on every acceptance; the new rule forbids *having the field*, which is precisely why the fix deletes it rather than updating it. The worker's answer is an argument about compliance, not classification: "the Behavioral obligations are already met" shows the change is safe, and that is worth recording, but it does not move the class. I will not accept the alternative resolution of rewording `:193` until it stops being a rule — the rule is the fix.
+**6. Impact class — my call: it is Behavioral, and the record must say so.** `agents.md:476` triggers Behavioral on "agents must re-learn something: **a rule**, a gate, a command contract, a pipeline step", and `:193` is a rule authors must follow: "A carrier (`agents.md`, this file, `convention.md`, `skills/arggon-cli/**`) … never restates that ADR's status." The duty is not the one the PR argues was already required — `:71`/`:212` forced authors to _keep the restatement accurate_, which means editing the status on every acceptance; the new rule forbids _having the field_, which is precisely why the fix deletes it rather than updating it. The worker's answer is an argument about compliance, not classification: "the Behavioral obligations are already met" shows the change is safe, and that is worth recording, but it does not move the class. I will not accept the alternative resolution of rewording `:193` until it stops being a rule — the rule is the fix.
 **What must change:** the impact statement must read **Behavioral** and carry the ADR 0016 adopter-upgrade-channel reference, in the **PR description and as an item comment** (`agents.md:473` requires both; both currently say Advisory), and `:478` makes a misstated class a change request. Alongside it, record the delegation that discharges the "keep the skill and its copies in sync" obligation — I verified all four links in that chain by reading: `skills/arggon-cli/references/methodology.md:61` points at §ADR process rather than copying it; `skills:sync` is therefore a no-diff; `.agents/skills/` is a marker-prefixed generated copy pinned byte-equal by `cli/src/skill-copy.test.ts` inside `npm test`; and `engineering.md` is materialized into adopter trees (`cli/src/docs.ts:521` in `TIER2_DESTS`, asserted by `cli/src/init.test.ts:112`), so an adopter's agent reaches the rule through a pointer into a file it has, with nothing hand-copied to drift. No code change is implied.
 
 **7. Delivery is clean.** The union kept the informative side of the frontmatter: `status: in_progress` plus `assignee`/`branch`/`claimed_at`/`worktree_path` all survive (main's copy had none of them and `status: todo`, so nothing was lost by preferring the branch). All nine `###` blocks are present — filing note (:34), round-1 worker comment (:52/54), round-1 handoff (:117), my round-1 verdict with its `## Probes needed` block intact (:122/124, header at :126), round-2 worker comment (:162/163), round-2 handoff (:210). The ticked list is 3 of 4 with box 2 still explicitly reserved for the coordinator. `git diff origin/main...HEAD --stat` is exactly the three intended files (item +76/-5-ish, `engineering.md` +3/-1, the suite +375). `tasks-validate` green. One cosmetic artifact carried over from round 1: each comment sits under a doubled `### date @author` header (52/54, 122/124, 162/163) because the comment body brings its own heading; schema-legal, not worth a push.
@@ -240,11 +271,13 @@ Re-reviewed by reading the amended head `aa86f434`: the full suite (375 lines), 
 **CI status at review time:** `tasks-validate` pass, `ui-smoke` pass, **`cli` job PENDING** on `aa86f434`. So I have not seen build/`npm test`/lint green on the amended head; the worker's local log (127 files / 2593 tests) is their evidence and CI is the authority. Merge waits on it.
 
 **Non-blocking notes for the follow-ups**
-- `engineering.md:193`'s reason clause ("narrower only because `convention.md` still links a dead ADR 0015") is a fact that expires when `bug-convention-md-links-nonexistent-adr-0015` lands, and nothing will catch its staleness. The parity test forces the *coverage clause* to move with `LINK_CARRIERS`; add "update that reason clause" to that item's acceptance list.
+
+- `engineering.md:193`'s reason clause ("narrower only because `convention.md` still links a dead ADR 0015") is a fact that expires when `bug-convention-md-links-nonexistent-adr-0015` lands, and nothing will catch its staleness. The parity test forces the _coverage clause_ to move with `LINK_CARRIERS`; add "update that reason clause" to that item's acceptance list.
 - The §Related bullet still carries a rule restatement that duplicates §ADR process (two places to change if the rule ever changes). Fine as shipped; the PR's own principle would drop it.
 - For `task-engineering-doc-restates-more-drifted-facts`: my round-1 addition `README.md:177` still stands, and note that widening rule 1 to the carriers does not reach `explorations/**` (those links are `../adr/…`, not `./adr/…`).
 
 ## Probes needed
+
 cwd `/home/arggon/Projects/ArggonManager-bug-engineering-doc-stale-adr-statuses`, head `aa86f434`.
 
 1. **Merge blocker — CI `cli` job on `aa86f434`.** Expected: `npm run build` (incl. `tsconfig.typecheck.json` over the new suite), `npm test` with `cli/src/adr-status-doc-contract.test.ts` at 4 tests + 4 parameterized cases, `npm run lint`, `test:structure`, `lint:structure`, `check:plugin` all green. Observed at my review: pending. Result changes the verdict only if red.
@@ -255,7 +288,9 @@ cwd `/home/arggon/Projects/ArggonManager-bug-engineering-doc-stale-adr-statuses`
 Unverified by me: the worker's three probe re-runs, five drift simulations and end-to-end carrier checks (their expected-vs-observed messages and sha256 reverts are recorded on the item at :168-206; I did not reproduce them), the prettier-convergence claim, and the `cli` gate on the amended head.
 
 ### 2026-10-03 @Arggon
+
 ### 2026-10-03 @Arggon
+
 Round 2 addressed — record only. Commit 040f6276 (merge of `origin/main`); no code change, no doc prose change.
 
 **Methodology impact class: Behavioral** (`ArggonManager/docs/agents.md:473`/`:476`). Restated in the PR description and here, which is what `:473` requires of both places.
@@ -264,11 +299,12 @@ Round 2 addressed — record only. Commit 040f6276 (merge of `origin/main`); no 
 
 It also does not merely document existing practice. The prior duty (`engineering.md:71` "update the doc **in the same PR**", `:212` "Docs/ADR updated in the same PR when contracts change") required authors to keep a restatement **accurate** — which means hand-editing the status word on every acceptance. The new rule forbids **having the field**. That is precisely why this PR deletes `(Proposed)` instead of correcting it to `Accepted`: the change replaces one obligation with a different one, so an agent who complied with the old duty must now stop doing what the old duty asked for. Rule change → Behavioral.
 
-**What I got wrong, stated plainly:** I argued *compliance* ("the Behavioral obligations are already met"), which shows the change is safe — useful, but it answers "do we owe a re-sync", not "what class is this". I cited `engineering.md:71`/`:212` as if they already required this rule; they require the opposite handling of the same field. The evidence was good and the inference was wrong, which is a worse failure than weak evidence.
+**What I got wrong, stated plainly:** I argued _compliance_ ("the Behavioral obligations are already met"), which shows the change is safe — useful, but it answers "do we owe a re-sync", not "what class is this". I cited `engineering.md:71`/`:212` as if they already required this rule; they require the opposite handling of the same field. The evidence was good and the inference was wrong, which is a worse failure than weak evidence.
 
 **Adopter-upgrade channel: ADR 0016.** `agents.md:476` requires a Behavioral change to reference it ([ADR 0016](./adr/0016-adopter-upgrade-channel.md)), and this change carries that reference. What an adopting repo's agents must re-learn: in a methodology carrier an ADR is **linked, never described** — the status lives in the ADR's own `- Status:` line and in the ADR index, and a carrier must not carry a copy. Adopters get it through the channel because `engineering.md` is materialized into their tree by `arggon init` (`cli/src/docs.ts:521` in `TIER2_DESTS`, asserted by `cli/src/init.test.ts:112`), so the rule arrives in the file their agents already read.
 
 **The copy-sync obligation: already discharged, by delegation.** `agents.md:476` also requires keeping `skills/arggon-cli/` ↔ `.agents/skills/arggon-cli/` in sync and byte-equal. That is met, structurally rather than by exception — four links in the chain, each verified by reading:
+
 1. **No copy to update.** `skills/arggon-cli/references/methodology.md:61` points at §ADR process ("§ADR process — 4-digit id, kebab-case title, Status/Date/Deciders + Context / …") instead of reproducing it, so the skill never carried the rule this PR changes.
 2. **`skills:sync` is a no-diff.** `npm run skills:sync` synced 7 bundled files and left the branch untouched.
 3. **The generated copy is pinned byte-equal.** `.agents/skills/arggon-cli/` is a marker-prefixed generated copy, held byte-equal to `skills/arggon-cli/` by `cli/src/skill-copy.test.ts` inside `npm test`, so it cannot drift silently between releases.
@@ -289,10 +325,12 @@ A Behavioral change whose copy obligation is met by a pointer is the intended de
 Left `in_progress` — completion is the coordinator's call after merge.
 
 ### handoff 2026-10-03 @Arggon (session: ses_efe310c5effeaOs8Nra70sfiUu) — next: Coordinator merges PR #618 (record-only round done: impact class restated Behavioral with ADR 0016 in the PR body and an item comment), then flips the item to done.
+
 - branch: fix/bug-engineering-doc-stale-adr-statuses
 - open questions: Commit messages still say Advisory — unfixable without a forbidden force-push; PR body + comment are authoritative. Non-blocking reviewer note left unapplied on purpose: expect(linkFrom).toBeGreaterT…
 
 ### 2026-10-06 @Arggon
+
 Re-dispatch round 3 (post-ADR-0021 role rename) · commits `7b7c3c73` + `5def12ec` · PR #618 · branch unchanged.
 
 **The branch was 401 behind and red. It is now merged, green, and pushed.** Read the "not what was expected" note first — the red was not the flake.
@@ -308,7 +346,7 @@ FAIL cli/src/adr-status-doc-contract.test.ts > ArggonManager/docs/convention.md 
   convention.md: labels ADR 0021 "accepted" — docs/adr/0021-…md says "Accepted"
 ```
 
-`convention.md` now links ADR 0021 at `:553` — `([ADR 0021](…) §4): whether a container's work was accepted …` — which describes what a product-acceptance record *contains* (`accept: approve` / `accept: changes-requested`), **not** ADR 0021's status. With no group closer in `TAIL_STOPS` the trailing window ran **181 characters** past that `)` and read `accepted` as a restatement. A false positive on correct prose, newly reachable because ADR 0021 landed in those 401 commits. A gate that fires on correct prose gets deleted rather than fixed, so `TAIL_STOPS` now ends at the closer of the group the reference sits in.
+`convention.md` now links ADR 0021 at `:553` — `([ADR 0021](…) §4): whether a container's work was accepted …` — which describes what a product-acceptance record _contains_ (`accept: approve` / `accept: changes-requested`), **not** ADR 0021's status. With no group closer in `TAIL_STOPS` the trailing window ran **181 characters** past that `)` and read `accepted` as a restatement. A false positive on correct prose, newly reachable because ADR 0021 landed in those 401 commits. A gate that fires on correct prose gets deleted rather than fixed, so `TAIL_STOPS` now ends at the closer of the group the reference sits in.
 
 **This is a second, code-bearing change beyond the "one substantive fix" this re-dispatch scoped, and it crosses the boundary the round-2 reviewer drew ("no code change implied; I will not re-review code").** Flagging rather than burying it. It is one character in one regex plus one premise guard; reverting is one commit (`git revert 7b7c3c73`) and the branch goes red again, so it is the delivery lead's call, not mine.
 
@@ -316,21 +354,21 @@ FAIL cli/src/adr-status-doc-contract.test.ts > ArggonManager/docs/convention.md 
 
 `adr-index-parity.test.ts:125-131` → dead, PR #620 moved `STATUS_CLASSES` to `:191`. **The claim was true; only the locator was wrong.** Both sites (`:143`, `:234`) now name the symbol — `STATUS_CLASSES` in `cli/src/adr-index-parity.test.ts` — because a line range into a file two concurrent PRs both rewrote is exactly what let it go stale, and a symbol survives the next rewrite. `task-adr-index-parity-status-classes-line-ref-stale` is **not** closed here: this PR owns the reference, not #620.
 
-Four `adr-index-parity.test.ts:<digits>` occurrences remain repo-wide and I left all four: 3 in that tracking item (quotes the old value as the historical record) and 1 in `task-adr-index-parity-does-not-check-titles.md:131` — a **`done`** item's reviewer verdict, which is the report that *found* this defect ("one stale reference, owned by #618") and quotes the old value on purpose. Sanitising a closed record's verdict would be rewriting history.
+Four `adr-index-parity.test.ts:<digits>` occurrences remain repo-wide and I left all four: 3 in that tracking item (quotes the old value as the historical record) and 1 in `task-adr-index-parity-does-not-check-titles.md:131` — a **`done`** item's reviewer verdict, which is the report that _found_ this defect ("one stale reference, owned by #618") and quotes the old value on purpose. Sanitising a closed record's verdict would be rewriting history.
 
 ### Premise re-checked against current main — it survived
 
 1. **Still stale, not already fixed.** `origin/main:ArggonManager/docs/engineering.md:311` still reads `milestone field (Proposed): [ADR 0003](…)` while `docs/adr/0003-milestone-field.md` says `- Status: Accepted`. Unfixed after 401 commits; this PR is still the fix. Box 2's spec/plan 009 pair is likewise untouched on main (`spec-opencode2-009.md:87`, `plan-opencode2-009.md:24`, both still "ADR 0010 Proposed"; the file says `Partially superseded by ADR 0011 … layout superseded by ADR 0012`). **Still the coordinator's call, still unticked.**
 2. **The check is not vacuous — by mutation, not assertion.** Clean corpus 7/7 GREEN, then each mutation reverted and sha256-verified:
 
-| Mutation | Expected | Observed |
-|---|---|---|
-| A `0003 (Proposed)` before the link | RED | RED (`expected [ Array(1) ] to deeply equal []`) |
-| B `0008 (superseded by ADR 0011)` | RED | RED |
-| C `0003 (Proposed)` inside the link text | RED | RED |
-| D `0003 (Proposed)` after the link | RED | RED |
-| E link renumbered to a non-existent ADR | RED | RED (rule 2) |
-| F drop `)` from `TAIL_STOPS` | RED | **RED, 2 assertions** — the new guard *and* the real carrier |
+| Mutation                                 | Expected | Observed                                                     |
+| ---------------------------------------- | -------- | ------------------------------------------------------------ |
+| A `0003 (Proposed)` before the link      | RED      | RED (`expected [ Array(1) ] to deeply equal []`)             |
+| B `0008 (superseded by ADR 0011)`        | RED      | RED                                                          |
+| C `0003 (Proposed)` inside the link text | RED      | RED                                                          |
+| D `0003 (Proposed)` after the link       | RED      | RED                                                          |
+| E link renumbered to a non-existent ADR  | RED      | RED (rule 2)                                                 |
+| F drop `)` from `TAIL_STOPS`             | RED      | **RED, 2 assertions** — the new guard _and_ the real carrier |
 
 Both halves of the new bound fail in exactly opposite states: drop `)` → the guard fires; keep `)` → the existing `(Proposed)` after-the-link assertion still fires, so the trailing half is not blinded. I also removed a duplicate assertion I had first written — the existing one already proves that half.
 
@@ -338,16 +376,16 @@ Both halves of the new bound fail in exactly opposite states: drop `)` → the g
 
 ### Gates — expected vs observed, at the pushed head `5def12ec`
 
-| Gate | Expected | Observed |
-|---|---|---|
-| `npm run build` (full, after merging main) | exit 0 | **0** — lib + tsc + typecheck + e2e + bundle |
-| `npm run test` | green | **131 files / 2768 tests, 0 failed** |
-| `npm run arggon -- validate` | ok | **ok (0 warnings, convention v5)** |
-| `npm run check:plugin` | bundle in sync | **clean, exit 0** |
-| `npm run lint` / `test:structure` / `lint:structure` | 0 / 5 / clean | **0 · 5 passed · clean** |
-| `merge-tree --write-tree origin/main HEAD` | exit 0, no conflicts | **exit 0**, single tree sha, no conflict lines |
-| grep for remaining line-range citations | none live | **none live**; 4 historical, left alone (above) |
-| `git status --porcelain` | clean | **clean**, bundle not dirty |
+| Gate                                                 | Expected             | Observed                                        |
+| ---------------------------------------------------- | -------------------- | ----------------------------------------------- |
+| `npm run build` (full, after merging main)           | exit 0               | **0** — lib + tsc + typecheck + e2e + bundle    |
+| `npm run test`                                       | green                | **131 files / 2768 tests, 0 failed**            |
+| `npm run arggon -- validate`                         | ok                   | **ok (0 warnings, convention v5)**              |
+| `npm run check:plugin`                               | bundle in sync       | **clean, exit 0**                               |
+| `npm run lint` / `test:structure` / `lint:structure` | 0 / 5 / clean        | **0 · 5 passed · clean**                        |
+| `merge-tree --write-tree origin/main HEAD`           | exit 0, no conflicts | **exit 0**, single tree sha, no conflict lines  |
+| grep for remaining line-range citations              | none live            | **none live**; 4 historical, left alone (above) |
+| `git status --porcelain`                             | clean                | **clean**, bundle not dirty                     |
 
 Full build before any test, both times — the stale-`lib/dist` `SyntaxError` did not recur.
 
@@ -360,5 +398,6 @@ I also **reverted a prettier run of my own** that reformatted the whole item fil
 **Untouched on purpose:** every acceptance box — they live inside a dated `## Notes` block (`:45-50`), not under `## Acceptance` (which is empty), so ticking them in place means rewriting history. Status stays `in_progress`; the `done` flip is the delivery lead's after merge verification. The reviewer's round-2 non-blocking hardening notes (`expect(linkFrom).toBeGreaterThan(from)`; updating `:193`'s reason clause when `bug-convention-md-links-nonexistent-adr-0015` lands) remain unapplied and unowned by this round.
 
 ### handoff 2026-10-06 @Arggon — next: Delivery lead: review the TAIL_STOPS ')' change in 7b7c3c73 (code-bearing, beyond the scoped fix) — approve or git revert; then CI on 5691ee9e and flip to done.
+
 - branch: fix/bug-engineering-doc-stale-adr-statuses
 - open questions: Is the one-character TAIL_STOPS ')' bound acceptable given the round-2 reviewer said 'no code change; I will not re-review code'? Reverting returns the branch to red on convention.md:553. Box 2 (spec…
