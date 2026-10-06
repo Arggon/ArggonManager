@@ -16,6 +16,7 @@ import {
   containersMissingAcceptance,
   docsDirForRoot,
   findTasksDir,
+  itemsWithUnansweredBrief,
   loadItems,
   readConventionConfig,
   readConventionVersion,
@@ -526,6 +527,16 @@ export type SpecAnalyzeResult = {
    * `findings` array.
    */
   productAcceptance: SpecFinding[];
+  /**
+   * Unanswered decision-brief findings (ADR 0026, spec owner-decision-brief-021):
+   * any item carrying a `decide:` header with no later `decided:` comment —
+   * deliberately any type and any status while the state is `open`, unlike the
+   * terminal-`story` acceptance bucket beside it. Additive bucket, corpus mode
+   * only, and ALWAYS EMPTY unless the project has armed
+   * `x-tracker.product-acceptance: true` (the existing arming — no new key).
+   * Baseline snapshots include it in the flat `findings` array.
+   */
+  unansweredDecisionBrief: SpecFinding[];
 };
 
 /** Deliberately small, documented checklist; deterministic, no AI. */
@@ -1009,6 +1020,9 @@ function decisionFindings(root: string): SpecFinding[] {
 /** The finding kind for a container that closed with no recorded acceptance. */
 export const PRODUCT_ACCEPTANCE_FINDING_KIND = "MISSING-PRODUCT-ACCEPTANCE";
 
+/** The finding kind for a decision brief that was never answered. */
+export const UNANSWERED_DECISION_BRIEF_FINDING_KIND = "UNANSWERED-DECISION-BRIEF";
+
 /**
  * Whether this project has armed the `accept:` recording convention
  * (`x-tracker.product-acceptance: true`).
@@ -1073,6 +1087,56 @@ function productAcceptanceFindings(root: string): SpecFinding[] {
   return findings;
 }
 
+/**
+ * One sentence naming the item and the recording path — domain-neutral on
+ * purpose (ADR 0026 §7): the surface is "a comment the adopting project
+ * writes", not a software artifact. Deterministic (fixed enum tokens, no clock,
+ * no counts, no status) so a committed baseline fingerprints it stably. The
+ * brief text itself is deliberately NOT interpolated: the item's own path is
+ * the identity, and the finding is a signal, not a restatement.
+ */
+function unansweredDecisionBriefMessage(id: string): string {
+  return (
+    `${id} carries an open decision brief with no recorded answer — record the answer ` +
+    `with a comment on the item (decided: <the chosen option | other>); ` +
+    `report-only, nothing is blocked`
+  );
+}
+
+/**
+ * Unanswered decision-brief findings: any item whose `decide:` header has no
+ * later `decided:` comment (ADR 0026, spec owner-decision-brief-021).
+ *
+ * Inherits the product-acceptance arming (`x-tracker.product-acceptance: true`,
+ * the existing key — no new config key), and reports every `open` item.
+ * **Deliberately NOT scoped to containers or terminal statuses**, unlike
+ * {@link productAcceptanceFindings}: an acceptance is due at closure, so waiting
+ * for the container to close is what keeps that detector low-noise; a brief is
+ * owed while the decision is open and stays open for its whole default window,
+ * and it may well be filed on a leaf. Narrowing this by analogy would silence
+ * the one case it exists for — a brief sent and never answered, and nobody
+ * notices. Never fires on `decided` or `self-decided` (the question was asked
+ * and answered), never when unarmed, never fails the run.
+ *
+ * Report-only in every respect: exit 0 with findings, nothing filed, no item
+ * mutated, no transition consulted.
+ */
+function unansweredDecisionBriefFindings(root: string): SpecFinding[] {
+  if (!productAcceptanceArmed(root)) return [];
+  const findings: SpecFinding[] = [];
+  for (const gap of itemsWithUnansweredBrief(loadItems(findTasksDir(root)))) {
+    findings.push(
+      finding(
+        posixRel(root, gap.item.filePath),
+        UNANSWERED_DECISION_BRIEF_FINDING_KIND,
+        "warn",
+        unansweredDecisionBriefMessage(gap.item.id),
+      ),
+    );
+  }
+  return findings;
+}
+
 export function runSpecAnalyze(opts: SpecAnalyzeOptions): SpecAnalyzeResult {
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
@@ -1109,6 +1173,7 @@ export function runSpecAnalyze(opts: SpecAnalyzeOptions): SpecAnalyzeResult {
   const consistency = opts.spec ? [] : consistencyFindings(root);
   const decisions = opts.spec ? [] : decisionFindings(root);
   const productAcceptance = opts.spec ? [] : productAcceptanceFindings(root);
+  const unansweredDecisionBrief = opts.spec ? [] : unansweredDecisionBriefFindings(root);
 
   const byFile = (a: SpecFinding, b: SpecFinding): number =>
     a.file.localeCompare(b.file) || a.kind.localeCompare(b.kind) || (a.line ?? 0) - (b.line ?? 0);
@@ -1116,6 +1181,7 @@ export function runSpecAnalyze(opts: SpecAnalyzeOptions): SpecAnalyzeResult {
   consistency.sort(byFile);
   decisions.sort(byFile);
   productAcceptance.sort(byFile);
+  unansweredDecisionBrief.sort(byFile);
   return {
     root,
     conventionVersion,
@@ -1124,6 +1190,7 @@ export function runSpecAnalyze(opts: SpecAnalyzeOptions): SpecAnalyzeResult {
     consistency,
     decisions,
     productAcceptance,
+    unansweredDecisionBrief,
   };
 }
 
@@ -1154,6 +1221,13 @@ export function formatSpecAnalyzeHuman(result: SpecAnalyzeResult): string {
       `${f.severity} ${sanitizeHumanError(f.file)}: ${sanitizeHumanError(f.message)} [${f.kind}]`,
     );
   }
+  // Unanswered decision-brief findings name a work item too (any type/status):
+  // same boundary, no line number.
+  for (const f of result.unansweredDecisionBrief) {
+    lines.push(
+      `${f.severity} ${sanitizeHumanError(f.file)}: ${sanitizeHumanError(f.message)} [${f.kind}]`,
+    );
+  }
   for (const f of result.ambiguity) {
     const at = f.line === undefined ? "" : `${f.line}:`;
     lines.push(
@@ -1164,7 +1238,8 @@ export function formatSpecAnalyzeHuman(result: SpecAnalyzeResult): string {
     result.ambiguity.length +
     result.consistency.length +
     result.decisions.length +
-    result.productAcceptance.length;
+    result.productAcceptance.length +
+    result.unansweredDecisionBrief.length;
   if (total === 0) {
     lines.push(`arggon spec analyze: clean (${result.scanned} spec(s) scanned)`);
   } else {
@@ -1233,6 +1308,7 @@ function snapshotFromResult(result: SpecAnalyzeResult): SpecBaselineSnapshot {
     ...result.consistency,
     ...result.decisions,
     ...result.productAcceptance,
+    ...result.unansweredDecisionBrief,
   ]);
   return {
     schemaVersion: SPEC_BASELINE_SCHEMA_VERSION,
@@ -1344,6 +1420,7 @@ export function runSpecAnalyzeCompareBaseline(
     ...result.consistency,
     ...result.decisions,
     ...result.productAcceptance,
+    ...result.unansweredDecisionBrief,
   ];
   const currentKeySet = new Set(current.map(findingKey));
   const unchanged: SpecFinding[] = [];
@@ -1367,7 +1444,8 @@ export function formatSpecBaselineSaveHuman(r: SpecBaselineSaveResult): string {
     r.result.ambiguity.length +
     r.result.consistency.length +
     r.result.decisions.length +
-    r.result.productAcceptance.length;
+    r.result.productAcceptance.length +
+    r.result.unansweredDecisionBrief.length;
   return `arggon spec analyze: baseline written to ${sanitizeHumanError(r.file)} (${total} finding(s) across ${r.result.scanned} spec(s))\n`;
 }
 
