@@ -4,6 +4,12 @@ See [ADR process](../engineering.md#adr-process) in `docs/engineering.md`.
 
 Files: `NNNN-short-title.md` (four-digit number, kebab title).
 
+The Title column is the ADR's own `# NNNN Title` heading, verbatim. A row that
+deliberately differs declares the difference in its own ADR as
+`- Index title: …`; without that line the row must copy the heading. Enforced
+by `cli/src/adr-index-parity.test.ts`, which also pins one row per ADR, the
+numbering, the status and the row order.
+
 | ADR                                                           | Title                                                                                                          | Status                                 |
 | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
 | [0001](./0001-cli-stack.md)                                   | CLI stack (Phase 1)                                                                                            | Accepted                               |
@@ -26,6 +32,6 @@ Files: `NNNN-short-title.md` (four-digit number, kebab title).
 | [0018](./0018-update-delivery-and-distribution-channel.md)    | Update delivery and distribution channel (release pipeline, update channel, skew, tarballs)                    | Accepted                               |
 | [0019](./0019-worktree-runtime-isolation.md)                  | Worktree runtime isolation: environment contract by default, ephemeral service containers as an opt-in pattern | Proposed                               |
 | [0020](./0020-methodology-first-productization.md)            | Methodology-first productization with per-agent native adapters                                                | Accepted                               |
-| [0021](./0021-agents-primary-workers-human-product-owner.md)  | Agents as primary workers, humans as product owner: role model, promotion policy, recorded acceptance          | Accepted                               |
-| [0022](./0022-decline-autoharness-autocontext-autocompact.md) | External agent tooling: decline AutoHarness / AutoContext / AutoCompact, steal the lesson-store idea           | Proposed                               |
+| [0021](./0021-agents-primary-workers-human-product-owner.md)  | Agents as primary workers, humans as product owner                                                             | Accepted                               |
+| [0022](./0022-decline-autoharness-autocontext-autocompact.md) | External agent tooling — decline AutoHarness / AutoContext / AutoCompact, and steal the lesson-store idea      | Proposed                               |
 | [0023](./0023-ci-wall-clock.md)                               | CI wall clock: concurrency groups, duration-aware sharding, and the `cli` required check                       | Proposed                               |
