@@ -47,12 +47,53 @@ export function tsxLoaderPath(root: string = repoRoot): string {
 }
 
 /**
- * argv that runs `entry` (the CLI or a spawned TS helper script) through
- * tsx's loader: `node --import <loader> <entry>`. Spread the result before
- * the entry's own arguments.
+ * Absolute path of the resolver hook that points a spawned child's
+ * `@arggondev/lib` at the kernel SOURCE instead of the built `lib/dist`
+ * (bug-test-suite-lib-dist-rebuild-race). Test-only, outside the build project
+ * and the published `files` allowlist — see `test/kernel-source-hooks.mjs`.
+ */
+export function kernelSourceHookPath(root: string = repoRoot): string {
+  return resolve(root, "test/kernel-source-resolve.mjs");
+}
+
+/**
+ * argv that runs `entry` (a spawned TS helper script) through tsx's loader:
+ * `node --import <loader> <entry>`. Spread the result before the entry's own
+ * arguments.
+ *
+ * This is the SHAPE a source run has, and what `cli/src/measure.ts` spawns in
+ * production (`cli/src/measure.test.ts` pins that equality), so it is left
+ * exactly as it was. It resolves the kernel through `node_modules`, i.e. the
+ * BUILT `lib/dist`. A child that reaches the kernel wants {@link cliNodeArgs}
+ * instead: the callers left here are TS driver scripts that never import the
+ * kernel, and the one gate that exercises a built kernel on purpose
+ * (`cli/src/lib-build.test.ts`, against its own private copy's `dist`).
  */
 export function nodeImportArgs(entry: string, root: string = repoRoot): string[] {
   return ["--import", tsxLoaderPath(root), entry];
+}
+
+/**
+ * argv for a child that imports the kernel: tsx's loader plus the kernel-source
+ * resolve hook, entry last --
+ * `node --import <loader> --import <kernel-source hook> <entry>`.
+ *
+ * bug-test-suite-lib-dist-rebuild-race: `vitest.config.ts` aliases
+ * `@arggondev/lib` to `lib/src/index.ts` so an in-process test never depends on
+ * a previous `npm run build`, but a child does not inherit that alias (`tsx`
+ * does not read the vitest config) and resolved the built `lib/dist` instead --
+ * the one directory a test is expected to rebuild. A lane that rebuilt it in
+ * place could therefore hand a concurrently linking child a half-written module
+ * and kill it in Node's ESM loader as an unrelated `SyntaxError: ... does not
+ * provide an export named ...`. Loading the source makes the child immune: no
+ * suite rewrites `lib/src`, so there is nothing left to race.
+ *
+ * Isolation, never a retry: no spawn is repeated and no child error is
+ * swallowed. `cli/src/kernel-isolation.test.ts` pins the resolution and
+ * reproduces the original failure shape.
+ */
+export function cliNodeArgs(entry: string = cliEntryPath(), root: string = repoRoot): string[] {
+  return ["--import", tsxLoaderPath(root), "--import", kernelSourceHookPath(root), entry];
 }
 
 export type RunCliOptions = Omit<SpawnSyncOptionsWithStringEncoding, "encoding"> & {
@@ -68,9 +109,14 @@ export type RunCliOptions = Omit<SpawnSyncOptionsWithStringEncoding, "encoding">
  *   process ever ran; `status` and `signal` are both null.
  * - `signalled` — the child was killed by a signal (OOM killer, timeout kill).
  * - `child-boot-failed` — the child started but died inside Node's ESM loader
- *   while building the module graph, before the CLI's own code ran. The repo's
- *   spawned CLI loads the kernel from the BUILT `lib/dist`, so this is the shape
- *   a rebuild of that artifact under a live reader takes.
+ *   while building the module graph, before the CLI's own code ran. This is the
+ *   shape a half-written module takes, and the shape the reported flake had
+ *   (bug-test-suite-lib-dist-rebuild-race): a lane rebuilt the repo's built
+ *   artifacts in place while this child linked them. A harness child no longer
+ *   loads `lib/dist` at all ({@link cliNodeArgs} points it at the kernel
+ *   source) and the run freezes those artifacts
+ *   (`test/kernel-artifacts.ts`), so seeing it means something outside the
+ *   suite moved them.
  * - `program-exit` — the CLI ran and exited non-zero on its own terms (the case
  *   tests assert on); never raised, never retried.
  */
@@ -116,16 +162,26 @@ export function classifySpawnFailure(proc: SpawnOutcome): SpawnFailureKind {
 }
 
 /**
- * Built artifacts a spawned child ESM-loads: the CLI's TypeScript sources are
- * transpiled in-memory, but `@arggondev/lib` and the build identity resolve to
- * `lib/dist` / `dist` on disk. A lane that rebuilds them in place rewrites
- * every file (tsc does not skip byte-identical output), so a child that links
- * the graph mid-rewrite sees a truncated module.
+ * Built artifacts in the repo root that a child may still ESM-load: the CLI's
+ * TypeScript sources are transpiled in-memory, but `dist/cli.js` (the production
+ * entry `cli/src/measure.ts` spawns) and the build identity live on disk, and a
+ * lane that rebuilds them in place rewrites every file (tsc does not skip
+ * byte-identical output), so a child that links the graph mid-rewrite sees a
+ * truncated module.
+ *
+ * The kernel is deliberately NOT read by a harness child any more
+ * ({@link cliNodeArgs} points it at `lib/src`), but `lib/dist` stays watched:
+ * these files are exactly what `test/kernel-artifacts.ts` freezes for the run,
+ * so any move here is a writer that bypassed the freeze and must be reported.
  */
-const KERNEL_ARTIFACTS = ["lib/dist/index.js", "lib/dist/create.js", "dist/cli.js"] as const;
+export const KERNEL_ARTIFACTS = ["lib/dist/index.js", "lib/dist/create.js", "dist/cli.js"] as const;
 
-/** `size:mtimeMs` per watched artifact, or `absent` — one cheap stat each. */
-function artifactFingerprint(root: string): string {
+/**
+ * `size:mtimeMs` per watched artifact, or `absent` — one cheap stat each.
+ * Exported so the suite-wide globalSetup gate (`test/kernel-artifacts.ts`) and
+ * this per-child check share ONE definition of "the artifacts moved".
+ */
+export function artifactFingerprint(root: string): string {
   return KERNEL_ARTIFACTS.map((rel) => {
     try {
       const st = statSync(resolve(root, rel));
@@ -203,6 +259,239 @@ export class SpawnHarnessError extends Error {
 }
 
 /**
+ * The repo's built artifacts were REWRITTEN while a child ran, and the child
+ * itself produced a result.
+ *
+ * bug-test-suite-lib-dist-rebuild-race: the drift was report-only, so it only
+ * ever surfaced by accident — as a child that died in Node's loader with an
+ * unrelated `SyntaxError: ... does not provide an export named ...`. That is
+ * the shape the reported flake had, three PRs deep, with the real cause in a
+ * different lane. A writer is a defect whether or not a reader happened to be
+ * unlucky, so drift is now its own named failure instead of a footnote on
+ * someone else's error.
+ *
+ * It cannot fire on a POSIX run that went through the freeze in
+ * `test/kernel-artifacts.ts` (those files are read-only for the duration of the
+ * suite), so a raise here means the write bypassed the freeze — a root-owned
+ * build, a `chmod`u+w slip, or a platform without POSIX modes.
+ *
+ * The same class is what the suite-wide check throws (`scope: "suite"`), so the
+ * class has one name whether a single spawn or the whole run saw the move.
+ */
+
+/** Where a drift was observed: one child, or the run as a whole. */
+export type KernelArtifactDriftScope = "child" | "suite";
+export class KernelArtifactDriftError extends Error {
+  readonly argv: string[];
+  readonly cwd: string;
+  readonly drift: string;
+  /** `child` when one spawn saw it; `suite` for the whole-run check. */
+  readonly scope: KernelArtifactDriftScope;
+
+  constructor(init: {
+    argv?: string[];
+    cwd: string;
+    drift: string;
+    scope?: KernelArtifactDriftScope;
+  }) {
+    const argv = init.argv ?? [];
+    const { cwd, drift } = init;
+    const scope = init.scope ?? "child";
+    super(
+      [
+        `[arggon-test-spawn] kernel artifact drift (not an assertion failure) [${scope}]`,
+        `the repo's built artifacts were REWRITTEN ${
+          scope === "suite" ? "during the run" : "while this child ran"
+        }:`,
+        `  ${drift}`,
+        ...(scope === "child" ? [`  child: node ${argv.join(" ")}`] : []),
+        `  cwd: ${cwd}`,
+        "  a suite lane rebuilt lib/dist or dist in place. The suite freezes those",
+        "  files for the duration of the run (test/kernel-artifacts.ts), so a write",
+        "  that landed anyway came from outside the freeze. Build into your own temp",
+        "  root instead (see freshCloneCopy in cli/src/pack-fixtures.ts).",
+        "  fix the writer, not the reader.",
+      ].join("\n"),
+    );
+    this.name = "KernelArtifactDriftError";
+    this.argv = argv;
+    this.cwd = cwd;
+    this.drift = drift;
+    this.scope = scope;
+  }
+}
+
+/**
+ * Which entry point produced a text a test is about to read as a `--json`
+ * envelope. Carried into every reader failure so the next occurrence names CLI
+ * vs MCP instead of leaving the reader to guess
+ * (bug-mcp-parity-branch-test-json-parse-of-human-stdout).
+ */
+export type EnvelopeSurface = "CLI" | "MCP";
+
+/**
+ * A stream a test wanted to read as a `--json` envelope, with enough context to
+ * name the failure. `isError` is the MCP tool-error flag: a tool-level error
+ * carries a human sentence where an envelope would be, and that flag is the one
+ * piece of evidence that says so.
+ */
+export type EnvelopeReadInit = {
+  surface: EnvelopeSurface;
+  /** The operation, e.g. `arggon branch` or `arggon_branch`. */
+  command: string;
+  text: string;
+  /** The same run's stderr, when there is one (CLI child). */
+  stderr?: string;
+  /** MCP tool-result `isError`; omitted for a CLI child. */
+  isError?: boolean;
+};
+
+/**
+ * A surface produced text that is not a `--json` envelope — no JSON object could
+ * be located in it. Thrown (never returned) precisely so it is distinguishable
+ * from an assertion diff: the surface, the raw text and the run's stderr all
+ * survive into the test output, replacing the bare
+ * `SyntaxError: Unexpected token 'a', "arggon bra"...` that three guesses and a
+ * bisect used to be needed for.
+ */
+export class EnvelopeReadError extends Error {
+  readonly surface: EnvelopeSurface;
+  readonly command: string;
+  readonly text: string;
+  readonly stderr: string;
+  readonly isError: boolean | null;
+
+  constructor(init: EnvelopeReadInit) {
+    const { surface, command, text } = init;
+    const stderr = init.stderr ?? "";
+    const isError = init.isError ?? null;
+    const detail: string[] = [
+      `surface: ${surface} (${command}) produced no JSON envelope`,
+      `tool-level error: ${isError === null ? "n/a (not an MCP tool result)" : String(isError)}`,
+    ];
+    if (isError === true) {
+      detail.push(
+        `  the MCP server raised a TOOL ERROR, so this text is its diagnostic message,`,
+        `  not an envelope — the underlying spawn reported no result.`,
+      );
+    }
+    detail.push(
+      `--- ${surface} stdout ---\n${clipForMessage(text)}`,
+      `--- ${surface} stderr ---\n${stderr.trim() ? clipForMessage(stderr) : "(empty)"}`,
+    );
+    super(`[arggon-test-spawn] unreadable envelope\n${detail.join("\n")}`);
+    this.name = "EnvelopeReadError";
+    this.surface = surface;
+    this.command = command;
+    this.text = text;
+    this.stderr = stderr;
+    this.isError = isError;
+  }
+}
+
+/** Raw-text budget inside a reader failure (head — that is where the noise is). */
+const ENVELOPE_ECHO_CHARS = 2000;
+
+/**
+ * Clip to {@link ENVELOPE_ECHO_CHARS}, keeping the HEAD: the offending line is
+ * the one ahead of the envelope, which is the whole diagnosis.
+ */
+function clipForMessage(text: string, max = ENVELOPE_ECHO_CHARS): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= max) return trimmed === "" ? "(empty)" : trimmed;
+  return `${trimmed.slice(0, max)}\n… (${trimmed.length - max} more characters)`;
+}
+
+/** Whole lines and brace candidates tried while locating an envelope. */
+const ENVELOPE_SCAN_BUDGET = 2000;
+
+/**
+ * The balanced `{…}` slice starting at `start`, or null when it never closes.
+ * Only `"` opens a JSON string — a human line's apostrophe must not be able to
+ * swallow the rest of the scan.
+ */
+function balancedObjectSlice(text: string, start: number): string | null {
+  let depth = 0;
+  let inString = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]!;
+    if (inString) {
+      if (ch === "\\") i++;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}" && --depth === 0) return text.slice(start, i + 1);
+  }
+  return null;
+}
+
+/** A JSON object parsed out of candidate text, or null. */
+function parseEnvelopeObject(candidate: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(candidate);
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export type ReadEnvelope = {
+  envelope: Record<string, unknown>;
+  /**
+   * True when the WHOLE trimmed text was the envelope — the documented `--json`
+   * contract (one JSON object on stdout). False means the reader had to look
+   * past other text to find it, which a test can assert on when it wants the
+   * strict JSON-only contract rather than just a parsable envelope.
+   */
+  exact: boolean;
+};
+
+/**
+ * Read one `--json` envelope out of a surface's output.
+ *
+ * Whole-text parse first (that is the contract, and it is what every current
+ * caller emits). Failing that, LOCATE the envelope object inside surrounding
+ * text — a human success line ahead of the envelope, or a tool-error sentence in
+ * place of one, must not turn into a bare `SyntaxError`. When no object is
+ * found the caller gets {@link EnvelopeReadError}, naming the surface, the
+ * command, the MCP tool-error flag and both raw streams.
+ *
+ * Two granularities, both tried in order and both cheap: whole lines (`emitJson`
+ * writes one object plus a newline, so the envelope IS a line), then brace
+ * candidates inside a line for the shape where a human prefix shares the
+ * envelope's line.
+ *
+ * The fallback locates; it never invents. Text with no JSON object in it still
+ * raises, so a surface that produced no result cannot be mistaken for a passing
+ * parity run.
+ */
+export function readEnvelope(init: EnvelopeReadInit): ReadEnvelope {
+  const trimmed = init.text.trim();
+  const whole = parseEnvelopeObject(trimmed);
+  if (whole) return { envelope: whole, exact: true };
+  const lines = trimmed.split("\n");
+  let budget = ENVELOPE_SCAN_BUDGET;
+  for (const line of lines) {
+    if (budget-- <= 0) break;
+    const found = parseEnvelopeObject(line.trim());
+    if (found) return { envelope: found, exact: false };
+  }
+  for (const line of lines) {
+    for (let i = line.indexOf("{"); i >= 0; i = line.indexOf("{", i + 1)) {
+      if (budget-- <= 0) break;
+      const slice = balancedObjectSlice(line, i);
+      const found = slice === null ? null : parseEnvelopeObject(slice);
+      if (found) return { envelope: found, exact: false };
+    }
+  }
+  throw new EnvelopeReadError(init);
+}
+
+/**
  * Sync-spawn the real CLI: `node --import <tsx loader> cli/src/cli.ts <args>`
  * (bug-row-table-flake). `cwd` defaults to the vitest process cwd; `options`
  * are passed straight to `spawnSync` (env, input, timeout, …).
@@ -217,7 +506,7 @@ export function runCli(
   cwd?: string,
   options: RunCliOptions = {},
 ): SpawnSyncReturns<string> {
-  const argv = [...nodeImportArgs(cliEntryPath()), ...args];
+  const argv = [...cliNodeArgs(), ...args];
   const before = artifactFingerprint(repoRoot);
   const proc = spawnSync(process.execPath, argv, {
     encoding: "utf8",
@@ -225,14 +514,21 @@ export function runCli(
     ...options,
   });
   const kind = classifySpawnFailure(proc);
-  if (!HARNESS_KINDS.has(kind)) return proc;
   const after = artifactFingerprint(repoRoot);
+  const drift = before === after ? null : `before[${before}] after[${after}]`;
+  if (!HARNESS_KINDS.has(kind)) {
+    // A real CLI result is returned untouched (dozens of tests assert on a
+    // non-zero arggon exit code) — but a writer is never silently tolerated.
+    if (drift !== null)
+      throw new KernelArtifactDriftError({ argv, cwd: cwd ?? process.cwd(), drift });
+    return proc;
+  }
   throw new SpawnHarnessError({
     kind,
     argv,
     cwd: cwd ?? process.cwd(),
     outcome: proc,
-    artifactDrift: before === after ? null : `before[${before}] after[${after}]`,
+    artifactDrift: drift,
   });
 }
 
@@ -247,7 +543,7 @@ export function spawnNodeCli(
 ): ChildProcessWithoutNullStreams {
   return spawn(
     process.execPath,
-    [...nodeImportArgs(cliEntryPath()), ...args],
+    [...cliNodeArgs(), ...args],
     options,
   ) as ChildProcessWithoutNullStreams;
 }

@@ -41,6 +41,7 @@ import {
   TIER2_DESTS,
   type DocsPlan,
   type DocsPlanEntry,
+  type OrphanReapDecision,
 } from "./docs.js";
 import {
   agentForTemplate,
@@ -105,7 +106,35 @@ export type InitOptions = {
   agents?: string;
   /** `--no-agents`: docs + CLI only, no adapter seam materialized. */
   noAgents?: boolean;
+  /**
+   * Templates root override (task-adapter-orphan-reaping): the `templates/` dir
+   * this run generates from AND measures the current template set against, for
+   * orphan detection. Injection point for tests (a mutable fixture copy
+   * simulates a template leaving the install); the product never sets it, so a
+   * flagless run reads the bundled templates exactly as before.
+   */
+  templatesDir?: string;
 };
+
+/**
+ * One named refusal from the reaping family (task-adapter-orphan-reaping):
+ * an orphaned destination this run did NOT remove, and why. Carried per file so
+ * a refusal can never be silent — the path and the reason travel together in
+ * both the `--json` envelope and human output.
+ */
+export type ReapRefusal = {
+  /** Destination path (posix, relative to `root`). */
+  dest: string;
+  /** Recorded template id — the one this arggon version no longer ships. */
+  template: string;
+  /** Why the file was kept. */
+  reason: string;
+};
+
+/** {@link ReapRefusal} rows for the envelope: the plan's own decision, projected. */
+function reapRefusals(rows: readonly OrphanReapDecision[]): ReapRefusal[] {
+  return rows.map(({ dest, template, reason }) => ({ dest, template, reason }));
+}
 
 export type InitResult = {
   root: string;
@@ -120,6 +149,17 @@ export type InitResult = {
   backedUp: string[];
   /** Doc files left untouched (never overwritten). */
   skipped: string[];
+  /**
+   * Orphaned destinations REMOVED by this run (task-adapter-orphan-reaping): the
+   * recorded template is gone from this arggon version AND the bytes were still
+   * exactly as generated. Its own action family — never folded into
+   * `created`/`updated`/`modified`/`skipped`, so a deletion never reads as a
+   * write. Empty on a healthy tree, and empty again on a re-run (the reaped
+   * destination and its `x-generated` entry are both gone).
+   */
+  reaped: string[];
+  /** Orphaned destinations this run KEPT, each named with the refusal reason. */
+  reapRefused: ReapRefusal[];
   restored: string[];
   conventionPath: string;
   /** Side-file upgrade proposals (--propose, task-init-propose-acked-updates, additive). */
@@ -165,19 +205,23 @@ function ensureTemplates(root: string, force: boolean): string[] {
 
 /**
  * Tracker hygiene (bug-init-leaves-docs-untracked-start-blocks-on-clean-tree):
- * commit exactly the files this run wrote — docs, templates, the tracker tree and
- * the tracker `.convention.yml` (its x-generated state must ride along so the first
- * commit is self-consistent). Surgical staging (`git add -- <path>`), never
- * `git add -A`; best effort — non-git trees and git-absent machines skip with
- * a reason and the command stays ok. A re-run that rewrote nothing (identical
- * bytes) hits the quiet "nothing to commit" skip, keeping HEAD untouched.
+ * commit exactly the paths this run MUTATED — the docs it wrote, the templates it
+ * restored, the tracker tree, the tracker `.convention.yml` (its x-generated state
+ * must ride along so the first commit is self-consistent) and, since reaping
+ * deletes files (task-adapter-orphan-reaping), the orphans it removed: staging a
+ * deletion is the only way the removal and the state entry that drops it land in
+ * the SAME commit, so a committed tree never carries an orphan whose provenance is
+ * already gone. Surgical staging (`git add -- <path>`), never `git add -A`; best
+ * effort — non-git trees and git-absent machines skip with a reason and the
+ * command stays ok. A re-run that rewrote nothing (identical bytes) hits the quiet
+ * "nothing to commit" skip, keeping HEAD untouched.
  */
 function commitGeneratedDocs(
   root: string,
-  writtenPaths: string[],
+  mutatedPaths: string[],
   commitFlag: boolean | undefined,
 ): TrackerCommitResult {
-  const paths = [...new Set(writtenPaths)].sort();
+  const paths = [...new Set(mutatedPaths)].sort();
   return commitTrackerMutation(root, paths, {
     message: trackerCommitMessage("generated", [`init docs (${paths.length} files)`]),
     commit: resolveAutoCommit(commitFlag, readAutoCommitConfig(root)),
@@ -301,6 +345,7 @@ export function planInit(opts: InitOptions): InitPlan {
         now: opts.now,
         layout,
         agents: adapters.selected,
+        ...(opts.templatesDir !== undefined ? { templatesDir: opts.templatesDir } : {}),
       }),
       adapters,
     };
@@ -319,7 +364,16 @@ export function planInit(opts: InitOptions): InitPlan {
     return {
       ...base,
       scaffold: [],
-      docs: { entries: [], created: [], updated: [], backedUp: [], modified: [], skipped: [] },
+      docs: {
+        entries: [],
+        created: [],
+        updated: [],
+        backedUp: [],
+        modified: [],
+        skipped: [],
+        reaped: [],
+        reapRefused: [],
+      },
       error: `${strayTracker}/ exists but is missing .convention.yml. Re-run with --force to scaffold, or fix manually.`,
       adapters,
     };
@@ -372,6 +426,7 @@ export function planInit(opts: InitOptions): InitPlan {
       prev: carried,
       prevProjectName: carriedName,
       layout,
+      ...(opts.templatesDir !== undefined ? { templatesDir: opts.templatesDir } : {}),
       // The resolved adapter selection (spec §S2), so the fresh-scaffold path
       // honors --agents / --no-agents exactly like the already-initialized one.
       agents: adapters.selected,
@@ -942,6 +997,14 @@ export type InitDryRunResult = {
   backedUp: string[];
   skipped: string[];
   restored: string[];
+  /**
+   * Destinations this run WOULD reap (task-adapter-orphan-reaping) — preview
+   * only: `--dry-run` writes nothing, so the files (and their `x-generated`
+   * entries) are still exactly as they were when the preview ended.
+   */
+  reaped: string[];
+  /** Orphaned destinations this run WOULD keep, each named with its reason. */
+  reapRefused: ReapRefusal[];
   /** Proposal plan with --propose (task-init-propose-acked-updates, additive). */
   proposals?: ProposalEntry[];
   /**
@@ -993,9 +1056,12 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
       skipped: [],
       restored: [],
       proposals,
-      // A proposal sweep writes no adapter file, so `scope: "propose"` with
-      // zero counts; the selection itself is still resolved and reported, so
-      // `--agents` + `--propose` is visible in the envelope instead of silent.
+      // A proposal sweep writes no adapter file and reaps no orphan (it only
+      // writes side files), so both reaping arrays are empty here — the
+      // selection itself is still resolved and reported, so `--agents` +
+      // `--propose` is visible in the envelope instead of silent.
+      reaped: [],
+      reapRefused: [],
       adapters: {
         scope: "propose",
         selection: plan.adapters,
@@ -1033,6 +1099,10 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
       backedUp: plan.docs.backedUp,
       skipped: plan.docs.skipped,
       restored: plan.scaffold.map((e) => e.dest).sort(),
+      // The reaping this run WOULD perform, from the same plan — preview only,
+      // nothing written (`--dry-run` writes nothing at all).
+      reaped: plan.docs.reaped,
+      reapRefused: reapRefusals(plan.docs.reapRefused),
       adapters,
       warning,
     };
@@ -1054,6 +1124,8 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
     backedUp: plan.docs.backedUp,
     skipped: plan.docs.skipped,
     restored: [],
+    reaped: plan.docs.reaped,
+    reapRefused: reapRefusals(plan.docs.reapRefused),
     adapters,
     warning,
   };
@@ -1096,6 +1168,10 @@ export function runInit(opts: InitOptions): InitResult {
       restored: [],
       conventionPath,
       proposals,
+      // A proposal sweep writes no adapter file and reaps no orphan (it only
+      // writes side files), so the reaping family is empty and says so.
+      reaped: [],
+      reapRefused: [],
       adapters: {
         scope: "propose",
         selection,
@@ -1132,6 +1208,9 @@ export function runInit(opts: InitOptions): InitResult {
       ...restored,
       ...docs.created,
       ...docs.updated,
+      // A reaped file is a DELETION, and a committed deletion is what keeps the
+      // tree self-consistent with the x-generated entry this run dropped.
+      ...docs.reaped,
       `${trackerName}/.convention.yml`,
     ];
     return {
@@ -1145,6 +1224,11 @@ export function runInit(opts: InitOptions): InitResult {
       skipped: docs.skipped,
       restored,
       conventionPath,
+      // The reaping family, reported on its own terms: `reaped[]` names every
+      // file this run REMOVED and `reapRefused[]` every orphan it kept, with the
+      // reason — a deletion is never folded into a write count, and never silent.
+      reaped: docs.reaped,
+      reapRefused: reapRefusals(docs.reapRefused),
       // Built from the plan, not from the apply result, so a dry run over the
       // same options reports the same rows before anything is written.
       adapters,
@@ -1165,7 +1249,7 @@ export function runInit(opts: InitOptions): InitResult {
   const copiedTemplates = ensureTemplates(root, opts.force).map((name) => `templates/${name}`);
   const docs = applyDocsPlan(root, plan.docs);
   const created = [`${trackerName}/.convention.yml`, ...copiedTemplates, ...docs.created].sort();
-  const written = [...created, ...docs.updated];
+  const written = [...created, ...docs.updated, ...docs.reaped];
 
   return {
     root,
@@ -1178,6 +1262,8 @@ export function runInit(opts: InitOptions): InitResult {
     skipped: docs.skipped,
     restored: [],
     conventionPath,
+    reaped: docs.reaped,
+    reapRefused: reapRefusals(docs.reapRefused),
     adapters,
     commit: commitGeneratedDocs(root, written, opts.commit),
     warning: gitWarning,

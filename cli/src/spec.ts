@@ -13,8 +13,11 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import {
   TRACKER_DIR_NAME,
   acceptanceRows,
+  containersMissingAcceptance,
   docsDirForRoot,
   findTasksDir,
+  loadItems,
+  readConventionConfig,
   readConventionVersion,
   repoRootFromTasks,
   sanitizeHumanError,
@@ -514,6 +517,15 @@ export type SpecAnalyzeResult = {
    * only (empty with `--spec <path>`).
    */
   decisions: SpecFinding[];
+  /**
+   * Product-acceptance findings (ADR 0021 §4, spec promotion-policy-018): a
+   * container that reached a terminal status with no recorded acceptance.
+   * Additive bucket, corpus mode only, and ALWAYS EMPTY unless the project has
+   * armed `x-tracker.product-acceptance: true` — see
+   * {@link productAcceptanceArmed}. Baseline snapshots include it in the flat
+   * `findings` array.
+   */
+  productAcceptance: SpecFinding[];
 };
 
 /** Deliberately small, documented checklist; deterministic, no AI. */
@@ -994,6 +1006,73 @@ function decisionFindings(root: string): SpecFinding[] {
   return findings;
 }
 
+/** The finding kind for a container that closed with no recorded acceptance. */
+export const PRODUCT_ACCEPTANCE_FINDING_KIND = "MISSING-PRODUCT-ACCEPTANCE";
+
+/**
+ * Whether this project has armed the `accept:` recording convention
+ * (`x-tracker.product-acceptance: true`).
+ *
+ * Arming is the act of saying "we have a product owner and we want the record";
+ * absent or `false` keeps every adopter silent (the `allow-steal` precedent,
+ * docs/convention.md §Tracker hygiene). Tolerant on purpose: an unparseable
+ * `.convention.yml` reads as UNARMED rather than failing a report-only scan —
+ * configuration errors are `arggon validate`'s to report, not analyze's.
+ */
+export function productAcceptanceArmed(root: string): boolean {
+  try {
+    return readConventionConfig(root).tracker.productAcceptance === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * One sentence naming the container, its state and the recording path —
+ * domain-neutral on purpose (ADR 0021 §6.2): the surface is "a comment the
+ * adopting project writes", not a software artifact. Deterministic (fixed enum
+ * tokens, no clock, no counts) so a committed baseline fingerprints it stably.
+ */
+function productAcceptanceMessage(id: string, status: string, state: string): string {
+  const latest = state === "none" ? "" : ` (latest recorded: ${state})`;
+  return (
+    `${id} reached ${status} with no recorded product acceptance${latest} — record the decision ` +
+    `with a comment on the item (accept: approve | accept: changes-requested); ` +
+    `report-only, nothing is blocked`
+  );
+}
+
+/**
+ * Product-acceptance findings: a container of the convention's scope (`story`)
+ * that reached `done`/`cancelled` with no recorded `accepted` decision
+ * (ADR 0021 §4, spec promotion-policy-018).
+ *
+ * Never fires on a leaf (the agent self-certifies there), never on an open
+ * container, never when unarmed. `self-accepted` and `changes-noted` both count
+ * as gaps — the question is whether the product owner's decision is on the
+ * record, and neither state is that.
+ *
+ * Report-only in every respect, like the rest of analyze: exit 0 with findings,
+ * nothing filed, no item mutated, no transition consulted. `report --json` and
+ * `show --json` keep answering the same question with or without this arming —
+ * the arming is what turns a missing record into a REPORTED one.
+ */
+function productAcceptanceFindings(root: string): SpecFinding[] {
+  if (!productAcceptanceArmed(root)) return [];
+  const findings: SpecFinding[] = [];
+  for (const gap of containersMissingAcceptance(loadItems(findTasksDir(root)))) {
+    findings.push(
+      finding(
+        posixRel(root, gap.item.filePath),
+        PRODUCT_ACCEPTANCE_FINDING_KIND,
+        "warn",
+        productAcceptanceMessage(gap.item.id, gap.item.status, gap.state),
+      ),
+    );
+  }
+  return findings;
+}
+
 export function runSpecAnalyze(opts: SpecAnalyzeOptions): SpecAnalyzeResult {
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
@@ -1029,13 +1108,23 @@ export function runSpecAnalyze(opts: SpecAnalyzeOptions): SpecAnalyzeResult {
 
   const consistency = opts.spec ? [] : consistencyFindings(root);
   const decisions = opts.spec ? [] : decisionFindings(root);
+  const productAcceptance = opts.spec ? [] : productAcceptanceFindings(root);
 
   const byFile = (a: SpecFinding, b: SpecFinding): number =>
     a.file.localeCompare(b.file) || a.kind.localeCompare(b.kind) || (a.line ?? 0) - (b.line ?? 0);
   ambiguity.sort(byFile);
   consistency.sort(byFile);
   decisions.sort(byFile);
-  return { root, conventionVersion, scanned, ambiguity, consistency, decisions };
+  productAcceptance.sort(byFile);
+  return {
+    root,
+    conventionVersion,
+    scanned,
+    ambiguity,
+    consistency,
+    decisions,
+    productAcceptance,
+  };
 }
 
 /**
@@ -1058,13 +1147,24 @@ export function formatSpecAnalyzeHuman(result: SpecAnalyzeResult): string {
       `${f.severity} ${sanitizeHumanError(f.file)}:${at} ${sanitizeHumanError(f.message)} [${f.kind}]`,
     );
   }
+  // Product-acceptance findings name a work item, not a spec line: same
+  // sanitization boundary, no line number (the item's status is in the message).
+  for (const f of result.productAcceptance) {
+    lines.push(
+      `${f.severity} ${sanitizeHumanError(f.file)}: ${sanitizeHumanError(f.message)} [${f.kind}]`,
+    );
+  }
   for (const f of result.ambiguity) {
     const at = f.line === undefined ? "" : `${f.line}:`;
     lines.push(
       `${f.severity} ${sanitizeHumanError(f.file)}:${at} ${sanitizeHumanError(f.message)} [${f.kind}]`,
     );
   }
-  const total = result.ambiguity.length + result.consistency.length + result.decisions.length;
+  const total =
+    result.ambiguity.length +
+    result.consistency.length +
+    result.decisions.length +
+    result.productAcceptance.length;
   if (total === 0) {
     lines.push(`arggon spec analyze: clean (${result.scanned} spec(s) scanned)`);
   } else {
@@ -1132,6 +1232,7 @@ function snapshotFromResult(result: SpecAnalyzeResult): SpecBaselineSnapshot {
     ...result.ambiguity,
     ...result.consistency,
     ...result.decisions,
+    ...result.productAcceptance,
   ]);
   return {
     schemaVersion: SPEC_BASELINE_SCHEMA_VERSION,
@@ -1238,7 +1339,12 @@ export function runSpecAnalyzeCompareBaseline(
   const baseline = readBaselineSnapshot(opts.file);
   const result = runSpecAnalyze({ cwd: opts.cwd, spec: opts.spec });
   const baselineKeys = new Set(baseline.findings.map(findingKey));
-  const current = [...result.ambiguity, ...result.consistency, ...result.decisions];
+  const current = [
+    ...result.ambiguity,
+    ...result.consistency,
+    ...result.decisions,
+    ...result.productAcceptance,
+  ];
   const currentKeySet = new Set(current.map(findingKey));
   const unchanged: SpecFinding[] = [];
   const added: SpecFinding[] = [];
@@ -1257,7 +1363,11 @@ export function runSpecAnalyzeCompareBaseline(
 }
 
 export function formatSpecBaselineSaveHuman(r: SpecBaselineSaveResult): string {
-  const total = r.result.ambiguity.length + r.result.consistency.length + r.result.decisions.length;
+  const total =
+    r.result.ambiguity.length +
+    r.result.consistency.length +
+    r.result.decisions.length +
+    r.result.productAcceptance.length;
   return `arggon spec analyze: baseline written to ${sanitizeHumanError(r.file)} (${total} finding(s) across ${r.result.scanned} spec(s))\n`;
 }
 

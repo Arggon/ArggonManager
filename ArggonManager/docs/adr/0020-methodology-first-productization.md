@@ -18,6 +18,27 @@
   untouched, and the follow-on Claude Code adapter keeps the same bar
   ([spec-methodology-adapters-017 §S6](../specs/spec-methodology-adapters-017.md)).
 
+> Amendment (2026-10-04, [ADR 0021](./0021-agents-primary-workers-human-product-owner.md)
+> §1): **the invariants list in §Decision.1 is superseded — only its parity
+> clause.** The clause _"humans and agents follow the same rules"_ is left exactly
+> as taken, because an ADR is superseded by a dated note, never silently rewritten
+> ([`ArggonManager/docs/engineering.md`](../engineering.md) §ADR process). It reads
+> as flat parity across two axes, and only the first is flat: any human and any
+> agent may claim an item, work it, review it, comment on it and merge it, under
+> the same kernel rules and the same JSON contracts — the **loop** is identical.
+> What is **not** shared is authority: a small, named set of decisions belongs to
+> the product owner, and the irreversible ones are structurally human-only.
+> Parity is not weakened by that split; it is what the code already enforced, now
+> recorded. The **other four invariants in that list are unchanged** (state in
+> git; discipline enforceable; docs travel with code; never-steal/never-reopen),
+> and so is this record's **status** — still Accepted, nothing else in the decision
+> moves, including §Decision.3's capability matrix. For the **live wording, read
+> the carriers**, which PR #636 rewired to byte-identical `- **Invariants:**`
+> header blocks — `ArggonManager/docs/agents.md`,
+> [`docs/engineering.md`](../engineering.md) and
+> [`docs/convention.md`](../convention.md). They are the product this decision
+> declares; this clause is the dated record of what was decided then.
+
 ## Context
 
 ArggonManager's methodology (find → claim → work → review → merge → done,
