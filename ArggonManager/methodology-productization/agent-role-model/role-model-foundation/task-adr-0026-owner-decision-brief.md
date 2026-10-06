@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adr-0026-owner-decision-brief
 title: "ADR 0026: the bounded plain-language decision brief — a delivery lead brings a decision to the product owner with options, one recommendation, and a default that executes unanswered"
+assignee: arggon-delivery-lead
+branch: feat/task-adr-0026-owner-decision-brief
 parent: role-model-foundation
 labels: [methodology, roles, adr]
 priority: p0
 created: "2026-10-06"
 updated: "2026-10-06"
+claimed_at: "2026-10-06T14:01:55.152Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0026-owner-decision-brief
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-adr-0026-owner-decision-brief.md
