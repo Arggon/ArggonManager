@@ -291,3 +291,70 @@ Left `in_progress` — completion is the coordinator's call after merge.
 ### handoff 2026-10-03 @Arggon (session: ses_efe310c5effeaOs8Nra70sfiUu) — next: Coordinator merges PR #618 (record-only round done: impact class restated Behavioral with ADR 0016 in the PR body and an item comment), then flips the item to done.
 - branch: fix/bug-engineering-doc-stale-adr-statuses
 - open questions: Commit messages still say Advisory — unfixable without a forbidden force-push; PR body + comment are authoritative. Non-blocking reviewer note left unapplied on purpose: expect(linkFrom).toBeGreaterT…
+
+### 2026-10-06 @Arggon
+Re-dispatch round 3 (post-ADR-0021 role rename) · commits `7b7c3c73` + `5def12ec` · PR #618 · branch unchanged.
+
+**The branch was 401 behind and red. It is now merged, green, and pushed.** Read the "not what was expected" note first — the red was not the flake.
+
+### Not what was expected: the predicted flake is gone, a real defect appeared
+
+The `cli` lane failed on 2026-10-03 (`37128380721`) on `cli/src/cli.test.ts > CLI --json > arggon board --github overlays PR state with a mocked gh` — 127 files, 126 passed, 1 failed. That is the known flake family, and **it passes on the merged tree**: 131 files / 2768 tests green, `board --github` included. It was a stale red. Not "fixed", not chased.
+
+But re-running on the merged tree surfaced a **different** red, and it was mine:
+
+```
+FAIL cli/src/adr-status-doc-contract.test.ts > ArggonManager/docs/convention.md states no status for any ADR it links to
+  convention.md: labels ADR 0021 "accepted" — docs/adr/0021-…md says "Accepted"
+```
+
+`convention.md` now links ADR 0021 at `:553` — `([ADR 0021](…) §4): whether a container's work was accepted …` — which describes what a product-acceptance record *contains* (`accept: approve` / `accept: changes-requested`), **not** ADR 0021's status. With no group closer in `TAIL_STOPS` the trailing window ran **181 characters** past that `)` and read `accepted` as a restatement. A false positive on correct prose, newly reachable because ADR 0021 landed in those 401 commits. A gate that fires on correct prose gets deleted rather than fixed, so `TAIL_STOPS` now ends at the closer of the group the reference sits in.
+
+**This is a second, code-bearing change beyond the "one substantive fix" this re-dispatch scoped, and it crosses the boundary the round-2 reviewer drew ("no code change implied; I will not re-review code").** Flagging rather than burying it. It is one character in one regex plus one premise guard; reverting is one commit (`git revert 7b7c3c73`) and the branch goes red again, so it is the delivery lead's call, not mine.
+
+### The dead citation
+
+`adr-index-parity.test.ts:125-131` → dead, PR #620 moved `STATUS_CLASSES` to `:191`. **The claim was true; only the locator was wrong.** Both sites (`:143`, `:234`) now name the symbol — `STATUS_CLASSES` in `cli/src/adr-index-parity.test.ts` — because a line range into a file two concurrent PRs both rewrote is exactly what let it go stale, and a symbol survives the next rewrite. `task-adr-index-parity-status-classes-line-ref-stale` is **not** closed here: this PR owns the reference, not #620.
+
+Four `adr-index-parity.test.ts:<digits>` occurrences remain repo-wide and I left all four: 3 in that tracking item (quotes the old value as the historical record) and 1 in `task-adr-index-parity-does-not-check-titles.md:131` — a **`done`** item's reviewer verdict, which is the report that *found* this defect ("one stale reference, owned by #618") and quotes the old value on purpose. Sanitising a closed record's verdict would be rewriting history.
+
+### Premise re-checked against current main — it survived
+
+1. **Still stale, not already fixed.** `origin/main:ArggonManager/docs/engineering.md:311` still reads `milestone field (Proposed): [ADR 0003](…)` while `docs/adr/0003-milestone-field.md` says `- Status: Accepted`. Unfixed after 401 commits; this PR is still the fix. Box 2's spec/plan 009 pair is likewise untouched on main (`spec-opencode2-009.md:87`, `plan-opencode2-009.md:24`, both still "ADR 0010 Proposed"; the file says `Partially superseded by ADR 0011 … layout superseded by ADR 0012`). **Still the coordinator's call, still unticked.**
+2. **The check is not vacuous — by mutation, not assertion.** Clean corpus 7/7 GREEN, then each mutation reverted and sha256-verified:
+
+| Mutation | Expected | Observed |
+|---|---|---|
+| A `0003 (Proposed)` before the link | RED | RED (`expected [ Array(1) ] to deeply equal []`) |
+| B `0008 (superseded by ADR 0011)` | RED | RED |
+| C `0003 (Proposed)` inside the link text | RED | RED |
+| D `0003 (Proposed)` after the link | RED | RED |
+| E link renumbered to a non-existent ADR | RED | RED (rule 2) |
+| F drop `)` from `TAIL_STOPS` | RED | **RED, 2 assertions** — the new guard *and* the real carrier |
+
+Both halves of the new bound fail in exactly opposite states: drop `)` → the guard fires; keep `)` → the existing `(Proposed)` after-the-link assertion still fires, so the trailing half is not blinded. I also removed a duplicate assertion I had first written — the existing one already proves that half.
+
+3. **No collision with `adr-index-parity.test.ts`** (#620, +195 lines). Different corpus and different rule: it owns **index row ↔ ADR file** agreement (`docs/adr/README.md`); this suite owns **carrier must not restate** (`docs/{engineering,agents,convention}.md`). Only the vocabulary overlaps, and sharing a vocabulary is not claiming a rule.
+
+### Gates — expected vs observed, at the pushed head `5def12ec`
+
+| Gate | Expected | Observed |
+|---|---|---|
+| `npm run build` (full, after merging main) | exit 0 | **0** — lib + tsc + typecheck + e2e + bundle |
+| `npm run test` | green | **131 files / 2768 tests, 0 failed** |
+| `npm run arggon -- validate` | ok | **ok (0 warnings, convention v5)** |
+| `npm run check:plugin` | bundle in sync | **clean, exit 0** |
+| `npm run lint` / `test:structure` / `lint:structure` | 0 / 5 / clean | **0 · 5 passed · clean** |
+| `merge-tree --write-tree origin/main HEAD` | exit 0, no conflicts | **exit 0**, single tree sha, no conflict lines |
+| grep for remaining line-range citations | none live | **none live**; 4 historical, left alone (above) |
+| `git status --porcelain` | clean | **clean**, bundle not dirty |
+
+Full build before any test, both times — the stale-`lib/dist` `SyntaxError` did not recur.
+
+### Delivery notes
+
+The first push was **rejected non-fast-forward**: the remote branch had a commit I did not have (`fba49048 Merge branch 'main'`, which a prior actor pushed after my fetch). Integrated with a merge, not a rebase, and no force — `fba49048..5def12ec`, plain fast-forward. `git merge-tree` was clean first.
+
+I also **reverted a prettier run of my own** that reformatted the whole item file (table padding, `*true*`→`_true_`, blank lines). That was unrelated reformatting of a historical record; the file now carries exactly my two citation edits (2 insertions, 2 deletions). Prettier is not a CI gate here, so nothing is lost — the test file is prettier-clean.
+
+**Untouched on purpose:** every acceptance box — they live inside a dated `## Notes` block (`:45-50`), not under `## Acceptance` (which is empty), so ticking them in place means rewriting history. Status stays `in_progress`; the `done` flip is the delivery lead's after merge verification. The reviewer's round-2 non-blocking hardening notes (`expect(linkFrom).toBeGreaterThan(from)`; updating `:193`'s reason clause when `bug-convention-md-links-nonexistent-adr-0015` lands) remain unapplied and unowned by this round.
