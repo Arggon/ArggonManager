@@ -108,6 +108,7 @@ visible on the read receipt rather than only on the refusal.
 
 ## Notes
 
+
 ### Acceptance evidence — expected vs observed, per box
 
 Fix: `opencode/plugins/arggon/index.ts` (+ regenerated bundle) and
@@ -236,3 +237,21 @@ verdict: approve on the change; merge currently blocked by a pre-existing gate f
 - Per the project's own rule an intermittent failure is **not chased by reruns** (`agents.md` §Review bar → flake reproduction harness), and green CI is necessary to merge. So the merge waits on `bug-test-suite-lib-dist-rebuild-race`, which is now the single gate blocking this PR, #618 and #586 at once — making it the highest-leverage item on the board.
 
 **Not done here, deliberately:** `priority` untouched (product owner's field); no ADR proposed for the guard's design because the change is additive and reversible — the design question that *does* need a record (who declares the worktree) is carried on the filed residual item rather than smuggled into this PR.
+
+### 2026-10-05 @arggon-delivery-lead
+### 2026-10-05 @arggon-delivery-lead
+**In flight — do not dispatch.** Work is complete and reviewed on branch `fix/bug-native-arggon-tools-resolve-tracker-root-to-session-cwd`, open as **PR #646**. The claim (`in_progress` / assignee / `worktree_path`) lives on that **branch**, not on `main`, so this item still reads as unclaimed `todo` here — the merge carries the frontmatter across.
+
+Recorded so no wave re-claims it and opens a conflicting branch: a previous session produced 7 PRs that were invisible to the tracker for exactly this reason, and the fix for it (PR #646) is itself subject to it until it merges.
+
+Merge is currently held by a **pre-existing** gate flake, not by this change: `cli` failed with the harness's own `kernel artifact drift … another suite lane rebuilt lib/dist in place` verdict plus `SyntaxError: './json.js' does not provide an export named 'compactWorkItem'` — `bug-test-suite-lib-dist-rebuild-race` (p1), the same defect red-lining PRs #618 and #586. CI was green on this branch's earlier head (runs 3736254693 / 3736254688). Full delivery-lead verdict and gate evidence are on the branch.
+
+### 2026-10-05 @arggon-delivery-lead
+Merge blockers resolved; closing out. Both reasons the previous entry recorded as holding this PR are gone:
+
+- **`bug-test-suite-lib-dist-rebuild-race` is fixed and merged** (PR #647, `fa8b8072`). The `lib/dist` isolation landed: children load the kernel from source via a resolve hook, and the shared build is frozen so no suite can mutate it mid-run. The variable behind the flake was the **npm major** — `npm pack --ignore-scripts` runs `prepare > npm run build` on npm 10 (CI) and does no lifecycle at all on npm 12, which is why a warm local run could never see it. Verified in the item worktree: 5 consecutive full runs under npm 10.9.4, 0 race-class occurrences.
+- **`main` is green.** I had recorded a separate `packed-bin` parity failure as a pre-existing blocker. **That was wrong and is retracted** (`bug-headless-ci-twin-init-nondeterministic`, retitled): the cause is a stale `dist/cli.js` in a worktree, not nondeterminism. Full `npm run build` → **129 files / 2692 passed** on the primary checkout.
+
+Both corrections came from me reporting a worktree build-state artifact as a product defect, which sent two makers chasing a defect that does not exist. The lesson is on that item: check build state before filing a lane failure as a product bug.
+
+The **residual limit is unchanged and still honest**: the guard is reconciling, so it is silent when nothing is declared — a worker that neither moved its session nor sourced `.arggon.env` is still unprotected, and `agents.md` rule 1 remains its only guard. Filed as `bug-native-guard-silent-without-worktree-declaration`.

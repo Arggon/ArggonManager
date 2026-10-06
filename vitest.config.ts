@@ -7,6 +7,15 @@ export default defineConfig({
     // package entry (@arggondev/lib, ADR 0013). Tests resolve it to the source
     // entry so a run never depends on a previous `npm run build`; the built
     // artifact is exercised for real in cli/src/lib-build.test.ts.
+    //
+    // bug-test-suite-lib-dist-rebuild-race: that promise held only in-process.
+    // A SPAWNED child does not inherit this alias (tsx does not read the vitest
+    // config) and resolved the package through `node_modules` to the built
+    // `lib/dist`, so any lane rebuilding the shared build raced every other
+    // lane's children. Children now get the same resolution through an explicit
+    // `--import` hook (`cliNodeArgs` in cli/src/test-spawn.ts,
+    // test/kernel-source-resolve.mjs), and test/kernel-artifacts.ts freezes the
+    // shared build for the run so a writer cannot produce the race at all.
     alias: [
       {
         find: /^@arggondev\/lib$/,
@@ -51,7 +60,12 @@ export default defineConfig({
     // os.tmpdir() after the suite (age-gated, concurrent-run-safe — see
     // test/teardown-tmp.ts). Vitest has no globalTeardown hook, so this is a
     // globalSetup file returning a teardown function.
-    globalSetup: ["./test/teardown-tmp.ts"],
+    //
+    // test/kernel-artifacts.ts is the second one (bug-test-suite-lib-dist-rebuild-race):
+    // it freezes the repo's built artifacts for the run and fails the run if
+    // anything moved them, so a lane cannot rebuild the shared `lib/dist` under
+    // the readers. Order is irrelevant — the two share nothing.
+    globalSetup: ["./test/teardown-tmp.ts", "./test/kernel-artifacts.ts"],
     // bug-spawn-sync-test-timeout-flake: the cli/ files mix fast in-process
     // unit tests with spawnSync e2e tests that launch `node + tsx + cli.ts`
     // per invocation (~400ms warm, multiple seconds cold or when the machine

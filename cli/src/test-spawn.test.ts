@@ -5,7 +5,10 @@ import { describe, expect, it } from "vitest";
 import {
   classifySpawnFailure,
   cliEntryPath,
+  cliNodeArgs,
   EnvelopeReadError,
+  KernelArtifactDriftError,
+  kernelSourceHookPath,
   nodeImportArgs,
   readEnvelope,
   runCli,
@@ -252,7 +255,9 @@ describe("spawn failure classification (bug-cli-spawn-suites-exit-1-flake)", () 
     // next occurrence of the CI flake is diagnosable from the test output alone.
     const err = new SpawnHarnessError({
       kind: "child-boot-failed",
-      argv: [...nodeImportArgs(cliEntryPath()), "--json", "list"],
+      // The representative argv is the harness one, so the rendered diagnostic
+      // shows what a real spawn would have run.
+      argv: [...cliNodeArgs(cliEntryPath()), "--json", "list"],
       cwd: repoRoot,
       outcome: outcome({ status: 1, stderr: BOOT_FAILURE_STDERR }),
       artifactDrift: "before[lib/dist/index.js=6001:1] after[lib/dist/index.js=0:2]",
@@ -266,23 +271,128 @@ describe("spawn failure classification (bug-cli-spawn-suites-exit-1-flake)", () 
     expect(err.message).toContain("does not provide an export named 'assertParentEdge'");
   });
 
-  it("the in-repo pack passes --ignore-scripts so it cannot rebuild lib/dist under the suite", () => {
-    // The cause, pinned at the one lane whose cwd IS the repo.
-    // Deliberately NOT a repo-wide "no unguarded pack" scan: lib-build and
-    // pack-contents run `npm run build` / `npm pack` on purpose and are safe
-    // precisely because their cwd is a fresh clone copy that owns its own
-    // `lib/` — and which cwd an argv literal carries cannot be decided
-    // statically, so a blanket ban would delete real coverage. This pins the
-    // flag on the only lane whose lifecycle scripts reach the artifact every
-    // other lane is reading.
+  it("the checkout is never a pack cwd, so no pack can rebuild the shared lib/dist", () => {
+    // The cause, pinned where it actually lives — and corrected.
+    //
+    // This gate used to assert only that the in-repo `npm pack` passed
+    // `--ignore-scripts`, on the belief that the flag stops the root `prepare`.
+    // It does not, on the npm major CI runs: measured on npm 10.9.4,
+    // `npm pack --ignore-scripts` in this checkout still emits
+    // `> prepare > npm run build` and rewrites every file of `lib/dist` and
+    // `dist` in place with vitest's other forks live. The flag is kept (it is
+    // free on npm >= 12) but the mechanism is the pack cwd, so that is what is
+    // pinned here.
+    //
+    // Deliberately NOT a repo-wide "no pack" ban: lib-build and pack-contents
+    // pack on purpose and are safe precisely because their cwd is a private
+    // copy that owns its own `lib/`. What must never come back is the CHECKOUT
+    // as a pack cwd, and in the one lane that packs it that is one grep away.
     const code = stripComments(readFileSync(join(repoRoot, "cli/src/headless-ci.test.ts"), "utf8"));
     const packs = [...code.matchAll(/"pack",([^[\]]*)\]/g)].map((m) => m[1]!);
     expect(packs.length).toBeGreaterThan(0);
     expect(packs.filter((argv) => !argv.includes("--ignore-scripts"))).toEqual([]);
+    // The cwd is the seeded private copy, built from THIS checkout's build
+    // output, so the packed bytes are still the ones under test.
+    expect(code).toContain("freshCloneCopy(root, packClone, true)");
+    expect(code).toContain('join(packClone, "lib"), packClone');
+    // The checkout itself is not a pack cwd any more.
+    expect(code).not.toContain('join(root, "lib"), root');
     // The clone-copy lane keeps its build — opposite discipline, still covered.
     expect(
       stripComments(readFileSync(join(repoRoot, "cli/src/pack-contents.test.ts"), "utf8")),
     ).toContain('"pack", "--dry-run", "--json"');
+  });
+
+  it("the pack clone is seeded from this checkout, so the packed bytes are the ones under test", () => {
+    // The copy is only honest if it carries the build output: both directories
+    // are gitignored, so a plain clone has none and the tarball would ship
+    // without `dist/cli.js`.
+    const fixtures = stripComments(
+      readFileSync(join(repoRoot, "cli/src/pack-fixtures.ts"), "utf8"),
+    );
+    expect(fixtures).toContain('const BUILD_OUTPUT_DIRS = ["lib/dist", "dist"] as const;');
+    // A copy, never a link: a link would put the shared artifact back in play.
+    expect(fixtures).toContain("cpSync(from, to, { recursive: true });");
+    expect(fixtures).not.toContain("symlinkSync(from");
+  });
+});
+
+/**
+ * bug-test-suite-lib-dist-rebuild-race gate: the READER side of the shared-build
+ * isolation, complementing the `--ignore-scripts` writer gate above.
+ *
+ * `lib/dist` is frozen for the run (`test/kernel-artifacts.ts`), so a writer can
+ * no longer produce the race. That is only half of it: a child that resolves the
+ * kernel through `node_modules` reads the artifact at all, so any writer that
+ * gets past the freeze (root, `chmod -R u+w`, a platform without POSIX modes)
+ * is one broken child away from the original flake. `cliNodeArgs` removes the
+ * read: the child loads `lib/src`, which nothing rebuilds.
+ *
+ * So the pin is on the argv, in two directions:
+ *   - the harness itself must never build a child argv the old way, and
+ *   - no test may spawn a CLI child with the bare source-run argv.
+ *
+ * The exemption is deliberate and narrow: `cli/src/lib-build.test.ts` spawns the
+ * CLI of a PRIVATE fresh-clone copy against that copy's own `dist`, which is the
+ * gate that exercises the built kernel for real (the reason the alias-to-source
+ * exists at all). Nothing else may name a CLI entry through `nodeImportArgs`.
+ */
+describe("spawned children resolve the kernel from source (bug-test-suite-lib-dist-rebuild-race)", () => {
+  // Assembled at runtime so this gate's own pattern cannot match itself (the
+  // precedent the wrapper scan sets with WRAPPER_REF above).
+  const CLI_ENTRY_ARGV = new RegExp(
+    ["nodeImportArgs", "\\(\\s*(cliEntryPath\\(\\)|cli\\b|cliEntry\\b)"].join(""),
+  );
+
+  it("the harness builds every child argv with the kernel-source hook", () => {
+    const code = stripComments(readFileSync(join(repoRoot, "cli/src/test-spawn.ts"), "utf8"));
+    // `nodeImportArgs` stays as an exported helper (production's shape, see
+    // cli/src/measure.ts) but the harness must not CALL it: the one remaining
+    // occurrence in this file is the helper's own declaration.
+    expect(code.match(/nodeImportArgs\(/g) ?? []).toHaveLength(1);
+    expect(code).toContain("export function nodeImportArgs(");
+    // Both spawn paths (runCli and spawnNodeCli) spread the hooked argv.
+    expect(code.match(/\[\.\.\.cliNodeArgs\(\), \.\.\.args\]/g) ?? []).toHaveLength(2);
+    expect(existsSync(kernelSourceHookPath())).toBe(true);
+    // The entry is last in both shapes: measureBudget and the loader contract
+    // read the position, not the whole argv.
+    expect(cliNodeArgs("entry.ts").at(-1)).toBe("entry.ts");
+  });
+
+  it("no test spawns a CLI child through the bare source-run argv", () => {
+    const offenders: string[] = [];
+    for (const rel of SCANNED) {
+      for (const file of walkTestFiles(join(repoRoot, rel))) {
+        if (file.endsWith("lib-build.test.ts")) continue; // private copy's dist
+        const code = stripComments(readFileSync(file, "utf8"));
+        // A CLI entry named through nodeImportArgs: `cliEntryPath()`, a `cli`
+        // const, or an `cliEntry` parameter. Driver scripts (which import no
+        // kernel) pass a bare filename and are untouched.
+        if (CLI_ENTRY_ARGV.test(code)) {
+          offenders.push(file.slice(repoRoot.length + 1));
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("drift is a named failure of its own, not a footnote on somebody else's error", () => {
+    // The reported class was report-only: it surfaced only when a reader was
+    // unlucky enough to die, as an unrelated SyntaxError. A writer is a defect
+    // whether or not it broke somebody, so it now has its own name.
+    const err = new KernelArtifactDriftError({
+      argv: [...cliNodeArgs(cliEntryPath()), "--json", "list"],
+      cwd: repoRoot,
+      drift: "before[lib/dist/index.js=6001:1] after[lib/dist/index.js=0:2]",
+    });
+    expect(err.name).toBe("KernelArtifactDriftError");
+    expect(err).toBeInstanceOf(Error);
+    expect(err.drift).toContain("before[");
+    expect(err.message).toContain("REWRITTEN");
+    expect(err.message).toContain("not an assertion failure");
+    // The two instructions that matter: where a build belongs, and whose bug it is.
+    expect(err.message).toContain("freshCloneCopy");
+    expect(err.message).toContain("fix the writer, not the reader");
   });
 });
 

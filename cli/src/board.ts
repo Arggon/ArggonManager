@@ -754,10 +754,10 @@ export function clipDetailText(
  * (bug-three-acceptance-parsers-diverging). The row grammar lives in
  * `lib/src/items.ts` (`acceptanceRows`) next to the DONE GATE that refuses the
  * `--status done` flip, so the drawer and the gate cannot disagree about which
- * lines are rows. This local name is kept because the ZCode goal contract
- * (`cli/src/goal-mode.ts`) and the drawer tests import it; it exists purely so
- * those call sites read the kernel by one name. There is deliberately NO regex
- * below — a second one here is the exact defect this item closed.
+ * lines are rows. This local name is a one-line alias kept for the drawer tests
+ * (and any adopter-side caller); since the unification the ZCode goal contract
+ * reads the kernel directly, like every other consumer. There is deliberately NO
+ * regex below — a second one here is the exact defect this item closed.
  *
  * Callers must pass the canonical body (`acceptanceBody(item)`, comments
  * included), never a reader's prose. See `acceptanceBody`'s invariant.
