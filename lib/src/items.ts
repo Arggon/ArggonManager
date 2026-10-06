@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
+  FrontmatterParseError,
   parseFrontmatter,
   numberField,
   stringArrayField,
@@ -92,8 +93,25 @@ export type SoftIssue = {
   message: string;
 };
 
+/**
+ * WHY a `.md` file is not a work item (bug-validate-does-not-check-frontmatter-present).
+ *
+ * `no-frontmatter` is the interesting one: the file carries no block at all,
+ * which is either a deliberate non-item document OR a work item whose block
+ * was destroyed. Only a caller that knows the file's expected ROLE can tell the
+ * two apart, so the loader reports the reason instead of deciding — and
+ * `validate` turns it into a `MISSING_FRONTMATTER` error for a file the layout
+ * says must be an item. Readers that have no such role knowledge
+ * (`loadItems`, `list`, `next`) keep skipping both reasons unchanged.
+ */
+export type SkipReason =
+  /** No `---` fence at the start of the file (also true for a 0-byte file). */
+  | "no-frontmatter"
+  /** A block parsed, but it carries no `type:` — not an item document. */
+  | "no-type";
+
 export type SoftLoadResult =
-  | { kind: "skip" }
+  | { kind: "skip"; reason: SkipReason }
   | { kind: "fatal"; issues: SoftIssue[] }
   | {
       kind: "item";
@@ -133,9 +151,38 @@ export function walkTasksTree(
 }
 
 /**
+ * Classify a frontmatter parse refusal into a `SoftIssue`.
+ *
+ * The two STRUCTURAL codes pass through under their own names: the block is
+ * absent (`MISSING_FRONTMATTER`) or was opened and never closed
+ * (`UNTERMINATED_FRONTMATTER`) — the shapes `validate` must be able to tell
+ * apart from each other and from ordinary YAML breakage. Everything else keeps
+ * the historical generic `BROKEN_YAML`, so a malformed line inside an
+ * otherwise well-formed block reports exactly as it did before
+ * (bug-validate-does-not-check-frontmatter-present, additive).
+ */
+function parseIssue(err: unknown): SoftIssue {
+  const message = err instanceof Error ? err.message : String(err);
+  if (
+    err instanceof FrontmatterParseError &&
+    (err.code === "MISSING_FRONTMATTER" || err.code === "UNTERMINATED_FRONTMATTER")
+  ) {
+    return { code: err.code, message };
+  }
+  return { code: "BROKEN_YAML", message };
+}
+
+/**
  * Soft-load a work item without throwing.
  * Broken YAML / missing required fields are fatal; other schema issues attach to the item.
  * One parse path — unknown keys returned for the caller to warn on.
+ *
+ * A file that is not a work item is a `skip` carrying its REASON
+ * (`SkipReason`), never a bare skip (bug-validate-does-not-check-frontmatter-present):
+ * the two reasons need opposite verdicts. A missing `type` is a plain
+ * non-item document. A missing frontmatter BLOCK is only a non-item document if
+ * nothing expected an item there — and only `validate` knows the tree layout,
+ * so it is the caller that promotes that skip into an error.
  */
 export function softTryLoadItem(filePath: string): SoftLoadResult {
   let raw: string;
@@ -147,21 +194,18 @@ export function softTryLoadItem(filePath: string): SoftLoadResult {
       issues: [{ code: "READ_FAILED", message: err instanceof Error ? err.message : String(err) }],
     };
   }
-  if (!raw.startsWith("---")) return { kind: "skip" };
+  if (!raw.startsWith("---")) return { kind: "skip", reason: "no-frontmatter" };
 
   let data: Frontmatter;
   let body: string;
   try {
     ({ data, body } = parseFrontmatter(raw));
   } catch (err) {
-    return {
-      kind: "fatal",
-      issues: [{ code: "BROKEN_YAML", message: err instanceof Error ? err.message : String(err) }],
-    };
+    return { kind: "fatal", issues: [parseIssue(err)] };
   }
 
   const typeRaw = stringField(data, "type");
-  if (!typeRaw) return { kind: "skip" };
+  if (!typeRaw) return { kind: "skip", reason: "no-type" };
   if (!isItemType(typeRaw)) {
     return {
       kind: "fatal",
@@ -312,22 +356,175 @@ export function itemsById(items: WorkItem[]): Map<string, WorkItem> {
   return map;
 }
 
+// ---------------------------------------------------------------------------
+// Acceptance parsing — the ONE kernel owner (bug-three-acceptance-parsers-diverging)
+// ---------------------------------------------------------------------------
+
+/**
+ * The canonical acceptance marker: leading `[ \t]*`, a `-` or `*` bullet,
+ * EXACTLY ONE space, then a `[ ]` / `[x]` / `[X]` box.
+ *
+ * The single space is the done gate's historical rule and is load-bearing:
+ * `-  [ ] text` (two spaces) is NOT a row, so it must not start gating the
+ * `done` flip (bug-three-acceptance-parsers-diverging acceptance 6: this
+ * unification may not add or remove a refusal). A box glued to its text
+ * (`- [ ]x`) and a bare `- [ ] x` ARE rows — decided and documented in
+ * `ArggonManager/docs/convention.md` §Acceptance rows.
+ *
+ * Matched against ONE line at a time (see `ACCEPTANCE_LINE_BREAK`); this regex
+ * itself carries no `m` flag because the caller hands it a single line.
+ */
+const ACCEPTANCE_MARKER = /^[ \t]*[-*] \[( |x|X)\][ \t]*/;
+
+/** The tail of a marker line that actually carries text (the gate's `[^\s]`). */
+const ACCEPTANCE_TEXT = /^\S/;
+
+/**
+ * Where an acceptance row may START — the ECMAScript **LineTerminator** set,
+ * and nothing else: `\n` (LF), `\r` (CR), `\u2028` (LINE SEPARATOR) and
+ * `\u2029` (PARAGRAPH SEPARATOR).
+ *
+ * This set is the whole reason the row scan cannot be written as
+ * `split("\n")`. The done gate has always been a `/…/gm` regex, and JS `^`
+ * under `m` anchors after **every** LineTerminator — all four, not just `\n`.
+ * Splitting on `\n` alone therefore glues the rest of a CR-separated,
+ * U+2028-separated or U+2029-separated body onto the previous line, and a
+ * criterion the gate used to refuse on silently becomes invisible:
+ * `- [x] a\u2028- [ ] b\n` reads as one ticked row and the flip is ALLOWED.
+ * That is a gate false-pass, so the refusal set must match, not merely
+ * overlap (bug-three-acceptance-parsers-diverging, review F1).
+ *
+ * Deliberately NOT in the set: `\v` (U+000B) and `\f` (U+000C). They are
+ * whitespace but not LineTerminators, so `^` under `m` never anchored after
+ * them — `- [x] a\v- [ ] b` is ONE row to the gate, and must stay one.
+ * `\u00a0` and friends likewise stay inside the tail, where the gate's `[^\s]`
+ * (mirrored by `ACCEPTANCE_TEXT`) rejects them as leading whitespace.
+ */
+const ACCEPTANCE_LINE_BREAK = /[\n\r\u2028\u2029]/;
+
+/**
+ * One acceptance checkbox row, as the kernel classifies it.
+ *
+ * - `text` — everything after the marker on that line, trimmed, for DISPLAY.
+ *   `""` for a bare box (the `- [ ]` scaffold placeholder).
+ * - `criterion` — whether this row gates the done flip. A row with no text
+ *   after the box is a scaffold placeholder, never a criterion
+ *   (bug-empty-template-checkbox). This is deliberately a separate fact from
+ *   `text !== ""`: the gate's own rule is "the first character after the box
+ *   is not whitespace", so `- [ ]\u00a0x` is a row whose text trims to `"x"`
+ *   and still is not a criterion. Deriving one from the other re-introduces
+ *   a parser.
+ */
+export interface AcceptanceRow {
+  text: string;
+  checked: boolean;
+  criterion: boolean;
+}
+
+/** Minimal shape `acceptanceBody` needs — any loaded item or show envelope. */
+export interface AcceptanceBodySource {
+  body: string;
+}
+
+/**
+ * THE canonical body every acceptance consumer must read
+ * (bug-three-acceptance-parsers-diverging).
+ *
+ * ## The invariant: one question, one input
+ *
+ * The done gate's refusal and every rendered "acceptance" list are the SAME
+ * question asked of the SAME bytes, so they are answered by one parser
+ * (`acceptanceRows` / `acceptanceCriteria` / `acceptanceComplete`) over one
+ * input — this accessor.
+ *
+ * **Never pass a reader-derived string to an acceptance predicate.** A reader
+ * that trims, clips, byte-caps, strips HTML comments or strips COMMENT
+ * SECTIONS before calling has changed the question, and on reachable shapes
+ * it changes the ANSWER: a checklist filed as a comment (`arggon create` has
+ * no `--body` flag, so this is the path every new item takes) then reads as
+ * "nothing unchecked" from a consumer while the gate still blocks the flip.
+ * That inversion is the defect this accessor exists to prevent, and it is
+ * structural: the only way to get it wrong now is to bypass the accessor.
+ *
+ * Bounded reads (`runShow`'s `prose`, the board's clipped prose, a bounded
+ * comment tail) are for PROSE RENDERING, not for verdicts. A consumer that
+ * needs the verdict calls the predicate on `acceptanceBody(item)`; a consumer
+ * that renders rows calls `acceptanceRows(acceptanceBody(item))` and applies
+ * its own byte cap to the resulting rows.
+ *
+ * Byte-for-byte identity is deliberate. LF normalization would be *sound*
+ * (the marker above is CRLF-safe) but adds a second representation of the same
+ * document for no gain, so it is not done here.
+ */
+export function acceptanceBody(source: AcceptanceBodySource): string {
+  return source.body;
+}
+
+/**
+ * Every acceptance checkbox row in `body`, in document order.
+ *
+ * The ONE row parser: the done gate, the board renderer, the native detail
+ * block and the ZCode goal contract all read rows through here, so they
+ * cannot disagree about which lines are rows. Consumers MUST pass
+ * `acceptanceBody(item)` (see that function's invariant).
+ *
+ * Pure; O(lines). A marker that reaches end-of-line with nothing after it is
+ * returned as a non-criterion row so renderers can still show the box.
+ *
+ * The split is `ACCEPTANCE_LINE_BREAK` (the LineTerminator set), never `"\n"`:
+ * see that constant for the gate-false-pass that a `\n`-only split produces on
+ * CR / U+2028 / U+2029 bodies.
+ */
+export function acceptanceRows(body: string): AcceptanceRow[] {
+  const rows: AcceptanceRow[] = [];
+  for (const line of body.split(ACCEPTANCE_LINE_BREAK)) {
+    const match = ACCEPTANCE_MARKER.exec(line);
+    if (!match) continue;
+    const tail = line.slice(match[0].length);
+    rows.push({
+      text: tail.trim(),
+      checked: match[1] !== " ",
+      criterion: ACCEPTANCE_TEXT.test(tail),
+    });
+  }
+  return rows;
+}
+
+/**
+ * The rows that gate the done flip: `acceptanceRows` minus the bare-box
+ * scaffold placeholders (bug-empty-template-checkbox). Exposed so a consumer
+ * can print "these are the boxes the done gate refuses on" without
+ * re-deriving the placeholder rule.
+ */
+export function acceptanceCriteria(body: string): AcceptanceRow[] {
+  return acceptanceRows(body).filter((row) => row.criterion);
+}
+
+/** The unchecked criteria — exactly the rows that make `acceptanceComplete` false. */
+export function acceptanceUnchecked(body: string): AcceptanceRow[] {
+  return acceptanceCriteria(body).filter((row) => !row.checked);
+}
+
 /**
  * Acceptance-aware cascade helper (task-cascade-acceptance-aware): does the
  * item body carry an acceptance contract, and is it fully satisfied?
  *
- * Markdown task-list items only (`- [ ]` / `- [x]` / `- [X]`, leading
- * whitespace tolerated). A body with NO task-list items has no acceptance
- * checklist — treated as complete so the cascade may finish it as before.
- * A body WITH checklist items is complete only when every CRITERION is
- * checked, and a checkbox line with no text after the box is not a criterion
- * (bug-empty-template-checkbox): it is a scaffold placeholder — `create`
- * used to leave one under `## Acceptance`, and since the real checklist is
- * filed in a comment, that stale empty box must never wedge the done gate
- * or the cascade. Real (text-bearing) unchecked boxes still gate strictly.
+ * Defined over `acceptanceCriteria`, so it is the same row set every renderer
+ * displays: Markdown task-list items only (`- [ ]` / `- [x]` / `- [X]`, one
+ * space after the bullet, leading whitespace tolerated). A body with NO
+ * task-list items has no acceptance checklist — treated as complete so the
+ * cascade may finish it as before. A body WITH checklist items is complete
+ * only when every CRITERION is checked, and a checkbox line with no text
+ * after the box is not a criterion (bug-empty-template-checkbox): it is a
+ * scaffold placeholder — `create` used to leave one under `## Acceptance`,
+ * and since the real checklist is filed in a comment, that stale empty box
+ * must never wedge the done gate or the cascade. Real (text-bearing)
+ * unchecked boxes still gate strictly.
+ *
+ * This is the DONE GATE (ADR 0015). Its refusal set is the contract every
+ * other consumer is measured against; unifying the parsers must never change
+ * it, so this function is specified as `!acceptanceUnchecked(body).length`.
  */
 export function acceptanceComplete(body: string): boolean {
-  const criteria = [...body.matchAll(/^[ \t]*[-*] \[( |x|X)\][ \t]*[^\s]/gm)];
-  if (criteria.length === 0) return true;
-  return criteria.every((match) => match[1] !== " ");
+  return acceptanceUnchecked(body).length === 0;
 }

@@ -49,8 +49,8 @@ agent write to GitHub.
       convergent designs are small-project, not proven at scale
 - [x] The decision is recorded as an ADR (carrier change is **behavioral**) and the
       hunted edge cases become spec acceptance criteria —
-      [ADR 0021](../../../docs/adr/0021-adopter-friction-channel.md) and
-      [spec-friction-capture-018](../../../docs/specs/spec-friction-capture-018.md)
+      [ADR 0024](../../../docs/adr/0024-adopter-friction-channel.md) and
+      [spec-friction-capture-020](../../../docs/specs/spec-friction-capture-020.md)
       (13 hunted dimensions → 13 mapped criteria, plus non-goals and surface/carrier
       discipline), with the plan at
       [plan-friction-capture-018](../../../docs/plans/plan-friction-capture-018.md)

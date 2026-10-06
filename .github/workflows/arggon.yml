@@ -8,14 +8,16 @@
 name: arggon
 
 on:
-  # Cheap (~30-60 s) but deliberately scoped: the drift gate below compares the
-  # committed seam against what the pinned `ARGGON_VERSION` generates, so the
-  # job must not run on every topic-branch push or tracker auto-commit (adjust
-  # the branch list to YOUR default branch(es); pull requests always run it so
-  # a stale seam is caught before merge). The runner's own file is excluded
-  # from the comparison (see the drift-gate step): a self-bootstrapping
-  # workflow cannot be gated against the pinned version, because its own
-  # template change only reaches a release after merge.
+  # `pull_request` always runs the job, so a stale seam is caught before merge;
+  # `push` is limited to the long-lived branches (adjust the branch list to YOUR
+  # default branch(es)). Deliberately scoped: the job installs a release from the
+  # registry, and in the seam's OWN repo it also builds the checkout's own bin —
+  # cheap for an adopter (~30-60 s), and on every topic-branch push it would only
+  # repeat a comparison the next PR run repeats anyway.
+  #
+  # The runner's own file is excluded from the drift comparison (see the drift
+  # step): a self-bootstrapping workflow cannot be gated against the pinned
+  # release, because its own template change only reaches a release after merge.
   push:
     branches: [main]
   pull_request:
@@ -29,7 +31,9 @@ env:
   # its step-3 publish — before the registry has it — turning tasks-validate
   # red on main and on the release PR on every release. A stale literal is a
   # red test, not a silent outage: cli/src/ci-seam-pin.test.ts fails until
-  # the runbook's post-release re-pin lands. The adopter TEMPLATE keeps its
+  # the runbook's post-release re-pin lands. The pin is ALSO the seam
+  # reference the drift step's pinned-lag assertion polices — it must never
+  # sit behind the seam it has to reproduce. The adopter TEMPLATE keeps its
   # literal pin by design — adopters pin deliberately.
   ARGGON_VERSION: "0.5.0"
 
@@ -46,7 +50,24 @@ jobs:
         run: npm install -g "arggon-manager@$ARGGON_VERSION"
 
       - name: Bootstrap the tracker (idempotent; never overwrites adopter files)
-        run: arggon init --no-commit
+        run: |
+          # Bootstrap with the tool that OWNS this seam. When the checkout IS
+          # the seam's source (the arggon repo itself, or a fork of it), build
+          # it and bootstrap with the branch's own generator — that is what
+          # lets a feature PR that adds or edits generated content go green
+          # without waiting for a release. Every other repo has no arggon
+          # source to build, so the pinned install above IS its generator.
+          # Same predicate as the drift-gate step — a step cannot hand an env
+          # var to the next one on a GitHub runner without the per-step env
+          # file, and this recipe derives nothing at run time (the pin is a
+          # literal): package name + the CLI's own entry point.
+          if [ -f cli/src/cli.ts ] && grep -q '"name":[[:space:]]*"arggon-manager"' package.json; then
+            npm ci --ignore-scripts --no-audit --no-fund
+            npm run build
+            node dist/cli.js init --no-commit
+          else
+            arggon init --no-commit
+          fi
 
       - name: Committed seam is current (drift gate; no-op until initialized)
         run: |
@@ -60,16 +81,63 @@ jobs:
             echo "no committed arggon seam yet — run 'arggon init' locally and commit the generated docs"
             exit 0
           fi
+          # Pinned-lag assertion, FIRST so the lag case gets its own message
+          # instead of surfacing as an unexplainable diff: every x-generated
+          # entry records the arggon version that last wrote it, so a stamp
+          # NEWER than ARGGON_VERSION means the pinned install would rewrite
+          # committed content (the #527 outage class). Read the COMMITTED
+          # state (`git show HEAD:…`) so this run's own `generatedAt` refresh
+          # cannot decide it; no committed state file means no stamps, and the
+          # assertion has nothing to compare.
+          state=""
+          for candidate in ArggonManager/.convention.yml tasks/.convention.yml; do
+            if git cat-file -e "HEAD:$candidate" 2>/dev/null; then
+              state="$candidate"
+              break
+            fi
+          done
+          if [ -n "$state" ]; then
+            newest=$(git show "HEAD:$state" \
+              | grep -oE 'arggonVersion: "[0-9]+\.[0-9]+\.[0-9]+"' \
+              | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' \
+              | sort -V | tail -1)
+            # `sort -V` is GNU (CI runners have coreutils): the larger of the
+            # two is ARGGON_VERSION itself unless the seam is newer than the pin.
+            if [ -n "$newest" ] \
+              && [ "$(printf '%s\n%s\n' "$newest" "$ARGGON_VERSION" | sort -V | tail -1)" != "$ARGGON_VERSION" ]; then
+              echo "ARGGON_VERSION ($ARGGON_VERSION) lags the committed arggon seam ($newest):"
+              echo "the pinned init would REWRITE committed content — bump ARGGON_VERSION to $newest"
+              echo "once that version is released (release.md, 'The re-pin'). Re-running the pinned"
+              echo "init is not the fix: it is what deletes the newer content."
+              exit 1
+            fi
+          fi
+          # Re-generate with the generator this repo is checked against (the
+          # branch's own build where the checkout is the seam's source, the
+          # pinned release everywhere else), then require a clean tree.
+          if [ -f cli/src/cli.ts ] && grep -q '"name":[[:space:]]*"arggon-manager"' package.json; then
+            if [ ! -f dist/cli.js ]; then
+              echo "dist/cli.js is missing: run 'npm ci && npm run build' (the bootstrap step does this)"
+              exit 1
+            fi
+            node dist/cli.js init --no-commit
+            generator="this checkout's own build (node dist/cli.js)"
+            remedy="regenerate it with 'npm ci && npm run build && node dist/cli.js init' and commit, or drop the template change that moved it"
+          else
+            arggon init --no-commit
+            generator="arggon-manager@$ARGGON_VERSION"
+            remedy="re-run 'arggon init' with arggon-manager@$ARGGON_VERSION and commit the result"
+          fi
           # `init` refreshes the per-doc generatedAt bookkeeping on every run,
           # so the state file is excluded. The runner's own file is excluded
           # too: it bootstraps itself (its template change only reaches the
           # pinned ref after merge, so gating it would make every trigger edit
           # fail its own PR) and its step bodies are exercised verbatim by
           # `cli/src/headless-ci.test.ts`. Every other generated file must be
-          # byte-identical to what the pinned version generates.
+          # byte-identical to what the generator above produces.
           dirty=$(git status --porcelain -- . ':(exclude)ArggonManager/.convention.yml' ':(exclude)tasks/.convention.yml' ':(exclude).github/workflows/arggon.yml')
           if [ -n "$dirty" ]; then
-            echo "the committed arggon seam predates the pinned ref — run 'arggon init' and commit:"
+            echo "the committed arggon seam does not match what $generator generates — $remedy:"
             echo "$dirty"
             exit 1
           fi

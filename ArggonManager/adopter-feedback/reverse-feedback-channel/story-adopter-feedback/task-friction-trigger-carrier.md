@@ -22,8 +22,8 @@ depends_on: [task-friction-surface-parity-and-docs]
 
 ## Context
 
-Plan task T6 for [spec-friction-capture-018](../../../docs/specs/spec-friction-capture-018.md),
-stage 1 of [ADR 0021](../../../docs/adr/0021-adopter-friction-channel.md).
+Plan task T6 for [spec-friction-capture-020](../../../docs/specs/spec-friction-capture-020.md),
+stage 1 of [ADR 0024](../../../docs/adr/0024-adopter-friction-channel.md).
 
 **This is the behavioral carrier change and the highest-risk item in the plan.**
 Per `docs/agents.md` §Changing the methodology itself this is a **behavioral**
@@ -34,9 +34,9 @@ impact class: a rule agents must re-learn. Consequences the ADR settles:
   agent actively escalating and following the rule that pointed at it still missed
   it; the friction was "absorbed into the session" — silent loss, which looks
   like success. Author's maxim: "a disabled capability nobody can see is absent."
-- Opt-out must **not** gate the trigger's presence (ADR 0021 §3).
+- Opt-out must **not** gate the trigger's presence (ADR 0024 §3).
 
-The `doctor` block is owned **solely** by this task (ADR 0021 §2), and its
+The `doctor` block is owned **solely** by this task (ADR 0024 §2), and its
 justification is narrow — note the self-correction, because this paragraph
 previously argued the opposite while naming the mechanism that already works:
 

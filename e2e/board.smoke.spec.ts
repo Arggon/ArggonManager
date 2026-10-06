@@ -39,7 +39,7 @@ import { fileURLToPath } from "node:url";
 // wrapper): `node --import <tsx loader> cli/src/cli.ts`, per bug-row-table-
 // flake. Playwright's transpiler handles the plain TS import (verified by the
 // @smoke lane); the `.js` extension is what NodeNext type-checking requires.
-import { cliEntryPath, nodeImportArgs } from "../cli/src/test-spawn.js";
+import { cliNodeArgs } from "../cli/src/test-spawn.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(repoRoot, "dist", "cli.js");
@@ -1418,7 +1418,7 @@ test.describe("@smoke board from source (tsx path, bug-tsx-board-dead-script)", 
 
   /** Run the CLI FROM SOURCE through tsx inside the fixture. */
   function runCliTs(args: string[]): string {
-    const result = spawnSync(process.execPath, [...nodeImportArgs(cliEntryPath()), ...args], {
+    const result = spawnSync(process.execPath, [...cliNodeArgs(), ...args], {
       cwd: fixture,
       encoding: "utf8",
       timeout: 120_000,
@@ -1433,14 +1433,10 @@ test.describe("@smoke board from source (tsx path, bug-tsx-board-dead-script)", 
 
   /** Start `board --serve` from the tsx source path on a free port. */
   function startBoardServerTs(): Promise<{ child: ChildProcess; url: string }> {
-    const child = spawn(
-      process.execPath,
-      [...nodeImportArgs(cliEntryPath()), "board", "--serve", "--port", "0"],
-      {
-        cwd: fixture,
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
+    const child = spawn(process.execPath, [...cliNodeArgs(), "board", "--serve", "--port", "0"], {
+      cwd: fixture,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     return new Promise((resolvePromise, reject) => {
       let output = "";
       const timer = setTimeout(() => {

@@ -1,23 +1,49 @@
 # Orchestration — multi-agent work
 
 Part of the `arggon-cli` skill (`SKILL.md`). Non-trivial items are **orchestrated
-by default**: a coordinator delegates them to subagents instead of working them
-inline. Trivial items (one-line fixes, doc tweaks) stay inline. Full rules:
+by default**: the delivery lead delegates them to subagents instead of working
+them inline. Trivial items (one-line fixes, doc tweaks) stay inline. Full rules:
 `ArggonManager/docs/agents.md` §Orchestration.
 
-## Coordinator duties
+## The roles (named by what they decide)
+
+Authoritative table, with the software analogue marked non-normative:
+`ArggonManager/docs/engineering.md` §Roles and authority (ADR 0021 §6.1).
+
+| Shipped id                  | Role                 | Decides                                                                                                        |
+| --------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `arggon-delivery-lead`      | Delivery lead        | what is built next and in what order; who is dispatched; tracker state; merge verification and the `done` flip |
+| `arggon-standards-reviewer` | Practice & standards | whether a change is right by the project's own bar; asks for refactor                                          |
+| `arggon-maker`              | Maker                | producing the change, keeping it on the item                                                                   |
+| `arggon-verifier`           | Verifier             | whether the delivered thing does what was specified, by executing the project's gates                          |
+
+Two boundaries the roles must not blur: the delivery lead **sequences** and
+recommends priority — the product owner (human) sets the `priority` field; and
+the verifier **reports** observed-versus-expected without deciding the verdict.
+Each id names its **role** (ADR 0021 §6.2a′) — never the software title, never
+the process verb — so cite the role, which is what the table above states.
+
+Everywhere else the loop is **parity**: any human and any agent may claim, work,
+review, comment and merge under the same kernel rules and the same JSON
+contracts. Only the irreversible overrides are structurally human-only — steal,
+waive, force, reopen — and they are the product owner's (ADR 0021 §1/§2).
+
+## Delivery lead duties
 
 - **Wave planning by file-disjointness:** group claimable items into waves whose
   members touch disjoint files/modules; items that would collide go in different
   waves.
 - **Claim before dispatch:** claim every item you are about to delegate —
-  `tools.arggon.start({ id, assignee, worktree: true })` (CLI: `arggon start <id>
---worktree`) — **before** launching its worker, then launch into the path the
-  claim returned. That call is the worktree step: it takes the single-writer
-  stamp, creates `../<repo>-<id>`, pre-builds the packages that copy owns and
-  records `branch` + `worktree_path`. Never hand-roll `git worktree add` for a
-  claim, never dispatch a worker as the first claimant, never claim an item you
-  are not dispatching (unclaim it **and release it** —
+  `tools.arggon.start({ id, assignee: "arggon-delivery-lead", worktree: true })`
+  (CLI: `arggon start <id> --worktree`) — **before** launching its maker, then
+  launch into the path the claim returned. `assignee` is **your role id**, never
+  the product owner's login: a claim identifies its writer, and the writer is not
+  the owner (`@me` resolves the human login, so an agent claim correctly does not
+  appear under `--assignee @me`). That call is the worktree step: it takes the
+  single-writer stamp, creates `../<repo>-<id>`, pre-builds the packages that copy
+  owns and records `branch` + `worktree_path`. Never hand-roll `git worktree add`
+  for a claim, never dispatch a maker as the first claimant, never claim an item
+  you are not dispatching (unclaim it **and release it** —
   `tools.arggon.cleanup({ release: id })` / `arggon cleanup --release <id>`: the
   unclaim clears the assignee but leaves the claim's worktree, `.arggon.env` and
   claim stamp behind, and `--prune` cannot reap a `todo` item; the unclaim's own
@@ -25,37 +51,48 @@ inline. Trivial items (one-line fixes, doc tweaks) stay inline. Full rules:
   as evidence,
   not a retry — `start` has no `--force`, and no refusal is a licence to route
   around it by hand.
-- **Per-item worktrees:** one subagent per item, each in its own worktree — the
+- **Per-item worktrees:** one maker per item, each in its own worktree — the
   recorded `worktree_path` on the item, never a `../<repo>-<id>` convention
-  guess; no two subagents share a working tree.
-- **Code review (lead architect):** review **every** subagent PR before merge
-  against the review bar in `ArggonManager/docs/engineering.md` (architecture-first,
-  conventions first, quality/security bar, tests travel with behavior, docs
-  travel with code, scope stays on the item, **blocking smoke test**) plus the
+  guess; no two makers share a working tree.
+- **Code review (practice & standards):** review **every** subagent PR before merge
+  against the bar the **project's engineering docs declare** (this project's
+  `ArggonManager/docs/engineering.md` §Review bar: architecture-first,
+  conventions first, quality/security bar, evidence travels with the change, docs
+  travel with code, scope stays on the item, **blocking end-to-end check** — whose
+  software worked example is the probe evidence and the browser drive the review
+  bar describes) plus the
   coordination specifics: surgical staging, no cross-item files, no unrelated
   reformatting, acceptance ticks honest. Change requests and verdicts go back via
   `arggon comment <item-id>` on the item — never as GitHub PR comments.
-- **Merge verification:** after each subagent PR, verify the merge; resolve
+- **Merge verification:** after each maker's change, verify the merge; resolve
   cross-item conflicts when waves overlap.
 - **Tracker ownership:** claim conflicts, blocked items, follow-up filing, and
   final wave verification (`arggon validate` ok, `arggon doctor` clean).
+- **Sequencing ≠ priority:** decide what is built next and in what order, and
+  recommend `priority` changes — the product owner sets the field (ADR 0021 §6.1).
 
 ## Subagent rules
 
 - Work an item inside the worktree you were handed, and only when the item is
-  **already claimed** — a coordinator that dispatches work claims it first, so
+  **already claimed** — a delivery lead that dispatches work claims it first, so
   confirm with `tools.arggon.show({ id, meta: true })` and never re-claim, never
   take over the stamp and never hand-roll a worktree. Claim it through `start`
   (never a bare `update --status in_progress`) only when you picked the item up
-  yourself and no claim exists.
-- Never flip your item `done` — completion is the coordinator's call after merge
-  verification — and never reopen `done`/`cancelled` or steal a claim.
-- Expect the coordinator's review and address change requests before merge.
-- Come with smoke evidence for behavior changes: changed commands probed on a
-  fixture (expected vs observed); UI changes browser-driven per ADR 0008 — the
-  smoke gate blocks merge.
-- Report findings back to the coordinator instead of filing tracker items — the
-  coordinator consolidates and files.
+  yourself and no claim exists — stamping your own role id, never a human login.
+- Never flip your item `done` — completion is the delivery lead's call after merge
+  verification — and never reopen `done`/`cancelled` or steal a claim. Those
+  irreversible overrides are the product owner's, structurally.
+- Expect the delivery lead's code review on your change and address change
+  requests before it merges.
+- Come with evidence for behavior changes: **the gates this project declares**,
+  executed end-to-end against the specification and reported as
+  expected-vs-observed (in software: changed commands probed on a fixture, UI
+  changes browser-driven per ADR 0008) — the smoke gate blocks merge.
+- Keep the item's acceptance checklist honest: it is the **done contract** and
+  the domain-invariant — a non-software project checks it with its own gates, a
+  software project with tests, lint and a smoke.
+- Report findings back to the delivery lead instead of filing tracker items — the
+  delivery lead consolidates and files.
 
 ## Worktrees in practice
 
@@ -81,3 +118,11 @@ is merged, `arggon cleanup` lists stale worktrees and `--prune` removes them.
 The claim, branch, PR and validate rules apply to subagents **unchanged**: same
 commands, same gates, same never-list. The kernel enforces the rules; neither
 role forks them.
+
+One goal per claimed item: `arggon goal <id>` (rendered from inside the item's
+worktree) turns the item's acceptance checklist into the goal-mode contract an
+agent loop runs on — objective, verification, boundaries — and takes "is there
+work left" from the DONE GATE, so it never contradicts what `done` would refuse.
+It refuses an unresolvable identity, a foreign claim, a closed item and any
+checkout that is not the item's recorded `worktree_path` (no override flag), and
+a goal never spans worktrees or items.

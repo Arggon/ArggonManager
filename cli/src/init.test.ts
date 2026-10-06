@@ -17,6 +17,10 @@ import { runInit, dryRunInit, type ProposalEntry } from "./init.js";
 import { arggonVersion, renderGeneratedDoc } from "./docs.js";
 import { readGeneratedState, updateGeneratedSection } from "@arggondev/lib";
 import { runCli } from "./test-spawn.js";
+// Ordering assertions go through assertOrder, never a bare `indexOf`
+// comparison: `-1 < n` makes a renamed clause pass as if it were still
+// ordered (bug-vacuous-substring-ordering-assertions).
+import { assertOrder } from "../../test/assert-order.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -49,12 +53,13 @@ const TIER1_DOCS = [
   // .arggon.env so a fresh scaffold never tracks the per-worktree env file.
   ".gitignore",
   ".mcp.json",
-  ".opencode/agents/arggon-coordinator.md",
+  ".opencode/agents/arggon-delivery-lead.md",
   // task-prover-agent-reviewer-split: execution evidence is its own agent, and
-  // init emits the agents alphabetically (coordinator, prover, reviewer, worker).
-  ".opencode/agents/arggon-prover.md",
-  ".opencode/agents/arggon-reviewer.md",
-  ".opencode/agents/arggon-worker.md",
+  // init emits the agents alphabetically (delivery-lead, maker,
+  // standards-reviewer, verifier).
+  ".opencode/agents/arggon-maker.md",
+  ".opencode/agents/arggon-standards-reviewer.md",
+  ".opencode/agents/arggon-verifier.md",
   ".opencode/commands/arggon-adopt.md",
   ".opencode/commands/arggon-adr.md",
   ".opencode/commands/arggon-done.md",
@@ -73,14 +78,15 @@ const TIER1_DOCS = [
   // ADR 0014 (task-zcode-plugin-seam): the ZCode plugin seam is tier-1 —
   // marketplace catalog + the vendored declarative plugin.
   ".zcode-marketplace/arggon/.zcode-plugin/plugin.json",
-  ".zcode-marketplace/arggon/agents/arggon-coordinator.md",
-  ".zcode-marketplace/arggon/agents/arggon-reviewer.md",
-  ".zcode-marketplace/arggon/agents/arggon-worker.md",
+  ".zcode-marketplace/arggon/agents/arggon-delivery-lead.md",
+  ".zcode-marketplace/arggon/agents/arggon-maker.md",
+  ".zcode-marketplace/arggon/agents/arggon-standards-reviewer.md",
   ".zcode-marketplace/arggon/commands/arggon-adopt.md",
   ".zcode-marketplace/arggon/commands/arggon-adr.md",
   ".zcode-marketplace/arggon/commands/arggon-board.md",
   ".zcode-marketplace/arggon/commands/arggon-done.md",
   ".zcode-marketplace/arggon/commands/arggon-explore.md",
+  ".zcode-marketplace/arggon/commands/arggon-goal.md",
   ".zcode-marketplace/arggon/commands/arggon-handoff.md",
   ".zcode-marketplace/arggon/commands/arggon-next.md",
   ".zcode-marketplace/arggon/commands/arggon-playbook.md",
@@ -90,6 +96,8 @@ const TIER1_DOCS = [
   ".zcode-marketplace/arggon/commands/arggon-status.md",
   ".zcode-marketplace/arggon/hooks/gate.mjs",
   ".zcode-marketplace/arggon/hooks/hooks.json",
+  // task-zcode-goal-mode: the goal-mode contract template is tier-1 too.
+  ".zcode-marketplace/arggon/templates/goal-mode.md",
   ".zcode-marketplace/marketplace.json",
   "AGENTS.md",
   "ArggonManager/docs/tracking.md",
@@ -688,9 +696,7 @@ describe("init --propose", () => {
     const content = readFileSync(proposalFile, "utf8");
     // Distinguishing header ABOVE the standard generated marker.
     expect(content).toContain(`arggon:proposed-update dest="AGENTS.md" version="${version}"`);
-    expect(content.indexOf("arggon:proposed-update")).toBeLessThan(
-      content.indexOf("arggon:generated"),
-    );
+    assertOrder(content, "arggon:proposed-update", "arggon:generated");
     expect(content).toContain("arggon adopt --ack");
     expect(p.removed).toBeGreaterThan(0);
     expect(p.added).toBeGreaterThanOrEqual(0);

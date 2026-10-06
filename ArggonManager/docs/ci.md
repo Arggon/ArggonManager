@@ -94,21 +94,170 @@ instructions` prints — lives in
 **When it runs (scoped on purpose).** `pull_request` always runs the job so a
 stale seam is caught before merge, while `push` is limited to the long-lived
 branches (`branches: [main]` in the shipped recipe — adjust to your
-default branch(es)). The job is cheap (~30–60 s) but the drift gate compares the
-committed seam against the pinned `ARGGON_VERSION`, so running it on every
-topic-branch push or tracker auto-commit would only re-check a comparison that
-cannot pass before the ref moves.
+default branch(es)). The job is cheap for an adopter (~30–60 s) but it installs a
+release from the registry, so running it on every topic-branch push or tracker
+auto-commit only repeats a comparison the next PR run repeats anyway.
+
+## Which generator the gate compares against
+
+The drift gate answers one question: **does the committed seam match what the
+generator that owns it produces?** The answer depends on who owns it, so the
+recipe picks the generator explicitly, with the same predicate in the bootstrap
+and drift steps (a step cannot hand an env var to the next one without
+`GITHUB_ENV`, which this recipe must not use):
+
+| Checkout                                                                           | Generator                                                           | Why                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Is the seam's source (`package.json` name is `arggon-manager` + `cli/src/cli.ts`)? | its own build: `npm ci` → `npm run build` → `node dist/cli.js init` | A feature PR that legitimately **adds or edits generated content** can satisfy the gate on its own branch. Judging it against the last release instead made every such PR red until a release and a re-pin — and the prescribed remedy ("run `arggon init`") could not work, because the pinned init was the thing deleting the new content (PR #605). |
+| Anything else (every adopter and fork)                                             | the pinned release: `arggon init`                                   | An adopter has no arggon source to build; the pinned install above is its only generator, and its committed seam is expected to be reproducible from exactly that release.                                                                                                                                                                             |
+
+Each direction prints its own verdict, so the failure names what disagrees and
+the remedy that works for it:
+
+```text
+# the pin sits behind the committed seam (the #527 class)
+ARGGON_VERSION (0.5.0) lags the committed arggon seam (0.9.9):
+the pinned init would REWRITE committed content — bump ARGGON_VERSION to 0.9.9
+once that version is released (release.md, 'The re-pin'). Re-running the pinned
+init is not the fix: it is what deletes the newer content.
+
+# the committed bytes disagree with the generator this repo is checked against
+the committed arggon seam does not match what this checkout's own build (node dist/cli.js) generates — regenerate it with 'npm ci && npm run build && node dist/cli.js init' and commit, or drop the template change that moved it:
+ M .mcp.json
+# ... or, in an adopter repo, the same diff against the pinned release:
+the committed arggon seam does not match what arggon-manager@0.5.0 generates — re-run 'arggon init' with arggon-manager@0.5.0 and commit the result:
+ M .mcp.json
+
+# no committed seam yet (a fresh clone): green, no-op
+no committed arggon seam yet — run 'arggon init' locally and commit the generated docs
+```
+
+The self-hosted branch **builds the checkout** (`npm ci --ignore-scripts` — no
+double build through the `prepare` lifecycle — then `npm run build`), so its
+bootstrap needs a registry round trip for dependencies and a build; the drift
+step re-runs the branch's own `init` (a no-op when the seam is current) and
+fails loudly if `dist/cli.js` is missing, rather than silently falling back to
+the pinned release — that silent fall-back _is_ the bug.
+
+**What the branch-local comparison gives up.** In the seam's own repo,
+`tasks-validate` no longer proves that the _pinned release_ reproduces the
+committed seam. That is the price of the decision recorded in `release.md`
+§One release story ("the price paid is one weaker claim"), and it is the ceiling
+of what the remaining checks claim — read them as what they are:
+
+- the **pinned-lag assertion** inside the drift step is a **version-skew proxy,
+  not byte-equality**. It fires when a committed `x-generated` `arggonVersion`
+  stamp is NEWER than `ARGGON_VERSION` — the #527 class, where the pinned install
+  would rewrite committed content — and prescribes the only remedy that works:
+  bump the pin once that version is released. Re-running the pinned `init` is
+  not the fix; it is what deletes the newer content. It is **blind in exactly the
+  case this gate change unblocks**: a feature PR that moves templates and
+  regenerates the seam with **no version bump** leaves every stamp at the pin, so
+  the seam has postdated the release while the stamps say nothing. Nothing in
+  `tasks-validate` detects that on a branch. It is not meant to: that PR is the
+  one the branch-local comparison exists to let through, and its seam is
+  reproducible from its own source, which is the generator the gate uses;
+- `arggon validate` / `doctor` / `list` still run through the **pinned** bin, so
+  the release can always read the tracker (the adopter-shaped check). That is a
+  read gate, not a seam gate.
+
+**Where the rule of record lives.** The drift gate's rule is the workflow
+template, [`templates/docs/github/workflows/arggon.yml`](../../templates/docs/github/workflows/arggon.yml):
+it is what adopters vendor and what the parity test in
+`cli/src/headless-ci.test.ts` holds `.github/workflows/arggon.yml` to (same rule,
+same generator predicate, `uses:` SHA pins excepted). The pin-lag rule has a
+second implementation, the `pinLagsSeam()` predicate in
+`cli/src/ci-seam-pin.test.ts` — the repo-side guard that runs in the `cli` job,
+so the same invariant fails on a local run instead of only in CI. **They are one
+rule, not two spellings**: `pinLagsSeam()` is the TypeScript transcription of
+the drift step's pinned-lag clause, and a parity test **executes that clause** —
+lifted out of both workflow copies, never remembered — against the predicate over
+a corpus covering every state the release runbook passes through (the verdict
+table in `cli/src/ci-seam-pin.test.ts`) plus the one input where the two once
+disagreed. Editing one and leaving the other is a red test that names the input,
+not a silent skew.
+
+**What the rule does not read: `package.json`.** The clause compares the pin
+against the newest committed `arggonVersion` stamp and nothing else. That is the
+decision, not an omission (`bug-ci-seam-pin-shell-vs-test-copy-divergence`): the
+repo-side predicate used to add a `pin !== package.json` conjunct, and it was
+wrong twice over.
+
+1. No documented state of the release flow needs it — the release window
+   (`pin == stamps`, `package.json` already bumped) is green without it, which is
+   what that conjunct claimed to buy.
+2. It silenced the #527 signal in exactly the state the clause exists to catch: a
+   stamp newer than the pin while `package.json` equals the pin. Reachable
+   whenever a contributor's installed `arggon` is newer than their branch's
+   `package.json` and they run `arggon init` — and then the pinned install really
+   would rewrite committed content.
+
+It could not have been closed by pasting the conjunct into the shell copy, which
+is the direction the finding suggested. The clause runs in every adopter's repo
+too, and an adopter's `package.json` version is unrelated to arggon releases: any
+adopter whose version coincides with the pin literal would have had the #527 gate
+switch off for them and shipped the outage silently. Both surfaces now witness the
+deciding input — the predicate in `cli/src/ci-seam-pin.test.ts` (which executes
+the shipped clause) and the clause itself, driven verbatim end to end in
+`cli/src/headless-ci.test.ts`. Byte equality of the seam against the pin, and a
+pin sitting _ahead_ of the stamps, stay out of scope for both; see [What the
+branch-local comparison gives up](#which-generator-the-gate-compares-against).
+
+The pin is a literal on purpose and stays one: deriving it from `package.json`
+would install the bumped version between the release runbook's step-1 bump and
+its step-3 publish — before the registry has it — turning `tasks-validate` red on
+main and on the release PR on every release ([ADR
+0018](./adr/0018-update-delivery-and-distribution-channel.md) §1's amendment,
+`task-ci-seam-pin-tracks-release`).
+
+## Reproduce the drift gate both ways
+
+The gate is only worth its cost if both directions are demonstrable. The
+hermetic fixture (`npm test -- headless-ci`) drives the step bodies on synthetic
+repos; this is the real thing — real templates, real build, the branch's own
+`dist/cli.js` — in a throwaway clone:
+
+```bash
+# 0. a scratch clone of the branch (never run this in your working tree)
+git clone --quiet /path/to/your/checkout /tmp/arggon-seam && cd /tmp/arggon-seam
+git checkout --quiet fix/<item-id>
+export ARGGON_VERSION=0.5.0            # the value the workflow's env: block pins
+
+# 1. GREEN, both ways: this branch's seam is current for its own generator
+npm ci --ignore-scripts --no-audit --no-fund && npm run build
+node dist/cli.js init --no-commit
+git status --porcelain -- . ':(exclude)ArggonManager/.convention.yml' \
+  ':(exclude)tasks/.convention.yml' ':(exclude).github/workflows/arggon.yml'   # empty => green
+
+# 2. RED, stale seam: move a template, leave the committed seam behind
+printf '\n// moved\n' >> templates/docs/mcp-json
+node dist/cli.js init --no-commit
+git status --porcelain -- . ':(exclude)ArggonManager/.convention.yml'   # ` M .mcp.json` => red
+git checkout -- . && git clean -fd templates
+
+# 3. RED under the OLD gate (the #605 shape): the seam POSTDATES the pin. Commit
+#    the regeneration from step 2, then run the pinned release's init — it
+#    rewrites the committed content the release does not know about:
+#      npx --yes arggon-manager@$ARGGON_VERSION init --no-commit
+#      git status --porcelain    # ` M .mcp.json` => the seam predates nothing;
+#                                # it POSTDATES the pin. With the fix, tasks-validate
+#                                # compares step 1's generator and stays green.
+```
+
+Both red cases are also asserted in `cli/src/headless-ci.test.ts` (the drift step
+body run verbatim, including the pinned-lag assertion, the branch generator's
+selection, and the missing-build error).
 
 Steps, and what each one is for:
 
-| Step                      | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| install                   | Headless bin from the registry, pinned by `ARGGON_VERSION` (`npm install -g "arggon-manager@$ARGGON_VERSION"`); no model, no MCP, no clone.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `arggon init --no-commit` | Idempotent bootstrap/upgrade: creates the tracker on a fresh clone, restores missing templates, refreshes untouched generated docs (`updated[]`), never touches adopter-modified ones. `--no-commit` keeps CI from writing history (the default auto-commit is for local runs).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| drift gate                | Runs after the bootstrap step: once an arggon-managed tree is committed, `git status --porcelain` must be empty — a dirty tree means the committed seam predates the pinned arggon version (re-run `arggon init` locally and commit). It activates on the presence of a **committed provenance marker** in any generated file (not just the state file), so a repo that commits the generated docs without committing `*.convention.yml` still gets checked; a fresh clone has no committed marker and no-ops. Two files are excused from the check: the state file (`ArggonManager/.convention.yml`, or `tasks/.convention.yml` on legacy trees), because init refreshes its per-doc `generatedAt` bookkeeping on every run by design, and **the workflow file itself** (`.github/workflows/arggon.yml`), because a self-bootstrapping runner cannot be gated against the pinned version — its own template change only reaches a release after merge, so gating it would fail every such PR; its step bodies are pinned by the fixture below. |
-| `arggon validate --json`  | The hard gate: frontmatter, tree integrity, claim/blocked invariants. Non-zero exit on a broken tracker.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `arggon doctor --json`    | Report-only installation shape (convention version, provenance buckets, OpenCode seam state, tracker counts); always exit 0.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `arggon list --json`      | Report-only tracker scan for the log.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Step                      | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| install                   | Headless bin from the registry, pinned by `ARGGON_VERSION` (`npm install -g "arggon-manager@$ARGGON_VERSION"`); no model, no MCP, no clone.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `arggon init --no-commit` | Idempotent bootstrap/upgrade with the **generator that owns this seam** (see [Which generator](#which-generator-the-gate-compares-against)): the checkout's own build when the checkout is the seam's source, else the pinned bin. Creates the tracker on a fresh clone, restores missing templates, refreshes untouched generated docs (`updated[]`), never touches adopter-modified ones. `--no-commit` keeps CI from writing history (the default auto-commit is for local runs).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| drift gate                | Runs after the bootstrap step, against the **same generator**, in three parts: **(a)** the pinned-lag assertion — no committed `x-generated` `arggonVersion` stamp may be newer than `ARGGON_VERSION` (the #527 class: the pinned init would rewrite committed content; the remedy is to bump the pin, never to re-run init); **(b)** regenerate, then require `git status --porcelain` to be empty — a dirty tree means the committed seam does not match what the generator above produces, and the message names _that_ generator plus the remedy for that direction. It activates on the presence of a **committed provenance marker** in any generated file (not just the state file), so a repo that commits the generated docs without committing `*.convention.yml` still gets checked; a fresh clone has no committed marker and no-ops. Two files are excused from the diff: the state file (`ArggonManager/.convention.yml`, or `tasks/.convention.yml` on legacy trees), because init refreshes its per-doc `generatedAt` bookkeeping on every run by design, and **the workflow file itself** (`.github/workflows/arggon.yml`), because a self-bootstrapping runner cannot be gated against the pinned release — its own template change only reaches a release after merge, so gating it would fail every such PR; its step bodies are pinned by the fixture below. |
+| `arggon validate --json`  | The hard gate: frontmatter, tree integrity, claim/blocked invariants. Non-zero exit on a broken tracker.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `arggon doctor --json`    | Report-only installation shape (convention version, provenance buckets, OpenCode seam state, tracker counts); always exit 0.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `arggon list --json`      | Report-only tracker scan for the log.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 Notes:
 
@@ -148,7 +297,16 @@ Notes:
    committed provenance marker, not `*.convention.yml` — and re-runs the recipe
    after deleting `.mcp.json` and the whole `.opencode/` + `.agents/` seam:
    green, proving no MCP, OpenCode or model is required;
-4. compares the `--json` envelopes of the recipe-installed bin against the
+4. drives the **branch-aware** gate on a self-hosted-shaped fixture (the arggon
+   package name + `cli/src/cli.ts` + a built `dist/cli.js` standing in for the
+   branch's own generator, with `init`'s checksum rule): a seam that POSTDATES
+   the pin is green on the branch-local path and red with the pinned one (the
+   #605 shape, both verdicts asserted); a moved template and a hand-edited
+   generated file are red with the branch generator named; the pinned-lag
+   assertion fires on a committed `arggonVersion` newer than `ARGGON_VERSION`,
+   with the bump-the-pin remedy; a missing `dist/cli.js` is an error, never a
+   silent fall-back;
+5. compares the `--json` envelopes of the recipe-installed bin against the
    checkout CLI on the same/twin fixtures (`init --no-commit`, `init`,
    `validate`, `doctor`, `list`, `show`, `next`, `report`) and the generated
    bytes of `init` — they must be identical.

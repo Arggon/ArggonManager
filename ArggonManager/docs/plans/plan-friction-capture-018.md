@@ -1,15 +1,15 @@
 ---
 plan_id: friction-capture-018
 title: Plan for Adopter friction capture, dedupe and redacted report
-spec: ArggonManager/docs/specs/spec-friction-capture-018.md
+spec: ArggonManager/docs/specs/spec-friction-capture-020.md
 status: proposed
 created: 2026-10-02
 ---
 
 # Plan: Adopter friction capture, dedupe and redacted report (friction-capture-018)
 
-Derived from `ArggonManager/docs/specs/spec-friction-capture-018.md` (stage 1 of
-[ADR 0021](../adr/0021-adopter-friction-channel.md)). Each task carries a
+Derived from `ArggonManager/docs/specs/spec-friction-capture-020.md` (stage 1 of
+[ADR 0024](../adr/0024-adopter-friction-channel.md)). Each task carries a
 verifiable acceptance criterion and links back to the spec.
 
 No implementation task may be claimed before `arggon spec analyze` reports no
@@ -94,4 +94,4 @@ exist yet — an agent file naming a missing command is worse than no trigger.
 
 Tier C (`gh` upstream pre-search, comment-on-existing, `--yes`), rolling issues
 per fingerprint, maintainer-side aggregation of adopter reports, and the eval-FAIL
-producer. All are stage 2 or later per ADR 0021.
+producer. All are stage 2 or later per ADR 0024.

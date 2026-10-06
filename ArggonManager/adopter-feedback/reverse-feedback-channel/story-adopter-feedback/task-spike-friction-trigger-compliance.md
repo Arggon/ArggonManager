@@ -24,7 +24,7 @@ depends_on: [task-friction-trigger-carrier]
 
 A **spike, not a task**: it builds nothing and implements nothing. It answers the
 one open question
-[exploration-adopter-feedback-channel-019](../../../docs/explorations/exploration-adopter-feedback-channel-019.md)
+[exploration-adopter-feedback-channel-024](../../../docs/explorations/exploration-adopter-feedback-channel-024.md)
 deliberately refused to guess at, and it **gates stage 2**.
 
 The question: do adopters run the command? The evidence says instruction-only
@@ -35,7 +35,7 @@ defaulted off, the skill was absent from the host's skill-discovery inventory,
 and the `REFERENCES.md` index the managed `AGENTS.md` told agents to scan was
 never deposited. But that is evidence about a **skill reference**. It says
 nothing about a command embedded in the agent files the adopter already loads —
-which is exactly the change ADR 0021 makes and exactly what stage 1 ships.
+which is exactly the change ADR 0024 makes and exactly what stage 1 ships.
 
 So the spike measures the thing stage 1 actually changed.
 

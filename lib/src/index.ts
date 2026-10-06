@@ -43,13 +43,18 @@ export type { Frontmatter } from "./frontmatter.js";
 // --- Items -----------------------------------------------------------------
 
 export {
+  acceptanceBody,
   acceptanceComplete,
+  acceptanceCriteria,
+  acceptanceRows,
+  acceptanceUnchecked,
   itemsById,
   loadItems,
   softTryLoadItem,
   tryLoadItem,
   walkTasksTree,
 } from "./items.js";
+export type { AcceptanceBodySource, AcceptanceRow } from "./items.js";
 export {
   numberField,
   parseFrontmatter,
@@ -232,6 +237,19 @@ export { runSync } from "./sync-command.js";
 export type { SyncResult } from "./sync-types.js";
 export { classifyVerdicts, parseVerdicts } from "./verdict.js";
 export type { VerdictComment, VerdictState } from "./verdict.js";
+export {
+  ACCEPTANCE_CONTAINER_TYPES,
+  ACCEPTANCE_STATES,
+  classifyAcceptance,
+  containersMissingAcceptance,
+  parseAcceptances,
+} from "./acceptance.js";
+export type {
+  AcceptanceComment,
+  AcceptanceGap,
+  AcceptanceState,
+  AcceptanceValue,
+} from "./acceptance.js";
 export {
   CLEANUP_TERMINAL_STATUSES,
   classifyCleanupEntry,

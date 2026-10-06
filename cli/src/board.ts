@@ -2,6 +2,9 @@ import { writeFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import {
   STATUSES,
+  acceptanceBody,
+  acceptanceComplete,
+  acceptanceRows,
   aggregateReport,
   buildStatusIndex,
   completedOf,
@@ -20,6 +23,7 @@ import {
   sortById,
   statusCounts,
   toContractWorkItem,
+  type AcceptanceRow,
   type ContractWorkItem as WorkItem,
   type KernelWorkItem,
   type PriorityCounts,
@@ -680,9 +684,22 @@ export type BoardDetailPayload = {
   item: WorkItem;
   detail: {
     prose: string;
-    /** The server's per-item prose cap cut the text (acceptance rows included). */
+    /** The server's per-item prose cap cut the text. */
     prose_truncated: boolean;
-    acceptance: Array<{ text: string; checked: boolean }>;
+    /**
+     * Acceptance rows of the WHOLE canonical body, in document order, bounded by
+     * `MAX_DETAIL_ACCEPTANCE_ROWS` — read through the kernel's one row parser.
+     */
+    acceptance: AcceptanceRow[];
+    /** Rows beyond `MAX_DETAIL_ACCEPTANCE_ROWS` were omitted from the list above. */
+    acceptance_truncated: boolean;
+    /**
+     * The DONE GATE's verdict on the canonical body, verbatim
+     * (`acceptanceComplete(acceptanceBody(item))`) — false means the `--status
+     * done` flip is refused. Carried because the row list above is byte-bounded
+     * for the browser, so a clipped list must never read as "nothing left".
+     */
+    acceptance_complete: boolean;
     comments: Array<{ date: string; author: string; text: string; truncated: boolean }>;
     /** Comments omitted by the kernel tail (allComments - tail). */
     hidden_comments: number;
@@ -694,14 +711,24 @@ export type BoardDetailPayload = {
 /**
  * Per-item byte caps for the detail drawer (task-board-item-detail): the item
  * body is prose that grows with the corpus, so it is clipped before it reaches
- * the browser (ADR 0006 spirit). The prose cap also bounds the acceptance rows
- * parsed from it; the comment cap applies per comment in the kernel tail
- * (DEFAULT_TAIL_COMMENTS entries). `prose_truncated` / `comments[].truncated`
- * tell the drawer to point at the item file. Both the serve route and the
- * static `--details` embedding use these same caps.
+ * the browser (ADR 0006 spirit). The comment cap applies per comment in the
+ * kernel tail (DEFAULT_TAIL_COMMENTS entries). `prose_truncated` /
+ * `comments[].truncated` tell the drawer to point at the item file. Both the
+ * serve route and the static `--details` embedding use these same caps.
  */
 export const MAX_DETAIL_PROSE_BYTES = 8 * 1024;
 export const MAX_DETAIL_COMMENT_BYTES = 4 * 1024;
+
+/**
+ * Row cap for the drawer's acceptance list (bug-three-acceptance-parsers-diverging).
+ *
+ * Acceptance rows are now parsed from the WHOLE canonical body, not from the
+ * clipped prose: the prose cap must not be able to hide an unchecked criterion,
+ * or the drawer would print "nothing unchecked" while the done gate refuses the
+ * flip. So the bound moves from "bytes of prose" to "rows published", and
+ * `acceptance_complete` carries the unbounded verdict next to it.
+ */
+export const MAX_DETAIL_ACCEPTANCE_ROWS = 64;
 
 /** Clip `text` to at most `maxBytes` UTF-8 bytes without splitting a code point. */
 export function clipDetailText(
@@ -720,14 +747,23 @@ export function clipDetailText(
   return { text: clipped, truncated: true };
 }
 
-/** Read-only acceptance rows: `- [ ]`/`- [x]` lines of the item prose. */
-export function parseAcceptanceRows(prose: string): Array<{ text: string; checked: boolean }> {
-  const rows: Array<{ text: string; checked: boolean }> = [];
-  for (const line of prose.split("\n")) {
-    const match = /^\s*[-*]\s+\[([ xX])\]\s+(.*)$/.exec(line);
-    if (match) rows.push({ text: match[2].trim(), checked: match[1].toLowerCase() === "x" });
-  }
-  return rows;
+/**
+ * Read-only acceptance rows of the drawer's acceptance section.
+ *
+ * **Defers to the kernel — this is NOT a parser**
+ * (bug-three-acceptance-parsers-diverging). The row grammar lives in
+ * `lib/src/items.ts` (`acceptanceRows`) next to the DONE GATE that refuses the
+ * `--status done` flip, so the drawer and the gate cannot disagree about which
+ * lines are rows. This local name is a one-line alias kept for the drawer tests
+ * (and any adopter-side caller); since the unification the ZCode goal contract
+ * reads the kernel directly, like every other consumer. There is deliberately NO
+ * regex below — a second one here is the exact defect this item closed.
+ *
+ * Callers must pass the canonical body (`acceptanceBody(item)`, comments
+ * included), never a reader's prose. See `acceptanceBody`'s invariant.
+ */
+export function parseAcceptanceRows(body: string): AcceptanceRow[] {
+  return acceptanceRows(body);
 }
 
 /** Bounded read parts of one item, in the kernel `show` shape. */
@@ -736,11 +772,18 @@ type BoundedParts = { prose: string; allComments: ShowComment[]; comments: ShowC
 /**
  * The one detail-payload assembly, shared by the serve route and the static
  * embedding (task-board-static-details): clip the bounded prose, clip each
- * tail comment, parse the acceptance rows from the CLIPPED prose, map
- * dependencies through the shared status index (the ADR 0004 open/terminal
- * rule; unknown ids count as open, exactly like the card's blocked-by line)
- * and match the PR overlay snapshot. Pure: no reads beyond the inputs, no
- * writes.
+ * tail comment, parse the acceptance rows and the done-gate verdict from the
+ * CANONICAL body, map dependencies through the shared status index (the
+ * ADR 0004 open/terminal rule; unknown ids count as open, exactly like the
+ * card's blocked-by line) and match the PR overlay snapshot. Pure: no reads
+ * beyond the inputs, no writes.
+ *
+ * The acceptance fields read `acceptanceBody(kernelItem)` — the whole body,
+ * comments included — and NOT `bounded.prose` (bug-three-acceptance-parsers-diverging,
+ * the #605 round-2 defect): `prose` excludes comment sections, so a checklist
+ * filed as a comment (`create` has no `--body` flag, so that is the default
+ * path for every new item) rendered as an empty acceptance list while the done
+ * gate kept refusing the flip.
  */
 function detailPayloadOf(
   kernelItem: KernelWorkItem,
@@ -764,13 +807,16 @@ function detailPayloadOf(
     const status = entry ? entry.status : null;
     return { id: depId, status, terminal: status === "done" || status === "cancelled" };
   });
+  const acceptance = parseAcceptanceRows(acceptanceBody(kernelItem));
   return {
     ok: true,
     item: contractItem,
     detail: {
       prose: prose.text,
       prose_truncated: prose.truncated,
-      acceptance: parseAcceptanceRows(prose.text),
+      acceptance: acceptance.slice(0, MAX_DETAIL_ACCEPTANCE_ROWS),
+      acceptance_truncated: acceptance.length > MAX_DETAIL_ACCEPTANCE_ROWS,
+      acceptance_complete: acceptanceComplete(acceptanceBody(kernelItem)),
       comments,
       hidden_comments: bounded.allComments.length - bounded.comments.length,
       dependencies,
@@ -1036,7 +1082,31 @@ export function renderBoardDetail(container: HTMLElement, payload: BoardDetailPa
       check.appendChild(el("span", "", String(acceptance[a].text)));
       accSection.appendChild(check);
     }
+    // A bounded row list must never read as "nothing left" while the done gate
+    // still refuses the flip (bug-three-acceptance-parsers-diverging): the
+    // gate's own verdict rides along next to the list.
+    if (detail.acceptance_truncated === true) {
+      accSection.appendChild(
+        el("div", "drawer-note", "more acceptance rows — open the item file for the full list"),
+      );
+    }
+    if (detail.acceptance_complete === false) {
+      accSection.appendChild(
+        el("div", "drawer-note", "done gate: unchecked acceptance criteria remain"),
+      );
+    }
     container.appendChild(accSection);
+  } else if (detail.acceptance_complete === false) {
+    // No rows shown, yet the gate refuses: say so rather than implying the
+    // item is finished (a checklist clipped out of the payload, or a body the
+    // row parser cannot read as rows).
+    container.appendChild(
+      el(
+        "div",
+        "drawer-note",
+        "done gate: unchecked acceptance criteria remain (no rows shown — open the item file)",
+      ),
+    );
   }
 
   const bodySection = section("body", "drawer-prose");

@@ -52,7 +52,7 @@ key is not speculative value here.
 **The proposal under evaluation was an instruction for agents to open a GitHub
 issue on friction.** Validated against code, docs and dated external precedent;
 recorded in
-[`exploration-adopter-feedback-channel-019`](../../../docs/explorations/exploration-adopter-feedback-channel-019.md).
+[`exploration-adopter-feedback-channel-024`](../../../docs/explorations/exploration-adopter-feedback-channel-024.md).
 
 Verdict, on evidence: the **instinct is right and load-bearing** (the reverse
 channel is genuinely missing) but the **mechanism is refuted** by a named
@@ -122,16 +122,16 @@ before the spec exists and `arggon spec analyze` reports no NEW findings.**
 - [x] Phase 5 done: 2–3 approaches with trade-offs; the user's original proposal
       is evaluated as Approach 1 and **refuted on cited evidence**, with three
       named alternatives and the converged external architecture recorded
-- [x] Artifact written: [`exploration-adopter-feedback-channel-019`](../../../docs/explorations/exploration-adopter-feedback-channel-019.md),
+- [x] Artifact written: [`exploration-adopter-feedback-channel-024`](../../../docs/explorations/exploration-adopter-feedback-channel-024.md),
       including an explicit "evidence gaps" section
 - [x] `arggon validate` green; exploration ids/links resolve
 - [x] **ADR written** settling the cross-cutting parts: the methodology-carrier
       change (**behavioral** impact class per `docs/agents.md` §Changing the
       methodology itself), opt-out semantics, and the explicit non-goal of
-      automatic publication — [ADR 0021](../../../docs/adr/0021-adopter-friction-channel.md)
+      automatic publication — [ADR 0024](../../../docs/adr/0024-adopter-friction-channel.md)
 - [x] **Spec + plan written** from the edge-case table, then a clean
       `spec analyze` run — the gate that releases implementation tasks —
-      [spec-friction-capture-018](../../../docs/specs/spec-friction-capture-018.md)
+      [spec-friction-capture-020](../../../docs/specs/spec-friction-capture-020.md)
       (all 13 hunted dimensions mapped one-to-one onto its acceptance criteria)
       and
       [plan-friction-capture-018](../../../docs/plans/plan-friction-capture-018.md);
@@ -142,14 +142,14 @@ before the spec exists and `arggon spec analyze` reports no NEW findings.**
 **Needs a spec — written, not filed for approval.** The reverse channel is real
 and the exploration's verdict stands: the _instinct_ (adopters should be able to
 send friction back) is load-bearing, the _mechanism_ (agent-opened GitHub
-issues) is refuted by a named incident. What lands is stage 1 of ADR 0021:
+issues) is refuted by a named incident. What lands is stage 1 of ADR 0024:
 
 `arggon friction` → local bounded log **outside** the tracker → stable-fields-only
 fingerprint → redacted report → human-gated tier-A/tier-B output.
 
 Two things the coordinator should know that were **not** in the prior research:
 
-1. **`doctor` gains a narrow `friction` block** (ADR 0021 §2) — for what the
+1. **`doctor` gains a narrow `friction` block** (ADR 0024 §2) — for what the
    `outdated` bucket cannot already do, which is narrower than this section first
    claimed. `doctor.ts` re-renders the current template for every
    `config.generated` entry in every local state **including acked**, and the
@@ -161,7 +161,7 @@ Two things the coordinator should know that were **not** in the prior research:
    `task-spike-friction-trigger-compliance` needs to tell "never seen" from "seen
    and ignored". If stage 1 must be minimal, cut `triggerVersion` and `files`,
    **not** the block.
-2. **The evals harness is ruled out as the capture vehicle** (ADR 0021 §5) and
+2. **The evals harness is ruled out as the capture vehicle** (ADR 0024 §5) and
    kept as a stage-2 _producer_. `skills/arggon-cli/evals/` runs against
    `dist/cli.js` in a synthetic temp fixture it creates itself, scores pass/fail
    into stdout for a maintainer to read, and never touches an adopter — putting
@@ -215,7 +215,7 @@ same underlying mistake: **a superseded rationale surviving in live prose** wher
 dated amendment correctly said it had been wrong.
 
 - [x] **M1** — the spec's §_The trigger and its visibility_, its header paragraph, and T6's
-      Context all carried the withdrawn 4a claim. All three now carry ADR 0021 §2's
+      Context all carried the withdrawn 4a claim. All three now carry ADR 0024 §2's
       reasoning (per-file `triggerVersion`; _trigger absent_ vs generic drift), each
       stating the correction explicitly: `doctor.ts` re-renders every
       `config.generated` entry in every local state **including acked** and the agent
@@ -231,7 +231,7 @@ dated amendment correctly said it had been wrong.
       **live body prose**, with dated corrections naming what was wrong.
 - [x] **Round-2 invariants re-verified after these edits**: residual duplicate-number
       findings still **exactly 5**, none mine; zero dangling links in any live body;
-      ADR 0021 still `Proposed` (never `Accepted`) in file, README row and epic note;
+      ADR 0024 still `Proposed` (never `Accepted`) in file, README row and epic note;
       prettier **convergent across repeated passes** (two-pass assertion, not a single
       `--check`); `spec validate` / `spec analyze --baseline` clean of anything I own.
 
@@ -245,7 +245,7 @@ criteria but that is an addition, not a remap, and the count of dimensions is
 unchanged); `bug-prettier-indented-list-continuation-grows-2-spaces-per-write` already
 exists on main and is not mine to re-prioritise.
 
-## Renumber map (2026-10-03)
+## Renumber map
 
 The coordinator resolved the reviewer's B1 collision by renumbering **this
 branch's** artifacts — the collision was the coordinator's, having written and
@@ -253,17 +253,35 @@ accepted its own ADR 0020 before dispatching this worker, which independently
 wrote another. Renumbering main's side would have touched an **accepted** ADR
 plus four artifacts that already reference it.
 
+**Renumbered, because `main` grew under this branch and took those ids too.** The
+branch was cut before `main` landed its own ADRs `0021`–`0023`,
+`spec-promotion-policy-018` and `exploration-agent-primary-workers-019`. So the
+same collision the first renumber fixed reappeared one directory over: merging
+`main` turned `cli/src/adr-index-parity.test.ts` red (one index row per ADR file;
+gapless, strictly ascending, duplicate-free numbering) and `arggon spec validate`
+red (`spec-friction-capture-018` against main's `spec-promotion-policy-018`,
+`exploration-adopter-feedback-channel-019` against main's
+`exploration-agent-primary-workers-019`). The branch's side renumbers again, for
+the reason recorded above. **The plan keeps `018`** — `main`'s plans stop at
+`017`, so it never collided.
+
 | Was                                                        | Now                                                                                                                                  |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `adr/0020-adopter-friction-channel.md`                     | [`adr/0021-adopter-friction-channel.md`](../../../docs/adr/0021-adopter-friction-channel.md)                                         |
-| `specs/spec-friction-capture-017.md`                       | [`specs/spec-friction-capture-018.md`](../../../docs/specs/spec-friction-capture-018.md)                                             |
+| `adr/0020-adopter-friction-channel.md`                     | [`adr/0024-adopter-friction-channel.md`](../../../docs/adr/0024-adopter-friction-channel.md)                                         |
+| `specs/spec-friction-capture-017.md`                       | [`specs/spec-friction-capture-020.md`](../../../docs/specs/spec-friction-capture-020.md)                                             |
 | `plans/plan-friction-capture-017.md`                       | [`plans/plan-friction-capture-018.md`](../../../docs/plans/plan-friction-capture-018.md)                                             |
-| `explorations/exploration-adopter-feedback-channel-018.md` | [`explorations/exploration-adopter-feedback-channel-019.md`](../../../docs/explorations/exploration-adopter-feedback-channel-019.md) |
+| `explorations/exploration-adopter-feedback-channel-018.md` | [`explorations/exploration-adopter-feedback-channel-024.md`](../../../docs/explorations/exploration-adopter-feedback-channel-024.md) |
+
+Intermediate labels readers may still meet, all superseded by the row above:
+`0021-adopter-friction-channel.md` and `spec-friction-capture-018.md` (the
+2026-10-03 renumber). Dated comments still say **"ADR 0020"** / **"ADR 0021"** and
+cite the old filenames — see the boundary note below.
 
 **The comment history below is deliberately verbatim.** A comment records what was
-said on a date, so the older blocks still read "ADR 0020" and cite the old
-filenames — including the reviewer's B1 evidence table, which editing would
-_falsify_. This table is the map.
+said on a date, so the older blocks still read "ADR 0020" / "ADR 0021" and cite the
+old filenames — including the reviewer's B1 evidence table, which editing would
+_falsify_. This table is the map. The live body above, by contrast, is current
+state and has been renumbered to `0024` / `020` / `024`.
 
 ## Notes
 
@@ -455,7 +473,7 @@ The collision is real and the root cause was mine: I wrote ADR 0020 (methodology
 
 Renumbering `origin/main`'s side would mean touching an ACCEPTED ADR and four artifacts that already reference it (the carriers from PR #592, README, `task-methodology-carriers`, the spec/plan pair). Renumbering the branch's side touches one PR that has not merged. So:
 
-- ADR `0020-adopter-friction-channel.md` → `0021-adopter-friction-channel.md`
+- ADR `0020-adopter-friction-channel.md` → `0024-adopter-friction-channel.md`
 - `spec-friction-capture-017.md` → `spec-friction-capture-018.md`, `plan-friction-capture-017.md` → `plan-friction-capture-018.md`
 - `exploration-adopter-feedback-channel-018.md` → `exploration-adopter-feedback-channel-019.md`
 - every internal reference: frontmatter `spec:`/`planTask:`, the exploration's Decision link to its ADR, the spec's link back, the plan's link back, any cross-reference in the item body and the 6 tasks + 3 spikes

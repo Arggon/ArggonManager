@@ -22,7 +22,7 @@ updated: "2026-10-02"
 ## Context
 
 Found while authoring
-[`exploration-adopter-feedback-channel-019`](../../../docs/explorations/exploration-adopter-feedback-channel-019.md)
+[`exploration-adopter-feedback-channel-024`](../../../docs/explorations/exploration-adopter-feedback-channel-024.md)
 (2026-10-02; repo has prettier 3.9.6, `.prettierrc.json` = `printWidth: 100`,
 `proseWrap` unset). A **continuation list item** whose text contains a
 multi-word inline code span near the wrap boundary makes prettier

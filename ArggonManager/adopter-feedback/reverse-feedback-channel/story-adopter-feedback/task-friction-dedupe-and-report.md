@@ -22,7 +22,7 @@ depends_on: [task-friction-capture-command]
 
 ## Context
 
-Plan task T3 for [spec-friction-capture-018](../../../docs/specs/spec-friction-capture-018.md).
+Plan task T3 for [spec-friction-capture-020](../../../docs/specs/spec-friction-capture-020.md).
 
 This is the piece the maintainer actually reads, so it is optimized for
 **signal per unit of attention**, not volume: one row per fingerprint, sorted

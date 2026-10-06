@@ -22,7 +22,7 @@ depends_on: [task-friction-tier-b-url-and-optout]
 
 ## Context
 
-Plan task T5 for [spec-friction-capture-018](../../../docs/specs/spec-friction-capture-018.md).
+Plan task T5 for [spec-friction-capture-020](../../../docs/specs/spec-friction-capture-020.md).
 
 `docs/agents.md` §MCP keeps the CLI, the native tool surface and the MCP tool in
 parity, and `cli/src/mcp-parity.test.ts` is the enforcement. A new command that

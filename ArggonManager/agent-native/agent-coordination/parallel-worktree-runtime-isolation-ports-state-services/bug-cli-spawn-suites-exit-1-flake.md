@@ -137,3 +137,27 @@ I consciously accept the re-scoped acceptance (reviewer note 4): boxes 1 and 2 a
 Honest limits recorded: the collision does not reproduce locally (~120 rewrite windows across loaded/amplified runs, 0 hits — CI is the oracle), and the `spawnNodeCli` async lanes get the root-cause fix but not the typed error (capturing stderr would steal bytes from existing pipe/for-await callers — a design decision, not a drive-by).
 
 Merged: PR #580 squash -> main. Item done. Follow-ups filed: task-plugin-test-type-coverage (plugin test files escape every type gate, so the `runCli` env-shape footgun can only fail at runtime).
+
+### 2026-10-03 @Arggon
+**Sharper signature for this flake, captured 2026-10-03 from PR #618's `cli` lane (run 37128380721), which failed twice in a row on it.**
+
+The harness classifies it as `kind: child-boot-failed (no CLI result — this is not an assertion failure)`, which is why it looks like noise in a CI log. The actual failure is a **stale `lib/dist` module-export mismatch**:
+
+```
+argv: [ '--import', '.../tsx/dist/loader.mjs', 'cli/src/cli.ts', 'update', 'launch-mvp', ... ]
+cwd: '/tmp/arggon-board-gh-2ZqDkD/work'
+status: 1, spawnError: 'none'
+stderr: file:///…/lib/dist/priority.js:15
+        import { loadItems } from "./items.js";
+                             ^^^^^^^^^
+        SyntaxError: The requested module './items.js' does not provide an export named 'loadItems'
+```
+
+That is specific and checkable: `lib/dist/priority.js` was emitted expecting `loadItems` from `lib/dist/items.js`, and the `items.js` present at import time does not export it. Two source states produced two `dist` states and the spawned child read a mix.
+
+Acceptance (added to this item — it is the same class as the `SpawnHarnessError` / `lib/dist` rebuild drift already recorded here):
+- [ ] Explain how `lib/dist` can hold a `priority.js` and an `items.js` from **different builds** — a non-atomic multi-file emit, a partially-completed rebuild, or a concurrent rebuild racing the spawn. Note that `arggon` builds for spawn explicitly (`--import` loader + `lib/dist`), so the rebuild window is part of the product's own path
+- [ ] The spawn path should either build-then-swap atomically or **verify the emit is self-consistent** before spawning (every import in `lib/dist` resolves to a real export). A cheap `import()` probe of the entry module would turn a confusing child SyntaxError into a named failure
+- [ ] The harness's classification is actively harmful here: `child-boot-failed` says "not an assertion failure", which is true and useless — the failure IS real and reproducible by re-running. Reclassify so a child that exits non-zero with a `SyntaxError` is reported as a test failure with the stderr attached, not as an infrastructure note
+- [ ] **Two consecutive failures on one lane should be visible as a pattern**, not read as noise. This signature has now appeared on at least three unrelated PRs today (#610, #618 ×2, plus the `mcp-parity` spawn lane). A lane that fails twice on the same non-assertion signature warrants a louder signal than a rerun
+- [ ] Reproduce it deterministically (a build racing a spawn loop) rather than waiting for CI to hit it again — the current reproduction rate is roughly one lane-run in three, which is low enough that each occurrence costs a review cycle

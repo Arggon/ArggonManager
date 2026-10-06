@@ -21,8 +21,8 @@ updated: "2026-10-02"
 
 ## Context
 
-Plan task T1 for [spec-friction-capture-018](../../../docs/specs/spec-friction-capture-018.md),
-stage 1 of [ADR 0021](../../../docs/adr/0021-adopter-friction-channel.md).
+Plan task T1 for [spec-friction-capture-020](../../../docs/specs/spec-friction-capture-020.md),
+stage 1 of [ADR 0024](../../../docs/adr/0024-adopter-friction-channel.md).
 
 Implements the `arggon friction` capture surface and the on-disk record: the
 field table and per-field caps, `fingerprint = sha256(commandShape ‖ errorCode ‖
