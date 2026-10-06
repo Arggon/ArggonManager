@@ -1,6 +1,6 @@
 # 0024 Adopter friction channel
 
-- Status: Proposed
+- Status: Accepted
 
 > Numbering note (2026-10-06): renumbered a second time, `0021` → `0024`, for the same reason as the first time and under the same precedent. This PR was cut before `0021`, `0022` and `0023` landed on `main`; `0021-agents-primary-workers-human-product-owner.md` (accepted in `171f43b3`, PR #624), `0022-decline-autoharness-autocontext-autocompact.md` and `0023-ci-wall-clock.md` now occupy those ids, so merging `main` would have produced two ADRs numbered `0021` and turned `main` red — `cli/src/adr-index-parity.test.ts` pins one index row per ADR file and gapless, strictly ascending, duplicate-free numbering, and failed on exactly that after the merge. The branch's side renumbers again for the reason recorded below: renumbering `main` would touch an **accepted** ADR plus the artifacts that already reference it. Decision content unchanged; nothing below this note is rewritten.
 > Numbering note (2026-10-03): originally filed as `0020-adopter-friction-channel.md` in collision with `0020-methodology-first-productization.md` (landed earlier on main, PR #592, accepted in `ecedac02`). Renumbered to the next free id on the coordinator's decision; the branch's side renumbers rather than main's, because renumbering main would touch an **accepted** ADR plus four artifacts that already reference it. Decision content unchanged. Same precedent as ADR 0016 and ADR 0019.
