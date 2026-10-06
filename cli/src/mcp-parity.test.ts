@@ -8,6 +8,12 @@
  * schemas for the four wrapped commands are derived against the ACTUAL
  * commander option definitions in cli/src/cli.ts (parsed from source) and
  * must match BOTH ways, minus the documented exception list below.
+ *
+ * bug-mcp-parity-branch-test-json-parse-of-human-stdout: every read of a
+ * surface's output goes through `readEnvelope` (cli/src/test-spawn.ts) and
+ * every comparison through `expectSameEnvelope`, so a surface that produced no
+ * envelope fails with its own name and raw text attached instead of a bare
+ * `SyntaxError` from `JSON.parse`.
  */
 import { spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -18,7 +24,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import { runCreate } from "@arggondev/lib";
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
-import { cliEntryPath, nodeImportArgs, runCli as runCliBase } from "./test-spawn.js";
+import {
+  cliEntryPath,
+  cliNodeArgs,
+  EnvelopeReadError,
+  readEnvelope,
+  runCli as runCliBase,
+  type EnvelopeSurface,
+} from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -34,14 +47,98 @@ const cli = cliEntryPath();
 
 type Envelope = Record<string, unknown>;
 
+/**
+ * One surface's result: the envelope, which entry point produced it, the tree it
+ * ran against, and the raw text it came from. Carrying `raw` and `surface` on
+ * the read (rather than parsing at the call site) is what lets every failure
+ * name its producer
+ * (bug-mcp-parity-branch-test-json-parse-of-human-stdout).
+ */
+type SurfaceRead = {
+  surface: EnvelopeSurface;
+  /** The operation, for the failure message (`arggon branch` / `arggon_branch`). */
+  command: string;
+  envelope: Envelope;
+  /** The surface's raw text, echoed verbatim when a comparison fails. */
+  raw: string;
+  /** True when the raw text WAS the envelope (the strict `--json` contract). */
+  exact: boolean;
+  /** Tree root this surface ran against (normalization + temp cleanup). */
+  dir: string;
+};
+
+/** An MCP read plus the tool-error flag (`ok: false` is not a transport error). */
+type McpRead = SurfaceRead & { isError: boolean };
+
 function runCli(args: string[], cwd: string) {
   return runCliBase(["--json", ...args], cwd);
 }
 
-function cliJson(args: string[], cwd: string): Envelope {
+/**
+ * Read one CLI `--json` envelope. `expectSuccess` is false for the deliberate
+ * failure arms, where a non-zero exit is the point (the envelope still rides
+ * stdout, per docs/json-output.md).
+ */
+function readCli(args: string[], cwd: string, expectSuccess = true): SurfaceRead {
   const proc = runCli(args, cwd);
-  expect(proc.status, proc.stderr).toBe(0);
-  return JSON.parse(proc.stdout) as Envelope;
+  const command = `arggon ${args.join(" ")}`;
+  if (expectSuccess) {
+    expect(
+      proc.status,
+      `CLI: \`${command}\` exited ${String(proc.status)} instead of 0\n${proc.stderr}`,
+    ).toBe(0);
+  } else {
+    expect(
+      proc.status,
+      `CLI: \`${command}\` was expected to fail but exited ${String(proc.status)}`,
+    ).not.toBe(0);
+  }
+  // readEnvelope names the CLI surface and carries stderr into the failure, so
+  // a non-JSON stdout here is a labeled assertion, not a bare SyntaxError.
+  const { envelope, exact } = readEnvelope({
+    surface: "CLI",
+    command,
+    text: proc.stdout,
+    stderr: proc.stderr,
+  });
+  return { surface: "CLI", command, envelope, raw: proc.stdout, exact, dir: cwd };
+}
+
+/**
+ * Envelope only — for the many call sites that seed a tree and never compare.
+ * Reads still go through {@link readCli}, so seeding cannot throw a SyntaxError
+ * either.
+ */
+function cliJson(args: string[], cwd: string): Envelope {
+  return readCli(args, cwd).envelope;
+}
+
+/**
+ * The JSON-RPC transport is newline-delimited (ADR 0014), so accumulate until a
+ * newline instead of treating the first `data` chunk as a whole frame: a
+ * response large enough to span two chunks would otherwise hand `JSON.parse` a
+ * truncated frame
+ * (bug-mcp-parity-branch-test-json-parse-of-human-stdout).
+ */
+function nextFrame(output: PassThrough): Promise<Envelope> {
+  return new Promise((resolveFrame, rejectFrame) => {
+    let buffer = "";
+    const onData = (chunk: Buffer): void => {
+      buffer += chunk.toString("utf8");
+      const newline = buffer.indexOf("\n");
+      if (newline < 0) return;
+      output.off("data", onData);
+      const frame = buffer.slice(0, newline);
+      try {
+        resolveFrame(JSON.parse(frame) as Envelope);
+      } catch {
+        rejectFrame(
+          new Error(`[parity] MCP transport frame is not JSON: ${frame}\n(raw stream: ${buffer})`),
+        );
+      }
+    };
+    output.on("data", onData);
+  });
 }
 
 /** In-process MCP client bound to one repo root (client #2). */
@@ -50,13 +147,11 @@ async function mcpCall(
   name: string,
   args: Record<string, unknown>,
   serverOptions?: { cliSpawn?: { command: string; args: string[] } },
-): Promise<{ result: Envelope; isError: boolean }> {
+): Promise<McpRead> {
   const input = new PassThrough();
   const output = new PassThrough();
   runMcpServer({ cwd, input, output, ...serverOptions });
-  const responsePromise = new Promise<Envelope>((resolveResponse) => {
-    output.on("data", (chunk: Buffer) => resolveResponse(JSON.parse(chunk.toString("utf8"))));
-  });
+  const framePromise = nextFrame(output);
   input.write(
     `${JSON.stringify({
       jsonrpc: "2.0",
@@ -65,11 +160,58 @@ async function mcpCall(
       params: { name, arguments: args },
     })}\n`,
   );
-  const response = await responsePromise;
+  const response = await framePromise;
   expect(response.id).toBe(7);
   const result = response.result as Envelope;
   const text = (result.content as Array<{ text: string }>)[0]!.text;
-  return { result: JSON.parse(text) as Envelope, isError: result.isError === true };
+  const isError = result.isError === true;
+  // Read HERE, where the text and the tool-error flag are both in hand: a
+  // tool-LEVEL error carries a diagnostic sentence where an envelope would be,
+  // and the flag is the evidence that says so. The bare `JSON.parse` this
+  // replaces named neither the surface nor the reason.
+  const { envelope, exact } = readEnvelope({ surface: "MCP", command: name, text, isError });
+  return { surface: "MCP", command: name, envelope, raw: text, exact, dir: cwd, isError };
+}
+
+/**
+ * The parity assertion itself, with both surfaces named and both raw payloads
+ * echoed. Real parity is still what is asserted — the envelopes must be equal —
+ * but a failure is now readable without first working out which side is which.
+ */
+function expectSameEnvelope(mcp: McpRead, cliRead: SurfaceRead): void {
+  expect(
+    normalize(mcp.envelope, mcp.dir),
+    `CLI <-> MCP envelope mismatch for \`${cliRead.command}\`\n` +
+      `--- MCP (${mcp.command}, isError=${String(mcp.isError)}) ---\n${mcp.raw}\n` +
+      `--- CLI (${cliRead.command}) ---\n${cliRead.raw}`,
+  ).toEqual(normalize(cliRead.envelope, cliRead.dir));
+}
+
+/**
+ * A non-error tool result, asserted with the raw text attached. The bare
+ * `expect(mcpResult.isError).toBe(false)` failed as "expected true to be false"
+ * with nothing about what the tool actually said
+ * (bug-mcp-parity-branch-test-json-parse-of-human-stdout).
+ */
+function expectOk(read: McpRead): void {
+  expect(read.isError, `MCP: ${read.command} returned a tool error\n${read.raw}`).toBe(false);
+}
+
+/**
+ * The JSON-only `--json` contract on BOTH surfaces: each side's whole payload is
+ * the envelope, nothing else. This is what keeps the locate-a-human-line
+ * fallback from quietly tolerating a product that prints a success line in
+ * `--json` mode — the fallback stays available for a diagnostic, but the
+ * contract is still asserted.
+ */
+function expectJsonOnly(...reads: SurfaceRead[]): void {
+  for (const read of reads) {
+    expect(
+      read.exact,
+      `${read.surface}: \`${read.command}\` did not emit ONLY a JSON envelope in --json mode\n` +
+        `--- ${read.surface} stdout ---\n${read.raw}`,
+    ).toBe(true);
+  }
 }
 
 function normalize(envelope: Envelope, dir: string): Envelope {
@@ -120,19 +262,23 @@ function gitInit(dir: string): void {
  * The spawn tools (branch/cleanup/start) re-enter the CLI through the same
  * spec the CLI side of these tests uses — inside vitest, the default argv
  * derivation deliberately refuses to guess, so the spec is injected.
+ *
+ * `cliNodeArgs` (not `nodeImportArgs`): this child imports the kernel, so it
+ * resolves it from source like every other CLI child — the built `lib/dist` is
+ * frozen for the run (bug-test-suite-lib-dist-rebuild-race).
  */
-const CLI_SPAWN = { cliSpawn: { command: process.execPath, args: nodeImportArgs(cliEntryPath()) } };
+const CLI_SPAWN = { cliSpawn: { command: process.execPath, args: cliNodeArgs() } };
 
 describe("CLI <-> MCP parity", () => {
   it("create produces the same envelope through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
-    const cliResult = cliJson(
+    const cliResult = readCli(
       ["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"],
       cliDir,
     );
     const mcpResult = await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
-    expect(mcpResult.isError).toBe(false);
-    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+    expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
   });
 
   it("update claims identically through both entry points", async () => {
@@ -142,7 +288,7 @@ describe("CLI <-> MCP parity", () => {
       cliDir,
     );
     await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
-    const cliResult = cliJson(
+    const cliResult = readCli(
       ["update", "task-rate-limit", "--status", "in_progress", "--assignee", "same-user"],
       cliDir,
     );
@@ -151,8 +297,8 @@ describe("CLI <-> MCP parity", () => {
       status: "in_progress",
       assignee: "same-user",
     });
-    expect(mcpResult.isError).toBe(false);
-    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+    expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
   });
 
   it("update --add-depends-on emits identical depends_on through both entry points", async () => {
@@ -169,7 +315,7 @@ describe("CLI <-> MCP parity", () => {
       parent: "story-login",
       id: "second",
     });
-    const cliResult = cliJson(
+    const cliResult = readCli(
       ["update", "task-rate-limit", "--add-depends-on", "task-second"],
       cliDir,
     );
@@ -177,15 +323,15 @@ describe("CLI <-> MCP parity", () => {
       id: "task-rate-limit",
       add_depends_on: "task-second",
     });
-    expect(mcpResult.isError).toBe(false);
-    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
-    const item = cliResult.item as { depends_on?: string[] };
+    expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
+    const item = cliResult.envelope.item as { depends_on?: string[] };
     expect(item.depends_on).toEqual(["task-second"]);
   });
 
   it("create/update --issue emit identical envelopes through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
-    const cliResult = cliJson(
+    const cliResult = readCli(
       [
         "create",
         "task",
@@ -200,23 +346,23 @@ describe("CLI <-> MCP parity", () => {
       cliDir,
     );
     const mcpResult = await mcpCall(mcpDir, "arggon_create", { ...CREATE_ARGS, issue: 42 });
-    expect(mcpResult.isError).toBe(false);
-    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
-    expect((cliResult.item as { issue?: number }).issue).toBe(42);
+    expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
+    expect((cliResult.envelope.item as { issue?: number }).issue).toBe(42);
 
-    const cliClear = cliJson(["update", "task-rate-limit", "--issue", "0"], cliDir);
+    const cliClear = readCli(["update", "task-rate-limit", "--issue", "0"], cliDir);
     const mcpClear = await mcpCall(mcpDir, "arggon_update", {
       id: "task-rate-limit",
       issue: 0,
     });
-    expect(mcpClear.isError).toBe(false);
-    expect(normalize(mcpClear.result, mcpDir)).toEqual(normalize(cliClear, cliDir));
-    expect((cliClear.item as { issue?: number }).issue).toBeUndefined();
+    expectOk(mcpClear);
+    expectSameEnvelope(mcpClear, cliClear);
+    expect((cliClear.envelope.item as { issue?: number }).issue).toBeUndefined();
   });
 
   it("create --labels emits identical label frontmatter through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
-    const cliResult = cliJson(
+    const cliResult = readCli(
       [
         "create",
         "task",
@@ -231,9 +377,9 @@ describe("CLI <-> MCP parity", () => {
       cliDir,
     );
     const mcpResult = await mcpCall(mcpDir, "arggon_create", { ...CREATE_ARGS, labels: "p2,perf" });
-    expect(mcpResult.isError).toBe(false);
-    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
-    expect((cliResult.item as { labels?: string[] }).labels).toEqual(["p2", "perf"]);
+    expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
+    expect((cliResult.envelope.item as { labels?: string[] }).labels).toEqual(["p2", "perf"]);
   });
 
   it("list returns the same items through both entry points", async () => {
@@ -243,10 +389,10 @@ describe("CLI <-> MCP parity", () => {
       cliDir,
     );
     await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
-    const cliResult = cliJson(["list", "--type", "task"], cliDir);
+    const cliResult = readCli(["list", "--type", "task"], cliDir);
     const mcpResult = await mcpCall(mcpDir, "arggon_list", { type: "task" });
-    expect(mcpResult.isError).toBe(false);
-    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+    expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
   });
 
   it("handoff appends the same structured section through both entry points", async () => {
@@ -256,7 +402,7 @@ describe("CLI <-> MCP parity", () => {
       cliDir,
     );
     await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
-    const cliResult = cliJson(
+    const cliResult = readCli(
       [
         "handoff",
         "task-rate-limit",
@@ -278,8 +424,8 @@ describe("CLI <-> MCP parity", () => {
       session: "sess_parity_1",
       author: "same-user",
     });
-    expect(mcpResult.isError).toBe(false);
-    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+    expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
   });
 
   it("next suggests the same item with the same envelope through both entry points", async () => {
@@ -289,11 +435,11 @@ describe("CLI <-> MCP parity", () => {
       cliDir,
     );
     await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
-    const cliResult = cliJson(["next"], cliDir);
+    const cliResult = readCli(["next"], cliDir);
     const mcpResult = await mcpCall(mcpDir, "arggon_next", {});
-    expect(mcpResult.isError).toBe(false);
-    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
-    const suggestion = cliResult.suggestion as { item: { id: string }; unblocks: number };
+    expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
+    const suggestion = cliResult.envelope.suggestion as { item: { id: string }; unblocks: number };
     // task-next-pool-stories: the default pool excludes stories, so the
     // seeded unclaimed story is NOT suggested — the leaf task is.
     expect(suggestion.item.id).toBe("task-rate-limit");
@@ -306,19 +452,19 @@ describe("CLI <-> MCP parity", () => {
       cliDir,
     );
     await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
-    const cliResult = cliJson(["report"], cliDir);
+    const cliResult = readCli(["report"], cliDir);
     const mcpResult = await mcpCall(mcpDir, "arggon_report", {});
-    expect(mcpResult.isError).toBe(false);
-    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+    expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
   });
 
   it("validate returns the same ok envelope through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
-    const cliResult = cliJson(["validate"], cliDir);
+    const cliResult = readCli(["validate"], cliDir);
     const mcpResult = await mcpCall(mcpDir, "arggon_validate", {});
-    expect(mcpResult.isError).toBe(false);
-    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
-    expect(cliResult.ok).toBe(true);
+    expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
+    expect(cliResult.envelope.ok).toBe(true);
   });
 
   it("validate failure carries the same errors and ok:false shape through both entry points", async () => {
@@ -338,31 +484,33 @@ describe("CLI <-> MCP parity", () => {
     };
     await breakTree(cliDir);
     await breakTree(mcpDir);
-    const cliProc = runCli(["validate"], cliDir);
-    expect(cliProc.status).not.toBe(0);
-    const cliResult = JSON.parse(cliProc.stdout) as Envelope;
-    expect(cliResult.ok).toBe(false);
+    const cliResult = readCli(["validate"], cliDir, false);
+    expect(cliResult.envelope.ok).toBe(false);
     const mcpResult = await mcpCall(mcpDir, "arggon_validate", {});
-    expect(mcpResult.isError).toBe(true);
-    expect(mcpResult.result).toEqual(normalize(cliResult, cliDir));
+    expect(
+      mcpResult.isError,
+      `MCP: arggon_validate was expected to be a tool error\n${mcpResult.raw}`,
+    ).toBe(true);
+    expectSameEnvelope(mcpResult, cliResult);
   });
 
   it("report --since without trend fails identically through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
-    const cliProc = runCli(["report", "--since", "2026-01-01"], cliDir);
-    expect(cliProc.status).not.toBe(0);
-    const cliResult = JSON.parse(cliProc.stdout) as Envelope;
+    const cliResult = readCli(["report", "--since", "2026-01-01"], cliDir, false);
     const mcpResult = await mcpCall(mcpDir, "arggon_report", { since: "2026-01-01" });
-    expect(mcpResult.isError).toBe(true);
-    expect(mcpResult.result).toEqual(normalize(cliResult, cliDir));
+    expect(
+      mcpResult.isError,
+      `MCP: arggon_report was expected to be a tool error\n${mcpResult.raw}`,
+    ).toBe(true);
+    expectSameEnvelope(mcpResult, cliResult);
   });
 
   it("priority migrate --dry-run plans identically through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
-    const cliResult = cliJson(["priority", "migrate", "--dry-run"], cliDir);
+    const cliResult = readCli(["priority", "migrate", "--dry-run"], cliDir);
     const mcpResult = await mcpCall(mcpDir, "arggon_priority", { dry_run: true });
-    expect(mcpResult.isError).toBe(false);
-    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+    expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
   });
 
   it("branch checks out identically through both entry points", async () => {
@@ -374,31 +522,87 @@ describe("CLI <-> MCP parity", () => {
       cliDir,
     );
     await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
-    const cliResult = cliJson(["branch", "task-rate-limit"], cliDir);
+    const cliResult = readCli(["branch", "task-rate-limit"], cliDir);
     const mcpResult = await mcpCall(mcpDir, "arggon_branch", { id: "task-rate-limit" }, CLI_SPAWN);
-    expect(mcpResult.isError).toBe(false);
-    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
-    expect(cliResult.ok).toBe(true);
+    expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
+    expect(cliResult.envelope.ok).toBe(true);
+    // The --json contract on both surfaces, asserted because `readEnvelope`
+    // tolerates a human line ahead of the envelope: parity alone would not
+    // notice one, and a `arggon branch: ...` success line in --json mode is a
+    // product regression this test must not absorb.
+    expectJsonOnly(mcpResult, cliResult);
   });
 
   it("cleanup classifies an empty merged-worktree set identically through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
     gitInit(cliDir);
     gitInit(mcpDir);
-    const cliResult = cliJson(["cleanup"], cliDir);
+    const cliResult = readCli(["cleanup"], cliDir);
     const mcpResult = await mcpCall(mcpDir, "arggon_cleanup", {}, CLI_SPAWN);
-    expect(mcpResult.isError).toBe(false);
-    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+    expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
+    // Same JSON-only contract as the branch arm, and the reason the CI failure
+    // ("arggon cle"... is not valid JSON) is diagnosable rather than a bare
+    // SyntaxError pointing at an unknown producer.
+    expectJsonOnly(mcpResult, cliResult);
   });
 
   it("errors match: same message text and ok:false shape through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
-    const cliProc = runCli(["update", "nope", "--status", "todo"], cliDir);
-    expect(cliProc.status).not.toBe(0);
-    const cliResult = JSON.parse(cliProc.stdout) as Envelope;
+    const cliResult = readCli(["update", "nope", "--status", "todo"], cliDir, false);
     const mcpResult = await mcpCall(mcpDir, "arggon_update", { id: "nope", status: "todo" });
-    expect(mcpResult.isError).toBe(true);
-    expect(mcpResult.result).toEqual(normalize(cliResult, cliDir));
+    expect(
+      mcpResult.isError,
+      `MCP: arggon_update was expected to be a tool error\n${mcpResult.raw}`,
+    ).toBe(true);
+    expectSameEnvelope(mcpResult, cliResult);
+  });
+
+  /**
+   * The regression case for this item, at the surface where CI hit it: a surface
+   * whose payload is NOT an envelope must fail with its own name, the tool-error
+   * flag and the raw text — never a bare `JSON.parse` SyntaxError — and a
+   * genuine CLI/MCP divergence must still fail the parity assertion.
+   */
+  it("a surface that emitted no envelope fails by name, and a real divergence still fails parity", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    // (a) A spawned CLI that dies before printing anything: the MCP server turns
+    // that into a tool-LEVEL error whose text is a sentence. This is the exact
+    // CI shape ("arggon bra"... is not valid JSON at the old line 72).
+    const deadSpawn = await mcpCall(
+      mcpDir,
+      "arggon_branch",
+      { id: "task-rate-limit" },
+      { cliSpawn: { command: process.execPath, args: ["/nonexistent/entry.js"] } },
+    ).then(
+      (read) => read,
+      (err: unknown) => err,
+    );
+    expect(deadSpawn).toBeInstanceOf(EnvelopeReadError);
+    const readErr = deadSpawn as EnvelopeReadError;
+    expect(readErr.surface).toBe("MCP");
+    expect(readErr.command).toBe("arggon_branch");
+    expect(readErr.isError).toBe(true);
+    expect(readErr.message).toContain("arggon_branch");
+    expect(readErr.message).toContain("did not emit a JSON envelope");
+    // Not the old symptom.
+    expect(readErr.message).not.toContain("is not valid JSON");
+
+    // (b) Real parity is still real parity: two surfaces that BOTH emit an
+    // envelope but disagree must fail the comparison, not the reader.
+    const cliResult = readCli(
+      ["create", "task", "Divergent", "--parent", "story-login", "--id", "d"],
+      cliDir,
+    );
+    const divergent = await mcpCall(mcpDir, "arggon_create", {
+      type: "task",
+      title: "Something else entirely",
+      parent: "story-login",
+      id: "d",
+    });
+    expect(divergent.isError).toBe(false);
+    expect(() => expectSameEnvelope(divergent, cliResult)).toThrow(/envelope mismatch/);
   });
 });
 
@@ -585,11 +789,11 @@ async function mcpTools(): Promise<Array<{ name: string; inputSchema: Record<str
   const input = new PassThrough();
   const output = new PassThrough();
   runMcpServer({ cwd: process.cwd(), input, output });
-  const responsePromise = new Promise<Envelope>((resolveResponse) => {
-    output.on("data", (chunk: Buffer) => resolveResponse(JSON.parse(chunk.toString("utf8"))));
-  });
+  // tools/list is the largest frame this file reads, so it is the one most
+  // likely to span two chunks — same newline-delimited read as a tools/call.
+  const framePromise = nextFrame(output);
   input.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })}\n`);
-  const response = await responsePromise;
+  const response = await framePromise;
   expect(response.id).toBe(1);
   return (response.result as Envelope).tools as Array<{
     name: string;

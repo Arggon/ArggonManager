@@ -80,7 +80,7 @@
  */
 
 import { execFile } from "node:child_process"
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { basename, dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -1353,6 +1353,14 @@ export type ArgonToolOptions = {
    */
   sessionDirectory?: (sessionID: string) => Promise<string | undefined>
   /**
+   * The environment consulted for the per-worktree declaration
+   * (`ARGGON_WORKTREE_PATH` and friends). Defaults to the host `process.env`,
+   * which is where a worktree session's sourced env contract lands; exposed so a
+   * test can drive the real seam without mutating the real environment
+   * (bug-native-arggon-tools-resolve-tracker-root-to-session-cwd).
+   */
+  worktreeEnv?: Record<string, string | undefined>
+  /**
    * Fallback item-templates dir for `create`/`import-issues` (ADR 0013: the
    * kernel embeds no templates). The repo's own `templates/` always wins.
    */
@@ -1545,6 +1553,343 @@ export async function resolveToolCwd(
   return { cwd: directory }
 }
 
+/* -------------------------------------------------------------------------- *
+ * Tracker binding: which checkout did the root land in, and does that checkout
+ * agree with the per-worktree identity the caller declares?
+ *
+ * `resolveToolCwd` answers "where does the session live". That alone was enough
+ * to move worker evidence off the primary checkout — and it is enough for the
+ * failure to stay SILENT when the session is somewhere the worker did not
+ * intend: the call resolves, commits, and reports `ok: true` with a hash, in a
+ * checkout the worker never opened. Nothing in that envelope says which
+ * checkout it was.
+ *
+ * The second signal is the documented worktree env contract
+ * (spec worktree-env-contract-016): `.arggon.env`, the gitignored file
+ * `start --worktree` writes at a worktree root. It is the only place a
+ * checkout states "I am this worktree, for this item", and until now nothing
+ * ever READ it for resolution — it was written, reported and reaped, never
+ * consulted. A worker that sources it (the convention the README documents)
+ * makes the host process declare its worktree; a `.arggon.env` found at the
+ * resolved directory declares the same thing from disk. Either is an
+ * expectation the resolution can be held to, which is what turns a silent
+ * mis-binding into either a named refusal (writes) or a visible receipt field
+ * (reads).
+ * -------------------------------------------------------------------------- */
+
+/** The env-contract file `start --worktree` writes at a worktree root. */
+export const WORKTREE_ENV_FILE = ".arggon.env"
+
+/** Documented identity keys of that file (spec worktree-env-contract-016). */
+export const WORKTREE_ENV_KEYS = {
+  item: ITEM_ENV,
+  worktreeId: "ARGGON_WORKTREE_ID",
+  worktreePath: "ARGGON_WORKTREE_PATH",
+  worktreeBranch: "ARGGON_WORKTREE_BRANCH",
+  stateDir: "ARGGON_STATE_DIR",
+  cacheDir: "ARGGON_CACHE_DIR",
+} as const
+
+/**
+ * How far up from the resolved directory a `.arggon.env` is looked for: the
+ * file is written at the worktree ROOT, so a session opened in a subdirectory
+ * needs a short walk. Bounded at 8 so a call can never turn into an unbounded
+ * filesystem crawl, and it stops at the first file found.
+ */
+const MAX_ENV_WALK_DEPTH = 8
+
+/** A `.arggon.env` larger than this is not the contract's file; ignored. */
+const MAX_ENV_FILE_BYTES = 8_192
+
+/** `source` value for an identity taken from the host process environment. */
+export const PROCESS_ENV_SOURCE = "process.env"
+
+/** Per-worktree identity, from the env file on disk or from `process.env`. */
+export type WorktreeIdentity = {
+  /** `ARGGON_WORKTREE_PATH` — the absolute worktree the writer declared. */
+  worktreePath?: string
+  /** `ARGGON_WORKTREE_ID` — `<repo>-<item-id>`. */
+  worktreeId?: string
+  /** `ARGON_ITEM` — the claimed item id. */
+  item?: string
+  /** `ARGGON_WORKTREE_BRANCH` — the claimed branch. */
+  branch?: string
+  /** `ARGGON_STATE_DIR` — the per-worktree state dir (id-suffixed). */
+  stateDir?: string
+  /** `ARGGON_CACHE_DIR` — the per-worktree cache dir (id-suffixed). */
+  cacheDir?: string
+  /** The `.arggon.env` path, or {@link PROCESS_ENV_SOURCE}. */
+  source: string
+}
+
+/** Fields of {@link WorktreeIdentity} in the documented key order. */
+const IDENTITY_FIELDS = [
+  ["worktreePath", WORKTREE_ENV_KEYS.worktreePath],
+  ["worktreeId", WORKTREE_ENV_KEYS.worktreeId],
+  ["item", WORKTREE_ENV_KEYS.item],
+  ["branch", WORKTREE_ENV_KEYS.worktreeBranch],
+  ["stateDir", WORKTREE_ENV_KEYS.stateDir],
+  ["cacheDir", WORKTREE_ENV_KEYS.cacheDir],
+] as const satisfies ReadonlyArray<readonly [keyof WorktreeIdentity, string]>
+
+/**
+ * Parse the contract's `KEY=value` lines (`lib/src/worktree.ts` writes them
+ * unquoted with CR/LF stripped from values). Unrecognized keys, blank values
+ * and lines without `=` are ignored, so an adopter's extra key never invents an
+ * identity. Returns undefined when nothing recognizable is present — that is
+ * the "no expectation declared" case, not an error.
+ */
+function parseWorktreeEnv(fields: Map<string, string>, source: string): WorktreeIdentity | undefined {
+  const identity: WorktreeIdentity = { source }
+  let declared = 0
+  for (const [field, key] of IDENTITY_FIELDS) {
+    const value = fields.get(key)
+    if (value === undefined) continue
+    ;(identity as Record<string, string>)[field] = value
+    declared += 1
+  }
+  return declared === 0 ? undefined : identity
+}
+
+/** Parse an env-contract file body (or a `KEY=value` env snapshot) to an identity. */
+function parseWorktreeEnvBody(body: string, source: string): WorktreeIdentity | undefined {
+  const fields = new Map<string, string>()
+  for (const line of body.split("\n")) {
+    const at = line.indexOf("=")
+    if (at <= 0) continue
+    const key = line.slice(0, at).trim()
+    const value = line.slice(at + 1).trim()
+    if (key !== "" && value !== "") fields.set(key, value)
+  }
+  return parseWorktreeEnv(fields, source)
+}
+
+/**
+ * Read one `.arggon.env`. Read-only and never fatal: a missing, unreadable,
+ * oversized or symlinked file yields undefined, which degrades resolution to its
+ * pre-existing behavior. This is why consulting the contract can never be the
+ * thing that breaks a call.
+ */
+export function readWorktreeEnv(file: string): WorktreeIdentity | undefined {
+  try {
+    const body = readFileSync(file, "utf8")
+    if (byteLength(body) > MAX_ENV_FILE_BYTES) return undefined
+    return parseWorktreeEnvBody(body, file)
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The `.arggon.env` for a checkout: read at `directory`, then up to
+ * {@link MAX_ENV_WALK_DEPTH} parents so a session opened below the worktree
+ * root still finds it. A primary checkout has no such file (only the worktree
+ * gets one), so this yields undefined there and declares no expectation.
+ */
+export function findWorktreeEnv(directory: string): WorktreeIdentity | undefined {
+  let dir = resolve(directory)
+  for (let depth = 0; depth <= MAX_ENV_WALK_DEPTH; depth += 1) {
+    const found = readWorktreeEnv(join(dir, WORKTREE_ENV_FILE))
+    if (found !== undefined) return found
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  return undefined
+}
+
+/**
+ * The host process's own worktree declaration, i.e. the env contract that a
+ * worktree session sources (the README's documented pairing). Parameterized on
+ * `env` so the resolution is testable without mutating the real environment.
+ */
+export function processWorktreeIdentity(
+  env: Record<string, string | undefined> = process.env,
+): WorktreeIdentity | undefined {
+  const fields = new Map<string, string>()
+  for (const [, key] of IDENTITY_FIELDS) {
+    const value = env[key]
+    if (value !== undefined && value !== "") fields.set(key, value)
+  }
+  // Only the documented keys count: an unrelated `ARGGON_*` in the environment
+  // is not a worktree declaration.
+  return parseWorktreeEnv(fields, PROCESS_ENV_SOURCE)
+}
+
+/**
+ * Where one call actually bound, and what the checkout claims to be.
+ *
+ * `root` is the checkout the tracker root resolved from (the tracker dir's
+ * parent), NOT the tracker dir: a worktree's identity names its checkout root,
+ * so the two have to be the same kind of thing to be compared. `declared` is
+ * every worktree path this call could be held to — the env file at the resolved
+ * directory and the process environment — and is empty when the caller
+ * declared nothing, which is the ordinary plain-checkout case.
+ */
+export type TrackerBinding = {
+  /** The working directory the call resolved to (the session's own). */
+  cwd: string
+  /** The checkout the tracker root resolved from. */
+  root: string
+  /** Every worktree path declared for this call, deduped and absolute. */
+  declared: string[]
+  /** Where each declaration came from, parallel to {@link declared}. */
+  sources: string[]
+  /** Identity of the checkout the call resolved into, when it declares one. */
+  worktree?: WorktreeIdentity
+}
+
+/**
+ * Resolve the checkout a call bound to. `findTasksDir` throws outside a tracker
+ * tree, which is not an error here: with no tracker there is nothing to bind
+ * and nothing to refuse, so the session's own directory stands.
+ */
+export function trackerBinding(
+  kernel: ArgonKernel,
+  cwd: string,
+  env: Record<string, string | undefined> = process.env,
+): TrackerBinding {
+  const root = resolvedTrackerRoot(kernel, cwd)
+  const worktree = findWorktreeEnv(cwd)
+  const declared: string[] = []
+  const sources: string[] = []
+  for (const identity of [worktree, processWorktreeIdentity(env)]) {
+    if (identity?.worktreePath === undefined) continue
+    const absolute = resolve(identity.worktreePath)
+    if (declared.includes(absolute)) continue
+    declared.push(absolute)
+    sources.push(identity.source)
+  }
+  return {
+    cwd,
+    root,
+    declared,
+    sources,
+    ...(worktree !== undefined ? { worktree } : {}),
+  }
+}
+
+function resolvedTrackerRoot(kernel: ArgonKernel, cwd: string): string {
+  try {
+    return kernel.repoRootFromTasks(kernel.findTasksDir(cwd))
+  } catch {
+    return resolve(cwd)
+  }
+}
+
+/**
+ * `error.code` for a write whose resolved checkout is none of the worktrees the
+ * caller declared. Native-surface only, for the same reason
+ * {@link SESSION_ROOT_UNRESOLVED} is: the CLI resolves its root from its own
+ * cwd and can never hold two candidates against each other.
+ */
+export const TRACKER_ROOT_MISMATCH = "TRACKER_ROOT_MISMATCH"
+
+/**
+ * A resolved-vs-expected disagreement: the call bound to {@link resolved} while
+ * the caller declared {@link declared} instead.
+ */
+export type TrackerRootMismatch = {
+  resolved: string
+  declared: string[]
+  sources: string[]
+}
+
+/**
+ * The mismatch for a binding, or undefined when there is none.
+ *
+ * The rule is deliberately narrow so it cannot wedge a correct session: it
+ * fires only when the caller declared at least one worktree AND the checkout it
+ * resolved into is none of them. A plain checkout declares nothing, so it is
+ * never refused; a session correctly moved into its worktree resolves to the
+ * declared path, so it is never refused. Only the third state — declared a
+ * worktree, resolved somewhere else — refuses.
+ *
+ * Identity is compared by PATH only, never by `ARGGON_WORKTREE_ID`: a
+ * long-lived host can carry a stale id from an earlier worktree session while
+ * sitting at the right path, and refusing there would block correct work.
+ * `worktreeId`/`stateDir` are still read and reported, so the receipt shows the
+ * full identity.
+ */
+export function trackerRootMismatch(binding: TrackerBinding): TrackerRootMismatch | undefined {
+  if (binding.declared.length === 0) return undefined
+  const resolved = resolve(binding.root)
+  if (binding.declared.includes(resolved)) return undefined
+  return { resolved, declared: binding.declared, sources: binding.sources }
+}
+
+/**
+ * The refusal body for a write that bound to the wrong checkout. It names both
+ * sides — what resolved and what was expected, each with its source — and the
+ * two remedies, because "which one is wrong" is exactly the question the
+ * silence left unanswered.
+ */
+export function trackerRootMismatchMessage(
+  command: string,
+  binding: TrackerBinding,
+  mismatch: TrackerRootMismatch,
+): string {
+  const expected = mismatch.declared
+    .map((path, at) => `${path} (from ${mismatch.sources[at] ?? "?"})`)
+    .join(", ")
+  return (
+    `${command} resolves the tracker root to ${mismatch.resolved}, but the worktree ` +
+    `identity this session declares is ${expected}; refusing to write ${command} into a ` +
+    `checkout the caller did not declare. Either move the session into that worktree ` +
+    `(opencode.session_move — the tracker root follows the session's own directory) or ` +
+    `clear the stale ${WORKTREE_ENV_FILE}/${WORKTREE_ENV_KEYS.worktreePath} declaration. ` +
+    `The resolution is per call and reads are never refused — they carry trackerRoot and ` +
+    `trackerRootMismatch instead, so this state is detectable without a write.`
+  )
+}
+
+/**
+ * Additive receipt fields for one call's binding.
+ *
+ * Emitted ONLY when the resolved checkout is something a caller might not have
+ * expected: a worktree identity was found at it, or a declared worktree
+ * disagrees with it. A plain checkout that declares nothing gets the CLI's
+ * bytes unchanged — deliberate, because `native tool outputs mirror the CLI
+ * --json envelopes` is a load-bearing invariant of this seam, and an always-on
+ * field would break byte-parity for every ordinary call to buy visibility only
+ * the interesting cases need. When a worktree IS involved the resolved root
+ * (`trackerRoot`) always rides along, so the receipt can never say "mismatch"
+ * without also saying which checkout it resolved to.
+ *
+ * Deliberately NOT declared in the per-tool output JSON Schema: that payload
+ * sits 126 B under the ADR 0006 advisory catalog budget, one shared property
+ * across fourteen tools does not fit, and the schema is already documented as
+ * never rejecting a valid envelope (`additionalProperties` defaults to true).
+ */
+export function trackerBindingReceipt(
+  binding: TrackerBinding,
+  mismatch: TrackerRootMismatch | undefined,
+): Record<string, unknown> {
+  if (binding.worktree === undefined && mismatch === undefined) return {}
+  const receipt: Record<string, unknown> = { trackerRoot: binding.root }
+  if (binding.worktree !== undefined) {
+    receipt.trackerWorktree = {
+      source: binding.worktree.source,
+      ...(binding.worktree.worktreePath !== undefined
+        ? { path: resolve(binding.worktree.worktreePath) }
+        : {}),
+      ...(binding.worktree.worktreeId !== undefined ? { id: binding.worktree.worktreeId } : {}),
+      ...(binding.worktree.item !== undefined ? { item: binding.worktree.item } : {}),
+      ...(binding.worktree.branch !== undefined ? { branch: binding.worktree.branch } : {}),
+      ...(binding.worktree.stateDir !== undefined ? { stateDir: binding.worktree.stateDir } : {}),
+      ...(binding.worktree.cacheDir !== undefined ? { cacheDir: binding.worktree.cacheDir } : {}),
+    }
+  }
+  if (mismatch !== undefined) {
+    receipt.trackerRootMismatch = {
+      resolved: mismatch.resolved,
+      declared: mismatch.declared,
+      sources: mismatch.sources,
+    }
+  }
+  return receipt
+}
+
 type ArgonToolSpec = {
   name: string
   description: string
@@ -1556,6 +1901,16 @@ type ArgonToolSpec = {
     options: ArgonToolOptions,
     tool?: ArgonToolCallContext,
   ) => { ok: boolean; envelope: Record<string, unknown> } | Promise<{ ok: boolean; envelope: Record<string, unknown> }>
+  /**
+   * True for the specs that write — a tracker item, a claim, a commit. It is
+   * the ONLY thing {@link argonToolDefinitions} uses to tell a write from a
+   * read, and therefore what decides whether a resolved-vs-expected worktree
+   * mismatch **refuses** the call or merely **reports** it in the receipt
+   * (bug-native-arggon-tools-resolve-tracker-root-to-session-cwd). Marked on
+   * the spec rather than derived from a name list so the two can never drift:
+   * a new tool is refusing-by-default until it says it only reads.
+   */
+  mutates?: boolean
 }
 
 const ID = { type: "string" }
@@ -1677,6 +2032,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
         templatesDir: options.templatesDir,
         full: input.full === true,
       }),
+    mutates: true,
   },
   {
     name: "update",
@@ -1752,6 +2108,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
         // reopen, no steal) exactly as they do through the MCP server.
         agent: true,
       }),
+    mutates: true,
   },
   {
     name: "show",
@@ -1883,6 +2240,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
         text: asString(input.text) ?? "",
         author: asString(input.author) ?? sessionToken(tool?.sessionID),
       }),
+    mutates: true,
   },
   {
     name: "handoff",
@@ -1935,6 +2293,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
         author: asString(input.author) ?? fallback,
       })
     },
+    mutates: true,
   },
   {
     name: "priority",
@@ -1961,6 +2320,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
         cwd: options.cwd,
         dryRun: input.dry_run === true,
       }),
+    mutates: true,
   },
   {
     name: "sync",
@@ -1998,6 +2358,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
         write: input.write === true,
         repo: asString(input.repo),
       }),
+    mutates: true,
   },
   {
     name: "import_issues",
@@ -2036,6 +2397,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
         commit: input.no_commit === true ? false : undefined,
         templatesDir: options.templatesDir,
       }),
+    mutates: true,
   },
 ]
 
@@ -2182,6 +2544,16 @@ type NativePreparationReceipt = {
   /** Bounded preparation log (bug-start-install-ordering), as reported by the kernel. */
   steps?: NativePrepStep[]
   /**
+   * The kernel's own "entries were dropped" decision for that log, MIRRORED
+   * verbatim (bug-native-steps-truncated-flag-dropped). The kernel caps the log
+   * at `MAX_PREP_STEPS = 16`, so a longer run reaches this surface ALREADY
+   * shortened; re-deriving the flag from a cap of this surface's own could
+   * never fire through the kernel's smaller one, and the shortened list was
+   * handed over as if it were the whole log. It also folds into the shared
+   * `truncated` flag, so a capped log is never read as complete on either flag.
+   */
+  stepsTruncated?: true
+  /**
    * Worktree env contract receipt (spec worktree-env-contract-016), forwarded
    * from the kernel when the caller requested env preparation (every
    * `start --worktree` run does).
@@ -2317,6 +2689,13 @@ type NativeCommitResult = {
  * per-name character bound is re-applied, like every other name in the receipt,
  * and a kernel-side truncation is folded into the shared `truncated` flag so a
  * capped list is never passed off as the whole set.
+ *
+ * The one flag the kernel SETS is mirrored, never recomputed
+ * (bug-native-steps-truncated-flag-dropped): `stepsTruncated` says the kernel's
+ * own `MAX_PREP_STEPS` (16) log dropped entries. Deriving it here from a cap of
+ * this function's own (32) cannot fire through the kernel's smaller one, so the
+ * shortened list was reported as complete; the mirror keeps both surfaces on the
+ * kernel's decision, and the fold into `truncated` is additive on top of it.
  */
 function boundedPreparation(input: {
   ready: boolean
@@ -2329,6 +2708,8 @@ function boundedPreparation(input: {
   missingDependenciesTotal: number
   gateBins?: NativeGateBinResolution[]
   steps?: NativePrepStep[]
+  /** The kernel's own log-truncation decision; mirrored, never re-derived. */
+  stepsTruncated?: true
   env?: NativeEnvReceipt
   claim?: NativeClaimReceipt
 }): NativePreparationReceipt {
@@ -2356,7 +2737,12 @@ function boundedPreparation(input: {
   })
   // The kernel owns discovery and its own cap (MAX_PREP_STEPS = 16, below this
   // function's MAX_NATIVE_PREPARATION_NAMES); only the per-string bound is
-  // re-applied, and an over-cap kernel log folds into the shared truncation.
+  // re-applied. The 32-name slice stays as defense in depth — a hand-built
+  // receipt is the only way it can fire through the kernel — while the
+  // kernel's OWN decision about dropping entries is mirrored, never recomputed
+  // from that slice (below): the length comparison cannot see a kernel-side
+  // drop, so deriving the flag from it is what let a shortened log be read as
+  // the whole log.
   const steps = (input.steps ?? []).slice(0, MAX_NATIVE_PREPARATION_NAMES).map((entry) => {
     const bounded: NativePrepStep = {
       // A kernel-produced phase token from a fixed three-value set: passed
@@ -2369,6 +2755,10 @@ function boundedPreparation(input: {
     }
     return bounded
   })
+  // The kernel's own "the log was capped" decision (bug-native-steps-truncated-flag-dropped).
+  // Mirrored verbatim, and only ever true when the kernel set it: a flag invented
+  // here would be a second, disagreeing account of the same event.
+  const kernelDroppedSteps = input.stepsTruncated === true
   // Env contract fragment (spec worktree-env-contract-016): projected, not
   // re-derived — the kernel owns the check and the six-key shape.
   const env = input.env === undefined ? undefined : boundedEnvReceipt(input.env)
@@ -2379,6 +2769,10 @@ function boundedPreparation(input: {
   const claim =
     input.claim === undefined ? undefined : boundedClaimReceipt(input.claim)
   const truncated =
+    // The kernel's capped log folds in here too, so a caller watching only the
+    // shared flag still learns the log is not the whole log (additive on top of
+    // the named `stepsTruncated` mirror, never a replacement for it).
+    kernelDroppedSteps ||
     input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
     input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
     (input.steps?.length ?? 0) > steps.length ||
@@ -2408,6 +2802,7 @@ function boundedPreparation(input: {
     missingDependenciesTotal: input.missingDependenciesTotal,
     gateBins,
     ...(steps.length > 0 ? { steps } : {}),
+    ...(kernelDroppedSteps ? { stepsTruncated: true as const } : {}),
     ...(env !== undefined ? { env } : {}),
     ...(claim !== undefined ? { claim } : {}),
     ...(truncated ? { truncated: true } : {}),
@@ -4558,6 +4953,7 @@ const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
     output: OBJECT,
     run: (kernel, input, options, tool) =>
       guarded(kernel, "start", "START_FAILED", () => nativeStart(kernel, input, options, tool)),
+    mutates: true,
   },
   {
     name: "branch",
@@ -4572,6 +4968,7 @@ const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
     output: OBJECT,
     run: (kernel, input, options) =>
       guarded(kernel, "branch", "BRANCH_FAILED", async () => nativeBranch(kernel, input, options)),
+    mutates: true,
   },
   {
     name: "cleanup",
@@ -4596,6 +4993,7 @@ const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
       guarded(kernel, "cleanup", "CLEANUP_FAILED", () =>
         nativeCleanup(kernel, input, options, tool),
       ),
+    mutates: true,
   },
 ]
 
@@ -4658,12 +5056,28 @@ export function argonToolDefinitions(
       // (bug-native-tools-commit-to-primary-checkout).
       const resolved = await resolveToolCwd(kernel, spec.name, options, tool)
       if ("error" in resolved) throw resolved.error
+      // …and then held against the per-worktree identity the caller declares,
+      // because resolving correctly is not the same as resolving into the
+      // checkout the caller meant. A WRITE refuses on the disagreement; a READ
+      // reports it, so the mismatch is observable without a mutation
+      // (bug-native-arggon-tools-resolve-tracker-root-to-session-cwd).
+      const binding = trackerBinding(kernel, resolved.cwd, options.worktreeEnv ?? process.env)
+      const mismatch = trackerRootMismatch(binding)
+      if (mismatch !== undefined && spec.mutates === true) {
+        throw new ArgonToolError(
+          kernel.failEnvelope({
+            command: spec.name,
+            code: TRACKER_ROOT_MISMATCH,
+            message: trackerRootMismatchMessage(spec.name, binding, mismatch),
+          }),
+        )
+      }
       const callOptions =
         resolved.cwd === options.cwd ? options : { ...options, cwd: resolved.cwd }
       const outcome = await spec.run(kernel, input ?? {}, callOptions, tool)
       const envelope = outcome.envelope as Record<string, unknown>
       if (!outcome.ok) throw new ArgonToolError(envelope)
-      return { output: envelope }
+      return { output: { ...envelope, ...trackerBindingReceipt(binding, mismatch) } }
     },
   }))
 }

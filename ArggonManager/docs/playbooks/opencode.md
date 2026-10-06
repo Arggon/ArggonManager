@@ -493,7 +493,7 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   session rename, the failing-`validate` commit warning, and the W4 scenarios:
   the full claim → worktree → commit → stubbed-PR → done → cleanup round-trip
   through the native tools, the never-steal/no-reopen invariants with the
-  generated permissions active (a real `arggon-worker` session) and the
+  generated permissions active (a real `arggon-maker` session) and the
   reviewer gates (every mutating native tool absent from the Code Mode catalog,
   `git push` denied against a planted local `origin`, inspection still working))
   and exits 0 with

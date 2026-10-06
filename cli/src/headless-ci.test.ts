@@ -27,7 +27,13 @@
  *      pinned init would then rewrite committed content. Both directions are
  *      driven here — a seam newer than the pin goes GREEN, a seam whose bytes
  *      differ from its own generator's goes RED, and the messages name the
- *      generator that disagrees.
+ *      generator that disagrees. The lag assertion is driven on both sides of
+ *      the `package.json`-vs-pin question too (a fixture whose `package.json`
+ *      version equals the pin still goes RED): it never reads `package.json`,
+ *      which is why the repo-side predicate's old `pin !== pkgVersion` conjunct
+ *      could not be pasted in here to "close the gap" — see
+ *      `cli/src/ci-seam-pin.test.ts` and `ArggonManager/docs/ci.md`
+ *      §Where the rule of record lives.
  *
  * The shipped install step is `npm install -g "arggon-manager@$ARGGON_VERSION"`
  * (task-ci-recipe-published-one-liner): registry install, no clone. Its TEXT
@@ -57,6 +63,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CONVENTION_VERSION } from "@arggondev/lib";
 import { checksumOf } from "./docs.js";
+import { freshCloneCopy } from "./pack-fixtures.js";
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
 import { runCli } from "./test-spawn.js";
 // Ordering assertions go through assertOrder, never a bare `indexOf`
@@ -167,9 +174,11 @@ function normalize(raw: string, dir: string): string {
  * parses the TEMPLATE, so a hand-divide of the two copies (a predicate edited in
  * one, an exclusion dropped in the other) shipped unnoticed — and the reviewer of
  * PR #607 found a real semantic divergence in the pin-lag rule because of it.
- * `cli/src/ci-seam-pin.test.ts` is the OTHER two-copy pair (shell vs TS
- * predicate, tracked as bug-ci-seam-pin-shell-vs-test-copy-divergence); this is
- * the workflow pair.
+ * The OTHER two-copy pair (the shell clause vs the `pinLagsSeam()` predicate in
+ * `cli/src/ci-seam-pin.test.ts`) is closed: they are one rule, held together by
+ * a parity test that EXECUTES the clause lifted from both copies below
+ * (bug-ci-seam-pin-shell-vs-test-copy-divergence). This block is the workflow
+ * pair — template vs the committed copy.
  */
 describe("workflow parity: template vs the copy CI runs", () => {
   const COMMITTED_WORKFLOW = join(root, ".github/workflows/arggon.yml");
@@ -228,6 +237,8 @@ describePacked("headless bootstrap + CI (packed install)", () => {
   let binVersion = "";
   /** Adopter-shaped fixture (git repo without a tracker). */
   let fixture = "";
+  /** Private copy of this checkout, carrying its build output; the pack cwd. */
+  let packClone = "";
   /** The shipped workflow's step bodies, by name. */
   let steps = new Map<string, string>();
 
@@ -267,26 +278,31 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     prefix = mkdtemp("arggon-headless-prefix-");
     const packsDir = join(runnerTemp, "packs");
     mkdirSync(packsDir, { recursive: true });
-    for (const cwd of [join(root, "lib"), root]) {
-      // bug-cli-spawn-suites-exit-1-flake: `--ignore-scripts` is load-bearing,
-      // not a speed-up. `npm pack` in the repo ROOT runs the `prepare`
-      // lifecycle (`npm run build`), and this loop runs with vitest's other
-      // forks live: four `tsc` passes then rewrite every file of `lib/dist` and
-      // `dist` IN PLACE (tsc does not skip byte-identical output, so each file
-      // is `open(O_TRUNC)` + write), for ~1s of wall clock. Every other lane's
-      // spawned child ESM-loads those exact files — the CLI's own sources are
-      // transpiled in memory, but `@arggondev/lib` resolves to `lib/dist` — so
-      // a child linking the graph inside that window reads a half-written
-      // module and dies in Node's loader before the CLI ever runs. That was
-      // three CI flakes that all printed a bare `expected 1 to be +0` (PR #571
-      // run 36960202458 `handoff --session`, PR #576 `adopt --ack`, PR #573 run
-      // 36966932103 `arggon init`); a measured full-suite run rewrites 141
-      // artifact files across two such windows. The bytes under test must be
-      // the ones `npm run build` already produced (the assertions above are
-      // the build-before-test precondition), so skipping the rebuild is exactly
-      // what this gate means: pack the built tree, never rebuild it under the
-      // suite. `pack-contents.test.ts` does build on purpose — but in a fresh
-      // clone copy that owns its own `lib/`: same repo, opposite discipline.
+    // bug-test-suite-lib-dist-rebuild-race: pack a COPY of this checkout, seeded
+    // with its build output, never the checkout itself. `--ignore-scripts` is
+    // kept (it is free on npm >= 12) but it is NOT the mechanism: npm 10 — the
+    // major on the CI runner — runs the root `prepare` from `npm pack` anyway,
+    // so this lane rebuilt `lib/dist` AND `dist` in place under every other
+    // lane's readers on every CI run. Measured on npm 10.9.4: `npm pack
+    // --ignore-scripts` in the checkout emits `> prepare > npm run build`; the
+    // same command on npm 12.0.2 does not. That is the one writer the
+    // suite-wide freeze refuses, which is how it was found: PR #647's `cli` job
+    // failed with `TS5033 … lib/dist/*.d.ts: EACCES`.
+    packClone = mkdtemp("arggon-headless-packclone-");
+    freshCloneCopy(root, packClone, true);
+    for (const cwd of [join(packClone, "lib"), packClone]) {
+      // bug-cli-spawn-suites-exit-1-flake: this loop used to run with the
+      // checkout as its cwd, on the strength of `--ignore-scripts`. Measured on
+      // npm 10.9.4 that flag does not stop `npm pack` from running the root
+      // `prepare`, so four `tsc` passes rewrote every file of `lib/dist` and
+      // `dist` IN PLACE (tsc does not skip byte-identical output) for ~10s of
+      // wall clock, with vitest's other forks live. Every other lane's spawned
+      // child ESM-loaded those exact files, which is the reported flake class.
+      // The copy above is the mechanism now; the flag only keeps npm >= 12 from
+      // rebuilding the copy. The bytes under test are still the ones `npm run
+      // build` produced (the assertions above are the build-before-test
+      // precondition, and the copy is seeded from those outputs), so skipping
+      // the rebuild is exactly what this gate means.
       const packed = spawnSync(
         "npm",
         ["pack", "--ignore-scripts", "--pack-destination", packsDir],
@@ -641,13 +657,19 @@ process.stdout.write("fixture branch generator: init --no-commit\\n");
    * Git fixture holding that seam, shaped either as the seam's own source
    * (selfHosted: the arggon package name + the CLI entry point + a built bin)
    * or as an adopter repo (anything else — the pinned release is its only
-   * generator).
+   * generator). `pkgVersion`/`stamp` override the two version inputs the
+   * pinned-lag assertion compares, so a fixture can reproduce a specific
+   * (pin, package.json, stamps) triple.
    */
-  function seedSeam(dir: string, selfHosted: boolean): void {
+  function seedSeam(
+    dir: string,
+    selfHosted: boolean,
+    opts: { pkgVersion?: string; stamp?: string } = {},
+  ): void {
     const name = selfHosted ? "arggon-manager" : "adopter-demo";
     writeFileSync(
       join(dir, "package.json"),
-      `${JSON.stringify({ name, version: "0.1.0", private: true }, null, 2)}\n`,
+      `${JSON.stringify({ name, version: opts.pkgVersion ?? "0.1.0", private: true }, null, 2)}\n`,
     );
     const seam = seamNewerThanPin();
     if (selfHosted) {
@@ -667,7 +689,10 @@ process.stdout.write("fixture branch generator: init --no-commit\\n");
     // assertion reads.
     writeFileSync(join(dir, "AGENTS.md"), `${AGENTS_MARKER}\n# adopter repo\n`);
     mkdirSync(join(dir, "ArggonManager"), { recursive: true });
-    writeFileSync(join(dir, "ArggonManager", ".convention.yml"), stateFile(binVersion, seam));
+    writeFileSync(
+      join(dir, "ArggonManager", ".convention.yml"),
+      stateFile(opts.stamp ?? binVersion, seam),
+    );
     writeFileSync(join(dir, ".mcp.json"), seam);
     initFixtureRepo(dir);
     expect(git(["add", "--", "."], dir).status).toBe(0);
@@ -788,6 +813,26 @@ process.stdout.write("fixture branch generator: init --no-commit\\n");
     writeFileSync(statePath, stateFile(binVersion, seamNewerThanPin()));
     expect(git(["commit", "-am", "re-pin"], branch).status).toBe(0);
     expect(runStep(DRIFT_STEP, branch).status).toBe(0);
+
+    // Direction 3b — the one input where the shipped clause and the repo-side
+    // `pinLagsSeam()` used to disagree (bug-ci-seam-pin-shell-vs-test-copy-divergence):
+    // the SAME lag, on a repo whose `package.json` version EQUALS the pin. That is
+    // this repo's mid-cycle shape and, for any adopter, the shape their version
+    // lands in whenever it coincides with the pin literal. The clause still fires
+    // — it never reads `package.json` — and that is precisely why the TS
+    // predicate's old `pin !== package.json` conjunct could NOT be pasted into the
+    // shell copy to "close the gap": pasted in, this repo would go green while the
+    // pinned init rewrites committed content, i.e. #527 with the gate off.
+    // `cli/src/ci-seam-pin.test.ts` asserts the TS predicate agrees on this exact
+    // triple by EXECUTING the clause this step runs.
+    const coincident = mkdtemp("arggon-headless-coincident-");
+    seedSeam(coincident, true, { pkgVersion: binVersion, stamp: "99.0.0" });
+    const coincidentLag = runStep(DRIFT_STEP, coincident);
+    expect(coincidentLag.status, `${coincidentLag.stdout}\n${coincidentLag.stderr}`).not.toBe(0);
+    expect(coincidentLag.stdout).toContain(
+      `ARGGON_VERSION (${binVersion}) lags the committed arggon seam (99.0.0)`,
+    );
+    expect(coincidentLag.stdout).toContain("bump ARGGON_VERSION to 99.0.0");
 
     // A missing build is an error, never a silent fall back to the pinned
     // release — that fall back IS the bug (it strips the branch's own content
