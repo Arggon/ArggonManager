@@ -1,7 +1,7 @@
 /**
  * ZCode plugin seam (ADR 0014, task-zcode-plugin-seam): `arggon init` vendors
  * a declarative ZCode plugin under `.zcode-marketplace/` — marketplace
- * catalog, manifest, the eleven commands, the three agents and the hook
+ * catalog, manifest, the commands, the three agents and the hook
  * gates (global git gates + the dispatch-scoped reviewer backstop).
  *
  * The gate script is exercised as a real child process against the GENERATED
@@ -56,6 +56,7 @@ const COMMANDS = [
   "board",
   "done",
   "explore",
+  "goal",
   "handoff",
   "next",
   "playbook",
@@ -113,7 +114,7 @@ describe("zcode plugin seam generation", () => {
     ]) {
       expect(existsSync(join(dir, ...rel.split("/"))), rel).toBe(true);
     }
-    expect(readdirSync(join(dir, PLUGIN_ROOT, "commands"))).toHaveLength(12);
+    expect(readdirSync(join(dir, PLUGIN_ROOT, "commands"))).toHaveLength(13);
     expect(readdirSync(join(dir, PLUGIN_ROOT, "agents"))).toHaveLength(3);
   });
 
