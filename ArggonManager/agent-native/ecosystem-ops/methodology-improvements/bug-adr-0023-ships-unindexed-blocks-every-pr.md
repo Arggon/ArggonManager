@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-adr-0023-ships-unindexed-blocks-every-pr
 title: "ADR 0023 ships unindexed, so `cli/src/adr-index-parity.test.ts` is red on `main` and the `cli` lane fails on every PR regardless of its diff"
 assignee: arggon-delivery-lead
@@ -8,7 +8,6 @@ parent: methodology-improvements
 labels: [docs, adr, ci-blocking, tests]
 created: "2026-10-05"
 updated: "2026-10-06"
-claimed_at: "2026-10-06T10:40:33.971Z"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-adr-0023-ships-unindexed-blocks-every-pr.md
