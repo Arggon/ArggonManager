@@ -1063,3 +1063,21 @@ Rebuilding the record from its two known-good sources instead of repairing the m
 One coordinator action before the squash, unchanged from round 3: this verdict is written with `tools.arggon.comment`, which resolves the tracker from this session's cwd (the primary checkout), so it lands on the **primary's** copy of the item. The branch must merge `origin/main` once more — or the item-file conflict must be resolved as a union that includes this verdict — or the merged record will not carry it, and `classifyVerdicts` will keep reporting round 4's `request-changes` as the latest. Do that, squash, flip the item to `done`, and PR #605 closes with its acceptance checklist complete and every verdict intact.
 
 Two non-blocking items are already filed and neither gates this PR: `bug-verification-regex-matching-nothing` (the class this session keeps hitting) and `bug-parity-suite-cannot-catch-wrong-input-at-call-sites` (the `convention.md:150` overstatement, correctly left to its owner). `arggon adopt --ack` for the 15 pre-existing stamp mismatches stays a human step.
+
+### 2026-10-06 @arggon-delivery-lead
+### 2026-10-05 @arggon-delivery-lead
+Merged: PR #605 as `6bc995ba`, all three lanes green after two conflict resolutions and a drift-gate fix.
+
+**This PR was 240+ commits stale and its branch predates PR #641**, so it carried pre-rename agent ids. Its six conflicted files could not simply take main's side: doing so silently discarded the goal-mode work that also lived in them. The correct resolution was a union, and it is recorded on the branch in `fix(zcode-seam): keep the agent rename while adding the goal-mode command`:
+
+- `templates/docs/zcode/arggon/.zcode-plugin/plugin.json` — main's description (correct agent names) **plus** the goal-mode clause, instead of the branch's string that reverted to coordinator/worker/reviewer
+- `cli/src/init-zcode.test.ts` — `"goal"` added to `COMMANDS`, 12 → 13 commands, stale "eleven commands" header corrected
+- `cli/src/adapter-selection.test.ts` — snapshot 19 → 21 zcode files, **0 in every other bucket** (the two new goal-mode templates, all `present`)
+
+Swept `templates/`, `.opencode/` and `.zcode-marketplace/`: **no retired id survives** (`arggon-coordinator` / `arggon-worker` / `arggon-reviewer`), and `templates/docs/{opencode,zcode}/arggon/agents/` hold only shipped ids.
+
+**The `tasks-validate` failure was the seam drift gate, not a test.** It runs `node dist/cli.js init --no-commit` and requires a clean tree; my hand-merged description had not been propagated to the committed generated copy. Regenerated and committed — the gate now passes locally when run exactly as CI runs it.
+
+Gates: `npm test` **130 files / 2736 passed** · `npm run build` · seam drift gate clean · `cli` / `tasks-validate` / `ui-smoke` green on the merged head.
+
+**Two corrections this item inherited, both from my own errors, recorded so they are not repeated:** the "packed-bin parity" failure I had been calling a `main`-red defect was a **stale `dist/cli.js`** in my worktree — `main` is green (129 files / 2692). And the "five suites rebuild `lib/dist`" premise was wrong in the other direction: the writer was **one** suite, and only on **npm 10**. Both items are corrected rather than quietly closed.
