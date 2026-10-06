@@ -5,6 +5,7 @@ id: task-implement-decision-brief-kernel
 title: "Implement the decision-brief kernel per spec-owner-decision-brief-021 AC 1-8: `lib/src/brief.ts`, the additive `show --json` field, the opt-in UNANSWERED-DECISION-BRIEF finding, and their tests"
 parent: role-model-foundation
 labels: [cli, native-seam, json-contract]
+priority: p0
 created: "2026-10-06"
 updated: "2026-10-06"
 ---
