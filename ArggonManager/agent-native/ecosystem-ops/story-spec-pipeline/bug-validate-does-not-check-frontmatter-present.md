@@ -291,3 +291,34 @@ So "in each case the commit that emptied the file IS its own `chore(tasks): comm
 **Correction propagated.** `bug-zero-byte-item-files-committed-by-comment-autocommit` is corrected in the same push: its frontmatter title, its H1, and its operative acceptance boxes now name the measured mechanism, and a dated correction block records the per-file truth with the shas. Its earlier dated blocks are untouched. The byte-for-byte recovery it asks for is confirmed (`9c17ae6c` restored 14037 / 3463 / 8304 / 5388, matching each last non-empty blob exactly) and recorded as evidence rather than ticked — the boxes live inside dated blocks and that call is the delivery lead's.
 
 **Still true from my earlier blocks, unchanged by this correction:** the `cli` lane's own-tree assertion did need *a* restore on this branch (all four files were 0 bytes at the branch point `53785ed5`), the recovery was byte-for-byte, and the kernel rule was never in question. B1 applies to *which* bytes: main has since recovered (`9c17ae6c`), marked two done (`8e3e9214`) and pruned all four (`f2214234`), so this branch now takes main's bytes for the three that diverged — see the merge commit on this branch. `bug-live-reload-sse-race.md` was already byte-identical to main (3463B) and was left untouched.
+
+### 2026-10-06 @Arggon
+**Gate evidence for the three blockers (2026-10-06, maker).** All commands run in `/home/arggon/Projects/ArggonManager-bug-validate-does-not-check-frontmatter-present` after a full `npm run build`. Expected → observed:
+
+| # | gate | expected | observed |
+| --- | --- | --- | --- |
+| 1 | `npm run build` (full) | exit 0 | **exit 0**; postbuild `build:plugin` emitted 41 modules / 460 645 bytes |
+| 1b | bundle unchanged | byte-identical, not regenerated | **identical**: worktree md5 `99ceb8c9e6eecd5a7088450c60499dd2` / 460 645 B == committed; `git status --porcelain -- opencode/plugins/arggon/index.bundle.ts` empty |
+| 2 | `npx vitest run cli/src/validate.test.ts cli/src/headless-ci.test.ts` | pass | **2 files / 64 tests passed**, exit 0 |
+| 3 | `npm run arggon -- validate --json` | `ok: true`, 0 errors, 0 warnings | **`ok: true`, 0 errors, 0 warnings**, convention v5, exit 0 |
+| 4 | `git diff --stat origin/main HEAD -- <the three item files>` | empty | **empty**; each file `cmp`-identical to `origin/main`, each `status: done`, `updated: "2026-10-04"`, zero `claimed_at`/`worktree_path` |
+| 5 | own item file = union of both sides | all blocks, none lost | **8 `###` blocks** = 7 union blocks (verified verbatim **and contiguous** against both sides) + this round's appended correction; 0 of 152 distinct non-blank `## Notes` lines from either side absent; both `verdict:` lines present |
+| 6 | working tree clean | clean | **clean** |
+
+**Gate 7 — `git merge-tree --write-tree --name-only origin/main HEAD` FAILED: exit 1, two conflicts.** This is reported, not waived.
+
+```
+ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-validate-does-not-check-frontmatter-present.md   CONFLICT (content)
+ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/bug-zero-byte-item-files-committed-by-comment-autocommit.md   CONFLICT (add/add)
+```
+
+GitHub's own PR view independently agrees: `mergeable: CONFLICTING` on head `019035a0`.
+
+**Why it cannot pass from the branch side, and why that is the expected state.** It is not caused by B1 — B1 is fixed, and `bug-live-reload-sse-race.md` does not appear in the conflict list at all. The two remaining conflicts are inherent to B2 + B3 together:
+
+- My own item file **must** contain main's round-1 review block (B2/B3 require the union), and main **must** contain it too. Both sides therefore append different blocks at the same `## Notes` append point relative to the merge base (`0faa8a47`), so git textually conflicts.
+- B3 established there is no union merge driver (no `.gitattributes`, no merge driver, no union-merge code), so git cannot recognise the two appends as compatible and will always conflict there. A union file and a conflict-free merge are mutually exclusive *for a branch that has not yet merged main*.
+
+**The remedy, verified but NOT applied** (it is a branch-structure change reserved to the delivery lead per the round-2 verdict's "Merge recipe (yours to run, not mine)"): merging `origin/main` into this branch conflicts in **exactly these two files and nothing else** — all kernel code, tests, fixtures, `convention.md` and the bundle auto-merge clean (measured in an isolated clone at `/tmp/opencode/mergeproof`). Resolving both to the hand-written unions yields a clean merge, after which `git merge-tree --write-tree --name-only origin/main HEAD` **exits 0** (observed `a3d7f3ac…`, no conflict lines). It is a merge commit — no squash, no force-push, no tracker sha rewritten. Not pushed: the lead owns the merge and its resolution.
+
+One consequence to decide before merging: the round-2 recipe's step 3 expects the item's frontmatter to become main's (`status: todo`, no assignee) after the coordinator's merge. My resolution deliberately keeps **this branch's** live claim (`status: in_progress`, `assignee: Arggon`, `claimed_at`, `worktree_path`) because the claim is real and I was told not to flip any status. If the coordinator's merge is expected to land main's frontmatter instead, that resolution must be made deliberately, not by accident.
