@@ -78,3 +78,32 @@ Spec landed as `ArggonManager/docs/specs/spec-owner-decision-brief-021.md` (NNN 
 - ADR 0026 §8's two reversal limbs are **not computable** from anything this spec adds: limb (a) needs answer latency (a comment-date difference) and limb (b) needs a count of decisions made outside briefs, which no surface records. Recorded as an explicit "not established" non-answer in the spec rather than a metric invented here.
 
 **Not done (yours):** item not flipped to `done`, PR not merged. `task-wire-decision-brief-carriers` remains `todo` and gated — its `depends_on` already lists this item.
+
+### 2026-10-06 @ses_eee50c3c2ffea91lEKg6KhytwM
+Spec landed as `ArggonManager/docs/specs/spec-owner-decision-brief-021.md` (NNN 021: 020 is the highest existing spec, so 021 is the next free number — verified with `ls | sort`, not assumed). PR #660, one commit `2451727e`, no squash. Branch `feat/task-spec-owner-decision-brief`.
+
+**The two questions ADR 0026 left open, answered**
+
+1. *Which read-only surface reports an unanswered brief* → `show <id> --json` gains an additive `decision_brief` field (`none｜open｜decided｜self-decided`) and `spec analyze` gains one report-only finding `UNANSWERED-DECISION-BRIEF`, mirroring `MISSING-PRODUCT-ACCEPTANCE` under the **existing** `x-tracker.product-acceptance` arming (no new config key). `report --json` and `sync --json` stay byte-identical: `sync` classifies only items reconciled with an open PR (`lib/src/sync-command.ts:81–83`) — the same correction ADR 0021's dated amendment records at 0021:323–347 — and `report` aggregates per container (`lib/src/report.ts:13`) while a brief is item-level and often lives on a leaf. Justified in the spec's §"The read-only surface".
+2. *Where the carrier text lives* → `task-wire-decision-brief-carriers`; the spec's §"Boundary with the carriers item" lists what that item will do and what it must not re-decide.
+
+**Gates (command → expected → observed)**
+
+- `npm run arggon -- validate --json` → `ok:true` → `{"ok":true,...,"errors":[],"warnings":[]}`
+- `npm run arggon -- spec validate` → ok → `arggon spec: ok (37 doc(s), 5 warning(s))`; the 5 are pre-existing `DOC_NUMBER_COLLISION` warnings in other files, unchanged (36 docs → 37 docs)
+- `npm run arggon -- spec analyze` → no NEW findings → **10 findings before, 10 after**, none in this spec. Before: 2 `no-error-path`, 3 `vague-quantifier`, 5 `duplicate-doc-number`. After: identical counts and kinds. `spec analyze --spec ArggonManager/docs/specs/spec-owner-decision-brief-021.md` → `scanned 1`, zero findings in every bucket.
+- `npx prettier --check <file>` → clean → "All matched files use Prettier code style!" (run before the commit, re-run after the final edit — this repo's Markdown formatter has non-idempotent cases, so the post-edit re-check is the one that counts)
+- `npm run test:structure` → green → "test result: ok. 5 passed; 0 failed"
+- `npm run lint:structure` → clean → no rule hits
+- `npm run --silent arggon -- validate` (the pre-commit hook body, run manually) → ok → "arggon validate: ok (0 warning(s), convention v5)"
+
+**Edge-case coverage.** All twelve rows of exploration 025 §Edge cases are carried: hostile input / no product owner (non-goal + default-executes), one option / options with no consequence (AC 9, AC 12), concurrency (AC 11 + no-dedupe-scanner non-goal), no answer by the date (§Synopsis default rule), forgery / self-answer (`self-decided` reported never blocked + auth non-goal), rubber-stamping (routing rule bounds volume), relative deadlines (AC 12), existing trees (nothing-migrates non-goal), unanswered observability (AC 4), hostile brief text (AC 13), non-software adopters (AC 14), upgrade (AC 15).
+
+**Ambiguity found in ADR 0026, reported not resolved by invention**
+
+- The ADR names the surface question but does not say whether the *classification* also rides `report`. I chose `show` + `spec analyze` and left `report` unchanged, with the reasoning stated in the spec. A maker could reasonably have added a container row; that is now a documented choice, not an open question.
+- `self-decided` is **my** state name. ADR 0026 §2 mandates attribution-only but never names a state; I mirrored `self-accepted` because the sibling precedent is exactly this case. Flagged in the spec's §States as mirroring, so a reviewer can reject the name without unpicking the design.
+- ADR 0026 §8's two reversal limbs are **not computable** from anything this spec adds: limb (a) needs answer latency (a comment-date difference) and limb (b) needs a count of decisions made outside briefs, which no surface records. Recorded as an explicit "not established" non-answer in the spec rather than a metric invented here.
+- ADR 0026 §1 says the `decide:` header "may carry a short scope in parentheses" but does not give a brief example; the `decided:` example at §2:113–117 is the only worked header. My §Synopsis brief example therefore follows the ADR's own non-software vocabulary (§7:243–244) rather than reconstructing a form the ADR never wrote down.
+
+**Not done (yours):** item not flipped to `done`, PR not merged. `task-wire-decision-brief-carriers` remains `todo` and gated — its `depends_on` already lists this item.
