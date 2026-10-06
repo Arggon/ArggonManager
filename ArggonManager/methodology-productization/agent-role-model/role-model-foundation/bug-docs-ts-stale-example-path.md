@@ -9,8 +9,7 @@ parent: role-model-foundation
 labels: [docs, cli]
 priority: p3
 created: "2026-10-05"
-updated: "2026-10-05"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-docs-ts-stale-example-path
+updated: "2026-10-06"
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-docs-ts-stale-example-path.md

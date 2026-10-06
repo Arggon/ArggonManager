@@ -9,8 +9,7 @@ parent: methodology-improvements
 labels: [tests, ci-blocking, tooling]
 priority: p1
 created: "2026-10-04"
-updated: "2026-10-05"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-test-suite-lib-dist-rebuild-race
+updated: "2026-10-06"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-test-suite-lib-dist-rebuild-race.md

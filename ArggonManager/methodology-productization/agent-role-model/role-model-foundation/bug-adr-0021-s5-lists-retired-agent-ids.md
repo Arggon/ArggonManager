@@ -9,8 +9,7 @@ parent: role-model-foundation
 labels: [docs, adr, roles]
 priority: p2
 created: "2026-10-05"
-updated: "2026-10-05"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-adr-0021-s5-lists-retired-agent-ids
+updated: "2026-10-06"
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-adr-0021-s5-lists-retired-agent-ids.md
