@@ -107,3 +107,7 @@ Spec landed as `ArggonManager/docs/specs/spec-owner-decision-brief-021.md` (NNN 
 - ADR 0026 §1 says the `decide:` header "may carry a short scope in parentheses" but does not give a brief example; the `decided:` example at §2:113–117 is the only worked header. My §Synopsis brief example therefore follows the ADR's own non-software vocabulary (§7:243–244) rather than reconstructing a form the ADR never wrote down.
 
 **Not done (yours):** item not flipped to `done`, PR not merged. `task-wire-decision-brief-carriers` remains `todo` and gated — its `depends_on` already lists this item.
+
+### handoff 2026-10-06 @ses_eee50c3c2ffea91lEKg6KhytwM (session: ses_eee50c3c2ffea91lEKg6KhytwM) — next: Review + merge PR #660 (spec owner-decision-brief-021), then claim task-wire-decision-brief-carriers
+- branch: feat/task-spec-owner-decision-brief
+- open questions: Report-or-show for report? (chose show+analyze, report unchanged); 'self-decided' state name is mine, ADR 0026 names no state; ADR 0026 §8 reversal limbs not computable from this spec's fields
