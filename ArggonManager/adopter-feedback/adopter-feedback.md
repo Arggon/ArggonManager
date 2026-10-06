@@ -17,10 +17,20 @@ updated: "2026-10-02"
 
 ## Context
 
-<!-- Why this initiative exists. -->
+Every channel ArggonManager has is one-directional. This initiative owns making the
+loop close: adopters and their agents hit friction, and the project learns from it
+without weakening the rule that the in-tree tracker is the single source of truth.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [x] The gap is identified and evidenced; a design is validated against local
+      mechanics and external precedent
+- [ ] The design ships: trigger, capture, dedupe and human-gated publish, with the
+      edge cases resolved into spec acceptance criteria
 
 ## Notes
+
+Opened 2026-10-02 as a fresh chain rather than reusing a `done` container — the
+repo's own rule is never to reopen `done`/`cancelled`, and
+`agents.md` §5 warns against modelling new administrative leaves under closed
+product containers.

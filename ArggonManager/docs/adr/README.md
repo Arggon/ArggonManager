@@ -35,3 +35,4 @@ numbering, the status and the row order.
 | [0021](./0021-agents-primary-workers-human-product-owner.md)  | Agents as primary workers, humans as product owner                                                             | Accepted                               |
 | [0022](./0022-decline-autoharness-autocontext-autocompact.md) | External agent tooling — decline AutoHarness / AutoContext / AutoCompact, and steal the lesson-store idea      | Proposed                               |
 | [0023](./0023-ci-wall-clock.md)                               | CI wall clock: concurrency groups, duration-aware sharding, and the `cli` required check                       | Proposed                               |
+| [0024](./0024-adopter-friction-channel.md)                    | Adopter friction channel                                                                                       | Proposed                               |
