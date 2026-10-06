@@ -124,6 +124,17 @@ CLI create examples:
 
 **Work-item detection:** any `*.md` under the tracker root whose frontmatter has `type:` is a work item and must satisfy naming + placement. Other files (`README`, images, `.convention.yml`) are ignored by `validate`.
 
+**Frontmatter presence is enforced, not assumed** (bug-validate-does-not-check-frontmatter-present). Detection above is a
+positive rule; it is deliberately not the whole rule. A file in a position the layout RESERVES for a work item — a container
+index (`<dir>/<dir>.md`) or a `task-*.md` / `bug-*.md` leaf — MUST open with a `---` frontmatter block: without one it
+reports `MISSING_FRONTMATTER`, and a block that opens but never closes reports `UNTERMINATED_FRONTMATTER`. Both name the
+file. Before this rule the worst possible corruption was the only shape `validate` accepted: required-field checks are
+skipped when there is no block to check them against, so a file whose whole block was deleted — by a conflict-resolution
+script, a truncated write — was read as body prose and the tree reported `ok`, while the item could not be listed, claimed,
+gated on `done` or resolved by `depends_on`. Checking the _content_ of a structure is not checking that the structure
+exists. The requirement is scoped to item positions on purpose: a plain `.md` that the layout reserves nothing for stays an
+ignored non-item document, so the rule cannot invent a requirement for a `README` or a notes file.
+
 Note: a container's acceptance-aware cascade guard is any unticked checkbox that carries text — a checkbox line with no text after the box is a scaffold placeholder, not a criterion (bug-empty-template-checkbox): the kernel ignores it, and `arggon create` no longer scaffolds one under `## Acceptance`.
 
 ### Acceptance rows (the one grammar)
