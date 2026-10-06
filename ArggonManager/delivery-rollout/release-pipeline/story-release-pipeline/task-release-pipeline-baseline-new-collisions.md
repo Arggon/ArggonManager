@@ -43,3 +43,42 @@ Acceptance:
 - [ ] Both baselines are handled, not just the story-scoped one
 - [ ] Never a blanket refresh: `agents.md` documents `--baseline` as the NEW-findings wave gate
 - [ ] Depends on task-renumber-colliding-doc-numbers, not on the detector landing
+
+### 2026-10-06 @ses_ef169b774ffddLlcycmzGGeU5Q
+### 2026-10-06 @arggon-delivery-lead — reproduction on `main`, and a second consequence
+
+The item's title frames this as a **future** wave exiting 1. It is stronger than that: **`main` exits 1 today.**
+
+Reproduction on a clean `main`:
+
+```
+$ npm run arggon -- spec analyze --baseline ArggonManager/spec-analyze-baseline.json
+5 new, 1 resolved, 5 unchanged, 10 total
+real exit code: 1
+```
+
+All 5 NEW are `[duplicate-doc-number]`, and they are exactly the 5 pairs this item names:
+
+| doc | collision |
+|---|---|
+| `exploration-cheap-path-to-prod-001.md` | ↔ `exploration-token-context-efficiency-001.md` |
+| `plan-deps-001.md` | ↔ `plan-sync-001.md` |
+| `spec-deps-001.md` | ↔ `spec-sync-001.md` |
+| `plan-release-pipeline-015.md` | ↔ `plan-update-channel-015.md` |
+| `spec-release-pipeline-015.md` | ↔ `spec-update-channel-015.md` |
+
+The same 5 surface as `DOC_NUMBER_COLLISION` warnings from `spec validate`, so the two surfaces agree — this is one defect seen twice, not two defects.
+
+### The second consequence, not recorded here before
+
+This baseline failure is now **blocking an unrelated chain**. The ADR 0017 gate requires zero NEW findings before an implementation task is claimed, so the 5 NEW findings gate `task-friction-capture-command` (T1) in `story-adopter-feedback`, whose own PR #586 merged clean. A `story-release-pipeline` doc-number collision is holding an `adopter-feedback` implementation task hostage, and neither story records the link.
+
+That is the argument for treating this as more than bookkeeping: the baseline is a shared gate, so a stale entry in one story's corpus silently blocks another.
+
+### Acceptance additions
+
+- [ ] `spec analyze --baseline ArggonManager/spec-analyze-baseline.json` exits **0** on a clean `main` — today it exits 1, which is a red gate on the default branch
+- [ ] All 5 `duplicate-doc-number` findings are gone (via `task-renumber-colliding-doc-numbers`), not absorbed by re-saving the baseline. Widening the baseline makes the gate green without fixing anything
+- [ ] Whether `main` exiting 1 on this lane is surfaced anywhere a human sees before merge. A required-check failure would have caught it; `spec analyze` evidently is not one
+- [ ] The cross-story coupling is recorded where it bites: the ADR 0017 zero-NEW gate is global, so any story's stale baseline entry blocks any other story's implementation tasks
+- [ ] If re-saving the baseline is ever chosen, record the decision and its reason — the current temptation is to make the gate green by widening the net
