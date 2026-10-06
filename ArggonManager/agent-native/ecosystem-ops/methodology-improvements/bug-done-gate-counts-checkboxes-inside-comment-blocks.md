@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-done-gate-counts-checkboxes-inside-comment-blocks
 title: "The done gate counts `- [ ]` anywhere in an item body, so a reporter comment that quotes its acceptance verbatim makes the item impossible to complete"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: [done-gate, tracker-schema, tests]
 created: "2026-10-05"
 updated: "2026-10-06"
-claimed_at: "2026-10-06T11:00:45.778Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-done-gate-counts-checkboxes-inside-comment-blocks
 ---
 <!--
@@ -27,7 +26,21 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-done-gate-counts-checkbox
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [x] A ticked live `## Acceptance` section plus unticked boxes inside a dated `## Notes` block flips `done` **without a waiver** — the defect. Verified by the real flip of `bug-validate-does-not-check-frontmatter-present` (5 comment-only boxes, `10bb6060`) and `bug-engineering-doc-stale-adr-statuses` (`d9b3f4bb`), both of which the pre-fix gate refused
+- [x] An unticked criterion in the **live** section is still refused, so the gate was narrowed rather than gutted. Mutation-verified: reverting the scoping fails 237 assertions
+- [x] **No live criterion at all is refused** with a distinct `no-live-contract` reason, even when every box in the comment record is ticked — otherwise a fresh `arggon create` scaffold is the _default_ flippable item and an item with no contract gets a free pass
+- [x] A bare `- [ ]` carrying no text stays a scaffold, not a criterion (`convention.md:300`), and a section of bare boxes refuses for _no contract_ rather than for an unfinished criterion. Pinned by a mutation that fails 33 assertions
+- [x] The **auto-done workflow's classifier recognises both refusal reasons**. `.github/workflows/auto-done.yml` grepped `"unchecked boxes"`, so ADR 0025's new `no-live-contract` refusals annotated as "update failed unexpectedly" — backwards, and untested. Now classified by `error.code === "UPDATE_FAILED"` plus the gate's shared `cannot mark '` prefix (`cli/auto-done-refusal.mjs`), so a third reason classifies without a code change
+- [x] The classifier is verified against **verbatim kernel strings**, not pasted ones: both gate messages (`lib/src/update.ts:572`, `:576`) classify `expected`, and `id '…' not found under the tracker`, `parent '…' not found`, and `cannot transition status blocked -> todo` all classify `unexpected` — the prefix occurs in exactly two places in the kernel, both the gate
+- [x] The refusal classifier has its own test, built from the **real kernel** via `updateOperation` rather than pasted messages, plus an assertion on the wiring (2 call sites, 1 definition, no inline message match)
+- [x] ADR 0025 amends 0015, is indexed, and its row's status class agrees with the ADR file. Its Context carries the **measured** split with definitions attached — 5 unblocked / 56 relabelled / 56 unchanged, 7 open leaves newly refused, 40 relabelled, 3 unblocked — not the inverted "61 already satisfied", and not the review's 61 either. Both prior figures were wrong in the direction that flattered the change
+- [x] The container-cascade deferral is recorded in the carrier per `docs/engineering.md` §Definition of done 6, with the live instance named (`story-ci-wall-clock`, `liveCriteria=0`, `wholeUnchecked=5`), as `task-cascade-whole-body-acceptance-defers-this-defect` — not only in a PR comment
+- [x] `acceptanceComplete` keeps its whole-body meaning for renderers and cascade; only its doc comment changed, and `update.ts:1073` still uses it. No silent semantic flip under the new readers
+- [x] Gates green on the merged result: full `npm run build`, `npm run test` **132 files / 2803 tests**, `arggon validate` ok (0 warnings, v5), `npm run check:plugin` green, lint and prettier clean, generated bundle byte-unchanged
+
+This section was the template placeholder while the work landed — the rule this item ships
+refuses exactly that, so the contract is recorded here after the merge, with the evidence in
+`## Notes` and the review verdicts beneath it.
 
 ## Notes
 
@@ -137,23 +150,25 @@ Also recorded, per `docs/engineering.md` §Definition of done 6: the cascade-sco
 Unchanged by this round: the gate's decision logic (`liveAcceptanceCriteria(...) === 0` as the single no-contract predicate, the bare-box carve-out, the container exemption). No status flipped, no acceptance box ticked — this item's own live `## Acceptance` is still the template placeholder and still refuses as `no-live-contract`, which is the lead's to populate after merge.
 
 ### 2026-10-06 @Arggon
+
 ## Review round 2: evidence for both blocking fixes (commit f8b7551b)
 
 ### B1 — proof the classifier now recognises BOTH refusal reasons
 
-Mechanism: `error.code` + the gate's shared prefix, not prose. `cli/auto-done-refusal.mjs` classifies `expected` iff the envelope is `ok:false`, `error.code === "UPDATE_FAILED"`, and `error.message` contains `cannot mark '`. **Why not the code alone:** `UPDATE_FAILED` is what *every* kernel update refusal carries (unknown id, illegal transition, refused steal, agent `--waive`), so code-only would annotate real breakage as an expected refusal. **Why not prose alone:** `error.message` is human text the kernel may reword; the prefix `cannot mark '<id>' done:` is shared by both reasons, so a THIRD reason is classified correctly with no change to the classifier — which is exactly what the message-substring list could not promise. The code is on the wire, so I used it; the prefix is the narrowest stable discriminator available on top of it.
+Mechanism: `error.code` + the gate's shared prefix, not prose. `cli/auto-done-refusal.mjs` classifies `expected` iff the envelope is `ok:false`, `error.code === "UPDATE_FAILED"`, and `error.message` contains `cannot mark '`. **Why not the code alone:** `UPDATE_FAILED` is what _every_ kernel update refusal carries (unknown id, illegal transition, refused steal, agent `--waive`), so code-only would annotate real breakage as an expected refusal. **Why not prose alone:** `error.message` is human text the kernel may reword; the prefix `cannot mark '<id>' done:` is shared by both reasons, so a THIRD reason is classified correctly with no change to the classifier — which is exactly what the message-substring list could not promise. The code is on the wire, so I used it; the prefix is the narrowest stable discriminator available on top of it.
 
 Observed, driving the workflow's exact `classify_refusal` shell function against envelopes produced by the **real kernel** (`updateOperation` on real fixtures, not pasted strings):
 
-| refusal reason | pre-fix `grep "unchecked boxes"` | pre-fix annotation | now | now annotation |
-|---|---|---|---|---|
-| `no-live-contract` | **MISS** | "update failed unexpectedly" | `expected` | "flip refused by the done gate" |
-| `unchecked-live-criteria` | MATCH | gate refusal | `expected` | "flip refused by the done gate" |
-| control: `unknown id` (same code) | MISS | unexpected | `unexpected` | "update failed unexpectedly" (correct) |
+| refusal reason                    | pre-fix `grep "unchecked boxes"` | pre-fix annotation           | now          | now annotation                         |
+| --------------------------------- | -------------------------------- | ---------------------------- | ------------ | -------------------------------------- |
+| `no-live-contract`                | **MISS**                         | "update failed unexpectedly" | `expected`   | "flip refused by the done gate"        |
+| `unchecked-live-criteria`         | MATCH                            | gate refusal                 | `expected`   | "flip refused by the done gate"        |
+| control: `unknown id` (same code) | MISS                             | unexpected                   | `unexpected` | "update failed unexpectedly" (correct) |
 
 New suite `cli/auto-done-refusal.test.ts`, **19 passed**. Its central assertion: `expect(classifyUpdateRefusal(NO_CONTRACT)).toBe("expected")` — the ADR 0025 `no-live-contract` refusal, produced by the kernel, is classified expected, so it can never again annotate as unexpected.
 
 Mutation-checked, because a test that passes with and without the fix is not evidence:
+
 - reverting the prefix to `unchecked boxes` (the shipped bug) → **4 failed**
 - dropping the `error.code` check (prose-only) → **1 failed**
 
@@ -163,24 +178,27 @@ Both halves are independently load-bearing. It also asserts the wiring (2 classi
 
 I re-measured from the shipped kernel instead of adopting either number. Over 482 claimable leaves, 117 pre-fix refusals split **5 / 56 / 56**: 5 unblocked (live criteria all ticked), 56 with no live criteria (relabelled, still refused), 56 keeping an unticked live criterion. Open leaves: **7** newly refused, **40** relabelled, **3** unblocked — the review's crosstab and my earlier figures both reproduce exactly.
 
-**One correction to the correction:** the no-live-criteria bucket is **56, not 61**. 61 is the count of pre-fix refusals that *have* a live section (5 + 56) — a population containing both the unblocked and the unchanged, so it described neither. The ADR's Context and Consequences now carry the 5/56/56 split with the definitions, which is what makes decision 2's 7-item cost visible and proportionate. Also verified: the 40 relabelled open leaves carry 223 criterion rows and **0** ticked (so my earlier "their real criteria ticked in dated comments" was false), and all 56 no-live-criteria leaves keep their unticked boxes in dated comment blocks and nowhere else — checked against the kernel's own comment-block rule, not a reimplementation.
+**One correction to the correction:** the no-live-criteria bucket is **56, not 61**. 61 is the count of pre-fix refusals that _have_ a live section (5 + 56) — a population containing both the unblocked and the unchanged, so it described neither. The ADR's Context and Consequences now carry the 5/56/56 split with the definitions, which is what makes decision 2's 7-item cost visible and proportionate. Also verified: the 40 relabelled open leaves carry 223 criterion rows and **0** ticked (so my earlier "their real criteria ticked in dated comments" was false), and all 56 no-live-criteria leaves keep their unticked boxes in dated comment blocks and nowhere else — checked against the kernel's own comment-block rule, not a reimplementation.
 
 ### F3 — deferral in the carrier
+
 ADR 0025 §Alternatives now names `task-cascade-whole-body-acceptance-defers-this-defect` per `engineering.md` §Definition of done 6, and records it as live: `story-ci-wall-clock` is cascade-vetoed on comment history alone (`liveCriteria=0`, `wholeUnchecked=5`). I filed none of the three follow-ups.
 
 ### Gates (expected -> observed)
-| gate | expected | observed |
-|---|---|---|
-| `npm run build` (full, before any test) | exit 0 | exit 0 |
-| `npm run test` | pass | **132 files / 2803 tests passed** (was 2784; +19) |
-| `npm run arggon -- validate` | ok | `ok (0 warning(s), convention v5)` |
-| `npm run check:plugin` | exit 0, bundle unchanged | exit 0, **476897 bytes byte-unchanged** — no kernel change this round |
-| `npx vitest run` done-gate + goal-mode + acceptance-parity + board + new | pass | **5 files / 466 passed** |
-| `npm run lint` | clean | clean (it caught one unused param in my test helper; fixed) |
-| `npx prettier --check` on all 4 touched files | clean | clean |
+
+| gate                                                                     | expected                 | observed                                                              |
+| ------------------------------------------------------------------------ | ------------------------ | --------------------------------------------------------------------- |
+| `npm run build` (full, before any test)                                  | exit 0                   | exit 0                                                                |
+| `npm run test`                                                           | pass                     | **132 files / 2803 tests passed** (was 2784; +19)                     |
+| `npm run arggon -- validate`                                             | ok                       | `ok (0 warning(s), convention v5)`                                    |
+| `npm run check:plugin`                                                   | exit 0, bundle unchanged | exit 0, **476897 bytes byte-unchanged** — no kernel change this round |
+| `npx vitest run` done-gate + goal-mode + acceptance-parity + board + new | pass                     | **5 files / 466 passed**                                              |
+| `npm run lint`                                                           | clean                    | clean (it caught one unused param in my test helper; fixed)           |
+| `npx prettier --check` on all 4 touched files                            | clean                    | clean                                                                 |
 
 Deliberately untouched: the gate's decision logic, `acceptanceComplete`, the consumers, the bundle, every status, and every acceptance box — this item's live `## Acceptance` is still the template placeholder and still refuses as `no-live-contract`.
 
 ### handoff 2026-10-06 @Arggon — next: Reviewer: re-verify B1 by running the workflow's classify_refusal against a real no-live-contract envelope (must print 'expected'); B2 is a doc edit in ADR 0025 Context/Consequences. Then lead merges.
+
 - branch: fix/bug-done-gate-counts-checkboxes-inside-comment-blocks
 - open questions: Classifier keys on UPDATE_FAILED + the gate's shared 'cannot mark' prefix, not a per-message list — is the prefix too broad a gate? No-live-criteria bucket measured 56, not the 61 in the verdict (61 …
