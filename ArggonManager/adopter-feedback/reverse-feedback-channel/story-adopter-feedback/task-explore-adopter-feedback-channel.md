@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-explore-adopter-feedback-channel
 title: "Exploration: reverse feedback channel from adopter repos (friction capture, dedupe, human-gated publish)"
 assignee: Arggon
@@ -9,8 +9,7 @@ parent: story-adopter-feedback
 labels: [methodology, adopters]
 priority: p1
 created: "2026-10-02"
-updated: "2026-10-02"
-claimed_at: "2026-10-02T14:18:08.885Z"
+updated: "2026-10-06"
 worktree_path: /home/arggon/Projects/ArggonManager-task-explore-adopter-feedback-channel
 ---
 <!--
