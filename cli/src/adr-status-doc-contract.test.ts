@@ -109,15 +109,25 @@ const LABEL_DELIMITERS = /[·|\n]/;
 
 /**
  * Where the TRAILING window of a reference stops: the first of a sentence end, a
- * comma, a list delimiter or a line break. Without this the window would run to
- * the end of the line, and a long prose line would drag unrelated text into a
- * status check — `agents.md:473` continues for hundreds of characters past its
- * ADR links, so a window that wide would report prose that has nothing to do
+ * comma, a group closer, a list delimiter or a line break. Without this the window
+ * would run to the end of the line, and a long prose line would drag unrelated text
+ * into a status check — `agents.md:473` continues for hundreds of characters past
+ * its ADR links, so a window that wide would report prose that has nothing to do
  * with any ADR's status. A status for a specific ADR is written as a short
  * appositive right after its link — `(Proposed)`, `— superseded by 0011` — so one
  * clause is the whole shape worth reading.
+ *
+ * `)` is a stop because it closes the group the reference sits in, and prose after
+ * that closer is outside the reference however close it sits: `convention.md:553`
+ * writes `([ADR 0021](…) §4): whether a container's work was accepted …` — it
+ * describes what a product-acceptance record *contains* (`accept: approve` /
+ * `accept: changes-requested`), not ADR 0021's status — but with no group closer in
+ * this set the window ran 181 characters past the `)` and read `accepted` as a
+ * restatement. That is over-reading, and a gate that fires on correct prose is a
+ * gate that gets deleted rather than fixed. Dropping `)` re-opens it; the premise
+ * test pins both halves so neither can move alone.
  */
-const TAIL_STOPS = /[·|,\n]|\.\s/;
+const TAIL_STOPS = /[·|,\n)]|\.\s/;
 
 interface CarrierReference {
   /** `0003` */
@@ -292,6 +302,23 @@ describe("the carrier pins ADR references to the ADR files", () => {
       one(
         "- x: [ADR 0011](./adr/0011-native-first-architecture.md) is the contract, and " +
           "a change is accepted only once it is explicitly recorded.",
+      ),
+    ).toEqual([]);
+    // …and at the group closer, which is the boundary `convention.md:553` crosses:
+    // its link sits inside a parenthetical and the prose after the `)` is about a
+    // product-acceptance record's contents, not ADR 0021's status. Same shape as
+    // the real line, with the status word in the same place.
+    //
+    // The group closer bounds the window but does not blind it, and that half needs
+    // no new assertion: the `(Proposed)` assertion above already reads the trailing
+    // window through this same set and still finds the word, because it sits before
+    // the closer. Together these two fail in exactly opposite states — drop `)` and
+    // this one fires; keep `)` and the other one keeps firing — so neither bound can
+    // move alone.
+    expect(
+      one(
+        "- x: arms the record ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) " +
+          "§4): whether a container's work was accepted is written as an ordinary comment.",
       ),
     ).toEqual([]);
     // A status belonging to a DIFFERENT ADR's clause is not this ADR's claim:
