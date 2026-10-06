@@ -177,3 +177,7 @@ Every quotation in both files re-checked against its source, and reported rather
 | `npm run lint:structure` | no findings | no findings |
 
 `ArggonManager/docs/adr/README.md` needed no edit: the H1 is unchanged, so the verbatim row and its `Proposed` status still hold. Three files changed, 104 insertions / 45 deletions. Nothing merged, no `done` flip, and no `Accepted` written.
+
+### handoff 2026-10-06 @arggon-maker — next: Re-review e2023c1a, then merge; in the merge commit flip Status to Accepted AND tick acceptance box 8
+- branch: feat/task-adr-0026-owner-decision-brief
+- open questions: Is leaving box 8 unticked right, or do you want all eight ticked now?; the exploration's intro paragraph still says each item 'asks the product owner' — left as written since the lead filed it; needs…
