@@ -105,3 +105,7 @@ Docs-only change set, three files, one commit `76e0a4bc`:
 **Verbatim reversal condition** (§8) carries both limbs as given: (a) latency collapsing to "immediate, no scope note", or an answered-brief ratio near 1.0 with zero `decided: other` replies across a meaningful sample; (b) more real decisions made in chat than in briefs, which would mean the routing rule is wrong, not the convention.
 
 No `skills/`, `.agents/skills/`, `templates/`, `.opencode/` or `cli/` file was touched — the carriers and both skill copies belong to `task-wire-decision-brief-carriers`.
+
+### handoff 2026-10-06 @arggon-maker — next: Review PR #659 and merge; flip Status to Accepted on merge, then tick the live ## Acceptance boxes
+- branch: feat/task-adr-0026-owner-decision-brief
+- open questions: Should the acceptance boxes be ticked by the lead or left for merge verification?
