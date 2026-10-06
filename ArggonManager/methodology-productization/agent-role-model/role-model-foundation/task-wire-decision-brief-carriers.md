@@ -5,6 +5,7 @@ id: task-wire-decision-brief-carriers
 title: "Wire the decision-brief convention into the carriers, the generated delivery-lead contract, both skill copies and the ADR 0016 adoption channel"
 parent: role-model-foundation
 labels: [methodology, seam, adopters]
+priority: p0
 created: "2026-10-06"
 updated: "2026-10-06"
 depends_on: [task-spec-owner-decision-brief]
