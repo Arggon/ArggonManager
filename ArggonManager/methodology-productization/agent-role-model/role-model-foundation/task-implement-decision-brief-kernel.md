@@ -52,3 +52,33 @@ The **implementation half** of [spec-owner-decision-brief-021](../../docs/specs/
 - [ ] **The registry is correct after the change.** The spec's `brief.ts` is a **new module**: confirm nothing in the capability matrix or the package `files` list needs a row, and if something does, update it in this PR rather than leaving a silent gap
 
 ## Notes
+
+### 2026-10-06 @ses_eedebf8d6ffe8pvs9Yk2jnK5WS
+Implementation complete (AC 1-8). PR #662 — branch feat/task-implement-decision-brief-kernel, one commit b2233b67.
+
+WHAT BUILT, PER FILE
+- lib/src/brief.ts (new): parseDecisionBriefs(body) -> DecisionBriefEvent[] {kind: brief|answer, date, order, author, text}; classifyDecisionBrief(body, assignee?) -> none|open|decided|self-decided; itemsWithUnansweredBrief(items) -> UnansweredBrief[] {item, state} sorted by id; DECISION_BRIEF_STATES.
+- lib/src/index.ts: exports classifyDecisionBrief, parseDecisionBriefs, itemsWithUnansweredBrief, DECISION_BRIEF_STATES + types DecisionBriefEvent/DecisionBriefState/UnansweredBrief.
+- lib/src/operations.ts: ShowPayload gains decision_brief; showOperation computes it once via classifyDecisionBrief(acceptanceBody(item), item.assignee).
+- cli/src/spec.ts: UNANSWERED_DECISION_BRIEF_FINDING_KIND; unansweredDecisionBriefFindings(root); additive SpecAnalyzeResult.unansweredDecisionBrief bucket; wired into human output, baseline snapshot/compare, totals.
+- cli/src/cli.ts: JSON emission gains findings.unansweredDecisionBrief in all three spec analyze arms (plain/save/compare).
+- cli/src/decision-brief-convention.test.ts (new, 34 tests).
+- opencode/plugins/arggon/index.bundle.ts: regenerated (kernel changed); check:plugin clean.
+- ArggonManager/docs/json-output.md: field + kind documented.
+
+AC 4 SCOPE WIDTH (verified): unansweredDecisionBriefFindings does NOT import ACCEPTANCE_CONTAINER_TYPES and has no status filter — it calls itemsWithUnansweredBrief, which iterates every item and fires only on state==="open". Tests: a leaf task in_progress (task-rate-limit.md) and a non-terminal story (story-login.md) both fire; a todo leaf also fires; decided/self-decided/unarmed do not.
+
+AC 2 ASSIGNEE (verified): sameOwner folds case; classifyDecisionBrief(body, assignee) is called with item.assignee at both call sites (showOperation; itemsWithUnansweredBrief). Tests: self-decided when answer author == assignee (case-folded), decided when null/undefined/""/different author.
+
+GATES (command -> expected -> observed)
+- npm run build -> ok -> ok (43 modules, bundle regenerated)
+- npm run test -> all green -> 133 files, 2837 tests passed
+- npm run test:structure -> 5 rules pass -> 5 passed, 0 failed
+- npm run lint:structure -> clean -> clean
+- npm run arggon -- validate -> ok -> ok (0 warnings, convention v5)
+- npm run arggon -- spec validate -> ok -> ok (37 docs, 5 pre-existing DOC_NUMBER_COLLISION warnings)
+- npm run arggon -- spec analyze -> 10 findings, none new -> 10 total; unansweredDecisionBrief: 0
+- npx prettier --check (touched files) -> clean -> clean
+- npm run check:plugin -> no drift -> no drift
+
+BUILD-REGENERATED FILE: opencode/plugins/arggon/index.bundle.ts is modified because the kernel entry changed; it is staged in the commit. No node_modules staged (git status verified before/after).
