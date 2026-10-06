@@ -7929,7 +7929,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
+exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.TRACKER_ROOT_MISMATCH = exports.PROCESS_ENV_SOURCE = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
 exports.isArggonItemId = isArggonItemId;
 exports.parseArggonItemFromCommand = parseArggonItemFromCommand;
 exports.parseArggonItemFromCode = parseArggonItemFromCode;
@@ -7946,6 +7946,13 @@ exports.onToolAfter = onToolAfter;
 exports.csvList = csvList;
 exports.sessionToken = sessionToken;
 exports.resolveToolCwd = resolveToolCwd;
+exports.readWorktreeEnv = readWorktreeEnv;
+exports.findWorktreeEnv = findWorktreeEnv;
+exports.processWorktreeIdentity = processWorktreeIdentity;
+exports.trackerBinding = trackerBinding;
+exports.trackerRootMismatch = trackerRootMismatch;
+exports.trackerRootMismatchMessage = trackerRootMismatchMessage;
+exports.trackerBindingReceipt = trackerBindingReceipt;
 exports.worktreeOptions = worktreeOptions;
 exports.nativeToolSchemas = nativeToolSchemas;
 exports.nativeToolsCatalogBytes = nativeToolsCatalogBytes;
@@ -8870,6 +8877,161 @@ async function resolveToolCwd(kernel, command, options, tool) {
     }
     return { cwd: directory };
 }
+exports.WORKTREE_ENV_FILE = ".arggon.env";
+exports.WORKTREE_ENV_KEYS = {
+    item: exports.ITEM_ENV,
+    worktreeId: "ARGGON_WORKTREE_ID",
+    worktreePath: "ARGGON_WORKTREE_PATH",
+    worktreeBranch: "ARGGON_WORKTREE_BRANCH",
+    stateDir: "ARGGON_STATE_DIR",
+    cacheDir: "ARGGON_CACHE_DIR",
+};
+const MAX_ENV_WALK_DEPTH = 8;
+const MAX_ENV_FILE_BYTES = 8_192;
+exports.PROCESS_ENV_SOURCE = "process.env";
+const IDENTITY_FIELDS = [
+    ["worktreePath", exports.WORKTREE_ENV_KEYS.worktreePath],
+    ["worktreeId", exports.WORKTREE_ENV_KEYS.worktreeId],
+    ["item", exports.WORKTREE_ENV_KEYS.item],
+    ["branch", exports.WORKTREE_ENV_KEYS.worktreeBranch],
+    ["stateDir", exports.WORKTREE_ENV_KEYS.stateDir],
+    ["cacheDir", exports.WORKTREE_ENV_KEYS.cacheDir],
+];
+function parseWorktreeEnv(fields, source) {
+    const identity = { source };
+    let declared = 0;
+    for (const [field, key] of IDENTITY_FIELDS) {
+        const value = fields.get(key);
+        if (value === undefined)
+            continue;
+        identity[field] = value;
+        declared += 1;
+    }
+    return declared === 0 ? undefined : identity;
+}
+function parseWorktreeEnvBody(body, source) {
+    const fields = new Map();
+    for (const line of body.split("\n")) {
+        const at = line.indexOf("=");
+        if (at <= 0)
+            continue;
+        const key = line.slice(0, at).trim();
+        const value = line.slice(at + 1).trim();
+        if (key !== "" && value !== "")
+            fields.set(key, value);
+    }
+    return parseWorktreeEnv(fields, source);
+}
+function readWorktreeEnv(file) {
+    try {
+        const body = (0, node_fs_1.readFileSync)(file, "utf8");
+        if (byteLength(body) > MAX_ENV_FILE_BYTES)
+            return undefined;
+        return parseWorktreeEnvBody(body, file);
+    }
+    catch {
+        return undefined;
+    }
+}
+function findWorktreeEnv(directory) {
+    let dir = (0, node_path_1.resolve)(directory);
+    for (let depth = 0; depth <= MAX_ENV_WALK_DEPTH; depth += 1) {
+        const found = readWorktreeEnv((0, node_path_1.join)(dir, exports.WORKTREE_ENV_FILE));
+        if (found !== undefined)
+            return found;
+        const parent = (0, node_path_1.dirname)(dir);
+        if (parent === dir)
+            break;
+        dir = parent;
+    }
+    return undefined;
+}
+function processWorktreeIdentity(env = process.env) {
+    const fields = new Map();
+    for (const [, key] of IDENTITY_FIELDS) {
+        const value = env[key];
+        if (value !== undefined && value !== "")
+            fields.set(key, value);
+    }
+    return parseWorktreeEnv(fields, exports.PROCESS_ENV_SOURCE);
+}
+function trackerBinding(kernel, cwd, env = process.env) {
+    const root = resolvedTrackerRoot(kernel, cwd);
+    const worktree = findWorktreeEnv(cwd);
+    const declared = [];
+    const sources = [];
+    for (const identity of [worktree, processWorktreeIdentity(env)]) {
+        if (identity?.worktreePath === undefined)
+            continue;
+        const absolute = (0, node_path_1.resolve)(identity.worktreePath);
+        if (declared.includes(absolute))
+            continue;
+        declared.push(absolute);
+        sources.push(identity.source);
+    }
+    return {
+        cwd,
+        root,
+        declared,
+        sources,
+        ...(worktree !== undefined ? { worktree } : {}),
+    };
+}
+function resolvedTrackerRoot(kernel, cwd) {
+    try {
+        return kernel.repoRootFromTasks(kernel.findTasksDir(cwd));
+    }
+    catch {
+        return (0, node_path_1.resolve)(cwd);
+    }
+}
+exports.TRACKER_ROOT_MISMATCH = "TRACKER_ROOT_MISMATCH";
+function trackerRootMismatch(binding) {
+    if (binding.declared.length === 0)
+        return undefined;
+    const resolved = (0, node_path_1.resolve)(binding.root);
+    if (binding.declared.includes(resolved))
+        return undefined;
+    return { resolved, declared: binding.declared, sources: binding.sources };
+}
+function trackerRootMismatchMessage(command, binding, mismatch) {
+    const expected = mismatch.declared
+        .map((path, at) => `${path} (from ${mismatch.sources[at] ?? "?"})`)
+        .join(", ");
+    return (`${command} resolves the tracker root to ${mismatch.resolved}, but the worktree ` +
+        `identity this session declares is ${expected}; refusing to write ${command} into a ` +
+        `checkout the caller did not declare. Either move the session into that worktree ` +
+        `(opencode.session_move — the tracker root follows the session's own directory) or ` +
+        `clear the stale ${exports.WORKTREE_ENV_FILE}/${exports.WORKTREE_ENV_KEYS.worktreePath} declaration. ` +
+        `The resolution is per call and reads are never refused — they carry trackerRoot and ` +
+        `trackerRootMismatch instead, so this state is detectable without a write.`);
+}
+function trackerBindingReceipt(binding, mismatch) {
+    if (binding.worktree === undefined && mismatch === undefined)
+        return {};
+    const receipt = { trackerRoot: binding.root };
+    if (binding.worktree !== undefined) {
+        receipt.trackerWorktree = {
+            source: binding.worktree.source,
+            ...(binding.worktree.worktreePath !== undefined
+                ? { path: (0, node_path_1.resolve)(binding.worktree.worktreePath) }
+                : {}),
+            ...(binding.worktree.worktreeId !== undefined ? { id: binding.worktree.worktreeId } : {}),
+            ...(binding.worktree.item !== undefined ? { item: binding.worktree.item } : {}),
+            ...(binding.worktree.branch !== undefined ? { branch: binding.worktree.branch } : {}),
+            ...(binding.worktree.stateDir !== undefined ? { stateDir: binding.worktree.stateDir } : {}),
+            ...(binding.worktree.cacheDir !== undefined ? { cacheDir: binding.worktree.cacheDir } : {}),
+        };
+    }
+    if (mismatch !== undefined) {
+        receipt.trackerRootMismatch = {
+            resolved: mismatch.resolved,
+            declared: mismatch.declared,
+            sources: mismatch.sources,
+        };
+    }
+    return receipt;
+}
 const ID = { type: "string" };
 const STRINGS = { type: "array", items: { type: "string" } };
 const OBJECT = { type: "object" };
@@ -8973,6 +9135,7 @@ const TOOL_SPECS = [
             templatesDir: options.templatesDir,
             full: input.full === true,
         }),
+        mutates: true,
     },
     {
         name: "update",
@@ -9044,6 +9207,7 @@ const TOOL_SPECS = [
             full: input.full === true,
             agent: true,
         }),
+        mutates: true,
     },
     {
         name: "show",
@@ -9166,6 +9330,7 @@ const TOOL_SPECS = [
             text: asString(input.text) ?? "",
             author: asString(input.author) ?? sessionToken(tool?.sessionID),
         }),
+        mutates: true,
     },
     {
         name: "handoff",
@@ -9217,6 +9382,7 @@ const TOOL_SPECS = [
                 author: asString(input.author) ?? fallback,
             });
         },
+        mutates: true,
     },
     {
         name: "priority",
@@ -9241,6 +9407,7 @@ const TOOL_SPECS = [
             cwd: options.cwd,
             dryRun: input.dry_run === true,
         }),
+        mutates: true,
     },
     {
         name: "sync",
@@ -9276,6 +9443,7 @@ const TOOL_SPECS = [
             write: input.write === true,
             repo: asString(input.repo),
         }),
+        mutates: true,
     },
     {
         name: "import_issues",
@@ -9312,6 +9480,7 @@ const TOOL_SPECS = [
             commit: input.no_commit === true ? false : undefined,
             templatesDir: options.templatesDir,
         }),
+        mutates: true,
     },
 ];
 function worktreeOptions(ctx) {
@@ -10631,6 +10800,7 @@ const WORKTREE_TOOL_SPECS = [
         },
         output: OBJECT,
         run: (kernel, input, options, tool) => guarded(kernel, "start", "START_FAILED", () => nativeStart(kernel, input, options, tool)),
+        mutates: true,
     },
     {
         name: "branch",
@@ -10643,6 +10813,7 @@ const WORKTREE_TOOL_SPECS = [
         },
         output: OBJECT,
         run: (kernel, input, options) => guarded(kernel, "branch", "BRANCH_FAILED", async () => nativeBranch(kernel, input, options)),
+        mutates: true,
     },
     {
         name: "cleanup",
@@ -10663,6 +10834,7 @@ const WORKTREE_TOOL_SPECS = [
         },
         output: OBJECT,
         run: (kernel, input, options, tool) => guarded(kernel, "cleanup", "CLEANUP_FAILED", () => nativeCleanup(kernel, input, options, tool)),
+        mutates: true,
     },
 ];
 const ALL_TOOL_SPECS = [...TOOL_SPECS, ...WORKTREE_TOOL_SPECS];
@@ -10691,12 +10863,21 @@ function argonToolDefinitions(kernel, options) {
             const resolved = await resolveToolCwd(kernel, spec.name, options, tool);
             if ("error" in resolved)
                 throw resolved.error;
+            const binding = trackerBinding(kernel, resolved.cwd, options.worktreeEnv ?? process.env);
+            const mismatch = trackerRootMismatch(binding);
+            if (mismatch !== undefined && spec.mutates === true) {
+                throw new ArgonToolError(kernel.failEnvelope({
+                    command: spec.name,
+                    code: exports.TRACKER_ROOT_MISMATCH,
+                    message: trackerRootMismatchMessage(spec.name, binding, mismatch),
+                }));
+            }
             const callOptions = resolved.cwd === options.cwd ? options : { ...options, cwd: resolved.cwd };
             const outcome = await spec.run(kernel, input ?? {}, callOptions, tool);
             const envelope = outcome.envelope;
             if (!outcome.ok)
                 throw new ArgonToolError(envelope);
-            return { output: envelope };
+            return { output: { ...envelope, ...trackerBindingReceipt(binding, mismatch) } };
         },
     }));
 }
