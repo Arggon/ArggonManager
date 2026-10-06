@@ -8,7 +8,6 @@ labels: [native-seam, worktree, hygiene]
 created: "2026-10-05"
 updated: "2026-10-05"
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-native-guard-silent-without-worktree-declaration.md
   Leaves live only under a story. id is the filename stem: bug-native-guard-silent-without-worktree-declaration.
@@ -42,3 +41,35 @@ That is exactly the incident that made **7 open PRs** invisible to the tracker o
       that it still is
 
 ## Notes
+
+### 2026-10-06 @ses_ef169b774ffddLlcycmzGGeU5Q
+Measured reproduction from a delivery-lead session on 2026-10-05, offered as evidence for this item rather than as a new report. **This is the same guard and the same `ARGGON_WORKTREE_PATH` root — I did not open a separate item.**
+
+### What happens
+
+Two native calls, both made while my session was working inside `/home/arggon/Projects/ArggonManager-task-adr-index-parity-does-not-check-titles`:
+
+- `tools.arggon.show({ id: "task-adr-index-parity-does-not-check-titles", meta: true })` → `status: todo, assignee: null, branch: null, claimed_at: null, worktree_path: null`
+- the branch's own item file at that same moment → `status: in_progress, assignee: Arggon, branch: feat/…, claimed_at: "2026-10-03T12:48:04.010Z"`
+
+Same item, same moment, two different answers. The native tool read the **primary checkout**; the claim lived in the worktree. No error, no warning, no degraded flag — just a confident, wrong item state.
+
+### Why this is worse than "the guard is silent"
+
+The silent-guard framing says the failure is *absent output*. This is **present, plausible, wrong output**, and it survived every check I ran. I built a wave plan on it. Two of the five "in-flight" items I identified were only caught because I happened to run `git worktree list` and `git show <branch>:<item>` by hand — nothing in the native surface prompted me to. Had I not cross-checked, I would have dispatched a maker into a worktree another writer already held, which is a claim conflict the kernel refuses but the maker would have walked into.
+
+It also corrupts the ordinary read path: `next` returns `task-explore-adopter-feedback-channel` as the top claimable item, and `show` reports it unclaimed, while its worktree holds a two-round-reviewed PR on a branch claimed by `Arggon`.
+
+### The three faces of one root, for whoever picks this up
+
+I now think this item's scope should cover all three, because all three are "the tracker only learns about a worktree when a commit rides a branch, and `main` cannot read branch state":
+
+1. **Pool** — `list`/`next` compute claimability from `main`, so 5 in-flight items read as unclaimed `todo`. Tracked separately as `bug-claim-pool-computed-from-main-misses-branch-claims`.
+2. **Read path** — the native `show`/`list` resolve to the primary checkout, so a worktree's item state is unreachable. **This item.**
+3. **Reap path** — `cleanup --prune` could only reap **1 of 9** stale worktrees today. The other 8 belong to `done` items whose `main` frontmatter records no `worktree_path` (the claim was released rather than landed), so the reaper is blind to them. 15 worktrees persist with no tracker footprint.
+
+Face 3 has a cheap standalone check: a `done` item with a matching `../<repo>-<id>` directory on disk that `cleanup` does not list as a candidate. That is a report-only assertion and needs no behavioural change.
+
+### One adjacent trap, in case it is in scope
+
+The same session, `doctor` reported `vendored plugin STALE`, so the native catalog was whatever was on disk at session start. `tools.arggon.cleanup` exposed only `{prune, no_gh, no_commit}` — no `release`, no `take_over_worktree` — while the CLI has both and `cli/src/mcp-server.ts` declares both. I nearly filed that as a seam-drift defect. It is **not** one: `doctor` had already named the cause and the fix. Worth a line here only because the failure presents as "the tool is missing a flag" and the real answer is "restart the session".
