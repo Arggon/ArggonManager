@@ -13,7 +13,6 @@ updated: "2026-10-06"
 claimed_at: "2026-10-06T14:01:55.152Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0026-owner-decision-brief
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-adr-0026-owner-decision-brief.md
   Leaves live only under a story. id is the filename stem: task-adr-0026-owner-decision-brief.
@@ -130,3 +129,51 @@ No `skills/`, `.agents/skills/`, `templates/`, `.opencode/` or `cli/` file was t
 
 - branch: feat/task-adr-0026-owner-decision-brief
 - open questions: Should the acceptance boxes be ticked by the lead or left for merge verification?
+
+### 2026-10-06 @arggon-maker
+**Change request addressed — commit `e2023c1a` on `feat/task-adr-0026-owner-decision-brief`, PR #659 left open.**
+
+All four blocking findings and all five non-blocking ones are fixed, all as prose in files already in the PR. Every finding was re-verified against the tree before I edited; two of them were confirmed by re-fetching the cited source rather than trusting the review.
+
+### Blocking
+
+**B1 — default direction.** §3 now constrains direction, not just presence. For a hard-to-reverse call the default is **the reversible or "hold" option, never the more aggressive one**; where no such default exists the default is **"hold"** and the brief says so explicitly; for every other decision that owes a brief it is the lead's own recommended option. The consequence is stated in the ADR's own words: **a brief can never make an irreversible act happen because nobody replied.** §3 now says why that clause is load-bearing rather than merely prudent — §5 routes hard-to-reverse calls here, so silence fires exactly where an unforced default does the most damage. The two clauses are also explicitly tied: the direction rule is "the clause that makes the first one safe", and a reader who never opens the brief and a repository with no reader both land on the same safe outcome, which is what lets a brief be sent without a blocker status ever existing.
+
+**B1b — the contradiction.** Silence no longer claims the product owner chose anything by not answering. §3 now says the choice was made and put in writing **by the lead, before the brief was sent, precisely so the owner could override it** — silence selects a default the owner was shown in advance, not one they picked by abstention. That formulation holds for both halves: the no-product-owner case is now folded into the same paragraph as the ordinary silence case rather than sitting two paragraphs below it to contradict it.
+
+**B2 — live `## Acceptance` published.** The eight criteria now live in the item's live `## Acceptance` section, replacing the `<!-- The real acceptance criteria… -->` placeholder; the placeholder is gone and the dated-comment copy is left as history. Verified against the kernel's own view: **8 live rows, 7 ticked, 1 unticked**.
+
+**Box 8 is deliberately unticked, and this is the one judgement call in the set.** Its first half ships here (`Status: Proposed` plus the status note). Its second half — Accepted on merge — is the merge commit, which per the lead's own answer is not work in this PR, so it cannot honestly be verified from here. It is the same commit that flips the status. The section says so in a line under the checklist. Tick it in the merge commit and the contract is complete; I would rather hand you one open box with a stated reason than eight ticked ones where one is unearned. Say the word if you would rather I tick it now.
+
+**B3 — misattributed quotation, fixed.** The clause is now attributed to `docs/engineering.md` §Review bar → Product acceptance, where `grep` confirms it verbatim at `:145`, with ADR 0021 §3 kept for the rule and credited with its own wording ("compliant by default and never blocked", `0021:283`). Confirmed independently: the phrase "wedge a container" occurs **zero** times in ADR 0021.
+
+**B4 — the fabricated quotation, restated.** The quoted fragment is deleted. The row now reads what the item actually says: **partially — it is a decision item, not a bug, and states the choice in mechanism terms**. Grounded in the item's own frontmatter (`type: task`, its title asking whether to arm a setting or record why the report-only default is kept) and its acceptance checklist ("Decision recorded on the item…"). Table alignment verified intact — all five rows measure 58/112/88/26, so prettier had nothing to rewrite.
+
+### Also fixed
+
+- **N1** — §8's "counters in §4" → "the two countermeasures in §4, read as conventions rather than as counters".
+- **N2** — Context's "Measured, not assumed" replaced with "Three open items of the same shape, verified 2026-10-06", stating what was actually checked (each `todo`, unassigned, no recommendation, choice stated in mechanism terms), naming the product-owner framing as **an inference rather than something the items ask in their own words**, and recording the caveat that under §5's own routing rule two of the three would not owe a brief at all. The paragraph now says the load-bearing evidence is the product owner's request.
+- **N3** — line 135's confirmation dialog is now domain-neutral and the software shape is labelled: "asks a question the reader has no way to decline — in software, the shape of a confirmation dialog with no cancel button."
+- **N4** — NN/g heuristic-2 restored to the source's "**that** seem" (the reviewer's reading confirmed against the live page, including the 1994 / last-reviewed-2024-01-30 dating).
+- **N5** — MADR 0015's three drivers now name all three; the missing one is "MADR should contain fields important to the ADR decision process" (confirmed against the live page).
+- **The §6.2 attribution** — "any project — not only software" now traced to **ADR 0020 §Decision.1**, quoted in ADR 0021's §6 amendment preamble at `0021:20`, with §6.2 credited as the substance leaned on.
+
+### One more citation defect I found in my own text, beyond the six
+
+Same class as B3, in the sentence about the `priority`-style frontmatter field: I cited the `role:`/`owner:` rejection to **ADR 0021 §Consequences**. It is at `0021:417`, under **§Alternatives considered** (`## Consequences` is at `:376`, `## Alternatives considered` at `:405`). Corrected. I checked every other ADR 0021 citation in the file the same way — §4, §2, §6.1 boundary 1, and §3 (`:283`, `:297` are both inside §3) are all accurate, and "reduce per-item human cost, never add one" is verbatim at `0021:297`.
+
+### Quotation re-check, as asked
+
+Every quotation in both files re-checked against its source, and reported rather than quietly patched. Verified **unchanged and correct**: Klein (HBR 2007-09, fetched live), the NN/g confirmation-dialog quotes, the Plain Writing Act "written for its specific audience" and the archive note (fetched live), "reduce per-item human cost, never add one", "compliant by default and never blocked", "forgeable or unusable", the five authority-map rows. Verified **wrong and fixed**: the three above plus the coordinator-decides fabrication. Nothing else moved.
+
+### Gates — command → expected → observed
+
+| Gate | Expected | Observed |
+| --- | --- | --- |
+| `npx prettier --check` (4 files) | clean and stable | `--write` reported **all 4 unchanged**; `--check` then green |
+| `npm run arggon -- validate` | `ok:true` | `ok (0 warning(s), convention v5)` |
+| `npx vitest run cli/src/adr-index-parity.test.ts` | 9/9 | **9 passed** |
+| `npm run test:structure` | 5/5 | **5 passed; 0 failed** |
+| `npm run lint:structure` | no findings | no findings |
+
+`ArggonManager/docs/adr/README.md` needed no edit: the H1 is unchanged, so the verbatim row and its `Proposed` status still hold. Three files changed, 104 insertions / 45 deletions. Nothing merged, no `done` flip, and no `Accepted` written.
