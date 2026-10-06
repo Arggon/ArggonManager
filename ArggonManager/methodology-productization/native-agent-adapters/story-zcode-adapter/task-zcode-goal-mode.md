@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-zcode-goal-mode
 title: ZCode goal-mode template from item checklist (plan T5)
 assignee: arggon-delivery-lead
@@ -8,8 +8,7 @@ branch: feat/task-zcode-goal-mode
 parent: story-zcode-adapter
 labels: []
 created: "2026-10-02"
-updated: "2026-10-05"
-claimed_at: "2026-10-05T23:34:16.069Z"
+updated: "2026-10-06"
 depends_on: [task-adapter-selection-flags, task-capability-matrix]
 worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-goal-mode
 ---
