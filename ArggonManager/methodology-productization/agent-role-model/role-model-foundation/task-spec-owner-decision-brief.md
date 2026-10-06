@@ -211,3 +211,42 @@ npx prettier --check ArggonManager/docs/specs/spec-owner-decision-brief-021.md
 What it changes: if B1–B4's fixes shift the finding count above 10, the ADR 0017 gate for `task-wire-decision-brief-carriers` closes again and that item stays unclaimable. If a hand-rolled link is introduced while fixing non-blocking #3, `spec analyze` will not catch it — re-run the dead-link check by hand (`cd ArggonManager/docs/specs` and test each `(`..`)` target).
 
 **Merge recommendation: no-merge.** Blocking B1–B4 plus non-blocking 1–5 are all in the single file this PR adds; the fix is one editing pass and no re-design. Re-review after that pass is a diff read, not a re-analysis.
+
+### 2026-10-06 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-06 @arggon-delivery-lead
+
+**verdict: request-changes (4 blocking, all in one file) — do not merge yet.**
+
+The standards reviewer's mechanical pass confirmed three of the four defects I found and **ruled the fourth against me**, correctly. I record that ruling here because the maker escalated it to me and the answer belongs in the record, not in a chat.
+
+## The register question — ruled: the non-software example stays
+
+I was wrong. ADR 0026 §7's rule is "every field is named in the project's own terms", and **its own model of that rule is the supplier phrasing**; the software constraint is about *where* software may appear — "in carriers … never as the convention's own language". The convention's own language is the six field names and the two header tokens, all of them neutral. A non-software worked example demonstrates §7 rather than violating it.
+
+**But the maker's accompanying claim is false and must go:** the spec asserts the software case "appears once" in it. It appears **not at all**. That is the one substantive thing about the register question, and a false claim about coverage is worse than a missing example.
+
+## Blocking
+
+- **B1 — the Synopsis example attributes the brief to the product owner** (line 80: the decide: brief is headed @gonzalo). **Worse than I framed it:** the reviewer's grep found there is **no other authorship statement anywhere in the spec**, so that line is not contradicted by the prose — it is the spec's *only* claim about who writes a brief, and it is inverted. With both blocks on @gonzalo, the example reads either as the owner authoring her own brief or as the owner answering her own question — the exact case self-decided exists to flag. Fix: attribute the brief to the delivery lead, and **say in the record section that the lead authors it** (ADR 0026 §1), so prose and example agree.
+- **B2 — the answer's scope is absent from the question.** The decided: line reads "option B (the second wave)" while the brief's options are "A keep one supplier" / "B add a second supplier". "The second wave" is residue from another draft. An answer naming a scope the question never offered teaches the wrong answer grammar.
+- **B3 — the answer's reasoning contradicts the brief's own option B.** "The only option that does not spend the thing we are short of" — option B is chosen precisely because it spends more. If the point is illustrating an owner overriding the recommendation, it must say so and reason coherently.
+
+## New, same class, also blocking
+
+- **B4 — the example recommends B and defaults to A with nothing licensing the difference.** That is legal only under ADR 0026 §3's hard-to-reverse constraint (the default is the reversible-or-hold option), and **the example never signals that constraint**. A reader concludes the default is free to differ from the recommendation — precisely the clause that keeps auto-execution safe. Fix: make the constraint visible in the example, or align the recommendation and default.
+
+## Non-blocking, same file — fix here rather than file
+
+The four **dead relative links** (the ../lib/src/* paths resolve to ArggonManager/docs/lib/…; no gate catches it), AC 5 omitting self-decided from the ungated list, and the reviewer's seven cheap fixes listed in its verdict.
+
+One of those needs a correction to the maker's own work, and I want it on the record: the maker declared **ADR 0026 §8's reversal limbs "not established"**. The reviewer checked and **limb (a) is computable** — AC 1 mandates a parser whose siblings already carry date. So the declaration was not a smuggled decision, but its stated reason was wrong. Correct it to what is actually true rather than leaving an honest-sounding inaccuracy.
+
+## Verified, so it is not re-litigated
+
+All 20+ ADR line citations resolve to what the spec says. Every technical claim was checked by reading the file, not the citation: the sync no_pr skip, report's per-container aggregation, both parsers' heading/bounded/first-match rules, VerdictComment genuinely lacking an author field, create having no --body, no new config key needed, AC 7's capability-matrix claim.
+
+**The hard gate is clear:** spec analyze is 10 findings on main and 10 on the branch, identical kinds, none in this file — so task-wire-decision-brief-carriers is unblocked once this lands.
+
+## Not merged-and-done in one step
+
+AC 6 requires a **plan** filed with ordered tasks and depends_on. It does not exist yet, so the done flip waits for it. That is the item's own contract, not a formality.
