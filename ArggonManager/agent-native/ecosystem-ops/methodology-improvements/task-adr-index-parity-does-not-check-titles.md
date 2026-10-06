@@ -10,7 +10,6 @@ labels: [docs, adr, tests]
 created: "2026-10-03"
 updated: "2026-10-06"
 depends_on: [task-adr-readme-index-missing-adr-0020]
-worktree_path: /home/arggon/Projects/ArggonManager-task-adr-index-parity-does-not-check-titles
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr-index-parity-does-not-check-titles.md
