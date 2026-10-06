@@ -180,3 +180,7 @@ ADR 0025 §Alternatives now names `task-cascade-whole-body-acceptance-defers-thi
 | `npx prettier --check` on all 4 touched files | clean | clean |
 
 Deliberately untouched: the gate's decision logic, `acceptanceComplete`, the consumers, the bundle, every status, and every acceptance box — this item's live `## Acceptance` is still the template placeholder and still refuses as `no-live-contract`.
+
+### handoff 2026-10-06 @Arggon — next: Reviewer: re-verify B1 by running the workflow's classify_refusal against a real no-live-contract envelope (must print 'expected'); B2 is a doc edit in ADR 0025 Context/Consequences. Then lead merges.
+- branch: fix/bug-done-gate-counts-checkboxes-inside-comment-blocks
+- open questions: Classifier keys on UPDATE_FAILED + the gate's shared 'cannot mark' prefix, not a per-message list — is the prefix too broad a gate? No-live-criteria bucket measured 56, not the 61 in the verdict (61 …
