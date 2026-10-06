@@ -1,3 +1,4 @@
+import { classifyAcceptance, type AcceptanceState } from "./acceptance.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 import { sanitizeHumanTextUncapped } from "./sanitize.js";
@@ -16,6 +17,23 @@ export type ReportContainer = {
   counts: StatusCounts;
   /** True when the story has no task/bug leaves. */
   empty: boolean;
+  /**
+   * Report-only product-acceptance state of the container, from the `accept:`
+   * header convention (ADR 0021 §4, `classifyAcceptance`):
+   * `accepted｜changes-noted｜none｜self-accepted` — one bounded enum token,
+   * additive within `schemaVersion: 1`.
+   *
+   * UNCONDITIONAL, unlike the `spec analyze` detector: this is a pure read of
+   * the container's own body (`none` for every project that never adopted the
+   * convention), while arming `x-tracker.product-acceptance: true` is what
+   * turns a missing record into a REPORTED one. Keeping the field ungated is
+   * what makes the ratio behind the spec's deferred-gate metric computable.
+   *
+   * NOT rendered in the human table: a project reads it from `--json` (and the
+   * MCP/native `report` envelope, same payload) with no change to the text
+   * surface it already reads.
+   */
+  acceptance: AcceptanceState;
 };
 
 export type ReportGroup = {
@@ -95,6 +113,11 @@ export function aggregateReport(items: WorkItem[]): {
           type: story.type,
           counts,
           empty: leaves.length === 0,
+          // The container's OWN body, never a reader-derived string: this is the
+          // same `accept:` question `show --json` answers, read through the one
+          // kernel classifier (no adapter grammar). Bodies are already in memory
+          // from `loadItems`, so the report pays no extra I/O.
+          acceptance: classifyAcceptance(story.body, story.assignee),
         };
       });
       const totals = emptyCounts();

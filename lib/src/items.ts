@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
+  FrontmatterParseError,
   parseFrontmatter,
   numberField,
   stringArrayField,
@@ -92,8 +93,25 @@ export type SoftIssue = {
   message: string;
 };
 
+/**
+ * WHY a `.md` file is not a work item (bug-validate-does-not-check-frontmatter-present).
+ *
+ * `no-frontmatter` is the interesting one: the file carries no block at all,
+ * which is either a deliberate non-item document OR a work item whose block
+ * was destroyed. Only a caller that knows the file's expected ROLE can tell the
+ * two apart, so the loader reports the reason instead of deciding — and
+ * `validate` turns it into a `MISSING_FRONTMATTER` error for a file the layout
+ * says must be an item. Readers that have no such role knowledge
+ * (`loadItems`, `list`, `next`) keep skipping both reasons unchanged.
+ */
+export type SkipReason =
+  /** No `---` fence at the start of the file (also true for a 0-byte file). */
+  | "no-frontmatter"
+  /** A block parsed, but it carries no `type:` — not an item document. */
+  | "no-type";
+
 export type SoftLoadResult =
-  | { kind: "skip" }
+  | { kind: "skip"; reason: SkipReason }
   | { kind: "fatal"; issues: SoftIssue[] }
   | {
       kind: "item";
@@ -133,9 +151,38 @@ export function walkTasksTree(
 }
 
 /**
+ * Classify a frontmatter parse refusal into a `SoftIssue`.
+ *
+ * The two STRUCTURAL codes pass through under their own names: the block is
+ * absent (`MISSING_FRONTMATTER`) or was opened and never closed
+ * (`UNTERMINATED_FRONTMATTER`) — the shapes `validate` must be able to tell
+ * apart from each other and from ordinary YAML breakage. Everything else keeps
+ * the historical generic `BROKEN_YAML`, so a malformed line inside an
+ * otherwise well-formed block reports exactly as it did before
+ * (bug-validate-does-not-check-frontmatter-present, additive).
+ */
+function parseIssue(err: unknown): SoftIssue {
+  const message = err instanceof Error ? err.message : String(err);
+  if (
+    err instanceof FrontmatterParseError &&
+    (err.code === "MISSING_FRONTMATTER" || err.code === "UNTERMINATED_FRONTMATTER")
+  ) {
+    return { code: err.code, message };
+  }
+  return { code: "BROKEN_YAML", message };
+}
+
+/**
  * Soft-load a work item without throwing.
  * Broken YAML / missing required fields are fatal; other schema issues attach to the item.
  * One parse path — unknown keys returned for the caller to warn on.
+ *
+ * A file that is not a work item is a `skip` carrying its REASON
+ * (`SkipReason`), never a bare skip (bug-validate-does-not-check-frontmatter-present):
+ * the two reasons need opposite verdicts. A missing `type` is a plain
+ * non-item document. A missing frontmatter BLOCK is only a non-item document if
+ * nothing expected an item there — and only `validate` knows the tree layout,
+ * so it is the caller that promotes that skip into an error.
  */
 export function softTryLoadItem(filePath: string): SoftLoadResult {
   let raw: string;
@@ -147,21 +194,18 @@ export function softTryLoadItem(filePath: string): SoftLoadResult {
       issues: [{ code: "READ_FAILED", message: err instanceof Error ? err.message : String(err) }],
     };
   }
-  if (!raw.startsWith("---")) return { kind: "skip" };
+  if (!raw.startsWith("---")) return { kind: "skip", reason: "no-frontmatter" };
 
   let data: Frontmatter;
   let body: string;
   try {
     ({ data, body } = parseFrontmatter(raw));
   } catch (err) {
-    return {
-      kind: "fatal",
-      issues: [{ code: "BROKEN_YAML", message: err instanceof Error ? err.message : String(err) }],
-    };
+    return { kind: "fatal", issues: [parseIssue(err)] };
   }
 
   const typeRaw = stringField(data, "type");
-  if (!typeRaw) return { kind: "skip" };
+  if (!typeRaw) return { kind: "skip", reason: "no-type" };
   if (!isItemType(typeRaw)) {
     return {
       kind: "fatal",

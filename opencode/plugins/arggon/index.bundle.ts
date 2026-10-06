@@ -40,6 +40,7 @@ __arggonEdges.set("lib/src/import-issues.ts\u0000./items.js", "lib/src/items.ts"
 __arggonEdges.set("lib/src/import-issues.ts\u0000./paths.js", "lib/src/paths.ts")
 __arggonEdges.set("lib/src/import-issues.ts\u0000./tracker-commit.js", "lib/src/tracker-commit.ts")
 __arggonEdges.set("lib/src/import-issues.ts\u0000./update.js", "lib/src/update.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./acceptance.js", "lib/src/acceptance.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./atomic.js", "lib/src/atomic.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./cleanup.js", "lib/src/cleanup.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./comment.js", "lib/src/comment.ts")
@@ -94,12 +95,14 @@ __arggonEdges.set("lib/src/next.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./paths.js", "lib/src/paths.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./status.js", "lib/src/status.ts")
+__arggonEdges.set("lib/src/operations.ts\u0000./acceptance.js", "lib/src/acceptance.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./comment.js", "lib/src/comment.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./contract.js", "lib/src/contract.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./convention.js", "lib/src/convention.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./create.js", "lib/src/create.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./handoff.js", "lib/src/handoff.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./import-issues.js", "lib/src/import-issues.ts")
+__arggonEdges.set("lib/src/operations.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./json.js", "lib/src/json.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./list.js", "lib/src/list.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./next.js", "lib/src/next.ts")
@@ -116,6 +119,7 @@ __arggonEdges.set("lib/src/priority.ts\u0000./dates.js", "lib/src/dates.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./frontmatter.js", "lib/src/frontmatter.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./paths.js", "lib/src/paths.ts")
+__arggonEdges.set("lib/src/report.ts\u0000./acceptance.js", "lib/src/acceptance.ts")
 __arggonEdges.set("lib/src/report.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/report.ts\u0000./paths.js", "lib/src/paths.ts")
 __arggonEdges.set("lib/src/report.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
@@ -177,6 +181,88 @@ function __arggonRequire(id, from) {
   __arggonModules.get(resolved)(module.exports, (child) => __arggonRequire(child, resolved), module)
   return module.exports
 }
+
+__arggonModules.set("lib/src/acceptance.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ACCEPTANCE_CONTAINER_TYPES = exports.ACCEPTANCE_STATES = void 0;
+exports.parseAcceptances = parseAcceptances;
+exports.classifyAcceptance = classifyAcceptance;
+exports.containersMissingAcceptance = containersMissingAcceptance;
+exports.ACCEPTANCE_STATES = [
+    "accepted",
+    "changes-noted",
+    "none",
+    "self-accepted",
+];
+const COMMENT_HEADING = /^###\s+(\d{4}-\d{2}-\d{2})\s+@(\S+)/;
+const ACCEPTANCE_LINE = /^[ \t]*accept:[ \t]*(approve|changes-requested)(?=$|[ \t(])/i;
+function parseAcceptances(body) {
+    const acceptances = [];
+    let order = -1;
+    let current = null;
+    let seenInComment = false;
+    for (const line of body.split("\n")) {
+        if (/^###\s/.test(line)) {
+            order++;
+            const heading = COMMENT_HEADING.exec(line);
+            current = heading ? { date: heading[1], author: heading[2] } : null;
+            seenInComment = false;
+            continue;
+        }
+        if (current === null || seenInComment)
+            continue;
+        const match = ACCEPTANCE_LINE.exec(line);
+        if (!match)
+            continue;
+        const scope = line.slice(match.index + match[0].length).trim();
+        acceptances.push({
+            date: current.date,
+            order,
+            author: current.author,
+            value: match[1].toLowerCase(),
+            scope: scope.length > 0 ? scope : null,
+        });
+        seenInComment = true;
+    }
+    return acceptances;
+}
+function sameOwner(a, b) {
+    return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+function classifyAcceptance(body, assignee) {
+    let latest = null;
+    for (const acceptance of parseAcceptances(body)) {
+        if (latest === null ||
+            acceptance.date > latest.date ||
+            (acceptance.date === latest.date && acceptance.order > latest.order)) {
+            latest = acceptance;
+        }
+    }
+    if (!latest)
+        return "none";
+    if (latest.value === "changes-requested")
+        return "changes-noted";
+    if (assignee && sameOwner(latest.author, assignee))
+        return "self-accepted";
+    return "accepted";
+}
+exports.ACCEPTANCE_CONTAINER_TYPES = new Set(["story"]);
+function containersMissingAcceptance(items) {
+    const gaps = [];
+    for (const item of items) {
+        if (!exports.ACCEPTANCE_CONTAINER_TYPES.has(item.type))
+            continue;
+        if (item.status !== "done" && item.status !== "cancelled")
+            continue;
+        const state = classifyAcceptance(item.body, item.assignee);
+        if (state === "accepted")
+            continue;
+        gaps.push({ item, state });
+    }
+    return gaps.sort((a, b) => (a.item.id < b.item.id ? -1 : a.item.id > b.item.id ? 1 : 0));
+}
+})
 
 __arggonModules.set("lib/src/atomic.ts", (exports, require, module) => {
 "use strict";
@@ -850,8 +936,10 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
     const tracker = {
         autoCommit: null,
         allowSteal: null,
+        reapAckedOrphans: null,
         strictGateBins: null,
         strictWorktreeWrites: null,
+        productAcceptance: null,
     };
     const generated = {};
     let generatedProjectName = null;
@@ -1001,6 +1089,20 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
                 tracker.strictWorktreeWrites = value === "true";
                 continue;
             }
+            if (key === "product-acceptance") {
+                if (value !== "true" && value !== "false") {
+                    throw new Error(`${sourcePath}: 'product-acceptance' must be a boolean (got ${JSON.stringify(value)})`);
+                }
+                tracker.productAcceptance = value === "true";
+                continue;
+            }
+            if (key === "reap-acked-orphans") {
+                if (value !== "true" && value !== "false") {
+                    throw new Error(`${sourcePath}: 'reap-acked-orphans' must be a boolean (got ${JSON.stringify(value)})`);
+                }
+                tracker.reapAckedOrphans = value === "true";
+                continue;
+            }
             if (key !== "auto-commit")
                 continue;
             if (value !== "true" && value !== "false") {
@@ -1141,8 +1243,10 @@ function readConventionConfig(dir) {
             tracker: {
                 autoCommit: null,
                 allowSteal: null,
+                reapAckedOrphans: null,
                 strictGateBins: null,
                 strictWorktreeWrites: null,
+                productAcceptance: null,
             },
             import: { labelTypes: null },
             worktree: { postStart: null, postStartShell: null, env: null, services: null },
@@ -1661,21 +1765,31 @@ function matchesPredicate(item, pred, blockedByIndex, ancestorIndex) {
 __arggonModules.set("lib/src/frontmatter.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.FrontmatterParseError = void 0;
 exports.parseFrontmatter = parseFrontmatter;
 exports.stringifyFrontmatter = stringifyFrontmatter;
 exports.stringField = stringField;
 exports.numberField = numberField;
 exports.stringArrayField = stringArrayField;
 const FENCE = "---";
+class FrontmatterParseError extends Error {
+    code;
+    constructor(code, message) {
+        super(message);
+        this.name = "FrontmatterParseError";
+        this.code = code;
+    }
+}
+exports.FrontmatterParseError = FrontmatterParseError;
 function parseFrontmatter(raw) {
     const normalized = raw.replace(/^\uFEFF/, "");
     if (!normalized.startsWith(`${FENCE}\n`) && !normalized.startsWith(`${FENCE}\r\n`)) {
-        throw new Error("missing YAML frontmatter (expected file to start with ---)");
+        throw new FrontmatterParseError("MISSING_FRONTMATTER", "missing YAML frontmatter (expected file to start with ---)");
     }
     const rest = normalized.slice(normalized.indexOf("\n") + 1);
     const endMatch = rest.match(/\r?\n---\r?\n?/);
     if (!endMatch || endMatch.index === undefined) {
-        throw new Error("unterminated YAML frontmatter");
+        throw new FrontmatterParseError("UNTERMINATED_FRONTMATTER", "unterminated YAML frontmatter");
     }
     const yaml = rest.slice(0, endMatch.index);
     const body = rest.slice(endMatch.index + endMatch[0].length);
@@ -1685,7 +1799,7 @@ function parseFrontmatter(raw) {
             continue;
         const idx = line.indexOf(":");
         if (idx === -1) {
-            throw new Error(`invalid frontmatter line: ${JSON.stringify(line)}`);
+            throw new FrontmatterParseError("INVALID_FRONTMATTER_LINE", `invalid frontmatter line: ${JSON.stringify(line)}`);
         }
         const key = line.slice(0, idx).trim();
         const value = line.slice(idx + 1).trim();
@@ -2409,9 +2523,9 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceUnchecked = exports.acceptanceRows = exports.acceptanceCriteria = exports.acceptanceComplete = exports.acceptanceBody = void 0;
 exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = void 0;
-exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeReleaseRefusal = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = void 0;
-exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = void 0;
+exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeReleaseRefusal = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = void 0;
+exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceBody", { enumerable: true, get: function () { return items_js_1.acceptanceBody; } });
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
@@ -2572,6 +2686,12 @@ Object.defineProperty(exports, "runSync", { enumerable: true, get: function () {
 var verdict_js_1 = require("./verdict.js");
 Object.defineProperty(exports, "classifyVerdicts", { enumerable: true, get: function () { return verdict_js_1.classifyVerdicts; } });
 Object.defineProperty(exports, "parseVerdicts", { enumerable: true, get: function () { return verdict_js_1.parseVerdicts; } });
+var acceptance_js_1 = require("./acceptance.js");
+Object.defineProperty(exports, "ACCEPTANCE_CONTAINER_TYPES", { enumerable: true, get: function () { return acceptance_js_1.ACCEPTANCE_CONTAINER_TYPES; } });
+Object.defineProperty(exports, "ACCEPTANCE_STATES", { enumerable: true, get: function () { return acceptance_js_1.ACCEPTANCE_STATES; } });
+Object.defineProperty(exports, "classifyAcceptance", { enumerable: true, get: function () { return acceptance_js_1.classifyAcceptance; } });
+Object.defineProperty(exports, "containersMissingAcceptance", { enumerable: true, get: function () { return acceptance_js_1.containersMissingAcceptance; } });
+Object.defineProperty(exports, "parseAcceptances", { enumerable: true, get: function () { return acceptance_js_1.parseAcceptances; } });
 var cleanup_js_1 = require("./cleanup.js");
 Object.defineProperty(exports, "CLEANUP_TERMINAL_STATUSES", { enumerable: true, get: function () { return cleanup_js_1.CLEANUP_TERMINAL_STATUSES; } });
 Object.defineProperty(exports, "classifyCleanupEntry", { enumerable: true, get: function () { return cleanup_js_1.classifyCleanupEntry; } });
@@ -2785,6 +2905,14 @@ function walkTasksTree(dir, opts) {
     }
     return { files, dirs };
 }
+function parseIssue(err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (err instanceof frontmatter_js_1.FrontmatterParseError &&
+        (err.code === "MISSING_FRONTMATTER" || err.code === "UNTERMINATED_FRONTMATTER")) {
+        return { code: err.code, message };
+    }
+    return { code: "BROKEN_YAML", message };
+}
 function softTryLoadItem(filePath) {
     let raw;
     try {
@@ -2797,21 +2925,18 @@ function softTryLoadItem(filePath) {
         };
     }
     if (!raw.startsWith("---"))
-        return { kind: "skip" };
+        return { kind: "skip", reason: "no-frontmatter" };
     let data;
     let body;
     try {
         ({ data, body } = (0, frontmatter_js_1.parseFrontmatter)(raw));
     }
     catch (err) {
-        return {
-            kind: "fatal",
-            issues: [{ code: "BROKEN_YAML", message: err instanceof Error ? err.message : String(err) }],
-        };
+        return { kind: "fatal", issues: [parseIssue(err)] };
     }
     const typeRaw = (0, frontmatter_js_1.stringField)(data, "type");
     if (!typeRaw)
-        return { kind: "skip" };
+        return { kind: "skip", reason: "no-type" };
     if (!(0, ids_js_1.isItemType)(typeRaw)) {
         return {
             kind: "fatal",
@@ -3037,6 +3162,7 @@ function failEnvelope(opts) {
         schemaVersion: exports.JSON_SCHEMA_VERSION,
         conventionVersion: opts.conventionVersion ?? convention_js_1.CONVENTION_VERSION_DEFAULT,
         command: opts.command,
+        ...(opts.payload ?? {}),
         error,
     };
 }
@@ -3470,12 +3596,14 @@ exports.priorityOperation = priorityOperation;
 exports.syncOperation = syncOperation;
 exports.importIssuesOperation = importIssuesOperation;
 const node_path_1 = require("node:path");
+const acceptance_js_1 = require("./acceptance.js");
 const convention_js_1 = require("./convention.js");
 const contract_js_1 = require("./contract.js");
 const create_js_1 = require("./create.js");
 const comment_js_1 = require("./comment.js");
 const handoff_js_1 = require("./handoff.js");
 const import_issues_js_1 = require("./import-issues.js");
+const items_js_1 = require("./items.js");
 const json_js_1 = require("./json.js");
 const list_js_1 = require("./list.js");
 const next_js_1 = require("./next.js");
@@ -3525,6 +3653,7 @@ function showOperation(opts) {
         return succeed("show", {
             item: (0, contract_js_1.toContractWorkItem)(result.item, result.root),
             path: result.path,
+            acceptance: (0, acceptance_js_1.classifyAcceptance)((0, items_js_1.acceptanceBody)(result.item), result.item.assignee),
             ...(opts.body === true
                 ? { body: result.item.body, comments: result.allComments.map((c) => ({ ...c })) }
                 : { comments: result.comments.map((c) => ({ ...c })) }),
@@ -3943,6 +4072,7 @@ exports.runReport = runReport;
 exports.completedOf = completedOf;
 exports.formatReportTable = formatReportTable;
 exports.formatReportMarkdown = formatReportMarkdown;
+const acceptance_js_1 = require("./acceptance.js");
 const items_js_1 = require("./items.js");
 const paths_js_1 = require("./paths.js");
 const sanitize_js_1 = require("./sanitize.js");
@@ -3983,6 +4113,7 @@ function aggregateReport(items) {
                 type: story.type,
                 counts,
                 empty: leaves.length === 0,
+                acceptance: (0, acceptance_js_1.classifyAcceptance)(story.body, story.assignee),
             };
         });
         const totals = emptyCounts();
@@ -5701,6 +5832,15 @@ function posixRel(root, abs) {
 function push(bucket, path, message, code) {
     bucket.push({ path, message, code });
 }
+function isItemFilePosition(filePath) {
+    const name = (0, node_path_1.basename)(filePath);
+    if (!name.endsWith(".md"))
+        return false;
+    const stem = name.slice(0, -".md".length);
+    if (stem === (0, node_path_1.basename)((0, node_path_1.dirname)(filePath)))
+        return true;
+    return stem.startsWith("task-") || stem.startsWith("bug-");
+}
 function checkItemShape(item, errors) {
     const { relPath: rel, filePath, type, id, status, assignee, blockedReason, data } = item;
     try {
@@ -5845,8 +5985,12 @@ function runValidate(opts) {
             continue;
         const rel = posixRel(root, file);
         const loaded = (0, items_js_1.softTryLoadItem)(file);
-        if (loaded.kind === "skip")
+        if (loaded.kind === "skip") {
+            if (loaded.reason === "no-frontmatter" && isItemFilePosition(file)) {
+                push(errors, rel, "missing required YAML frontmatter: a work item file must start with a `---` block carrying at least `type`, `id` and `status`", "MISSING_FRONTMATTER");
+            }
             continue;
+        }
         if (loaded.kind === "fatal") {
             for (const issue of loaded.issues) {
                 push(errors, rel, issue.message, issue.code);
@@ -7813,7 +7957,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
+exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.TRACKER_ROOT_MISMATCH = exports.PROCESS_ENV_SOURCE = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
 exports.isArggonItemId = isArggonItemId;
 exports.parseArggonItemFromCommand = parseArggonItemFromCommand;
 exports.parseArggonItemFromCode = parseArggonItemFromCode;
@@ -7830,6 +7974,13 @@ exports.onToolAfter = onToolAfter;
 exports.csvList = csvList;
 exports.sessionToken = sessionToken;
 exports.resolveToolCwd = resolveToolCwd;
+exports.readWorktreeEnv = readWorktreeEnv;
+exports.findWorktreeEnv = findWorktreeEnv;
+exports.processWorktreeIdentity = processWorktreeIdentity;
+exports.trackerBinding = trackerBinding;
+exports.trackerRootMismatch = trackerRootMismatch;
+exports.trackerRootMismatchMessage = trackerRootMismatchMessage;
+exports.trackerBindingReceipt = trackerBindingReceipt;
 exports.worktreeOptions = worktreeOptions;
 exports.nativeToolSchemas = nativeToolSchemas;
 exports.nativeToolsCatalogBytes = nativeToolsCatalogBytes;
@@ -8754,6 +8905,161 @@ async function resolveToolCwd(kernel, command, options, tool) {
     }
     return { cwd: directory };
 }
+exports.WORKTREE_ENV_FILE = ".arggon.env";
+exports.WORKTREE_ENV_KEYS = {
+    item: exports.ITEM_ENV,
+    worktreeId: "ARGGON_WORKTREE_ID",
+    worktreePath: "ARGGON_WORKTREE_PATH",
+    worktreeBranch: "ARGGON_WORKTREE_BRANCH",
+    stateDir: "ARGGON_STATE_DIR",
+    cacheDir: "ARGGON_CACHE_DIR",
+};
+const MAX_ENV_WALK_DEPTH = 8;
+const MAX_ENV_FILE_BYTES = 8_192;
+exports.PROCESS_ENV_SOURCE = "process.env";
+const IDENTITY_FIELDS = [
+    ["worktreePath", exports.WORKTREE_ENV_KEYS.worktreePath],
+    ["worktreeId", exports.WORKTREE_ENV_KEYS.worktreeId],
+    ["item", exports.WORKTREE_ENV_KEYS.item],
+    ["branch", exports.WORKTREE_ENV_KEYS.worktreeBranch],
+    ["stateDir", exports.WORKTREE_ENV_KEYS.stateDir],
+    ["cacheDir", exports.WORKTREE_ENV_KEYS.cacheDir],
+];
+function parseWorktreeEnv(fields, source) {
+    const identity = { source };
+    let declared = 0;
+    for (const [field, key] of IDENTITY_FIELDS) {
+        const value = fields.get(key);
+        if (value === undefined)
+            continue;
+        identity[field] = value;
+        declared += 1;
+    }
+    return declared === 0 ? undefined : identity;
+}
+function parseWorktreeEnvBody(body, source) {
+    const fields = new Map();
+    for (const line of body.split("\n")) {
+        const at = line.indexOf("=");
+        if (at <= 0)
+            continue;
+        const key = line.slice(0, at).trim();
+        const value = line.slice(at + 1).trim();
+        if (key !== "" && value !== "")
+            fields.set(key, value);
+    }
+    return parseWorktreeEnv(fields, source);
+}
+function readWorktreeEnv(file) {
+    try {
+        const body = (0, node_fs_1.readFileSync)(file, "utf8");
+        if (byteLength(body) > MAX_ENV_FILE_BYTES)
+            return undefined;
+        return parseWorktreeEnvBody(body, file);
+    }
+    catch {
+        return undefined;
+    }
+}
+function findWorktreeEnv(directory) {
+    let dir = (0, node_path_1.resolve)(directory);
+    for (let depth = 0; depth <= MAX_ENV_WALK_DEPTH; depth += 1) {
+        const found = readWorktreeEnv((0, node_path_1.join)(dir, exports.WORKTREE_ENV_FILE));
+        if (found !== undefined)
+            return found;
+        const parent = (0, node_path_1.dirname)(dir);
+        if (parent === dir)
+            break;
+        dir = parent;
+    }
+    return undefined;
+}
+function processWorktreeIdentity(env = process.env) {
+    const fields = new Map();
+    for (const [, key] of IDENTITY_FIELDS) {
+        const value = env[key];
+        if (value !== undefined && value !== "")
+            fields.set(key, value);
+    }
+    return parseWorktreeEnv(fields, exports.PROCESS_ENV_SOURCE);
+}
+function trackerBinding(kernel, cwd, env = process.env) {
+    const root = resolvedTrackerRoot(kernel, cwd);
+    const worktree = findWorktreeEnv(cwd);
+    const declared = [];
+    const sources = [];
+    for (const identity of [worktree, processWorktreeIdentity(env)]) {
+        if (identity?.worktreePath === undefined)
+            continue;
+        const absolute = (0, node_path_1.resolve)(identity.worktreePath);
+        if (declared.includes(absolute))
+            continue;
+        declared.push(absolute);
+        sources.push(identity.source);
+    }
+    return {
+        cwd,
+        root,
+        declared,
+        sources,
+        ...(worktree !== undefined ? { worktree } : {}),
+    };
+}
+function resolvedTrackerRoot(kernel, cwd) {
+    try {
+        return kernel.repoRootFromTasks(kernel.findTasksDir(cwd));
+    }
+    catch {
+        return (0, node_path_1.resolve)(cwd);
+    }
+}
+exports.TRACKER_ROOT_MISMATCH = "TRACKER_ROOT_MISMATCH";
+function trackerRootMismatch(binding) {
+    if (binding.declared.length === 0)
+        return undefined;
+    const resolved = (0, node_path_1.resolve)(binding.root);
+    if (binding.declared.includes(resolved))
+        return undefined;
+    return { resolved, declared: binding.declared, sources: binding.sources };
+}
+function trackerRootMismatchMessage(command, binding, mismatch) {
+    const expected = mismatch.declared
+        .map((path, at) => `${path} (from ${mismatch.sources[at] ?? "?"})`)
+        .join(", ");
+    return (`${command} resolves the tracker root to ${mismatch.resolved}, but the worktree ` +
+        `identity this session declares is ${expected}; refusing to write ${command} into a ` +
+        `checkout the caller did not declare. Either move the session into that worktree ` +
+        `(opencode.session_move — the tracker root follows the session's own directory) or ` +
+        `clear the stale ${exports.WORKTREE_ENV_FILE}/${exports.WORKTREE_ENV_KEYS.worktreePath} declaration. ` +
+        `The resolution is per call and reads are never refused — they carry trackerRoot and ` +
+        `trackerRootMismatch instead, so this state is detectable without a write.`);
+}
+function trackerBindingReceipt(binding, mismatch) {
+    if (binding.worktree === undefined && mismatch === undefined)
+        return {};
+    const receipt = { trackerRoot: binding.root };
+    if (binding.worktree !== undefined) {
+        receipt.trackerWorktree = {
+            source: binding.worktree.source,
+            ...(binding.worktree.worktreePath !== undefined
+                ? { path: (0, node_path_1.resolve)(binding.worktree.worktreePath) }
+                : {}),
+            ...(binding.worktree.worktreeId !== undefined ? { id: binding.worktree.worktreeId } : {}),
+            ...(binding.worktree.item !== undefined ? { item: binding.worktree.item } : {}),
+            ...(binding.worktree.branch !== undefined ? { branch: binding.worktree.branch } : {}),
+            ...(binding.worktree.stateDir !== undefined ? { stateDir: binding.worktree.stateDir } : {}),
+            ...(binding.worktree.cacheDir !== undefined ? { cacheDir: binding.worktree.cacheDir } : {}),
+        };
+    }
+    if (mismatch !== undefined) {
+        receipt.trackerRootMismatch = {
+            resolved: mismatch.resolved,
+            declared: mismatch.declared,
+            sources: mismatch.sources,
+        };
+    }
+    return receipt;
+}
 const ID = { type: "string" };
 const STRINGS = { type: "array", items: { type: "string" } };
 const OBJECT = { type: "object" };
@@ -8857,6 +9163,7 @@ const TOOL_SPECS = [
             templatesDir: options.templatesDir,
             full: input.full === true,
         }),
+        mutates: true,
     },
     {
         name: "update",
@@ -8928,6 +9235,7 @@ const TOOL_SPECS = [
             full: input.full === true,
             agent: true,
         }),
+        mutates: true,
     },
     {
         name: "show",
@@ -9050,6 +9358,7 @@ const TOOL_SPECS = [
             text: asString(input.text) ?? "",
             author: asString(input.author) ?? sessionToken(tool?.sessionID),
         }),
+        mutates: true,
     },
     {
         name: "handoff",
@@ -9101,6 +9410,7 @@ const TOOL_SPECS = [
                 author: asString(input.author) ?? fallback,
             });
         },
+        mutates: true,
     },
     {
         name: "priority",
@@ -9125,6 +9435,7 @@ const TOOL_SPECS = [
             cwd: options.cwd,
             dryRun: input.dry_run === true,
         }),
+        mutates: true,
     },
     {
         name: "sync",
@@ -9160,6 +9471,7 @@ const TOOL_SPECS = [
             write: input.write === true,
             repo: asString(input.repo),
         }),
+        mutates: true,
     },
     {
         name: "import_issues",
@@ -9196,6 +9508,7 @@ const TOOL_SPECS = [
             commit: input.no_commit === true ? false : undefined,
             templatesDir: options.templatesDir,
         }),
+        mutates: true,
     },
 ];
 function worktreeOptions(ctx) {
@@ -10515,6 +10828,7 @@ const WORKTREE_TOOL_SPECS = [
         },
         output: OBJECT,
         run: (kernel, input, options, tool) => guarded(kernel, "start", "START_FAILED", () => nativeStart(kernel, input, options, tool)),
+        mutates: true,
     },
     {
         name: "branch",
@@ -10527,6 +10841,7 @@ const WORKTREE_TOOL_SPECS = [
         },
         output: OBJECT,
         run: (kernel, input, options) => guarded(kernel, "branch", "BRANCH_FAILED", async () => nativeBranch(kernel, input, options)),
+        mutates: true,
     },
     {
         name: "cleanup",
@@ -10547,6 +10862,7 @@ const WORKTREE_TOOL_SPECS = [
         },
         output: OBJECT,
         run: (kernel, input, options, tool) => guarded(kernel, "cleanup", "CLEANUP_FAILED", () => nativeCleanup(kernel, input, options, tool)),
+        mutates: true,
     },
 ];
 const ALL_TOOL_SPECS = [...TOOL_SPECS, ...WORKTREE_TOOL_SPECS];
@@ -10575,12 +10891,21 @@ function argonToolDefinitions(kernel, options) {
             const resolved = await resolveToolCwd(kernel, spec.name, options, tool);
             if ("error" in resolved)
                 throw resolved.error;
+            const binding = trackerBinding(kernel, resolved.cwd, options.worktreeEnv ?? process.env);
+            const mismatch = trackerRootMismatch(binding);
+            if (mismatch !== undefined && spec.mutates === true) {
+                throw new ArgonToolError(kernel.failEnvelope({
+                    command: spec.name,
+                    code: exports.TRACKER_ROOT_MISMATCH,
+                    message: trackerRootMismatchMessage(spec.name, binding, mismatch),
+                }));
+            }
             const callOptions = resolved.cwd === options.cwd ? options : { ...options, cwd: resolved.cwd };
             const outcome = await spec.run(kernel, input ?? {}, callOptions, tool);
             const envelope = outcome.envelope;
             if (!outcome.ok)
                 throw new ArgonToolError(envelope);
-            return { output: envelope };
+            return { output: { ...envelope, ...trackerBindingReceipt(binding, mismatch) } };
         },
     }));
 }

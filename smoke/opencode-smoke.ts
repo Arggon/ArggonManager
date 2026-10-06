@@ -40,7 +40,7 @@
  *                        worktree through the domain, deletes the merged branch
  *                        and clears the record in one tracker commit.
  *  15. invariants       — never-steal and no-reopen hold with the generated
- *                        permissions active (a real `arggon-worker` session):
+ *                        permissions active (a real `arggon-maker` session):
  *                        the kernel refuses both through the native tools and
  *                        the session continues.
  *  16. permissions      — the shipped agent permissions load and stay
@@ -1580,7 +1580,7 @@ function scenarioWorktreeLifecycle(): void {
 
 /**
  * W4 acceptance 2: never-steal and no-reopen hold with the generated
- * permissions active. The session runs as the shipped `arggon-worker` agent
+ * permissions active. The session runs as the shipped `arggon-maker` agent
  * (its frontmatter permissions are loaded) and the kernel — not the
  * permissions — is what refuses both invariants.
  */
@@ -1608,7 +1608,7 @@ function scenarioInvariants(): void {
   check(
     "generated seam + shipped worker agent carry the permissions (active)",
     f.read("opencode.jsonc").includes('"permissions"') &&
-      existsSync(f.path(".opencode/agents/arggon-worker.md")),
+      existsSync(f.path(".opencode/agents/arggon-maker.md")),
   );
 
   const session = f.opencode(
@@ -1624,7 +1624,7 @@ function scenarioInvariants(): void {
     ].join("\n"),
     undefined,
     undefined,
-    "arggon-worker",
+    "arggon-maker",
   );
   f.saveTranscript("invariants", session);
   check("session succeeds as the worker agent", session.status === 0, runTail(session));
@@ -1701,11 +1701,11 @@ function reviewerProbe(
   label: string,
   ready: (stdout: string) => boolean,
 ): RunResult {
-  const first = f.opencode(prompt, undefined, undefined, "arggon-reviewer");
+  const first = f.opencode(prompt, undefined, undefined, "arggon-standards-reviewer");
   f.saveTranscript(label, first);
   if (ready(first.stdout)) return first;
   console.log(`  retry ${label}: the transcript is missing the probe evidence`);
-  const retry = f.opencode(prompt, undefined, undefined, "arggon-reviewer");
+  const retry = f.opencode(prompt, undefined, undefined, "arggon-standards-reviewer");
   f.saveTranscript(`${label}-retry`, retry);
   return retry;
 }

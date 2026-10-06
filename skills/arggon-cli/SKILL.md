@@ -26,11 +26,12 @@ file — read the one that matches the task **before** acting:
 | `references/json-contract.md` | **JSON contract**: `--json` envelopes, error codes, filters, output surfaces, native tools, MCP                                                  |
 | `references/methodology.md`   | **Methodology**: what the work needs — spec, plan, ADR, exploration, playbook, runbook — and the quality bar                                     |
 | `references/exploration.md`   | **Greenfield exploration**: the six-phase protocol — classify, stance, ground, frontier rounds, edge-case hunt, artifacts + hard gate (ADR 0017) |
-| `references/orchestration.md` | **Orchestration**: coordinator/subagent waves, review bar, smoke gate, worktrees                                                                 |
+| `references/orchestration.md` | **Orchestration**: the four agent roles (named by what they decide), coordinator/subagent waves, review bar, smoke gate, worktrees               |
 | `references/pitfalls.md`      | **Pitfalls**: claim, cascade, tracker-merge and commit-staging traps                                                                             |
 
-The full workflow rules are `ArggonManager/docs/agents.md`; the review bar is
-`ArggonManager/docs/engineering.md`.
+The full workflow rules are `ArggonManager/docs/agents.md`; the review bar, the
+role table and the named (asymmetric) authority are
+`ArggonManager/docs/engineering.md` §Roles and authority / §Review bar.
 
 ## Native surface (OpenCode V2)
 
@@ -116,7 +117,7 @@ command/flag/description change; cli/src/skill-generated-commands.test.ts fails
 on drift). Curated nuances live in `references/`.
 
 ```bash
-<!-- arggon:generated-commands start: list,next,branch,start,update,comment,show,handoff,create,validate -->
+<!-- arggon:generated-commands start: list,next,branch,start,update,comment,show,goal,handoff,create,validate -->
 arggon list  # List work items under the tracker root with optional filters
 arggon next  # Suggest the next claimable leaf item (task/bug leaves; ready items rank first, by downstream weight — unblocks count; lexicographic id on ties; --include-stories opts stories back in)
 arggon branch <id>  # Check out the working branch for an item (generated from branch_patterns)
@@ -124,6 +125,7 @@ arggon start <id>  # Claim an item, check out its branch, commit, push, and opti
 arggon update <id>  # Update frontmatter fields of a work item
 arggon comment <id> [text]  # Append a timestamped, author-attributed comment section to an item's body
 arggon show <id>  # Read one item with bounded output (ADR 0006): frontmatter + last comments; full body is an explicit opt-in
+arggon goal <id>  # Render the goal-mode contract for one claimed item (objective + verification + boundaries) from its acceptance checklist
 arggon handoff <id>  # Append a structured, bounded handoff section (branch, next step, open questions) to an item's body
 arggon create <type> <title>  # Create a work item under the tracker root (label at creation with --labels <csv>)
 arggon validate  # Validate tracker frontmatter and tree integrity

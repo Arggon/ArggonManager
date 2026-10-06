@@ -75,6 +75,44 @@ describe("validate", () => {
     expect(result.errors.some((e) => e.code === "MISSING_INDEX")).toBe(true);
   });
 
+  // bug-validate-does-not-check-frontmatter-present: the structural cases. A
+  // validator that checks the CONTENT of a structure must also check that the
+  // structure EXISTS — these are the shapes that used to report `ok`.
+  it("reports a deleted frontmatter block on an item file, naming the file", () => {
+    const result = runValidate({ cwd: join(invalidRoot, "missing-frontmatter") });
+    const issue = result.errors.find((e) => e.code === "MISSING_FRONTMATTER");
+    expect(issue).toBeDefined();
+    expect(issue?.path).toBe("tasks/demo/e1/s1/task-wiped.md");
+  });
+
+  it("reports a deleted frontmatter block on a container index, naming the file", () => {
+    const result = runValidate({ cwd: join(invalidRoot, "missing-frontmatter-index") });
+    const issue = result.errors.find((e) => e.code === "MISSING_FRONTMATTER");
+    expect(issue?.path).toBe("tasks/demo/e1/s1/s1.md");
+  });
+
+  it("reports an unterminated frontmatter block as its own code", () => {
+    const result = runValidate({ cwd: join(invalidRoot, "unterminated-frontmatter") });
+    const issue = result.errors.find((e) => e.code === "UNTERMINATED_FRONTMATTER");
+    expect(issue).toBeDefined();
+    expect(issue?.path).toBe("tasks/demo/e1/s1/task-open.md");
+  });
+
+  it("reports a zero-byte item file (no block at all)", () => {
+    const result = runValidate({ cwd: join(invalidRoot, "empty-item-file") });
+    const issue = result.errors.find((e) => e.code === "MISSING_FRONTMATTER");
+    expect(issue?.path).toBe("tasks/demo/e1/s1/task-empty.md");
+  });
+
+  // The no-false-positive half of the rule: requiring a block is only safe
+  // because it applies to item POSITIONS, so an ordinary Markdown file that the
+  // layout reserves nothing for must stay silently ignored (as before).
+  it("does not demand frontmatter from a .md outside an item position", () => {
+    const result = runValidate({ cwd: join(invalidRoot, "non-item-markdown") });
+    expect(result.errors.filter((e) => e.code === "MISSING_FRONTMATTER")).toEqual([]);
+    expect(result.errors).toEqual([]);
+  });
+
   it("reports invalid branch with INVALID_BRANCH", () => {
     const result = runValidate({ cwd: join(invalidRoot, "invalid-branch") });
     expect(result.errors.some((e) => e.code === "INVALID_BRANCH")).toBe(true);

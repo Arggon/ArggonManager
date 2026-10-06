@@ -5,7 +5,12 @@ import { describe, expect, it } from "vitest";
 import {
   classifySpawnFailure,
   cliEntryPath,
+  cliNodeArgs,
+  EnvelopeReadError,
+  KernelArtifactDriftError,
+  kernelSourceHookPath,
   nodeImportArgs,
+  readEnvelope,
   runCli,
   SpawnHarnessError,
   tsxLoaderPath,
@@ -250,7 +255,9 @@ describe("spawn failure classification (bug-cli-spawn-suites-exit-1-flake)", () 
     // next occurrence of the CI flake is diagnosable from the test output alone.
     const err = new SpawnHarnessError({
       kind: "child-boot-failed",
-      argv: [...nodeImportArgs(cliEntryPath()), "--json", "list"],
+      // The representative argv is the harness one, so the rendered diagnostic
+      // shows what a real spawn would have run.
+      argv: [...cliNodeArgs(cliEntryPath()), "--json", "list"],
       cwd: repoRoot,
       outcome: outcome({ status: 1, stderr: BOOT_FAILURE_STDERR }),
       artifactDrift: "before[lib/dist/index.js=6001:1] after[lib/dist/index.js=0:2]",
@@ -264,22 +271,286 @@ describe("spawn failure classification (bug-cli-spawn-suites-exit-1-flake)", () 
     expect(err.message).toContain("does not provide an export named 'assertParentEdge'");
   });
 
-  it("the in-repo pack passes --ignore-scripts so it cannot rebuild lib/dist under the suite", () => {
-    // The cause, pinned at the one lane whose cwd IS the repo.
-    // Deliberately NOT a repo-wide "no unguarded pack" scan: lib-build and
-    // pack-contents run `npm run build` / `npm pack` on purpose and are safe
-    // precisely because their cwd is a fresh clone copy that owns its own
-    // `lib/` — and which cwd an argv literal carries cannot be decided
-    // statically, so a blanket ban would delete real coverage. This pins the
-    // flag on the only lane whose lifecycle scripts reach the artifact every
-    // other lane is reading.
+  it("the checkout is never a pack cwd, so no pack can rebuild the shared lib/dist", () => {
+    // The cause, pinned where it actually lives — and corrected.
+    //
+    // This gate used to assert only that the in-repo `npm pack` passed
+    // `--ignore-scripts`, on the belief that the flag stops the root `prepare`.
+    // It does not, on the npm major CI runs: measured on npm 10.9.4,
+    // `npm pack --ignore-scripts` in this checkout still emits
+    // `> prepare > npm run build` and rewrites every file of `lib/dist` and
+    // `dist` in place with vitest's other forks live. The flag is kept (it is
+    // free on npm >= 12) but the mechanism is the pack cwd, so that is what is
+    // pinned here.
+    //
+    // Deliberately NOT a repo-wide "no pack" ban: lib-build and pack-contents
+    // pack on purpose and are safe precisely because their cwd is a private
+    // copy that owns its own `lib/`. What must never come back is the CHECKOUT
+    // as a pack cwd, and in the one lane that packs it that is one grep away.
     const code = stripComments(readFileSync(join(repoRoot, "cli/src/headless-ci.test.ts"), "utf8"));
     const packs = [...code.matchAll(/"pack",([^[\]]*)\]/g)].map((m) => m[1]!);
     expect(packs.length).toBeGreaterThan(0);
     expect(packs.filter((argv) => !argv.includes("--ignore-scripts"))).toEqual([]);
+    // The cwd is the seeded private copy, built from THIS checkout's build
+    // output, so the packed bytes are still the ones under test.
+    expect(code).toContain("freshCloneCopy(root, packClone, true)");
+    expect(code).toContain('join(packClone, "lib"), packClone');
+    // The checkout itself is not a pack cwd any more.
+    expect(code).not.toContain('join(root, "lib"), root');
     // The clone-copy lane keeps its build — opposite discipline, still covered.
     expect(
       stripComments(readFileSync(join(repoRoot, "cli/src/pack-contents.test.ts"), "utf8")),
     ).toContain('"pack", "--dry-run", "--json"');
+  });
+
+  it("the pack clone is seeded from this checkout, so the packed bytes are the ones under test", () => {
+    // The copy is only honest if it carries the build output: both directories
+    // are gitignored, so a plain clone has none and the tarball would ship
+    // without `dist/cli.js`.
+    const fixtures = stripComments(
+      readFileSync(join(repoRoot, "cli/src/pack-fixtures.ts"), "utf8"),
+    );
+    expect(fixtures).toContain('const BUILD_OUTPUT_DIRS = ["lib/dist", "dist"] as const;');
+    // A copy, never a link: a link would put the shared artifact back in play.
+    expect(fixtures).toContain("cpSync(from, to, { recursive: true });");
+    expect(fixtures).not.toContain("symlinkSync(from");
+  });
+});
+
+/**
+ * bug-test-suite-lib-dist-rebuild-race gate: the READER side of the shared-build
+ * isolation, complementing the `--ignore-scripts` writer gate above.
+ *
+ * `lib/dist` is frozen for the run (`test/kernel-artifacts.ts`), so a writer can
+ * no longer produce the race. That is only half of it: a child that resolves the
+ * kernel through `node_modules` reads the artifact at all, so any writer that
+ * gets past the freeze (root, `chmod -R u+w`, a platform without POSIX modes)
+ * is one broken child away from the original flake. `cliNodeArgs` removes the
+ * read: the child loads `lib/src`, which nothing rebuilds.
+ *
+ * So the pin is on the argv, in two directions:
+ *   - the harness itself must never build a child argv the old way, and
+ *   - no test may spawn a CLI child with the bare source-run argv.
+ *
+ * The exemption is deliberate and narrow: `cli/src/lib-build.test.ts` spawns the
+ * CLI of a PRIVATE fresh-clone copy against that copy's own `dist`, which is the
+ * gate that exercises the built kernel for real (the reason the alias-to-source
+ * exists at all). Nothing else may name a CLI entry through `nodeImportArgs`.
+ */
+describe("spawned children resolve the kernel from source (bug-test-suite-lib-dist-rebuild-race)", () => {
+  // Assembled at runtime so this gate's own pattern cannot match itself (the
+  // precedent the wrapper scan sets with WRAPPER_REF above).
+  const CLI_ENTRY_ARGV = new RegExp(
+    ["nodeImportArgs", "\\(\\s*(cliEntryPath\\(\\)|cli\\b|cliEntry\\b)"].join(""),
+  );
+
+  it("the harness builds every child argv with the kernel-source hook", () => {
+    const code = stripComments(readFileSync(join(repoRoot, "cli/src/test-spawn.ts"), "utf8"));
+    // `nodeImportArgs` stays as an exported helper (production's shape, see
+    // cli/src/measure.ts) but the harness must not CALL it: the one remaining
+    // occurrence in this file is the helper's own declaration.
+    expect(code.match(/nodeImportArgs\(/g) ?? []).toHaveLength(1);
+    expect(code).toContain("export function nodeImportArgs(");
+    // Both spawn paths (runCli and spawnNodeCli) spread the hooked argv.
+    expect(code.match(/\[\.\.\.cliNodeArgs\(\), \.\.\.args\]/g) ?? []).toHaveLength(2);
+    expect(existsSync(kernelSourceHookPath())).toBe(true);
+    // The entry is last in both shapes: measureBudget and the loader contract
+    // read the position, not the whole argv.
+    expect(cliNodeArgs("entry.ts").at(-1)).toBe("entry.ts");
+  });
+
+  it("no test spawns a CLI child through the bare source-run argv", () => {
+    const offenders: string[] = [];
+    for (const rel of SCANNED) {
+      for (const file of walkTestFiles(join(repoRoot, rel))) {
+        if (file.endsWith("lib-build.test.ts")) continue; // private copy's dist
+        const code = stripComments(readFileSync(file, "utf8"));
+        // A CLI entry named through nodeImportArgs: `cliEntryPath()`, a `cli`
+        // const, or an `cliEntry` parameter. Driver scripts (which import no
+        // kernel) pass a bare filename and are untouched.
+        if (CLI_ENTRY_ARGV.test(code)) {
+          offenders.push(file.slice(repoRoot.length + 1));
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("drift is a named failure of its own, not a footnote on somebody else's error", () => {
+    // The reported class was report-only: it surfaced only when a reader was
+    // unlucky enough to die, as an unrelated SyntaxError. A writer is a defect
+    // whether or not it broke somebody, so it now has its own name.
+    const err = new KernelArtifactDriftError({
+      argv: [...cliNodeArgs(cliEntryPath()), "--json", "list"],
+      cwd: repoRoot,
+      drift: "before[lib/dist/index.js=6001:1] after[lib/dist/index.js=0:2]",
+    });
+    expect(err.name).toBe("KernelArtifactDriftError");
+    expect(err).toBeInstanceOf(Error);
+    expect(err.drift).toContain("before[");
+    expect(err.message).toContain("REWRITTEN");
+    expect(err.message).toContain("not an assertion failure");
+    // The two instructions that matter: where a build belongs, and whose bug it is.
+    expect(err.message).toContain("freshCloneCopy");
+    expect(err.message).toContain("fix the writer, not the reader");
+  });
+});
+
+/**
+ * bug-mcp-parity-branch-test-json-parse-of-human-stdout gate: a test that reads
+ * a surface's output as a `--json` envelope must never surface a bare
+ * `SyntaxError` from `JSON.parse`.
+ *
+ * CI captured exactly this on PR #610 (a docs-only change), twice, in
+ * `mcp-parity.test.ts`:
+ *
+ *   SyntaxError: Unexpected token 'a', "arggon bra"... is not valid JSON
+ *     ❯ mcp-parity.test.ts:72:25
+ *   SyntaxError: Unexpected token 'a', "arggon cle"... is not valid JSON
+ *
+ * The text was NOT a human success line from the CLI: `arggon branch --json`
+ * and `arggon cleanup --json` write the envelope and nothing else. It was the
+ * MCP server's own tool-LEVEL error sentence (`spawnedOutcome` in
+ * `cli/src/mcp-server.ts` throws `arggon <command> did not emit a JSON envelope
+ * (…)` when a spawned child died before printing one), and the parity helper
+ * parsed the tool result before the caller could read `isError`. The product
+ * message is reproduced verbatim below, because the whole point of this gate is
+ * that a reader no longer needs three guesses to identify it.
+ */
+describe("envelope reading (bug-mcp-parity-branch-test-json-parse-of-human-stdout)", () => {
+  const ENVELOPE = '{"ok":true,"schemaVersion":1,"conventionVersion":5,"command":"branch"}';
+
+  it("reads the contract shape exactly, and reports that it was exact", () => {
+    const read = readEnvelope({ surface: "CLI", command: "arggon branch", text: `${ENVELOPE}\n` });
+    expect(read.envelope).toEqual({
+      ok: true,
+      schemaVersion: 1,
+      conventionVersion: 5,
+      command: "branch",
+    });
+    expect(read.exact).toBe(true);
+  });
+
+  it("reads an envelope that a human line precedes, on its own line or not", () => {
+    // The shape acceptance box 1 asks for: a human success line must not be able
+    // to turn a parsable stream into a SyntaxError.
+    for (const text of [
+      `arggon branch: task task-rate-limit -> feat/rate-limit (created)\n${ENVELOPE}\n`,
+      `arggon branch: task task-rate-limit -> feat/rate-limit (created) ${ENVELOPE}`,
+    ]) {
+      const read = readEnvelope({ surface: "CLI", command: "arggon branch", text });
+      expect(read.envelope.command).toBe("branch");
+      // Found by locating, not by taking the whole text: the strict JSON-only
+      // contract is still assertable by a test that wants it.
+      expect(read.exact).toBe(false);
+    }
+  });
+
+  it("is not fooled by an apostrophe or a brace in the human line ahead of it", () => {
+    const read = readEnvelope({
+      surface: "CLI",
+      command: "arggon branch",
+      text: `arggon branch: can't attach 'fix/x' { id: task-rate-limit }\n${ENVELOPE}\n`,
+    });
+    expect(read.envelope.command).toBe("branch");
+    expect(read.exact).toBe(false);
+  });
+
+  it("raises a named, surface-tagged error for the MCP tool-error text, not a SyntaxError", () => {
+    // The CI-captured shape, byte-for-byte in its opening.
+    const text =
+      "arggon branch did not emit a JSON envelope (exit code 1): " +
+      "Cannot find module '/nonexistent/nope.js'";
+    let raised: unknown;
+    try {
+      readEnvelope({ surface: "MCP", command: "arggon_branch", text, isError: true });
+    } catch (err) {
+      raised = err;
+    }
+    expect(raised).toBeInstanceOf(EnvelopeReadError);
+    const err = raised as EnvelopeReadError;
+    expect(err.name).toBe("EnvelopeReadError");
+    expect(err.surface).toBe("MCP");
+    expect(err.command).toBe("arggon_branch");
+    expect(err.isError).toBe(true);
+    // One read has to be enough: which surface, that it was a tool error, and
+    // the raw text itself.
+    expect(err.message).toContain("surface: MCP (arggon_branch) produced no JSON envelope");
+    expect(err.message).toContain("tool-level error: true");
+    expect(err.message).toContain("TOOL ERROR");
+    expect(err.message).toContain("did not emit a JSON envelope (exit code 1)");
+    // Not the old symptom: no bare JSON.parse SyntaxError escapes any more.
+    expect(err.message).not.toContain("is not valid JSON");
+  });
+
+  it("fails when the envelope is genuinely malformed, and echoes the raw text", () => {
+    const cases = [
+      { label: "truncated", text: '{"ok":true,"schemaVers' },
+      { label: "not json at all", text: "arggon: error: no tracker root found" },
+      { label: "empty", text: "" },
+      { label: "json but not an object", text: "[1,2,3]" },
+      { label: "prose that merely mentions json", text: "expected {ok:true} but got nothing" },
+    ];
+    for (const { label, text } of cases) {
+      expect(() => readEnvelope({ surface: "CLI", command: "arggon branch", text }), label).toThrow(
+        EnvelopeReadError,
+      );
+    }
+    const err = (() => {
+      try {
+        readEnvelope({
+          surface: "CLI",
+          command: "arggon branch",
+          text: '{"ok":true,"schemaVers',
+          stderr: "SyntaxError: Unexpected end of JSON input",
+        });
+        return null;
+      } catch (e) {
+        return e as EnvelopeReadError;
+      }
+    })();
+    expect(err?.message).toContain('{"ok":true,"schemaVers');
+    expect(err?.message).toContain("SyntaxError: Unexpected end of JSON input");
+    // No stderr is stated, not left blank.
+    expect(
+      (() => {
+        try {
+          readEnvelope({ surface: "CLI", command: "arggon cleanup", text: "boom" });
+          return "";
+        } catch (e) {
+          return (e as EnvelopeReadError).message;
+        }
+      })(),
+    ).toContain("--- CLI stderr ---\n(empty)");
+  });
+
+  it("clips an oversized stream but keeps the head, where the noise is", () => {
+    // No envelope anywhere in it, so the scan runs out and reports.
+    const huge = `${"x".repeat(5000)}\narggon branch: still going`;
+    const err = (() => {
+      try {
+        readEnvelope({ surface: "MCP", command: "arggon_cleanup", text: huge });
+        return null;
+      } catch (e) {
+        return e as EnvelopeReadError;
+      }
+    })();
+    expect(err).toBeInstanceOf(EnvelopeReadError);
+    expect(err?.message).toContain("more characters)");
+    // The head is what the message carries; the tail is not echoed.
+    expect(err?.message).not.toContain("still going");
+  });
+
+  it("still finds the envelope behind a long human preamble", () => {
+    // The scan is budgeted, so a preamble long enough to push the envelope past
+    // the budget would silently report "no envelope" — pin that it does not.
+    const preamble = Array.from({ length: 400 }, (_v, i) => `warning ${i}: continuing`).join("\n");
+    const read = readEnvelope({
+      surface: "CLI",
+      command: "arggon branch",
+      text: `${preamble}\n${ENVELOPE}\n`,
+    });
+    expect(read.envelope.command).toBe("branch");
+    expect(read.exact).toBe(false);
   });
 });
