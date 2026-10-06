@@ -26,7 +26,7 @@ numbering, the status and the row order.
 | [0012](./0012-tracker-root-layout.md)                         | Tracker root and product docs layout: `ArggonManager/`                                                         | Accepted                               |
 | [0013](./0013-lib-package-split.md)                           | Kernel package: `@arggondev/lib`                                                                               | Accepted                               |
 | [0014](./0014-zcode-native-seam.md)                           | ZCode native seam: MCP as the full tool surface + declarative plugin                                           | Accepted                               |
-| [0015](./0015-done-gate-acceptance-waiver.md)                 | Done gate: enforce acceptance-checklist completeness on the terminal flip, with an explicit waiver             | Accepted                               |
+| [0015](./0015-done-gate-acceptance-waiver.md)                 | Done gate: enforce acceptance-checklist completeness on the terminal flip, with an explicit waiver             | Accepted (amended by 0025)             |
 | [0016](./0016-adopter-upgrade-channel.md)                     | Adopter upgrade channel                                                                                        | Accepted                               |
 | [0017](./0017-greenfield-exploration-gate.md)                 | Greenfield exploration gate                                                                                    | Accepted                               |
 | [0018](./0018-update-delivery-and-distribution-channel.md)    | Update delivery and distribution channel (release pipeline, update channel, skew, tarballs)                    | Accepted                               |
@@ -36,3 +36,4 @@ numbering, the status and the row order.
 | [0022](./0022-decline-autoharness-autocontext-autocompact.md) | External agent tooling — decline AutoHarness / AutoContext / AutoCompact, and steal the lesson-store idea      | Proposed                               |
 | [0023](./0023-ci-wall-clock.md)                               | CI wall clock: concurrency groups, duration-aware sharding, and the `cli` required check                       | Proposed                               |
 | [0024](./0024-adopter-friction-channel.md)                    | Adopter friction channel                                                                                       | Accepted                               |
+| [0025](./0025-done-gate-live-acceptance-section.md)           | Done gate scope: the live `## Acceptance` section, and no contract means no flip                               | Proposed                               |

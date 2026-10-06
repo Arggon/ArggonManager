@@ -14,7 +14,15 @@ import { assertUpdateRules } from "./rules.js";
 import { formatDate, formatDateTime } from "./dates.js";
 import { assertBranchName, assertLabels } from "./ids.js";
 import { assertPriority } from "./priority.js";
-import { acceptanceComplete, itemsById, loadItems, tryLoadItem, type WorkItem } from "./items.js";
+import {
+  acceptanceComplete,
+  acceptanceGate,
+  itemsById,
+  loadItems,
+  tryLoadItem,
+  type AcceptanceGateVerdict,
+  type WorkItem,
+} from "./items.js";
 import { findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
 import {
@@ -27,6 +35,14 @@ import {
 import { closeLinkedIssue, type IssueRoundtripResult } from "./issue-roundtrip.js";
 import { readConventionConfig } from "./convention.js";
 import { sanitizeHumanError } from "./sanitize.js";
+
+/**
+ * The gate's "no opinion" verdict, for the transitions it does not gate (any
+ * status other than `→ done`, and containers). A named constant rather than an
+ * inline literal so the narrowing below reads as "the gate answered", and so a
+ * future third refusal has exactly one place to widen the union.
+ */
+const GATE_ALLOWS: AcceptanceGateVerdict = { gated: false };
 
 export type UpdateOptions = {
   cwd: string;
@@ -509,21 +525,24 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     }
 
     // Done gate (task-done-gate-acceptance-waiver, ADR 0015): a claimable LEAF
-    // (task/bug) whose body still carries unchecked acceptance checkboxes cannot
-    // reach `done` without an explicit recorded waiver — "done = acceptance
-    // checklist complete (or explicitly waived in Notes with rationale)"
-    // (docs/agents.md §5) becomes kernel-enforced instead of prose. Containers
-    // (story/epic/initiative) are NOT gated here: their contract is the
-    // acceptance-aware cascade veto (task-cascade-acceptance-aware), so the same
-    // predicate is never enforced twice on one item. A body without any
-    // checklist (or with every box ticked) has no open acceptance contract and
-    // flips as before. The waiver never overrides the transition table — an
-    // illegal `→ done` transition (todo/blocked) is refused by the rules layer
-    // above, waive or not; the only legal path this gates is in_progress → done.
-    // Every refusal happens BEFORE any filesystem mutation.
+    // (task/bug) cannot reach `done` while its LIVE `## Acceptance` section
+    // carries an unticked criterion, and cannot reach it carrying no criterion
+    // at all — "done = acceptance checklist complete (or explicitly waived in
+    // Notes with rationale)" (docs/agents.md §5) becomes kernel-enforced instead
+    // of prose. Containers (story/epic/initiative) are NOT gated here: their
+    // contract is the acceptance-aware cascade veto (task-cascade-acceptance-aware),
+    // so the same predicate is never enforced twice on one item. The gate reads
+    // the LIVE section rather than the whole body, because a dated comment block
+    // is append-only history: an unticked box in one records what the criteria
+    // were, not an open obligation (bug-done-gate-counts-checkboxes-inside-comment-blocks).
+    // The waiver never overrides the transition table — an illegal `→ done`
+    // transition (todo/blocked) is refused by the rules layer above, waive or
+    // not; the only legal path this gates is in_progress → done. Every refusal
+    // happens BEFORE any filesystem mutation.
     const flippingToDone = newStatus === "done" && item.status !== "done";
     const gatedLeaf = item.type === "task" || item.type === "bug";
-    const gated = flippingToDone && gatedLeaf && !acceptanceComplete(item.body);
+    const gate = flippingToDone && gatedLeaf ? acceptanceGate(item.body) : GATE_ALLOWS;
+    const gated = gate.gated;
     // Trimmed once here and reused when the waiver section is recorded below;
     // reaching the body-append block with a non-empty reason implies the gate
     // validated the waiver (an empty reason or a non-gated request threw above).
@@ -541,12 +560,20 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
       }
       if (!gated) {
         throw new Error(
-          "--waive is only valid with --status done on a task/bug whose acceptance checklist still has unchecked boxes (nothing to waive)",
+          "--waive is only valid with --status done on a task/bug whose live '## Acceptance' section still has unchecked boxes or publishes no criteria (nothing to waive)",
         );
       }
+    } else if (gated && gate.reason === "no-live-contract") {
+      // The half that keeps the scoping honest (bug-done-gate-counts-checkboxes-inside-comment-blocks):
+      // an item whose live section is absent, empty or still the template
+      // placeholder has published no contract, so ticked boxes in dated comments
+      // are not evidence that the work is done — that would be vacuous success.
+      throw new Error(
+        `cannot mark '${id}' done: the item's live '## Acceptance' section has no acceptance criteria (the section is absent, empty, or still the template placeholder — boxes inside dated '## Notes' comment blocks are history, not the contract). Record the real criteria in that section, or pass --waive "<reason>" to record a dated waiver`,
+      );
     } else if (gated) {
       throw new Error(
-        `cannot mark '${id}' done: the acceptance checklist in the item body still has unchecked boxes. Tick every box, or pass --waive "<reason>" to record a dated waiver`,
+        `cannot mark '${id}' done: the acceptance checklist in the item's live '## Acceptance' section still has unchecked boxes. Tick every box there, or pass --waive "<reason>" to record a dated waiver`,
       );
     }
 

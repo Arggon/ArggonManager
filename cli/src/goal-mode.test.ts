@@ -10,12 +10,16 @@
  *     `bug-three-acceptance-parsers-diverging` the KERNEL owns the one acceptance
  *     grammar (`acceptanceRows` / `acceptanceCriteria` / `acceptanceUnchecked` /
  *     `acceptanceComplete`) and the one canonical input (`acceptanceBody`), and
- *     this adapter reads verdict AND text through it. The PARITY CORPUS below
- *     pins that on the shapes which used to disagree — CRLF, `- [ ]x`, `- [ ] x`,
- *     `-  [ ] x` (NOT a row), `*` bullets, indentation, tabs, empty boxes, and a
- *     checklist that lives only in a COMMENT section — asserting
- *     `hasGoal === !acceptanceComplete(body)` and
- *     `hasGoal === (acceptanceUnchecked(body).length > 0)` on every one.
+ *     this adapter reads verdict AND text through it. Since
+ *     `bug-done-gate-counts-checkboxes-inside-comment-blocks` the gate's own
+ *     question is the LIVE one (`acceptanceGate` / `liveAcceptanceRows` /
+ *     `liveAcceptanceUnchecked`, over the item's `## Acceptance` section with dated
+ *     comment blocks excluded), so this adapter derives from the same region. The
+ *     PARITY CORPUS below pins that on the shapes which used to disagree — CRLF,
+ *     `- [ ]x`, `- [ ] x`, `-  [ ] x` (NOT a row), `*` bullets, indentation, tabs,
+ *     empty boxes, and a checklist that lives only in a COMMENT section — asserting
+ *     `gateUnchecked === acceptanceGate(body).gated` and
+ *     `hasGoal === (liveAcceptanceUnchecked(body).length > 0)` on every one.
  *  2. **The refusals hold on real trees** (init + claim + a recorded
  *     `worktree_path`), not mocks, and every documented code is asserted —
  *     a refusal that is not asserted is a refusal that can rot.
@@ -37,8 +41,11 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   acceptanceComplete,
+  acceptanceGate,
   acceptanceRows,
   acceptanceUnchecked,
+  liveAcceptanceRows,
+  liveAcceptanceUnchecked,
   runComment,
   runCreate,
   runShow,
@@ -56,7 +63,7 @@ import {
   runGoal,
   type GoalContract,
 } from "./goal-mode.js";
-import { tickAcceptance } from "../../test/acceptance.js";
+import { satisfyAcceptance } from "../../test/acceptance.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -126,13 +133,16 @@ function treeWithTask(
 
 /**
  * The derivation as `runGoal` performs it, for the pure corpus matrix: the
- * kernel's rows and the kernel's unchecked criteria, both read from the WHOLE
- * body (`acceptanceBody`). Passing a trimmed/filtered body here would test a
- * different question, which is exactly how the round-2 defect survived — the
- * verdict was the right predicate on the wrong input.
+ * kernel's rows and the kernel's unchecked criteria, both read from the item's
+ * LIVE `## Acceptance` section out of the canonical body — the same bytes the
+ * done gate asks about. Passing a trimmed/filtered body here would test a
+ * different question, which is exactly how the round-2 defect survived (the
+ * verdict was the right predicate on the wrong input), and reading the rows from
+ * the whole body while the gate reads the section would reproduce the same class
+ * one level up.
  */
 function deriveAsRun(body: string): ReturnType<typeof deriveGoal> {
-  return deriveGoal(acceptanceRows(body), acceptanceUnchecked(body));
+  return deriveGoal(liveAcceptanceRows(body), liveAcceptanceUnchecked(body));
 }
 
 /** One `arggon comment` section, as `runComment` appends it. */
@@ -153,10 +163,14 @@ describe("parity corpus: the goal never disagrees with the done gate", () => {
     objective?: RegExp;
   }> = [
     {
-      name: "no checklist at all",
+      // No criteria in the live section: the gate refuses for
+      // `no-live-contract` (bug-done-gate-counts-checkboxes-inside-comment-blocks),
+      // so this is no longer the "nothing left" case it used to be — it is the
+      // "publish a contract" case, and the rendered objective says so.
+      name: "no checklist at all (no live contract)",
       checklist: "(none)",
-      gateUnchecked: false,
-      objective: /DEFINE THE GOAL FIRST/,
+      gateUnchecked: true,
+      objective: /publishes no criteria/,
     },
     {
       name: "one unchecked",
@@ -219,67 +233,106 @@ describe("parity corpus: the goal never disagrees with the done gate", () => {
       objective: /^x$/,
     },
     {
+      // Still NOT rows (the one-space rule is unchanged) — and under the live
+      // question that means the section publishes no criterion at all, so the gate
+      // refuses for `no-live-contract` rather than for a box it cannot see.
       name: "two spaces after the bullet `-  [ ] x` (decided: NOT a row)",
       checklist: "-  [ ] x\n-  [x] y",
-      gateUnchecked: false,
-      objective: /DEFINE THE GOAL FIRST/,
+      gateUnchecked: true,
+      objective: /publishes no criteria/,
     },
     {
       name: "tab between bullet and box (NOT a row: exactly one space)",
       checklist: "-\t[ ] x\n-\t[x] y",
-      gateUnchecked: false,
-      objective: /DEFINE THE GOAL FIRST/,
+      gateUnchecked: true,
+      objective: /publishes no criteria/,
     },
     // The ONLY boxes live in an `arggon comment` section — a first-class shape
     // here (`create` has no `--body` flag; `bug-empty-template-checkbox` is the
-    // stale empty box that shape leaves behind). The gate reads the whole body,
-    // so a verdict taken on a reader's prose would invert.
+    // stale empty box that shape leaves behind). A dated comment block is history
+    // and is not the contract, so the live section here carries no criterion: the
+    // gate refuses (rather than counting the comment's boxes), and the goal must
+    // not hand an agent a comment-filed criterion as the objective to loop on.
     {
-      name: "checklist filed as a comment (the round-2 input-layer inversion)",
+      name: "checklist filed as a comment (history, not the contract)",
       checklist: "- [ ]" + comment("- [ ] criterion filed in a comment"),
       gateUnchecked: true,
-      objective: /criterion filed in a comment/,
+      objective: /publishes no criteria/,
     },
     {
-      name: "checked-in-a-comment only (gate satisfied, nothing to loop on)",
+      name: "checked-in-a-comment only (same: history is not the contract)",
       checklist: "- [ ]" + comment("- [x] shipped, filed in a comment"),
+      gateUnchecked: true,
+      objective: /publishes no criteria/,
+    },
+    {
+      // The control for the two above: the SAME comment block, but the live
+      // section also publishes a criterion. Then the gate's verdict comes from
+      // the live section alone and the comment's boxes change nothing.
+      name: "a live criterion plus unticked boxes in a comment",
+      checklist: "- [ ] a live criterion" + comment("- [ ] criterion filed in a comment"),
+      gateUnchecked: true,
+      objective: /^a live criterion$/,
+    },
+    {
+      name: "a ticked live criterion plus unticked boxes in a comment",
+      checklist: "- [x] a live criterion" + comment("- [ ] criterion filed in a comment"),
       gateUnchecked: false,
-      objective: /DEFINE THE GOAL FIRST/,
+      objective: /every acceptance criterion in its live Acceptance section is ticked/,
     },
   ];
 
   for (const testCase of cases) {
-    it(`${testCase.name}: hasGoal === !acceptanceComplete`, () => {
+    it(`${testCase.name}: gateUnchecked === the gate's own verdict`, () => {
       const source = body(testCase.checklist);
-      const gateUnchecked = !acceptanceComplete(source);
+      // The gate's answer, asked the way the kernel asks it.
+      const gateUnchecked = acceptanceGate(source).gated;
       expect(gateUnchecked, "corpus expectation for the done gate").toBe(testCase.gateUnchecked);
       const goal = deriveAsRun(source);
-      expect(goal.hasGoal, "goal must agree with the gate").toBe(gateUnchecked);
-      // The same answer, computed the way `runGoal` computes it.
-      expect(goal.hasGoal, "goal must agree with the kernel's unchecked criteria").toBe(
-        acceptanceUnchecked(source).length > 0,
-      );
+      // A goal exists iff the LIVE section has an unchecked criterion — the
+      // work the gate would refuse for. On a no-contract item there is nothing to
+      // loop on, and the objective says why (that is the only shape where the
+      // gate refuses and `hasGoal` is false).
+      expect(goal.hasGoal).toBe(liveAcceptanceUnchecked(source).length > 0);
       if (testCase.objective) expect(goal.objective).toMatch(testCase.objective);
       // The inverse must never be reported: a goal that claims work while the
-      // gate is satisfied would send an agent after a criterion that does not
-      // block `done`.
+      // live contract is satisfied would send an agent after a criterion that
+      // does not block `done`.
       if (!gateUnchecked) expect(goal.hasGoal).toBe(false);
     });
   }
 
   it("a comment-stripped input would invert — which is why the canonical body is read", () => {
-    const source = body(`- [ ]${comment("- [ ] criterion filed in a comment")}`);
-    // The gate reads the whole body and refuses to close…
+    // A live criterion AND a comment-filed one: the two questions now disagree,
+    // which is what makes this a real input-layer probe rather than a tautology.
+    const source = body(`- [ ] live criterion${comment("- [ ] criterion filed in a comment")}`);
+    // The whole-body question (what the gate used to ask) refuses and counts both.
     expect(acceptanceComplete(source)).toBe(false);
-    expect(acceptanceUnchecked(source)).toHaveLength(1);
-    // …while the bounded prose (body minus comments) sees nothing: the round-2
-    // defect, and the reason `runGoal` calls `acceptanceBody(item)` rather than
-    // handing a reader's string to the kernel.
+    expect(acceptanceUnchecked(source)).toHaveLength(2);
+    // The live question — the gate's — reads the live section only.
+    expect(acceptanceGate(source).gated).toBe(true);
+    expect(liveAcceptanceUnchecked(source).map((row) => row.text)).toEqual(["live criterion"]);
+    // The bounded prose (body minus comments) sees the live one only, which is
+    // why `runGoal` hands the kernel the canonical body rather than a reader's
+    // string: the reader happens to agree HERE, and the shipped code must not
+    // depend on that accident (bug-three-acceptance-parsers-diverging).
     const proseOnly = source.slice(0, source.indexOf("### 2026-"));
-    expect(acceptanceUnchecked(proseOnly)).toEqual([]);
-    // What ships: one canonical body for the predicate AND the text.
+    expect(acceptanceUnchecked(proseOnly)).toHaveLength(1);
+    // What ships: one canonical body AND one region for the verdict and the text.
     expect(deriveAsRun(source).hasGoal).toBe(true);
-    expect(deriveAsRun(source).objective).toBe("criterion filed in a comment");
+    expect(deriveAsRun(source).objective).toBe("live criterion");
+  });
+
+  it("a comment-filed criterion is never the objective: history is not the contract", () => {
+    // The defect this change closes, from the goal side: before, the goal handed
+    // an agent the criterion recorded in a dated comment as the work to verify.
+    const source = body(`- [ ]${comment("- [ ] criterion filed in a comment")}`);
+    expect(acceptanceGate(source)).toEqual({ gated: true, reason: "no-live-contract" });
+    const goal = deriveAsRun(source);
+    expect(goal.hasGoal).toBe(false);
+    expect(goal.objective).not.toContain("criterion filed in a comment");
+    expect(goal.objective).toMatch(/publishes no criteria/);
+    expect(goal.verification[0]).toMatch(/live '## Acceptance' section carries at least one/);
   });
 
   it("CRLF: the kernel reads it, so the contract agrees with the gate (round 1)", () => {
@@ -301,8 +354,9 @@ describe("parity corpus: the goal never disagrees with the done gate", () => {
     // gate's refusal became invisible (PR #611 review F1) — the kernel owns the
     // set now, so this is a property of `acceptanceRows`, pinned here because this
     // adapter must not reintroduce a `\n` split of its own.
-    const source = "- [x] a\u2028- [ ] b\n";
+    const source = "# Item\n\n## Acceptance\n\n- [x] a\u2028- [ ] b\n";
     expect(acceptanceUnchecked(source)).toHaveLength(1);
+    expect(liveAcceptanceUnchecked(source).map((row) => row.text)).toEqual(["b"]);
     expect(deriveAsRun(source).objective).toBe("b");
   });
 
@@ -436,9 +490,10 @@ describe("runGoal (rendered contract from a real item)", () => {
   it("agrees with the done gate when the checklist is filed as a comment, end to end", () => {
     // `arggon create` has no `--body` flag, so a checklist filed as an
     // `arggon comment` is a first-class shape (bug-empty-template-checkbox is
-    // the stale empty box it leaves). The done gate reads the whole body; the
-    // goal must read the same one, or the contract claims "nothing left" while
-    // the gate refuses to close.
+    // the stale empty box it leaves). The gate reads the item's LIVE `##`
+    // `Acceptance` section (bug-done-gate-counts-checkboxes-inside-comment-blocks),
+    // so here it refuses for `no-live-contract` — and the goal must read the same
+    // region, or the contract would hand an agent history to verify.
     const { dir, id } = treeWithTask("- [ ]", { assignee: "Arggon" });
     runComment({
       cwd: dir,
@@ -448,11 +503,39 @@ describe("runGoal (rendered contract from a real item)", () => {
       now: NOW,
     });
     const item = runShow({ cwd: dir, id }).item;
-    expect(acceptanceComplete(item.body), "gate: unchecked work remains").toBe(false);
+    // The pre-fix whole-body question still counts the comment's box…
+    expect(acceptanceComplete(item.body), "whole-body question: history still counts").toBe(false);
+    // …and the gate's own verdict refuses because nothing is published live.
+    expect(acceptanceGate(item.body)).toEqual({ gated: true, reason: "no-live-contract" });
     const result = runGoal({ cwd: dir, id, login: "Arggon" });
     expect(result.goal.gateUnchecked).toBe(true);
-    expect(result.goal.hasGoal).toBe(true);
-    expect(result.goal.objective).toBe("criterion filed in a comment");
+    expect(result.goal.hasGoal).toBe(false);
+    expect(result.goal.objective).toMatch(/^DEFINE THE GOAL FIRST: this item's live/);
+    expect(result.goal.objective).toMatch(/publishes no criteria/);
+    expect(result.contract).toContain("the done gate will refuse the flip until some are written");
+  });
+
+  it("the live section decides the goal even when a comment block disagrees, end to end", () => {
+    // Same item, one criterion added to the LIVE section: the comment's unticked
+    // box changes nothing, and the goal's objective is the live criterion.
+    const { dir, id } = treeWithTask("- [ ] live criterion", { assignee: "Arggon" });
+    runComment({
+      cwd: dir,
+      id,
+      text: "- [ ] criterion filed in a comment",
+      author: "Arggon",
+      now: NOW,
+    });
+    const item = runShow({ cwd: dir, id }).item;
+    expect(acceptanceGate(item.body)).toEqual({ gated: true, reason: "unchecked-live-criteria" });
+    const result = runGoal({ cwd: dir, id, login: "Arggon" });
+    expect(result.goal.gateUnchecked).toBe(true);
+    expect(result.goal.objective).toBe("live criterion");
+    expect(result.goal.verification).toEqual(["live criterion"]);
+    // Ticking the live criterion satisfies the gate even though the comment's
+    // box stays unticked forever — the flip the gate once refused.
+    satisfyAcceptance(dir, id);
+    expect(acceptanceGate(runShow({ cwd: dir, id }).item.body).gated).toBe(false);
   });
 
   it("states the one-item / one-worktree boundaries in the rendered contract", () => {
@@ -520,7 +603,7 @@ describe("refusals: every documented code is asserted", () => {
       code: "GOAL_ITEM_CLOSED",
       arrange: () => {
         const { dir, id } = treeWithTask("- [x] shipped", { assignee: "Arggon" });
-        tickAcceptance(dir, id);
+        satisfyAcceptance(dir, id);
         runUpdate({ cwd: dir, id, status: "done", now: NOW });
         return { dir, id };
       },
@@ -601,7 +684,7 @@ describe("refusals: every documented code is asserted", () => {
 
   it("reports the closed item before the environment (no misleading remedy)", () => {
     const { dir, id } = treeWithTask("- [x] shipped", { assignee: "Arggon" });
-    tickAcceptance(dir, id);
+    satisfyAcceptance(dir, id);
     runUpdate({ cwd: dir, id, status: "done", now: NOW });
     // Identity ALSO unresolvable: the intrinsic cause must still win.
     const outcome = goalOperation({ cwd: dir, id, login: "" });
@@ -640,7 +723,7 @@ describe("goalOperation (json envelope)", () => {
 
   it("turns a fully ticked checklist into the define-the-goal-first shape", () => {
     const { dir, id } = treeWithTask("- [ ] one goal\n- [ ] two goals", { assignee: "Arggon" });
-    tickAcceptance(dir, id);
+    satisfyAcceptance(dir, id);
     const result = runGoal({ cwd: dir, id, login: "Arggon" });
     expect(result.goal.gateUnchecked).toBe(false);
     expect(result.goal.objective).toMatch(/DEFINE THE GOAL FIRST/);

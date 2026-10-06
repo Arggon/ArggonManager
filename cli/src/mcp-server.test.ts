@@ -16,7 +16,7 @@ import { HANDOFF_SESSION_CAP, conventionPathForRoot, runCreate } from "@arggonde
 import { arggonVersion } from "./docs.js";
 
 import { runInit } from "./init.js";
-import { tickAcceptance } from "../../test/acceptance.js";
+import { satisfyAcceptance } from "../../test/acceptance.js";
 import { deriveDefaultCliSpawn, runMcpServer } from "./mcp-server.js";
 import { cliNodeArgs, tsxLoaderPath } from "./test-spawn.js";
 
@@ -462,7 +462,7 @@ describe("mcp server", () => {
 
     // Done gate (task-done-gate-acceptance-waiver, ADR 0015): tick the
     // contract so the flip under test succeeds through the tool.
-    tickAcceptance(repoDir, "task-rate-limit");
+    satisfyAcceptance(repoDir, "task-rate-limit");
 
     const complete = await client.request("tools/call", {
       name: "arggon_update",
@@ -1131,7 +1131,7 @@ describe("mcp server additive update contract (task-native-kernel-lib-polish fin
 
     // Done gate (task-done-gate-acceptance-waiver, ADR 0015): tick the
     // contract so the flip under test succeeds through the tool.
-    tickAcceptance(repoDir, "task-rate-limit");
+    satisfyAcceptance(repoDir, "task-rate-limit");
 
     const done = await client.request("tools/call", {
       name: "arggon_update",

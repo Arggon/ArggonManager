@@ -38,7 +38,9 @@ import type { BoardDetailPayload, BoardGithub, PrInfo } from "./board.js";
 // ordered (bug-vacuous-substring-ordering-assertions).
 import { assertOrder } from "../../test/assert-order.js";
 import {
+  acceptanceGate,
   findTasksDir,
+  itemsById,
   loadItems,
   type ContractWorkItem as WorkItem,
   type KernelWorkItem,
@@ -1258,6 +1260,64 @@ describe("static export --details (task-board-static-details)", () => {
     const parsed = embeddedDetails(html);
     expect(parsed["task-a"].detail.prose).toBe(hostile);
     expect(parsed["task-a"].detail.comments[0].author).toBe('"><script>');
+  });
+
+  it("the drawer's `acceptance_complete` IS the gate's verdict, list or no list", () => {
+    // The list and the verdict are two questions on purpose (ADR 0025): the rows
+    // are rendered whole-body (history stays visible), while `acceptance_complete`
+    // carries the done gate's own answer over the item's LIVE `## Acceptance`
+    // section. These three items make the pair distinguishable in BOTH
+    // directions, which is what a reviewer needs to see the drawer cannot
+    // contradict the gate.
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-gate-"));
+    const { conventionYml } = writeBranchedTree(dir);
+    const storyDir = join(dir, "tasks/launch/auth/story-a");
+    const bodies: Record<string, string> = {
+      // ticked live section, unticked historical box in a dated comment
+      "task-one":
+        "# Task One\n\n## Acceptance\n\n- [x] real criterion\n\n## Notes\n\n### 2026-09-07 @user\n\n- [ ] original criterion\n",
+      // untouched scaffold: no live criterion, every comment box ticked
+      "task-two":
+        "# Task Two\n\n## Acceptance\n\n<!-- The real acceptance criteria. -->\n\n## Notes\n\n### 2026-09-07 @user\n\n- [x] ticked in a comment\n",
+      // unticked live criterion beside a ticked comment box
+      "task-three":
+        "# Task Three\n\n## Acceptance\n\n- [ ] open criterion\n\n## Notes\n\n- [x] history\n",
+    };
+    const expected = [
+      { id: "task-one", complete: true, rows: ["[x] real criterion", "[ ] original criterion"] },
+      { id: "task-two", complete: false, rows: ["[x] ticked in a comment"] },
+      { id: "task-three", complete: false, rows: ["[ ] open criterion", "[x] history"] },
+    ];
+    for (const { id } of expected) {
+      writeFileSync(
+        join(storyDir, `${id}.md`),
+        `---\ntype: task\nstatus: in_progress\nid: ${id}\nparent: story-a\nlabels: []\ncreated: "2026-09-07"\nupdated: "2026-09-07"\n---\n\n${bodies[id]}`,
+        "utf8",
+      );
+    }
+    const result = runBoard({
+      cwd: dir,
+      out: "out.html",
+      generatedAt: GENERATED_AT,
+      me: null,
+      details: true,
+    });
+    const payloads = embeddedDetails(readFileSync(result.outPath, "utf8"));
+    const byId = itemsById(loadItems(findTasksDir(dir)));
+    for (const { id, complete, rows } of expected) {
+      const detail = payloads[id]?.detail;
+      expect(detail, id).toBeDefined();
+      // The verdict field is the kernel's own answer — asserted against the
+      // predicate, not against a copy of it.
+      expect(detail?.acceptance_complete, id).toBe(!acceptanceGate(byId.get(id)!.body).gated);
+      expect(detail?.acceptance_complete, `${id} (expected)`).toBe(complete);
+      // The list still shows every row the item carries, history included.
+      expect(
+        detail?.acceptance.map((row) => `[${row.checked ? "x" : " "}] ${row.text}`.trim()),
+        id,
+      ).toEqual(rows);
+    }
+    expect(existsSync(conventionYml)).toBe(true);
   });
 
   it("runBoard --details embeds clipped prose, the 3-comment tail and acceptance rows", () => {

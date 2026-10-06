@@ -18,7 +18,7 @@ import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runAdopt } from "./adopt.js";
 import { runCleanup } from "./cleanup.js";
-import { tickAcceptance } from "../../test/acceptance.js";
+import { satisfyAcceptance } from "../../test/acceptance.js";
 import {
   commitPayload,
   commitTrackerMutation,
@@ -688,7 +688,7 @@ describe("tracker auto-commit on cleanup --prune", () => {
     const wt = started.worktreePath!;
     // Done gate (task-done-gate-acceptance-waiver, ADR 0015): the worktree
     // copy carries the item file — tick its contract there before the flip.
-    tickAcceptance(wt, "task-rate-limit");
+    satisfyAcceptance(wt, "task-rate-limit");
     runUpdate({ cwd: wt, id: "task-rate-limit", status: "done", now: NOW });
     git(["add", "ArggonManager"], wt);
     git(["commit", "--quiet", "-m", "close task-rate-limit"], wt);
@@ -756,6 +756,11 @@ describe("tracker auto-commit on update", () => {
         "utf8",
       );
     }
+    // The leaf needs a satisfied LIVE contract of its own: the done gate
+    // (ADR 0015, scoped by bug-done-gate-counts-checkboxes-inside-comment-blocks)
+    // refuses a flip whose live `## Acceptance` section publishes no criterion,
+    // and the template ships a placeholder rather than a checklist.
+    satisfyAcceptance(dir, "task-rate-limit");
     // Legal kernel path to done: claim first (todo -> done is illegal).
     runUpdate({
       cwd: dir,

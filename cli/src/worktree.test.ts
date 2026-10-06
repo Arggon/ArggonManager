@@ -23,7 +23,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { MAX_ENVELOPE_DETAIL_CHARS, defaultCleanupGit, runCleanup } from "./cleanup.js";
 import { parseFrontmatter, runCreate, runUpdate, runValidate } from "@arggondev/lib";
 
-import { tickAllAcceptance } from "../../test/acceptance.js";
+import { satisfyAllAcceptance } from "../../test/acceptance.js";
 
 import { runInit } from "./init.js";
 import { defaultStartGit, runStart } from "./start.js";
@@ -92,7 +92,7 @@ function initRepo(): string {
   }
   // Done gate (task-done-gate-acceptance-waiver, ADR 0015): these suites flip
   // the leaves done for cleanup/worktree rules, so arrange satisfied contracts.
-  tickAllAcceptance(dir);
+  satisfyAllAcceptance(dir);
   // init now also generates AND auto-commits the governing docs; this is a
   // tolerant no-op when everything is already committed (tracker hygiene).
   commitAllIfDirty(dir, "init tasks");

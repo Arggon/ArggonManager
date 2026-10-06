@@ -17,10 +17,13 @@
  *      `bug-three-acceptance-parsers-diverging` (PR #611) the kernel owns the
  *      only row parser in the tree — `acceptanceRows` / `acceptanceCriteria` /
  *      `acceptanceUnchecked` / `acceptanceComplete`, plus `acceptanceBody` for the
- *      one canonical input — and this adapter defers to it for BOTH the verdict
- *      and the text. There is no second parser left to disagree: the objective,
- *      the verification contract and the done flip's refusal set are the SAME
- *      rows, computed by the SAME functions, over the SAME bytes.
+ *      one canonical input and `acceptanceGate` / `liveAcceptanceRows` /
+ *      `liveAcceptanceUnchecked` for the LIVE question the `done` flip asks
+ *      (`bug-done-gate-counts-checkboxes-inside-comment-blocks`) — and this adapter
+ *      defers to it for BOTH the verdict and the text. There is no second parser
+ *      left to disagree: the objective, the verification contract and the done
+ *      flip's refusal set are the SAME rows, computed by the SAME functions, over
+ *      the SAME bytes.
  *      `acceptanceBody(item)` is that input, verbatim: a checklist filed as an
  *      `arggon comment` (first-class here — `create` has no `--body` flag) is
  *      inside it, while a reader's bounded `prose` is not, and passing one of
@@ -50,10 +53,11 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import {
   acceptanceBody,
-  acceptanceRows,
-  acceptanceUnchecked,
+  acceptanceGate,
   failEnvelope,
   findTasksDir,
+  liveAcceptanceRows,
+  liveAcceptanceUnchecked,
   readConventionVersion,
   repoRootFromTasks,
   resolveCurrentLogin,
@@ -166,10 +170,11 @@ export type GoalContract = {
   /** Acceptance-row arithmetic behind the contract. */
   checklist: { total: number; unchecked: number; checked: number };
   /**
-   * The DONE GATE's verdict: `acceptanceUnchecked(acceptanceBody(item)).length > 0`,
-   * which is exactly `!acceptanceComplete(acceptanceBody(item))` — the same rows
-   * and the same canonical input the `done` flip is refused by. Computed from
-   * the kernel, so the goal cannot disagree with it by construction.
+   * The DONE GATE's verdict: `acceptanceGate(acceptanceBody(item)).gated`, the
+   * kernel's own answer, so the goal cannot disagree with the refusal by
+   * construction. `true` covers both reasons the gate refuses — an unticked
+   * criterion in the live `## Acceptance` section, and no criterion published
+   * there at all (bug-done-gate-counts-checkboxes-inside-comment-blocks).
    */
   gateUnchecked: boolean;
   /** Where the loop may run, and whether the item recorded a worktree. */
@@ -234,14 +239,20 @@ function oneLine(text: string): string {
  * The derivation, pure: the kernel's rows → objective + verification.
  *
  * `rows` and `unchecked` are BOTH the kernel's, read from the same canonical
- * body (`acceptanceRows(acceptanceBody(item))` / `acceptanceUnchecked(...)`), so
- * "is there work left" and "what is left" cannot disagree — and neither can the
- * `done` flip's refusal set, which is the same `acceptanceUnchecked`. Two shapes:
+ * body and the same REGION (`liveAcceptanceRows(acceptanceBody(item))` /
+ * `liveAcceptanceUnchecked(...)`), so "is there work left" and "what is left"
+ * cannot disagree — and neither can the `done` flip's refusal set, which is
+ * `acceptanceGate` over exactly those bytes
+ * (bug-done-gate-counts-checkboxes-inside-comment-blocks). The region is the
+ * item's live `## Acceptance` section, because a dated comment block is history:
+ * listing its boxes as a verification contract would send an agent to re-verify
+ * a criterion that was already closed out in the record. Two shapes:
  *
  *   - work remains → one objective (the first unchecked criterion) + the
  *     unchecked criteria as the verification contract;
- *   - nothing remains → "DEFINE THE GOAL FIRST", never an empty goal (a body with
- *     no criteria has no contract to satisfy).
+ *   - nothing remains → "DEFINE THE GOAL FIRST", never an empty goal. That
+ *     includes an item whose live section publishes no criteria at all: the gate
+ *     refuses its flip, and the honest contract is to write the criteria down.
  *
  * There is deliberately no third shape. An earlier revision kept an "unrenderable"
  * branch for the case where the verdict and the text came from two parsers that
@@ -263,11 +274,19 @@ export function deriveGoal(
   const live = unchecked.map((row) => oneLine(row.text));
 
   if (live.length === 0) {
+    // Two situations, two next steps, told apart by the CRITERION count rather
+    // than by a second caller-supplied flag: zero criteria means the live section
+    // published no contract at all (the gate refuses for `no-live-contract`) —
+    // bare `- [ ]` scaffold rows do not count as one — while a non-zero count
+    // means every criterion it published is ticked.
+    const noContract = rows.every((row) => !row.criterion);
     return {
       hasGoal: false,
-      objective: NO_GOAL_OBJECTIVE,
+      objective: noContract ? NO_CONTRACT_OBJECTIVE : NO_GOAL_OBJECTIVE,
       verification: [
-        "No verification contract: this goal cannot start until the item carries at least one unchecked acceptance criterion.",
+        noContract
+          ? NO_CONTRACT_VERIFICATION
+          : "No verification contract: this goal cannot start until the item carries at least one unchecked acceptance criterion.",
       ],
       verificationOmitted: 0,
       truncated: false,
@@ -293,14 +312,35 @@ export function deriveGoal(
 /** Objective for "the gate says the contract is satisfied" (never empty). */
 const NO_GOAL_OBJECTIVE =
   "DEFINE THE GOAL FIRST: the done gate is satisfied for this item — every acceptance " +
-  "criterion is ticked, or its checklist is empty, so there is nothing verifiable to loop " +
-  "on. Either the work is finished — merge the PR and let the coordinator flip the item — or " +
-  "write the criterion into the item's Acceptance section (arggon comment) before starting a goal.";
+  "criterion in its live Acceptance section is ticked, so there is nothing verifiable " +
+  "to loop on. Either the work is finished — merge the PR and let the coordinator flip " +
+  "the item — or write a new criterion into the item's live Acceptance section before " +
+  "starting a goal.";
+
+/**
+ * Objective for the OTHER no-goal case: the item publishes no acceptance criteria
+ * at all, so the done gate refuses its flip
+ * (bug-done-gate-counts-checkboxes-inside-comment-blocks). Naming this separately
+ * matters — the two look identical to a reader ("nothing to loop on") and lead to
+ * opposite actions: one says merge it, the other says write the criteria down.
+ */
+const NO_CONTRACT_OBJECTIVE =
+  "DEFINE THE GOAL FIRST: this item's live '## Acceptance' section publishes no " +
+  "criteria, so the done gate refuses its flip and there is nothing verifiable to " +
+  "loop on. Write the real acceptance criteria into that section — the gate reads " +
+  "the live body, and boxes inside dated comment blocks are history, not the contract " +
+  "— then start the goal.";
+
+const NO_CONTRACT_VERIFICATION =
+  "No verification contract: a goal cannot start until the item's live '## Acceptance' " +
+  "section carries at least one criterion and one of them is unchecked.";
 
 /** The checklist tail note: what the inlined lines do and do not cover. */
 function checklistNote(goal: GoalContract): string {
   if (!goal.hasGoal) {
-    return "The done gate is satisfied for this item, so there is nothing to verify yet.";
+    return goal.objective === NO_CONTRACT_OBJECTIVE
+      ? "The item publishes no acceptance criteria in its live '## Acceptance' section, so the done gate will refuse the flip until some are written."
+      : "The done gate is satisfied for this item, so there is nothing to verify yet.";
   }
   if (goal.truncated) {
     return "Some checklist text was clipped or deferred: read `arggon show <id> --body` before calling the goal met.";
@@ -468,11 +508,14 @@ export function runGoal(opts: GoalOptions): GoalResult {
   assertWorktree(root, item);
 
   const template = loadGoalTemplate(root, opts.templatesDir);
-  // **One canonical body, one kernel parser.** `acceptanceBody(item)` is the
-  // item's whole body (comment sections included) — the input the done gate reads
-  // — and the kernel owns the only acceptance grammar in the tree since
-  // `bug-three-acceptance-parsers-diverging`. Both the verdict and the criterion
-  // text come from it, so they cannot disagree with each other or with the gate.
+  // **One canonical body, one kernel parser, one region.** `acceptanceBody(item)`
+  // is the item's whole body (comment sections included) and `acceptanceGate` /
+  // `liveAcceptanceRows` are the kernel's own functions over it — the same ones
+  // the `done` flip is refused by, so the verdict and the criteria text cannot
+  // disagree with each other or with the gate. The rows come from the item's LIVE
+  // `## Acceptance` section (`bug-done-gate-counts-checkboxes-inside-comment-blocks`):
+  // a dated comment block is history, so its boxes are neither the contract nor
+  // the work left.
   //
   // Do NOT hand a reader's string to these: a bounded `prose` (body minus
   // comments) makes a checklist filed as an `arggon comment` — first-class here,
@@ -480,9 +523,9 @@ export function runGoal(opts: GoalOptions): GoalResult {
   // still refuses to close the item. That inversion is what this call site exists
   // to prevent.
   const body = acceptanceBody(item);
-  const rows = acceptanceRows(body);
-  const unchecked = acceptanceUnchecked(body);
-  const gateUnchecked = unchecked.length > 0; // === !acceptanceComplete(body)
+  const rows = liveAcceptanceRows(body);
+  const unchecked = liveAcceptanceUnchecked(body);
+  const gateUnchecked = acceptanceGate(body).gated;
   const derived = deriveGoal(rows, unchecked);
   const worktreePath = item.worktreePath ?? root;
   const goal: GoalContract = {

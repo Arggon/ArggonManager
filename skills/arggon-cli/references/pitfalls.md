@@ -19,15 +19,21 @@ agents in this codebase — read before mutating the tracker or merging.
   y/N confirmation. Agents coordinate instead of stealing.
 - `update --status blocked` requires `--blocked-reason`; `blocked_reason` is
   forbidden otherwise.
-- **Done gate** (task-done-gate-acceptance-waiver, ADR 0015): `update --status
-done` on a task/bug whose body still has unchecked acceptance boxes is
-  REFUSED — tick every box first (the honest path), or pass
-  `--waive "<reason>"` (non-empty; records a dated `### Waiver` section in the
-  item body, then flips). The waiver is HUMAN-only: the `arggon_update`
-  MCP/native tool has no waive parameter, the kernel refuses `agent` callers,
-  and the flag refuses to fire when there is nothing to waive (no done flip, a
-  container, a complete checklist). Containers are not gated — their contract
-  is the acceptance-aware cascade below.
+- **Done gate** (task-done-gate-acceptance-waiver, ADR 0015; scoped by ADR 0025):
+  `update --status done` on a task/bug is REFUSED when its LIVE `## Acceptance`
+  section still has an unticked criterion, and also when that section publishes
+  NO criterion at all (absent, empty, or still the `<!-- … -->` template
+  placeholder) — an item that published no live contract does not get a free pass.
+  Dated `## Notes` comment blocks are history, not the contract: an unticked box
+  in one never blocks the flip, and the honest path is to write (or transcribe)
+  the criteria in the live section. A bare `- [ ]` with no text after it is a
+  scaffold placeholder, not a criterion, so it is never an unmet box. Otherwise
+  tick every box, or pass `--waive "<reason>"` (non-empty; records a dated
+  `### Waiver` section in the item body, then flips). The waiver is HUMAN-only:
+  the `arggon_update` MCP/native tool has no waive parameter, the kernel refuses
+  `agent` callers, and the flag refuses to fire when there is nothing to waive
+  (no done flip, a container, a satisfied live checklist). Containers are not
+  gated — their contract is the acceptance-aware cascade below.
 - **Cascade:** a terminal status (done/cancelled) auto-completes ancestor
   containers whose whole subtree is terminal — up to the initiative. Opt out with
   `--no-cascade`; flipped ids come back as `autoCompleted`. It is

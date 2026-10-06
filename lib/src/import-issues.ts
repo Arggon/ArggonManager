@@ -3,7 +3,7 @@ import { readConventionConfig } from "./convention.js";
 import { runCreate } from "./create.js";
 import { parseRepoSlug } from "./get-open-prs.js";
 import { itemId, slugify } from "./ids.js";
-import { acceptanceComplete, itemsById, loadItems } from "./items.js";
+import { acceptanceGate, itemsById, loadItems } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 import {
   commitTrackerMutation,
@@ -405,13 +405,18 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
         });
         // Done gate (task-done-gate-acceptance-waiver, ADR 0015): the flip
         // records a GitHub state ("this issue was closed"), not a completion
-        // claim, so an imported body with unchecked task-list checkboxes (an
-        // acceptance contract by shape only) waives the gate with the reason
-        // recorded in the item body. The waiver is passed ONLY when the gate
+        // claim, so an imported body that the gate would refuse on waives it
+        // with the reason recorded in the item body. `acceptanceGate` is the
+        // gate's own verdict — not a second opinion from a whole-body check, which
+        // would disagree with the refusal it is meant to pre-empt and turn the
+        // import into a thrown error (bug-done-gate-counts-checkboxes-inside-comment-blocks
+        // widened what "refused" means: a body whose live `## Acceptance`
+        // section publishes no criteria is refused too, which is the shape of
+        // most imported bodies). The waiver is passed ONLY when the gate
         // would fire — the kernel refuses --waive when there is nothing to
         // waive.
         const needsWaive =
-          !acceptanceComplete(createdItem.item.body) &&
+          acceptanceGate(createdItem.item.body).gated &&
           (createdItem.item.type === "task" || createdItem.item.type === "bug");
         const closed = runUpdate({
           cwd: opts.cwd,

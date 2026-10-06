@@ -50,6 +50,8 @@ import {
   type WorkItem,
 } from "@arggondev/lib";
 
+import { satisfyAcceptance } from "../../test/acceptance.js";
+
 import { runInit } from "./init.js";
 import { productAcceptanceArmed, runSpecAnalyze } from "./spec.js";
 import { runCli } from "./test-spawn.js";
@@ -271,6 +273,12 @@ function seeded(dir: string): { story: string; leaf: string } {
     now: NOW,
   });
   runUpdate({ cwd: dir, id: leaf.id, status: "in_progress", assignee: "ana", now: NOW });
+  // Done gate (task-done-gate-acceptance-waiver, ADR 0015; scoped by
+  // bug-done-gate-counts-checkboxes-inside-comment-blocks): these fixtures close
+  // the leaf for other rules, so give it a satisfied live `## Acceptance`
+  // contract — the shared arrange helper publishes one when the section has none
+  // (which is what `create` scaffolds) and ticks any it finds.
+  satisfyAcceptance(dir, leaf.id);
   // A leaf id gains the `task-` prefix, so the caller uses the returned id.
   return { story: "story-login", leaf: leaf.id };
 }

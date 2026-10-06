@@ -23,6 +23,8 @@ import { loadItems, lockFilePathFor, parseFrontmatter, runCreate, runUpdate } fr
 
 import { runInit } from "./init.js";
 
+import { satisfyAcceptance } from "../../test/acceptance.js";
+
 import { removeFixtureTree } from "./test-tmp.js";
 import { runCli, spawnNodeCli } from "./test-spawn.js";
 
@@ -81,7 +83,7 @@ function chainTree(): { dir: string; tasks: string[]; bug: string } {
     now: NOW,
   });
   for (const container of ["launch", "epic-a", "story-a"]) stripChecklist(dir, container);
-  for (const leaf of [t1.id, t2.id, bug.id]) tickChecklist(dir, leaf);
+  for (const leaf of [t1.id, t2.id, bug.id]) satisfyAcceptance(dir, leaf);
   return { dir, tasks: [t1.id, t2.id], bug: bug.id };
 }
 
@@ -109,28 +111,16 @@ function stripChecklist(dir: string, id: string): void {
 }
 
 /**
- * Tick every unchecked acceptance checkbox in ONE item's body. The done gate
- * (task-done-gate-acceptance-waiver, ADR 0015) refuses the `-> done` flip of
- * a task/bug with unchecked boxes, so cascade fixtures tick their LEAF
- * contracts at seed time and keep exercising the unwaived flip; containers
- * are not gated (their contract is the acceptance-aware cascade veto).
+ * Arrange a satisfied LIVE acceptance contract for the LEAF fixtures. The done
+ * gate (task-done-gate-acceptance-waiver, ADR 0015; scoped by
+ * bug-done-gate-counts-checkboxes-inside-comment-blocks) refuses the `-> done`
+ * flip of a task/bug whose live `## Acceptance` section carries an unticked
+ * criterion — and, since this change, one that publishes no criterion at all,
+ * which is what `create` scaffolds. The shared helper publishes a ticked
+ * criterion when the section has none and ticks any it finds, so cascade
+ * fixtures keep exercising the unwaived flip; containers are not gated (their
+ * contract is the acceptance-aware cascade veto, still the whole-body rule).
  */
-function tickChecklist(dir: string, id: string): void {
-  const tasksDir = join(dir, "ArggonManager");
-  const walk = (current: string): string[] =>
-    readdirSync(current, { withFileTypes: true }).flatMap((entry) => {
-      const full = join(current, entry.name);
-      return entry.isDirectory() ? walk(full) : full;
-    });
-  const file = walk(tasksDir).find((f) => f.endsWith(`/${id}.md`));
-  if (!file) throw new Error(`tickChecklist: '${id}' not found under ${tasksDir}`);
-  writeFileSync(
-    file,
-    readFileSync(file, "utf8").replace(/^([ \t]*[-*] \[) (\])/gm, "$1x]"),
-    "utf8",
-  );
-}
-
 function claimAndDone(dir: string, id: string): void {
   runUpdate({ cwd: dir, id, status: "in_progress", assignee: "worker", now: NOW });
   runUpdate({ cwd: dir, id, status: "done", now: NOW });
@@ -267,7 +257,7 @@ describe("automatic container completion", () => {
       now: NOW,
     });
     for (const container of ["launch", "epic-a", "story-a"]) stripChecklist(dir, container);
-    for (const leaf of ["task-one", "task-two"]) tickChecklist(dir, leaf);
+    for (const leaf of ["task-one", "task-two"]) satisfyAcceptance(dir, leaf);
     claimAndDone(dir, "task-one");
     runUpdate({ cwd: dir, id: "task-two", status: "in_progress", assignee: "worker", now: NOW });
     const result = runUpdate({ cwd: dir, id: "task-two", status: "done", now: NOW });
@@ -373,7 +363,7 @@ describe("cascade notice in human output", () => {
       now: NOW,
     });
     for (const container of ["launch", "epic-a", "story-a"]) stripChecklist(dir, container);
-    for (const leaf of ["task-one", "task-two"]) tickChecklist(dir, leaf);
+    for (const leaf of ["task-one", "task-two"]) satisfyAcceptance(dir, leaf);
     claimAndDone(dir, "task-one");
     runUpdate({ cwd: dir, id: "task-two", status: "in_progress", assignee: "worker", now: NOW });
     const res = runCli(["update", "task-two", "--status", "done"], dir);
