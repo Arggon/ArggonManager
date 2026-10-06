@@ -109,11 +109,11 @@ hypotheticals. Each is `todo`, unassigned, and each asks the product owner for a
 technical judgement while recording **no recommendation and no plain-language
 statement of what the choice costs**:
 
-| Item                                                     | What it asks the product owner to decide                                                                       | Plain-language statement present?                                       | Recommendation recorded? |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------ |
-| `task-decide-codebase-memory-default-discovery`          | Whether a specific MCP server becomes the agents' default code-discovery aid                                   | no — the body is about star counts and registry metadata                | no                       |
-| `task-decide-adr-0021-index-title-editorial-vs-verbatim` | Whether an ADR index row stays editorial (needs a `- Index title:` declaration) or copies its heading verbatim | no — reads as a file-format detail                                      | no                       |
-| `task-arm-strict-worktree-writes`                        | Whether to arm `x-tracker.strict-worktree-writes` or keep the report-only default                              | partially — the body explains the mechanism, ends "coordinator decides" | no                       |
+| Item                                                     | What it asks the product owner to decide                                                                       | Plain-language statement present?                                                      | Recommendation recorded? |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------ |
+| `task-decide-codebase-memory-default-discovery`          | Whether a specific MCP server becomes the agents' default code-discovery aid                                   | no — the body is about star counts and registry metadata                               | no                       |
+| `task-decide-adr-0021-index-title-editorial-vs-verbatim` | Whether an ADR index row stays editorial (needs a `- Index title:` declaration) or copies its heading verbatim | no — reads as a file-format detail                                                     | no                       |
+| `task-arm-strict-worktree-writes`                        | Whether to arm `x-tracker.strict-worktree-writes` or keep the report-only default                              | partially — it is a decision item, not a bug, and states the choice in mechanism terms | no                       |
 
 The third is the tell: it is a **flip-the-switch-or-leave-it** decision, written
 so that only someone who already knows the flag can answer it.
@@ -326,7 +326,7 @@ report-only scanner over it.
   style guide.
 - **Match the reader's world, not ours.** NN/g heuristic 2 states the design
   "should speak the users' language… rather than internal jargon", and warns
-  explicitly that terms "which seem perfectly clear to you and your colleagues may
+  explicitly that terms "that seem perfectly clear to you and your colleagues may
   be unfamiliar or confusing to your users" (source: Jakob Nielsen, "10 Usability
   Heuristics for User Interface Design", 24 April 1994, last reviewed 30 January
   2024, https://www.nngroup.com/articles/ten-usability-heuristics/, accessed
@@ -346,10 +346,11 @@ report-only scanner over it.
   extraneous load; a brief that states options, consequences and a recommended
   default is intrinsic.
 - **MADR upstreamed consulted/informed precisely to stay lightweight.** The
-  decision was made for three stated drivers: the template must be easy to
-  understand and lightweight (source: MADR ADR 0015, cited above). Our analogue
-  is that a brief stays **prose with a bounded header** — not a table, not
-  frontmatter, not a new command.
+  decision was made for three stated drivers — MADR should contain fields
+  important to the ADR decision process, the template should be easy to
+  understand, and MADR should be lightweight (source: MADR ADR 0015, cited
+  above). Our analogue is that a brief stays **prose with a bounded header** — not
+  a table, not frontmatter, not a new command.
 
 ## Recommendation
 

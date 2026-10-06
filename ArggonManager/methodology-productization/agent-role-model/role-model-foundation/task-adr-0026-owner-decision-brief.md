@@ -13,6 +13,7 @@ updated: "2026-10-06"
 claimed_at: "2026-10-06T14:01:55.152Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0026-owner-decision-brief
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-adr-0026-owner-decision-brief.md
   Leaves live only under a story. id is the filename stem: task-adr-0026-owner-decision-brief.
@@ -28,11 +29,28 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0026-owner-decision-
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+The live contract for this item (ADR 0025: boxes in a dated `## Notes` block are
+history, not the contract the done gate reads). PR #659.
+
+- [x] ADR 0026 written at `ArggonManager/docs/adr/0026-owner-decision-brief.md` with Status/Date/Deciders + Context / Decision / Consequences / Alternatives, per `ArggonManager/docs/engineering.md` §ADR process, and its row added to `ArggonManager/docs/adr/README.md`
+- [x] ADR states the **methodology impact class: Behavioral** and links exploration 025 as Input
+- [x] The six brief fields and the answer grammar are written out as the convention, not as a description of one
+- [x] The ADR states explicitly that **ADR 0021 §2 is unchanged** — no authority moves, and the delivery-lead contract still recommends rather than decides
+- [x] The **routing rule** is normative (which decisions owe a brief) and the "brief on every decision" rejection is recorded under Alternatives
+- [x] The **reversal condition** is recorded verbatim, falsifiable, with both limbs
+- [x] Exploration 025's Decision section links this ADR (closes the exploration-vs-ADR gap `task-exploration-decision-records` exists to prevent)
+- [ ] ADR lifecycle honored: Proposed in the PR, Accepted on merge — never rewritten in place afterwards
+
+Box 8 is deliberately left unticked by the maker. Its first half ships in this PR
+(Status `Proposed`, plus the status note recording the lifecycle); its second half
+— `Accepted` on merge — is the delivery lead's merge-commit action, not work in
+this PR, so it cannot honestly be verified from here. It belongs to the same commit
+that flips the status.
 
 ## Notes
 
 ### 2026-10-06 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+
 Input: [exploration-owner-decision-brief-025](../../../docs/explorations/exploration-owner-decision-brief-025.md) (2026-10-06) — classification **greenfield** (entered bounded, upgraded in the ground phase: there is no request-side convention anywhere, and this is a Behavioral change reaching every adopter through the ADR 0016 channel).
 
 **The decision the ADR records.** Adopt C1: a bounded, plain-language **decision brief** the delivery lead writes **on the item**, answered by a bounded `decided:` comment. Authority does not move — ADR 0021 §2 stands verbatim; the lead still recommends, the product owner still decides. This record adds only the missing **request side**.
@@ -62,6 +80,7 @@ Two load-bearing constraints, both from the exploration's findings:
 - [ ] ADR lifecycle honored: Proposed in the PR, Accepted on merge — never rewritten in place afterwards
 
 ### 2026-10-06 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+
 ### 2026-10-06 @arggon-delivery-lead
 
 Priority provenance: **`p0` set by the product owner on 2026-10-06** ("this is top priority. Let's start working on this."), after reading exploration 025. Recorded because ADR 0021 §6.1 boundary 1 makes the `priority` field the product owner's and the lead's call is sequencing only — the field, not the recommendation, is what carries their decision here.
@@ -77,6 +96,7 @@ File-disjointness is not the constraint here — causality is: each item consume
 **Watch for in W3:** it is Behavioral, so both skill copies must land byte-equal in the same PR and the ADR 0016 release note must name the change. There is a standing item for the drift-gate interaction (`bug-seam-drift-gate-blocks-new-generated-seam-content`) — a PR adding new generated seam content fails the drift gate until a release + re-pin, so W3 must be checked against that before it is opened, not after it goes red.
 
 ### 2026-10-06 @arggon-maker
+
 **Maker report — ADR 0026 landed on `feat/task-adr-0026-owner-decision-brief`, PR #659** (draft status: Proposed; Accepted on merge).
 
 Docs-only change set, three files, one commit `76e0a4bc`:
@@ -87,16 +107,16 @@ Docs-only change set, three files, one commit `76e0a4bc`:
 
 ### Gates — command → expected → observed
 
-| Gate | Expected | Observed |
-| --- | --- | --- |
-| `npx prettier --check` (3 files) | clean, and stable | `--write` reported **all 3 unchanged**; `--check` then green. Re-ran after the last edit: unchanged again |
-| `npm run arggon -- validate` | `ok:true` | `arggon validate: ok (0 warning(s), convention v5)` |
-| `npx vitest run cli/src/adr-index-parity.test.ts` | green | 1 file, **9 passed** |
-| `npm run test:structure` | pass | **5 passed**, 0 failed |
-| `npm run lint:structure` | no findings | no findings |
-| `npm run test` (full, not required) | green | **132 files / 2803 tests passed** |
+| Gate                                              | Expected          | Observed                                                                                                  |
+| ------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------- |
+| `npx prettier --check` (3 files)                  | clean, and stable | `--write` reported **all 3 unchanged**; `--check` then green. Re-ran after the last edit: unchanged again |
+| `npm run arggon -- validate`                      | `ok:true`         | `arggon validate: ok (0 warning(s), convention v5)`                                                       |
+| `npx vitest run cli/src/adr-index-parity.test.ts` | green             | 1 file, **9 passed**                                                                                      |
+| `npm run test:structure`                          | pass              | **5 passed**, 0 failed                                                                                    |
+| `npm run lint:structure`                          | no findings       | no findings                                                                                               |
+| `npm run test` (full, not required)               | green             | **132 files / 2803 tests passed**                                                                         |
 
-**One honest note on the full suite.** Its first run failed `cli/src/headless-ci.test.ts` on `run \`npm run build\` first` — the worktree had never produced `dist/cli.js` (the earlier `[kernel-artifacts] freeze not complete` warning said the same). `npm run build`, then that file passed 7/7 and the full suite was green. Environmental, not caused by this change; reporting it because a red first run is worth naming rather than hiding.
+**One honest note on the full suite.** Its first run failed `cli/src/headless-ci.test.ts` on `run \`npm run build\` first`— the worktree had never produced`dist/cli.js`(the earlier`[kernel-artifacts] freeze not complete`warning said the same).`npm run build`, then that file passed 7/7 and the full suite was green. Environmental, not caused by this change; reporting it because a red first run is worth naming rather than hiding.
 
 ### On the two hard acceptance boxes
 
@@ -107,5 +127,6 @@ Docs-only change set, three files, one commit `76e0a4bc`:
 No `skills/`, `.agents/skills/`, `templates/`, `.opencode/` or `cli/` file was touched — the carriers and both skill copies belong to `task-wire-decision-brief-carriers`.
 
 ### handoff 2026-10-06 @arggon-maker — next: Review PR #659 and merge; flip Status to Accepted on merge, then tick the live ## Acceptance boxes
+
 - branch: feat/task-adr-0026-owner-decision-brief
 - open questions: Should the acceptance boxes be ticked by the lead or left for merge verification?

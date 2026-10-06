@@ -34,19 +34,30 @@ person who cannot see why it went the way it did.
 
 The product owner raised this on 2026-10-06 in exactly these terms: the delivery
 lead keeps bringing **technical** decisions, and a product owner with no technical
-background cannot take one. ADR 0021 §6.2 — the methodology is for "any project —
-not only software", while the product owner is a person not assumed to share the
-lead's vocabulary — makes that a contradiction rather than a matter of taste. An
-escalation written in the lead's own register is out of scope for the very method
-that requires the escalation.
+background cannot take one. The scope the carriers declare — the methodology is
+for any project, not only software (ADR 0020 §Decision.1, quoted in ADR 0021's
+§6 amendment preamble and the substance of its §6.2 domain-neutrality clause) —
+while the product owner is a person not assumed to share the lead's vocabulary,
+makes that a contradiction rather than a matter of taste. An escalation written in
+the lead's own register is out of scope for the very method that requires the
+escalation.
 
-Measured, not assumed: three open items in this repository ask the product owner
-for a judgement while recording no plain-language statement of the choice and no
-recommendation (`task-decide-codebase-memory-default-discovery`,
+Three open items of the same shape, verified 2026-10-06: each is `todo`,
+unassigned, records no recommendation, and states its choice in mechanism terms
+rather than outcome terms (`task-decide-codebase-memory-default-discovery`,
 `task-decide-adr-0021-index-title-editorial-vs-verbatim`,
-`task-arm-strict-worktree-writes`). The third is the tell — a
-flip-the-switch-or-leave-it question, written so that only someone who already
-knows the mechanism can answer it.
+`task-arm-strict-worktree-writes`). The third is the clearest case — a
+decision item rather than a defect, whose acceptance asks whether to arm a
+named setting or keep the report-only default, written so that only someone who
+already knows the mechanism can answer it.
+
+Two things about that evidence, stated so the record does not lean on it harder
+than it can bear. Addressing those items to the product owner is an **inference**,
+not something any of the three asks in its own words; and under §5's routing rule
+two of them would not owe a brief at all, being neither authority-map rows nor
+obviously hard-to-reverse. They are evidence that the shape recurs in this
+repository, not that §5 currently under-routes. The load-bearing evidence for
+this record is the product owner's request above.
 
 This is **Behavioral**: a new obligation on the delivery-lead role, carried into
 every adopting project through the ADR 0016 channel. That is why it is an ADR and
@@ -113,26 +124,51 @@ Attribution only, never authentication: the same line ADR 0021 §4 draws.
 ### 3. The stated default is what makes a brief safe to send
 
 **A brief with a default is a time-boxed proposal. A brief without one is a
-blocker, and it is not sent.** Silence then carries a meaning the product owner
-has already chosen by not answering: the default executes on the stated date, and
-the record says so.
+blocker, and it is not sent.** On the stated date the default executes, and the
+record says so.
 
-This is ADR 0021 §3's rule — an absent product owner can never wedge a
-container's children — applied to the request side, where it had never been
-applied. It is why a brief is cheap enough to send, and why escalation replaces a
-session rather than adding a step.
+Silence does **not** mean the product owner chose anything by not answering. It
+means the choice was already made and put in writing — by the lead, before the
+brief was sent, precisely so that the owner could override it. Silence then
+selects a default the owner was shown in advance, not one they picked by
+abstention. That is also why the no-product-owner case is not a special case: a
+repository with nobody to answer stays compliant by default, exactly as it does
+for `accept:` — the default executes, and the brief records that it did.
+
+This rule is the one `docs/engineering.md` §Review bar → Product acceptance states
+as "an absent product owner can never wedge a container's children", which ADR
+0021 §3 introduces as its compliant-by-default, never-blocked default tier; this
+record applies it to the request side, where it had never been applied. It is why
+a brief is cheap enough to send, and why escalation replaces a session rather than
+adding a step.
 
 A brief is never sent without a default because "this one really needs you" is
-not a state the record can carry. A repository with no product owner stays
-compliant by default, exactly as it does for `accept:`: the default executes, and
-the brief records that it did.
+not a state the record can carry.
+
+**The default's direction is constrained too, and this is the clause that makes
+the first one safe.** §5 routes hard-to-reverse calls here, so the class most
+likely to auto-execute on silence is the class where an unforced default does the
+most damage. So the direction is not the lead's to pick freely:
+
+- **For a hard-to-reverse call, the default is the reversible or "hold" option** —
+  never the more aggressive one.
+- **If no such default exists, the default is "hold"**, and the brief says so
+  explicitly rather than picking the nearest irreversible thing.
+- For every other decision that owes a brief, the default is the lead's own
+  recommended option.
+
+The consequence, stated plainly: **a brief can never make an irreversible act
+happen because nobody replied.** A reader who never opens the brief, and a
+repository with no reader at all, both land on the same safe outcome — which is
+what lets the brief be sent without a blocker status ever existing.
 
 ### 4. A recommendation-first brief is a confirmation-bias vector
 
 Field 4 puts a preferred option in front of a reader who is, by construction, not
 the person who knows most about it. That is what makes the record decidable in
 minutes, and exactly what makes a lazy "yes" easy. A brief that offers only
-agreement is a confirmation dialog with no cancel button.
+agreement asks a question the reader has no way to decline — in software, the
+shape of a confirmation dialog with no cancel button.
 
 **Two counters, both already in the grammar, and both conventions rather than
 gates:**
@@ -216,8 +252,9 @@ ratio near 1.0 with zero `decided: other` replies across a meaningful sample; or
 (b) more real decisions are made in chat than in briefs, which would mean the
 routing rule is wrong, not the convention.
 
-Both limbs are measurable and each names its own target: (a) at the counters in
-§4, (b) at the routing rule in §5. Neither limb is a reason to abandon the record.
+Both limbs are measurable, and each names its own target: limb (a) at the two
+countermeasures in §4, read as conventions rather than as counters, and limb (b)
+at the routing rule in §5. Neither limb is a reason to abandon the record.
 
 ## Consequences
 
@@ -273,7 +310,7 @@ How it ships:
 - **A `priority`-style frontmatter field** recording that a brief is outstanding.
   Rejected: a schema change carrying a fact a comment already carries, and a
   kernel-trusted field a worker could write — the same objection that already
-  rejected `role:`/`owner:` (ADR 0021 §Consequences).
+  rejected `role:`/`owner:` (ADR 0021 §Alternatives considered).
 - **Gate a transition on the product owner's answer.** Rejected as forgeable or
   unusable, for the reason §6 restates and inherits from ADR 0021 §4.
 - **Let the delivery lead answer its own question and inform the product owner
