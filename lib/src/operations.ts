@@ -19,6 +19,7 @@
  */
 import { relative, sep } from "node:path";
 import { classifyAcceptance, type AcceptanceState } from "./acceptance.js";
+import { classifyDecisionBrief, type DecisionBriefState } from "./brief.js";
 import { readConventionVersion } from "./convention.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate, type CreateOptions } from "./create.js";
@@ -155,6 +156,18 @@ export type ShowPayload = {
    */
   acceptance: AcceptanceState;
   /**
+   * Report-only decision-brief state of THIS item, from the `decide:`/`decided:`
+   * header convention (ADR 0026, `classifyDecisionBrief`):
+   * `none｜open｜decided｜self-decided` — one bounded enum token, additive within
+   * `schemaVersion: 1`, and read from the item's canonical body so a bounded
+   * comment tail can never hide it.
+   *
+   * Carried on every view, `--meta` included, and **ungated**: it is a pure read
+   * of the body, so all four states report whoever armed what. It never gates
+   * the read.
+   */
+  decision_brief: DecisionBriefState;
+  /**
    * `--body` (or an MCP body request) includes the full body plus every
    * comment; the compact view includes only the bounded comment tail.
    */
@@ -171,6 +184,7 @@ export function showOperation(opts: ShowOptions): CommandOutcome<ShowPayload> {
         item: toContractWorkItem(result.item, result.root),
         path: result.path,
         acceptance: classifyAcceptance(acceptanceBody(result.item), result.item.assignee),
+        decision_brief: classifyDecisionBrief(acceptanceBody(result.item), result.item.assignee),
         ...(opts.body === true
           ? { body: result.item.body, comments: result.allComments.map((c) => ({ ...c })) }
           : { comments: result.comments.map((c) => ({ ...c })) }),

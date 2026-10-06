@@ -261,6 +261,13 @@ export type {
   AcceptanceValue,
 } from "./acceptance.js";
 export {
+  DECISION_BRIEF_STATES,
+  classifyDecisionBrief,
+  itemsWithUnansweredBrief,
+  parseDecisionBriefs,
+} from "./brief.js";
+export type { DecisionBriefEvent, DecisionBriefState, UnansweredBrief } from "./brief.js";
+export {
   CLEANUP_TERMINAL_STATUSES,
   classifyCleanupEntry,
   classifyReleaseEntry,

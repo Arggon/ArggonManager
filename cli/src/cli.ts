@@ -1755,6 +1755,7 @@ spec
                 consistency: saved.result.consistency,
                 decisions: saved.result.decisions,
                 productAcceptance: saved.result.productAcceptance,
+                unansweredDecisionBrief: saved.result.unansweredDecisionBrief,
               },
               baseline: { file: saved.file, written: true, count: saved.snapshot.count },
             });
@@ -1784,6 +1785,7 @@ spec
                 consistency: cmp.result.consistency,
                 decisions: cmp.result.decisions,
                 productAcceptance: cmp.result.productAcceptance,
+                unansweredDecisionBrief: cmp.result.unansweredDecisionBrief,
               },
               baseline: {
                 file: cmp.file,
@@ -1814,6 +1816,7 @@ spec
               consistency: result.consistency,
               decisions: result.decisions,
               productAcceptance: result.productAcceptance,
+              unansweredDecisionBrief: result.unansweredDecisionBrief,
             },
           });
           return;
