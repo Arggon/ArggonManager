@@ -68,7 +68,16 @@ Two load-bearing constraints, both from the exploration's findings:
 
 **Falsifiable reversal condition**, to be written into the ADR verbatim: revisit if (a) briefs are routinely rubber-stamped — measurable as answer latency collapsing to "immediate, no scope note", or an answered-brief ratio near 1.0 with zero `decided: other` replies across a meaningful sample; or (b) more real decisions are made in chat than in briefs, which would mean the routing rule is wrong, not the convention.
 
-## Acceptance
+### Acceptance (superseded — this is the lead's original filing, kept as history)
+
+<!--
+  Demoted from `## Acceptance` on 2026-10-06. Written into this comment as a
+  heading, it created a SECOND `## Acceptance` section in the body, and the
+  done gate resolved to this one instead of the live contract at the top of the
+  file — so the flip was refused on eight boxes that are history, which is
+  exactly what ADR 0025 says they are. The live section is authoritative; these
+  rows are the draft the maker transcribed into it.
+-->
 
 - [ ] ADR 0026 written at `ArggonManager/docs/adr/0026-<owner-decision-brief>.md` with Status/Date/Deciders + Context / Decision / Consequences / Alternatives, per `ArggonManager/docs/engineering.md` §ADR process, and its row added to `ArggonManager/docs/adr/README.md`
 - [ ] ADR states the **methodology impact class: Behavioral** and links exploration 025 as Input
