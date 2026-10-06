@@ -10,8 +10,8 @@ labels: [docs]
 created: "2026-10-03"
 updated: "2026-10-06"
 blocked_reason: "Superseded 2026-10-06 — the original block is half-lifted and this reason was stale. The link fix merged long ago (PR #649) and the trigger PR #618 has now merged too (bbe1f4eb), so 'unblocks when #618 merges' is satisfied. Measured on main: (a) the defect itself is FIXED — convention.md:142 now reads [ADR 0015](./adr/0015-done-gate-acceptance-waiver.md), the real filename, so there is no dead link left; (b) acceptance box 2, widening #618's link-resolution rule, is still UNDONE but is now partially feasible. #618 shipped LINK_CARRIERS = ['ArggonManager/docs/engineering.md'] — rule 2 still covers one carrier — while rule 1 (STATUS_CARRIERS) already covers all three methodology carriers (engineering.md, agents.md, convention.md). So agents.md and convention.md can join rule 2 today. The fourth carrier, skills/arggon-cli/**, still cannot: 0 of its files carry a real ./adr/ link, so a link-resolution rule over it would pass vacuously. Blocked on the real remaining work — widen LINK_CARRIERS to the three methodology carriers and record why the skills carrier is excluded until its markdown carries real links — not on a PR that is still open. Not agent-waivable; no waiver is needed, since the honest end state is that the widening is unstarted."
-worktree_path: /home/arggon/Projects/ArggonManager-bug-convention-md-links-nonexistent-adr-0015
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-convention-md-links-nonexistent-adr-0015.md
   Leaves live only under a story. id is the filename stem: bug-convention-md-links-nonexistent-adr-0015.
@@ -77,7 +77,9 @@ Acceptance:
 Note: the ADR **index** parity test (`cli/src/adr-index-parity.test.ts`) pins one `README.md` row per ADR and does not read prose links, so nothing catches this today.
 
 ### 2026-10-05 @arggon-delivery-lead
+
 ### 2026-10-05 @arggon-delivery-lead
+
 Merged: PR #649, all three lanes green, `MERGEABLE/CLEAN`. The **link fix** is done and merged: `convention.md:131` now points at `./adr/0015-done-gate-acceptance-waiver.md`. The ADR **number was right** and the filename was stale, so no ADR was renamed and no reference elsewhere needed sweeping.
 
 **Left `blocked`, not `done`, because acceptance box 2 is genuinely undelivered:** widening #618's link-resolution rule from 1 carrier to all four is not this item's to land — #618 is the product owner's live claim and is unmerged. The maker measured the widening rather than guessing it: `engineering.md`, `agents.md` and `convention.md` now pass **3/3** (so the carrier list widens with one constant), while `skills/arggon-cli/**` **cannot** be added as-is because all 7 of its markdown files have zero `./adr/` links and the suite's vacuity guard fails on each — it needs real ADR links inside `arggon:generated` blocks, which is separate work.
