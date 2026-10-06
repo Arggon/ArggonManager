@@ -1,14 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-spec-owner-decision-brief
 title: "Spec: the decision-brief convention, its answer grammar, and the unanswered-brief report-only finding (exploration 025 edge cases as acceptance criteria)"
+assignee: arggon-delivery-lead
+branch: feat/task-spec-owner-decision-brief
 parent: role-model-foundation
 labels: [methodology, roles, spec]
 priority: p0
 created: "2026-10-06"
 updated: "2026-10-06"
+claimed_at: "2026-10-06T14:47:11.367Z"
 depends_on: [task-adr-0026-owner-decision-brief]
+worktree_path: /home/arggon/Projects/ArggonManager-task-spec-owner-decision-brief
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-spec-owner-decision-brief.md
