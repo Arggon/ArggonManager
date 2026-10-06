@@ -790,3 +790,7 @@ ADR 0024 ships **`Status: Proposed`** with its `Status note`; no status flipped,
 
 - branch: feat/task-explore-adopter-feedback-channel
 - open questions: Does the delivery lead accept the forced renumber, or overrule it and take a different id? 0024 row uses the verbatim H1 title - confirm that rather than adding - Index title:, which pre-empts task-decide-adr-0021-index-title-editorial-vs-verbatim. Still-unfiled from earlier rounds: the stale-branch-deletes-merged-code class (reviewer probe 5).
+
+### handoff 2026-10-06 @Arggon — next: Merge PR #586, then flip ADR 0024 to Accepted together with its docs/adr/README.md row in ONE commit, then release task-friction-capture-command (T1).
+- branch: feat/task-explore-adopter-feedback-channel
+- open questions: Accept the forced renumber (0021->0024 / spec 018->020 / exploration 019->024) or overrule the id? 0024 row uses the verbatim H1 - confirm rather than pre-empting task-decide-adr-0021-index-title-edi…
