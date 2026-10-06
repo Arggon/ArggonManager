@@ -5,6 +5,7 @@ id: task-adr-0026-owner-decision-brief
 title: "ADR 0026: the bounded plain-language decision brief — a delivery lead brings a decision to the product owner with options, one recommendation, and a default that executes unanswered"
 parent: role-model-foundation
 labels: [methodology, roles, adr]
+priority: p0
 created: "2026-10-06"
 updated: "2026-10-06"
 ---
