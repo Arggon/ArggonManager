@@ -13,7 +13,6 @@ updated: "2026-10-02"
 claimed_at: "2026-10-02T14:18:08.885Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-explore-adopter-feedback-channel
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-explore-adopter-feedback-channel.md
   Leaves live only under a story. id is the filename stem: task-explore-adopter-feedback-channel.
@@ -730,3 +729,64 @@ Your question 2 / probe 5 (the stale-branch-deletes-merged-code class) is **not 
 
 - branch: feat/task-explore-adopter-feedback-channel
 - open questions: Need one `arggon create bug` for the stale-branch-deletes-merged-code class (reviewer probe 5) - not filed, deferred to coordinator; file it? Keep '13 dimensions -> 13 criteria' wording?
+
+### 2026-10-06 @Arggon
+**Re-dispatch round: M1–M4 were already landed; a NEW blocker was found and fixed. Branch pushed (fast-forward, no force). Item left `in_progress`.**
+
+## First, a correction to the dispatch brief
+
+M1–M4 **were already closed** on the branch before this dispatch — commits `258bdfc9` (M1–M3), `8b2c5e1b` (M4), `5eeb61ba` (prettier converge), pushed by the previous round-3 agent. I verified each by reading, not by trusting the claim: the spec's §_The trigger and its visibility_ carries ADR §2's reasoning, the header paragraph says `triggerVersion`/drift, T6's Context states the `doctor.ts` `config.generated` re-render including acked, T6's AC reads "Owned solely by this task", the plan's two bare ids are `task-spike-friction-tier-b-surface` / `task-spike-friction-volume-threshold`, and the body's two false claims are both corrected. **No M-edit was needed.**
+
+## The blocker the brief did not anticipate: a second renumber, forced
+
+The brief says to take `main`'s ADR 0021 content and README row and not re-flip its status. **That is not possible as written: `main`'s `0021` is a different ADR.** While this branch was cold, `main` landed its own ADRs `0021` (agents-primary-workers-human-product-owner, accepted `171f43b3`/#624), `0022` and `0023`. So merging `main` produced **two ADR files numbered `0021`** — measured, not assumed:
+
+```
+npx vitest run cli/src/adr-index-parity.test.ts
+Tests  3 failed | 6 passed (9)
+  "numbering: position 22 is 0021, expected 0022"
+  "numbering: position 23 is 0022, expected 0023"
+  "numbering: position 24 is 0023, expected 0024"
+```
+
+That suite pins one index row per ADR file and gapless, strictly ascending, duplicate-free numbering. **Following the brief literally would have deleted this PR's entire decision record** (taking main's 0021 = the role-model ADR) or turned `main` red.
+
+Renumbered, following the precedent the branch's own first Numbering note records ("the branch's side renumbers rather than main's, because renumbering main would touch an **accepted** ADR plus four artifacts that already reference it"):
+
+| Was | Now |
+| --- | --- |
+| ADR `0021-adopter-friction-channel.md` | ADR **`0024-adopter-friction-channel.md`** |
+| spec `018` | spec **`020`** |
+| exploration `019` | exploration **`024`** |
+| plan `018` | plan **`018`** (unchanged — `main`'s plans stop at `017`, never collided) |
+
+`spec validate` caught the spec and exploration collisions too, which the ADR suite does not cover: `spec-friction-capture-018` vs main's `spec-promotion-policy-018`, and `exploration-adopter-feedback-channel-019` vs main's `exploration-agent-primary-workers-019`. I found the free ids by enumerating each directory on `origin/main` (specs top out at `019`, explorations at `023`). Additive `Numbering note` added, per ADR 0016 / 0019 precedent — nothing below it rewritten.
+
+**`main`'s ADR 0021 did not regress.** `- Status: Accepted` and its row `Agents as primary workers, humans as product owner` are both main's, byte-identical; the conflict was resolved by taking main's table and prose wholesale, then adding only a `0024` row. `adr-index-parity.test.ts` now **9/9 green**, which asserts status-class agreement, so the probe-4 hazard is closed for real. **The `0024` row uses the verbatim H1 title**, not the old editorial one — main's `task-decide-adr-0021-index-title-editorial-vs-verbatim` shows main settled on verbatim for its own 0021, so I did not pre-empt that decision for a second ADR.
+
+## Dated-comment boundary held
+
+Live body prose renumbered to the new ids; **every dated comment left verbatim**, including the reviewer's round-1 B1 table. In this item that meant restoring three copies the bulk edit had touched: the `### 2026-10-03 @ses_f0143…` renumber-map row (now still reads `0021-adopter-friction-channel.md`), and the `ADR 0021` / `friction-capture-018` / `adopter-feedback-channel-019` labels in the comment zone. Live-body-only edits were done with a line-range-restricted `sed` (body = lines 1–371, comments from 372) rather than a whole-file replace. The body's `## Renumber map` is now a **three-label** map and says plainly which labels are superseded.
+
+## One near-miss worth naming
+
+A blanket `sed 's/friction-capture-018/friction-capture-020/g'` silently caught the **substring** inside `plan-friction-capture-018` and rewrote the plan's own `plan_id` and H1 to `020`. Caught by re-reading the plan's frontmatter after the sweep; reverted (`plan_id: friction-capture-018`, H1 `(friction-capture-018)`), while the plan's `spec:` pointer correctly stays `spec-friction-capture-020.md`. Worth flagging because the bulk edit looked clean in its own diff output.
+
+## Gates on the merged tree
+
+`build` ✅ (full `npm run build`, before any test) · `test` ✅ **130 files / 2761 tests, all passing** — matches main's current figures, and **the `cli.test.ts` stale-install failure did not reproduce** · `lint` not re-run separately (docs-only) · `arggon validate` ✅ ok, 0 warnings, convention v5 · `spec validate` ✅ ok (**36 docs, exactly 5 `DOC_NUMBER_COLLISION`, none naming `0024`/`020`/`024`/`018`**) · `spec analyze --baseline` ✅ **5 new, 1 resolved, 5 unchanged — zero name any of my artifacts** (all 5 are the known pre-existing pairs) · `npx vitest run cli/src/adr-index-parity.test.ts` ✅ **9/9** · `git merge-tree --write-tree --name-only origin/main HEAD` ✅ **exit 0, no conflict lines** · zero dangling links in any live body (anchor-aware sweep) ✅
+
+**Doc count is 36, not the 34 in the dispatch brief** — `main` grew the corpus; the requirement that matters (no collision naming my artifacts) is met.
+
+**Prettier two-pass convergence, not `--check`.** `prettier -w` pass 1 → pass 2 produced **zero** md5 changes, and pass 2 → pass 3 also zero. First attempt at this assertion was itself vacuous — the snapshot copy silently failed and the diff reported "No such file or directory" for every file, which I read as a failure and redid with per-file `md5sum`. `--check` alone is not accepted as evidence.
+
+**PR shape preserved:** `git diff --name-status origin/main...HEAD` → **19 rows, all under `ArggonManager/`, zero `D`**. `opencode/plugins/arggon/index.bundle.ts` is byte-identical to `origin/main` (`git diff --quiet` clean) — carried in by the merge, untouched by me, as required.
+
+## Deliberately left alone
+
+ADR 0024 ships **`Status: Proposed`** with its `Status note`; no status flipped, no acceptance box ticked, PR not merged — all the delivery lead's calls. Main's own files referencing main's `0021` (about 40 rows across `agents.md`, `engineering.md`, `convention.md`, `claim.md`, the role-model tree and three other explorations) were **not** touched — they are a different ADR and rewording them would be a second, unrelated regression.
+
+### handoff 2026-10-06 @arggon-maker — next: delivery lead to merge PR #586, then flip ADR 0024 to Accepted together with its docs/adr/README.md row in ONE commit (adr-index-parity.test.ts asserts status-class agreement), then release task-friction-capture-command (T1). Re-review the renumber: 0021 -> 0024 / spec 018 -> 020 / exploration 019 -> 024.
+
+- branch: feat/task-explore-adopter-feedback-channel
+- open questions: Does the delivery lead accept the forced renumber, or overrule it and take a different id? 0024 row uses the verbatim H1 title - confirm that rather than adding - Index title:, which pre-empts task-decide-adr-0021-index-title-editorial-vs-verbatim. Still-unfiled from earlier rounds: the stale-branch-deletes-merged-code class (reviewer probe 5).
