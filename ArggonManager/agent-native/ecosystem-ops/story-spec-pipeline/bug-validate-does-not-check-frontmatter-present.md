@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-validate-does-not-check-frontmatter-present
 title: "`arggon validate` reports ok on an item file whose FRONTMATTER was deleted entirely — it checks required fields when a frontmatter block exists, never that one exists"
 assignee: Arggon
@@ -8,8 +8,7 @@ branch: fix/bug-validate-does-not-check-frontmatter-present
 parent: story-spec-pipeline
 labels: [tracker-schema, validate]
 created: "2026-10-03"
-updated: "2026-10-03"
-claimed_at: "2026-10-03T12:48:00.029Z"
+updated: "2026-10-06"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-validate-does-not-check-frontmatter-present
 ---
 <!--
