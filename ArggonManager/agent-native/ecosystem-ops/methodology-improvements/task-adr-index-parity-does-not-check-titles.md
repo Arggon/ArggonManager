@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr-index-parity-does-not-check-titles
 title: "ADR index parity test does not check titles: the corpus is 17/20 verbatim H1 copies, so a wrong title stays green"
 assignee: Arggon
@@ -8,8 +8,7 @@ branch: feat/task-adr-index-parity-does-not-check-titles
 parent: methodology-improvements
 labels: [docs, adr, tests]
 created: "2026-10-03"
-updated: "2026-10-03"
-claimed_at: "2026-10-03T12:48:04.010Z"
+updated: "2026-10-06"
 depends_on: [task-adr-readme-index-missing-adr-0020]
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-index-parity-does-not-check-titles
 ---
