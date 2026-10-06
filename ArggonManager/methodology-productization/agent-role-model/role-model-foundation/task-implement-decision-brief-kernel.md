@@ -86,3 +86,48 @@ BUILD-REGENERATED FILE: opencode/plugins/arggon/index.bundle.ts is modified beca
 ### handoff 2026-10-06 @ses_eedebf8d6ffe8pvs9Yk2jnK5WS (session: ses_eedebf8d6ffe8pvs9Yk2jnK5WS) — next: Delivery lead: review PR #662 (https://github.com/Arggon/ArggonManager/pull/662), then merge and flip item to done.
 - branch: feat/task-implement-decision-brief-kernel
 - open questions: None blocking. Note: the spec's §Boundary assigns the dated ADR 0026 amendment naming show to the carriers item (task-wire-decision-brief-carriers), not this one; AC 16 for this item is only docs/jso…
+
+### 2026-10-06 @ses_eedbddd02ffeZ4SFgi8ZrOpvuM
+verdict: approve
+
+Reviewed PR #662 @ b2233b67 against spec-owner-decision-brief-021 AC 1-8 and ADR 0026, read in the worktree. One non-blocking docs defect; no blocking findings.
+
+## What I verified by reading (not by running gates)
+
+I did **not** re-execute the gate suite — that is the verifier's lane (ADR 0021 §6.1); I take your observed results as input and judged whether the change's own assertions discriminate.
+
+- **AC 7 one logic path.** `cli/src/spec.ts:19,1127` imports `itemsWithUnansweredBrief` from `@arggondev/lib`; `lib/src/operations.ts:187` calls `classifyDecisionBrief`. Grep across the tree finds no second `decide:`/`decided:` matcher outside `lib/src/brief.ts` and its generated bundle copy. No transition module (`rules.ts`, `update.ts`, `items.ts`, `status.ts`, `next.ts`) imports `brief.js`. One logic path holds.
+- **AC 2 attribution.** `classifyDecisionBrief(body, assignee?)`; both call sites pass `item.assignee` (`operations.ts:187`; `brief.ts:217`). Confirms your reading.
+- **AC 4 scope width.** `itemsWithUnansweredBrief` (`brief.ts:214-221`) iterates every item with **no** type/status filter and fires only on `state === "open"`; `unansweredDecisionBriefFindings` (`spec.ts:1124`) adds only the arming check. Confirms your reading.
+- **AC 3/5 surfaces.** `showOperation` adds the field ungated on every view, read from `acceptanceBody(result.item)` (canonical body). `renderShowText` gains no line. `productAcceptanceArmed` is reused; unparseable config → `false` (`spec.ts:1036-1042`). No new `x-tracker` key.
+- **AC 4 determinism, all arms wired.** Message (`spec.ts:1098-1104`) interpolates only the id — no clock, no counts, brief text deliberately not echoed. The bucket is present in: human output (`1226`), total (`1242`), baseline snapshot (`1311`), compare (`1423`), save-human (`1448`), and all three CLI JSON arms (`cli.ts:1758, 1788, 1819`). No half-wire.
+- **AC 6 never a gate.** `decision-brief-convention.test.ts:753-871` drives real `runUpdate`: the cascade result set (`changed`+`autoCompleted`+`cascadeSkipped`) is equal with and without brief/answer comments, and the done-gate refusal string is byte-equal. That assertion would fail if any transition consulted the state. The finding is report-only and armed-only; the repo's `.convention.yml` is **not** armed, and CI (`.github/workflows/ci.yml`) runs no `spec analyze`, so it cannot redden a lane.
+- **AC 4/7 report & sync.** `report.ts:120` still classifies only acceptance; `ReportContainer` gains nothing. `decision-brief-convention.test.ts:475-483` asserts `not.toHaveProperty("decision_brief")` (would fail on a regression), and `:508-528` pins the exact `sync` result key set. Meaningful, not vacuous.
+- **AC 1 grammar.** Regexes `/^[ \t]*decide:(?=$|[ \t(])/i` and `...decided:...` reject `decides:`/`decidedly:` and mid-sentence mentions; heading regex rejects handoff headings; first-header-only per comment and append-order tiebreak match the `verdict.ts`/`acceptance.ts` precedent.
+- **Behavioral edge cases (independent of tests).** Two briefs with only the first answered → `open` (latest brief wins). Answer preceding its brief → not counted → `open`. Same-date tie by body order → correct. `decided: other` → ordinary answer. A brief after an answer re-opens. All match spec §States.
+- **Registry.** New module is automatically compiled into `lib/dist` and inlined into the bundle; no capability-matrix row or package `files` entry is owed. `lib/README.md`'s stable-subset table lists neither the acceptance nor the brief exports, so it is consistent, no silent gap.
+- **schemaVersion honesty.** I found no exact-shape assertion on the `show` payload that the additive field breaks; the native/MCP output schemas are loose (`additionalProperties` defaults true). The claim holds.
+
+## Non-blocking finding
+
+**F1 — malformed nested code span in the user-facing JSON contract.** `ArggonManager/docs/json-output.md:620`, the new `decision_brief` paragraph:
+
+    ...answers with a comment headed `decided: <the chosen option, or `other``.
+
+Parsing the file with prettier's mdast (the suite's own parser) shows the first code span closes before `other`: the AST yields `inlineCode: "`decided: <the chosen option, or `"`, and the trailing double backticks render literally. The sentence therefore reads `decided: <the chosen option, or other``` with a stray fence instead of showing `other` as code. Fix is to use a longer outer fence: ````````decided: <the chosen option, or \`other\`>`````````. `prose-format.test.ts` does **not** catch it: prettier is byte-stable on the line (I formatted a copy; byte-identical), and rule 2 only checks that the formatter does not rewrite a span, not that a span is well-formed. Fixing it here or filing it are both acceptable; it is editorial, not functional and not behavioral.
+
+## Explicitly not re-reported
+
+The two `arggon: warning: commit skipped: ... native gate: missing dependency` lines in the full suite are pre-existing on `main` (confirmed by the delivery lead), not this change's.
+
+## Verification status
+
+- Verified by reading: AC 1-8 code paths, tests' discriminating power, docs completeness, one-logic-path, report/sync isolation, never-a-gate wiring.
+- Taken as input (not re-executed by me, per role): `validate`, `spec validate`, `spec analyze` = 10 none new, prettier, `test:structure`, `lint:structure`, full `test` 133/2837, `check:plugin` no drift. No probe changes my verdict — the one item that would rest on execution (bundle determinism) is covered by `check:plugin`, which the maker reports clean; the bundle diff is a visibly mechanical module-registry regeneration carrying `lib/src/brief.ts`.
+- Remaining unverified: none material to the verdict.
+
+## Recommendation
+
+**Merge.** Clean against the project's review bar: architecture/boundaries, conventions, tests-that-discriminate travel with the behavior, docs travel with the code, scope stays on the item, report/sync byte-identical, never-a-gate asserted by a real test. F1 is the only defect and is non-blocking.
+
+Process note (delivery lead's call, not a code finding): the item frontmatter still reads `status: todo`, `assignee: null`, `worktree_path: null` despite the claim commit — flip it on merge per §5.
