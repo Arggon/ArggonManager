@@ -358,3 +358,7 @@ The first push was **rejected non-fast-forward**: the remote branch had a commit
 I also **reverted a prettier run of my own** that reformatted the whole item file (table padding, `*true*`→`_true_`, blank lines). That was unrelated reformatting of a historical record; the file now carries exactly my two citation edits (2 insertions, 2 deletions). Prettier is not a CI gate here, so nothing is lost — the test file is prettier-clean.
 
 **Untouched on purpose:** every acceptance box — they live inside a dated `## Notes` block (`:45-50`), not under `## Acceptance` (which is empty), so ticking them in place means rewriting history. Status stays `in_progress`; the `done` flip is the delivery lead's after merge verification. The reviewer's round-2 non-blocking hardening notes (`expect(linkFrom).toBeGreaterThan(from)`; updating `:193`'s reason clause when `bug-convention-md-links-nonexistent-adr-0015` lands) remain unapplied and unowned by this round.
+
+### handoff 2026-10-06 @Arggon — next: Delivery lead: review the TAIL_STOPS ')' change in 7b7c3c73 (code-bearing, beyond the scoped fix) — approve or git revert; then CI on 5691ee9e and flip to done.
+- branch: fix/bug-engineering-doc-stale-adr-statuses
+- open questions: Is the one-character TAIL_STOPS ')' bound acceptable given the round-2 reviewer said 'no code change; I will not re-review code'? Reverting returns the branch to red on convention.md:553. Box 2 (spec…
