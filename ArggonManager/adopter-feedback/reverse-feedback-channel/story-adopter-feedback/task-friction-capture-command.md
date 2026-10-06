@@ -9,7 +9,6 @@ priority: p1
 created: "2026-10-02"
 updated: "2026-10-02"
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-capture-command.md
   Leaves live only under a story. id is the filename stem: task-friction-capture-command.
@@ -64,3 +63,25 @@ to `arggon validate`, and cannot become a task by accident.
 Sibling tasks `task-friction-redaction-at-write` and `task-friction-dedupe-and-report`
 both depend on this one. `task-friction-trigger-carrier` must land **after** them:
 an agent file naming a command that does not exist is worse than no trigger.
+
+### 2026-10-06 @ses_ef169b774ffddLlcycmzGGeU5Q
+### 2026-10-06 @arggon-delivery-lead — do not claim yet
+
+**T1 is gated and stays `todo`.** Recording the reason here so the next agent does not read its unclaimed `todo` status as a green light.
+
+ADR 0017 requires that no implementation task is claimed before a spec with clean `spec analyze`. PR #586 merged as `12df1ee0` and ADR 0024 was accepted on merge as `3d612032`, so the **renumber** half of the release condition is met. The **zero-NEW** half is not:
+
+```
+$ npm run arggon -- spec analyze --baseline ArggonManager/spec-analyze-baseline.json
+5 new, 1 resolved, 5 unchanged, 10 total
+exit code: 1
+```
+
+All 5 NEW findings are `[duplicate-doc-number]` and **none are caused by the adopter-friction chain** — they are `main`'s own pre-existing collisions (exploration-001, plan-001, plan-015, spec-001, spec-015), missing from the committed baseline because they predate it.
+
+So the release condition fails on a defect that belongs to a different story. Two ways out, and the choice is the product owner's:
+
+1. Renumber those five first — `task-renumber-colliding-doc-numbers` already owns it, and `task-release-pipeline-baseline-new-collisions` records that its completion is what unblocks the baseline. That is the honest route and it also turns `main` green again.
+2. Re-save the baseline to record the five as known. **I would not recommend this as the first move**: it makes the gate green by widening the net rather than by fixing anything, and `main` currently exits 1, so the lane is red either way until one of these lands.
+
+Until then T1 stays unreleased, and `task-spike-friction-volume-threshold` / the compliance spike stay behind their declared `depends_on` edges.
