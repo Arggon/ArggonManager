@@ -213,3 +213,43 @@ The chain that just merged — ADR 0026, spec 021, the decision-brief kernel and
 I have not pushed a `Release-As` commit. The runbook assigns that to the operator, `engineering.md` §Authority map lists "Publishing a release" as the product owner's, and `release.md` calls npm publishes and GitHub Releases owner-only. Deciding a version number is also a product judgement (minor vs patch, and what the release note leads with) — not mine to take quietly.
 
 **What I can do on your word:** push the `Release-As` trailer (one empty commit), let release-please open the PR, hand-edit the drafted CHANGELOG section to house style, verify the five-file diff, and bring it back to you for the merge. The merge is the release, so that click stays yours.
+
+### 2026-10-07 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-07 @arggon-delivery-lead — the release deadlock, root cause isolated
+
+**This is not a missing human trigger. It is a config mismatch that has killed the release pipeline since 2026-10-02, while every run reported green.** Pushing the `Release-As: 0.6.0` trailer surfaced it; the trigger was never the problem.
+
+## The cause, measured
+
+`release-please-config.json` never sets `include-component-in-tag`. Per the official schema (fetched 2026-10-07, `schemas/config.json`), **that option defaults to `true`** — so release-please looks for component-prefixed tags. The logs show it hunting:
+
+```
+⚠ Found release tag with component '', but not configured in manifest
+❯ looking for tagName: arggon-manager-v0.5.0
+❯ looking for tagName: lib-v0.5.0
+⚠ There are untagged, merged release PRs outstanding - aborting
+```
+
+But the tags that actually exist are plain — `v0.2.0 v0.3.0 v0.4.0 v0.4.1 v0.5.0` — because **`release.yml` creates them that way by the decided contract**: `git tag -a "v${VERSION}"` (`.github/workflows/release.yml:101`), and spec-release-pipeline-015 invariant 1 says *"the root tag `vX.Y.Z` names the exact commit being published"*.
+
+So release-please never finds `v0.5.0`, concludes its own merged PR #556 is still untagged, and aborts before opening a new one. **It cannot ever open the next release PR until this is resolved** — a permanent deadlock, not a one-off.
+
+## Why nobody noticed
+
+**Every run reports `success`.** Verified across 13+ consecutive runs since the 0.5.0 cycle — 2026-10-06 and 2026-10-07 alike — every one contains `untagged, merged release PRs outstanding - aborting` and every one is green. The abort is a warning inside a successful job, so the failure is invisible to CI status, to dashboards, and to anyone who did not read the log line. That is the same defect class as `bug-verification-regex-matching-nothing`: a check that cannot fail teaches its reader that nothing is wrong.
+
+## The fix, and which side is wrong
+
+**The config is wrong, not the workflow.** ADR 0018 and spec-release-pipeline-015 both decide `vX.Y.Z` as the tag contract, and `release.yml` — the spec's chosen owner of tag + GitHub Release + publish (spec §Rationale: release-please must NOT own them, because `GITHUB_TOKEN`-created events do not trigger workflows) — implements exactly that. So the fix is to make release-please agree with the decided contract:
+
+```json
+"include-component-in-tag": false
+```
+
+Added at the top level of `release-please-config.json`, so both packages (`arggon-manager` and `lib`) resolve to the plain `v`-prefixed tag the workflow creates.
+
+**What I am NOT doing:** I am not touching `release.yml`, not renaming or creating tags (the runbook forbids moving or deleting a released tag, and `v0.5.0` is a real shipped release of record), and not choosing the version — that stays the product owner's, and the `Release-As` trailer is already pushed and waiting.
+
+## The gap this exposes, which needs its own item
+
+`release-please-config.json` has **no test and no gate**. Nothing asserts that its tag convention agrees with the tags `release.yml` actually creates, which is why a one-word omission could silently disable releases for five days. After the fix lands, this wants the same treatment the seam pin got: a check that the two agree, so the next config drift fails loudly instead of aborting quietly inside a green job.
