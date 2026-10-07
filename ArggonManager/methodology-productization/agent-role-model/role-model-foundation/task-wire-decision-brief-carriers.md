@@ -10,7 +10,6 @@ created: "2026-10-06"
 updated: "2026-10-06"
 depends_on: [task-spec-owner-decision-brief]
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-wire-decision-brief-carriers.md
   Leaves live only under a story. id is the filename stem: task-wire-decision-brief-carriers.
@@ -64,3 +63,78 @@ Behavioral change: it reaches every adopter's tree through the generated seam, s
 - [ ] Report-only `spec analyze` finding shipped and tested; **no transition, command or CI lane consults it** — asserted by a test, not by prose
 - [ ] Tests travel with the change: brief/answer parsing, supersede-by-later-`decided:`, the routing rule, and the opt-in finding
 - [ ] The three live cases named in exploration 025 are re-briefed or recorded as decided under the new convention, so the convention ships against real input rather than a fixture alone
+
+### 2026-10-07 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-06 @arggon-delivery-lead
+
+**Methodology impact class: Behavioral** (ADR 0016; `docs/agents.md` §Changing the methodology itself). Agents must re-learn something — there is a new delivery-lead duty and a new item-level convention — so this ships through the ADR 0016 propose channel, and the release note names it.
+
+**Which carriers move:**
+
+- `docs/agents.md` §Orchestration and `docs/engineering.md` §Roles and authority — the convention and the routing rule, with the ADR 0021 §2 authority map restated as unchanged
+- the generated `arggon-delivery-lead` contract, both twins (`templates/docs/opencode/**` and `templates/docs/zcode/**`), regenerated through `arggon init` so the materialized copies and `x-generated` checksums stay honest
+- `skills/arggon-cli/references/orchestration.md` — the committed skill source; `npm run skills:sync` and `cli/src/skill-copy.test.ts` regenerate the copy (`.agents/skills/**` is gitignored, so there is no second committed copy)
+- a dated amendment to ADR 0026's Consequences naming the surface the kernel implemented
+
+**Impact class on the carrier edit itself:** the carriers state the convention; the enforcing surface is `show --json`'s additive `decision_brief` field and the opt-in `UNANSWERED-DECISION-BRIEF` finding, both shipped in `task-implement-decision-brief-kernel` (merged, PR #662). Nothing here adds a command, a gate, a config key or a frontmatter field.
+
+Row 6 of this item's live contract asked for the release note to name the change. `CHANGELOG.md` is **release-please-generated** from conventional-commit subjects (`.release-please-manifest.json`, `release-please-config.json`), not hand-edited — so the mechanism is the commit type (`docs:` maps to the release "Changed" section) plus this declaration, which is the form ADR 0016 actually asks for. Recorded here rather than by hand-editing a generated file.
+
+### 2026-10-07 @arggon-standards-reviewer
+verdict: request-changes
+
+Two findings, both small and both introduced/owned by this change: a **dead cross-reference in the ADR amendment** (the item's central deliverable, and nothing in CI catches it), and **row 8's evidence is uncommitted**. Everything else is clean — see the evidence below.
+
+## Evidence I verified by reading (not by running gates)
+
+**Scope is prose only, no behavior.** `git diff --name-only origin/main...HEAD` contains no `.ts/.js/.json` source; the only code-adjacent file is the generated `x-generated` state (`ArggonManager/.convention.yml`). No new command, flag, frontmatter field, config key or gate. Nothing re-decides ADR 0026 or the promotion tiers; the §Boundary table is respected.
+
+**Restatements match ADR 0026 §§1–7 and the spec, not "almost".**
+- Six fields in order, the 2-or-3-options-never-one rule, field 5 mandatory, field 6 absolute date, and the "restate it in their own words" test — all present and matching ADR 0026 §1 / spec §The record.
+- Routing rule lists exactly the five authority-map rows (direction and priority, container acceptance, residual risk, claim takeover, release) plus hard-to-reverse calls — matches ADR 0026 §5 and the live authority map in `engineering.md:89`.
+- Default-direction constraint (reversible/"hold" for hard-to-reverse) and "a brief can never make an irreversible act happen because nobody replied" — matches ADR 0026 §3.
+- Report-only surface: `show`'s additive `decision_brief`, one opt-in finding (same `x-tracker.product-acceptance` arming), `report`/`sync` byte-identical — matches the merged code (below).
+
+**Domain neutrality (ADR 0021 §6.2 / ADR 0026 §7).** Both `engineering.md` §The decision brief and `agents.md` §Decision briefs label the software example explicitly ("This project's worked example — software, an example only"; "software is **this project's** example, never the convention's vocabulary"). The convention's own language — six field names, `decide:`/`decided:`, four states, routing rule — carries no load-bearing software noun. The non-software supplier example stays in the spec.
+
+**The carried statements are true against the merged kernel.** `lib/src/operations.ts:169,187` adds `decision_brief` beside `acceptance`, computed via `acceptanceBody(result.item)` (canonical body, so a comment-filed brief classifies). `lib/src/report.ts` `ReportContainer` carries only `acceptance` — no `decision_brief`. `lib/src/sync-command.ts:81` skips `no_pr`, so a brief on a PR-less item is invisible there. `cli/src/spec.ts:1024,1131` adds `UNANSWERED-DECISION-BRIEF` under the reused `productAcceptanceArmed` gate, unscoped by type/status. `.gitignore:14` confirms `.agents/skills/` is gitignored/generated; `skills/arggon-cli/references/orchestration.md` is the committed source and the committed diff touches only it (generated copy differs by the provenance marker line only — in sync).
+
+**Skill/generated-seam correctness.** The PR edits the committed skill source and the two templates, then lets `arggon init` regenerate the materialized `.opencode/.zcode` copies; `x-generated` checksums moved with them and match the on-disk generated files (I hashed both: `a833e431…` opencode, `d54d4301…` zcode). Nothing relies on a file absent from an adopter tree: the convention reaches adopters through the bundled skill (`BUNDLED_SKILLS` in `cli/src/docs.ts:281`) and the generated contract; `docs/agents.md`/`docs/engineering.md` are this repo's own carriers, not templates.
+
+**ADR 0026 amendment follows house style.** Blockquote, "nothing above this note is rewritten", links spec + merged PR #662. The sibling ADR 0021 amendment correction it cites ("`sync` left byte-identical") is quoted accurately, and choosing `show` over `report` for an item-level record is justified.
+
+## Findings
+
+### Blocking — F1: dead cross-reference in the ADR 0026 amendment
+`ArggonManager/docs/adr/0026-owner-decision-brief.md:302` links `[spec `owner-decision-brief-021`](./specs/spec-owner-decision-brief-021.md)`. ADRs live in `docs/adr/`, so `./specs/…` resolves to `docs/adr/specs/`, which does not exist — the link is dead. Every other ADR→spec link uses `../specs/` (`0010:7`, `0019:58`, `0020:19`). This link is **added by this PR** (absent on `main`). No link-checker gate exists, so nothing catches it. Fix: `../specs/spec-owner-decision-brief-021.md`. (Note the same pattern already sits in ADR 0021:327 — pre-existing, not this PR's to fix, but do not propagate it further.)
+
+### Blocking — F2: row 8's routing-decision evidence is uncommitted
+The branch commit body and the item comment claim "Routing decisions recorded on the three live cases from exploration 025", and `tools.arggon.show` returns the three `routing decision under ADR 0026` comments. But those comments are **staged-only in the primary checkout** (`git status --short` → `M `), and absent from every ref: `git log --all -S "routing decision under ADR 0026"` → nothing; both `origin/main` and `feat/task-wire-decision-brief-carriers` → 0 hits. Evidence that does not travel with the change and lives in an uncommitted working tree is a claim I cannot find on the record. Commit those three item edits (or explicitly defer them on a filed follow-up) so row 8 is durably met.
+
+### Non-blocking — F3: commit `2fde2846` message and ordering
+`chore(tasks): generated init docs (37 files)` changed **3** files, not 37: the two generated `arggon-delivery-lead` copies and `.convention.yml`. It also committed the generated copy **ahead of** the template edit (`0e547431`) — at `2fde2846` the generated file carries the duty while its template does not, so `arggon init` at that commit would strip it. Harmless at tip (generated == template, checksums match) but the seam was momentarily inconsistent. The wholesale `generatedAt` timestamp churn across ~37 entries is inherent to a batch `arggon init`; it belongs with the carrier change, not as unrelated noise — but the message should not say "37 files". Also, the plugin checksum moved (`bb7ac137…` → `0d454f9a…`) because the kernel PR changed the bundle source without re-recording its generated checksum; `2fde2846` is partly catching that up. Fine to keep, worth a line in the commit body.
+
+### Node on the item's rows I was asked to challenge
+- **Row 6 (adoption channel / release note):** I accept your call. `release-please-config.json` maps `docs` → "Changed", and the subject `docs(methodology): …` names the change; the commit body carries the `init --propose` instruction (release-please emits the subject by default, so the changelog line is thinner than the body — still adequate to "name it"). `init --propose` delivers the convention through the bundled skill and generated contract, confirmed by the mechanism. Not a hand-edit of a generated file. Fine.
+- **Row 8 (three live cases):** your classification is right — none of the three owes a brief under §5 (all config/prose-reversible lead calls), and manufacturing briefs would be noise. I am not challenging the decision. I am challenging only its **durability** (F2).
+
+## Gates — expected vs observed (re-run by me at `0e547431`)
+
+| Gate | Expected | Observed |
+|---|---|---|
+| `npm run arggon -- validate` | ok | `ok (0 warning(s), convention v5)` |
+| `npm run arggon -- spec validate` | ok, pre-existing collisions | `ok (37 doc(s), 5 warning(s))` — all 5 pre-existing `DOC_NUMBER_COLLISION` |
+| `npm run arggon -- spec analyze` | 11, extra is date-driven | `11 finding(s)`. I reproduced **11 on `main` too** (`1316dbde`, after rebuild). Extra = `DECISION-PENDING-EXPLORATION` on `exploration-methodology-improvements-014` (created 2026-09-29, 7-day threshold, now 2026-10-07). **I confirm the caller's explanation: not this change.** (The committed baseline is stale at count 6 and pins a different decision-pending file, so `--baseline` drift-compare is not a usable cleaner here.) |
+| `npx prettier --check` changed files | clean | `All matched files use Prettier code style!` |
+| `npm run test:structure` | 5/5 | `5 passed; 0 failed` |
+| `npm run lint:structure` | clean | exit 0, no findings |
+| `cli/src/skill-copy.test.ts` + `skill-generated-commands.test.ts` | green | `12 passed` |
+| `cli/src/init-docs.test.ts` | green | `42 passed` |
+| `npm run check:plugin` | current | green (bundle regenerated, no diff) |
+| `npm test` | green | `133 files / 2837 passed` |
+
+## Not verified / out of scope
+No behavioral change, so no smoke probe was owed and none was run. I did not run the ADR 0016 `init --propose` against a scratch adopter tree (the proposal mechanism is exercised by `cli/src/init.test.ts`, 42 passing). Nothing else remains unverified.
+
+## Merge recommendation
+**No-merge as-is.** Both blockers are one-line fixes (F1 path; F2 commit the three item edits). After those, the change is approvable: scope, domain neutrality, restatement fidelity and the merged-code claims all hold. F3 is cosmetic.
