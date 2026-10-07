@@ -190,3 +190,26 @@ Every quotation in both files re-checked against its source, and reported rather
 
 - branch: feat/task-adr-0026-owner-decision-brief
 - open questions: Is leaving box 8 unticked right, or do you want all eight ticked now?; the exploration's intro paragraph still says each item 'asks the product owner' — left as written since the lead filed it; needs…
+
+### 2026-10-07 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-07 @arggon-delivery-lead — release checked, and it is not broken
+
+**Verdict: the release automation is healthy. There is no release PR because the human trigger was never pushed** — not because anything failed. That trigger is the product owner's step (publishing is a human-only power, `engineering.md` §Authority map), so this is a decision brief, not a fix.
+
+## What I checked, and what it showed
+
+- **`v0.5.0` is the latest release** (2026-10-02, GitHub Release exists, tag exists, and the tag is an ancestor of `main`). Nothing is stranded.
+- **release-please runs green on every push** — 5 recent runs, all `success`. It is not failing and not wedged.
+- **`v0.5.0..main` is 973 commits**: 13 `feat`, 39 `fix`, 65 `docs`, 719 `chore` (`chore` is mapped to the *Changed* section, so it is deliberately releasable). **52 releasable `feat`/`fix` commits have no home in a release.**
+- **`release-please` opens a PR only when a version is requested.** Per `release.md` §What the automation owns, step 1: push a `Release-As: X.Y.Z` trailer commit to `main`. There is no such commit in history, so release-please had no number to propose — it correctly did nothing.
+- **No release PR is open** (`gh pr list` — only a dependabot bump), and the `release-please--branches--main` branch still exists from the 0.5.0 cycle, which is why the action's log mentions PR #556: that is the *merged* 0.5.0 PR from Oct 2, re-read for state, not a live one.
+
+## Why this matters, stated plainly
+
+The chain that just merged — ADR 0026, spec 021, the decision-brief kernel and carriers — is **Behavioral** and reaches adopters only through the ADR 0016 channel, which ships **in a release**. Same for the done-gate scoping fix (#656) and everything else since Oct 2. Until a release is cut, none of it produces any value outside this repository: the work is done, merged, and inert.
+
+## What I am NOT doing
+
+I have not pushed a `Release-As` commit. The runbook assigns that to the operator, `engineering.md` §Authority map lists "Publishing a release" as the product owner's, and `release.md` calls npm publishes and GitHub Releases owner-only. Deciding a version number is also a product judgement (minor vs patch, and what the release note leads with) — not mine to take quietly.
+
+**What I can do on your word:** push the `Release-As` trailer (one empty commit), let release-please open the PR, hand-edit the drafted CHANGELOG section to house style, verify the five-file diff, and bring it back to you for the merge. The merge is the release, so that click stays yours.
