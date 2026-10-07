@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-probe-native-seam-gate
 title: "PROBE (throwaway): does the native done-gate agree with the CLI?"
 assignee: arggon-delivery-lead
@@ -8,7 +8,6 @@ parent: tooling-and-environment
 labels: [probe]
 created: "2026-10-07"
 updated: "2026-10-07"
-claimed_at: "2026-10-07T17:40:13.700Z"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-probe-native-seam-gate.md
