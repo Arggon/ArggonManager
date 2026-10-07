@@ -97,3 +97,26 @@ Split from `bug-native-seam-bundle-diverges-from-live-kernel`, which keeps the
 divergence record, the three reproductions, and the mechanism choice. When the
 mechanism there is chosen, this item's mitigation must agree with it — do not let
 the two records prescribe different fixes.
+
+### 2026-10-07 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-07 @arggon-delivery-lead — premise CONFIRMED, mechanism now precise
+
+Earlier today I downgraded this item's causal premise to "unproven" because a diff of the gate function between two bundle revisions came back identical. **That downgrade was wrong and is withdrawn here.**
+
+The cause is isolated and reproduced on `bug-native-seam-bundle-diverges-from-live-kernel`. Precisely:
+
+- The stale `.opencode` copy was built from a kernel **before PR #656** (`bug-done-gate-counts-checkboxes-inside-comment-blocks`). Its gate counted **every checkbox in the whole item body** — including unticked boxes inside a comment's history — instead of reading only the live `## Acceptance` section.
+- The proof is the error string. The native refusal said *"the acceptance checklist in the **item body** still has unchecked boxes"*; the current kernel says *"the **live '## Acceptance' section** still has unchecked boxes"*. The pre-fix wording occurs **1×** in the pre-fix bundle and **0×** in the current kernel; the live wording occurs **2×** in the current kernel. The seam spoke the pre-fix dialect.
+- A minimal probe reproduced it: a fully-ticked live section plus a comment carrying unticked boxes → native refuses, CLI refuses for a different stated reason. Two kernels, two verdicts.
+
+## Why my diff came back identical
+
+I compared `6d3bef0c` (the done-gate *fix*) against current, saw the same `acceptanceGate`, and concluded the bundle could not explain it. **I diffed the wrong revision** — the discriminating kernel is `81828441^`, the commit *before* the fix, which I never opened. A negative result from the wrong comparison is not a negative result, and I treated it as one for several hours. That is the error to avoid repeating on this item: **test the version that actually produced the symptom.**
+
+## What this changes here
+
+- **The session-start defect is real.** A session loaded that pre-fix kernel at start and served every mutation from it for three days, including three refusals. This is not a hypothetical about what staleness *could* do.
+- **The reverse-direction row is now answerable, not just important.** I know exactly which kernel to swap in (`81828441^`) and which body shape discriminates (ticked live + unticked history), so the test that has been open since this item was filed can be built directly: does that pre-fix kernel, through the native surface, **permit** a transition the current kernel refuses?
+- **The fixture for the parent's row 2 now exists** as a documented body shape, so it does not need re-deriving.
+
+The acceptance list stands as written. Nothing here is blocked — but note that the *ordering* matters more now than it did this morning: the mitigation should follow the reverse-direction test, because that test's answer decides whether this is a hygiene fix or a safety fix.
