@@ -1,9 +1,8 @@
 ---
 type: task
-status: done
+status: cancelled
 id: task-probe-native-seam-gate
 title: "PROBE (throwaway): does the native done-gate agree with the CLI?"
-assignee: arggon-delivery-lead
 parent: tooling-and-environment
 labels: [probe]
 created: "2026-10-07"
