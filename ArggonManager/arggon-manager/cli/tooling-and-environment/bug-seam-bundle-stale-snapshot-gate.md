@@ -7,8 +7,8 @@ parent: tooling-and-environment
 labels: [native-seam, parity, done-gate]
 created: "2026-10-07"
 updated: "2026-10-07"
+depends_on: [bug-native-seam-bundle-diverges-from-live-kernel]
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-seam-bundle-stale-snapshot-gate.md
   Leaves live only under a story. id is the filename stem: bug-seam-bundle-stale-snapshot-gate.
