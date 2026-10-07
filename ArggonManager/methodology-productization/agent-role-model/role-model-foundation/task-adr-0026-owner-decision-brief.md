@@ -253,3 +253,31 @@ Added at the top level of `release-please-config.json`, so both packages (`arggo
 ## The gap this exposes, which needs its own item
 
 `release-please-config.json` has **no test and no gate**. Nothing asserts that its tag convention agrees with the tags `release.yml` actually creates, which is why a one-word omission could silently disable releases for five days. After the fix lands, this wants the same treatment the seam pin got: a check that the two agree, so the next config drift fails loudly instead of aborting quietly inside a green job.
+
+### 2026-10-07 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-07 @arggon-delivery-lead — release PR is READY for the merge
+
+**`#664 chore: release main` is open, `0.6.0`, CI fully green, `CLEAN`.** The release PR was requested by the product owner ("release please, with your recommendation") and is complete through the review step the runbook prescribes. **The merge is the release and it stays the product owner's click.**
+
+## What was actually wrong (two stacked defects, neither a missing trigger)
+
+Pushing the `Release-As: 0.6.0` trailer surfaced that the pipeline had been **dead since 2026-10-02**, with every run reporting green:
+
+1. **`include-component-in-tag` was never set**, and the schema defaults it to `true`. release-please hunted for `arggon-manager-v0.5.0` / `lib-v0.5.0` while the tags that exist are plain `v0.5.0` — because `release.yml` creates them that way by the decided contract (spec-release-pipeline-015 invariant 1, ADR 0018). It never found `v0.5.0`, concluded its own merged PR #556 was untagged, and aborted. **Fixed** (`include-component-in-tag: false`, b7b5f866), verified against the fetched schema; v0.5.0 dereferences to 13d72f5f, exactly PR #556's merge commit.
+2. **A stale `autorelease: pending` label on PR #556** — the second half of the deadlock. release-please filters merged PRs by that label (`DEFAULT_LABELS`, `manifest.ts:289`), and it normally flips the label to `autorelease: tagged` when it tags. This repo sets `skip-github-release: true` and lets `release.yml` tag via `git tag`, so **release-please's tagging path never runs and the label is never flipped** — a permanent deadlock by construction. Resolved by creating the `autorelease: tagged` label and moving #556 onto it. Verified: the abort count went 1 → 0 and #664 appeared.
+
+**Nobody had considered the label lifecycle.** `grep -rn autorelease` across the whole repo returned zero hits before this — the label is load-bearing for the pipeline and appears nowhere in the spec, the ADR, or the runbook.
+
+## The review edits applied (three, per the runbook)
+
+- **CHANGELOG curated to house style** — bold name + prose + `(PR, spec)`, no commit links; duplicates from merge commits and rebases collapsed. **The 0.5.0 section and everything older are byte-identical** (append-only invariant verified by diff, then re-verified after prettier).
+- **The one-time kernel pin bootstrap** (`release.md` exception): the extra-files JSON updater preserves the range prefix, so the first release PR after an un-pin keeps the caret. The caret had **never** been bootstrapped — `v0.4.0`, `v0.4.1` and `v0.5.0` all shipped with one. Edited to the exact `0.6.0`; from the next release on the rewrite is exact-to-exact and machine-owned.
+- **`package-lock.json` resynced** to the exact pin.
+
+The diff is exactly the **five files the spec mandates**: both `package.json`, `package-lock.json`, `CHANGELOG.md`, `.release-please-manifest.json`. Versions in lockstep at `0.6.0`.
+
+## Filed, because they are real gaps this exposed
+
+- **No gate guards the release config↔workflow agreement.** A one-word omission disabled releases for five days inside a green job. The next config drift should fail loudly, not abort quietly.
+- **The `autorelease` label lifecycle is documented nowhere** and is load-bearing. Whatever the fix (the workflow flipping the label, or the config accounting for the split ownership), it needs writing down.
+- **release-please's abort is a warning in a `success` run** — the same class as `bug-verification-regex-matching-nothing`: a check that cannot fail teaches its reader that nothing is wrong.
