@@ -114,6 +114,44 @@ Bounded and named (ADR 0021 §2). No new authority is granted to any agent by th
 
 Publishing a release is the fifth human step and is human by construction (a human-pushed commit), not by a CLI gate.
 
+### The decision brief (the request side of the authority map)
+
+**The authority map above is unchanged by this convention** ([ADR 0026](./adr/0026-owner-decision-brief.md) §Decision; ADR 0021 §2 stands): the delivery lead still **recommends**, the product owner still **decides**, sequence is still not priority. What this adds is the missing **request side** — how the delivery lead brings a decision to the product owner, so a question does not land in a chat and the answer has somewhere durable to live.
+
+A **brief** is an ordinary comment on the item, headed `decide:` and written by the delivery lead; the **answer** is an ordinary comment headed `decided:`, written by the product owner. Both use the dated heading `arggon comment` writes — `### <YYYY-MM-DD> @<author>` — and both are prose, never schema: there is no flag that writes a brief and no frontmatter field (ADR 0026 §6). A brief is **written for one reader whose vocabulary is not assumed**; the mechanical test is whether that reader could restate the choice and its consequence in their own words.
+
+**The six fields, in this order** (ADR 0026 §1):
+
+1. **The question**, in one sentence — any specialist term translated, at first use, into what it changes for the product.
+2. **Why it matters**, in outcome terms — what changes for the people who use it, what it costs, what it risks; never in mechanism terms.
+3. **The options** — two or three, **never one** — each with its consequence in plain words, and for the recommended one its honest cost stated rather than implied.
+4. **The recommendation**, and why.
+5. **The strongest argument against that recommendation**, written by the lead. A brief that omits this field is not a brief.
+6. **The default**: what the lead will do if no answer arrives, and the **absolute** date after which it happens — never a relative deadline ("by Friday").
+
+The **answer** carries the chosen option — the text of the option, or `other` for "none of these", which is a first-class, unremarkable reply — optionally with a scope note in parentheses, then the reasoning. A later `decided:` supersedes an earlier one, and a superseded brief is **never rewritten**.
+
+**The routing rule — which decisions owe a brief** (ADR 0026 §5). A brief is owed **only** for the rows of the authority map above — direction and priority, product acceptance of a container, accepting residual risk, taking over another writer's claim, publishing a release — and for **hard-to-reverse calls** (those whose cost of being wrong later exceeds the time it takes to undo). Everything else the delivery lead **decides and records on the item as a plain comment**; a question with one real option is not a brief. A brief never replaces the record a row already has — the `priority` field, an `accept:` comment, the ADR 0015 waiver, the claim-takeover gate and the human-pushed release all keep their records: the brief is the **request**, not the answer. One item is canonical for a given decision; a second brief links to it. **This rule is normative, not advisory**: without it every decision becomes a brief, which inverts the tier table below — human attention must not rise per shipped change (a brief **replaces a chat question rather than adding a step**).
+
+**The stated default is what makes a brief safe to send** (ADR 0026 §3). On the stated date the default executes and the record says so, so **silence selects a default the owner was shown in advance, never an answer by abstention**. The direction of that default is constrained: for a hard-to-reverse call it is the reversible or "hold" option, never the more aggressive one; if no reversible option exists the default is "hold" and the brief says so; for every other decision that owes a brief the default is the lead's own recommended option. The net effect is the property that lets a brief be sent without a blocker: **a brief can never make an irreversible act happen because nobody replied.**
+
+**Report-only, never a gate** (ADR 0026 §6). This is inherited from the acceptance convention below, with its reasoning, not only its conclusion: the tracker has no identity layer, so an answer is attributed but never authenticated, and a gate built on it would be forgeable or unusable. No transition consults a brief, no command refuses because one is missing, and CI never fails on one. **The surface is `show`:** `arggon show <id> --json` carries an additive `decision_brief` field (`none` | `open` | `decided` | `self-decided`), and `arggon spec analyze` gains one additive, opt-in finding (`UNANSWERED-DECISION-BRIEF`, armed by the same `x-tracker.product-acceptance` as the acceptance detector); `arggon report --json` and `arggon sync --json` are **byte-identical** (a brief is an item-level record, so the container-level `report` and the PR-reconciled `sync` cannot carry it — the correction ADR 0021's own amendment records for the sibling artifact).
+
+**This project's worked example — software, an example only.** The convention's own language is the six field names and the two header tokens above; they are domain-neutral, and a reader who has never written anything technical can follow the convention itself. Software is **this project's** example and never the convention's vocabulary (ADR 0026 §7). A brief written in this repository's own terms, therefore, would read like this — "a shared library", "a feature flag", "a database index" are the ADR's own named software cases:
+
+```
+### 2026-10-06 @Arggon
+decide: a shared library for the date handling (the logic three screens each use today)
+- The question: should the date logic live in one shared library, or stay copied in each screen that uses it?
+- Why it matters: today a fix must be made in three copies and a missed copy shows customers different behaviour in different screens; one library costs a release shared by three teams.
+- The options: A — keep three copies, so each team moves independently and every fix is made by hand; B — one library, so a fix lands once for every screen, at the cost of a shared release.
+- The recommendation: B — a wrong date in one screen is a customer-visible defect, three times over.
+- The strongest argument against that recommendation: a shared library couples three teams' release timing, and one library change can hold up a team that would otherwise ship today.
+- The default: B, from 2026-10-27 — one library is the recommendation, and this call is one we can reverse in a release.
+```
+
+A non-software adopter writes the same six fields in its own words; a library, a flag and an index are not required vocabulary. The non-software worked example lives in [`spec-owner-decision-brief-021`](./specs/spec-owner-decision-brief-021.md) §Synopsis.
+
 ## Review bar (blocks merge)
 
 A bar is named by **what the project declares**, never by a tool: this document declares ArggonManager's own bar, and every adopting project rewrites its own (`arggon init` never overwrites it — `agents.md` §Prerequisites). The domain-invariant that survives every project is the **acceptance contract on the item** — the checklist in the item body — not the tool that checks it. Everything below is this project's declaration, and the parenthetical gates are the software worked example (ADR 0021 §6.2).
@@ -155,6 +193,8 @@ accept: approve
 `accept: approve` or `accept: changes-requested`, optionally followed by a short scope in parentheses, then the evidence list; a later `approve` supersedes an earlier `changes-requested`. Prose, documentation, not schema.
 
 **Never a gate.** The tracker has no identity — the session id is correlation metadata only (`agents.md` §MCP server) — so an acceptance cannot be authenticated; a gate built on it would be forgeable or unusable, and both are worse than none. An acceptance written by the item's own assignee is reported as self-accepted rather than blocked. [spec promotion-policy-018](./specs/spec-promotion-policy-018.md) specifies the read-only surfaces that classify it (`report` / `show` per container, plus one opt-in `spec analyze` finding); none of them gates a transition, ever.
+
+The **request** that precedes an acceptance — how a decision is asked, the six-field brief and its `decide:`/`decided:` grammar, the routing rule and the answer's report-only surface — is §Roles and authority → The decision brief (ADR 0026). A brief never replaces the `accept:` record above: the one is the request, the other the answer.
 
 ### Implementation quality (maker, checked in review)
 

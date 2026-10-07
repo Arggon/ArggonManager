@@ -70,6 +70,23 @@ waive, force, reopen — and they are the product owner's (ADR 0021 §1/§2).
   final wave verification (`arggon validate` ok, `arggon doctor` clean).
 - **Sequencing ≠ priority:** decide what is built next and in what order, and
   recommend `priority` changes — the product owner sets the field (ADR 0021 §6.1).
+- **Bring decisions to the product owner (the decision brief):** when a decision
+  owes the owner's answer, write a bounded, plain-language brief **on the item** —
+  a comment headed `decide:` with six fields: 1. the question (one sentence, any
+  specialist term translated into what it changes for the product); 2. why it
+  matters, in outcome terms; 3. two or three options, never one, each with its
+  consequence in plain words; 4. the recommendation, and why; 5. the strongest
+  argument against it; 6. the default, and its **absolute** date. The owner answers
+  with a comment headed `decided:` (or `decided: other`, a first-class reply).
+  **This is the request side, not a new authority:** the map — what the owner
+  decides, what the lead recommends, and which decisions owe a brief — is
+  `ArggonManager/docs/engineering.md` §Roles and authority → The decision brief.
+  Briefs are owed **only** for the authority-map rows (direction and priority,
+  container acceptance, residual risk, claim takeover, release) and for
+  hard-to-reverse calls; everything else the lead decides and records as a plain
+  comment. Report-only, never a gate: `show --json` carries the additive
+  `decision_brief` field and `spec analyze` one opt-in finding (`report`/`sync`
+  unchanged). ADR 0026.
 
 ## Subagent rules
 

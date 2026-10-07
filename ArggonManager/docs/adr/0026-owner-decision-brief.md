@@ -295,6 +295,38 @@ How it ships:
   answered, and the carrier text that teaches the convention. Both belong to the
   spec and the carriers that follow this record, in that order.
 
+> **Amendment (2026-10-06, `task-wire-decision-brief-carriers`): the read-only
+> surface is named — `show`'s additive field, with `report` and `sync`
+> byte-identical.** The decision above is unchanged and nothing above this note
+> is rewritten. §Consequences left the surface to the chain that follows
+> ("Not decided here:" above); [spec `owner-decision-brief-021`](./specs/spec-owner-decision-brief-021.md)
+> §The read-only surface settled it on the evidence, and
+> `task-implement-decision-brief-kernel` (merged, PR #662) implemented it:
+>
+> - **`arggon show <id> --json`** gains an additive `decision_brief` field beside
+>   the existing `acceptance` field — `none` | `open` | `decided` |
+>   `self-decided` — read from the item's own canonical body, so a brief filed as
+>   a comment (the default path) is still classified.
+> - **`arggon spec analyze`** gains one additive, opt-in finding,
+>   `UNANSWERED-DECISION-BRIEF`, under the **existing**
+>   `x-tracker.product-acceptance` arming (no new config key).
+> - **`arggon report --json` and `arggon sync --json` stay byte-identical.** A
+>   brief is an **item-level** record, and `report` aggregates per **container**
+>   (one row per story under an epic) while a brief may live on a leaf, where
+>   `report` has no row; `sync` classifies only items reconciled with an **open
+>   PR**, so a brief on an item with no open PR could never be reported there —
+>   the same correction ADR 0021's own dated amendment records for the sibling
+>   `accept:` artifact (`sync` "left byte-identical"). Choosing `show` over
+>   `report` is the record this amendment completes: the brief lives on the item
+>   it governs, so the surface that reads an item's own canonical body carries
+>   it.
+>
+> The finding remains report-only in every respect and never a gate, exactly as
+> §6 requires; the carrier text that teaches the convention lands in the same
+> change (`docs/agents.md` §Orchestration, `docs/engineering.md` §Roles and
+> authority, the generated delivery-lead contract, the `arggon-cli` skill and
+> the ADR 0016 channel).
+
 ## Alternatives considered
 
 - **C2 — teach only:** put the plain-language rule in the delivery-lead contract
