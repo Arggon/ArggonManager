@@ -299,7 +299,7 @@ How it ships:
 > surface is named — `show`'s additive field, with `report` and `sync`
 > byte-identical.** The decision above is unchanged and nothing above this note
 > is rewritten. §Consequences left the surface to the chain that follows
-> ("Not decided here:" above); [spec `owner-decision-brief-021`](./specs/spec-owner-decision-brief-021.md)
+> ("Not decided here:" above); [spec `owner-decision-brief-021`](../specs/spec-owner-decision-brief-021.md)
 > §The read-only surface settled it on the evidence, and
 > `task-implement-decision-brief-kernel` (merged, PR #662) implemented it:
 >
