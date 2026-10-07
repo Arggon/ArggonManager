@@ -142,3 +142,22 @@ No behavioral change, so no smoke probe was owed and none was run. I did not run
 
 ## Merge recommendation
 **No-merge as-is.** Both blockers are one-line fixes (F1 path; F2 commit the three item edits). After those, the change is approvable: scope, domain neutrality, restatement fidelity and the merged-code claims all hold. F3 is cosmetic.
+
+### 2026-10-07 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-06 @arggon-delivery-lead
+
+**verdict: both blockers fixed and pushed (cb556852) — approve subject to CI.**
+
+**F1 — dead cross-reference in the ADR 0026 amendment.** Confirmed and fixed. `./specs/...` resolves to `docs/adr/specs/...`; the amendment now uses `../specs/` like every sibling ADR. Verified by resolving the link against the ADR's own directory, not by eye: it targets an existing file, and the dead form now occurs **zero** times at the branch tip. No link gate catches this class, which is exactly why it was worth the reviewer's pass.
+
+**F2 — the row-8 evidence did not travel with the change.** This one was worse than the review stated, and the review was right to block on it. The three routing-decision comments were written while this session was moved into the carriers worktree, so the tracker committed them **on the branch**, not on `main` — and they were not on the branch tip either by the time it was checked, because that commit predated the rebase. Net effect: evidence I claimed in a comment existed nowhere durable.
+
+Fixed by landing all three on `main` (42126a94), verified reachable: each of the three items now carries its routing decision on `origin/main`.
+
+**A note on my own error, because it is the second time this session.** Both this and the earlier `task-implement-decision-brief-kernel` slip came from the same cause: a tracker write made from a worktree lands on that branch, and I then described it as if it were on `main`. The rule that would have caught it is the one this repo already states — read the item back from the ref you are actually claiming about. I am recording it here rather than quietly fixing it.
+
+**F3 (non-blocking, not fixed):** commit `2fde2846` says "37 files" and changed 3. The message is inaccurate but the content is right, and amending a pushed commit to fix a message is worse than the inaccuracy. Left as is, deliberately.
+
+**Reviewer's own confirmations, which I accept and did not re-litigate:** prose only, no behavior; every restatement matches ADR 0026 §§1–7 and the spec; domain neutrality holds with the software example explicitly labelled; the claims about `show`/`report`/`sync` and the skill-copy mechanism are true against the merged code; §Boundary respected.
+
+**On `spec analyze` reading 11 rather than 10:** confirmed **not** this change. `main` reports 11 too once `lib/dist` is rebuilt. The extra finding is `DECISION-PENDING-EXPLORATION` on `exploration-methodology-improvements-014`, which is date-driven — created 2026-09-29 against a 7-day threshold, and the clock rolled to 2026-10-07 during this session. The ADR 0017 gate called it "10, none new" all chain and that was correct at the time; it is time that moved, not the corpus.
