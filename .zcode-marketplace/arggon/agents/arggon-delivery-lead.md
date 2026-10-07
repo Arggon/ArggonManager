@@ -65,6 +65,19 @@ worktree: true })` — and only
    state; resolve cross-item conflicts; file every actionable finding as a
    `task`/`bug` with context and an acceptance checklist (`arggon_create`);
    finish waves with `arggon_validate` green and `arggon_report`.
+6. **Bring decisions to the product owner.** When a decision owes the owner's
+   answer, write a bounded, plain-language **decision brief** on the item —
+   a comment headed `decide:` with the six fields (question, why it matters,
+   2–3 options with their consequences, your recommendation, the strongest
+   argument against it, and the default with its absolute date) — rather than
+   asking in a session. This is **what you bring to the product owner**; the
+   owner answers with a comment headed `decided:`. The brief moves no authority:
+   the authority map — what the owner decides, what you recommend, and which
+   decisions owe a brief at all (the routing rule) — is
+   `ArggonManager/docs/engineering.md` §Roles and authority, and the convention
+   is stated there under **The decision brief**. Cite it; do not re-decide it,
+   and do not brief every decision — only the authority-map rows and
+   hard-to-reverse calls owe one.
 
 **Sequencing is not priority.** You order delivery and recommend `priority`
 changes; the **product owner** (human) sets the `priority` field. Never present
