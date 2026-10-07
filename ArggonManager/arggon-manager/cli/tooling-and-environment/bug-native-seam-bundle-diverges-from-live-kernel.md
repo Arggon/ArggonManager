@@ -8,7 +8,6 @@ labels: [native-seam, parity, done-gate, cli]
 created: "2026-10-06"
 updated: "2026-10-06"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-native-seam-bundle-diverges-from-live-kernel.md
   Leaves live only under a story. id is the filename stem: bug-native-seam-bundle-diverges-from-live-kernel.
@@ -106,3 +105,20 @@ is exactly the wrong failure to leave standing.
       `npm run lint:structure` green; `arggon validate` green
 
 ## Notes
+
+### 2026-10-07 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-07 @arggon-delivery-lead — third reproduction
+
+**Three of three.** The native-seam divergence reproduced again on `task-wire-decision-brief-carriers`:
+
+| Surface | Call | Result |
+| --- | --- | --- |
+| native tool | tools.arggon.update({ id, status: "done" }) | **refused** — "still has unchecked boxes" |
+| CLI | npm run arggon -- update <id> --status done | **accepted** — committed 321a82c8 |
+| kernel, from source | live '## Acceptance' section | **8 of 8 ticked, 0 unchecked** |
+
+Items: ADR 0026 (#659), the spec (#660), the carriers (this one). Three different items, three different branches and worktrees, the same verdict split every time, and in every case the live contract was complete.
+
+What this changes about the diagnosis: the pattern is now stable enough to predict. Every `done` flip on this chain had to fall back to the CLI. That is no longer a curiosity — it is the normal path, which means the native `update` surface cannot currently be trusted for the one transition the whole tracker is built around.
+
+Still **not isolated**: which line in the bundle computes the different verdict. Three reproductions narrow it to the done-gate verdict on a fully-ticked live section and rule out the per-item/per-branch explanations; they do not identify the cause. The acceptance's first row stands as the first thing to settle, and the reverse direction (a rule the bundle predates *permitting* something the live kernel refuses) remains unmeasured.
