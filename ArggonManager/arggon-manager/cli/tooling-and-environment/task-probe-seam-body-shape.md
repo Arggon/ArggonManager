@@ -26,3 +26,20 @@ updated: "2026-10-07"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-07 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+## Acceptance
+
+<!-- live contract -->
+
+- [x] crit one
+- [x] crit two
+
+## Notes
+
+### 2026-10-06 @arggon-delivery-lead
+
+## Acceptance
+
+- [ ] crit one (old draft)
+- [ ] crit two (old draft)
