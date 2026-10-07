@@ -186,3 +186,46 @@ The parent item (`...diverges-from-live-kernel`) is now mostly a **record plus o
 - **W1 — the reverse-direction test**, on the split item. It is cheap, it is the dangerous half, and its answer determines how urgent the mitigation is (if a stale snapshot cannot permit anything live refuses, the failure is bounded to noise; if it can, this is a safety bug, not a hygiene bug).
 - **W2 — the mitigation**, chosen with that answer in hand.
 - **W3 — the verdict-comparing parity surface**, which is what keeps it fixed.
+
+### 2026-10-07 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-07 @arggon-delivery-lead — CORRECTION: the recorded root cause is WITHDRAWN (I cannot reproduce it)
+
+I set out to fix this and instead disproved my own diagnosis. Recording that plainly, because the item currently states something as measured fact that this session found **false**, and a wrong cause is worse than an open one.
+
+## What I tested, and what it showed
+
+**1. The bundle's gate is byte-equivalent to the live kernel's across versions.** I extracted the committed bundle from commit `6d3bef0c` — the done-gate fix, the version that would have been current when the staleness allegedly bit — and compared the functions that decide the verdict. Identical, in every relevant part:
+
+| Element | `6d3bef0c` bundle | `lib/src` today |
+| --- | --- | --- |
+| `acceptanceGate` | `no-live-contract` / `unchecked-live-criteria`, same branch order | identical |
+| `liveAcceptanceRegion` | same loop, same `start = i + 1`, same `SECTION_END_HEADING` break | identical |
+| `ACCEPTANCE_HEADING` | `/^##[ \t]+acceptance[ \t]*$/i` | identical |
+| `SECTION_END_HEADING` | `/^#{1,2}[ \t]/` | identical |
+| `ACCEPTANCE_LINE_BREAK` | `/[
+\r\u2028\u2029]/` | identical |
+
+So **a stale snapshot of that bundle would have computed the same verdict.** The mechanism I recorded cannot produce the divergence it attributed to it.
+
+**2. The historical bodies all return `gated: false`.** I ran the real parser over the item body as it stood at each relevant commit, including the body at my first refusal. Every one: `{"gated": false}`, 0 unchecked in the live region. Including the body that has **two** `## Acceptance` headings (line 30 live, line 71 inside my comment) — the region parser correctly takes the first and stops at `## Notes`.
+
+**3. The refusal condition at that moment was legitimate.** At the merge commit, the live section had **7 ticked and box 8 unticked** — `ADR lifecycle honored: Proposed in the PR, Accepted on merge` — because the maker deliberately left it open pending the merge. A gate refusing that flip was **correct**, not divergent.
+
+**4. The native path succeeds today.** I created a disposable probe item with a two-box live contract, ticked both, and flipped it `todo → in_progress → done` **through `tools.arggon.update`** — the exact surface that refused. It succeeded. I have since removed the probe.
+
+**5. `lib/dist` and `lib/src` agree** on five gate cases (ticked-live-with-unticked-history, ticked-live, unticked-live, no-section, empty-section) — so the build is not a second copy that disagrees.
+
+## What this means
+
+**I cannot reproduce the divergence, and the cause I recorded is refuted by the evidence above.** The honest state is: three refusals happened, the CLI accepted the same flips, and I do not currently know why. What I do know is that it was **not** the stale-bundle mechanism this item names, because that mechanism's logic is provably identical.
+
+Two stale claims to remove from this record, both mine:
+
+- the "structural cause (measured)" section asserting the bundle snapshot explains it — **withdrawn**; and
+- the follow-on claim in `bug-seam-bundle-stale-snapshot-gate` that the session-start snapshot caused a three-day failure — **downgraded to unproven**, since its premise was the refuted cause. That item's *design* point (nothing re-checks a loaded bundle) is still true as a property of the seam; its *causal* claim is not established.
+
+## What I am NOT doing
+
+I am not dispatching a maker to "fix" a cause I have just disproven, and I am not filing the reverse-direction test as if the hazard were confirmed — that would be building on a refuted premise. The acceptance rows that called for isolation produced a **negative** result, which is a legitimate and useful outcome: the item's row 1 is answered (`the different verdict is not produced by the bundle`), and rows 2–7 need re-deriving against what is actually true rather than against my old theory.
+
+**Recommended next step, and I would rather have your read before doing it:** the refusal was almost certainly environmental — something about that session's loaded kernel, its working directory, or the tracker root it resolved at the time — and the strong candidate I have *not* yet tested is what the native tool resolved as its tracker root during that session (the seam's own `options.cwd`). That is testable. I would rather spend the next step on that than on a fix for the withdrawn cause.
