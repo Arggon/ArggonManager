@@ -29,3 +29,14 @@ Found while reviewing PR #599 (bug-aged-exploration-decisions): exploration-open
 - [ ] Exploration 013 updated to point at this decision
 
 ## Notes
+
+### 2026-10-07 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-06 @arggon-delivery-lead — routing decision under ADR 0026 §5 (the decision brief)
+
+Recorded from `task-wire-decision-brief-carriers` row 8, which asked the three live cases named in exploration 025 to be **re-briefed or recorded as decided under the new convention**. This is the classification, not the content answer: it records *whether the product owner is asked at all*, which is exactly what ADR 0026 §5's routing rule decides, and it leaves the underlying question open on this item.
+
+**Verdict: this does NOT owe a brief.**
+
+A tooling preference for how agents find code. It is reversible in an afternoon, it is not one of the ADR 0021 §2 authority-map rows, and its cost of being wrong later does not exceed the time to undo it — so under ADR 0026 §5's routing rule it is a call the delivery lead makes and records, not a brief. The convention this item's row asked to exercise: recorded as a routing decision, not re-asked. The content decision itself (adopt or reject) remains open work on this item.
+
+So no `decide:` brief is written for it. Recording the classification matters more than it looks: ADR 0026 §5 exists precisely so that not every open question becomes a brief, and these three were the evidence that questions without a home pile up looking like pending product-owner decisions. Two of them never were one.

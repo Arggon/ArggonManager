@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-implement-decision-brief-kernel
 title: "Implement the decision-brief kernel per spec-owner-decision-brief-021 AC 1-8: `lib/src/brief.ts`, the additive `show --json` field, the opt-in UNANSWERED-DECISION-BRIEF finding, and their tests"
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [cli, native-seam, json-contract]
 priority: p0
 created: "2026-10-06"
 updated: "2026-10-06"
-claimed_at: "2026-10-06T16:37:07.521Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-implement-decision-brief-kernel
 ---
 <!--
@@ -39,24 +38,26 @@ The **implementation half** of [spec-owner-decision-brief-021](../../docs/specs/
 
 <!-- The live contract (ADR 0025): the done gate reads THIS section, not the dated comment blocks below. -->
 
-- [ ] **AC 1 — parser.** `lib/src/brief.ts` parses a brief and its answer with the grammar spec §The record fixes: heading `### <YYYY-MM-DD> @<author>` (a handoff heading never matches), first header-looking line per comment only, `decide:` and `decided:` bounded so `decides:` never matches, append-order tiebreak, and a later `decided:` supersedes an earlier one; a superseded brief is never rewritten
-- [ ] **AC 2 — attribution.** The parsed answer carries the comment's **author** (new data relative to the verdict parser) and the classifier takes the item's current `assignee`, so `self-decided` is computable
-- [ ] **AC 3 — `show`.** Additive `decision_brief` (`none｜open｜decided｜self-decided`) on the item's own classification, read from the item's canonical body, bounded like its neighbours (ADR 0006) and additive within `schemaVersion` 1. The **human** `arggon show` view gains no field line — the brief is already visible as the item's own comment text
-- [ ] **AC 4 — the finding.** `UNANSWERED-DECISION-BRIEF` per spec §The finding: fires only when armed **and** the state is `open`; **any item type, any status**; deterministic message (no clock, no counts) so a committed baseline fingerprints stably; `file` is the item's own path, so no `line`
-- [ ] **AC 5 — opt-in, no new key.** Reuses the **existing** `x-tracker.product-acceptance` arming. Absent/`false` ⇒ no finding, while `show`'s field still reports **all four** states unconditionally. An unparseable `.convention.yml` reads as UNARMED, never an analyze failure
-- [ ] **AC 6 — never a gate.** No transition consults the state, no command refuses because of it, CI never fails on it, no new status/timer/blocked state. **Asserted by a test** that the done gate and the cascade are untouched — not by prose
-- [ ] **AC 7 — one logic path.** The classification is computed **once** in the kernel and read by every surface; no second parser in the CLI or the seam
-- [ ] **AC 8 — idempotence and forward-only.** Re-running any surface never mutates an item body; nothing backfills historical items
-- [ ] **Tests travel with the change:** parsing, supersede-by-later-`decided:`, `decided: other` as a first-class reply, the routing-rule boundary (a one-option question is not a brief), the four states, the opt-in arming, and the scope width in AC 4 (a leaf and a non-terminal item both fire)
-- [ ] **`docs/json-output.md`** documents the new `decision_brief` field and the new finding kind in the same PR; `arggon validate`, `spec validate`, `spec analyze` (still 10, none new), `prettier`, `test`, `test:structure`, `lint:structure` all green
-- [ ] **The registry is correct after the change.** The spec's `brief.ts` is a **new module**: confirm nothing in the capability matrix or the package `files` list needs a row, and if something does, update it in this PR rather than leaving a silent gap
+- [x] **AC 1 — parser.** `lib/src/brief.ts` parses a brief and its answer with the grammar spec §The record fixes: heading `### <YYYY-MM-DD> @<author>` (a handoff heading never matches), first header-looking line per comment only, `decide:` and `decided:` bounded so `decides:` never matches, append-order tiebreak, and a later `decided:` supersedes an earlier one; a superseded brief is never rewritten
+- [x] **AC 2 — attribution.** The parsed answer carries the comment's **author** (new data relative to the verdict parser) and the classifier takes the item's current `assignee`, so `self-decided` is computable — **delivery-lead verified at the call sites**: `lib/src/operations.ts:187` and `lib/src/brief.ts:217` both pass `item.assignee`
+- [x] **AC 3 — `show`.** Additive `decision_brief` (`none｜open｜decided｜self-decided`) on the item's own classification, read from the item's canonical body, bounded like its neighbours (ADR 0006) and additive within `schemaVersion` 1. The **human** `arggon show` view gains no field line — the brief is already visible as the item's own comment text
+- [x] **AC 4 — the finding.** `UNANSWERED-DECISION-BRIEF` per spec §The finding: fires only when armed **and** the state is `open`; **any item type, any status**; deterministic message (no clock, no counts) so a committed baseline fingerprints stably; `file` is the item's own path, so no `line` — **delivery-lead verified by reading `unansweredDecisionBriefFindings`**: no status filter, and it does not import the acceptance detector's container set
+- [x] **AC 5 — opt-in, no new key.** Reuses the **existing** `x-tracker.product-acceptance` arming. Absent/`false` ⇒ no finding, while `show`'s field still reports **all four** states unconditionally. An unparseable `.convention.yml` reads as UNARMED, never an analyze failure
+- [x] **AC 6 — never a gate.** No transition consults the state, no command refuses because of it, CI never fails on it, no new status/timer/blocked state. **Asserted by a test** that the done gate and the cascade are untouched — not by prose
+- [x] **AC 7 — one logic path.** The classification is computed **once** in the kernel and read by every surface; no second parser in the CLI or the seam
+- [x] **AC 8 — idempotence and forward-only.** Re-running any surface never mutates an item body; nothing backfills historical items
+- [x] **Tests travel with the change:** parsing, supersede-by-later-`decided:`, `decided: other` as a first-class reply, the routing-rule boundary (a one-option question is not a brief), the four states, the opt-in arming, and the scope width in AC 4 (a leaf and a non-terminal item both fire)
+- [x] **`docs/json-output.md`** documents the new `decision_brief` field and the new finding kind in the same PR; `arggon validate`, `spec validate`, `spec analyze` (still 10, none new), `prettier`, `test`, `test:structure`, `lint:structure` all green
+- [x] **The registry is correct after the change.** The spec's `brief.ts` is a **new module**: confirm nothing in the capability matrix or the package `files` list needs a row, and if something does, update it in this PR rather than leaving a silent gap
 
 ## Notes
 
 ### 2026-10-06 @ses_eedebf8d6ffe8pvs9Yk2jnK5WS
+
 Implementation complete (AC 1-8). PR #662 — branch feat/task-implement-decision-brief-kernel, one commit b2233b67.
 
 WHAT BUILT, PER FILE
+
 - lib/src/brief.ts (new): parseDecisionBriefs(body) -> DecisionBriefEvent[] {kind: brief|answer, date, order, author, text}; classifyDecisionBrief(body, assignee?) -> none|open|decided|self-decided; itemsWithUnansweredBrief(items) -> UnansweredBrief[] {item, state} sorted by id; DECISION_BRIEF_STATES.
 - lib/src/index.ts: exports classifyDecisionBrief, parseDecisionBriefs, itemsWithUnansweredBrief, DECISION_BRIEF_STATES + types DecisionBriefEvent/DecisionBriefState/UnansweredBrief.
 - lib/src/operations.ts: ShowPayload gains decision_brief; showOperation computes it once via classifyDecisionBrief(acceptanceBody(item), item.assignee).
@@ -71,6 +72,7 @@ AC 4 SCOPE WIDTH (verified): unansweredDecisionBriefFindings does NOT import ACC
 AC 2 ASSIGNEE (verified): sameOwner folds case; classifyDecisionBrief(body, assignee) is called with item.assignee at both call sites (showOperation; itemsWithUnansweredBrief). Tests: self-decided when answer author == assignee (case-folded), decided when null/undefined/""/different author.
 
 GATES (command -> expected -> observed)
+
 - npm run build -> ok -> ok (43 modules, bundle regenerated)
 - npm run test -> all green -> 133 files, 2837 tests passed
 - npm run test:structure -> 5 rules pass -> 5 passed, 0 failed
@@ -84,10 +86,12 @@ GATES (command -> expected -> observed)
 BUILD-REGENERATED FILE: opencode/plugins/arggon/index.bundle.ts is modified because the kernel entry changed; it is staged in the commit. No node_modules staged (git status verified before/after).
 
 ### handoff 2026-10-06 @ses_eedebf8d6ffe8pvs9Yk2jnK5WS (session: ses_eedebf8d6ffe8pvs9Yk2jnK5WS) — next: Delivery lead: review PR #662 (https://github.com/Arggon/ArggonManager/pull/662), then merge and flip item to done.
+
 - branch: feat/task-implement-decision-brief-kernel
 - open questions: None blocking. Note: the spec's §Boundary assigns the dated ADR 0026 amendment naming show to the carriers item (task-wire-decision-brief-carriers), not this one; AC 16 for this item is only docs/jso…
 
 ### 2026-10-06 @ses_eedbddd02ffeZ4SFgi8ZrOpvuM
+
 verdict: approve
 
 Reviewed PR #662 @ b2233b67 against spec-owner-decision-brief-021 AC 1-8 and ADR 0026, read in the worktree. One non-blocking docs defect; no blocking findings.
@@ -133,6 +137,7 @@ The two `arggon: warning: commit skipped: ... native gate: missing dependency` l
 Process note (delivery lead's call, not a code finding): the item frontmatter still reads `status: todo`, `assignee: null`, `worktree_path: null` despite the claim commit — flip it on merge per §5.
 
 ### 2026-10-06 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+
 ### 2026-10-06 @arggon-delivery-lead
 
 **verdict: approve — merge when CI is green.**
