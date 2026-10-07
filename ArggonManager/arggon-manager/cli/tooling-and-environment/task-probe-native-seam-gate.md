@@ -23,6 +23,7 @@ updated: "2026-10-07"
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] probe criterion one
+- [ ] probe criterion two
 
 ## Notes
