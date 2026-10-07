@@ -1,14 +1,12 @@
 ---
 type: task
-status: in_progress
+status: cancelled
 id: task-probe-seam-body-shape
 title: "PROBE (throwaway): duplicated `## Acceptance` heading via comment"
-assignee: arggon-delivery-lead
 parent: tooling-and-environment
 labels: [probe]
 created: "2026-10-07"
 updated: "2026-10-07"
-claimed_at: "2026-10-07T17:44:14.694Z"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-probe-seam-body-shape.md
