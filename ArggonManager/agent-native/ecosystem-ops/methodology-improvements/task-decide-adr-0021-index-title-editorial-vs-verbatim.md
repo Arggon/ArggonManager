@@ -49,3 +49,14 @@ The result: the merge is green (9/9, and 130 files / 2751 tests), but a **ticked
 - [ ] Whatever is decided, correct acceptance box 5 on `task-adr-index-parity-does-not-check-titles` (now `done`) so it records what actually shipped. Amending the prose of a merged item's checklist needs a dated comment or a one-line edit with a `Numbering note`-style addendum — **not** a rewrite of the box's history
 - [ ] `npx vitest run cli/src/adr-index-parity.test.ts` green, and the corpus report re-derived: state how many rows are verbatim vs declared after the change
 - [ ] Decide whether ADR 0022's verbatim row also wants the declaration instead — its H1 carries an em dash and a comma that the row lacked, which reads as accidental, but the same question applies
+
+### 2026-10-07 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-06 @arggon-delivery-lead — routing decision under ADR 0026 §5 (the decision brief)
+
+Recorded from `task-wire-decision-brief-carriers` row 8, which asked the three live cases named in exploration 025 to be **re-briefed or recorded as decided under the new convention**. This is the classification, not the content answer: it records *whether the product owner is asked at all*, which is exactly what ADR 0026 §5's routing rule decides, and it leaves the underlying question open on this item.
+
+**Verdict: this does NOT owe a brief.**
+
+An ADR index-row style question — editorial, local, and trivially reversible. Not an authority-map row and not hard to reverse, so per ADR 0026 §5 it is a lead call recorded as a plain comment. What is genuinely missing on this item is not a product-owner decision but a *rule written down* (`task-adr-index-title-rule-unwritten-in-engineering-md` covers that half).
+
+So no `decide:` brief is written for it. Recording the classification matters more than it looks: ADR 0026 §5 exists precisely so that not every open question becomes a brief, and these three were the evidence that questions without a home pile up looking like pending product-owner decisions. Two of them never were one.
