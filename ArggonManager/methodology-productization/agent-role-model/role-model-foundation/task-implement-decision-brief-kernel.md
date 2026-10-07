@@ -9,8 +9,7 @@ parent: role-model-foundation
 labels: [cli, native-seam, json-contract]
 priority: p0
 created: "2026-10-06"
-updated: "2026-10-06"
-worktree_path: /home/arggon/Projects/ArggonManager-task-implement-decision-brief-kernel
+updated: "2026-10-07"
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-implement-decision-brief-kernel.md

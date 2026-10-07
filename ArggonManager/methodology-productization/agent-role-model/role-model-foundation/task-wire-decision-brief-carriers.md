@@ -11,7 +11,6 @@ priority: p0
 created: "2026-10-06"
 updated: "2026-10-07"
 depends_on: [task-spec-owner-decision-brief]
-worktree_path: /home/arggon/Projects/ArggonManager-task-wire-decision-brief-carriers
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-wire-decision-brief-carriers.md
