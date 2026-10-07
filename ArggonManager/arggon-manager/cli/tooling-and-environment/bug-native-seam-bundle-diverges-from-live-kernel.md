@@ -229,3 +229,46 @@ Two stale claims to remove from this record, both mine:
 I am not dispatching a maker to "fix" a cause I have just disproven, and I am not filing the reverse-direction test as if the hazard were confirmed — that would be building on a refuted premise. The acceptance rows that called for isolation produced a **negative** result, which is a legitimate and useful outcome: the item's row 1 is answered (`the different verdict is not produced by the bundle`), and rows 2–7 need re-deriving against what is actually true rather than against my old theory.
 
 **Recommended next step, and I would rather have your read before doing it:** the refusal was almost certainly environmental — something about that session's loaded kernel, its working directory, or the tracker root it resolved at the time — and the strong candidate I have *not* yet tested is what the native tool resolved as its tracker root during that session (the seam's own `options.cwd`). That is testable. I would rather spend the next step on that than on a fix for the withdrawn cause.
+
+### 2026-10-07 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-07 @arggon-delivery-lead — ROOT CAUSE ISOLATED, and both earlier claims were wrong in different directions
+
+**Third correction, and this one is measured end to end.** I reproduced the divergence on a throwaway item and identified the cause from the error string itself. The arc matters, so here it is honestly: my *original* claim blamed the stale bundle (right direction, wrong mechanism — I said a missing `brief.ts`); my *withdrawal* said the cause was unproven (too far — it was real); this is the accurate version.
+
+## The reproduction
+
+Probe item with the exact ADR-item body shape: a fully-ticked live `## Acceptance` section, then a comment whose text begins `## Acceptance` and carries **unticked** boxes.
+
+| Surface | Result | Reason given |
+| --- | --- | --- |
+| native `tools.arggon.update` | **refused** | "the acceptance checklist in the **item body** still has unchecked boxes" |
+| CLI `arggon update --status done` | **refused** | "the item's **live '## Acceptance' section** has no acceptance criteria" |
+
+**They disagree — and the reason strings are the proof.** Those are two different kernel versions talking, and each is self-identifying:
+
+| Wording | Pre-fix kernel | Current kernel |
+| --- | --- | --- |
+| "acceptance checklist in the **item body** still has unchecked" | **1** | **0** |
+| "live **'## Acceptance' section** still has unchecked" | 0 | **2** |
+
+The native refusal used the **pre-fix** string. So the seam was executing a kernel from **before PR #656** (`bug-done-gate-counts-checkboxes-inside-comment-blocks`), whose gate counted **every checkbox in the whole body** — including a comment's history — instead of reading only the live section.
+
+Corroboration: the pre-fix bundle (`81828441^`) contains **none** of the live-section machinery (`liveAcceptanceRegion` → 0 occurrences), and with the generated marker its stamp size matches the stale copy that was on disk.
+
+## Why my first mechanism was wrong
+
+I attributed the staleness to the missing `brief.ts` module and "measured" it by its absence. That was a real difference between the copies, but **not the discriminating one** — the bundle that caused the refusals also lacked the done-gate fix, and that fix is what changed the verdict. I pattern-matched a visible difference instead of testing which difference decided the outcome. The test I should have run on day one is the one I ran just now: **compare the refusal strings across kernel versions.**
+
+## Why my withdrawal was also wrong
+
+I then concluded the cause was unproven because the *gate function* I diffed between `6d3bef0c` and current was identical. It is — but I diffed the **post-fix** commit. The pre-fix kernel I needed was `81828441^`, which I never opened. A negative result from the wrong comparison is not a negative result.
+
+## What this means for the two items
+
+- This item's original mechanism claim needs one word changed: the stale copy predated **the done-gate fix**, not `brief.ts`. Everything else in its "structural cause" section holds, including that the copy is gitignored and that nothing compared verdicts on real bodies.
+- `bug-seam-bundle-stale-snapshot-gate` is **restored to confirmed**: the session loaded the stale kernel at start and ran it for three days. Its causal premise is proven, not unproven.
+- The reproduction above is the fixture row 2 asks for.
+
+## Still not done, and still the point
+
+The reverse direction remains untested: this proves a stale copy can cause a **false refusal**. Whether it can **permit** something the live kernel refuses is still unmeasured — and now that the mechanism is understood, that question is answerable, because I know exactly which kernel to swap in.
