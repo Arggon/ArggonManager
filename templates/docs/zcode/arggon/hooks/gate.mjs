@@ -43,14 +43,21 @@
  * denies nothing (the old whole-string scan denied exactly those benign
  * writes, and this repo's methodology tells agents to document gate
  * behavior). Quoted text the shell will still EXECUTE is never exempted: a
- * span handed to a shell (`sh -c "…"`, `bash -lc "…"`, `eval "…"`), a span
- * carrying a command substitution (`$( … )` or backticks — the substituted
- * text runs), and the tail of an unterminated quote all stay in the scan —
- * fail-closed on anything that is not provably inert text. Real invocations
- * are unquoted at their head, so the deny matrix (force push, --no-verify,
- * refspec-plus) is unchanged. Concretely: the gates run against `scanText`
- * below, which blanks inert quoted spans (length-preserving) and keeps
- * everything else verbatim.
+ * span that is the `-c` payload of a sh-family shell — wherever the shell
+ * sits, wrapper prefixes included (`sudo sh -c "…"`, `ls | xargs sh -c '…'`,
+ * `bash -lc "…"`) — or the argument of `eval`, a span carrying a command
+ * substitution (`$( … )` or backticks — the substituted text runs), and the
+ * tail of an unterminated quote all stay in the scan. The shell test accepts
+ * fail-closed OVER-denial of inert look-alikes (`echo sh -c "…"` is denied).
+ * Recorded residual, accepted for this gate's accidental-use threat model:
+ * variable indirection is NOT caught — `X='<denied form>'; $X` keeps the
+ * assignment value exempt (inert text at scan time) while the unquoted
+ * expansion executes later; this gate is not a shell parser, and the old
+ * whole-string regex was equally evadable (e.g. a split flag like `--for"ce"`).
+ * Real invocations are unquoted at their head, so the deny matrix (force
+ * push, --no-verify, refspec-plus) is unchanged. Concretely: the gates run
+ * against `scanText` below, which blanks inert quoted spans
+ * (length-preserving) and keeps everything else verbatim.
  *
  * Output contract: exit 0 = allow (silent), exit 2 = deny (stderr is the
  * reason the client shows), anything else = hook error.
@@ -205,17 +212,23 @@ function quotedSpans(command) {
 
 /**
  * True when the quoted span [start, end) will still be EXECUTED rather than
- * printed or stored: it is the `-c` payload of a shell at a command position
- * (`sh -c "…"`, `bash -lc "…"`, incl. subshell and pipeline positions) or of
- * `eval`, or it carries a command substitution (`$( … )` / backticks — the
- * substituted text runs). A gate match inside such a span is a real
- * invocation and must still deny (the reviewer backstop relies on
- * `sh -c "arggon update …"` staying denied).
+ * printed or stored: it is the `-c` payload of a sh-family shell — wherever
+ * that shell sits in the command, wrapper prefixes included (`sh -c "…"`,
+ * `sudo sh -c "…"`, `ls | xargs sh -c '…'`, `bash -lc "…"`) — or the
+ * argument of `eval`, or it carries a command substitution (`$( … )` /
+ * backticks — the substituted text runs). A gate match inside such a span is
+ * a real invocation and must still deny (the reviewer backstop relies on
+ * `sh -c "arggon update …"` staying denied, wrappers and all). The shell
+ * test is deliberately UNANCHORED in the head, so inert look-alikes are
+ * over-denied fail-closed (`echo sh -c "…"`); and this is deliberately NOT
+ * a shell parser: a quoted assignment value that a later unquoted `$var`
+ * expansion runs (`X='…'; $X`) is inert at scan time and stays exempt — a
+ * recorded residual, see "Deny-pattern scope" in the header.
  */
 function quotedSpanExecutes(command, start, end) {
   if (/\$\(|`/.test(command.slice(start, end))) return true;
   const head = command.slice(0, start);
-  return /(?:^|[;&|(]\s*)\S*sh\s+(?:-\S+\s+)*-c\s*$/.test(head) || /\beval\s+$/.test(head);
+  return /\S*sh\s+(?:-\S+\s+)*-c\s*$/.test(head) || /\beval\s+$/.test(head);
 }
 
 /**

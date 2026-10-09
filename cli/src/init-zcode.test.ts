@@ -266,18 +266,37 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
 
   // The same decision, other side of the line: quoted text the shell still
   // EXECUTES is not documentation — the exemption must not become a bypass.
+  // Wrapper-prefixed shells execute too (review on this bug: the first
+  // matcher was anchored to a command boundary, so `sudo sh -c …` and
+  // `xargs sh -c …` were blanked as inert and ran); the matcher is now
+  // unanchored, accepting over-denial of inert look-alikes.
   it("quoted text that executes still denies (only inert text is exempt)", () => {
     const dir = initTree();
     for (const command of [
       'bash -c "git push --force origin main"',
       "sh -c 'git push --force'",
       'eval "git push --force"',
+      'sudo sh -c "git push --force origin main"',
+      "ls | xargs sh -c 'git push --force'",
       'npm run arggon -- comment x "see $(git push --force) docs"',
       'npm run arggon -- comment x "never git push --force', // unterminated quote: tail stays scanned
     ]) {
       const r = gate(dir, "pre", { session_id: "s3", tool_name: "Bash", tool_input: { command } });
       expect(r.status, command).toBe(2);
     }
+  });
+
+  // Recorded residual (decision artifact, header "Deny-pattern scope"):
+  // variable indirection is NOT caught — the quoted assignment value is inert
+  // text at scan time while the later unquoted expansion executes. Fixing
+  // that would mean a real shell parser, past this gate's accidental-use
+  // threat model (the old regex gate was equally evadable via a split flag).
+  // This test pins that the code does what the documented decision says.
+  it("records the variable-indirection residual: assignment values stay exempt", () => {
+    const dir = initTree();
+    const command = "X='git push --force origin main'; $X";
+    const r = gate(dir, "pre", { session_id: "s4", tool_name: "Bash", tool_input: { command } });
+    expect(r.status, command).toBe(0);
   });
 
   it("keeps ordinary sessions unimpaired", () => {
@@ -334,12 +353,22 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
       }).status,
     ).toBe(2);
     // Quoted invocations mutate the tracker all the same (review finding:
-    // the old leading-character class let `sh -c "arggon update x"` through).
+    // the old leading-character class let `sh -c "arggon update x"` through)
+    // — and wrapper-prefixed shells all the same again (review on this bug:
+    // the first quote-aware matcher was boundary-anchored, so a sudo-wrapped
+    // form blanked as inert inside the read-only window).
     expect(
       gate(dir, "pre", {
         session_id: session,
         tool_name: "Bash",
         tool_input: { command: 'sh -c "arggon update task-x --status done"' },
+      }).status,
+    ).toBe(2);
+    expect(
+      gate(dir, "pre", {
+        session_id: session,
+        tool_name: "Bash",
+        tool_input: { command: 'sudo sh -c "arggon update task-x --status done"' },
       }).status,
     ).toBe(2);
     // …but quoted TEXT that merely documents the denied forms (a verdict
