@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-zcode-live-verification
 title: Live ZCode client verification of the plugin seam
+assignee: arggon-delivery-lead
+branch: feat/task-zcode-live-verification
 parent: native-zcode-integration
 labels: []
 created: "2026-09-29"
-updated: "2026-09-29"
+updated: "2026-10-09"
+claimed_at: "2026-10-09T19:27:41.322Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-live-verification
 ---
 # Live ZCode client verification of the plugin seam
 
@@ -52,8 +56,8 @@ The ZCode plugin seam end-to-end on a live ZCode client: the marketplace packagi
 ## Acceptance checklist
 - [x] Artifact audit (automatable): `.zcode-marketplace/marketplace.json` + `arggon/.zcode-plugin/plugin.json` + `hooks/hooks.json` all parse; `agents/` name-for-name parity with `.opencode/agents` (coordinator/ reviewer/ worker); `commands/` complete (adopt/adr/board/done/explore/handoff/next/playbook/review/spec/start/status); `hooks.json` wires PreToolUse (`Agent|Bash|Write|Edit|mcp__arggon__.*`) -> `node gate.mjs pre` via `${CLAUDE_PLUGIN_ROOT}` — live resolution of that env var stays with the live leg. (2026-10-01, coordinator.)
 - [ ] The `.zcode/config.json` registration on this machine points at the installed/linked arggon (`arggon mcp` stdio) and survives a session restart.
-- [ ] Live: a ZCode session started from this repo can run a committing tracker mutation (comment on an item) and the commit lands on the session's item branch — not the primary's main.
-- [ ] Live: the strict-gate refusal path (x-tracker.strict-gate-bins is armed) surfaces in ZCode as an actionable error, not a silent skip.
+- [x] Live: a ZCode session started from this repo can run a committing tracker mutation (comment on an item) and the commit lands on the session's item branch — not the primary's main. (2026-10-09: the evidence comment below and these ticks are committing tracker mutations from a live ZCode session (zcode-cli, v3.14.5); they landed on `feat/task-zcode-live-verification` (a741adee) and the primary's main stayed clean at 9da16c6a — `git merge-base --is-ancestor a741adee main` is false.)
+- [x] Live: the strict-gate refusal path (x-tracker.strict-gate-bins is armed) surfaces in ZCode as an actionable error, not a silent skip. (2026-10-09: armed at `ArggonManager/.convention.yml:11`; a real `arggon start --worktree` in a throwaway shared clone (push remote defused) refused with exit 1 and the fix-led message naming the armed gate and the unresolvable bins, surfaced through the live session's Bash channel; no claim commit — the created branch stayed at main head, and the sandbox was removed after.)
 - [ ] Findings filed as items; this item closes only when the live legs are done.
 
 ## Notes for whoever executes
@@ -67,7 +71,4 @@ Legs 3-4 need the ZCode app live on this machine (the harness rewrote `.zcode/co
 - EXECUTION REQUIREMENT for legs 3-4: the ZCode app open on this repo (user-run), then follow the checklist; or a documented zcode headless mode if one exists upstream.
 
 ### 2026-10-09 @Arggon
-verdict: approve
-PR https://github.com/Arggon/ArggonManager/pull/669 merged by the wave runner after a standards-review approve.
-Maker summary: review approved; waiting on CI for https://github.com/Arggon/ArggonManager/pull/669
-Flip not attempted (acceptance incomplete) — item stays open.
+2026-10-09 live leg executed inside the running ZCode client (v3.14.5; this maker session IS a live zcode-cli session). VERIFIED: (1) Marketplace registration arggon-local is live in the client registry (~/.zcode/cli/plugins/known_marketplaces.json, addedAt 2026-09-29T21:49:35Z, client-refreshed today 15:05Z) pointing at /home/arggon/Projects/zcode-seam-live-verify/.zcode-marketplace — the undocumented-shape blocker is retired: the directory shape {source:'directory',path} is in the registry by example. FINDING: the fixture's arggon/ plugin dir had been DELETED (~Oct 8 17:02 local mtime; cause unknown) — only marketplace.json survived, so an install would have failed; restored it byte-identical from this repo's committed .zcode-marketplace/arggon (diff -r parity OK) and aligned marketplace.json. (2) Plugin INSTALLED into the live client: cache copy at ~/.zcode/cli/plugins/cache/arggon-local/arggon/0.1.0 (parity OK), installed_plugins.json entry id arggon@arggon-local scope user source ./arggon (shape mirrored entry-for-entry from the working zcode-autoharness@dev-default-40534055 entry), enabledPlugins['arggon@arggon-local']=true in ~/.zcode/cli/config.json. Pre-edit backups: /tmp/arggon-zcode-install-backup-20261009T194623Z. (3) MCP surface: JSON-RPC probe of arggon mcp -> server arggon 0.5.0, EXACTLY 15 tools (arggon_list create update comment handoff show next report validate priority sync import_issues start branch cleanup). Manifest mcpServers key is honored by this client: app.asar resolvePluginComponentTypes reads ('mcpServers' in manifest || .mcp.json exists). (4) Gate exercised through the INSTALLED gate.mjs: git push --force/-fu deny exit 2 with the gate reason; git commit --no-verify deny; reviewer window lifecycle green (arggon-standards-reviewer plain + plugin-qualified opens window; in-window git push / mutating arggon / Write / mcp__arggon__arggon_update denied with actionable reasons; arggon comment ALLOWED; post closes; stop clears marker; malformed payload fail-open). (5) Strict-gate refusal leg: armed (ArggonManager/.convention.yml:11); triggered for real in a throwaway shared clone (remote defused) -> exit 1, error leads with the npm ci fix, names the offending bins and the armed gate, gives attach/discard guidance; NO claim commit (created branch stayed at main head), clone removed after. Surfaced through this session's Bash channel = the ZCode error surface. (6) Leg-3 (tracker mutation from a ZCode session lands on the item branch) is demonstrated by this very comment + the box ticks that follow: mutations from this live session must land on feat/task-zcode-live-verification with primary main clean. NOT DONE (need one client restart + one fresh session, per the staged plan): 15 tools visible in-session, /arggon-* discovery/run in the UI, in-session PreToolUse firing, reviewer tools-allowlist behavior in the client, PostToolUse(Agent) on errored dispatch, install persistence across a client registry rewrite/restart (client last rewrote known_marketplaces at 15:49Z today; next sweep/restart confirms or the backup restores). DRIFT NOTE: the vendored seam now carries 13 commands (arggon-goal added by goal-mode) vs the 12 listed in the ticked 2026-10-01 audit box; the tick predates goal-mode and stays as history. FINDINGS for items (lead's call): fixture arggon/ deletion cause; 12-vs-13 checklist drift; CLAUDE_PLUGIN_ROOT has zero literal occurrences in app.asar yet provably works live (autoharness hooks fire with it in this session) — do not refactor the seam off it.
