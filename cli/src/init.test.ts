@@ -96,6 +96,10 @@ const TIER1_DOCS = [
   ".zcode-marketplace/arggon/commands/arggon-status.md",
   ".zcode-marketplace/arggon/hooks/gate.mjs",
   ".zcode-marketplace/arggon/hooks/hooks.json",
+  // task-zcode-automations: the opt-in automation contract templates are
+  // tier-1 too (daily spec-drift scan, weekly stale-claim sweep).
+  ".zcode-marketplace/arggon/templates/automations/spec-drift-scan.md",
+  ".zcode-marketplace/arggon/templates/automations/stale-claim-sweep.md",
   // task-zcode-goal-mode: the goal-mode contract template is tier-1 too.
   ".zcode-marketplace/arggon/templates/goal-mode.md",
   ".zcode-marketplace/marketplace.json",
