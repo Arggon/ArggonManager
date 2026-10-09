@@ -54,3 +54,6 @@ Acceptance:
 Carrier-change impact class (docs/agents.md §Changing the methodology): **Advisory**.
 
 skills/arggon-cli/** is a methodology carrier and this PR (Arggon/ArggonManager#668) touches it, so the class is stated here and in the PR description. Wording only: the §MCP surface paragraph now names ZCode AND Claude Code with their registration mechanisms (ZCode plugin bundle mcpServers manifest; Claude Code init-generated .mcp.json) and phrases registration as per-client seam data so the S6 claude bundle is an edit, not a contradiction. No rule, gate, command contract, or pipeline step changed — the 15-tool surface, envelopes and parity invariants are untouched (cli/src/mcp-doc-contract.test.ts and cli/src/mcp-parity surface unchanged and green). Mirror .agents/skills/ regenerated via npm run skills:sync, byte-equal modulo the generated marker (cli/src/skill-copy.test.ts green).
+
+### 2026-10-09 @Arggon
+verdict: approve — standards review approved during the wave; PR #668 merged after CI green; item flipped done. Premature mid-wave wave-runner comment dropped in merge resolution; live acceptance criteria transcribed into the live section per ADR 0025.
