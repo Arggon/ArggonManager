@@ -16,8 +16,8 @@ Refuse to run (and say why in the run log) unless ALL hold:
 
 1. **No claim held.** The scan is nobody's item work: it holds no
    `arggon start` claim, runs inside no item's `worktree_path`, and never
-   claims, branches or checks out anything (`git branch`/`git checkout`/`git
-   switch` are forbidden to it).
+   claims, branches or checks out anything (`git branch`/`git checkout`/
+   `git switch` are forbidden to it).
 2. **Primary checkout, default branch.** It runs from the primary checkout on
    the default branch with a **clean tree** (`git status --porcelain` empty).
    Filing appends the tracker's auto-commit, and that commit must never land on
@@ -45,8 +45,9 @@ Run each step, collect its output, and never act on a finding in-flight:
   already describes it (check with `arggon list --json` over the same area) and
   it is not a known-accepted baseline row. Cap the run (10 findings) and say so
   when the cap binds.
-- File with `arggon create bug "<finding> (spec-drift-scan <date>)" --parent
-  <story>` — the parent story is the one whose spec drifted (specs live under
+- File with
+  `arggon create bug "<finding> (spec-drift-scan <date>)" --parent <story>` —
+  the parent story is the one whose spec drifted (specs live under
   `docs/specs/`; the story id is in the spec's tracking references). A finding
   whose spec has no identifiable story falls back to the story whose id stem
   matches the spec's topic (`spec-<topic>-NNN` → `story-<topic>`); when even

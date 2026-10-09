@@ -15,10 +15,10 @@ Deleting it is the off switch.
 
 Refuse to run (and say why in the run log) unless ALL hold:
 
-1. **No claim held.** The sweep is nobody's item work: it holds no `arggon
-   start` claim, runs inside no item's `worktree_path`, and never claims,
-   branches or checks out anything (`git branch`/`git checkout`/`git switch`
-   are forbidden to it).
+1. **No claim held.** The sweep is nobody's item work: it holds no
+   `arggon start` claim, runs inside no item's `worktree_path`, and never
+   claims, branches or checks out anything (`git branch`/`git checkout`/
+   `git switch` are forbidden to it).
 2. **Primary checkout, default branch.** It runs from the primary checkout on
    the default branch with a **clean tree** (`git status --porcelain` empty).
    Filing appends the tracker's auto-commit, and that commit must never land
@@ -44,8 +44,8 @@ Refuse to run (and say why in the run log) unless ALL hold:
   the same claim already exists (`arggon list --json` filtered on the claim's
   story; the finding title carries the stale id). Cap the run (10 findings)
   and say so when the cap binds.
-- File with `arggon create task "Sweep: re-claim or release <stale-id>"
-  --parent <stale item's parent story>` — unassigned, status todo — then
+- File with
+  `arggon create task "Sweep: re-claim or release <stale-id>" --parent <stale item's parent story>` — unassigned, status todo — then
   `arggon comment <new-id>` with the evidence: the stale item id, its
   assignee, `claimed_at`, branch and worktree path, and the threshold used.
 - NEVER touch the stale item itself: no `arggon update` (a sweep never
