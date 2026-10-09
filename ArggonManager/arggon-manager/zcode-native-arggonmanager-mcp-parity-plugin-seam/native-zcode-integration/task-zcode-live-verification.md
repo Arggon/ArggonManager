@@ -75,3 +75,7 @@ Legs 3-4 need the ZCode app live on this machine (the harness rewrote `.zcode/co
 
 ### 2026-10-09 @Arggon
 verdict: approve — PR #669 merged after CI green. Live legs 3 (mutations from this session landed on feat/task-zcode-live-verification, primary main clean) and 4 (armed strict-gate refusal surfaced actionable, non-mutating) are verified and ticked. REMAINING (box 2): one client restart + one fresh session to prove the staged install survives a registry rewrite and surfaces in-session (15 tools, /arggon-* commands, PreToolUse firing); backups at /tmp/arggon-zcode-install-backup-20260109T194623Z if it needs restoring.
+
+### handoff 2026-10-09 @Arggon — next: Restart the ZCode client once and open a fresh session on this repo: confirm the arggon plugin loads (15 mcp tools, /arggon-* commands, gate fires), tick box 2, then flip done
+- branch: main
+- open questions: install persistence across registry rewrite; fixture arggon/ deletion cause (2026-10-08, restored)
