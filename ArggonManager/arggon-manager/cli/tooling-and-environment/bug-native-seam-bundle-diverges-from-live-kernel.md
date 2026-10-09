@@ -272,3 +272,37 @@ I then concluded the cause was unproven because the *gate function* I diffed bet
 ## Still not done, and still the point
 
 The reverse direction remains untested: this proves a stale copy can cause a **false refusal**. Whether it can **permit** something the live kernel refuses is still unmeasured — and now that the mechanism is understood, that question is answerable, because I know exactly which kernel to swap in.
+
+### 2026-10-09 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+### 2026-10-09 @arggon-delivery-lead — FINAL: the cause is NOT isolated. Withdrawing every isolation claim made on this item.
+
+I owe this item an honest record rather than a tidy one. **I have made four contradictory isolation claims on this page in three days and each has been overturned by the next check.** This retracts all of them. The cause is open.
+
+## The four claims, and what happened to each
+
+1. **"The stale copy lacked `lib/src/brief.ts` and ran a pre-fix gate."** — Withdrawn 2026-10-07. The irrelevant half was real (the copy lacked `brief.ts`) and the load-bearing half was never tested.
+2. **"The condition is invisible to `arggon doctor`."** — **False**, and the clearest of the four: `doctor` correctly reports `vendored plugin STALE` with an actionable hint. I verified this by deliberately staling the copy, so it is not speculation.
+3. **"Root cause isolated: the native refusal used the pre-PR-656 error string."** — Withdrawn 2026-10-07 (same page). I diffed the **post**-fix revision, concluded the logic was identical, and called the cause unproven; the discriminating revision was one I never opened.
+4. **"Proven: the pre-fix kernel permits what the current kernel refuses, on every vacuous body."** — Withdrawn now, 2026-10-09. I reached this by extracting `81828441^` and reading its gate. But the arithmetic says that kernel was **not the one loaded**: the stale `.opencode` copy measured **476968 bytes**, and `81828441^`'s bundle is **473462** (+71 B marker = 473533). The copy actually matches `81828441`'s bundle (**476897 + 71 = 476968** exactly) — which already contained the live-section logic. So my simulation compared a kernel that was never running against the live one, and I recorded the result as a proof about the seam.
+
+There is a fourth layer worth stating, because it is the mechanism that kept me here: the "pre-fix" wording I quoted as evidence also appears in two older, unrelated item bodies (`bug-validate-does-not-check-frontmatter-present.md:375`, and the done-gate bug's own evidence). That is a **different point in time**, not a different process — the wording is a real string the kernel once emitted, which is exactly why it was such an attractive thing to build on.
+
+## What IS established, and stays
+
+- **The refusals happened and the CLI accepted the same flips.** Three items, three worktrees. That is the original observation and it stands.
+- **The seam never re-checks its loaded kernel** (`bug-seam-bundle-stale-snapshot-gate`). The plugin loads the bundle at session start and every later mutation runs that snapshot. Nothing engages on the mutating path. True as a **property**, and no longer asserted as the *cause* of these three refusals.
+- **Session-start loading is real and explains the *scope* of exposure.** A session that opened before a kernel change runs the old kernel until it restarts, however restarted its git state gets.
+- **`doctor` detects and auto-heals the stale copy** — the opposite of what I first wrote here.
+- **At one refusal the contract was genuinely unticked** (7 ticked, box 8 open), so that refusal was correct rather than divergent. Which refusals, if any, were truly divergent is **not established**.
+
+## What is NOT established — the honest state
+
+**Which surface read which body at the moment of each refusal is unmeasured.** I never captured, from the native invocation itself, the body it evaluated or the gate verdict it computed. Everything since has been inference from files that had already moved.
+
+The one experiment that would settle it, and which I have not run: **reproduce with both sides logging their input** — the native call and the CLI call on the same body, in the same session, each printing the body hash and the gate verdict it computed. Until that runs, any answer I give here is another of the four.
+
+## Why this took so long, and what should have happened first
+
+**I repeatedly tested a hypothesis by reading source instead of capturing the behaviour.** The evidence that would have ended this on day one — recording the body hash and gate verdict at the point of refusal — was available at the first refusal and I never took it. Which is the same defect I recorded against the *ki* a few rows below, and now against myself: **a plausible mechanism recorded as fact is worse than an open question.**
+
+**Recommendation:** close this item as "not reproducible, cause open" and let `bug-seam-bundle-stale-snapshot-gate` carry the one design finding that survives (nothing verifies a loaded kernel mid-session). If a divergence appears again, the first action is to capture the two sides' inputs — not to diff source.
