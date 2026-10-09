@@ -50,3 +50,6 @@ mise.local.toml
 # scratch/probe extractions (never commit)
 /tmp/
 tmp/
+
+# isolation scratch (never commit)
+.scratch/
