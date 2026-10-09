@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-zcode-automations
 title: "ZCode automation templates (spec-drift scan, stale-claim sweep) (plan T5)"
+assignee: arggon-delivery-lead
+branch: feat/task-zcode-automations
 parent: story-zcode-adapter
 labels: []
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-09"
+claimed_at: "2026-10-09T19:26:48.474Z"
 depends_on: [task-adapter-selection-flags, task-capability-matrix]
+worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-automations
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-zcode-adapter/task-zcode-automations.md
