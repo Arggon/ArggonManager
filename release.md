@@ -55,6 +55,30 @@ trusted publisher bound to:
 npm's `repository.url` requirement is already satisfied: both `package.json`
 files carry `git+https://github.com/Arggon/ArggonManager.git`.
 
+**Every field is case-sensitive and must match exactly.** npm does not verify
+the configuration when you save it, so a wrong value only surfaces at publish
+time — as `ENEEDAUTH`, which says authentication failed without naming the
+cause. The org here is `Arggon`, capital A.
+
+**An existing connection cannot be edited.** To change one, delete it and
+create a new one; npm fixes the provider and required fields at creation.
+
+**A new configuration expires if its first successful publish does not land
+within 2 days.** If it expires you must delete and recreate it — so configure
+and re-run in the same sitting, not the next day.
+
+Package settings pages, for the two entries:
+
+- `npmjs.com/package/arggon-manager/access`
+- `npmjs.com/package/@arggondev/lib/access`
+
+When a publish fails with `ENEEDAUTH`, check the configured publisher first:
+`npm trust list <package>` prints it. It requires a one-time password (it is a
+2FA-protected read), and it is the fastest way to see whether the entry exists
+and what it actually says — the two failures that cost this repo two release
+attempts were a missing entry for `@arggondev/lib` and a lowercase-org repo
+string for `arggon-manager`.
+
 ## "Approve workflows" (once per release PR)
 
 `release-please.yml` creates the release PR with the default `GITHUB_TOKEN`,

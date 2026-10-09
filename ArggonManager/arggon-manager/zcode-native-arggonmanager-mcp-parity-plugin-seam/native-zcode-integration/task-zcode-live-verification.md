@@ -65,3 +65,9 @@ Legs 3-4 need the ZCode app live on this machine (the harness rewrote `.zcode/co
 - The sanctioned computer-use skill (Orca) is NOT installed on this machine (orca-ide: AppImage not found), and raw X11 automation of a localized Electron GUI is out of scope for this item.
 - Leg 2 premise shifted: the repo's .zcode/config.json is machine-local + untracked since #514 and is currently absent; the registration path for 0.4.1 is the generated .zcode-marketplace/ packaging (leg 1, green) — re-derive leg 2 as "the marketplace plugin registration survives a ZCode restart" when executed live.
 - EXECUTION REQUIREMENT for legs 3-4: the ZCode app open on this repo (user-run), then follow the checklist; or a documented zcode headless mode if one exists upstream.
+
+### 2026-10-09 @Arggon
+verdict: approve
+PR https://github.com/Arggon/ArggonManager/pull/669 merged by the wave runner after a standards-review approve.
+Maker summary: review approved; waiting on CI for https://github.com/Arggon/ArggonManager/pull/669
+Flip not attempted (acceptance incomplete) — item stays open.
