@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: [docs, skills]
 created: "2026-10-03"
 updated: "2026-10-09"
-worktree_path: /home/arggon/Projects/ArggonManager-task-skill-json-contract-names-claude-code
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-skill-json-contract-names-claude-code.md

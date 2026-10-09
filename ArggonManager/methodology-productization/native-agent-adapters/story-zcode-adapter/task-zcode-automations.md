@@ -10,7 +10,6 @@ labels: []
 created: "2026-10-02"
 updated: "2026-10-09"
 depends_on: [task-adapter-selection-flags, task-capability-matrix]
-worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-automations
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-zcode-adapter/task-zcode-automations.md
