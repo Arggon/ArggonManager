@@ -171,7 +171,7 @@ function fakeDomain(dir: string) {
     async refresh(): Promise<unknown> {
       return undefined;
     },
-    async remove(input: { directory: string; force?: boolean }): Promise<unknown> {
+    async remove(input: { directory: string; force?: boolean }): Promise<void> {
       git(dir, ["worktree", "remove", ...(input.force === true ? ["--force"] : []), input.directory]);
     },
   };
@@ -324,7 +324,9 @@ beforeAll(async () => {
   //    directory where the stamp file belongs makes the write fail on any path.
   const stampPath = join(worktreeGitDir(worktreePath), "arggon-claim.json");
   rmSync(stampPath, { force: true });
-  mkdirSync(stampPath, { force: true });
+  // `mkdirSync` has no `force`; `recursive` is the idempotent form (recreating
+  // over an existing directory must not throw EEXIST).
+  mkdirSync(stampPath, { recursive: true });
   await run({}, "ses_c");
   // 8. Over-cap PREPARATION LOG (bug-native-steps-truncated-flag-dropped): a
   //    second fixture whose primary install links MAX_PREP_STEPS workspace
