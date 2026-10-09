@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-skill-json-contract-names-claude-code
 title: "`skills/arggon-cli/references/json-contract.md` §MCP surface names ZCode as the no-code-mode client but not Claude Code, which now gets the same 15-tool MCP surface"
+assignee: arggon-delivery-lead
+branch: feat/task-skill-json-contract-names-claude-code
 parent: methodology-improvements
 labels: [docs, skills]
 created: "2026-10-03"
-updated: "2026-10-03"
+updated: "2026-10-09"
+claimed_at: "2026-10-09T19:27:25.961Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-skill-json-contract-names-claude-code
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-skill-json-contract-names-claude-code.md
