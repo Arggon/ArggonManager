@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-stale-x-generated-records-goal-mode-seam-pair
 title: "Stale x-generated records: goal-mode seam pair"
+assignee: arggon-delivery-lead
+branch: fix/bug-stale-x-generated-records-goal-mode-seam-pair
 parent: story-zcode-adapter
 labels: []
 created: "2026-10-09"
 updated: "2026-10-09"
+claimed_at: "2026-10-09T21:49:25.804Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-stale-x-generated-records-goal-mode-seam-pair
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-zcode-adapter/bug-stale-x-generated-records-goal-mode-seam-pair.md
