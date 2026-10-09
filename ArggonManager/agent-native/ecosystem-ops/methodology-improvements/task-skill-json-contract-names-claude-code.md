@@ -27,7 +27,11 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-skill-json-contract-name
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [x] §MCP surface names BOTH clients that reach the kernel over MCP (ZCode and Claude Code), with the mechanism for each (`.mcp.json` init destination; the ZCode plugin bundle)
+- [x] The statement stays true after the S6 Claude Code adapter lands — phrase it so adding a client is an edit, not a contradiction
+- [x] `skills/arggon-cli/` and `.agents/skills/` byte-equal, mirror regenerated via `npm run skills:sync` (not hand-copied)
+- [x] Beam consistent with the shipped capability matrix rows (no skill/matrix disagreement)
+- [x] Carrier change → state the impact class per `docs/agents.md` §Changing the methodology
 
 ## Notes
 
