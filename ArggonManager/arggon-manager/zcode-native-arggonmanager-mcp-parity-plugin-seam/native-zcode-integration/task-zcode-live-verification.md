@@ -24,17 +24,40 @@ question.
 
 ## Acceptance
 
-- [ ] Plugin Marketplace → Add → Add Plugin Marketplace with a fresh-init
+- [x] Plugin Marketplace → Add → Add Plugin Marketplace with a fresh-init
       repo's `.zcode-marketplace/` directory; the `arggon` plugin installs
-- [ ] The 15 `mcp__arggon__arggon_*` tools appear in a session (needs the
+      (2026-10-10: end state proven live — the client's own registry sweep at
+      21:21:49Z adopted and kept the staged `arggon-local` registration pointing
+      at the fresh-init fixture's `.zcode-marketplace/`; `installed_plugins.json`
+      entry, `enabledPlugins: true` and the populated cache survived the restart;
+      the UI Add dialog itself was not hand-driven — the coordinator's 2026-10-01
+      re-derivation of this leg governs.)
+- [x] The 15 `mcp__arggon__arggon_*` tools appear in a session (needs the
       arggon CLI on PATH)
+      (2026-10-10: post-restart session carries all 15, namespaced by the client
+      as `mcp__plugin_arggon_arggon__arggon_*`; `arggon_validate` answered with
+      the tracker envelope. Note: the zcode-autoharness plugin registers a second
+      copy of the same 15 under its own prefix — duplicate registration, worth
+      knowing when reading tool counts.)
 - [ ] `/arggon-next`, `/arggon-start`, `/arggon-review` commands discover and
       run; `${CLAUDE_PLUGIN_ROOT}` expands for the hook commands
-- [ ] A `PreToolUse` hook actually fires in-session (force-push Bash probe
+      (2026-10-10: the second clause is proven — the gate hook fired in-session,
+      which requires `${CLAUDE_PLUGIN_ROOT}` to have expanded; the `/arggon-*`
+      UI-discovery half needs one user glance, it is not observable from inside
+      a session.)
+- [x] A `PreToolUse` hook actually fires in-session (force-push Bash probe
       denied with the gate's reason)
-- [ ] Reviewer dispatch: the agent's `tools:` allowlist honors `mcp__arggon__*`
+      (2026-10-10: `git push --force origin no-such-ref` in a remoteless throwaway
+      repo was denied pre-execution: "arggon gate: denied — force push … denied by
+      the arggon plugin gate", exit 2.)
+- [x] Reviewer dispatch: the agent's `tools:` allowlist honors `mcp__arggon__*`
       names (worst case: ZCode ignores them and the hook backstop is the only
       restriction — the reason it exists)
+      (2026-10-10: WORST CASE CONFIRMED — a dispatched `arggon:arggon-standards-reviewer`
+      sees the full tool surface including Bash, despite its role prompt saying
+      "no shell"; ZCode does not enforce the generated `tools:` allowlist. The
+      hook backstop, verified live, is the only real restriction, exactly as the
+      box anticipated. Recorded as the seam's operative posture in ZCode.)
 - [ ] Whether `PostToolUse(Agent)` fires when a subagent dispatch errors —
       if not, confirm Stop/TTL clearing suffices (the gate header documents
       the assumption)
@@ -55,7 +78,7 @@ The ZCode plugin seam end-to-end on a live ZCode client: the marketplace packagi
 
 ## Acceptance checklist
 - [x] Artifact audit (automatable): `.zcode-marketplace/marketplace.json` + `arggon/.zcode-plugin/plugin.json` + `hooks/hooks.json` all parse; `agents/` name-for-name parity with `.opencode/agents` (coordinator/ reviewer/ worker); `commands/` complete (adopt/adr/board/done/explore/handoff/next/playbook/review/spec/start/status); `hooks.json` wires PreToolUse (`Agent|Bash|Write|Edit|mcp__arggon__.*`) -> `node gate.mjs pre` via `${CLAUDE_PLUGIN_ROOT}` — live resolution of that env var stays with the live leg. (2026-10-01, coordinator.)
-- [ ] The `.zcode/config.json` registration on this machine points at the installed/linked arggon (`arggon mcp` stdio) and survives a session restart.
+- [x] The `.zcode/config.json` registration on this machine points at the installed/linked arggon (`arggon mcp` stdio) and survives a session restart. (2026-10-10: satisfied in the coordinator's re-derived form — the marketplace registration survived a ZCode restart AND a client registry rewrite; the in-session surface came up with it. The literal `.zcode/config.json` path was superseded by #514's machine-local untracking; registration today is `known_marketplaces.json` + `installed_plugins.json` + `enabledPlugins`.)
 - [x] Live: a ZCode session started from this repo can run a committing tracker mutation (comment on an item) and the commit lands on the session's item branch — not the primary's main. (2026-10-09: the evidence comment below and these ticks are committing tracker mutations from a live ZCode session (zcode-cli, v3.14.5); they landed on `feat/task-zcode-live-verification` (a741adee) and the primary's main stayed clean at 9da16c6a — `git merge-base --is-ancestor a741adee main` is false.)
 - [x] Live: the strict-gate refusal path (x-tracker.strict-gate-bins is armed) surfaces in ZCode as an actionable error, not a silent skip. (2026-10-09: armed at `ArggonManager/.convention.yml:11`; a real `arggon start --worktree` in a throwaway shared clone (push remote defused) refused with exit 1 and the fix-led message naming the armed gate and the unresolvable bins, surfaced through the live session's Bash channel; no claim commit — the created branch stayed at main head, and the sandbox was removed after.)
 - [ ] Findings filed as items; this item closes only when the live legs are done.
