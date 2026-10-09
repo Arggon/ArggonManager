@@ -515,6 +515,18 @@ describe("zcode automation templates (opt-in, spec S5)", () => {
       expect(filing, rel).toContain("arggon create");
       expect(filing, rel).toContain("whole write surface");
     }
+    // The spec-drift scan's no-story fallback is a parseable rule with a main
+    // verb and a deterministic parent, not a dangling sentence (review fix):
+    // fall back to the topic-matched story, else skip and log — never a
+    // guessed parent.
+    const driftFiling = shippedAutomation("automations/spec-drift-scan.md").slice(
+      shippedAutomation("automations/spec-drift-scan.md").indexOf("## Filing"),
+    );
+    expect(contract(driftFiling)).toContain(
+      "falls back to the story whose id stem matches the spec's topic",
+    );
+    expect(contract(driftFiling)).toContain("never filed under a guessed parent");
+    expect(contract(driftFiling)).toContain("`spec-<topic>-NNN` → `story-<topic>`");
     // The sweep pins its kernel primitive: `arggon list --stale`.
     expect(shippedAutomation("automations/stale-claim-sweep.md")).toContain(
       "arggon list --stale",
