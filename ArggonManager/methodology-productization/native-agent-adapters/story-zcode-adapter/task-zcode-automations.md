@@ -28,8 +28,8 @@ Opt-in automation templates: daily spec-drift scan, weekly stale-claim sweep —
 
 ## Acceptance
 
-- [ ] templates carry claim/branch preconditions
-- [ ] scans run read-only; findings filed via arggon create
-- [ ] documented as opt-in
+- [x] templates carry claim/branch preconditions
+- [x] scans run read-only; findings filed via arggon create
+- [x] documented as opt-in
 
 ## Notes
