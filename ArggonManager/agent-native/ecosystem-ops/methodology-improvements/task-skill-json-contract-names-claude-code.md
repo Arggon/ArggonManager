@@ -42,3 +42,9 @@ Acceptance:
 - [ ] `skills/arggon-cli/` and `.agents/skills/` byte-equal, mirror regenerated via `npm run skills:sync` (not hand-copied)
 - [ ] Beam consistent with the shipped capability matrix rows (no skill/matrix disagreement)
 - [ ] Carrier change → state the impact class per `docs/agents.md` §Changing the methodology
+
+### 2026-10-09 @Arggon
+verdict: approve
+PR https://github.com/Arggon/ArggonManager/pull/668 merged by the wave runner after a standards-review approve.
+Maker summary: review approved; waiting on CI for https://github.com/Arggon/ArggonManager/pull/668
+Flip not attempted (acceptance incomplete) — item stays open.
