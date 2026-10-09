@@ -1,6 +1,7 @@
 # THROWAWAY PROBE — tests whether the npm trusted-publisher relationship
-# resolves, WITHOUT publishing anything. Runs `npm whoami` and `npm ping` only.
-# Delete after use.
+# resolves, WITHOUT publishing. Runs a real `npm publish --dry-run` with the
+# OIDC token presented, which is the exact code path a trusted publisher serves.
+# (npm docs: `npm whoami` is NOT a check of trusted-publishing permissions.)
 name: oidc-probe
 on:
   pull_request:
@@ -15,10 +16,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Probe the lib trusted publisher
+      - name: Probe the trusted publisher via the real publish path
         run: |
           npm install -g npm@latest
-          echo "--- npm whoami (OIDC) ---"
-          npm whoami 2>&1 || echo "RESULT: no OIDC identity"
-          echo "--- npm ping ---"
-          npm ping 2>&1 || true
+          echo "--- npm publish --dry-run (OIDC presented, nothing published) ---"
+          npm publish --workspace lib --dry-run 2>&1 | tail -20
+          echo "--- exit: $? ---"
