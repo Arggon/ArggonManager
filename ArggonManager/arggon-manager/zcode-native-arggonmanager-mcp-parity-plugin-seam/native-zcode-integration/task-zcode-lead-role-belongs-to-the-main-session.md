@@ -37,3 +37,6 @@ Direction recorded from the product owner (in-session, 2026-10-10): the delivery
 - [ ] Live surface (needs the install + one restart): the dispatchable `arggon:arggon-delivery-lead` entry no longer appears in a fresh session's agent list, and `arggon:arggon-maker` / `arggon:arggon-standards-reviewer` still do.
 
 ## Notes
+
+### 2026-10-09 @Arggon
+Owner direction recorded (in-session 2026-10-10): 'delivery-lead is a subagent but this one should be the one who the user interact main agent not a subagent' — the lead is the main session's role; the seam should stop shipping it as a dispatchable ZCode subagent. This item is claimable as scoped.
