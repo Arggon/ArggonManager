@@ -79,3 +79,7 @@ verdict: approve — PR #669 merged after CI green. Live legs 3 (mutations from 
 ### handoff 2026-10-09 @Arggon — next: Restart the ZCode client once and open a fresh session on this repo: confirm the arggon plugin loads (15 mcp tools, /arggon-* commands, gate fires), tick box 2, then flip done
 - branch: main
 - open questions: install persistence across registry rewrite; fixture arggon/ deletion cause (2026-10-08, restored)
+
+### handoff 2026-10-09 @Arggon — next: Restart the ZCode client once and open a fresh session on this repo: confirm the arggon plugin loads (15 mcp tools, /arggon-* commands, gate fires), tick box 2, then flip done
+- branch: main
+- open questions: install persistence across registry rewrite; fixture arggon/ deletion cause (2026-10-08, restored)
