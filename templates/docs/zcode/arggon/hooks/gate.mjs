@@ -35,6 +35,23 @@
  * for an errored dispatch, Stop (or the TTL) clears the marker; whether that
  * skip happens at all is on the live-client checklist.
  *
+ * Deny-pattern scope (bug-gate-deny-pattern-matches-quoted-text-blocking-
+ * benign-writes), decided: the shell gates match the command's WORDS, not its
+ * quoted arguments. Text inside single or double quotes is documentation —
+ * the payload of an `arggon comment` documenting a probe, a commit message
+ * citing a denied form — and a deny pattern occurring only inside such a span
+ * denies nothing (the old whole-string scan denied exactly those benign
+ * writes, and this repo's methodology tells agents to document gate
+ * behavior). Quoted text the shell will still EXECUTE is never exempted: a
+ * span handed to a shell (`sh -c "…"`, `bash -lc "…"`, `eval "…"`), a span
+ * carrying a command substitution (`$( … )` or backticks — the substituted
+ * text runs), and the tail of an unterminated quote all stay in the scan —
+ * fail-closed on anything that is not provably inert text. Real invocations
+ * are unquoted at their head, so the deny matrix (force push, --no-verify,
+ * refspec-plus) is unchanged. Concretely: the gates run against `scanText`
+ * below, which blanks inert quoted spans (length-preserving) and keeps
+ * everything else verbatim.
+ *
  * Output contract: exit 0 = allow (silent), exit 2 = deny (stderr is the
  * reason the client shows), anything else = hook error.
  */
@@ -157,6 +174,65 @@ function bashCommand(input) {
   return typeof command === "string" ? command : "";
 }
 
+/**
+ * [start, end) spans of shell-quoted text in `command`: single- and
+ * double-quoted regions, honoring backslash escapes outside quotes and inside
+ * double quotes (none inside single quotes, per POSIX). An unterminated quote
+ * yields NO span for its tail, so that text stays in the scan (fail-closed).
+ */
+function quotedSpans(command) {
+  const spans = [];
+  let quote = null;
+  let start = -1;
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i];
+    if (quote !== null) {
+      if (ch === quote) {
+        spans.push([start, i + 1]);
+        quote = null;
+      } else if (quote === '"' && ch === "\\") {
+        i++;
+      }
+    } else if (ch === "\\") {
+      i++;
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+      start = i;
+    }
+  }
+  return spans;
+}
+
+/**
+ * True when the quoted span [start, end) will still be EXECUTED rather than
+ * printed or stored: it is the `-c` payload of a shell at a command position
+ * (`sh -c "…"`, `bash -lc "…"`, incl. subshell and pipeline positions) or of
+ * `eval`, or it carries a command substitution (`$( … )` / backticks — the
+ * substituted text runs). A gate match inside such a span is a real
+ * invocation and must still deny (the reviewer backstop relies on
+ * `sh -c "arggon update …"` staying denied).
+ */
+function quotedSpanExecutes(command, start, end) {
+  if (/\$\(|`/.test(command.slice(start, end))) return true;
+  const head = command.slice(0, start);
+  return /(?:^|[;&|(]\s*)\S*sh\s+(?:-\S+\s+)*-c\s*$/.test(head) || /\beval\s+$/.test(head);
+}
+
+/**
+ * The command with inert quoted spans blanked (same length, spaces in place,
+ * so nothing shifts): the text the shell gates scan. Quoted spans that still
+ * execute and unterminated quote tails are kept verbatim — see
+ * "Deny-pattern scope" in the header.
+ */
+function scanText(command) {
+  let out = command;
+  for (const [start, end] of quotedSpans(command).reverse()) {
+    if (quotedSpanExecutes(command, start, end)) continue;
+    out = out.slice(0, start) + " ".repeat(end - start) + out.slice(end);
+  }
+  return out;
+}
+
 function pre(input) {
   const tool = typeof input.tool_name === "string" ? input.tool_name : "";
   if (tool === "Agent") {
@@ -166,18 +242,20 @@ function pre(input) {
     allow();
   }
   if (tool === "Bash") {
-    const command = bashCommand(input);
+    // Scan the command's words, not its quoted arguments (see "Deny-pattern
+    // scope" in the header): inert quoted text is blanked before matching.
+    const scanned = scanText(bashCommand(input));
     for (const gate of GLOBAL_SHELL_GATES) {
-      if (gate.re.test(command)) deny(`${gate.why} is denied by the arggon plugin gate`);
+      if (gate.re.test(scanned)) deny(`${gate.why} is denied by the arggon plugin gate`);
     }
     if (reviewerActive(input)) {
-      if (MUTATING_ARGGON_WORDS.test(command)) {
+      if (MUTATING_ARGGON_WORDS.test(scanned)) {
         deny(
           "a reviewer dispatch is in flight — tracker mutations are denied (post the verdict with arggon_comment)",
         );
       }
       for (const gate of REVIEWER_SHELL_GATES) {
-        if (gate.re.test(command)) deny(`reviewer dispatch in flight — ${gate.why} is denied`);
+        if (gate.re.test(scanned)) deny(`reviewer dispatch in flight — ${gate.why} is denied`);
       }
     }
     allow();

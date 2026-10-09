@@ -245,6 +245,41 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
     }
   });
 
+  // bug-gate-deny-pattern-matches-quoted-text-blocking-benign-writes: the
+  // decided scope (documented in the gate header) is that the shell gates
+  // match the command's words, not its quoted arguments — a tracker-comment
+  // payload or a commit message QUOTING a denied form is documentation, and
+  // denying it blocked exactly the benign writes the methodology mandates.
+  it("quoted text is documentation: a comment payload quoting a denied form passes the gate", () => {
+    const dir = initTree();
+    for (const command of [
+      'npm run arggon -- comment task-x "a force-push probe: git push --force origin main"',
+      "npm run arggon -- comment task-x 'quoting git push -fu origin'",
+      'git commit -m "docs: never run git commit --no-verify"',
+      'echo "git push origin +main"',
+      'npm run arggon -- comment task-x "we never git push --force" && git status',
+    ]) {
+      const r = gate(dir, "pre", { session_id: "s2", tool_name: "Bash", tool_input: { command } });
+      expect(r.status, command).toBe(0);
+    }
+  });
+
+  // The same decision, other side of the line: quoted text the shell still
+  // EXECUTES is not documentation — the exemption must not become a bypass.
+  it("quoted text that executes still denies (only inert text is exempt)", () => {
+    const dir = initTree();
+    for (const command of [
+      'bash -c "git push --force origin main"',
+      "sh -c 'git push --force'",
+      'eval "git push --force"',
+      'npm run arggon -- comment x "see $(git push --force) docs"',
+      'npm run arggon -- comment x "never git push --force', // unterminated quote: tail stays scanned
+    ]) {
+      const r = gate(dir, "pre", { session_id: "s3", tool_name: "Bash", tool_input: { command } });
+      expect(r.status, command).toBe(2);
+    }
+  });
+
   it("keeps ordinary sessions unimpaired", () => {
     const dir = initTree();
     for (const payload of [
@@ -307,6 +342,19 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
         tool_input: { command: 'sh -c "arggon update task-x --status done"' },
       }).status,
     ).toBe(2);
+    // …but quoted TEXT that merely documents the denied forms (a verdict
+    // describing them) is not a mutation (bug-gate-deny-pattern-matches-
+    // quoted-text-blocking-benign-writes decision).
+    expect(
+      gate(dir, "pre", {
+        session_id: session,
+        tool_name: "Bash",
+        tool_input: {
+          command:
+            'npm run arggon -- comment task-x "the reviewer cannot run arggon update or git commit"',
+        },
+      }).status,
+    ).toBe(0);
     expect(
       gate(dir, "pre", {
         session_id: session,
