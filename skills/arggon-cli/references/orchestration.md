@@ -143,3 +143,15 @@ work left" from the DONE GATE, so it never contradicts what `done` would refuse.
 It refuses an unresolvable identity, a foreign claim, a closed item and any
 checkout that is not the item's recorded `worktree_path` (no override flag), and
 a goal never spans worktrees or items.
+
+Opt-in automations (ZCode seam): `arggon init` vendors two read-only scan
+contracts under `.zcode-marketplace/arggon/templates/automations/` — a daily
+spec-drift scan (`spec analyze`, `doctor --agents`) and a weekly stale-claim
+sweep (`arggon list --stale`). Nothing is scheduled: an adopter wires a
+contract into their own scheduler, and deleting it is the off switch. Both
+refuse to run anywhere but the primary checkout on the default branch with a
+clean tree and no claim held; the scan is pure read and the only permitted
+write is `arggon create` — one finding item per NEW drift or stale claim, with
+the evidence commented on the new item. Neither ever touches the items it
+scans (no update, no comment there, no claim release) and the kernel
+invariants outrank the contract.

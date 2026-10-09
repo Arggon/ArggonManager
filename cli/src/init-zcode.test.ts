@@ -395,3 +395,146 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
     ).toBe(0);
   });
 });
+
+/**
+ * Opt-in automation templates (spec methodology-adapters-017 §S5, plan T5,
+ * task-zcode-automations): a daily spec-drift scan and a weekly stale-claim
+ * sweep, vendored beside the goal-mode contract template. The contracts are
+ * pinned by DERIVING them from the shipped template bytes — restating the
+ * rules here would let the template and the test drift apart silently.
+ */
+describe("zcode automation templates (opt-in, spec S5)", () => {
+  const AUTOMATIONS = [
+    "automations/spec-drift-scan.md",
+    "automations/stale-claim-sweep.md",
+  ] as const;
+
+  /** Read a shipped automation template (the source init materializes from). */
+  function shippedAutomation(rel: string): string {
+    return readFileSync(join(repoRoot, "templates/docs/zcode/arggon/templates", rel), "utf8");
+  }
+
+  /** Text before the filing section: frontmatter + preconditions + scan. */
+  function preFiling(template: string): string {
+    const cut = template.indexOf("## Filing");
+    expect(cut, "the template carries a filing section").toBeGreaterThan(0);
+    return template.slice(0, cut);
+  }
+
+  /** Text of the scan section only. */
+  function scanSection(template: string): string {
+    const start = template.indexOf("## Scan");
+    const end = template.indexOf("## Filing");
+    expect(start, "the template carries a scan section").toBeGreaterThan(0);
+    expect(end, "filing follows scan").toBeGreaterThan(start);
+    return template.slice(start, end);
+  }
+
+  /** Backtick-quoted commands in `text` (the templates quote every command). */
+  function quotedCommands(text: string): string[] {
+    return [...text.matchAll(/`([^`]+)`/g)]
+      .map((m) => m[1]!.trim())
+      .filter((cmd) => cmd.startsWith("arggon ") || cmd.startsWith("git "));
+  }
+
+  /**
+   * The contract prose with markdown hard-wraps collapsed, so a phrase
+   * assertion is about the WORDS the template carries, not its line length.
+   */
+  function contract(template: string): string {
+    return template.replace(/\s+/g, " ");
+  }
+
+  it("generates both automation templates with provenance markers (tier-1)", () => {
+    const dir = initTree();
+    for (const rel of AUTOMATIONS) {
+      const dest = join(dir, PLUGIN_ROOT, "templates", ...rel.split("/"));
+      expect(existsSync(dest), rel).toBe(true);
+      const generated = readFileSync(dest, "utf8");
+      // Frontmatter-first artifacts carry the marker INSIDE the frontmatter,
+      // like the commands and the goal-mode template.
+      expect(generated.startsWith("---\n# arggon:generated"), rel).toBe(true);
+      // The generated copy is the template modulo the marker line.
+      const marker = /^# arggon:generated template="[^"]+"\n/m;
+      expect(generated.replace(marker, ""), rel).toEqual(shippedAutomation(rel));
+    }
+  });
+
+  it("never overwrites an adopter-edited automation template", () => {
+    const dir = initTree();
+    const dest = join(dir, PLUGIN_ROOT, "templates/automations/spec-drift-scan.md");
+    const adopted = readFileSync(dest, "utf8").replace(
+      "Cadence: **daily**",
+      "Cadence: **twice a day**",
+    );
+    writeFileSync(dest, adopted, "utf8");
+    const result = runInit({ dir, force: false });
+    expect(readFileSync(dest, "utf8")).toEqual(adopted);
+    expect((result.skipped ?? []).some((s) => s.includes("spec-drift-scan.md"))).toBe(true);
+  });
+
+  it("each template carries the claim/branch preconditions (AC 1)", () => {
+    for (const rel of AUTOMATIONS) {
+      const pre = contract(preFiling(shippedAutomation(rel)));
+      // Claim precondition: the automation is nobody's item work.
+      expect(pre, rel).toContain("No claim held");
+      expect(pre, rel).toContain("worktree_path");
+      expect(pre, rel).toContain("never claims, branches or checks out anything");
+      // Branch precondition: primary checkout, default branch, clean tree.
+      expect(pre, rel).toContain("Primary checkout, default branch");
+      expect(pre, rel).toContain("git status --porcelain");
+      expect(pre, rel).toContain("clean tree");
+    }
+  });
+
+  it("the scan runs read-only; only the filing section may write (AC 2)", () => {
+    // The read-only primitives the scan sections may quote. A new scan step
+    // must either be added here (after proving it is a pure read) or rejected.
+    const READ_ONLY = new Set([
+      "arggon validate --json",
+      "arggon spec validate --json",
+      "arggon spec analyze --json",
+      "arggon doctor --agents --json",
+      "arggon list --stale --older-than 7d --json",
+      "arggon show <id> --meta --json",
+      "git status --porcelain",
+    ]);
+    for (const rel of AUTOMATIONS) {
+      const template = shippedAutomation(rel);
+      // The scan itself never names the write primitive, and every command it
+      // quotes is a pure read. (Frontmatter and preconditions MAY name
+      // `arggon create` — they declare the write budget; the scan does not.)
+      const scan = scanSection(template);
+      expect(scan, rel).not.toContain("arggon create");
+      for (const cmd of quotedCommands(scan)) {
+        expect(READ_ONLY.has(cmd), `${rel}: ${cmd}`).toBe(true);
+      }
+      // The ONLY write surface is `arggon create` (plus its documented comment
+      // on the NEW finding, never on a scanned item).
+      const filing = template.slice(template.indexOf("## Filing"));
+      expect(filing, rel).toContain("arggon create");
+      expect(filing, rel).toContain("whole write surface");
+    }
+    // The sweep pins its kernel primitive: `arggon list --stale`.
+    expect(shippedAutomation("automations/stale-claim-sweep.md")).toContain(
+      "arggon list --stale",
+    );
+    // ... and never mutates the stale item it reports.
+    const sweep = shippedAutomation("automations/stale-claim-sweep.md");
+    expect(sweep).toContain("NEVER touch the stale item itself");
+  });
+
+  it("both templates are documented as opt-in (AC 3)", () => {
+    for (const rel of AUTOMATIONS) {
+      const template = contract(shippedAutomation(rel));
+      expect(template, rel).toMatch(/description: OPT-IN /);
+      expect(template, rel).toContain("Nothing is scheduled or runs until");
+      expect(template, rel).toContain("Deleting it is the off switch");
+    }
+    // Docs travel: agents.md §ZCode documents the pair as opt-in automations.
+    const agents = readFileSync(join(repoRoot, "ArggonManager/docs/agents.md"), "utf8");
+    expect(agents).toContain("templates/automations/spec-drift-scan.md");
+    expect(agents).toContain("templates/automations/stale-claim-sweep.md");
+    expect(agents).toContain("**Automations (opt-in)**");
+  });
+});
