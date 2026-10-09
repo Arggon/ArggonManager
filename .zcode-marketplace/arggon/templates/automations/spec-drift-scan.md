@@ -49,8 +49,12 @@ Run each step, collect its output, and never act on a finding in-flight:
 - File with `arggon create bug "<finding> (spec-drift-scan <date>)" --parent
   <story>` — the parent story is the one whose spec drifted (specs live under
   `docs/specs/`; the story id is in the spec's tracking references). A finding
-  with no identifiable story files under the methodology epic's story for that
-  spec. Then `arggon comment <new-id>` with the evidence: the exact command,
+  whose spec has no identifiable story falls back to the story whose id stem
+  matches the spec's topic (`spec-<topic>-NNN` → `story-<topic>`); when even
+  that does not resolve, the finding is skipped and logged in the run log —
+  never filed under a guessed parent (`arggon create` refuses unknown parents
+  anyway, and a wrong-parent finding is worse than a logged one). Then
+  `arggon comment <new-id>` with the evidence: the exact command,
   the finding JSON, and the file/line.
 - NEVER `arggon update`/`comment`/`start` a scanned item, never edit a spec,
   doc or seam file to "fix" drift inline, and never `git commit`/`push` by
