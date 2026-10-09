@@ -2,7 +2,7 @@
 type: bug
 status: todo
 id: bug-bundle-update-tool-drops-waive-and-force
-title: bundle-update-tool-drops-waive-and-force
+title: "gate-parity drift: the vendored bundle's update tool drops --waive and --force, refusing done-flips and steals the CLI permits"
 parent: tooling-and-environment
 labels: [parity, native-seam, done-gate]
 created: "2026-10-09"
