@@ -38,3 +38,9 @@ The concrete instance (PR #574 worker): the suite's local `runCli(args, cwd, env
 - [ ] Plugin test files are inside a type gate: extend `cli/tsconfig.plugin.json` (or add a sibling project) so `opencode/plugins/arggon/**/*.test.ts` is type-checked in CI, and the CI workflow runs it.
 - [ ] One env-injection convention for tests: either the shared `cli/src/test-spawn.ts` options shape everywhere, or the local wrapper renamed/typed so the two cannot be confused; a wrong shape must be a TYPE error, not a runtime surprise.
 - [ ] Negative control: a test that passes the wrong shape fails to compile (or fails immediately and legibly).
+
+### 2026-10-09 @Arggon
+verdict: approve
+PR https://github.com/Arggon/ArggonManager/pull/671 merged by the wave runner after a standards-review approve.
+Maker summary: review approved; waiting on CI for https://github.com/Arggon/ArggonManager/pull/671
+Flip not attempted (acceptance incomplete) — item stays open.
