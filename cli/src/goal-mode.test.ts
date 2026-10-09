@@ -625,7 +625,7 @@ describe("refusals: every documented code is asserted", () => {
       arrange: () => {
         const { dir, id } = treeWithTask("- [ ] one goal", { assignee: "Arggon" });
         writeWorktreePath(dir, id, mkdtempSync(join(tmpdir(), "arggon-goal-other-")));
-        return { dir, id };
+        return { dir, id, login: "Arggon" };
       },
     },
     {
@@ -635,7 +635,7 @@ describe("refusals: every documented code is asserted", () => {
         const gone = mkdtempSync(join(tmpdir(), "arggon-goal-gone-"));
         writeWorktreePath(dir, id, gone);
         rmSync(gone, { recursive: true, force: true });
-        return { dir, id };
+        return { dir, id, login: "Arggon" };
       },
     },
     {
@@ -646,7 +646,7 @@ describe("refusals: every documented code is asserted", () => {
         // An empty templates dir removes the packaged fallback too.
         const empty = mkdtempSync(join(tmpdir(), "arggon-goal-templates-"));
         mkdirSync(join(empty, "docs/zcode/arggon/templates"), { recursive: true });
-        return { dir, id, templatesDir: empty };
+        return { dir, id, templatesDir: empty, login: "Arggon" };
       },
     },
     {
