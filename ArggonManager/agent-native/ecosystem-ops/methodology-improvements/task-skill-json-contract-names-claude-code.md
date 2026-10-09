@@ -45,7 +45,7 @@ Acceptance:
 - [x] The statement stays true after the S6 Claude Code adapter lands — phrase it so adding a client is an edit, not a contradiction
 - [x] `skills/arggon-cli/` and `.agents/skills/` byte-equal, mirror regenerated via `npm run skills:sync` (not hand-copied)
 - [x] Beam consistent with the shipped capability matrix rows (no skill/matrix disagreement)
-- [ ] Carrier change → state the impact class per `docs/agents.md` §Changing the methodology
+- [x] Carrier change → state the impact class per `docs/agents.md` §Changing the methodology
 
 ### 2026-10-09 @Arggon
 Carrier-change impact class (docs/agents.md §Changing the methodology): **Advisory**.
