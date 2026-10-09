@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-gate-deny-pattern-matches-quoted-text-blocking-benign-writes
 title: "Gate deny-pattern matches quoted text, blocking benign writes"
+assignee: arggon-delivery-lead
+branch: fix/bug-gate-deny-pattern-matches-quoted-text-blocking-benign-writes
 parent: native-zcode-integration
 labels: []
 created: "2026-10-09"
 updated: "2026-10-09"
+claimed_at: "2026-10-09T21:49:31.610Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-gate-deny-pattern-matches-quoted-text-blocking-benign-writes
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/zcode-native-arggonmanager-mcp-parity-plugin-seam/native-zcode-integration/bug-gate-deny-pattern-matches-quoted-text-blocking-benign-writes.md
