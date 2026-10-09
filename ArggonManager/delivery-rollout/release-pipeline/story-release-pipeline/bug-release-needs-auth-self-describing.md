@@ -5,6 +5,7 @@ id: bug-release-needs-auth-self-describing
 title: "A failed release publish reports `npm ENEEDAUTH` with no pointer to the one-time npmjs.com trusted-publisher setup that resolves it — the runbook names the cause, but nothing on the failure path does"
 parent: story-release-pipeline
 labels: [release, docs, failure-mode]
+priority: p2
 created: "2026-10-09"
 updated: "2026-10-09"
 ---
