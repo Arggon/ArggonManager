@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-plugin-test-type-coverage
 title: Plugin test files escape every type gate (and the local runCli takes an env MAP while test-spawn takes an options object)
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [seam, tests]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-09"
-claimed_at: "2026-10-09T19:27:08.802Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-plugin-test-type-coverage
 ---
 <!--
