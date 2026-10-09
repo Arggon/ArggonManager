@@ -41,8 +41,8 @@ So the agent-facing skill under-describes where the methodology applies, and an 
 Both the source (`skills/arggon-cli/`) and the byte-equal mirror (`.agents/skills/`) need the update in one PR, plus `npm run skills:sync` so the mirror regenerates rather than being hand-edited — and, since the seam drift gate became branch-aware in PR #607, any committed generated copy must be regenerated rather than left stale.
 
 Acceptance:
-- [ ] §MCP surface names BOTH clients that reach the kernel over MCP (ZCode and Claude Code), with the mechanism for each (`.mcp.json` init destination; the ZCode plugin bundle)
-- [ ] The statement stays true after the S6 Claude Code adapter lands — phrase it so adding a client is an edit, not a contradiction
-- [ ] `skills/arggon-cli/` and `.agents/skills/` byte-equal, mirror regenerated via `npm run skills:sync` (not hand-copied)
-- [ ] Beam consistent with the shipped capability matrix rows (no skill/matrix disagreement)
+- [x] §MCP surface names BOTH clients that reach the kernel over MCP (ZCode and Claude Code), with the mechanism for each (`.mcp.json` init destination; the ZCode plugin bundle)
+- [x] The statement stays true after the S6 Claude Code adapter lands — phrase it so adding a client is an edit, not a contradiction
+- [x] `skills/arggon-cli/` and `.agents/skills/` byte-equal, mirror regenerated via `npm run skills:sync` (not hand-copied)
+- [x] Beam consistent with the shipped capability matrix rows (no skill/matrix disagreement)
 - [ ] Carrier change → state the impact class per `docs/agents.md` §Changing the methodology
