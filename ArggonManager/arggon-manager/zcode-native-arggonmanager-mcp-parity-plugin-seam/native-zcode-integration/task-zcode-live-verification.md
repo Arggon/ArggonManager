@@ -39,12 +39,12 @@ question.
       the tracker envelope. Note: the zcode-autoharness plugin registers a second
       copy of the same 15 under its own prefix — duplicate registration, worth
       knowing when reading tool counts.)
-- [ ] `/arggon-next`, `/arggon-start`, `/arggon-review` commands discover and
+- [x] `/arggon-next`, `/arggon-start`, `/arggon-review` commands discover and
       run; `${CLAUDE_PLUGIN_ROOT}` expands for the hook commands
-      (2026-10-10: the second clause is proven — the gate hook fired in-session,
-      which requires `${CLAUDE_PLUGIN_ROOT}` to have expanded; the `/arggon-*`
-      UI-discovery half needs one user glance, it is not observable from inside
-      a session.)
+      (2026-10-10: BOTH halves proven — the product owner confirms the commands
+      are offered in the UI on the reinstalled seam; `${CLAUDE_PLUGIN_ROOT}`
+      expansion was proven by the gate hook firing in-session, which requires
+      it to have resolved `gate.mjs`.)
 - [x] A `PreToolUse` hook actually fires in-session (force-push Bash probe
       denied with the gate's reason)
       (2026-10-10: `git push --force origin no-such-ref` in a remoteless throwaway
@@ -79,7 +79,12 @@ question.
       the errored dispatch's own post — then post closed the window and a second
       pre+stop cycle confirmed stop removes the marker file (state dir left
       empty). Matches the gate header's documented assumption (gate.mjs:35-37).)
-- [ ] On full pass: flip spec/plan to `implemented`, close the story
+- [x] On full pass: flip spec/plan to `implemented`, close the story
+      (2026-10-10: full pass reached — every box above ticked, the last being
+      the product owner's /arggon-* confirmation; `spec-zcode-native-seam-012`
+      and `plan-zcode-native-seam-012` flipped `implemented`, and the
+      `native-zcode-integration` story's acceptance ticks published with
+      evidence, closing the story.)
 
 ### 2026-09-29 @Arggon
 STAGED (everything headless is ready): global arggon CLI refreshed from merged main via npm link (0.4.0 d83fcd55; live doctor --budget = 15 tools / 15,701 B from the very arggon mcp entry the plugin registers); fixture repo /home/arggon/Projects/zcode-seam-live-verify init'ed with that CLI — .zcode-marketplace/ seam vendored (marketplace.json + arggon plugin), arggon validate ok. NOT done by hand: registering the marketplace in the client's registries (known_marketplaces.json has no documented local-directory source shape; a guessed hand-edit risks the live plugin system and buys nothing — the session-bound checks need a restart anyway). orca computer-use unavailable (AppImage missing). REMAINING (one restart away): in ZCode UI Plugin Marketplace -> Add -> Add Plugin Marketplace paste /home/arggon/Projects/zcode-seam-live-verify/.zcode-marketplace -> Install arggon -> restart/open a new session in the fixture -> probe: /arggon-next works, 15 mcp__arggon__ tools present, force-push Bash probe denied by the gate, reviewer dispatch read-only. Trial prompt for the fresh session: 'Run /arggon-next in this repo, then claim nothing; report which arggon MCP tools you can see.'
