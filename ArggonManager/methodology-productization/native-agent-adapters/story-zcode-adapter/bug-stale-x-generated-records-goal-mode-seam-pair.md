@@ -8,7 +8,7 @@ branch: fix/bug-stale-x-generated-records-goal-mode-seam-pair
 parent: story-zcode-adapter
 labels: []
 created: "2026-10-09"
-updated: "2026-10-09"
+updated: "2026-10-10"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-stale-x-generated-records-goal-mode-seam-pair
 ---
 <!--
@@ -47,3 +47,9 @@ So the item's original framing (records stale from the round-1 edit that changed
 4. **Why no gate noticed** (verified against the workflow): the `tasks-validate` drift gate regenerates with the checkout's own build and requires a clean tree — but it compares the committed COPIES against the generator's output and deliberately EXCLUDES `ArggonManager/.convention.yml` from its dirty diff (each run refreshes `generatedAt`); the copies stayed byte-identical to the templates (templates unchanged since round 3), so the gate stayed green. Its pinned-lag assertion reads only `arggonVersion` stamps — with the records gone there were no stamps to read. `arggon validate` checks the tracker tree, not the seam ledger; `doctor` reports `adopter-edited` for state-less files but is report-only. Nothing anywhere compared records vs committed bytes — which is exactly the gap `auditGeneratedProvenance` now closes.
 
 ## Notes
+
+### 2026-10-10 @Arggon
+verdict: approve
+PR https://github.com/Arggon/ArggonManager/pull/673 merged in wave 2 (merge-order chain: stale records -> gate pattern -> lead role) after a standards-review approve and green CI.
+Maker summary: merged https://github.com/Arggon/ArggonManager/pull/673; review approved; CI gate for https://github.com/Arggon/ArggonManager/pull/673
+Item flipped done after merge.
