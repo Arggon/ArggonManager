@@ -245,6 +245,65 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
     }
   });
 
+  // bug-gate-deny-pattern-matches-quoted-text-blocking-benign-writes: the
+  // decided scope (documented in the gate header) is that the shell gates
+  // match the command's words, not its quoted arguments — a tracker-comment
+  // payload or a commit message QUOTING a denied form is documentation, and
+  // denying it blocked exactly the benign writes the methodology mandates.
+  it("quoted text is documentation: a comment payload quoting a denied form passes the gate", () => {
+    const dir = initTree();
+    for (const command of [
+      'npm run arggon -- comment task-x "a force-push probe: git push --force origin main"',
+      "npm run arggon -- comment task-x 'quoting git push -fu origin'",
+      'git commit -m "docs: never run git commit --no-verify"',
+      'echo "git push origin +main"',
+      'npm run arggon -- comment task-x "we never git push --force" && git status',
+    ]) {
+      const r = gate(dir, "pre", { session_id: "s2", tool_name: "Bash", tool_input: { command } });
+      expect(r.status, command).toBe(0);
+    }
+  });
+
+  // The same decision, other side of the line: quoted text the shell still
+  // EXECUTES is not documentation — the exemption must not become a bypass.
+  // Wrapper-prefixed shells execute too (review round 1: the first matcher
+  // was anchored to a command boundary, so `sudo sh -c …` / `xargs sh -c …`
+  // were blanked as inert and ran), and so do combined short flags (review
+  // round 2: requiring the final flag word to be exactly `-c` let `bash -lc`
+  // / `sh -ec` payloads blank and run); the matcher is unanchored and only
+  // requires the final flag word to CONTAIN c, accepting over-denial of
+  // inert look-alikes.
+  it("quoted text that executes still denies (only inert text is exempt)", () => {
+    const dir = initTree();
+    for (const command of [
+      'bash -c "git push --force origin main"',
+      "sh -c 'git push --force'",
+      'eval "git push --force"',
+      'sudo sh -c "git push --force origin main"',
+      "ls | xargs sh -c 'git push --force'",
+      'bash -lc "git push --force origin main"',
+      "sh -ec 'git push --force origin main'",
+      'npm run arggon -- comment x "see $(git push --force) docs"',
+      'npm run arggon -- comment x "never git push --force', // unterminated quote: tail stays scanned
+    ]) {
+      const r = gate(dir, "pre", { session_id: "s3", tool_name: "Bash", tool_input: { command } });
+      expect(r.status, command).toBe(2);
+    }
+  });
+
+  // Recorded residual (decision artifact, header "Deny-pattern scope"):
+  // variable indirection is NOT caught — the quoted assignment value is inert
+  // text at scan time while the later unquoted expansion executes. Fixing
+  // that would mean a real shell parser, past this gate's accidental-use
+  // threat model (the old regex gate was equally evadable via a split flag).
+  // This test pins that the code does what the documented decision says.
+  it("records the variable-indirection residual: assignment values stay exempt", () => {
+    const dir = initTree();
+    const command = "X='git push --force origin main'; $X";
+    const r = gate(dir, "pre", { session_id: "s4", tool_name: "Bash", tool_input: { command } });
+    expect(r.status, command).toBe(0);
+  });
+
   it("keeps ordinary sessions unimpaired", () => {
     const dir = initTree();
     for (const payload of [
@@ -299,7 +358,10 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
       }).status,
     ).toBe(2);
     // Quoted invocations mutate the tracker all the same (review finding:
-    // the old leading-character class let `sh -c "arggon update x"` through).
+    // the old leading-character class let `sh -c "arggon update x"` through)
+    // — and wrapper-prefixed shells all the same again (review on this bug:
+    // the first quote-aware matcher was boundary-anchored, so a sudo-wrapped
+    // form blanked as inert inside the read-only window).
     expect(
       gate(dir, "pre", {
         session_id: session,
@@ -307,6 +369,26 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
         tool_input: { command: 'sh -c "arggon update task-x --status done"' },
       }).status,
     ).toBe(2);
+    expect(
+      gate(dir, "pre", {
+        session_id: session,
+        tool_name: "Bash",
+        tool_input: { command: 'sudo sh -c "arggon update task-x --status done"' },
+      }).status,
+    ).toBe(2);
+    // …but quoted TEXT that merely documents the denied forms (a verdict
+    // describing them) is not a mutation (bug-gate-deny-pattern-matches-
+    // quoted-text-blocking-benign-writes decision).
+    expect(
+      gate(dir, "pre", {
+        session_id: session,
+        tool_name: "Bash",
+        tool_input: {
+          command:
+            'npm run arggon -- comment task-x "the reviewer cannot run arggon update or git commit"',
+        },
+      }).status,
+    ).toBe(0);
     expect(
       gate(dir, "pre", {
         session_id: session,
@@ -393,5 +475,160 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
     expect(
       gate(dir, "pre", { session_id: "other", tool_name: "Write", tool_input: {} }).status,
     ).toBe(0);
+  });
+});
+
+/**
+ * Opt-in automation templates (spec methodology-adapters-017 §S5, plan T5,
+ * task-zcode-automations): a daily spec-drift scan and a weekly stale-claim
+ * sweep, vendored beside the goal-mode contract template. The contracts are
+ * pinned by DERIVING them from the shipped template bytes — restating the
+ * rules here would let the template and the test drift apart silently.
+ */
+describe("zcode automation templates (opt-in, spec S5)", () => {
+  const AUTOMATIONS = [
+    "automations/spec-drift-scan.md",
+    "automations/stale-claim-sweep.md",
+  ] as const;
+
+  /** Read a shipped automation template (the source init materializes from). */
+  function shippedAutomation(rel: string): string {
+    return readFileSync(join(repoRoot, "templates/docs/zcode/arggon/templates", rel), "utf8");
+  }
+
+  /** Text before the filing section: frontmatter + preconditions + scan. */
+  function preFiling(template: string): string {
+    const cut = template.indexOf("## Filing");
+    expect(cut, "the template carries a filing section").toBeGreaterThan(0);
+    return template.slice(0, cut);
+  }
+
+  /** Text of the scan section only. */
+  function scanSection(template: string): string {
+    const start = template.indexOf("## Scan");
+    const end = template.indexOf("## Filing");
+    expect(start, "the template carries a scan section").toBeGreaterThan(0);
+    expect(end, "filing follows scan").toBeGreaterThan(start);
+    return template.slice(start, end);
+  }
+
+  /** Backtick-quoted commands in `text` (the templates quote every command). */
+  function quotedCommands(text: string): string[] {
+    return [...text.matchAll(/`([^`]+)`/g)]
+      .map((m) => m[1]!.trim())
+      .filter((cmd) => cmd.startsWith("arggon ") || cmd.startsWith("git "));
+  }
+
+  /**
+   * The contract prose with markdown hard-wraps collapsed, so a phrase
+   * assertion is about the WORDS the template carries, not its line length.
+   */
+  function contract(template: string): string {
+    return template.replace(/\s+/g, " ");
+  }
+
+  it("generates both automation templates with provenance markers (tier-1)", () => {
+    const dir = initTree();
+    for (const rel of AUTOMATIONS) {
+      const dest = join(dir, PLUGIN_ROOT, "templates", ...rel.split("/"));
+      expect(existsSync(dest), rel).toBe(true);
+      const generated = readFileSync(dest, "utf8");
+      // Frontmatter-first artifacts carry the marker INSIDE the frontmatter,
+      // like the commands and the goal-mode template.
+      expect(generated.startsWith("---\n# arggon:generated"), rel).toBe(true);
+      // The generated copy is the template modulo the marker line.
+      const marker = /^# arggon:generated template="[^"]+"\n/m;
+      expect(generated.replace(marker, ""), rel).toEqual(shippedAutomation(rel));
+    }
+  });
+
+  it("never overwrites an adopter-edited automation template", () => {
+    const dir = initTree();
+    const dest = join(dir, PLUGIN_ROOT, "templates/automations/spec-drift-scan.md");
+    const adopted = readFileSync(dest, "utf8").replace(
+      "Cadence: **daily**",
+      "Cadence: **twice a day**",
+    );
+    writeFileSync(dest, adopted, "utf8");
+    const result = runInit({ dir, force: false });
+    expect(readFileSync(dest, "utf8")).toEqual(adopted);
+    expect((result.skipped ?? []).some((s) => s.includes("spec-drift-scan.md"))).toBe(true);
+  });
+
+  it("each template carries the claim/branch preconditions (AC 1)", () => {
+    for (const rel of AUTOMATIONS) {
+      const pre = contract(preFiling(shippedAutomation(rel)));
+      // Claim precondition: the automation is nobody's item work.
+      expect(pre, rel).toContain("No claim held");
+      expect(pre, rel).toContain("worktree_path");
+      expect(pre, rel).toContain("never claims, branches or checks out anything");
+      // Branch precondition: primary checkout, default branch, clean tree.
+      expect(pre, rel).toContain("Primary checkout, default branch");
+      expect(pre, rel).toContain("git status --porcelain");
+      expect(pre, rel).toContain("clean tree");
+    }
+  });
+
+  it("the scan runs read-only; only the filing section may write (AC 2)", () => {
+    // The read-only primitives the scan sections may quote. A new scan step
+    // must either be added here (after proving it is a pure read) or rejected.
+    const READ_ONLY = new Set([
+      "arggon validate --json",
+      "arggon spec validate --json",
+      "arggon spec analyze --json",
+      "arggon doctor --agents --json",
+      "arggon list --stale --older-than 7d --json",
+      "arggon show <id> --meta --json",
+      "git status --porcelain",
+    ]);
+    for (const rel of AUTOMATIONS) {
+      const template = shippedAutomation(rel);
+      // The scan itself never names the write primitive, and every command it
+      // quotes is a pure read. (Frontmatter and preconditions MAY name
+      // `arggon create` — they declare the write budget; the scan does not.)
+      const scan = scanSection(template);
+      expect(scan, rel).not.toContain("arggon create");
+      for (const cmd of quotedCommands(scan)) {
+        expect(READ_ONLY.has(cmd), `${rel}: ${cmd}`).toBe(true);
+      }
+      // The ONLY write surface is `arggon create` (plus its documented comment
+      // on the NEW finding, never on a scanned item).
+      const filing = template.slice(template.indexOf("## Filing"));
+      expect(filing, rel).toContain("arggon create");
+      expect(filing, rel).toContain("whole write surface");
+    }
+    // The spec-drift scan's no-story fallback is a parseable rule with a main
+    // verb and a deterministic parent, not a dangling sentence (review fix):
+    // fall back to the topic-matched story, else skip and log — never a
+    // guessed parent.
+    const driftFiling = shippedAutomation("automations/spec-drift-scan.md").slice(
+      shippedAutomation("automations/spec-drift-scan.md").indexOf("## Filing"),
+    );
+    expect(contract(driftFiling)).toContain(
+      "falls back to the story whose id stem matches the spec's topic",
+    );
+    expect(contract(driftFiling)).toContain("never filed under a guessed parent");
+    expect(contract(driftFiling)).toContain("`spec-<topic>-NNN` → `story-<topic>`");
+    // The sweep pins its kernel primitive: `arggon list --stale`.
+    expect(shippedAutomation("automations/stale-claim-sweep.md")).toContain(
+      "arggon list --stale",
+    );
+    // ... and never mutates the stale item it reports.
+    const sweep = shippedAutomation("automations/stale-claim-sweep.md");
+    expect(sweep).toContain("NEVER touch the stale item itself");
+  });
+
+  it("both templates are documented as opt-in (AC 3)", () => {
+    for (const rel of AUTOMATIONS) {
+      const template = contract(shippedAutomation(rel));
+      expect(template, rel).toMatch(/description: OPT-IN /);
+      expect(template, rel).toContain("Nothing is scheduled or runs until");
+      expect(template, rel).toContain("Deleting it is the off switch");
+    }
+    // Docs travel: agents.md §ZCode documents the pair as opt-in automations.
+    const agents = readFileSync(join(repoRoot, "ArggonManager/docs/agents.md"), "utf8");
+    expect(agents).toContain("templates/automations/spec-drift-scan.md");
+    expect(agents).toContain("templates/automations/stale-claim-sweep.md");
+    expect(agents).toContain("**Automations (opt-in)**");
   });
 });

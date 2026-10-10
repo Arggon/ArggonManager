@@ -83,7 +83,12 @@ import {
   type ArgonKernel,
   type ArgonToolDefinition,
 } from "./index.js";
-import { runCli as runCliBase } from "../../../cli/src/test-spawn.js";
+// The shared spawn helpers: `runCliJson` is the --json contract runner whose
+// third parameter IS the shared OPTIONS shape (`options.env`, never a
+// positional env MAP — task-plugin-test-type-coverage). `runCli` is imported
+// for the negative control below, which pins that the wrong shapes stay TYPE
+// errors.
+import { runCli, runCliJson } from "../../../cli/src/test-spawn.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -179,14 +184,6 @@ function claimRateLimit(dir: string): void {
 /** Legacy pN label so `priority migrate` has something to report. */
 function legacyPriorityLabel(dir: string): void {
   runUpdate({ cwd: dir, id: "task-rate-limit", labels: "p1,backend" });
-}
-
-function runCli(args: string[], cwd: string, env?: NodeJS.ProcessEnv) {
-  const proc = runCliBase(["--json", ...args], cwd, {
-    timeout: 60_000,
-    ...(env === undefined ? {} : { env }),
-  });
-  return { status: proc.status, stdout: proc.stdout ?? "", stderr: proc.stderr ?? "" };
 }
 
 /** Normalize volatile bytes: fixture root, dates, commit hashes. */
@@ -521,7 +518,7 @@ describe("native tool outputs mirror the CLI --json envelopes", () => {
     const label = `${testCase.name} ${JSON.stringify(testCase.input)}`;
     it(`${label} equals \`${testCase.args.join(" ")} --json\``, async () => {
       const dir = seedTree();
-      const expected = runCli(testCase.args, dir);
+      const expected = runCliJson(testCase.args, dir);
       expect(expected.status, expected.stderr).toBe(0);
       const output = await tool(definitions(dir), testCase.name).execute(testCase.input);
       expect(normalize(`${JSON.stringify(output.output)}\n`, dir)).toBe(
@@ -614,7 +611,7 @@ describe("native tool outputs mirror the CLI --json envelopes", () => {
       testCase.seed?.(cliDir);
       testCase.seed?.(toolDir);
 
-      const expected = runCli(testCase.args, cliDir);
+      const expected = runCliJson(testCase.args, cliDir);
       expect(expected.status, expected.stderr).toBe(0);
       const output = await tool(definitions(toolDir), testCase.name).execute(testCase.input);
 
@@ -1319,7 +1316,7 @@ describe("kernel failures are typed tool errors and the session continues", () =
   it("rejects with ArgonToolError carrying the kernel code and envelope", async () => {
     const dir = seedTree();
     const defs = definitions(dir);
-    const expected = runCli(["show", "nope"], dir);
+    const expected = runCliJson(["show", "nope"], dir);
     expect(expected.status).toBe(1);
 
     let caught: unknown;
@@ -1356,7 +1353,7 @@ describe("kernel failures are typed tool errors and the session continues", () =
       '---\ntype: task\nstatus: todo\nid: task-broken\ntitle: "Broken"\nparent: missing-story\n---\n\nbroken\n',
       "utf8",
     );
-    const expected = runCli(["validate"], dir);
+    const expected = runCliJson(["validate"], dir);
     expect(expected.status).toBe(1);
 
     let caught: unknown;
@@ -1378,7 +1375,7 @@ describe("kernel failures are typed tool errors and the session continues", () =
 
   it("sync surfaces the CLI's SYNC_FAILED envelope on a fixture without a GitHub remote", async () => {
     const dir = seedTree();
-    const expected = runCli(["sync"], dir);
+    const expected = runCliJson(["sync"], dir);
     expect(expected.status).toBe(1);
 
     let caught: unknown;
@@ -1416,9 +1413,11 @@ describe("GitHub-dependent tools mirror the CLI --json envelopes (fake gh)", () 
     const toolDir = seedGitTwin();
     const binDir = fakeGh(mkdtemp("arggon-w2-gh-"), { prList: FAKE_PR_LIST });
 
-    const expected = runCli(["sync", "--write"], cliDir, {
-      ...process.env,
-      PATH: `${binDir}:${process.env.PATH ?? ""}`,
+    const expected = runCliJson(["sync", "--write"], cliDir, {
+      env: {
+        ...process.env,
+        PATH: `${binDir}:${process.env.PATH ?? ""}`,
+      },
     });
     expect(expected.status, expected.stderr).toBe(0);
     const output = await withFakeGh(binDir, () =>
@@ -1436,9 +1435,11 @@ describe("GitHub-dependent tools mirror the CLI --json envelopes (fake gh)", () 
     const toolDir = seedTwin();
     const binDir = fakeGh(mkdtemp("arggon-w2-gh-"), { issueList: FAKE_ISSUE_LIST });
 
-    const expected = runCli(["import-issues", "--dry-run"], cliDir, {
-      ...process.env,
-      PATH: `${binDir}:${process.env.PATH ?? ""}`,
+    const expected = runCliJson(["import-issues", "--dry-run"], cliDir, {
+      env: {
+        ...process.env,
+        PATH: `${binDir}:${process.env.PATH ?? ""}`,
+      },
     });
     expect(expected.status, expected.stderr).toBe(0);
     const output = await withFakeGh(binDir, () =>
@@ -2230,7 +2231,7 @@ describe("worktree domain tools (W4)", () => {
     git(dirname(cliRemote), ["init", "--bare", "-q", cliRemote]);
     git(cliRemote, ["config", "maintenance.auto", "false"]);
     git(cliDir, ["remote", "add", "origin", cliRemote]);
-    const cliProc = runCli(["start", "task-rate-limit", "--worktree", "--assignee", "smoke"], cliDir);
+    const cliProc = runCliJson(["start", "task-rate-limit", "--worktree", "--assignee", "smoke"], cliDir);
     expect(cliProc.status, cliProc.stderr || cliProc.stdout).toBe(0);
     const cli = JSON.parse(cliProc.stdout) as Record<string, unknown>;
     expect(cli.prepSteps).toHaveLength(MAX_PREP_STEPS);
@@ -2351,6 +2352,7 @@ describe("worktree domain tools (W4)", () => {
     // nowhere, so its own name is probed (npm's string-bin convention) and it
     // reports missing, with no path.
     const preparation = payload.preparation as {
+      ready: boolean;
       gateBins?: Array<{ name: string; source: string; path?: string }>;
       steps?: Array<{ step: string; outcome: string; pkg?: string }>;
     };
@@ -3691,7 +3693,7 @@ describe("worktree domain tools (W4)", () => {
     const dir = seedGitTree();
     const { defs } = await completedWorktree(dir);
 
-    const expected = runCli(["cleanup", "--no-gh"], dir);
+    const expected = runCliJson(["cleanup", "--no-gh"], dir);
     expect(expected.status, expected.stderr).toBe(0);
     const output = await tool(defs, "cleanup").execute({ no_gh: true });
     expect(`${JSON.stringify(output.output)}\n`).toBe(expected.stdout);
@@ -4461,9 +4463,8 @@ describe("native release of a dropped claim (bug-unclaim-leaves-worktree-record-
     }
     expect(caught).toBeInstanceOf(ArgonToolError);
     expect((caught as ArgonToolError).code).toBe("CLEANUP_FAILED");
-    expect(String((caught as ArgonToolError).envelope.error.message)).toContain(
-      "either release or prune",
-    );
+    const eitherOrError = (caught as ArgonToolError).envelope.error as Record<string, unknown>;
+    expect(String(eitherOrError.message)).toContain("either release or prune");
   });
 
   // --- review round 2 ---------------------------------------------------
@@ -4499,9 +4500,8 @@ describe("native release of a dropped claim (bug-unclaim-leaves-worktree-record-
     }
     expect(caught).toBeInstanceOf(ArgonToolError);
     expect((caught as ArgonToolError).code).toBe("CLEANUP_FAILED");
-    expect(String((caught as ArgonToolError).envelope.error.message)).toContain(
-      "take_over_worktree requires release",
-    );
+    const takeoverError = (caught as ArgonToolError).envelope.error as Record<string, unknown>;
+    expect(String(takeoverError.message)).toContain("take_over_worktree requires release");
   });
 
   // M2: a dirty worktree is refused during classification, so nothing is
@@ -4602,7 +4602,7 @@ describe("native release of a dropped claim (bug-unclaim-leaves-worktree-record-
     // The CLI resolves its own identity (the fixture's git user.name); both
     // surfaces run unclaimed with a clean worktree, so the single-writer gate is
     // not involved on either side.
-    const cliProc = runCli(["cleanup", "--release", "task-rate-limit", "--json", "--no-gh"], cliDir);
+    const cliProc = runCliJson(["cleanup", "--release", "task-rate-limit", "--json", "--no-gh"], cliDir);
     expect(cliProc.status, cliProc.stderr).toBe(0);
 
     const native = await tool(nativeDefs, "cleanup").execute(
@@ -5032,11 +5032,12 @@ describe("native cleanup reaps declared Compose projects (ADR 0019 layer 2, task
     const cliLog = dockerLog();
     const nativeLog = dockerLog();
 
-    // The local runCli takes the env MAP (not an options object).
-    const expected = runCli(
+    // One env-injection convention: the env MAP goes at `options.env`
+    // (task-plugin-test-type-coverage) — never a positional argument.
+    const expected = runCliJson(
       ["cleanup", "--prune", "--no-gh", "--no-commit"],
       cliDir,
-      spawnEnv(dockerEnv(bin, cliLog, cli.paths[0])),
+      { env: spawnEnv(dockerEnv(bin, cliLog, cli.paths[0])) },
     );
     expect(expected.status, expected.stderr).toBe(0);
     const output = await withEnv(dockerEnv(bin, nativeLog, native.paths[0]), () =>
@@ -5069,10 +5070,10 @@ describe("native cleanup reaps declared Compose projects (ADR 0019 layer 2, task
     const native = await completedWorktrees(nativeDir, ["task-rate-limit", "task-second"]);
     const bin = gitOnlyBin();
 
-    const expected = runCli(
+    const expected = runCliJson(
       ["cleanup", "--prune", "--no-gh", "--no-commit"],
       cliDir,
-      spawnEnv({ PATH: bin }),
+      { env: spawnEnv({ PATH: bin }) },
     );
     expect(expected.status, expected.stderr).toBe(0);
     const output = await withEnv({ PATH: bin }, () =>
@@ -5085,3 +5086,39 @@ describe("native cleanup reaps declared Compose projects (ADR 0019 layer 2, task
     for (const path of native.paths) expect(existsSync(path)).toBe(false);
   });
 });
+
+// --- negative control: the wrong shapes must stay TYPE errors ---------------
+// task-plugin-test-type-coverage, acceptance 3. This suite once had a local
+// `runCli(args, cwd, env)` taking an env MAP while the shared
+// `cli/src/test-spawn.ts` `runCli` took an OPTIONS object in the same
+// same-named slot — nothing type-checked this file, so a wrong call compiled
+// and the child silently ran with the wrong environment. The wrapper is gone
+// (`runCliJson` takes the shared options shape) and these compile-time probes
+// pin the property: each `@ts-expect-error` line carries a WRONG shape, and the
+// plugin type gate (`cli/tsconfig.plugin.json` via `typecheck.test.ts`) fails
+// with `Unused '@ts-expect-error' directive` the moment a loosened signature
+// would let it compile again. The one wrong shape types cannot reject (an env
+// MAP VARIABLE passed as `options` — structurally assignable to any
+// all-optional options type) is rejected at runtime by
+// `assertRunCliOptionsShape` (pinned in `cli/src/test-spawn.test.ts`); these
+// probes therefore use fresh literals, the shape a wrong call is written with.
+
+// An env MAP is not the OPTIONS slot: an unknown key on a fresh literal is
+// excess.
+// @ts-expect-error — an env MAP literal must not satisfy RunCliOptions
+const negativeOptionsProbe: Parameters<typeof runCliJson>[2] = { ARGGON_NEGATIVE_CONTROL: "1" };
+void negativeOptionsProbe;
+
+// The mirror: an OPTIONS object is not an env MAP — `options.env` must reject
+// it (a string-map index signature cannot carry a number-valued option).
+// @ts-expect-error — a RunCliOptions-shaped object must not satisfy ProcessEnv
+const negativeEnvProbe: NodeJS.ProcessEnv = { timeout: 60_000 };
+void negativeEnvProbe;
+
+// The concrete PR #574 instance, shared-runner side: an env MAP literal in the
+// shared `runCli`'s options slot would run the child with the HOST environment
+// (every entry silently ignored), so an isolation test would pass for the wrong
+// reason.
+// @ts-expect-error — the shared runCli's options slot must reject an env MAP
+const negativeSharedProbe: Parameters<typeof runCli>[2] = { ARGGON_NEGATIVE_CONTROL: "1" };
+void negativeSharedProbe;

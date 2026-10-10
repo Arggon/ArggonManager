@@ -1,13 +1,15 @@
 ---
 type: task
-status: todo
+status: done
 id: task-plugin-test-type-coverage
 title: Plugin test files escape every type gate (and the local runCli takes an env MAP while test-spawn takes an options object)
+assignee: arggon-delivery-lead
+branch: feat/task-plugin-test-type-coverage
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [seam, tests]
 priority: p3
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-09"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-plugin-test-type-coverage.md
@@ -24,7 +26,9 @@ updated: "2026-10-02"
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [x] Plugin test files are inside a type gate: extend `cli/tsconfig.plugin.json` (or add a sibling project) so `opencode/plugins/arggon/**/*.test.ts` is type-checked in CI, and the CI workflow runs it.
+- [x] One env-injection convention for tests: either the shared `cli/src/test-spawn.ts` options shape everywhere, or the local wrapper renamed/typed so the two cannot be confused; a wrong shape must be a TYPE error, not a runtime surprise.
+- [x] Negative control: a test that passes the wrong shape fails to compile (or fails immediately and legibly).
 
 ## Notes
 
@@ -34,13 +38,5 @@ Found while reviewing PR #574 (native cleanup Compose parity): `opencode/plugins
 
 The concrete instance (PR #574 worker): the suite's local `runCli(args, cwd, env)` takes an env MAP and wraps it, while `cli/src/test-spawn.ts`'s `runCli` takes an OPTIONS object — passing `{ env }` gives the child an environment with one variable literally named `env`, PATH is silently lost, and the child then finds the HOST's real `docker`, so an absent-docker case would pass for the wrong reason. The new tests pass the right shape, so nothing is broken today; the class is what matters.
 
-## Acceptance
-- [ ] Plugin test files are inside a type gate: extend `cli/tsconfig.plugin.json` (or add a sibling project) so `opencode/plugins/arggon/**/*.test.ts` is type-checked in CI, and the CI workflow runs it.
-- [ ] One env-injection convention for tests: either the shared `cli/src/test-spawn.ts` options shape everywhere, or the local wrapper renamed/typed so the two cannot be confused; a wrong shape must be a TYPE error, not a runtime surprise.
-- [ ] Negative control: a test that passes the wrong shape fails to compile (or fails immediately and legibly).
-
 ### 2026-10-09 @Arggon
-verdict: approve
-PR https://github.com/Arggon/ArggonManager/pull/671 merged by the wave runner after a standards-review approve.
-Maker summary: review approved; waiting on CI for https://github.com/Arggon/ArggonManager/pull/671
-Flip not attempted (acceptance incomplete) — item stays open.
+verdict: approve — standards review approved during the wave; PR #671 merged after CI green; item flipped done. Premature mid-wave wave-runner comment dropped in merge resolution. Lead note: the maker's empirical finding stands — a ProcessEnv VARIABLE is structurally assignable to the all-optional RunCliOptions, so the env-map trap is closed by the runtime assertRunCliOptionsShape guard (type error for fresh literals, legible runtime refusal for variables), not by types alone.
