@@ -9,7 +9,6 @@ parent: native-zcode-integration
 labels: []
 created: "2026-09-29"
 updated: "2026-10-10"
-worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-live-verification
 ---
 # Live ZCode client verification of the plugin seam
 

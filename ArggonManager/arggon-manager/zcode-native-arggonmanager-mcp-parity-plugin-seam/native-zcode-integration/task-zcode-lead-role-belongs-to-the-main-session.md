@@ -9,7 +9,6 @@ parent: native-zcode-integration
 labels: []
 created: "2026-10-09"
 updated: "2026-10-10"
-worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-lead-role-belongs-to-the-main-session
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/zcode-native-arggonmanager-mcp-parity-plugin-seam/native-zcode-integration/task-zcode-lead-role-belongs-to-the-main-session.md
