@@ -266,10 +266,13 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
 
   // The same decision, other side of the line: quoted text the shell still
   // EXECUTES is not documentation — the exemption must not become a bypass.
-  // Wrapper-prefixed shells execute too (review on this bug: the first
-  // matcher was anchored to a command boundary, so `sudo sh -c …` and
-  // `xargs sh -c …` were blanked as inert and ran); the matcher is now
-  // unanchored, accepting over-denial of inert look-alikes.
+  // Wrapper-prefixed shells execute too (review round 1: the first matcher
+  // was anchored to a command boundary, so `sudo sh -c …` / `xargs sh -c …`
+  // were blanked as inert and ran), and so do combined short flags (review
+  // round 2: requiring the final flag word to be exactly `-c` let `bash -lc`
+  // / `sh -ec` payloads blank and run); the matcher is unanchored and only
+  // requires the final flag word to CONTAIN c, accepting over-denial of
+  // inert look-alikes.
   it("quoted text that executes still denies (only inert text is exempt)", () => {
     const dir = initTree();
     for (const command of [
@@ -278,6 +281,8 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
       'eval "git push --force"',
       'sudo sh -c "git push --force origin main"',
       "ls | xargs sh -c 'git push --force'",
+      'bash -lc "git push --force origin main"',
+      "sh -ec 'git push --force origin main'",
       'npm run arggon -- comment x "see $(git push --force) docs"',
       'npm run arggon -- comment x "never git push --force', // unterminated quote: tail stays scanned
     ]) {
