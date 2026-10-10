@@ -1,12 +1,12 @@
 ---
 type: epic
-status: todo
+status: done
 id: zcode-native-arggonmanager-mcp-parity-plugin-seam
 title: "ZCode-native ArggonManager: MCP parity + plugin seam"
 parent: arggon-manager
 labels: []
 created: "2026-09-29"
-updated: "2026-09-29"
+updated: "2026-10-10"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/zcode-native-arggonmanager-mcp-parity-plugin-seam/zcode-native-arggonmanager-mcp-parity-plugin-seam.md (epic index; required).
