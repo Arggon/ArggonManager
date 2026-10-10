@@ -9,7 +9,6 @@ parent: story-zcode-adapter
 labels: []
 created: "2026-10-09"
 updated: "2026-10-10"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-stale-x-generated-records-goal-mode-seam-pair
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-zcode-adapter/bug-stale-x-generated-records-goal-mode-seam-pair.md

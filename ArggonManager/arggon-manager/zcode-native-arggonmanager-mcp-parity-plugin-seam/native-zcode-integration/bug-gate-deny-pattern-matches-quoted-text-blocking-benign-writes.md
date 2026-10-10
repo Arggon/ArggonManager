@@ -9,7 +9,6 @@ parent: native-zcode-integration
 labels: []
 created: "2026-10-09"
 updated: "2026-10-10"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-gate-deny-pattern-matches-quoted-text-blocking-benign-writes
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/zcode-native-arggonmanager-mcp-parity-plugin-seam/native-zcode-integration/bug-gate-deny-pattern-matches-quoted-text-blocking-benign-writes.md
