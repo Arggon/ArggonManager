@@ -1,12 +1,12 @@
 ---
 type: story
-status: todo
+status: done
 id: native-zcode-integration
 title: Native ZCode integration
 parent: zcode-native-arggonmanager-mcp-parity-plugin-seam
 labels: []
 created: "2026-09-29"
-updated: "2026-09-29"
+updated: "2026-10-10"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/zcode-native-arggonmanager-mcp-parity-plugin-seam/native-zcode-integration/native-zcode-integration.md (story index; required).
