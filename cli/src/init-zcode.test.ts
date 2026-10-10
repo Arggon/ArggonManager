@@ -245,6 +245,65 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
     }
   });
 
+  // bug-gate-deny-pattern-matches-quoted-text-blocking-benign-writes: the
+  // decided scope (documented in the gate header) is that the shell gates
+  // match the command's words, not its quoted arguments — a tracker-comment
+  // payload or a commit message QUOTING a denied form is documentation, and
+  // denying it blocked exactly the benign writes the methodology mandates.
+  it("quoted text is documentation: a comment payload quoting a denied form passes the gate", () => {
+    const dir = initTree();
+    for (const command of [
+      'npm run arggon -- comment task-x "a force-push probe: git push --force origin main"',
+      "npm run arggon -- comment task-x 'quoting git push -fu origin'",
+      'git commit -m "docs: never run git commit --no-verify"',
+      'echo "git push origin +main"',
+      'npm run arggon -- comment task-x "we never git push --force" && git status',
+    ]) {
+      const r = gate(dir, "pre", { session_id: "s2", tool_name: "Bash", tool_input: { command } });
+      expect(r.status, command).toBe(0);
+    }
+  });
+
+  // The same decision, other side of the line: quoted text the shell still
+  // EXECUTES is not documentation — the exemption must not become a bypass.
+  // Wrapper-prefixed shells execute too (review round 1: the first matcher
+  // was anchored to a command boundary, so `sudo sh -c …` / `xargs sh -c …`
+  // were blanked as inert and ran), and so do combined short flags (review
+  // round 2: requiring the final flag word to be exactly `-c` let `bash -lc`
+  // / `sh -ec` payloads blank and run); the matcher is unanchored and only
+  // requires the final flag word to CONTAIN c, accepting over-denial of
+  // inert look-alikes.
+  it("quoted text that executes still denies (only inert text is exempt)", () => {
+    const dir = initTree();
+    for (const command of [
+      'bash -c "git push --force origin main"',
+      "sh -c 'git push --force'",
+      'eval "git push --force"',
+      'sudo sh -c "git push --force origin main"',
+      "ls | xargs sh -c 'git push --force'",
+      'bash -lc "git push --force origin main"',
+      "sh -ec 'git push --force origin main'",
+      'npm run arggon -- comment x "see $(git push --force) docs"',
+      'npm run arggon -- comment x "never git push --force', // unterminated quote: tail stays scanned
+    ]) {
+      const r = gate(dir, "pre", { session_id: "s3", tool_name: "Bash", tool_input: { command } });
+      expect(r.status, command).toBe(2);
+    }
+  });
+
+  // Recorded residual (decision artifact, header "Deny-pattern scope"):
+  // variable indirection is NOT caught — the quoted assignment value is inert
+  // text at scan time while the later unquoted expansion executes. Fixing
+  // that would mean a real shell parser, past this gate's accidental-use
+  // threat model (the old regex gate was equally evadable via a split flag).
+  // This test pins that the code does what the documented decision says.
+  it("records the variable-indirection residual: assignment values stay exempt", () => {
+    const dir = initTree();
+    const command = "X='git push --force origin main'; $X";
+    const r = gate(dir, "pre", { session_id: "s4", tool_name: "Bash", tool_input: { command } });
+    expect(r.status, command).toBe(0);
+  });
+
   it("keeps ordinary sessions unimpaired", () => {
     const dir = initTree();
     for (const payload of [
@@ -299,7 +358,10 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
       }).status,
     ).toBe(2);
     // Quoted invocations mutate the tracker all the same (review finding:
-    // the old leading-character class let `sh -c "arggon update x"` through).
+    // the old leading-character class let `sh -c "arggon update x"` through)
+    // — and wrapper-prefixed shells all the same again (review on this bug:
+    // the first quote-aware matcher was boundary-anchored, so a sudo-wrapped
+    // form blanked as inert inside the read-only window).
     expect(
       gate(dir, "pre", {
         session_id: session,
@@ -307,6 +369,26 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
         tool_input: { command: 'sh -c "arggon update task-x --status done"' },
       }).status,
     ).toBe(2);
+    expect(
+      gate(dir, "pre", {
+        session_id: session,
+        tool_name: "Bash",
+        tool_input: { command: 'sudo sh -c "arggon update task-x --status done"' },
+      }).status,
+    ).toBe(2);
+    // …but quoted TEXT that merely documents the denied forms (a verdict
+    // describing them) is not a mutation (bug-gate-deny-pattern-matches-
+    // quoted-text-blocking-benign-writes decision).
+    expect(
+      gate(dir, "pre", {
+        session_id: session,
+        tool_name: "Bash",
+        tool_input: {
+          command:
+            'npm run arggon -- comment task-x "the reviewer cannot run arggon update or git commit"',
+        },
+      }).status,
+    ).toBe(0);
     expect(
       gate(dir, "pre", {
         session_id: session,
