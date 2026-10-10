@@ -35,9 +35,27 @@ question.
 - [ ] Reviewer dispatch: the agent's `tools:` allowlist honors `mcp__arggon__*`
       names (worst case: ZCode ignores them and the hook backstop is the only
       restriction — the reason it exists)
-- [ ] Whether `PostToolUse(Agent)` fires when a subagent dispatch errors —
+- [x] Whether `PostToolUse(Agent)` fires when a subagent dispatch errors —
       if not, confirm Stop/TTL clearing suffices (the gate header documents
-      the assumption)
+      the assumption) (2026-10-10, live probe: RESOLVED on the fallback branch —
+      Stop/TTL clearing confirmed sufficient, TTL = 2h. Structure: the installed
+      hooks.json wires exactly PreToolUse / PostToolUse(Agent) / Stop — NO
+      failure event (e.g. PostToolUseFailure) is wired, so an errored dispatch
+      can never decrement via a failure path; only post (reviewer-named Agent,
+      gate.mjs:203-208), Stop (gate.mjs:210-213, unconditional zero, matcher-less
+      hooks.json:31-43) or TTL expiry (gate.mjs:50 `MARKER_TTL_MS = 2h`, enforced
+      gate.mjs:130) close the window. Live through the installed cache gate.mjs:
+      marker opened via pre (`/tmp/arggon-zcode-hooks/95d3dd5caa7953d0ded92945.json`
+      `{"count":1,...}`); then one errored dispatch-equivalent fired — this
+      subagent's toolset has NO Agent tool, so the closest surface, TaskOutput
+      with a nonexistent task id, errored ("No task found with ID: …") — marker
+      delta NONE (byte-identical). A non-Agent error cannot discriminate "client
+      skips PostToolUse(Agent) on errored dispatch" from "fires but no-ops for a
+      non-reviewer type"; the real reviewer type was not dispatched per probe
+      constraints. Undetermined-but-not-load-bearing: closure never depends on
+      the errored dispatch's own post — then post closed the window and a second
+      pre+stop cycle confirmed stop removes the marker file (state dir left
+      empty). Matches the gate header's documented assumption (gate.mjs:35-37).)
 - [ ] On full pass: flip spec/plan to `implemented`, close the story
 
 ### 2026-09-29 @Arggon
