@@ -44,9 +44,11 @@
  * denies nothing (the old whole-string scan denied exactly those benign
  * writes, and this repo's methodology tells agents to document gate
  * behavior). Quoted text the shell will still EXECUTE is never exempted: a
- * span that is the `-c` payload of a sh-family shell — wherever the shell
- * sits, wrapper prefixes included (`sudo sh -c "…"`, `ls | xargs sh -c '…'`,
- * `bash -lc "…"`) — or the argument of `eval`, a span carrying a command
+ * span that is the command payload of a sh-family shell — wherever the
+ * shell sits, wrapper prefixes included (`sudo sh -c "…"`,
+ * `ls | xargs sh -c '…'`), the payload flag in combined short form included
+ * (`bash -lc "…"`, `sh -ec '…'` — any final flag word containing `c`) — or
+ * the argument of `eval`, a span carrying a command
  * substitution (`$( … )` or backticks — the substituted text runs), and the
  * tail of an unterminated quote all stay in the scan. The shell test accepts
  * fail-closed OVER-denial of inert look-alikes (`echo sh -c "…"` is denied).
@@ -213,23 +215,27 @@ function quotedSpans(command) {
 
 /**
  * True when the quoted span [start, end) will still be EXECUTED rather than
- * printed or stored: it is the `-c` payload of a sh-family shell — wherever
- * that shell sits in the command, wrapper prefixes included (`sh -c "…"`,
- * `sudo sh -c "…"`, `ls | xargs sh -c '…'`, `bash -lc "…"`) — or the
- * argument of `eval`, or it carries a command substitution (`$( … )` /
- * backticks — the substituted text runs). A gate match inside such a span is
- * a real invocation and must still deny (the reviewer backstop relies on
- * `sh -c "arggon update …"` staying denied, wrappers and all). The shell
- * test is deliberately UNANCHORED in the head, so inert look-alikes are
- * over-denied fail-closed (`echo sh -c "…"`); and this is deliberately NOT
- * a shell parser: a quoted assignment value that a later unquoted `$var`
- * expansion runs (`X='…'; $X`) is inert at scan time and stays exempt — a
- * recorded residual, see "Deny-pattern scope" in the header.
+ * printed or stored: it is the command payload of a sh-family shell —
+ * wherever that shell sits in the command, wrapper prefixes included
+ * (`sh -c "…"`, `sudo sh -c "…"`, `ls | xargs sh -c '…'`), the payload flag
+ * in combined short form included (`bash -lc "…"`, `sh -ec '…'`: the final
+ * flag word only needs to CONTAIN `c` — requiring exactly `-c` let `-lc` /
+ * `-ec` payloads blank as inert and run, a deny→allow regression the R2
+ * standards review probed) — or the argument of `eval`, or it carries a
+ * command substitution (`$( … )` / backticks — the substituted text runs).
+ * A gate match inside such a span is a real invocation and must still deny
+ * (the reviewer backstop relies on `sh -c "arggon update …"` staying
+ * denied, wrappers and all). The shell test is deliberately UNANCHORED in
+ * the head, so inert look-alikes are over-denied fail-closed (`echo sh -c
+ * "…"`); and this is deliberately NOT a shell parser: a quoted assignment
+ * value that a later unquoted `$var` expansion runs (`X='…'; $X`) is inert
+ * at scan time and stays exempt — a recorded residual, see "Deny-pattern
+ * scope" in the header.
  */
 function quotedSpanExecutes(command, start, end) {
   if (/\$\(|`/.test(command.slice(start, end))) return true;
   const head = command.slice(0, start);
-  return /\S*sh\s+(?:-\S+\s+)*-c\s*$/.test(head) || /\beval\s+$/.test(head);
+  return /\S*sh\s+(?:-\S+\s+)*-\S*c\S*\s*$/.test(head) || /\beval\s+$/.test(head);
 }
 
 /**
