@@ -26,9 +26,19 @@ code-mode tools (MCP is the tool surface) and no per-agent permission DSL
 
 ## Acceptance
 
-- [ ] Capability audit complete (ZCode plugin/hooks/agents/MCP surfaces,
+- [x] Capability audit complete (ZCode plugin/hooks/agents/MCP surfaces,
       dated sources)
-- [ ] ADR 0014 (multi-client native surfaces: ZCode via MCP + plugin)
-- [ ] Implementation waves filed as tasks and closed
+      (2026-10-01 artifact audit on task-zcode-live-verification: manifest,
+      plugin.json, hooks.json parse; agents/commands parity; superseded and
+      re-verified live 2026-10-10 after waves 1-2 — 15-tool MCP surface,
+      13 commands, two subagents, gate fixed and live)
+- [x] ADR 0014 (multi-client native surfaces: ZCode via MCP + plugin)
+      (Accepted with status note; spec + plan zcode-native-seam-012 flipped
+      `implemented` 2026-10-10)
+- [x] Implementation waves filed as tasks and closed
+      (subtree fully terminal 2026-10-10: task-mcp-full-surface,
+      task-zcode-plugin-seam, task-zcode-board-command, task-zcode-goal-mode,
+      task-zcode-live-verification, bug-force-push-gate-misses-refspec-plus —
+      all done; story native-zcode-integration done)
 
 ## Notes
