@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-zcode-lead-role-belongs-to-the-main-session
 title: ZCode lead role belongs to the main session
+assignee: arggon-delivery-lead
+branch: feat/task-zcode-lead-role-belongs-to-the-main-session
 parent: native-zcode-integration
 labels: []
 created: "2026-10-09"
 updated: "2026-10-09"
+claimed_at: "2026-10-09T21:49:37.502Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-lead-role-belongs-to-the-main-session
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/zcode-native-arggonmanager-mcp-parity-plugin-seam/native-zcode-integration/task-zcode-lead-role-belongs-to-the-main-session.md
@@ -30,10 +34,10 @@ Direction recorded from the product owner (in-session, 2026-10-10): the delivery
 
 ## Acceptance
 
-- [ ] `templates/docs/zcode/arggon/agents/arggon-delivery-lead.md` is removed from the ZCode seam (maker + standards-reviewer remain; verifier joins as a subagent when it ships), and the seam is regenerated so the committed `.zcode-marketplace/` copy and `x-generated` provenance match (no stale-record drift — see `bug-stale-x-generated-records-goal-mode-seam-pair`).
-- [ ] The lead's contract reaches the main session through the carriers: the init-generated docs (or the seam README) state that in ZCode the main session IS the delivery lead, and no shipped ZCode surface tells the main session to "Dispatch" a lead.
-- [ ] Generator/tests updated for the new agent inventory (the `readdirSync`-driven parity and doctor `--agents` file-count snapshots), plus the init test that asserts the 2026-10-01 artifact audit's "agents/ name-for-name parity with .opencode/agents" — that rule is relaxed to parity modulo the primary/subagent mode split, with the reason recorded.
-- [ ] Gates green: build, targeted init/adapter tests, lint, `arggon validate`, `check:plugin`; CI on the PR.
+- [x] `templates/docs/zcode/arggon/agents/arggon-delivery-lead.md` is removed from the ZCode seam (maker + standards-reviewer remain; verifier joins as a subagent when it ships), and the seam is regenerated so the committed `.zcode-marketplace/` copy and `x-generated` provenance match (no stale-record drift — see `bug-stale-x-generated-records-goal-mode-seam-pair`). (2026-10-10: template removed; `npm run build && node dist/cli.js init` from the worktree reaped the committed `.zcode-marketplace/arggon/agents/arggon-delivery-lead.md` and its `x-generated` record and wrote the README record (init commit 553fb2ff); `provenance-audit.test.ts` repo-self block green.)
+- [x] The lead's contract reaches the main session through the carriers: the init-generated docs (or the seam README) state that in ZCode the main session IS the delivery lead, and no shipped ZCode surface tells the main session to "Dispatch" a lead. (2026-10-10: the init-generated seam README `templates/docs/zcode/arggon/README.md` states "the main session IS the delivery lead" and forbids dispatching a lead; `ArggonManager/docs/agents.md` §ZCode carries the carrier statement; the retired id survives in no generated artifact except the README's own prohibition — pinned by the init-zcode test.)
+- [x] Generator/tests updated for the new agent inventory (the `readdirSync`-driven parity and doctor `--agents` file-count snapshots), plus the init test that asserts the 2026-10-01 artifact audit's "agents/ name-for-name parity with .opencode/agents" — that rule is relaxed to parity modulo the primary/subagent mode split, with the reason recorded. (2026-10-10: `cli/src/init-zcode.test.ts` pins the relaxed rule as a derived test (opencode modes readdir'd; every ZCode agent must be an OpenCode `mode: subagent` role of the same name, the primary role is exactly what the seam omits, the v1 verifier gap asserted by name) with the reason in the test comment; the derived `BY_AGENT`/`PER_AGENT_COUNT` doctor `--agents` fixtures follow the inventory automatically; TIER1_DOCS + the init-opencode carrier test updated.)
+- [x] Gates green: build, targeted init/adapter tests, lint, `arggon validate`, `check:plugin`; CI on the PR. (2026-10-10: build / targeted 235 / full suite 2858 / lint / validate / check:plugin all green in the worktree; CI on PR #677 green — cli, tasks-validate, ui-smoke all pass.)
 - [ ] Live surface (needs the install + one restart): the dispatchable `arggon:arggon-delivery-lead` entry no longer appears in a fresh session's agent list, and `arggon:arggon-maker` / `arggon:arggon-standards-reviewer` still do.
 
 ## Notes
@@ -42,6 +46,8 @@ Direction recorded from the product owner (in-session, 2026-10-10): the delivery
 Owner direction recorded (in-session 2026-10-10): 'delivery-lead is a subagent but this one should be the one who the user interact main agent not a subagent' — the lead is the main session's role; the seam should stop shipping it as a dispatchable ZCode subagent. This item is claimable as scoped.
 
 ### 2026-10-10 @Arggon
+Implementation pushed — PR #677. Methodology impact class: **Behavioral** (ADR 0016) — the ZCode agent inventory changed (the dispatchable arggon-delivery-lead is retired from the seam) and agents must re-learn who the lead is: in ZCode the main session IS the delivery lead, per the new init-generated seam README and ArggonManager/docs/agents.md §ZCode (the carrier statement). Skill copies untouched (no skills/arggon-cli/** change, so the byte-equal clause is trivially satisfied). Evidence: templates/docs/zcode/arggon/agents/arggon-delivery-lead.md removed; templates/docs/zcode/arggon/README.md added; templates/docs/zcode/arggon/.zcode-plugin/plugin.json description updated; ArggonManager/docs/agents.md:642 rewritten (three agents → two + the main-session rule); parity rule (2026-10-01 artifact audit 'agents/ name-for-name parity with .opencode/agents') relaxed to parity modulo the primary/subagent mode split, pinned by a derived test in cli/src/init-zcode.test.ts with the reason recorded (ZCode has no primary/session-agent concept; OpenCode keeps mode: primary). Regenerated with npm run build && node dist/cli.js init from the worktree: init reaped the committed .zcode-marketplace copy and its x-generated record and wrote the README record (commit 553fb2ff), no stale-record drift. Gates run here: build green; targeted init/adapter/provenance/doctor tests 235/235; full suite 2858/2858; lint green; arggon validate ok (0 warnings); check:plugin green. Live-reinstall box (AC 5) left unticked — needs the live client restart, next wave.
+
 verdict: approve
 PR https://github.com/Arggon/ArggonManager/pull/677 merged in wave 2 (merge-order chain: stale records -> gate pattern -> lead role) after a standards-review approve and green CI.
 Maker summary: review approved; CI gate for https://github.com/Arggon/ArggonManager/pull/677
