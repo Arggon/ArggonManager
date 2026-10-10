@@ -52,3 +52,6 @@ verdict: approve
 PR https://github.com/Arggon/ArggonManager/pull/677 merged in wave 2 (merge-order chain: stale records -> gate pattern -> lead role) after a standards-review approve and green CI.
 Maker summary: review approved; CI gate for https://github.com/Arggon/ArggonManager/pull/677
 Flip not attempted (acceptance incomplete) — item stays open.
+
+### 2026-10-10 @Arggon
+2026-10-10 reinstall half of AC 5 done (delivery lead, after the user's restart): ground truth first — the client swept known_marketplaces at this restart (lastUpdated 01:50Z) but did NOT re-sync the installed cache (mtime Oct 9 16:27, lead agent still present), so restart alone is insufficient; the acceptance's 'reinstall' term is load-bearing. Reinstalled by hand the way the client's update path would: backed up the old cache (/tmp/arggon-zcode-cache-backup-20261010T015237Z), then rsync'd the committed seam (origin/main .zcode-marketplace) over ~/.zcode/cli/plugins/cache/arggon-local/arggon/0.1.0/ — diff -r vs origin/main: identical; agents/ now arggon-maker.md + arggon-standards-reviewer.md only (lead gone); 13 commands; README carries the main-session-is-lead rule. REMAINING for the tick: one more client restart, then a fresh session's agent list shows exactly the two subagents (user can confirm in Settings - Subagents); tick on that evidence.
