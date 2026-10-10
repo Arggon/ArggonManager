@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-zcode-lead-role-belongs-to-the-main-session
 title: ZCode lead role belongs to the main session
 assignee: arggon-delivery-lead
@@ -8,8 +8,7 @@ branch: feat/task-zcode-lead-role-belongs-to-the-main-session
 parent: native-zcode-integration
 labels: []
 created: "2026-10-09"
-updated: "2026-10-09"
-claimed_at: "2026-10-09T21:49:37.502Z"
+updated: "2026-10-10"
 worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-lead-role-belongs-to-the-main-session
 ---
 <!--
