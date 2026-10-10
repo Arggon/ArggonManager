@@ -58,9 +58,27 @@ question.
       "no shell"; ZCode does not enforce the generated `tools:` allowlist. The
       hook backstop, verified live, is the only real restriction, exactly as the
       box anticipated. Recorded as the seam's operative posture in ZCode.)
-- [ ] Whether `PostToolUse(Agent)` fires when a subagent dispatch errors —
+- [x] Whether `PostToolUse(Agent)` fires when a subagent dispatch errors —
       if not, confirm Stop/TTL clearing suffices (the gate header documents
-      the assumption)
+      the assumption) (2026-10-10, live probe: RESOLVED on the fallback branch —
+      Stop/TTL clearing confirmed sufficient, TTL = 2h. Structure: the installed
+      hooks.json wires exactly PreToolUse / PostToolUse(Agent) / Stop — NO
+      failure event (e.g. PostToolUseFailure) is wired, so an errored dispatch
+      can never decrement via a failure path; only post (reviewer-named Agent,
+      gate.mjs:203-208), Stop (gate.mjs:210-213, unconditional zero, matcher-less
+      hooks.json:31-43) or TTL expiry (gate.mjs:50 `MARKER_TTL_MS = 2h`, enforced
+      gate.mjs:130) close the window. Live through the installed cache gate.mjs:
+      marker opened via pre (`/tmp/arggon-zcode-hooks/95d3dd5caa7953d0ded92945.json`
+      `{"count":1,...}`); then one errored dispatch-equivalent fired — this
+      subagent's toolset has NO Agent tool, so the closest surface, TaskOutput
+      with a nonexistent task id, errored ("No task found with ID: …") — marker
+      delta NONE (byte-identical). A non-Agent error cannot discriminate "client
+      skips PostToolUse(Agent) on errored dispatch" from "fires but no-ops for a
+      non-reviewer type"; the real reviewer type was not dispatched per probe
+      constraints. Undetermined-but-not-load-bearing: closure never depends on
+      the errored dispatch's own post — then post closed the window and a second
+      pre+stop cycle confirmed stop removes the marker file (state dir left
+      empty). Matches the gate header's documented assumption (gate.mjs:35-37).)
 - [ ] On full pass: flip spec/plan to `implemented`, close the story
 
 ### 2026-09-29 @Arggon
@@ -113,3 +131,12 @@ verdict: approve — PR #669 merged after CI green. Live legs 3 (mutations from 
 ### handoff 2026-10-09 @Arggon — next: Two live-section boxes left: /arggon-* command discovery (one user glance at the UI — type /arggon-next), then the PostToolUse(Agent)-on-errored-dispatch probe; on full pass flip spec-zcode-native-se…
 - branch: main
 - open questions: PostToolUse(Agent) on errored dispatch; UI command discovery
+
+### 2026-10-10 @Arggon
+### 2026-10-10 @live-verification-probe (subagent dispatched by arggon-delivery-lead) — box 6 probe + fixture refresh
+
+BOX 6 (does PostToolUse(Agent) fire when a subagent dispatch errors) — RESOLVED on the fallback branch; box TICKED (commit 0bf387be). (1) Installed seam structure (cache copy ~/.zcode/cli/plugins/cache/arggon-local/arggon/0.1.0/): hooks.json wires EXACTLY three events — PreToolUse (matcher Agent|Bash|Write|Edit|mcp__arggon__.*) -> gate.mjs pre, PostToolUse (matcher Agent ONLY) -> gate.mjs post, Stop (NO matcher) -> gate.mjs stop (hooks.json:3-44). NO PostToolUseFailure or any failure event is wired, so an errored dispatch can never decrement through a failure path. Marker: /tmp/arggon-zcode-hooks/<sha256(projectDir+session_id)[:24]>.json; TTL 2h (gate.mjs:50, expiry enforced gate.mjs:130); post decrements only for reviewer-named Agent dispatches (gate.mjs:203-208); stop unconditionally zeroes (gate.mjs:210-213); the header documents the Stop/TTL assumption (gate.mjs:35-37). (2) ONE live probe, safe, real reviewer type NOT dispatched: baseline state dir EMPTY; opened a reviewer window for a synthetic probe key through the INSTALLED gate (tool_name=Agent, subagent_type=arggon-standards-reviewer, session_id=live-verification-probe, cwd=fixture) -> /tmp/arggon-zcode-hooks/95d3dd5caa7953d0ded92945.json {"count":1,...}. Errored dispatch-equivalent: this subagent's toolset has NO Agent tool, so the closest dispatch-adjacent surface, TaskOutput with a nonexistent task id, was fired and ERRORED ("No task found with ID: nonexistent-probe-task-live-verification"). DELTA after the error: NONE — marker byte-identical {"count":1,...}. CAVEAT recorded honestly: a non-Agent tool error cannot discriminate "client skips PostToolUse(Agent) on errored dispatch" from "fires but no-ops for a non-reviewer subagent_type"; whether the client itself fires PostToolUse(Agent) for an errored Agent dispatch stays undetermined from this seat (no Agent tool exists in a subagent toolset; dispatching the real reviewer type was forbidden). It is NOT load-bearing: Stop is matcher-less and unconditional and the 2h TTL bounds any stuck marker, so window closure never depends on the errored dispatch's own post. Side probe: grep of /opt/ZCode/zcode/resources/app.asar for hook event names is inconclusive as an instrument (even PreToolUse, which provably fires in this client, greps 0 — the asar is not greppable plaintext). (3) Stop/TTL sufficiency CONFIRMED live through the installed gate: post removed the marker file; a second pre re-opened it ({"count":1,...}) and stop removed it; state dir left EMPTY (no window jammed open). TTL = 2h cited from gate.mjs:50, not waited out. => Box 6 ticked on the 'Stop/TTL clearing confirmed sufficient with the TTL value named (2h)' branch; 'it fires on errored dispatch' neither affirmed nor needed.
+
+FIXTURE REFRESH (ask step 5) — refreshed from merged main; PREMISE CORRECTION: the lead-role task has NOT merged. Evidence, run now: gh pr view 677 -> {"state":"OPEN","mergedAt":null} (PR #677 = feat/task-zcode-lead-role-belongs-to-the-main-session, the lead-removal); after git fetch origin main, commit 54656327 (removes templates/docs/zcode/arggon/agents/arggon-delivery-lead.md) is still NOT an ancestor of origin/main (now 5f10ea65); the lead item on origin/main is status: todo. Refresh executed anyway from the ask's named source (merged main): git archive origin/main .zcode-marketplace -> rsync -a --delete into /home/arggon/Projects/zcode-seam-live-verify/.zcode-marketplace -> diff -r parity CLEAN. What the refresh changed in the fixture: arggon/hooks/gate.mjs (PR #675 deny-pattern fix, verified identical to origin/main), NEW arggon/templates/automations/, regenerated .zcode-plugin/plugin.json + marketplace.json. LEAD AGENT: still PRESENT in the refreshed copy (agents/ = arggon-delivery-lead.md, arggon-maker.md, arggon-standards-reviewer.md) — because merged main still ships it; once #677 merges, re-running this refresh (or the lead task's own AC 5 live leg) is what removes it. ADDITIONAL OBSERVATION: the installed client cache copy ~/.zcode/cli/plugins/cache/arggon-local/arggon/0.1.0/agents/ still carries arggon-delivery-lead.md (installed from the pre-#677 seam earlier today); whether a client restart re-syncs the cache from the directory marketplace source was NOT probed (no restart in scope) — if it does not, the running client also needs a reinstall to drop the lead agent.
+
+Nothing else committed: this comment + the box-6 tick on feat/task-zcode-live-verification only; primary checkout untouched.
