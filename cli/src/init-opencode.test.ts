@@ -490,12 +490,11 @@ describe("opencode seam: fresh init", () => {
     expect(maker).toContain("never re-claim");
     expect(maker).toContain("`ArggonManager/docs/agents.md` §Orchestration");
     expect(maker).not.toContain("Claim your item (`tools.arggon.update`");
-    // 3. the ZCode delivery-lead router (MCP spelling, same duty)
-    const zcode = flat("templates/docs/zcode/arggon/agents/arggon-delivery-lead.md");
-    expect(zcode).toContain("**Claim before dispatch.**");
-    expect(zcode).toContain("worktree: true");
-    expect(zcode).not.toContain("Claim **your** item");
-    // 3b. the ZCode maker contract (the fifth carrier the review's list missed)
+    // 3. the ZCode seam (MCP spelling, same duty): the lead role is NOT
+    // materialized there anymore (task-zcode-lead-role-belongs-to-the-main-
+    // session — ZCode plugin agents are all subagents; the main session IS
+    // the delivery lead, per the seam README), so its maker contract is the
+    // carrier that keeps the claim duty on the dispatched side.
     const zcodeMaker = flat("templates/docs/zcode/arggon/agents/arggon-maker.md");
     expect(zcodeMaker).toContain("Your item is **already claimed**");
     expect(zcodeMaker).toContain("never re-claim");

@@ -76,9 +76,16 @@ const TIER1_DOCS = [
   // W5 task-native-tui: the TUI board/status entry is vendored beside it.
   ".opencode/plugins/arggon/tui.tsx",
   // ADR 0014 (task-zcode-plugin-seam): the ZCode plugin seam is tier-1 —
-  // marketplace catalog + the vendored declarative plugin.
+  // marketplace catalog + the vendored declarative plugin. TIER1_DOCS mirrors
+  // the template walk's order (code-unit sort: `README.md` precedes the
+  // lowercase directories).
   ".zcode-marketplace/arggon/.zcode-plugin/plugin.json",
-  ".zcode-marketplace/arggon/agents/arggon-delivery-lead.md",
+  // task-zcode-lead-role-belongs-to-the-main-session: the seam README is
+  // tier-1 — it states that in ZCode the main session IS the delivery lead.
+  ".zcode-marketplace/arggon/README.md",
+  // task-zcode-lead-role-belongs-to-the-main-session: maker/standards-reviewer
+  // only — the delivery lead is the main session's role in ZCode, not a
+  // dispatchable subagent; the seam README carries that statement.
   ".zcode-marketplace/arggon/agents/arggon-maker.md",
   ".zcode-marketplace/arggon/agents/arggon-standards-reviewer.md",
   ".zcode-marketplace/arggon/commands/arggon-adopt.md",

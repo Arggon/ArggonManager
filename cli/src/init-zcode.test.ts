@@ -1,7 +1,9 @@
 /**
  * ZCode plugin seam (ADR 0014, task-zcode-plugin-seam): `arggon init` vendors
  * a declarative ZCode plugin under `.zcode-marketplace/` — marketplace
- * catalog, manifest, the commands, the three agents and the hook
+ * catalog, manifest, the commands, the two subagents (maker,
+ * standards-reviewer; the delivery lead is the MAIN SESSION in ZCode — see the
+ * parity test below) and the hook
  * gates (global git gates + the dispatch-scoped reviewer backstop).
  *
  * The gate script is exercised as a real child process against the GENERATED
@@ -115,7 +117,92 @@ describe("zcode plugin seam generation", () => {
       expect(existsSync(join(dir, ...rel.split("/"))), rel).toBe(true);
     }
     expect(readdirSync(join(dir, PLUGIN_ROOT, "commands"))).toHaveLength(13);
-    expect(readdirSync(join(dir, PLUGIN_ROOT, "agents"))).toHaveLength(3);
+    // task-zcode-lead-role-belongs-to-the-main-session: two subagents — the
+    // delivery lead is the main session's role and is no longer materialized
+    // (the parity test below pins the rule, not this count).
+    expect(readdirSync(join(dir, PLUGIN_ROOT, "agents"))).toHaveLength(2);
+  });
+
+  /**
+   * The 2026-10-01 artifact-audit rule ("`agents/` name-for-name parity with
+   * `.opencode/agents`"), RELAXED (task-zcode-lead-role-belongs-to-the-main-
+   * session) to **parity modulo the primary/subagent mode split**: ZCode can
+   * only surface plugin agents as dispatchable subagents (Settings →
+   * Subagents; the Agent tool) — it has no primary/session-agent concept —
+   * while the delivery lead is the primary worker who interacts with the
+   * product owner (ADR 0021 §6.1/§6.2a′; `ArggonManager/docs/agents.md`
+   * §Orchestration marks maker/reviewer/verifier "(subagent)" and leaves the
+   * lead unmarked for exactly this reason). Materializing the lead here
+   * invited the main session to spawn a lead-child with no product-owner
+   * channel, so the lead role is carried by the instruction carriers instead.
+   * Concretely: the OpenCode seam (the reference implementation) is the role
+   * source; every ZCode agent must be an OpenCode SUBAGENT role of the same
+   * name, no ZCode surface may dispatch a primary role, and the only OpenCode
+   * subagent not yet shipped here is the recorded v1 verifier gap (no ZCode
+   * verifier — `ArggonManager/docs/agents.md` §Who proves, who reviews; it
+   * joins as a subagent when it ships, which breaks the count below on
+   * purpose).
+   */
+  it("agents/ parity with .opencode/agents modulo the primary/subagent mode split", () => {
+    const opencodeAgentsDir = join(repoRoot, "templates/docs/opencode/agents");
+    const modes = readdirSync(opencodeAgentsDir)
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => ({
+        id: f.replace(/\.md$/, ""),
+        mode: /^mode:\s*(\S+)/m.exec(readFileSync(join(opencodeAgentsDir, f), "utf8"))?.[1] ?? "",
+      }));
+    // The reference seam's role split is sound: exactly one primary (the lead),
+    // everything else a subagent — otherwise "modulo the mode split" has no
+    // well-defined complement to parity against.
+    const primary = modes.filter((a) => a.mode === "primary").map((a) => a.id);
+    const subagents = modes.filter((a) => a.mode === "subagent").map((a) => a.id);
+    expect(primary).toEqual(["arggon-delivery-lead"]);
+
+    const zcodeIds = readdirSync(shipped.agentsDir)
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => f.replace(/\.md$/, ""));
+    // Name-for-name parity holds on the subagent side: every ZCode agent IS an
+    // OpenCode subagent role — no ZCode-only role may appear.
+    for (const id of zcodeIds) {
+      expect(subagents, id).toContain(id);
+    }
+    // ...and the primary role is exactly what the seam omits: the lead is the
+    // main session, never a dispatchable subagent.
+    for (const id of primary) {
+      expect(zcodeIds, id).not.toContain(id);
+    }
+    // The recorded residual: the verifier subagent has no ZCode materialization
+    // yet (v1 gap, `task-prover-agent-reviewer-split` scoped it to OpenCode).
+    // When it ships, update this line WITH the generator change — the assertion
+    // is the inventory's memory.
+    expect(zcodeIds.sort()).toEqual(["arggon-maker", "arggon-standards-reviewer"]);
+  });
+
+  it("the lead's contract reaches the main session: the README states the rule and no surface dispatches a lead", () => {
+    // task-zcode-lead-role-belongs-to-the-main-session AC 2: with the lead
+    // agent gone, the main session must still learn it IS the lead — through
+    // the init-generated seam README (the carrier that ships with the plugin),
+    // and no generated file may tell it to dispatch one.
+    const dir = initTree();
+    const readme = readFileSync(join(dir, PLUGIN_ROOT, "README.md"), "utf8");
+    expect(readme).toContain("the main session IS the delivery lead");
+    expect(readme).toContain("Do not dispatch a \"lead\"");
+
+    // No generated file carries the lead's agent id — the id is retired from
+    // the seam, so a stale dispatch instruction cannot hide in any artifact.
+    // The README is the one legitimate exception BY DESIGN: it names the id in
+    // order to forbid dispatching it, so the scan covers everything else.
+    const walk = (rel: string): string[] => {
+      const abs = join(dir, PLUGIN_ROOT, rel);
+      return readdirSync(abs, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? walk(join(rel, e.name)) : [join(rel, e.name)],
+      );
+    };
+    for (const file of walk(".")) {
+      if (file === "README.md") continue;
+      const body = readFileSync(join(dir, PLUGIN_ROOT, file), "utf8");
+      expect(body, String(file)).not.toContain("arggon-delivery-lead");
+    }
   });
 
   it("generates a schema-valid manifest whose marketplace entry matches it", () => {
