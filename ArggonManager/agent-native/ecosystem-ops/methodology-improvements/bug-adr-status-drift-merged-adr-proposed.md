@@ -150,3 +150,23 @@ findings for other items (not fixed here, filed by the delivery lead):
 ### handoff 2026-10-11 @ses_ed6995b8cffePDwIh3viZwoIaR (session: ses_ed6995b8cffePDwIh3viZwoIaR) — next: Delivery lead: review PR #683 (docs(adr) 97a6a6d0 + docs(tasks) 3a6e4436 + evidence comment 4828027d) and merge; the live Acceptance section is complete (6/6 criteria, gate ungated).
 - branch: fix/bug-adr-status-drift-merged-adr-proposed
 - open questions: Does the story need a note that ADR 0019 is a fourth merged-Proposed record (correct as written)? Leave ADR 0024's odd metadata note order alone?
+
+### 2026-10-11 @ses_ed6995b8cffePDwIh3viZwoIaR
+### 2026-10-11 @arggon-maker (addendum: the prettier gate on the item file)
+
+Precision on the one gate that does not come back clean, because `npx prettier --check` was run over every file I touched:
+
+| File | `prettier --check` |
+| --- | --- |
+| `ArggonManager/docs/adr/0022-decline-autoharness-autocontext-autocompact.md` | clean |
+| `ArggonManager/docs/adr/0023-ci-wall-clock.md` | clean |
+| `ArggonManager/docs/adr/0025-done-gate-live-acceptance-section.md` | clean |
+| `ArggonManager/docs/adr/README.md` | clean |
+| `ArggonManager/docs/engineering.md` | clean |
+| `ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-adr-status-drift-merged-adr-proposed.md` | **warn — pre-existing, not introduced here** |
+
+Measured, not assumed: the item file at the claim commit `0b634154` already fails `prettier --check` under the repo's own `.prettierrc.json`, with exactly two hunks — prettier's YAML printer wants the kernel-written frontmatter `title:` single-quoted instead of double-quoted, and a blank line after the closing `---`. My edits add no new class of failure: the appended comment carries an unpadded table and the two consecutive comment blocks sit on adjacent `### 2026-10-11 @…` headings, which is the shape every multi-comment item in this tracker has (measured: 5–36 unpadded table rows across five other item files; adjacent comment headings in at least six more).
+
+`prettier --write` was deliberately NOT run on this file. It rewrites the kernel-written frontmatter, a tracker schema surface this item does not own, and it would re-break on the next `arggon update` / `arggon comment` — the same fight the kernel wins every time. This matches the repo's own recorded position: `cli/src/prose-format.test.ts` excludes the tracker item tree from its prettier invariants ("item bodies are historical records … deliberately left as-is"), `.prettierignore` does not cover the tree, and CI never runs prettier (grep over `.github/workflows/`).
+
+Finding for the delivery lead, not fixed here: **no gate in this repo can require `prettier --check` to pass on a tracker item file**, because the kernel's frontmatter quoting disagrees with prettier's YAML printer on every item the tracker writes. If that is wanted, it is either a kernel change (emit prettier-clean frontmatter) or a `.prettierignore` entry for the tracker tree — both outside this item.
