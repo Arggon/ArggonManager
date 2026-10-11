@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-skill-exploration-reference-fails-prettier
 title: "skills/arggon-cli/references/exploration.md fails `prettier --check` at HEAD — pre-existing, found while keeping a methodology diff on-item"
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [docs, chore, skills]
 priority: p3
 created: "2026-10-04"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T04:23:44.958Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-skill-exploration-reference-fails-prettier
 ---
 <!--
