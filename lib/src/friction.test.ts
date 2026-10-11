@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   chmodSync,
   mkdirSync,
@@ -10,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { fc, checkProperty } from "../../test/property-runner.js";
 import {
   FRICTION_FORMAT_VERSION,
   FRICTION_MAX_LINES,
@@ -22,6 +24,7 @@ import {
   appendFrictionRecord,
   buildFrictionRecord,
   frictionFingerprint,
+  frictionFingerprintMaterial,
   frictionLogPath,
   frictionMajorVersion,
   frictionReporterId,
@@ -359,16 +362,14 @@ describe("friction fingerprint", () => {
     expect(a.narrative).not.toBe(b.narrative);
   });
 
-  it("hashes the documented separator, and the separator is not injectable-proof by construction", () => {
-    // The spec mandates sha256(commandShape ‖ "\x1f" ‖ errorCode ‖ …). The
-    // separator stops the ORDINARY collision (a value that contains a space or
-    // a dash cannot shift a field boundary by accident), but it is not a
-    // length prefix: a commandShape that itself carries U+001F can be crafted to
-    // produce the same material as a different tuple. That is a property of the
-    // spec's mandated construction, not a bug in it, and it is recorded here so
-    // the honest boundary is tested rather than assumed away. The payload that
-    // reaches these fields is capped (200/64/32) and shape-normalized, so a
-    // crafted collision requires a deliberately hostile `--command`.
+  it("cannot be forged: a crafted component cannot shift a field boundary", () => {
+    // The recorded decision (task-friction-fingerprint-separator-not-length-
+    // prefixed). The first implementation joined the four stable fields with
+    // U+001F. That stops the ORDINARY collision, but a separator delimits by
+    // VALUE, so a commandShape that itself carries U+001F can be crafted to
+    // produce the same material as a different tuple — the forge below. The
+    // fix length-prefixes each component, so the boundary is carried by a
+    // COUNT and neither of these two tuples can produce the other's pre-image.
     const forged = frictionFingerprint({
       commandShape: "a\u001fb",
       errorCode: "c",
@@ -381,9 +382,86 @@ describe("friction fingerprint", () => {
       harness: "d",
       majorVersion: "0",
     });
-    expect(forged).toBe(honest);
-    // The separator still does its job for the realistic case: a field that
-    // contains the separator's ASCII neighbours cannot shift a boundary.
+    expect(forged).not.toBe(honest);
+    // The two tuples are a genuine collision pair under the OLD separator
+    // encoding — which is what makes the assertion above a property of the new
+    // one rather than two arbitrary inputs.
+    const separatorJoined = (cs: string, ec: string, h: string, v: string): string =>
+      [cs, ec, h, v].join("\u001f");
+    expect(separatorJoined("a\u001fb", "c", "d", "0")).toBe(
+      separatorJoined("a", "b\u001fc", "d", "0"),
+    );
+  });
+
+  it("is injective over tuples wherever the boundary moves (property)", () => {
+    // The property the decision buys: the encoding delimits by count, so moving
+    // a boundary across the separator NEVER produces the same digest. The two
+    // tuples generated per run are exactly the pair the separator encoding let
+    // collide, so a regression to any value-delimited construction fails here.
+    checkProperty(
+      "friction fingerprint injective",
+      fc.property(
+        fc.string(),
+        fc.string(),
+        fc.string(),
+        fc.string(),
+        (head, tail, harness, version) => {
+          const injected = {
+            commandShape: head,
+            errorCode: `\u001f${tail}`,
+            harness,
+            majorVersion: version,
+          };
+          const shifted = {
+            commandShape: `${head}\u001f`,
+            errorCode: tail,
+            harness,
+            majorVersion: version,
+          };
+          // Never vacuous: the two tuples always differ (the commandShapes do).
+          expect(injected.commandShape).not.toBe(shifted.commandShape);
+          expect(frictionFingerprint(injected)).not.toBe(frictionFingerprint(shifted));
+        },
+      ),
+    );
+  });
+
+  it("encodes every component unambiguously (exhaustive over the adversarial alphabet)", () => {
+    // The injectivity claim checked exactly: every 4-tuple over the alphabet
+    // that defeats a separator — "", "a", the separator itself, and a value that
+    // CARRIES it — produces its own pre-image, and therefore its own digest.
+    // 4^4 = 256 tuples, no truncation involved in the first assertion.
+    const ALPHABET = ["", "a", "\u001f", "a\u001f"] as const;
+    const seen = new Map<string, string>();
+    const digests = new Set<string>();
+    for (const commandShape of ALPHABET) {
+      for (const errorCode of ALPHABET) {
+        for (const harness of ALPHABET) {
+          for (const majorVersion of ALPHABET) {
+            const tuple = JSON.stringify([commandShape, errorCode, harness, majorVersion]);
+            const material = frictionFingerprintMaterial([
+              commandShape,
+              errorCode,
+              harness,
+              majorVersion,
+            ]);
+            const owner = seen.get(material);
+            expect(
+              owner ?? tuple,
+              `${owner} and ${tuple} both encode to ${JSON.stringify(material)}`,
+            ).toBe(tuple);
+            seen.set(material, tuple);
+            digests.add(frictionFingerprint({ commandShape, errorCode, harness, majorVersion }));
+          }
+        }
+      }
+    }
+    expect(digests.size).toBe(seen.size);
+  });
+
+  it("keeps the separator's ASCII neighbours from shifting a boundary", () => {
+    // The realistic case the old construction also had right: a field that
+    // contains a space, a dash or a digit cannot move where a component ends.
     expect(
       frictionFingerprint({
         commandShape: "a b",
@@ -395,6 +473,22 @@ describe("friction fingerprint", () => {
       frictionFingerprint({
         commandShape: "a",
         errorCode: "b c",
+        harness: "d",
+        majorVersion: "0",
+      }),
+    );
+    // …and a length-looking component is data, never a boundary marker.
+    expect(
+      frictionFingerprint({
+        commandShape: "3:abc",
+        errorCode: "c",
+        harness: "d",
+        majorVersion: "0",
+      }),
+    ).not.toBe(
+      frictionFingerprint({
+        commandShape: "3",
+        errorCode: "abc",
         harness: "d",
         majorVersion: "0",
       }),
@@ -608,6 +702,69 @@ describe("readFrictionLog", () => {
     const read = readFrictionLog(logPath);
     expect(read.records.map((r) => r.fingerprint)).toEqual(["known"]);
     expect(read.skippedVersions).toEqual([99, 2]);
+  });
+
+  it("reads a v:1 line written under the pre-amendment fingerprint formula", () => {
+    // The backward-compatibility decision (task-friction-fingerprint-separator-
+    // not-length-prefixed): `v` answers "can this reader parse this line", NOT
+    // "does this line carry the fingerprint formula I compute now", so the
+    // formula amendment does not bump the record version. Bumping it would make
+    // an upgraded arggon SKIP every line the adopter already recorded — the
+    // reader's documented behaviour for an unknown `v` — which destroys a
+    // cache-like local history to fix a grouping ambiguity the bump does not fix
+    // either. Staying at `v: 1` degrades honestly instead: the reader never
+    // recomputes a fingerprint, it groups by the one each line carries, so a
+    // log spanning the change shows one class as two rows (a count split, never
+    // a wrong merge) and rotation ages the old-formula lines out.
+    const h = hermetic();
+    const logPath = frictionLogPath(h.env, h.home);
+    mkdirSync(join(h.stateBase, "arggon"), { recursive: true });
+    const oldFormula = (cs: string, ec: string, hh: string, v: string): string =>
+      createHash("sha256")
+        .update([cs, ec, hh, v].join("\u001f"), "utf8")
+        .digest("hex")
+        .slice(0, 16);
+    const before = { commandShape: "start --worktree <arg>", errorCode: "START_FAILED" };
+    const after = { ...before };
+    writeFileSync(
+      logPath,
+      [
+        JSON.stringify({
+          v: FRICTION_FORMAT_VERSION,
+          ts: "2026-10-01T10:00:00.000Z",
+          fingerprint: oldFormula(before.commandShape, before.errorCode, "unknown", "0"),
+          commandShape: before.commandShape,
+          errorCode: before.errorCode,
+          harness: "unknown",
+          majorVersion: "0",
+        }),
+        JSON.stringify({
+          v: FRICTION_FORMAT_VERSION,
+          ts: "2026-10-12T10:00:00.000Z",
+          fingerprint: frictionFingerprint({
+            commandShape: after.commandShape,
+            errorCode: after.errorCode,
+            harness: "unknown",
+            majorVersion: "0",
+          }),
+          commandShape: after.commandShape,
+          errorCode: after.errorCode,
+          harness: "unknown",
+          majorVersion: "0",
+        }),
+      ].join("\n") + "\n",
+      "utf8",
+    );
+    const read = readFrictionLog(logPath);
+    // Both lines are understood: nothing is skipped, nothing is malformed.
+    expect(read.skippedVersions).toEqual([]);
+    expect(read.malformed).toBe(0);
+    expect(read.records).toHaveLength(2);
+    // They are two fingerprints for one class — the count split, not a loss.
+    expect(read.records[0]!.fingerprint).not.toBe(read.records[1]!.fingerprint);
+    expect(read.records[0]!.fingerprint).toBe(
+      oldFormula(before.commandShape, before.errorCode, "unknown", "0"),
+    );
   });
 
   it("counts a non-object or unparsable line as malformed, not a skipped version", () => {

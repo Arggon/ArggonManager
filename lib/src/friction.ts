@@ -462,15 +462,47 @@ function sha256Hex(value: string): string {
 }
 
 /**
- * `sha256(commandShape ‖ "\x1f" ‖ errorCode ‖ "\x1f" ‖ harness ‖ "\x1f" ‖
- * majorVersion)` hex, truncated to 16 chars. NEVER derived from `narrative`:
- * an LLM-authored sentence is exactly the frequently-changing value that
- * produces bad groups (Sentry's `{{ error.value }}` rule) — two observations
- * with the same stable fields are the same class even if the prose differs,
- * and two with different error codes are not, however similar the prose.
+ * The fingerprint's pre-image: every component **length-prefixed**, then
+ * concatenated with no separator.
  *
- * `‖` is the unit separator U+001F, so a field value containing one cannot
- * forge a different tuple's digest.
+ * WHY a length prefix and not a separator — the decision recorded for
+ * task-friction-fingerprint-separator-not-length-prefixed (spec
+ * §Fingerprint discipline). The first implementation joined the four stable
+ * fields with U+001F, which stops the ORDINARY collision (a field containing a
+ * space or a dash cannot shift a boundary) but is ambiguous by construction,
+ * because a separator delimits by VALUE: `(a, US‖b, c, d)` and `(a‖US, b, c, d)`
+ * encode to byte-identical material, so a `--command` carrying U+001F could
+ * forge another tuple's digest. A length prefix delimits by COUNT instead, and
+ * the parse of an encoded string is therefore deterministic — read the digits,
+ * consume exactly that many characters — so no second tuple can encode to the
+ * same material. Injective over tuples: only a hash collision can still merge
+ * two classes, which is the honest boundary of a truncated digest.
+ *
+ * The length is UTF-16 code units: the unit `String.prototype.length` counts,
+ * and the unit `capField` truncates in, so the prefix describes the value that
+ * is actually hashed rather than an estimate of it. An empty component encodes
+ * as `0:` and stays unambiguous next to the digits that follow it.
+ *
+ * Exported so the injective-encoding property can be asserted on the pre-image
+ * itself — exactly, with no 16-hex truncation in the way.
+ */
+export function frictionFingerprintMaterial(components: readonly string[]): string {
+  return components.map((component) => `${component.length}:${component}`).join("");
+}
+
+/**
+ * `sha256` over the length-prefixed stable fields (see
+ * {@link frictionFingerprintMaterial}) hex, truncated to 16 chars. NEVER derived
+ * from `narrative`: an LLM-authored sentence is exactly the frequently-changing
+ * value that produces bad groups (Sentry's `{{ error.value }}` rule) — two
+ * observations with the same stable fields are the same class even if the prose
+ * differs, and two with different error codes are not, however similar the
+ * prose.
+ *
+ * The pre-image is injective over tuples, so a field value — including one
+ * that carries the old U+001F separator — cannot forge a different tuple's
+ * digest. `arggonVersion` feeds in as its major version only, so `0.6.0` and
+ * `0.6.1` are one class and `0.x` and `1.x` are two.
  */
 export function frictionFingerprint(args: {
   commandShape: string;
@@ -479,19 +511,24 @@ export function frictionFingerprint(args: {
   harness: string;
   majorVersion: string;
 }): string {
-  const material = [
-    args.commandShape,
-    args.errorCode ?? ABSENT,
-    args.harness,
-    args.majorVersion,
-  ].join("\u001f");
-  return sha256Hex(material).slice(0, FRICTION_FINGERPRINT_CHARS);
+  return sha256Hex(
+    frictionFingerprintMaterial([
+      args.commandShape,
+      args.errorCode ?? ABSENT,
+      args.harness,
+      args.majorVersion,
+    ]),
+  ).slice(0, FRICTION_FINGERPRINT_CHARS);
 }
 
 /**
  * `sha256(machineSalt ‖ repoAbsPath)` hex, truncated to 12 chars. Identifies
  * "same machine, same repo" and never WHICH repo. The salt is 32 random bytes
  * generated once in the state dir and never leaves it.
+ *
+ * Unlike the fingerprint, this concatenation needs no length prefix: the salt is
+ * fixed-width — exactly 64 hex chars, enforced by `SALT_HEX` — so where the salt
+ * ends and the path begins is never in doubt.
  */
 export function frictionReporterId(machineSalt: string, repoAbsPath: string): string {
   return sha256Hex(machineSalt + repoAbsPath).slice(0, FRICTION_REPORTER_ID_CHARS);
