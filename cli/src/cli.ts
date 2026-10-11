@@ -67,6 +67,7 @@ import { runDoctor, formatDoctorReport, measureBudgetForDoctor } from "./doctor.
 import {
   runInit,
   dryRunInit,
+  type ConventionRewriteReport,
   type InitResult,
   type InitDryRunResult,
   type ProposalEntry,
@@ -192,7 +193,7 @@ program
   .argument("[dir]", "target directory", ".")
   .option(
     "-f, --force",
-    "overwrite existing convention/templates (docs are never overwritten)",
+    "re-scaffold with existing configuration preserved: .convention.yml is re-scaffolded from its own bytes (only the x-generated provenance is refreshed) and templates are recopied — docs are never overwritten",
     false,
   )
   .option(
@@ -310,6 +311,13 @@ program
                 skipped: result.skipped,
                 restored: result.restored,
                 conventionPath: result.conventionPath,
+                // What the forced re-scaffold kept and replaced in
+                // `.convention.yml` (bug-init-force-drops-x-tracker-block) —
+                // the same keep/replace object the real run reports, so a
+                // preview and the run it previews cannot disagree. Absent
+                // unless this run force-re-scaffolds an EXISTING convention
+                // file (a fresh scaffold creates it).
+                ...(result.convention ? { convention: result.convention } : {}),
                 // Reaping family (task-adapter-orphan-reaping), previewed from
                 // the identical plan: what the run would remove and what it
                 // would keep, each refusal naming its reason.
@@ -355,6 +363,14 @@ program
               skipped: result.skipped,
               restored: result.restored,
               conventionPath: result.conventionPath,
+              // What the forced re-scaffold kept and replaced in
+              // `.convention.yml` (bug-init-force-drops-x-tracker-block): the
+              // keep/replace object the run is about to report, carried on the
+              // apply path itself (not only in the preview) so a forced
+              // re-init says what it kept instead of leaving the operator to
+              // infer it. Absent unless this run force-re-scaffolds an EXISTING
+              // convention file.
+              ...(result.convention ? { convention: result.convention } : {}),
               // Reaping family (task-adapter-orphan-reaping), never folded into
               // the create/update/skip counts: a deletion is its own action, and
               // a refusal names its path and reason.
@@ -3091,6 +3107,35 @@ function printInitAdapters(adapters: AdapterSelectionReport): void {
   }
 }
 
+/**
+ * Human line for the forced convention re-scaffold
+ * (bug-init-force-drops-x-tracker-block). The `--json` envelope carries the
+ * same keep/replace object; this is the line a human operator reads, and it
+ * exists because a forced re-scaffold used to be silent: the report has to
+ * reach the apply path, not only the preview. In the one arm where
+ * configuration genuinely IS discarded — the existing file could not be read by
+ * this arggon — the line names the wholesale replacement in so many words,
+ * because a rescue nobody is told about is the defect this item exists to kill.
+ */
+function printInitConvention(convention: ConventionRewriteReport): void {
+  if (convention.rescaffolded) {
+    console.log(
+      "arggon init: .convention.yml could not be read by this arggon — re-derived from " +
+        "the scaffold; its previous configuration was NOT preserved",
+    );
+    return;
+  }
+  const kept =
+    convention.preserved.length > 0
+      ? `preserved ${sanitizeHumanError(convention.preserved.join(", "))}`
+      : "preserved no existing sections";
+  const replaced =
+    convention.replaced.length > 0
+      ? `replaced ${sanitizeHumanError(convention.replaced.join(", "))}`
+      : "replaced nothing";
+  console.log(`arggon init: .convention.yml ${kept}; ${replaced}`);
+}
+
 function printInitHuman(result: InitResult): void {
   // bug-init-git-doctor-blindspot: human path warns on stderr; the --json
   // envelope carries the same text as the additive `warning` field instead.
@@ -3157,6 +3202,11 @@ function printInitHuman(result: InitResult): void {
       `  - kept adopter-modified docs (never overwritten): ${sanitizeHumanError(result.skipped.join(", "))}`,
     );
   }
+  // What the forced re-scaffold did to the tracker `.convention.yml`
+  // (bug-init-force-drops-x-tracker-block): present only when a `--force` run
+  // re-scaffolded an EXISTING file, which is the only case with configuration
+  // to keep — and the only case where keeping it used to be silent.
+  if (result.convention) printInitConvention(result.convention);
   printInitReaps(result.reaped, result.reapRefused);
   printInitAdapters(result.adapters);
   console.log("Next:");
