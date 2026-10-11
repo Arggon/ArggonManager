@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-tui-hierarchy-jump
 title: "TUI detail pane: jump to parent and list children"
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: story-hierarchy-navigation
 labels: []
 created: "2026-10-11"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T23:19:54.665Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-tui-hierarchy-jump
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/task-tui-hierarchy-jump.md
   Leaves live only under a story. id is the filename stem: task-tui-hierarchy-jump.
@@ -28,11 +26,11 @@ Parent story `story-hierarchy-navigation`: the TUI detail pane (`buildTuiDetailL
 
 ## Acceptance
 
-- [ ] A key from an open detail pane jumps to the parent's detail, and a key (or section) lists the children with a way to open each child's detail; keys documented in the help/shortcut surface
-- [ ] Items with no parent / no children report that in-pane instead of misfiring
-- [ ] Read-only preserved: the new keys never write (reducer stays write-free); rendering goes through the existing sanitize path
-- [ ] `npm run smoke:tui-board` green plus new scripted steps covering the jump (or documented manual check in the verdict if unscriptable); `tui.test.ts` pins the bindings
-- [ ] `arggon validate` green; prettier clean; PR opened
+- [x] A key from an open detail pane jumps to the parent's detail, and a key (or section) lists the children with a way to open each child's detail; keys documented in the help/shortcut surface
+- [x] Items with no parent / no children report that in-pane instead of misfiring
+- [x] Read-only preserved: the new keys never write (reducer stays write-free); rendering goes through the existing sanitize path
+- [x] `npm run smoke:tui-board` green plus new scripted steps covering the jump (or documented manual check in the verdict if unscriptable); `tui.test.ts` pins the bindings
+- [x] `arggon validate` green; prettier clean; PR opened
 
 ## Notes
 
