@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-friction-fingerprint-separator-not-length-prefixed
 title: "The friction fingerprint separator is not length-prefixed: a crafted `--command` containing U+001F can forge another tuple's digest — spec decision owed (length prefix or domain separation)"
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: story-adopter-feedback
 labels: [method, spec]
 created: "2026-10-11"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T11:00:41.973Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-friction-fingerprint-separator-not-length-prefixed
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-fingerprint-separator-not-length-prefixed.md
   Leaves live only under a story. id is the filename stem: task-friction-fingerprint-separator-not-length-prefixed.
