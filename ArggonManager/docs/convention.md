@@ -664,6 +664,35 @@ x-generated:
 - Unknown **unnamespaced** keys: validators may **warn**.
 - Official tools **must round-trip** unknown namespaced keys on `update` (do not strip).
 
+### `.convention.yml` syntax arggon reads (and what it refuses)
+
+`.convention.yml` is YAML, and arggon reads it with a **line** parser — the kernel has no YAML dependency and must run anywhere `node` runs. The two agree on the block-style mapping form every example in this document uses, and the parser is deliberately tolerant of what an adopter writes naturally:
+
+- **A trailing comment.** `allow-steal: true # armed` is the boolean `true`, exactly what YAML says it is. A `#` starts a comment at the start of a line or after whitespace; one inside a quoted scalar (`hot: "status:todo # tagged"`) or with no whitespace in front of it (`hot: status:todo#tag`) is content.
+- **A block scalar.** `post-start: |` (literal) and `>` (folded), each with an optional chomping indicator and an optional explicit indentation, in either order:
+
+  ```yaml
+  x-worktree:
+    post-start: |
+      npm ci
+      echo ready
+  ```
+
+  A literal block keeps its line breaks (`|` leaves exactly one trailing break, `|-` none, `|+` all of them); a folded block turns a single break between two ordinary lines into a space and keeps a blank line as a break. Inside the block a `#` is content and a `:` is content — neither is a comment nor a nested key. The decoded text is literal: it is never re-read as a quoted scalar.
+
+- **A quoted key.** `"x-tracker":` is `x-tracker`; `'allow-steal':` is `allow-steal`. Keys are decoded wherever a key is read, nested ones included.
+
+What the parser refuses, it refuses **by name**: flow style (`x-tracker: {allow-steal: true}`), anchors, aliases and tags are all valid YAML that this reader does not handle, and the parse error names the construct instead of leaving it to guess. That matters because `init --force` answers a file it cannot read by re-deriving it from the scaffold — so an error an adopter can diagnose is the difference between fixing a typo and losing their configuration (bug-convention-parser-rejects-valid-yaml-force-rescaffolds).
+
+One strictness is a safety property, not a limitation. The boolean options (`allow-steal`, `auto-commit`, `strict-gate-bins`, `strict-worktree-writes`, `reap-acked-orphans`, `product-acceptance`, `issue-roundtrip`, `x-worktree.env`, `x-generated.acknowledged`) accept only the exact tokens `true` and `false`:
+
+- `yes` / `on` / `no` / `off` are YAML-1.1 spellings; YAML 1.2 reads them as the **string** `"yes"`, so arming from one would be reading a flag out of a string. They are parse errors.
+- A **quoted** boolean (`allow-steal: "true"`) is also the string `"true"`, so it is a parse error too — accepting it is precisely how an armed gate reads as unset.
+
+Widening the parser for comments, block scalars and quoting therefore never widens what an arming flag accepts.
+
+Unknown keys, at either level, keep the forward-compatibility behaviour above: ignored, never an error.
+
 ### Reserved for later (invalid as ad-hoc in v0)
 
 These names are reserved for a future version — do not invent them as unknown keys with meaning:
