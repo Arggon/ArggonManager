@@ -477,6 +477,11 @@ export function acceptanceBody(source: AcceptanceBodySource): string {
  * The split is `ACCEPTANCE_LINE_BREAK` (the LineTerminator set), never `"\n"`:
  * see that constant for the gate-false-pass that a `\n`-only split produces on
  * CR / U+2028 / U+2029 bodies.
+ *
+ * Deliberately fence-blind: a `- [ ]` inside a fenced block is a row, because a
+ * renderer must list the rows an item actually carries. Fences are excluded
+ * where the QUESTION is scoped — inside `liveAcceptanceRegion`, never here
+ * (bug-done-gate-whole-body-scan-counts-fenced-repro-boxes).
  */
 export function acceptanceRows(body: string): AcceptanceRow[] {
   const rows: AcceptanceRow[] = [];
@@ -542,7 +547,8 @@ export function acceptanceComplete(body: string): boolean {
 
 // ---------------------------------------------------------------------------
 // The LIVE acceptance contract — the region the done gate reads
-// (bug-done-gate-counts-checkboxes-inside-comment-blocks)
+// (bug-done-gate-counts-checkboxes-inside-comment-blocks;
+//  bug-done-gate-whole-body-scan-counts-fenced-repro-boxes)
 // ---------------------------------------------------------------------------
 
 /**
@@ -578,39 +584,110 @@ const SECTION_END_HEADING = /^#{1,2}[ \t]/;
 const COMMENT_BLOCK_HEADING = /^###[ \t]+(?:\d{4}-\d{2}-\d{2}[ \t]+@|Waiver\b)/;
 
 /**
- * The body with every dated comment block removed — history stripped, live
- * prose kept.
- *
- * A block runs from its comment heading to the NEXT comment-shaped heading or the
- * end of the body, and **not** to the next `###`: a reporter who pastes a whole
- * item shape into a comment brings its own `### Acceptance` heading with it, and
- * that nested content is comment text, not a live section. A non-comment `###`
- * outside any block (`### Gates` under a live section) opens nothing. Comment
- * headings are append-only and normally sit after the live sections, so stripping
- * FIRST is also what keeps a `## Acceptance` pasted inside a comment from being
- * read as the contract at all.
- *
- * Not fence-aware, deliberately: `acceptanceRows` counts a `- [ ]` inside a
- * fenced block as a row (pinned by `cli/src/acceptance-parity.test.ts`), so
- * tracking fences here would be a second grammar for one document.
+ * A fenced code block's delimiter line: a run of three or more backticks or
+ * tildes, indented at most three spaces (CommonMark's limit — a deeper indent
+ * is an indented code block, which this parser deliberately does not model,
+ * because the row parser below already treats an indented `- [ ]` as a real
+ * continuation row). Group 1 is the run, group 2 the info string.
  */
-function withoutCommentBlocks(body: string): string {
+const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+
+/** One open fenced block: the run character plus the opening run's length. */
+interface FenceState {
+  char: string;
+  length: number;
+}
+
+/**
+ * True when `line` OPENS a fenced block: a legal run plus, for a backtick
+ * fence, an info string carrying no backtick (CommonMark — a backtick in the
+ * info string means the line is not a fence at all, it is text).
+ */
+function opensFence(line: string): boolean {
+  const match = FENCE_LINE.exec(line);
+  if (!match) return false;
+  if (match[1]![0] !== "`") return true;
+  return !match[2]!.includes("`");
+}
+
+/**
+ * True when `line` CLOSES the open `fence`: the same character, at least as
+ * long as the opening run, and nothing but whitespace after it (CommonMark's
+ * closer rule — an info string never closes, so ```` ```markdown ```` opens).
+ */
+function closesFence(line: string, fence: FenceState): boolean {
+  const match = FENCE_LINE.exec(line);
+  if (!match) return false;
+  const run = match[1]!;
+  if (run[0] !== fence.char || run.length < fence.length) return false;
+  return /^[ \t]*$/.test(match[2]!);
+}
+
+/**
+ * The body's LIVE lines — dated comment blocks and fenced code blocks removed,
+ * everything else kept verbatim. This is the ONE place the gate decides which
+ * bytes are its question, so the two exclusions are stated once, here.
+ *
+ * **Comment blocks** run from a comment-shaped heading to the next
+ * comment-shaped heading or the end of the body, and **not** to the next
+ * `###`: a reporter who pastes a whole item shape into a comment brings its own
+ * `### Acceptance` heading with it, and that nested content is comment text,
+ * not a live section. A non-comment `###` outside a block (`### Gates` under a
+ * live section) opens nothing. Stripping FIRST is also what keeps a
+ * `## Acceptance` pasted inside a comment from being read as the contract.
+ *
+ * **Fenced blocks** are excluded because a fence is CONTENT, not structure: a
+ * bug item whose own repro is a markdown sample — the shape
+ * `bug-prettier-glues-split-inline-code-span` carries — writes `- [ ]` rows,
+ * `## Acceptance` headings and `### <date> @author` headings *inside the fence*
+ * to show what the formatter does to them. Counting those rows made the item
+ * unflippable, and reading a fenced `### <date> @author` as a comment heading
+ * would have deleted the live section that followed the repro — the same defect
+ * with the opposite sign. A fence therefore wins over both the heading rules
+ * and the comment-block rules: everything between the opener and its closer is
+ * text, so it can neither open a section nor close one. An UNCLOSED fence runs
+ * to the end of the body, as CommonMark says, so an item whose repro fence is
+ * never closed publishes nothing after it.
+ *
+ * The row parser itself (`acceptanceRows`) stays fence-blind on purpose — a
+ * renderer must still list the rows an item actually carries, history and all
+ * — which is why the exclusion lives in the REGION extraction and not in the
+ * row parser: one row grammar, one input, and the region decides what it is
+ * asked about (ADR 0025 decision 5).
+ */
+function liveAcceptanceLines(body: string): string[] {
   const out: string[] = [];
+  let fence: FenceState | null = null;
   let inComment = false;
   for (const line of body.split(ACCEPTANCE_LINE_BREAK)) {
+    // Fence state is consulted FIRST: while a fence is open, no line is a
+    // heading of any rank — not a `## Acceptance`, not a `### <date> @author`,
+    // not a `- [ ]` row. The fence is also what ends, so this branch must never
+    // fall through to the comment heading test below.
+    if (fence) {
+      if (closesFence(line, fence)) fence = null;
+      continue;
+    }
+    if (opensFence(line)) {
+      const run = FENCE_LINE.exec(line)![1]!;
+      fence = { char: run[0]!, length: run.length };
+      continue;
+    }
     // Only a COMMENT-SHAPED heading opens a block. A nested `### Acceptance`
     // inside a comment does not close it — that is the whole point — so this test
     // must never reset `inComment` back to false.
     if (COMMENT_BLOCK_HEADING.test(line)) inComment = true;
     if (!inComment) out.push(line);
   }
-  return out.join("\n");
+  return out;
 }
 
 /**
  * The item's LIVE acceptance section: the body of its `## Acceptance` heading
- * up to the next rank-1/rank-2 heading, with dated comment blocks removed
- * (bug-done-gate-counts-checkboxes-inside-comment-blocks).
+ * up to the next rank-1/rank-2 heading, with dated comment blocks **and fenced
+ * code blocks** removed
+ * (bug-done-gate-counts-checkboxes-inside-comment-blocks,
+ * bug-done-gate-whole-body-scan-counts-fenced-repro-boxes).
  *
  * `null` when the item has no such section — the "no live contract" shape, which
  * the done gate refuses rather than reading as "nothing left to do" (an absent
@@ -625,11 +702,21 @@ function withoutCommentBlocks(body: string): string {
  * whose criteria are recorded in a dated comment could never be completed.
  * The live section is the contract; the comment record is history.
  *
+ * A fenced block is excluded for the same reason with a different label: it is
+ * CONTENT. A repro that demonstrates what a formatter does to a `- [ ]` list
+ * item writes literal `- [ ]` lines, and a gate that reads them as criteria
+ * wedges exactly the items whose subject matter is markdown-shaped — formatter
+ * bugs, tracker-shaped repros, docs items — which is the tracker eating its own
+ * dogfood in reverse. The fence exclusion also runs the other way: a fenced
+ * `## Acceptance` heading is not a section, and a fenced `### <date> @author`
+ * heading does not start a comment block, so a repro cannot delete the live
+ * contract that follows it.
+ *
  * Pure; O(lines). Takes the canonical body (`acceptanceBody(item)`), like every
  * other acceptance consumer.
  */
 export function liveAcceptanceRegion(body: string): string | null {
-  const lines = withoutCommentBlocks(body).split(ACCEPTANCE_LINE_BREAK);
+  const lines = liveAcceptanceLines(body);
   let start = -1;
   for (let i = 0; i < lines.length; i += 1) {
     if (ACCEPTANCE_HEADING.test(lines[i]!)) {
@@ -676,16 +763,26 @@ export type AcceptanceGateVerdict =
   { gated: false } | { gated: true; reason: AcceptanceGateRefusal };
 
 /**
- * THE done gate's verdict (ADR 0015, scoped by
- * bug-done-gate-counts-checkboxes-inside-comment-blocks) over one item body.
+ * THE done gate's verdict (ADR 0015, scoped by ADR 0025,
+ * bug-done-gate-counts-checkboxes-inside-comment-blocks,
+ * bug-done-gate-whole-body-scan-counts-fenced-repro-boxes) over one item body.
+ *
+ * ## The rule, in one sentence
+ *
+ * The gate reads the item's LIVE `## Acceptance` section — dated comment blocks
+ * and fenced code blocks excluded — and refuses the flip when that section
+ * publishes no criterion at all, or when one of its own boxes is unticked.
+ * Nothing else in the body gates the flip.
  *
  * Two refusals, and the second is the half that keeps the first honest:
  *
  * 1. `unchecked-live-criteria` — the live `## Acceptance` section carries at
  *    least one criterion and one is unticked. This is the refusal the gate has
- *    always made, minus the boxes that live in append-only comment history.
+ *    always made, minus the boxes that live in append-only comment history or
+ *    inside a fenced code block.
  * 2. `no-live-contract` — the live section publishes NO criterion at all: the
- *    section is absent, empty, or still the `<!-- … -->` template placeholder.
+ *    section is absent, empty, still the `<!-- … -->` template placeholder, or
+ *    carries nothing but boxes that sit inside a fence.
  *
  * Refusal 2 exists because scoping alone trades one lie for a worse one. An
  * item whose live section is the untouched template, while its real criteria sit
@@ -695,8 +792,8 @@ export type AcceptanceGateVerdict =
  * `bug-wave-probe-file-check-model-dependent`). "No criterion" is decided by
  * {@link liveAcceptanceCriteria} being empty, which is the one rule that cannot
  * be satisfied by accident: an absent heading, a whitespace-only section, the
- * template placeholder comment and a section of bare `- [ ]` scaffold rows all
- * reduce to it.
+ * template placeholder comment, a section whose only boxes are inside a fence
+ * and a section of bare `- [ ]` scaffold rows all reduce to it.
  *
  * A bare `- [ ]` row is still NOT an unmet criterion
  * (bug-empty-template-checkbox): it never appears in
@@ -705,8 +802,10 @@ export type AcceptanceGateVerdict =
  * refusal 2 — for having no contract, never for an unfinished box.
  *
  * Not a `validate` rule and not a container rule: the acceptance-aware cascade
- * keeps asking {@link acceptanceComplete} the whole-body question (containers
- * are exempt from this gate), and renderers keep listing whole-body rows.
+ * keeps asking {@link acceptanceComplete} the whole-body, fence-blind question
+ * (containers are exempt from this gate, and that widening is carried by
+ * `task-cascade-whole-body-acceptance-defers-this-defect`), and renderers keep
+ * listing whole-body rows.
  */
 export function acceptanceGate(body: string): AcceptanceGateVerdict {
   const criteria = liveAcceptanceCriteria(body);

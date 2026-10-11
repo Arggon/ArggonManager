@@ -169,7 +169,7 @@ Note: a container's acceptance-aware cascade guard is any unticked checkbox that
 
 **One body, one question.** A consumer of these rows must read the item's **canonical** body — the whole body, comment sections included, exactly as `acceptanceBody(item)` hands it over — and must not trim, EOL-normalize, clip or filter it before calling: a reader that pre-processes the body has changed the question, and on reachable shapes it changes the answer. `arggon show`'s `prose`, the board drawer's clipped prose and a bounded comment tail are for _rendering_; handing one to an acceptance predicate asks a different question, and on a checklist filed as a comment — the default shape, since `create` has no `--body` flag — the answer flips from "criteria remain" to "nothing left to do" while the gate still refuses the flip. That inversion is what had the goal contract telling an agent an item was finished at the exact moment the done gate was blocking it (bug-three-acceptance-parsers-diverging).
 
-**Which bytes is the question.** The canonical body is the INPUT; narrowing it is the consumer's business only when the rule says so, and the rule now says it in exactly one place. The `→ done` gate asks the **live `## Acceptance` section** of that body — dated comment blocks excluded — through `acceptanceGate` / `liveAcceptanceRows` (bug-done-gate-counts-checkboxes-inside-comment-blocks), while `acceptanceRows` / `acceptanceCriteria` / `acceptanceComplete` keep answering the whole-body question that the container cascade and the renderers ask. Both are the same row parser over the same canonical input; they differ in which region is the contract, and neither one narrows the INPUT at a call site. So a consumer still must never pre-filter: the region is decided INSIDE the predicate, on the canonical body.
+**Which bytes is the question.** The canonical body is the INPUT; narrowing it is the consumer's business only when the rule says so, and the rule now says it in exactly one place. The `→ done` gate asks the **live `## Acceptance` section** of that body — dated comment blocks and fenced code blocks excluded — through `acceptanceGate` / `liveAcceptanceRows` (bug-done-gate-counts-checkboxes-inside-comment-blocks, bug-done-gate-whole-body-scan-counts-fenced-repro-boxes), while `acceptanceRows` / `acceptanceCriteria` / `acceptanceComplete` keep answering the whole-body question that the container cascade and the renderers ask. Both are the same row parser over the same canonical input; they differ in which region is the contract, and neither one narrows the INPUT at a call site. So a consumer still must never pre-filter: the region is decided INSIDE the predicate, on the canonical body.
 
 ---
 
@@ -302,9 +302,9 @@ Intentional gaps: **`todo` ↛ `done`** and **`todo` ↛ `blocked`** — complet
 **Done gate (task-done-gate-acceptance-waiver, ADR 0015; scoped by bug-done-gate-counts-checkboxes-inside-comment-blocks):** for the claimable leaves `task`/`bug`, the `→ done` transition additionally requires the item's **live `## Acceptance` section** to be a complete acceptance contract. The gate reads that section — not the whole body — because a dated comment block is append-only history: an unticked box inside one records what the criteria _were_, so counting it made an item's verdict depend on its comment record rather than on the work. Two refusals, both named in the message:
 
 1. **`unchecked-live-criteria`** — the section carries at least one criterion and one is unticked. A checkbox line with no text after the box is a scaffold placeholder, not a criterion (bug-empty-template-checkbox), so it is never an unmet criterion and never appears here.
-2. **`no-live-contract`** — the section publishes **no criterion at all**: absent, empty, whitespace-only, still the `<!-- … -->` template placeholder, or nothing but bare `- [ ]` scaffold rows. "No criterion" is one predicate (zero criteria in the live section), so none of those spellings is a way past it, and an item that has published no live contract does not reach `done` on the strength of ticked boxes in a comment record — that is vacuous success, the defect class `bug-verification-regex-matching-nothing` and `bug-wave-probe-file-check-model-dependent` already name.
+2. **`no-live-contract`** — the section publishes **no criterion at all**: absent, empty, whitespace-only, still the `<!-- … -->` template placeholder, nothing but bare `- [ ]` scaffold rows, or nothing but rows that sit inside a fenced code block. "No criterion" is one predicate (zero criteria in the live section), so none of those spellings is a way past it, and an item that has published no live contract does not reach `done` on the strength of ticked boxes in a comment record — that is vacuous success, the defect class `bug-verification-regex-matching-nothing` and `bug-wave-probe-file-check-model-dependent` already name.
 
-The section is the one headed exactly `## Acceptance` (case-insensitively; `## Acceptance mapping` or `## Acceptance criteria` is prose that merely starts with the word and cannot answer for the contract), and it ends at the next `#`/`##` heading. Dated comment blocks inside it — `### <date> @<author>` and `### Waiver <date>`, through the next dated heading or the end of the body — are excluded, including any `### Acceptance` a reporter pasted into one. **The current body is the contract; the comment record is history, and history is never edited to satisfy a gate** — transcribe the criteria into the live section instead. The kernel refuses the flip unless the caller passes an explicit waiver — `update --status done --waive "<reason>"` with a non-empty reason, recorded as a dated `### Waiver <date>` section in the item body before the status changes. Agents are refused waivers (the MCP/native surfaces expose no waive parameter); containers are exempt here — their contract is the acceptance-aware cascade. The gate is a kernel rule on the transition, never a `validate` error: hand-edited files still validate either way.
+The section is the one headed exactly `## Acceptance` (case-insensitively; `## Acceptance mapping` or `## Acceptance criteria` is prose that merely starts with the word and cannot answer for the contract), and it ends at the next `#`/`##` heading. Dated comment blocks inside it — `### <date> @<author>` and `### Waiver <date>`, through the next dated heading or the end of the body — are excluded, including any `### Acceptance` a reporter pasted into one. **Fenced code blocks are excluded on the same footing, and the fence wins over the heading rules**: a fence is content, so a `- [ ]` row inside one is never a criterion, a `## Acceptance` heading inside one opens no section, and a `### <date> @author` line inside one opens no comment block — an unclosed fence runs to the end of the body (CommonMark). So a bug item whose own repro demonstrates what a formatter does to a `- [ ]` list item still flips, and a repro that quotes `arggon comment` output cannot delete the live section below it. **The current body is the contract; the comment record is history; a fence is content; and none of them is edited to satisfy a gate** — transcribe the criteria into the live section instead. The kernel refuses the flip unless the caller passes an explicit waiver — `update --status done --waive "<reason>"` with a non-empty reason, recorded as a dated `### Waiver <date>` section in the item body before the status changes. Agents are refused waivers (the MCP/native surfaces expose no waive parameter); containers are exempt here — their contract is the acceptance-aware cascade. The gate is a kernel rule on the transition, never a `validate` error: hand-edited files still validate either way.
 
 Changing status means editing frontmatter and committing (or opening a PR). Agents follow the same transitions except where playbook forbids reopen.
 
@@ -663,6 +663,35 @@ x-generated:
 - Unknown **namespaced** keys: ignore-unknown (do not fail).
 - Unknown **unnamespaced** keys: validators may **warn**.
 - Official tools **must round-trip** unknown namespaced keys on `update` (do not strip).
+
+### `.convention.yml` syntax arggon reads (and what it refuses)
+
+`.convention.yml` is YAML, and arggon reads it with a **line** parser — the kernel has no YAML dependency and must run anywhere `node` runs. The two agree on the block-style mapping form every example in this document uses, and the parser is deliberately tolerant of what an adopter writes naturally:
+
+- **A trailing comment.** `allow-steal: true # armed` is the boolean `true`, exactly what YAML says it is. A `#` starts a comment at the start of a line or after whitespace; one inside a quoted scalar (`hot: "status:todo # tagged"`) or with no whitespace in front of it (`hot: status:todo#tag`) is content.
+- **A block scalar.** `post-start: |` (literal) and `>` (folded), each with an optional chomping indicator and an optional explicit indentation, in either order:
+
+  ```yaml
+  x-worktree:
+    post-start: |
+      npm ci
+      echo ready
+  ```
+
+  A literal block keeps its line breaks (`|` leaves exactly one trailing break, `|-` none, `|+` all of them); a folded block turns a single break between two ordinary lines into a space and keeps a blank line as a break. Inside the block a `#` is content and a `:` is content — neither is a comment nor a nested key. The decoded text is literal: it is never re-read as a quoted scalar.
+
+- **A quoted key.** `"x-tracker":` is `x-tracker`; `'allow-steal':` is `allow-steal`. Keys are decoded wherever a key is read, nested ones included.
+
+What the parser refuses, it refuses **by name**: flow style (`x-tracker: {allow-steal: true}`), anchors, aliases and tags are all valid YAML that this reader does not handle, and the parse error names the construct instead of leaving it to guess. That matters because `init --force` answers a file it cannot read by re-deriving it from the scaffold — so an error an adopter can diagnose is the difference between fixing a typo and losing their configuration (bug-convention-parser-rejects-valid-yaml-force-rescaffolds).
+
+One strictness is a safety property, not a limitation. The boolean options (`allow-steal`, `auto-commit`, `strict-gate-bins`, `strict-worktree-writes`, `reap-acked-orphans`, `product-acceptance`, `issue-roundtrip`, `x-worktree.env`, `x-generated.acknowledged`) accept only the exact tokens `true` and `false`:
+
+- `yes` / `on` / `no` / `off` are YAML-1.1 spellings; YAML 1.2 reads them as the **string** `"yes"`, so arming from one would be reading a flag out of a string. They are parse errors.
+- A **quoted** boolean (`allow-steal: "true"`) is also the string `"true"`, so it is a parse error too — accepting it is precisely how an armed gate reads as unset.
+
+Widening the parser for comments, block scalars and quoting therefore never widens what an arming flag accepts.
+
+Unknown keys, at either level, keep the forward-compatibility behaviour above: ignored, never an error.
 
 ### Reserved for later (invalid as ad-hoc in v0)
 

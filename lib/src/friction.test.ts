@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   chmodSync,
   mkdirSync,
@@ -10,13 +11,20 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { fc, checkProperty } from "../../test/property-runner.js";
 import {
   FRICTION_FORMAT_VERSION,
   FRICTION_MAX_LINES,
+  FRICTION_NARRATIVE_CAP,
+  FRICTION_PATH_PLACEHOLDER,
+  FRICTION_REDACTED_FIELD,
+  FRICTION_REDACTION_MAX_SUBSTITUTIONS,
+  FRICTION_SECRET_PLACEHOLDER,
   FrictionError,
   appendFrictionRecord,
   buildFrictionRecord,
   frictionFingerprint,
+  frictionFingerprintMaterial,
   frictionLogPath,
   frictionMajorVersion,
   frictionReporterId,
@@ -26,6 +34,7 @@ import {
   normalizeCommandShape,
   readFrictionLog,
   readOrCreateMachineSalt,
+  redactFrictionText,
   type FrictionInput,
   type FrictionOptions,
   type FrictionRecord,
@@ -353,16 +362,14 @@ describe("friction fingerprint", () => {
     expect(a.narrative).not.toBe(b.narrative);
   });
 
-  it("hashes the documented separator, and the separator is not injectable-proof by construction", () => {
-    // The spec mandates sha256(commandShape ‖ "\x1f" ‖ errorCode ‖ …). The
-    // separator stops the ORDINARY collision (a value that contains a space or
-    // a dash cannot shift a field boundary by accident), but it is not a
-    // length prefix: a commandShape that itself carries U+001F can be crafted to
-    // produce the same material as a different tuple. That is a property of the
-    // spec's mandated construction, not a bug in it, and it is recorded here so
-    // the honest boundary is tested rather than assumed away. The payload that
-    // reaches these fields is capped (200/64/32) and shape-normalized, so a
-    // crafted collision requires a deliberately hostile `--command`.
+  it("cannot be forged: a crafted component cannot shift a field boundary", () => {
+    // The recorded decision (task-friction-fingerprint-separator-not-length-
+    // prefixed). The first implementation joined the four stable fields with
+    // U+001F. That stops the ORDINARY collision, but a separator delimits by
+    // VALUE, so a commandShape that itself carries U+001F can be crafted to
+    // produce the same material as a different tuple — the forge below. The
+    // fix length-prefixes each component, so the boundary is carried by a
+    // COUNT and neither of these two tuples can produce the other's pre-image.
     const forged = frictionFingerprint({
       commandShape: "a\u001fb",
       errorCode: "c",
@@ -375,9 +382,86 @@ describe("friction fingerprint", () => {
       harness: "d",
       majorVersion: "0",
     });
-    expect(forged).toBe(honest);
-    // The separator still does its job for the realistic case: a field that
-    // contains the separator's ASCII neighbours cannot shift a boundary.
+    expect(forged).not.toBe(honest);
+    // The two tuples are a genuine collision pair under the OLD separator
+    // encoding — which is what makes the assertion above a property of the new
+    // one rather than two arbitrary inputs.
+    const separatorJoined = (cs: string, ec: string, h: string, v: string): string =>
+      [cs, ec, h, v].join("\u001f");
+    expect(separatorJoined("a\u001fb", "c", "d", "0")).toBe(
+      separatorJoined("a", "b\u001fc", "d", "0"),
+    );
+  });
+
+  it("is injective over tuples wherever the boundary moves (property)", () => {
+    // The property the decision buys: the encoding delimits by count, so moving
+    // a boundary across the separator NEVER produces the same digest. The two
+    // tuples generated per run are exactly the pair the separator encoding let
+    // collide, so a regression to any value-delimited construction fails here.
+    checkProperty(
+      "friction fingerprint injective",
+      fc.property(
+        fc.string(),
+        fc.string(),
+        fc.string(),
+        fc.string(),
+        (head, tail, harness, version) => {
+          const injected = {
+            commandShape: head,
+            errorCode: `\u001f${tail}`,
+            harness,
+            majorVersion: version,
+          };
+          const shifted = {
+            commandShape: `${head}\u001f`,
+            errorCode: tail,
+            harness,
+            majorVersion: version,
+          };
+          // Never vacuous: the two tuples always differ (the commandShapes do).
+          expect(injected.commandShape).not.toBe(shifted.commandShape);
+          expect(frictionFingerprint(injected)).not.toBe(frictionFingerprint(shifted));
+        },
+      ),
+    );
+  });
+
+  it("encodes every component unambiguously (exhaustive over the adversarial alphabet)", () => {
+    // The injectivity claim checked exactly: every 4-tuple over the alphabet
+    // that defeats a separator — "", "a", the separator itself, and a value that
+    // CARRIES it — produces its own pre-image, and therefore its own digest.
+    // 4^4 = 256 tuples, no truncation involved in the first assertion.
+    const ALPHABET = ["", "a", "\u001f", "a\u001f"] as const;
+    const seen = new Map<string, string>();
+    const digests = new Set<string>();
+    for (const commandShape of ALPHABET) {
+      for (const errorCode of ALPHABET) {
+        for (const harness of ALPHABET) {
+          for (const majorVersion of ALPHABET) {
+            const tuple = JSON.stringify([commandShape, errorCode, harness, majorVersion]);
+            const material = frictionFingerprintMaterial([
+              commandShape,
+              errorCode,
+              harness,
+              majorVersion,
+            ]);
+            const owner = seen.get(material);
+            expect(
+              owner ?? tuple,
+              `${owner} and ${tuple} both encode to ${JSON.stringify(material)}`,
+            ).toBe(tuple);
+            seen.set(material, tuple);
+            digests.add(frictionFingerprint({ commandShape, errorCode, harness, majorVersion }));
+          }
+        }
+      }
+    }
+    expect(digests.size).toBe(seen.size);
+  });
+
+  it("keeps the separator's ASCII neighbours from shifting a boundary", () => {
+    // The realistic case the old construction also had right: a field that
+    // contains a space, a dash or a digit cannot move where a component ends.
     expect(
       frictionFingerprint({
         commandShape: "a b",
@@ -389,6 +473,22 @@ describe("friction fingerprint", () => {
       frictionFingerprint({
         commandShape: "a",
         errorCode: "b c",
+        harness: "d",
+        majorVersion: "0",
+      }),
+    );
+    // …and a length-looking component is data, never a boundary marker.
+    expect(
+      frictionFingerprint({
+        commandShape: "3:abc",
+        errorCode: "c",
+        harness: "d",
+        majorVersion: "0",
+      }),
+    ).not.toBe(
+      frictionFingerprint({
+        commandShape: "3",
+        errorCode: "abc",
         harness: "d",
         majorVersion: "0",
       }),
@@ -604,6 +704,69 @@ describe("readFrictionLog", () => {
     expect(read.skippedVersions).toEqual([99, 2]);
   });
 
+  it("reads a v:1 line written under the pre-amendment fingerprint formula", () => {
+    // The backward-compatibility decision (task-friction-fingerprint-separator-
+    // not-length-prefixed): `v` answers "can this reader parse this line", NOT
+    // "does this line carry the fingerprint formula I compute now", so the
+    // formula amendment does not bump the record version. Bumping it would make
+    // an upgraded arggon SKIP every line the adopter already recorded — the
+    // reader's documented behaviour for an unknown `v` — which destroys a
+    // cache-like local history to fix a grouping ambiguity the bump does not fix
+    // either. Staying at `v: 1` degrades honestly instead: the reader never
+    // recomputes a fingerprint, it groups by the one each line carries, so a
+    // log spanning the change shows one class as two rows (a count split, never
+    // a wrong merge) and rotation ages the old-formula lines out.
+    const h = hermetic();
+    const logPath = frictionLogPath(h.env, h.home);
+    mkdirSync(join(h.stateBase, "arggon"), { recursive: true });
+    const oldFormula = (cs: string, ec: string, hh: string, v: string): string =>
+      createHash("sha256")
+        .update([cs, ec, hh, v].join("\u001f"), "utf8")
+        .digest("hex")
+        .slice(0, 16);
+    const before = { commandShape: "start --worktree <arg>", errorCode: "START_FAILED" };
+    const after = { ...before };
+    writeFileSync(
+      logPath,
+      [
+        JSON.stringify({
+          v: FRICTION_FORMAT_VERSION,
+          ts: "2026-10-01T10:00:00.000Z",
+          fingerprint: oldFormula(before.commandShape, before.errorCode, "unknown", "0"),
+          commandShape: before.commandShape,
+          errorCode: before.errorCode,
+          harness: "unknown",
+          majorVersion: "0",
+        }),
+        JSON.stringify({
+          v: FRICTION_FORMAT_VERSION,
+          ts: "2026-10-12T10:00:00.000Z",
+          fingerprint: frictionFingerprint({
+            commandShape: after.commandShape,
+            errorCode: after.errorCode,
+            harness: "unknown",
+            majorVersion: "0",
+          }),
+          commandShape: after.commandShape,
+          errorCode: after.errorCode,
+          harness: "unknown",
+          majorVersion: "0",
+        }),
+      ].join("\n") + "\n",
+      "utf8",
+    );
+    const read = readFrictionLog(logPath);
+    // Both lines are understood: nothing is skipped, nothing is malformed.
+    expect(read.skippedVersions).toEqual([]);
+    expect(read.malformed).toBe(0);
+    expect(read.records).toHaveLength(2);
+    // They are two fingerprints for one class — the count split, not a loss.
+    expect(read.records[0]!.fingerprint).not.toBe(read.records[1]!.fingerprint);
+    expect(read.records[0]!.fingerprint).toBe(
+      oldFormula(before.commandShape, before.errorCode, "unknown", "0"),
+    );
+  });
+
   it("counts a non-object or unparsable line as malformed, not a skipped version", () => {
     const h = hermetic();
     const logPath = frictionLogPath(h.env, h.home);
@@ -660,5 +823,411 @@ describe("friction timestamps", () => {
     // Encodes as UTF-8 and decodes back byte-identical — what would NOT happen
     // to a lone surrogate (it would come back as U+FFFD).
     expect(Buffer.from(record.narrative, "utf8").toString("utf8")).toBe(record.narrative);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Redaction at write, never at render — plan T2 (spec §Redaction)
+// ---------------------------------------------------------------------------
+
+/**
+ * The spec's four-step pass, applied in the capture path. Every case below
+ * exercises the WRITE path: `buildFrictionRecord` is where the redacted value
+ * first exists, and the persisted line is asserted, because the invariant is
+ * that what lands in `<stateBase>/arggon/friction.jsonl` is already redacted —
+ * redaction is not something a renderer applies.
+ */
+describe("redaction at write", () => {
+  it("applies on the write path: the persisted line is already redacted", () => {
+    const h = hermetic();
+    const secret = "ghp_" + "a".repeat(30);
+    const { record } = capture(
+      {
+        observation: `the CLI rejected ${secret} while starting the worktree twice`,
+        command: "arggon start --worktree task-foo",
+      },
+      {},
+      h,
+    );
+    expect(record.narrative).toBe(
+      `the CLI rejected ${FRICTION_SECRET_PLACEHOLDER} while starting the worktree twice`,
+    );
+    // The line the log actually holds — no renderer exists between the two.
+    const logPath = frictionLogPath(h.env, h.home);
+    appendFrictionRecord(record, logPath);
+    const raw = readFileSync(logPath, "utf8");
+    expect(raw).not.toContain(secret);
+    expect(raw).toContain(FRICTION_SECRET_PLACEHOLDER);
+    // Persisted line and record agree byte-for-byte: the append writes exactly
+    // the redacted record the builder produced.
+    expect(JSON.parse(raw) as FrictionRecord).toEqual(record);
+  });
+
+  it("replaces a whole -----BEGIN … PRIVATE KEY----- block", () => {
+    const block = [
+      "-----BEGIN RSA PRIVATE KEY-----",
+      "MIIEowIBAAKCAQEA" + "x".repeat(40),
+      "-----END RSA PRIVATE KEY-----",
+    ].join("\n");
+    const out = redactFrictionText(
+      `the export step dropped ${block} mid-paste while the pipeline was running, and nobody expected the key material to appear in that log at all`,
+    );
+    expect(out).toBe(
+      `the export step dropped ${FRICTION_SECRET_PLACEHOLDER} mid-paste while the pipeline was running, and nobody expected the key material to appear in that log at all`,
+    );
+    expect(out).not.toContain("BEGIN");
+    expect(out).not.toContain("MIIEow");
+  });
+
+  it("takes a truncated PEM header with the base64 body that follows it", () => {
+    // Recorded decision: a paste cut off before its END marker would leave the
+    // header AND the key material behind if only the block form matched, so a
+    // bare header consumes the base64 body lines that follow it.
+    const body = `-----BEGIN PRIVATE KEY-----\n${"A".repeat(40)}\n${"B".repeat(40)}`;
+    expect(
+      redactFrictionText(
+        `the export step printed ${body} while the pipeline was running, and honestly nobody expected the key material to appear in that log at all, ever`,
+      ),
+    ).toBe(
+      `the export step printed ${FRICTION_SECRET_PLACEHOLDER} while the pipeline was running, and honestly nobody expected the key material to appear in that log at all, ever`,
+    );
+    // …and the complete-block form still wins when the END is present.
+    const block = `-----BEGIN PRIVATE KEY-----\n${"A".repeat(40)}\n-----END PRIVATE KEY-----`;
+    expect(
+      redactFrictionText(
+        `the file contained ${block} and then a lot more trailing prose that is not secret at all, honestly, it just goes on and on`,
+      ),
+    ).toBe(
+      `the file contained ${FRICTION_SECRET_PLACEHOLDER} and then a lot more trailing prose that is not secret at all, honestly, it just goes on and on`,
+    );
+  });
+
+  it("replaces every secret shape the spec names", () => {
+    // A long wrapper on purpose: the wrapper keeps each token a SMALL fraction
+    // of the field, so the placeholder survives instead of the wholesale
+    // replacement (which is covered by its own case below).
+    const wrap = (token: string): string =>
+      `the tool printed ${token} in its output even though I passed --quiet and expected silence from it here`;
+    // Token prefixes, each in prose so the field is not wholesale-redacted.
+    const prefixes: Array<[string, string]> = [
+      ["ghp_", "a".repeat(30)],
+      ["gho_", "b".repeat(30)],
+      ["ghs_", "c".repeat(30)],
+      ["ghr_", "d".repeat(30)],
+      ["ghu_", "e".repeat(30)],
+      // A conservative continuation of the spec's gh family: the fine-grained
+      // PAT prefix, recorded on the item rather than left as a leak.
+      ["github_pat_", "f".repeat(40)],
+      ["npm_", "g".repeat(24)],
+      ["sk-", "h".repeat(24)],
+      ["AKIA", "I".repeat(16)],
+    ];
+    for (const [prefix, body] of prefixes) {
+      expect(redactFrictionText(wrap(prefix + body))).toBe(wrap(FRICTION_SECRET_PLACEHOLDER));
+    }
+    // A JWT: header.payload.signature.
+    expect(redactFrictionText(wrap("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abcdefg"))).toBe(
+      wrap(FRICTION_SECRET_PLACEHOLDER),
+    );
+    // Assignments, in their spellings: `=`, YAML/JSON quoted, every name.
+    expect(redactFrictionText("sign in with password=hunthunthunt and retry the flow")).toBe(
+      `sign in with ${FRICTION_SECRET_PLACEHOLDER} and retry the flow`,
+    );
+    expect(redactFrictionText('the envelope carried token: "abcdef1234" in its body')).toBe(
+      `the envelope carried ${FRICTION_SECRET_PLACEHOLDER} in its body`,
+    );
+    expect(redactFrictionText("PASSWD=hunter2xx was printed by the wrapper script")).toBe(
+      `${FRICTION_SECRET_PLACEHOLDER} was printed by the wrapper script`,
+    );
+    for (const name of ["key", "token", "secret", "password", "passwd", "credential"]) {
+      expect(redactFrictionText(`the ${name}=hunter2xx option is what broke here`)).toBe(
+        `the ${FRICTION_SECRET_PLACEHOLDER} option is what broke here`,
+      );
+    }
+  });
+
+  it("keeps an assignment value shorter than the spec's 8-char threshold", () => {
+    // Recorded boundary: the spec's rule is a value of 8+ chars, so a shorter
+    // value is not a secret shape by that rule and is left alone.
+    expect(redactFrictionText("key=abc is short")).toBe("key=abc is short");
+  });
+
+  it("keeps the URL host and drops the query and the fragment", () => {
+    expect(
+      redactFrictionText(
+        "open https://github.com/Arggon/ArggonManager/issues/new?title=hi&body=x#frag for me",
+      ),
+    ).toBe("open https://github.com/Arggon/ArggonManager/issues/new for me");
+    // The host with a port and its path survive; only the query goes.
+    expect(
+      redactFrictionText(
+        "the dev server at http://localhost:3000/logs?level=debug is not interesting",
+      ),
+    ).toBe("the dev server at http://localhost:3000/logs is not interesting");
+  });
+
+  it("drops URL userinfo and collapses file: URLs to the path placeholder", () => {
+    // Recorded decisions, both conservative: a credential in userinfo is not
+    // the host, and a file: URL is a path in disguise.
+    expect(redactFrictionText("see https://user:pass@host/path/x for the details")).toBe(
+      "see https://host/path/x for the details",
+    );
+    expect(redactFrictionText("see file:///home/u/x for the details")).toBe(
+      `see ${FRICTION_PATH_PLACEHOLDER} for the details`,
+    );
+  });
+
+  it("collapses every cross-OS path form to one placeholder", () => {
+    const forms = [
+      "C:\\Users\\a\\b",
+      "c:/Users/a/b",
+      "\\\\?\\C:\\Users\\a\\b",
+      "/c/Users/a/b",
+      "/private/var/folders/x",
+    ];
+    const tokens = forms.map((form) => redactFrictionText(`failed to read ${form} again`));
+    for (const token of tokens) {
+      expect(token).toBe(`failed to read ${FRICTION_PATH_PLACEHOLDER} again`);
+    }
+    // One canonical token across every form — the point of normalization.
+    expect(new Set(forms.map((form) => redactFrictionText(form)))).toEqual(
+      new Set([FRICTION_PATH_PLACEHOLDER]),
+    );
+  });
+
+  it("leaves relative paths and prose slashes alone", () => {
+    // Recorded boundary: only a rooted path leaks a home or a username; a
+    // relative path and a ratio do not, and redacting them would destroy the
+    // narrative's signal without removing anything sensitive.
+    expect(redactFrictionText("failed to read docs/x.md again")).toBe(
+      "failed to read docs/x.md again",
+    );
+    expect(redactFrictionText("the and/or prose 10/20 ratio survived")).toBe(
+      "the and/or prose 10/20 ratio survived",
+    );
+  });
+
+  it("replaces a child path before its parent so no child is orphaned", () => {
+    expect(redactFrictionText("see /home/u/repo/sub/secret.txt inside /home/u/repo now")).toBe(
+      `see ${FRICTION_PATH_PLACEHOLDER} inside ${FRICTION_PATH_PLACEHOLDER} now`,
+    );
+    // The orphaned child is the leak this ordering prevents: had the parent
+    // been replaced first, `secret.txt` would survive as bare prose.
+    expect(redactFrictionText("see C:\\Users\\a\\b\\secrets.txt inside C:\\Users\\a\\b now")).toBe(
+      `see ${FRICTION_PATH_PLACEHOLDER} inside ${FRICTION_PATH_PLACEHOLDER} now`,
+    );
+    expect(
+      redactFrictionText("see /home/u/repo/sub/secret.txt inside /home/u/repo now"),
+    ).not.toContain("secret.txt");
+  });
+
+  it("replaces a field whose secret material exceeds 50% wholesale", () => {
+    // The spec's hostile-input example: a 60%-secret field is not safe to
+    // publish in any part.
+    expect(redactFrictionText("secret1=abcdefgh12345678 secret2=abcdefgh12345678 x")).toBe(
+      FRICTION_REDACTED_FIELD,
+    );
+    // Just under the threshold, the field keeps its prose and its placeholders.
+    const under = "secret1=abcdefgh12345678 and a lot of harmless prose around it here";
+    expect(redactFrictionText(under)).toBe(
+      `${FRICTION_SECRET_PLACEHOLDER} and a lot of harmless prose around it here`,
+    );
+  });
+
+  it("allows exactly the bound's substitutions and replaces the field past it", () => {
+    const many = (n: number): string =>
+      `${Array.from({ length: n }, () => "key=abcdefgh").join(" ")} ${"ok ".repeat(120)}`;
+    // 20 is the bound itself: allowed, and the field survives.
+    const at20 = redactFrictionText(many(20));
+    expect(at20.split(FRICTION_SECRET_PLACEHOLDER)).toHaveLength(
+      FRICTION_REDACTION_MAX_SUBSTITUTIONS + 1,
+    );
+    // 21 is past the bound: skipping the 21st substitution would leak it, so
+    // the whole field goes.
+    expect(redactFrictionText(many(21))).toBe(FRICTION_REDACTED_FIELD);
+  });
+
+  it("redacts --error values and commandShape through the same pass", () => {
+    // A token can arrive in argv: the shape normalizer already collapses
+    // token-SHAPED values to <arg>, and the redaction pass is what catches a
+    // plain-word value the normalizer keeps (`--token=<plain word>`).
+    const shape = "sync all workspaces in this repository --token=uniquepasswordvalue right now";
+    const { record } = capture({
+      error: "FRICTION_FAILED reason: token=abcdefgh12345678 while running",
+      command: `arggon ${shape}`,
+    });
+    expect(record.errorCode).toBe(
+      `FRICTION_FAILED reason: ${FRICTION_SECRET_PLACEHOLDER} while running`,
+    );
+    expect(record.commandShape).toBe(
+      `sync all workspaces in this repository ${FRICTION_SECRET_PLACEHOLDER} right now`,
+    );
+    // The fingerprint feeds on the REDACTED stable fields: two captures whose
+    // only difference is the leaked plain-word value are still one class.
+    expect(record.fingerprint).toBe(
+      frictionFingerprint({
+        commandShape: `sync all workspaces in this repository ${FRICTION_SECRET_PLACEHOLDER} right now`,
+        errorCode: `FRICTION_FAILED reason: ${FRICTION_SECRET_PLACEHOLDER} while running`,
+        harness: "unknown",
+        majorVersion: "0",
+      }),
+    );
+  });
+
+  it("redacts before capping, so a secret straddling the cap is redacted whole", () => {
+    // Recorded decision: the pass runs on the UNCAPPED field. Capping first
+    // would cut a secret at the boundary into a fragment no rule recognizes.
+    const observation = "x".repeat(1975) + " password=hunthunthunthunt " + "y".repeat(300);
+    const { record } = capture({ observation });
+    expect(record.narrative).not.toContain("hunthunthunt");
+    expect(record.narrative).toContain(FRICTION_SECRET_PLACEHOLDER);
+    expect(record.narrative.length).toBe(FRICTION_NARRATIVE_CAP);
+  });
+
+  it("persists a redacted --evidence value end to end", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-friction-evidence-redact-"));
+    const file = join(dir, "crash.log");
+    writeFileSync(
+      file,
+      [
+        "Traceback (most recent call last):",
+        '  File "app/main.py", line 10, in <module>',
+        "    run()",
+        '  File "app/runner.py", line 42, in run',
+        "    load_config()",
+        '  File "app/config.py", line 7, in load_config',
+        `    open("C:\\Users\\adopter\\project\\settings.toml")`,
+        "-----BEGIN PRIVATE KEY-----",
+        "MIIEowIBAAKCAQEA" + "x".repeat(40),
+        "-----END PRIVATE KEY-----",
+        "PermissionError: [Errno 13] Permission denied",
+      ].join("\n"),
+      "utf8",
+    );
+    const h = hermetic();
+    const { record } = capture({ evidencePath: file }, {}, h);
+    expect(record.evidence).toContain("Traceback");
+    expect(record.evidence).toContain("PermissionError");
+    expect(record.evidence).toContain(FRICTION_PATH_PLACEHOLDER);
+    expect(record.evidence).toContain(FRICTION_SECRET_PLACEHOLDER);
+    expect(record.evidence).not.toContain("C:\\Users\\adopter");
+    expect(record.evidence).not.toContain("BEGIN PRIVATE");
+    expect(record.evidence).not.toContain("MIIEow");
+    // …and the persisted line, not just the in-memory record.
+    const logPath = frictionLogPath(h.env, h.home);
+    appendFrictionRecord(record, logPath);
+    const raw = readFileSync(logPath, "utf8");
+    expect(raw).not.toContain("C:\\Users\\adopter");
+    expect(raw).not.toContain("MIIEow");
+    // The evidence file's PATH is never captured either.
+    expect(raw).not.toContain(file);
+  });
+
+  it("covers a narrative crafted to defeat naive redaction, and records what it does not", () => {
+    // Covered: nesting and overlap. A JWT and a path inside a URL query, a PEM
+    // block, and a QUOTED multi-word passphrase in one field — the pass runs in
+    // the spec's order, so each rule sees what the earlier ones left.
+    const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abcdefg";
+    const narrative = [
+      "The failure I hit is long and boring to describe in full, so here is the gist of it:",
+      `pasted ${jwt} into https://example.com/callback?next=/home/u/x&sig=1 for the flow`,
+      "-----BEGIN PRIVATE KEY-----",
+      "MIIEowIBAAKCAQEA" + "x".repeat(40),
+      "-----END PRIVATE KEY-----",
+      'then the tool said: password = "correct horse battery staple"',
+      "and I could not tell which of the three it was complaining about, honestly.",
+    ].join("\n");
+    const out = redactFrictionText(narrative);
+    expect(out).not.toContain(jwt);
+    expect(out).not.toContain("BEGIN");
+    expect(out).not.toContain("MIIEow");
+    expect(out).toContain("https://example.com/callback"); // host preserved
+    expect(out).not.toContain("correct horse"); // quoted multi-word value redacted
+    expect(out).toContain("The failure I hit is long"); // prose survives
+
+    // Covered: the overlap that would orphan a block body. An assignment name
+    // immediately before the header (`key: -----BEGIN …`) would, if the
+    // assignment rule matched first, consume the header and leave the key body
+    // behind — so the PEM shapes run as their own pass before it.
+    const body = "MIIEowIBAAKCAQEA" + "x".repeat(40);
+    const decoy = [
+      `the export printed --- BEGIN ... actually a full key: -----BEGIN RSA PRIVATE KEY-----`,
+      body,
+      "-----END RSA PRIVATE KEY-----",
+      "and I do not know which of the two it meant, honestly, it just goes on",
+    ].join("\n");
+    const decoyOut = redactFrictionText(decoy);
+    expect(decoyOut).not.toContain("MIIEow");
+    expect(decoyOut).not.toContain("-----END");
+
+    // Recorded boundaries — cases the spec's rule set does not name. Each is
+    // DELIBERATELY not guessed at: the pass asserts the honest current behavior
+    // rather than a half-rule that would miss the neighbours anyway.
+    // 1. A marker misspelled by one dash is not the PEM marker.
+    expect(redactFrictionText("----BEGIN PRIVATE KEY----- x")).toBe("----BEGIN PRIVATE KEY----- x");
+    // 2. A fullwidth `＝` is not the ASCII assignment separator the spec names.
+    expect(redactFrictionText("password＝secret12345 x")).toBe("password＝secret12345 x");
+    // 3. A token split by a zero-width space is not one token.
+    const split = `ghp_\u200b${"a".repeat(30)}`;
+    expect(redactFrictionText(`${split} x`)).toBe(`${split} x`);
+    // 4. A name split across a newline is not one identifier.
+    expect(redactFrictionText("pas\nsword=secret12345 x")).toBe("pas\nsword=secret12345 x");
+  });
+
+  it("guards the log itself: a hand-built record cannot persist an unredacted field", () => {
+    // The log-level invariant is structural, not procedural: an append is where
+    // bytes land on disk, so the pass runs there too — idempotently, so a
+    // record from buildFrictionRecord is unchanged.
+    const h = hermetic();
+    const logPath = frictionLogPath(h.env, h.home);
+    const handBuilt: FrictionRecord = {
+      v: FRICTION_FORMAT_VERSION,
+      ts: NOW.toISOString(),
+      fingerprint: "handbuilt01",
+      reporterId: "handbuilt02",
+      commandShape: "sync",
+      harness: "unknown",
+      arggonVersion: VERSION,
+      majorVersion: "0",
+      os: "linux",
+      arch: "x64",
+      node: "v22.0.0",
+      narrative: "leaked C:\\Users\\a\\b and password=hunthunthunthunt here",
+      evidence: "-----BEGIN PRIVATE KEY-----\nMIIEabc",
+    };
+    appendFrictionRecord(handBuilt, logPath);
+    const raw = readFileSync(logPath, "utf8");
+    expect(raw).not.toContain("C:\\Users\\a");
+    expect(raw).not.toContain("hunthunthunt");
+    expect(raw).not.toContain("BEGIN");
+    const read = readFrictionLog(logPath);
+    expect(read.records).toHaveLength(1);
+    expect(read.records[0]!.narrative).toBe(
+      `leaked ${FRICTION_PATH_PLACEHOLDER} and ${FRICTION_SECRET_PLACEHOLDER} here`,
+    );
+    // A builder-produced record passes through the guard unchanged (idempotent).
+    const { record } = capture({}, {}, h);
+    appendFrictionRecord(record, logPath);
+    expect(
+      JSON.parse(
+        readFileSync(logPath, "utf8")
+          .split("\n")
+          .filter((l) => l !== "")[1]!,
+      ),
+    ).toEqual(record);
+  });
+
+  it("keeps the rest of the record's fields untouched", () => {
+    // Redaction covers the caller-supplied free-text surfaces; the whitelisted
+    // kernel facts and derived fields ride verbatim.
+    const { record } = capture({
+      observation: "arggon start --worktree failed twice",
+      error: "START_FAILED",
+      harness: "opencode",
+    });
+    expect(record.errorCode).toBe("START_FAILED");
+    expect(record.harness).toBe("opencode");
+    expect(record.commandShape).toBe("start --worktree <arg>");
+    expect(record.narrative).toBe("arggon start --worktree failed twice");
   });
 });

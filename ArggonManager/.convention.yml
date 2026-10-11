@@ -14,7 +14,7 @@ x-generated:
   projectName: "ArggonManager"
   .agents/skills/arggon-cli/SKILL.md:
     template: "skills/arggon-cli/SKILL.md"
-    checksum: "sha256:0daabfde8d569ab72723d482fe5ea1b2948356ca0124e0e4e311df2d450d8a44"
+    checksum: "sha256:286002efa361b207cbf32d26fdd85d22ccce4d12b13e0b60089508e24945e3da"
     arggonVersion: "0.6.0"
     generatedAt: "2026-10-11T08:57:22.000Z"
   .agents/skills/arggon-cli/references/exploration.md:
@@ -29,7 +29,7 @@ x-generated:
     generatedAt: "2026-10-10T00:41:12.326Z"
   .agents/skills/arggon-cli/references/methodology.md:
     template: "skills/arggon-cli/references/methodology.md"
-    checksum: "sha256:81a8107b70d07bd99ce115cceee5885a9bd03cb1c9b145b5dc387b3b1b72ae37"
+    checksum: "sha256:3b71b3a122b67ee452512d5517da0c958adea7a6d72237c0fe8735285097920b"
     arggonVersion: "0.6.0"
     generatedAt: "2026-10-10T00:41:12.326Z"
   .agents/skills/arggon-cli/references/orchestration.md:

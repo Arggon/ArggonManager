@@ -213,7 +213,9 @@ export type { JsonEnvelopeBase, JsonError } from "./json.js";
 // --- Adopter friction capture (ADR 0024 stage 1; the log is not the tracker) -
 
 export {
+  FRICTION_COMMAND_SHAPE_CAP,
   FRICTION_DEFAULT_HARNESS,
+  FRICTION_DROPPED_FILE_NAME,
   FRICTION_ENV_FACT_CAP,
   FRICTION_EVIDENCE_CAP,
   FRICTION_FINGERPRINT_CHARS,
@@ -222,13 +224,19 @@ export {
   FRICTION_LOG_FILE_NAME,
   FRICTION_MAX_LINES,
   FRICTION_NARRATIVE_CAP,
+  FRICTION_PATH_PLACEHOLDER,
+  FRICTION_REDACTED_FIELD,
+  FRICTION_REDACTION_MAX_SUBSTITUTIONS,
   FRICTION_REPORTER_ID_CHARS,
   FRICTION_SALT_FILE_NAME,
+  FRICTION_SECRET_PLACEHOLDER,
   FRICTION_STATE_SUBDIR,
   FrictionError,
   appendFrictionRecord,
   buildFrictionRecord,
+  frictionDroppedPath,
   frictionFingerprint,
+  frictionFingerprintMaterial,
   frictionLogPath,
   frictionMajorVersion,
   frictionReporterId,
@@ -236,10 +244,19 @@ export {
   frictionStateBase,
   frictionStateDir,
   normalizeCommandShape,
+  readFrictionDropped,
   readFrictionLog,
   readOrCreateMachineSalt,
+  redactFrictionText,
   resolveRepoAbsPath,
 } from "./friction.js";
+export {
+  FRICTION_REPORT_MAX_ROWS,
+  readFrictionReport,
+  renderFrictionReport,
+  summarizeFrictionLog,
+} from "./friction-report.js";
+export type { FrictionClassRow, FrictionReport, FrictionReportOptions } from "./friction-report.js";
 export type {
   FrictionAppendResult,
   FrictionFailureReason,
@@ -398,6 +415,7 @@ export {
   commentOperation,
   createOperation,
   frictionOperation,
+  frictionReportOperation,
   handoffOperation,
   importIssuesOperation,
   listOperation,
@@ -417,6 +435,8 @@ export type {
   EnvelopePayload,
   FrictionOperationOptions,
   FrictionPayload,
+  FrictionReportOperationOptions,
+  FrictionReportPayload,
   HandoffPayload,
   ImportIssuesOperationOptions,
   ImportIssuesPayload,

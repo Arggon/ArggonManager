@@ -20,13 +20,18 @@ export const CONVENTION_VERSION_DEFAULT = 0;
  * the legacy layout). Returns CONVENTION_VERSION_DEFAULT when the file is
  * missing or has no parseable `version: N` line (per docs/json-output.md:
  * omit file = 0).
+ *
+ * The key is read exactly like `parseConventionConfig` reads it, quotes
+ * included (bug-convention-parser-rejects-valid-yaml-force-rescaffolds): two
+ * readers of one file must give one answer, so `"version": 5` is version 5 on
+ * both surfaces.
  */
 export function readConventionVersion(dir: string): number {
   const path = conventionPathForRoot(dir);
   if (!existsSync(path)) return CONVENTION_VERSION_DEFAULT;
   try {
     const raw = readFileSync(path, "utf8");
-    const match = raw.match(/^version\s*:\s*(\d+)/m);
+    const match = raw.match(/^["']?version["']?\s*:\s*(\d+)/m);
     if (!match) return CONVENTION_VERSION_DEFAULT;
     const parsed = Number.parseInt(match[1] ?? "", 10);
     return Number.isFinite(parsed) ? parsed : CONVENTION_VERSION_DEFAULT;
@@ -323,6 +328,174 @@ function stripQuotes(value: string): string {
 }
 
 /**
+ * Strip a trailing YAML comment from the raw text after a `key:` colon.
+ *
+ * bug-convention-parser-rejects-valid-yaml-force-rescaffolds: `allow-steal: true
+ * # armed` is valid YAML whose value is the boolean `true`, and it is the
+ * spelling an adopter writes naturally. Refusing it made `init --force`
+ * classify the whole file as unreadable and re-derive it from the fixed
+ * scaffold, dropping the adopter's configuration. YAML starts a comment at a
+ * `#` that begins the line or is preceded by whitespace, so that is exactly
+ * the rule here; a `#` inside a quoted scalar, or one with no whitespace in
+ * front of it, is content.
+ */
+function stripInlineComment(raw: string): string {
+  if (raw.startsWith("#")) return "";
+  let quote: '"' | "'" | null = null;
+  for (let i = 0; i < raw.length; i += 1) {
+    const ch = raw[i]!;
+    if (quote === '"') {
+      if (ch === "\\") i += 1;
+      else if (ch === '"') quote = null;
+      continue;
+    }
+    if (quote === "'") {
+      if (ch === "'") {
+        if (raw[i + 1] === "'") i += 1;
+        else quote = null;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === "#" && (raw[i - 1] === " " || raw[i - 1] === "\t")) {
+      return raw.slice(0, i).trimEnd();
+    }
+  }
+  return raw;
+}
+
+/** One parsed block-scalar header (`|`, `|-`, `>2+`, ...). */
+type BlockScalarHeader = {
+  style: "|" | ">";
+  /** Explicit indentation indicator, when the header carries one. */
+  indent: number | null;
+  /** `-` strip, `+` keep, `null` clip (the default). */
+  chomp: "-" | "+" | null;
+};
+
+/**
+ * Is the raw value a block-scalar header? `|` (literal) and `>` (folded),
+ * with an optional indentation indicator and an optional chomping indicator
+ * in either order — `|2-` and `|-2` both occur in the wild. Anything else is
+ * a plain scalar, so a `|` with text after it (`| npm ci`) stays text.
+ */
+function blockScalarHeader(raw: string): BlockScalarHeader | null {
+  const match = /^([|>])([0-9+-]*)$/.exec(raw);
+  if (!match) return null;
+  let indent: number | null = null;
+  let chomp: "-" | "+" | null = null;
+  for (const ch of match[2]!) {
+    if (ch === "-" || ch === "+") chomp = ch;
+    else {
+      const digit = Number.parseInt(ch, 10);
+      if (Number.isNaN(digit)) return null;
+      indent = indent === null ? digit : indent * 10 + digit;
+    }
+  }
+  return { style: match[1]! as "|" | ">", indent, chomp };
+}
+
+/**
+ * The block under a block-scalar header: every following blank line, plus
+ * every line indented deeper than the key's own indent. The next line at or
+ * below that indent ends the block, so a sibling option or a new top-level
+ * section is never swallowed.
+ */
+function collectBlockScalar(
+  lines: string[],
+  from: number,
+  parentIndent: number,
+): { body: string[]; next: number } {
+  const body: string[] = [];
+  let index = from;
+  for (; index < lines.length; index += 1) {
+    const line = lines[index]!;
+    if (line.trim() === "") {
+      body.push(line);
+      continue;
+    }
+    if (line.length - line.trimStart().length <= parentIndent) break;
+    body.push(line);
+  }
+  return { body, next: index };
+}
+
+/**
+ * Folded style (`>`): a single break between two ordinary lines becomes a
+ * space, a blank line stays a break, and a more-indented line keeps its own
+ * breaks (it is a literal chunk). Content is never dropped.
+ */
+function foldBlockScalar(core: string[]): string {
+  let out = "";
+  let previousWasFolded = false;
+  for (const line of core) {
+    if (line === "") {
+      out += "\n";
+      previousWasFolded = false;
+      continue;
+    }
+    if (/^[ \t]/.test(line)) {
+      out += `${line}\n`;
+      previousWasFolded = false;
+      continue;
+    }
+    if (previousWasFolded) out += " ";
+    out += line;
+    previousWasFolded = true;
+  }
+  // The last line's break belongs to the chomping indicator, not the body.
+  return out.endsWith("\n") ? out.slice(0, -1) : out;
+}
+
+/**
+ * Decode a block scalar into the value it denotes. The decoded text is
+ * LITERAL: it is never re-read as a quoted scalar, so `post-start: |-\n  "a b"`
+ * is the two-character-quoted command, not the unquoted one.
+ */
+function decodeBlockScalar(body: string[], header: BlockScalarHeader): string {
+  let blockIndent = header.indent;
+  if (blockIndent === null) {
+    for (const line of body) {
+      if (line.trim() === "") continue;
+      blockIndent = line.length - line.trimStart().length;
+      break;
+    }
+  }
+  if (blockIndent === null) return ""; // nothing but blanks: an empty block
+  const content = body.map((line) => (line.length >= blockIndent! ? line.slice(blockIndent!) : ""));
+  let last = content.length;
+  while (last > 0 && content[last - 1]!.trim() === "") last -= 1;
+  const core = content.slice(0, last);
+  const trailingBlanks = content.length - last;
+  if (core.length === 0) return header.chomp === "+" ? "\n".repeat(trailingBlanks) : "";
+  const joined = header.style === "|" ? core.join("\n") : foldBlockScalar(core);
+  if (header.chomp === "-") return joined;
+  if (header.chomp === "+") return `${joined}\n${"\n".repeat(trailingBlanks)}`;
+  return `${joined}\n`; // clip: exactly one trailing break
+}
+
+/**
+ * A mapping section (`x-tracker:`, `branch_patterns:`, ...) must open a mapping
+ * on the following lines. Anything else on the header line is refused — and the
+ * refusal NAMES the construct, because
+ * bug-convention-parser-rejects-valid-yaml-force-rescaffolds showed what a
+ * nameless refusal costs: `init --force` answered it by re-deriving the whole
+ * file from the fixed scaffold. Flow style, anchors, aliases and tags are all
+ * valid YAML this line parser does not read; a scalar is not a mapping.
+ */
+function requireEmptyMapping(sourcePath: string, key: string, rawValue: string): void {
+  if (rawValue === "") return;
+  throw new Error(
+    `${sourcePath}: '${key}' must be a mapping, one option per line ` +
+      `(got ${JSON.stringify(rawValue)}; this parser reads BLOCK style only — ` +
+      `flow style { }, anchors (&id), aliases (*id) and tags (!!tag) are not supported)`,
+  );
+}
+
+/**
  * Parse the tracker's `.convention.yml` (line-oriented, no YAML dependency).
  * Unknown top-level keys are ignored for forward compatibility;
  * `x-views` (saved views), `x-playbooks` (playbook staleness options),
@@ -333,6 +506,22 @@ function stripQuotes(value: string): string {
  * Throws with file context on malformed `branch_patterns`, `x-views`,
  * `x-playbooks`, `x-tracker`, `x-import`, `x-worktree`, or `x-github`; `x-generated`
  * parses tolerantly (machine-written state).
+ *
+ * bug-convention-parser-rejects-valid-yaml-force-rescaffolds: this is a LINE
+ * parser, not a YAML parser, and the difference used to cost the adopter their
+ * configuration — a valid-YAML file this reader refused was classified by
+ * `init --force` as "unreadable or unparseable" and re-derived from the fixed
+ * scaffold, wholesale. The tolerance is therefore deliberately widened for the
+ * constructs a real YAML read handles without any judgement: a trailing
+ * comment, a block scalar, and a quoted key. It is NOT widened where the
+ * strictness protects an arming flag: a boolean option still accepts only the
+ * exact tokens `true`/`false`, still refuses the YAML-1.1-only spellings
+ * (`yes`/`on`, which YAML 1.2 reads as the STRING "yes"), and still refuses a
+ * *quoted* boolean — accepting `allow-steal: "true"` is exactly how an armed
+ * gate reads as unset. The parser also stays honest about what it cannot read
+ * (flow style, anchors, aliases, tags): those are refused with a message that
+ * names the construct, because a refusal an adopter cannot diagnose is the
+ * first half of the same loss.
  */
 export function parseConventionConfig(
   raw: string,
@@ -365,63 +554,69 @@ export function parseConventionConfig(
   let generatedDest: string | null = null;
   let importOption: string | null = null;
 
-  for (const line of raw.split(/\r?\n/)) {
+  const lines = raw.split(/\r?\n/);
+  // A file's text ends with a newline; `split` turns that into one final empty
+  // element that is not a line of the document. Dropping it keeps a `+`
+  // (keep-chomping) block scalar from reading the file's own final newline as
+  // one trailing blank line of its content.
+  if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]!;
     if (!line.trim() || line.trimStart().startsWith("#")) continue;
     const indent = line.length - line.trimStart().length;
     const idx = line.indexOf(":");
     if (idx === -1) {
-      throw new Error(`${sourcePath}: invalid line ${JSON.stringify(line)}`);
+      throw new Error(
+        `${sourcePath}: invalid line ${JSON.stringify(line)} (expected 'key: value')`,
+      );
     }
-    const key = line.slice(0, idx).trim();
-    const value = line.slice(idx + 1).trim();
+    // A quoted key names the same section/option as the bare one ("x-tracker":
+    // is x-tracker), so every key comparison reads the decoded form.
+    const key = stripQuotes(line.slice(0, idx).trim());
+    // The raw value text, comment stripped but still quoted: the arming
+    // checks below compare against it, so a quoted boolean stays refused.
+    let rawValue = stripInlineComment(line.slice(idx + 1).trim());
+    let value = stripQuotes(rawValue);
+    const header = blockScalarHeader(rawValue);
+    if (header !== null) {
+      // `post-start: |` and friends: the value is the indented block below
+      // the key, not the indicator. Consume it here so its lines are never
+      // read as keys (nor as comments), and keep the decoded text literal.
+      const block = collectBlockScalar(lines, index + 1, indent);
+      index = block.next - 1;
+      rawValue = decodeBlockScalar(block.body, header);
+      value = rawValue;
+    }
     if (indent === 0) {
       section = null;
       generatedDest = null;
       importOption = null;
       if (key === "version") {
-        const parsed = Number.parseInt(value, 10);
+        const parsed = Number.parseInt(rawValue, 10);
         if (Number.isFinite(parsed)) version = parsed;
       } else if (key === "branch_patterns") {
-        if (value !== "") {
-          throw new Error(`${sourcePath}: 'branch_patterns' must be a mapping, one type per line`);
-        }
+        requireEmptyMapping(sourcePath, key, rawValue);
         section = "branch_patterns";
       } else if (key === "x-views") {
-        if (value !== "") {
-          throw new Error(`${sourcePath}: 'x-views' must be a mapping, one view per line`);
-        }
+        requireEmptyMapping(sourcePath, key, rawValue);
         section = "x-views";
       } else if (key === "x-playbooks") {
-        if (value !== "") {
-          throw new Error(`${sourcePath}: 'x-playbooks' must be a mapping, one option per line`);
-        }
+        requireEmptyMapping(sourcePath, key, rawValue);
         section = "x-playbooks";
       } else if (key === "x-tracker") {
-        if (value !== "") {
-          throw new Error(`${sourcePath}: 'x-tracker' must be a mapping, one option per line`);
-        }
+        requireEmptyMapping(sourcePath, key, rawValue);
         section = "x-tracker";
       } else if (key === "x-import") {
-        if (value !== "") {
-          throw new Error(`${sourcePath}: 'x-import' must be a mapping, one option per line`);
-        }
+        requireEmptyMapping(sourcePath, key, rawValue);
         section = "x-import";
       } else if (key === "x-worktree") {
-        if (value !== "") {
-          throw new Error(`${sourcePath}: 'x-worktree' must be a mapping, one option per line`);
-        }
+        requireEmptyMapping(sourcePath, key, rawValue);
         section = "x-worktree";
       } else if (key === "x-github") {
-        if (value !== "") {
-          throw new Error(`${sourcePath}: 'x-github' must be a mapping, one option per line`);
-        }
+        requireEmptyMapping(sourcePath, key, rawValue);
         section = "x-github";
       } else if (key === "x-generated") {
-        if (value !== "") {
-          throw new Error(
-            `${sourcePath}: 'x-generated' must be a mapping, one destination per line`,
-          );
-        }
+        requireEmptyMapping(sourcePath, key, rawValue);
         section = "x-generated";
       }
       continue;
@@ -438,10 +633,10 @@ export function parseConventionConfig(
         // A known scalar key, never a destination — hand-written legacy state
         // without it parses identically (ignore-unknown in reverse).
         if (key === "projectName") {
-          generatedProjectName = stripQuotes(value) || null;
+          generatedProjectName = value || null;
           continue;
         }
-        const dest = stripQuotes(key);
+        const dest = key;
         generatedDest = dest !== "" ? dest : null;
         if (generatedDest !== null && !(generatedDest in generated)) {
           generated[generatedDest] = {
@@ -455,11 +650,13 @@ export function parseConventionConfig(
       }
       if (generatedDest === null) continue;
       const entry = generated[generatedDest]!;
-      if (key === "template") entry.template = stripQuotes(value);
-      else if (key === "checksum") entry.checksum = stripQuotes(value);
-      else if (key === "arggonVersion") entry.arggonVersion = stripQuotes(value);
-      else if (key === "generatedAt") entry.generatedAt = stripQuotes(value);
-      else if (key === "acknowledged") entry.acknowledged = value === "true";
+      if (key === "template") entry.template = value;
+      else if (key === "checksum") entry.checksum = value;
+      else if (key === "arggonVersion") entry.arggonVersion = value;
+      else if (key === "generatedAt") entry.generatedAt = value;
+      // The raw token, not the decoded scalar: a quoted boolean is still False,
+      // exactly as before (bug-convention-parser-rejects-valid-yaml-force-rescaffolds).
+      else if (key === "acknowledged") entry.acknowledged = rawValue === "true";
       // Unknown nested keys are ignored.
       continue;
     }
@@ -467,12 +664,12 @@ export function parseConventionConfig(
       // Namespaced extension: unknown nested keys are ignored (ignore-unknown),
       // only the official `max-age-days` option is read.
       if (key !== "max-age-days") continue;
-      if (!/^\d+$/.test(value) || Number.parseInt(value, 10) <= 0) {
+      if (!/^\d+$/.test(rawValue) || Number.parseInt(rawValue, 10) <= 0) {
         throw new Error(
-          `${sourcePath}: 'max-age-days' must be a positive integer (got ${JSON.stringify(value)})`,
+          `${sourcePath}: 'max-age-days' must be a positive integer (got ${JSON.stringify(rawValue)})`,
         );
       }
-      playbooks.maxAgeDays = Number.parseInt(value, 10);
+      playbooks.maxAgeDays = Number.parseInt(rawValue, 10);
       continue;
     }
     if (section === "x-tracker") {
@@ -484,58 +681,64 @@ export function parseConventionConfig(
       // task-single-writer-worktree-enforcement), `product-acceptance`
       // (product-acceptance recording, ADR 0021 §4) and `reap-acked-orphans`
       // (orphan-reaping arming, task-adapter-orphan-reaping).
+      //
+      // Every boolean option is matched on the RAW token, comment stripped but
+      // still quoted (bug-convention-parser-rejects-valid-yaml-force-rescaffolds):
+      // widening the parser for trailing comments must not also widen it for
+      // quoting. `allow-steal: "true"` denotes the STRING "true", and reading an
+      // arming flag out of a string is exactly how an armed gate reads as unset.
       if (key === "allow-steal") {
-        if (value !== "true" && value !== "false") {
+        if (rawValue !== "true" && rawValue !== "false") {
           throw new Error(
-            `${sourcePath}: 'allow-steal' must be a boolean (got ${JSON.stringify(value)})`,
+            `${sourcePath}: 'allow-steal' must be a boolean (got ${JSON.stringify(rawValue)})`,
           );
         }
-        tracker.allowSteal = value === "true";
+        tracker.allowSteal = rawValue === "true";
         continue;
       }
       if (key === "strict-gate-bins") {
-        if (value !== "true" && value !== "false") {
+        if (rawValue !== "true" && rawValue !== "false") {
           throw new Error(
-            `${sourcePath}: 'strict-gate-bins' must be a boolean (got ${JSON.stringify(value)})`,
+            `${sourcePath}: 'strict-gate-bins' must be a boolean (got ${JSON.stringify(rawValue)})`,
           );
         }
-        tracker.strictGateBins = value === "true";
+        tracker.strictGateBins = rawValue === "true";
         continue;
       }
       if (key === "strict-worktree-writes") {
-        if (value !== "true" && value !== "false") {
+        if (rawValue !== "true" && rawValue !== "false") {
           throw new Error(
-            `${sourcePath}: 'strict-worktree-writes' must be a boolean (got ${JSON.stringify(value)})`,
+            `${sourcePath}: 'strict-worktree-writes' must be a boolean (got ${JSON.stringify(rawValue)})`,
           );
         }
-        tracker.strictWorktreeWrites = value === "true";
+        tracker.strictWorktreeWrites = rawValue === "true";
         continue;
       }
       if (key === "product-acceptance") {
-        if (value !== "true" && value !== "false") {
+        if (rawValue !== "true" && rawValue !== "false") {
           throw new Error(
-            `${sourcePath}: 'product-acceptance' must be a boolean (got ${JSON.stringify(value)})`,
+            `${sourcePath}: 'product-acceptance' must be a boolean (got ${JSON.stringify(rawValue)})`,
           );
         }
-        tracker.productAcceptance = value === "true";
+        tracker.productAcceptance = rawValue === "true";
         continue;
       }
       if (key === "reap-acked-orphans") {
-        if (value !== "true" && value !== "false") {
+        if (rawValue !== "true" && rawValue !== "false") {
           throw new Error(
-            `${sourcePath}: 'reap-acked-orphans' must be a boolean (got ${JSON.stringify(value)})`,
+            `${sourcePath}: 'reap-acked-orphans' must be a boolean (got ${JSON.stringify(rawValue)})`,
           );
         }
-        tracker.reapAckedOrphans = value === "true";
+        tracker.reapAckedOrphans = rawValue === "true";
         continue;
       }
       if (key !== "auto-commit") continue;
-      if (value !== "true" && value !== "false") {
+      if (rawValue !== "true" && rawValue !== "false") {
         throw new Error(
-          `${sourcePath}: 'auto-commit' must be a boolean (got ${JSON.stringify(value)})`,
+          `${sourcePath}: 'auto-commit' must be a boolean (got ${JSON.stringify(rawValue)})`,
         );
       }
-      tracker.autoCommit = value === "true";
+      tracker.autoCommit = rawValue === "true";
       continue;
     }
     if (section === "x-import") {
@@ -548,25 +751,25 @@ export function parseConventionConfig(
           // An explicitly declared label-types option is "set" even with zero
           // entries (empty mapping = no label mapping, replacing the default).
           importHasLabelTypes = true;
-          if (value !== "") {
+          if (rawValue !== "") {
             throw new Error(`${sourcePath}: 'label-types' must be a mapping, one label per line`);
           }
         }
         continue;
       }
       if (importOption !== "label-types") continue;
-      const label = stripQuotes(key);
+      const label = key;
       if (!label) {
         throw new Error(`${sourcePath}: invalid x-import entry ${JSON.stringify(line)}`);
       }
       if (label in importLabelTypes) {
         throw new Error(`${sourcePath}: duplicate label '${label}' in x-import.label-types`);
       }
-      const mapped = stripQuotes(value);
+      const mapped = value;
       if (!isItemType(mapped)) {
         throw new Error(
           `${sourcePath}: 'label-types' values must be work-item types ` +
-            `(initiative | epic | story | task | bug), got ${JSON.stringify(value)} for label '${label}'`,
+            `(initiative | epic | story | task | bug), got ${JSON.stringify(rawValue)} for label '${label}'`,
         );
       }
       importLabelTypes[label] = mapped;
@@ -583,20 +786,22 @@ export function parseConventionConfig(
         // Shell variant (task-post-start-env): "inherit" (default) or "login"
         // ($SHELL -lc, sources profile files so rustup/mise/asdf toolchains
         // are on PATH). Anything else is a parse error.
-        const shell = stripQuotes(value);
+        const shell = value;
         if (shell !== "inherit" && shell !== "login") {
           throw new Error(
-            `${sourcePath}: 'post-start-shell' must be "inherit" or "login" (got ${JSON.stringify(value)})`,
+            `${sourcePath}: 'post-start-shell' must be "inherit" or "login" (got ${JSON.stringify(rawValue)})`,
           );
         }
         worktree.postStartShell = shell;
         continue;
       }
       if (key === "env") {
-        if (value !== "true" && value !== "false") {
-          throw new Error(`${sourcePath}: 'env' must be a boolean (got ${JSON.stringify(value)})`);
+        if (rawValue !== "true" && rawValue !== "false") {
+          throw new Error(
+            `${sourcePath}: 'env' must be a boolean (got ${JSON.stringify(rawValue)})`,
+          );
         }
-        worktree.env = value === "true";
+        worktree.env = rawValue === "true";
         continue;
       }
       if (key === "services") {
@@ -610,29 +815,29 @@ export function parseConventionConfig(
         // after lowercasing, so the declared base is validated here, at parse
         // time, against the same alphabet (uppercase allowed, lowercased at
         // derivation).
-        if (value === "true") {
+        if (rawValue === "true") {
           worktree.services = "true";
           continue;
         }
-        if (value === "false") {
+        if (rawValue === "false") {
           worktree.services = null;
           continue;
         }
-        const base = stripQuotes(value);
+        const base = value;
         if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(base)) {
           throw new Error(
             `${sourcePath}: 'services' must be true, false, or a Compose project base name ` +
-              `([A-Za-z0-9][A-Za-z0-9_-]*, got ${JSON.stringify(value)})`,
+              `([A-Za-z0-9][A-Za-z0-9_-]*, got ${JSON.stringify(rawValue)})`,
           );
         }
         worktree.services = base;
         continue;
       }
       if (key !== "post-start") continue;
-      const command = stripQuotes(value);
+      const command = value;
       if (!command) {
         throw new Error(
-          `${sourcePath}: 'post-start' must be a non-empty string (got ${JSON.stringify(value)})`,
+          `${sourcePath}: 'post-start' must be a non-empty string (got ${JSON.stringify(rawValue)})`,
         );
       }
       worktree.postStart = command;
@@ -643,12 +848,12 @@ export function parseConventionConfig(
       // ignored (ignore-unknown); the official `issue-roundtrip` option is a
       // boolean gate for closing the linked GitHub issue on a done flip.
       if (key !== "issue-roundtrip") continue;
-      if (value !== "true" && value !== "false") {
+      if (rawValue !== "true" && rawValue !== "false") {
         throw new Error(
-          `${sourcePath}: 'issue-roundtrip' must be a boolean (got ${JSON.stringify(value)})`,
+          `${sourcePath}: 'issue-roundtrip' must be a boolean (got ${JSON.stringify(rawValue)})`,
         );
       }
-      github.issueRoundtrip = value === "true";
+      github.issueRoundtrip = rawValue === "true";
       continue;
     }
     if (section === "x-views") {
@@ -658,7 +863,7 @@ export function parseConventionConfig(
       if (key in views) {
         throw new Error(`${sourcePath}: duplicate view '${key}' in x-views`);
       }
-      const expr = stripQuotes(value);
+      const expr = value;
       if (!expr) {
         throw new Error(`${sourcePath}: empty expression for view '${key}'`);
       }
@@ -671,7 +876,7 @@ export function parseConventionConfig(
         `${sourcePath}: unknown type '${key}' in branch_patterns (expected: initiative | epic | story | task | bug)`,
       );
     }
-    const pattern = stripQuotes(value);
+    const pattern = value;
     if (!pattern) {
       throw new Error(`${sourcePath}: empty pattern for type '${key}'`);
     }
