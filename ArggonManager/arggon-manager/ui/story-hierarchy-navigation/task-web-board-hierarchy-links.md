@@ -34,3 +34,12 @@ Parent story `story-hierarchy-navigation`: the web board's detail drawer (`cli/s
 - [ ] `arggon validate` green; prettier clean; PR opened
 
 ## Notes
+
+### 2026-10-11 @arggon-maker
+evidence (maker probe + gates, 2026-10-11, commit 3294f22f):
+- gates: arggon validate ok (0 warnings, convention v5); prettier clean on all 6 touched files; tsc build+typecheck projects clean; eslint clean on touched cli files; ast-grep structure 5/5
+- vitest: board.test.ts + board-parity.test.ts 122/122 green; board-serve.test.ts 28/28 green (incl. new parent/children serve assertions)
+- serve probe on temp fixture (top->mid->leaf-a/leaf-b): /api/item leaf-a shows parent {mid,in_progress} + children []; mid shows parent {top,todo} + children [leaf-a todo, leaf-b done]; top shows parent null + children [mid]
+- playwright drive (chromium) on served board: leaf-a drawer shows parent link mid-in_progress + children none; clicking parent opens Mid with both child links; clicking leaf-b opens Leaf B; Esc returns focus to leaf-a card; zero img nodes in drawer
+- e2e: 5/5 drawer+axe specs green (ready-board, lens, static-export, static-details drawer incl. drawer axe scan, serve drawer); no new axe violations, no exclusions
+- push: origin feat/task-web-board-hierarchy-links, new branch, exit 0
