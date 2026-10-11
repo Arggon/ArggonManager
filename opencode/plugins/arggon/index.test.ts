@@ -1,17 +1,26 @@
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  ADMISSION_STAMP_KEY,
+  ADMISSION_STAMP_MAX_BYTES,
   CACHE_MAX_ENTRIES,
   ITEM_BLOCK_MAX_BYTES,
   MAX_SUBSTITUTION_DEPTH,
+  admissionStampFromResolution,
+  applyAdmissionStamp,
   boundText,
+  buildAdmissionStamp,
   buildItemBlock,
+  compactionRetentionPart,
   isArggonItemId,
   itemCacheKey,
   itemIdFromBranch,
   looksLikeCommitCommand,
+  needsCompactionRetention,
+  onCompaction,
+  onPromptAdmission,
   onToolAfter,
   parseArggonItemFromCode,
   parseArggonItemFromCommand,
@@ -663,5 +672,418 @@ describe("plugin-context: session directory wiring (bug-native-tools-commit-to-p
     // The throw reaches resolveToolCwd, which turns it into a refusal rather
     // than a silent fallback to the plugin location.
     await expect(resolve("ses_boom")).rejects.toThrow("session store unavailable");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T4 (plan-methodology-adapters-017, spec S4): the prompt-admission stamp and
+// the compaction retention. The rewrite contract is what these tests pin: the
+// `prompt` hook may write admission metadata and nothing else, the `compaction`
+// hook may re-inject the item block and never record the compaction itself.
+// The runtime load (a real hook firing on a real host) is the model-free
+// `npm run smoke:opencode-prompt-stamp` evidence.
+// ---------------------------------------------------------------------------
+
+/** A worktree identity as `arggon start --worktree` declares it in `.arggon.env`. */
+const IDENTITY = {
+  worktreePath: "/w/repo-task-stamp",
+  worktreeId: "repo-task-stamp",
+  item: "task-stamp",
+  branch: "feat/task-stamp",
+  stateDir: "/state/repo-task-stamp",
+  cacheDir: "/cache/repo-task-stamp",
+  source: "/w/repo-task-stamp/.arggon.env",
+};
+
+describe("plugin-context: admission stamp construction", () => {
+  it("carries the env contract's declared values and names the file as its source", () => {
+    expect(buildAdmissionStamp(IDENTITY)).toEqual({
+      item: "task-stamp",
+      branch: "feat/task-stamp",
+      worktreePath: "/w/repo-task-stamp",
+      worktreeId: "repo-task-stamp",
+      source: "/w/repo-task-stamp/.arggon.env",
+    });
+  });
+
+  it("stays silent when nothing declares an item or a branch", () => {
+    expect(buildAdmissionStamp(undefined)).toBeUndefined();
+    // State/cache dirs alone are not an identity: that is a plain checkout.
+    expect(
+      buildAdmissionStamp({
+        stateDir: "/state/x",
+        cacheDir: "/cache/x",
+        source: "process.env",
+      }),
+    ).toBeUndefined();
+  });
+
+  it("keeps a partial declaration and drops nothing it was given", () => {
+    expect(buildAdmissionStamp({ item: "task-only", source: "process.env" })).toEqual({
+      item: "task-only",
+      source: "process.env",
+    });
+    expect(buildAdmissionStamp({ branch: "fix/task-b", source: "/w/.arggon.env" })).toEqual({
+      branch: "fix/task-b",
+      source: "/w/.arggon.env",
+    });
+  });
+
+  it("clips values and drops the least load-bearing fields to respect the byte bound", () => {
+    const long = "z".repeat(400);
+    const stamp = buildAdmissionStamp({
+      ...IDENTITY,
+      item: long,
+      branch: long,
+      worktreePath: long,
+      worktreeId: long,
+      source: long,
+    });
+    expect(stamp).toBeDefined();
+    for (const value of Object.values(stamp ?? {})) {
+      expect(typeof value).toBe("string");
+    }
+    // The bound is the contract, not an aspiration.
+    expect(JSON.stringify(stamp).length).toBeLessThanOrEqual(ADMISSION_STAMP_MAX_BYTES);
+    // The identity survives: a stamp without an item or a branch is not a stamp.
+    expect(stamp?.item ?? stamp?.branch).toBeDefined();
+    expect(stamp?.source).toBeDefined();
+    // The worktree coordinates are the first thing dropped.
+    expect(stamp?.worktreeId).toBeUndefined();
+  });
+
+  it("maps the correlation chain onto the same stamp shape", () => {
+    expect(admissionStampFromResolution({ id: "task-branch", source: "branch" })).toEqual({
+      item: "task-branch",
+      source: "branch",
+    });
+    expect(admissionStampFromResolution({ id: "task-env", source: "env" })).toEqual({
+      item: "task-env",
+      source: "env",
+    });
+    expect(admissionStampFromResolution({ id: "task-storage", source: "storage" })).toEqual({
+      item: "task-storage",
+      source: "storage",
+    });
+    expect(admissionStampFromResolution(undefined)).toBeUndefined();
+  });
+});
+
+describe("plugin-context: prompt hook rewrite contract", () => {
+  /** An admission draft in the shape V2 hands the hook (observed on 2.0.26). */
+  function draft(): Record<string, unknown> {
+    return {
+      sessionID: "ses_stamp",
+      messageID: "msg_stamp",
+      prompt: {
+        text: "please implement the stamp",
+        files: [{ uri: "file:///repo/a.txt" }],
+        agents: [{ id: "build" }],
+        skills: [{ id: "arggon-cli" }],
+      },
+      delivery: "steer",
+    };
+  }
+
+  it("writes only metadata.arggon and leaves the submitted prompt byte-identical", () => {
+    const event = draft();
+    const before = structuredClone(event);
+    const applied = applyAdmissionStamp(event, buildAdmissionStamp(IDENTITY));
+    expect(applied?.item).toBe("task-stamp");
+    expect(event.metadata).toEqual({ [ADMISSION_STAMP_KEY]: applied });
+    // Everything else the host handed over is untouched, by value.
+    expect(event.prompt).toEqual(before.prompt);
+    expect(event.delivery).toBe(before.delivery);
+    expect(event.sessionID).toBe(before.sessionID);
+    expect(event.messageID).toBe(before.messageID);
+  });
+
+  it("merges into metadata the caller already set and never replaces it", () => {
+    const event = { ...draft(), metadata: { source: "api", keep: 1 } };
+    applyAdmissionStamp(event, buildAdmissionStamp(IDENTITY));
+    expect(event.metadata).toMatchObject({ source: "api", keep: 1 });
+    expect((event.metadata as Record<string, unknown>)[ADMISSION_STAMP_KEY]).toMatchObject({
+      item: "task-stamp",
+    });
+  });
+
+  it("overwrites a previous stamp instead of accumulating one per prompt", () => {
+    const event = draft();
+    const first = applyAdmissionStamp(event, buildAdmissionStamp(IDENTITY));
+    const second = applyAdmissionStamp(event, {
+      item: "task-other",
+      branch: "feat/task-other",
+      source: "branch",
+    });
+    expect(first?.item).toBe("task-stamp");
+    expect(second?.item).toBe("task-other");
+    expect(Object.keys(event.metadata as Record<string, unknown>)).toEqual([ADMISSION_STAMP_KEY]);
+    expect((event.metadata as Record<string, unknown>)[ADMISSION_STAMP_KEY]).toEqual(second);
+  });
+
+  it("creates no metadata object at all when there is nothing to stamp", () => {
+    const event = draft();
+    expect(applyAdmissionStamp(event, undefined)).toBeUndefined();
+    expect("metadata" in event).toBe(false);
+    expect(event).toEqual(draft());
+  });
+
+  it("survives a host that hands over a non-object metadata value", () => {
+    const event = { ...draft(), metadata: "not-an-object" };
+    applyAdmissionStamp(event, buildAdmissionStamp(IDENTITY));
+    expect(event.metadata).toMatchObject({ [ADMISSION_STAMP_KEY]: { item: "task-stamp" } });
+  });
+
+  it("never rewrites the delivery mode or the prompt contents (contract, not convention)", () => {
+    const event = draft();
+    const before = structuredClone(event.prompt);
+    applyAdmissionStamp(event, buildAdmissionStamp(IDENTITY));
+    expect(structuredClone(event.prompt)).toEqual(before);
+    expect(event.delivery).toBe("steer");
+    // No key outside the documented draft shape is ever introduced.
+    expect(Object.keys(event).sort()).toEqual(
+      ["delivery", "messageID", "metadata", "prompt", "sessionID"].sort(),
+    );
+  });
+});
+
+describe("plugin-context: prompt hook guard order (T4)", () => {
+  function context(directory: string): Parameters<typeof onPromptAdmission>[0] {
+    return {
+      location: { directory },
+      storage: { get: async () => undefined, set: async () => undefined, remove: async () => undefined },
+      vcs: { get: async () => ({ data: { branch: "feat/task-stamp" } }) },
+    };
+  }
+
+  it("stamps from the worktree env contract at the session directory", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "arggon-stamp-env-"));
+    try {
+      mkdirSync(join(directory, "ArggonManager"));
+      writeFileSync(
+        join(directory, ".arggon.env"),
+        [
+          "ARGON_ITEM=task-stamp",
+          "ARGGON_WORKTREE_ID=repo-task-stamp",
+          `ARGGON_WORKTREE_PATH=${directory}`,
+          "ARGGON_WORKTREE_BRANCH=feat/task-stamp",
+          "ARGGON_STATE_DIR=/state/repo-task-stamp",
+          "ARGGON_CACHE_DIR=/cache/repo-task-stamp",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+      const event: Record<string, unknown> = { sessionID: "ses_env", prompt: { text: "go" } };
+      await onPromptAdmission(context(directory), event);
+      expect(event.metadata).toEqual({
+        [ADMISSION_STAMP_KEY]: {
+          item: "task-stamp",
+          branch: "feat/task-stamp",
+          worktreePath: directory,
+          worktreeId: "repo-task-stamp",
+          source: join(directory, ".arggon.env"),
+        },
+      });
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to the branch when no env contract declares anything", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "arggon-stamp-branch-"));
+    try {
+      mkdirSync(join(directory, "ArggonManager"));
+      const event: Record<string, unknown> = { sessionID: "ses_branch", prompt: { text: "go" } };
+      await onPromptAdmission(context(directory), event);
+      expect(event.metadata).toEqual({
+        [ADMISSION_STAMP_KEY]: { item: "task-stamp", source: "branch" },
+      });
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("is silent outside a tracker tree and when nothing resolves", async () => {
+    const outside = mkdtempSync(join(tmpdir(), "arggon-stamp-outside-"));
+    const inside = mkdtempSync(join(tmpdir(), "arggon-stamp-empty-"));
+    try {
+      const event: Record<string, unknown> = { sessionID: "ses_out", prompt: { text: "go" } };
+      await onPromptAdmission(context(outside), event);
+      expect("metadata" in event).toBe(false);
+
+      mkdirSync(join(inside, "ArggonManager"));
+      const bare: Parameters<typeof onPromptAdmission>[0] = {
+        location: { directory: inside },
+        storage: { get: async () => undefined, set: async () => undefined, remove: async () => undefined },
+        vcs: { get: async () => ({ data: { branch: "main" } }) },
+      };
+      const second: Record<string, unknown> = { sessionID: "ses_plain", prompt: { text: "go" } };
+      await onPromptAdmission(bare, second);
+      expect("metadata" in second).toBe(false);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+      rmSync(inside, { recursive: true, force: true });
+    }
+  });
+
+  it("never throws on a bare or hostile context (failure isolation)", async () => {
+    await expect(onPromptAdmission({} as never, { sessionID: "ses_x" })).resolves.toBeUndefined();
+    await expect(
+      onPromptAdmission(
+        {
+          location: { directory: 7 },
+          session: { get: async () => undefined },
+        } as never,
+        {},
+      ),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe("plugin-context: compaction retention (T4)", () => {
+  function context(directory: string): Parameters<typeof onCompaction>[0] {
+    return {
+      location: { directory },
+      storage: { get: async () => undefined, set: async () => undefined, remove: async () => undefined },
+      vcs: { get: async () => ({ data: { branch: "feat/task-stamp" } }) },
+    };
+  }
+
+  const ITEM = {
+    id: "task-stamp",
+    type: "task",
+    status: "in_progress",
+    title: "Stamp",
+    parent: "story-stamp",
+    branch: "feat/task-stamp",
+    assignee: "arggon-maker",
+  };
+
+  /**
+   * A stub `arggon` on PATH answering `show <id> --meta --json` with the
+   * documented envelope, so the retention path's own view of the item is
+   * deterministic instead of depending on a binary the test machine may lack
+   * (the same in-process fake-CLI pattern `tools.test.ts` uses for `gh`).
+   */
+  function stubArgonShow(item: Record<string, unknown>): () => void {
+    const binDir = join(mkdtempSync(join(tmpdir(), "arggon-stub-bin-")), "bin");
+    mkdirSync(binDir, { recursive: true });
+    const shim = join(binDir, "arggon");
+    const payload = JSON.stringify({ ok: true, schemaVersion: 1, command: "show", item });
+    writeFileSync(
+      shim,
+      [
+        "#!/bin/sh",
+        'case "$1" in',
+        "  show)",
+        `    printf '%s' '${payload.replaceAll("'", "'\\''")}'`,
+        "    ;;",
+        "  *) exit 1 ;;",
+        "esac",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    chmodSync(shim, 0o755);
+    const original = process.env.PATH ?? "";
+    process.env.PATH = `${binDir}:${original}`;
+    return () => {
+      process.env.PATH = original;
+    };
+  }
+
+  /** `needsCompactionRetention` only decides; the part itself is this helper. */
+  it("retains the item block as exactly one system part", () => {
+    const block = buildItemBlock(ITEM);
+    const part = compactionRetentionPart(block.text);
+    expect(part).toEqual({ type: "text", text: block.text });
+    expect(part.text).toContain("<arggon-item>");
+    expect(part.text).toContain("id: task-stamp");
+    expect(part.text.length).toBeLessThanOrEqual(ITEM_BLOCK_MAX_BYTES);
+  });
+
+  it("needs retention only for a clean system array with no recorded result", () => {
+    expect(needsCompactionRetention([{ type: "text", text: "harness" }])).toBe(true);
+    // Already retained: a second compaction must not stack a duplicate.
+    expect(needsCompactionRetention([{ type: "text", text: buildItemBlock(ITEM).text }])).toBe(false);
+    // Another plugin recorded the compaction itself: no model call to retain for.
+    expect(needsCompactionRetention([{ type: "text", text: "harness" }], { summary: "…" })).toBe(false);
+    expect(needsCompactionRetention(undefined)).toBe(false);
+    expect(needsCompactionRetention("not-an-array")).toBe(false);
+  });
+
+  it("injects the block into a compaction request and leaves result unset", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "arggon-compact-"));
+    const restore = stubArgonShow(ITEM);
+    try {
+      mkdirSync(join(directory, "ArggonManager"));
+      const system: unknown[] = [{ type: "text", text: "harness instructions" }];
+      const event: Record<string, unknown> = {
+        sessionID: "ses_compact",
+        system,
+        messages: [{ id: "msg_1", role: "user", content: [{ type: "text", text: "go" }] }],
+      };
+      await onCompaction(context(directory), event);
+      const injected = system.filter(
+        (part) =>
+          typeof (part as { text?: unknown }).text === "string" &&
+          ((part as { text: string }).text as string).includes("<arggon-item>"),
+      );
+      expect(injected).toHaveLength(1);
+      expect((injected[0] as { text: string }).text).toContain("id: task-stamp");
+      // The model still writes the summary: the hook never records it.
+      expect(event.result).toBeUndefined();
+      expect(event.messages).toHaveLength(1);
+    } finally {
+      restore();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("does not stack a second block when a compaction request is re-offered", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "arggon-compact-twice-"));
+    const restore = stubArgonShow(ITEM);
+    try {
+      mkdirSync(join(directory, "ArggonManager"));
+      const system: unknown[] = [{ type: "text", text: "harness instructions" }];
+      const event: Record<string, unknown> = { sessionID: "ses_twice", system, messages: [] };
+      await onCompaction(context(directory), event);
+      await onCompaction(context(directory), event);
+      expect(
+        system.filter((part) =>
+          ((part as { text?: string }).text ?? "").includes("<arggon-item>"),
+        ),
+      ).toHaveLength(1);
+    } finally {
+      restore();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("is silent outside a tracker tree, with a recorded result, or on a non-array system", async () => {
+    const outside = mkdtempSync(join(tmpdir(), "arggon-compact-outside-"));
+    const inside = mkdtempSync(join(tmpdir(), "arggon-compact-guard-"));
+    try {
+      mkdirSync(join(inside, "ArggonManager"));
+      const outsideEvent: Record<string, unknown> = { sessionID: "ses_a", system: [] };
+      await onCompaction(context(outside), outsideEvent);
+      expect(outsideEvent.system).toEqual([]);
+
+      const recordedEvent: Record<string, unknown> = {
+        sessionID: "ses_b",
+        system: [],
+        result: { summary: "already written" },
+      };
+      await onCompaction(context(inside), recordedEvent);
+      expect(recordedEvent.system).toEqual([]);
+      expect(recordedEvent.result).toEqual({ summary: "already written" });
+
+      const noSystem: Record<string, unknown> = { sessionID: "ses_c", system: undefined };
+      await expect(onCompaction(context(inside), noSystem)).resolves.toBeUndefined();
+      expect(noSystem.system).toBeUndefined();
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+      rmSync(inside, { recursive: true, force: true });
+    }
   });
 });

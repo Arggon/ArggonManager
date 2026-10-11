@@ -121,6 +121,26 @@ true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
     injected text as `block=<json>` and measures those bytes independently
     (reported = measured, ≤ 1024) instead of trusting the reported count; exits
     0 with `skipped: opencode not installed` when absent.
+- **Prompt admission + compaction (T4, plan-methodology-adapters-017 §T4).**
+  Two more session hooks, both resolved from the SESSION's own directory
+  (`ctx.session.get` → `location.directory`, the value `session_move` updates):
+  the plugin instance is loaded from the project's canonical checkout, so
+  `ctx.location.directory` would name the primary even for a session moved into
+  a worktree — and the env contract's `.arggon.env` exists only at the session's
+  directory (observed on 2.0.26). `session.hook("prompt")` writes a bounded
+  branch/item stamp into the admitted prompt's `metadata` under the `arggon`
+  key (worktree env contract → process environment → the correlation chain
+  above; never into the prompt text, files, agents, skills or `delivery`), which
+  the host persists with the user message. `session.hook("compaction")` appends
+  the same bounded item block to the checkpoint-summary request's `system`
+  instructions, once per request (marker check) and never sets `result`, so the
+  model still writes the summary. Evidence harness:
+  `npx tsx smoke/opencode-prompt-stamp-smoke.ts` — model-free (real
+  `opencode serve` + a scripted OpenAI-compatible provider), skipping when the
+  binary is absent; it asserts the stamp on the persisted payload, the byte
+  identical prompt text, one item block in the compaction request, the summary
+  still landing, the block surviving into the next agent-loop request, an idle
+  window with no request at all (no polling) and no stamp on a plain checkout.
 - MCP (https://opencode.ai/v2/docs/mcp-servers/) is **optional** in V2 and not
   part of the default seam (W3): the native tools replace it. To use the stdio
   server with another client, register it under `mcp.servers` as
