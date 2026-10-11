@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-web-board-hierarchy-links
 title: "Web board detail drawer: link parent and list children"
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: story-hierarchy-navigation
 labels: []
 created: "2026-10-11"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T23:17:33.108Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-web-board-hierarchy-links
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/task-web-board-hierarchy-links.md
   Leaves live only under a story. id is the filename stem: task-web-board-hierarchy-links.
@@ -28,11 +26,11 @@ Parent story `story-hierarchy-navigation`: the web board's detail drawer (`cli/s
 
 ## Acceptance
 
-- [ ] The drawer renders the parent as a link that opens the parent's detail, and a children section listing each child's id + status, each opening that child's detail
-- [ ] Items with no parent / no children render that honestly (no dead links, no missing section confusion)
-- [ ] Resolution reads the kernel's `parent` edges (no parallel hierarchy); XSS-safe through the existing escape path
-- [ ] Axe WCAG A/AA scan stays green in `ui-smoke`; keyboard-reachable (links in the existing tab order); `board-parity` tests pin the new rows
-- [ ] `arggon validate` green; prettier clean; PR opened
+- [x] The drawer renders the parent as a link that opens the parent's detail, and a children section listing each child's id + status, each opening that child's detail
+- [x] Items with no parent / no children render that honestly (no dead links, no missing section confusion)
+- [x] Resolution reads the kernel's `parent` edges (no parallel hierarchy); XSS-safe through the existing escape path
+- [x] Axe WCAG A/AA scan stays green in `ui-smoke`; keyboard-reachable (links in the existing tab order); `board-parity` tests pin the new rows
+- [x] `arggon validate` green; prettier clean; PR opened
 
 ## Notes
 
