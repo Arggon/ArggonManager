@@ -63,3 +63,7 @@ spec analyze --baseline ArggonManager/spec-analyze-baseline.json:
 Gates (all green): npm test 2858 passed (134 files; note: build must run first in this worktree, headless-ci.test.ts asserts dist/cli.js); npm run build 0; npm run check:plugin 0 (bundle diff clean); npm run lint 0; tools.arggon validate ok 0/0; spec validate ok (only the 5 pre-existing renumber warnings).
 
 Baselines untouched; acceptance boxes ticked in the item body (6/6).
+
+### handoff 2026-10-11 @ses_ed6cf4c8dffeBceB5jc5D36KYp (session: ses_ed6cf4c8dffeBceB5jc5D36KYp) — next: Review + merge PR #679 (branch feat/task-decision-pending-methodology-improvements-014); delivery lead flips to done after merge — lanes stay red until the renumber wave lands its 5 duplicate-doc-num…
+- branch: feat/task-decision-pending-methodology-improvements-014
+- open questions: None from maker: C3 ADR question closed with explicit 'No ADR required' + linked implemented spec-analyze-decision-gaps-013.
