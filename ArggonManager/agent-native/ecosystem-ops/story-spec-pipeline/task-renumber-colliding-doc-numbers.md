@@ -43,3 +43,28 @@ The renumber precedent exists and is painful: ADR 0016 carries a renumber note, 
 - [x] The detector finding is NOT made blocking in this PR (per the reviewer's recommendation: land the gate after the corpus is clean, so it does not fire on every commit meanwhile)
 
 ## Notes
+
+### 2026-10-11 @arggon-maker
+Gate evidence — task-renumber-colliding-doc-numbers (branch feat/task-renumber-colliding-doc-numbers)
+
+spec validate:
+  BEFORE: arggon spec: ok (37 doc(s), 5 warning(s))  [5x DOC_NUMBER_COLLISION]
+  AFTER:  arggon spec: ok (37 doc(s), 0 warning(s))
+
+spec analyze:
+  BEFORE: 11 finding(s) (5x duplicate-doc-number + 6 other)
+  AFTER:   6 finding(s) (0x duplicate-doc-number; the 6 pre-existing non-collision findings remain — DECISION-PENDING-EXPLORATION, no-error-path x2 [one now on renamed spec-deps-022], vague-quantifier x3)
+
+spec analyze --baseline (both committed baselines): 0 duplicate-doc-number in new/resolved/unchanged. Only rename-induced churn = the pre-existing no-error-path finding relocating spec-deps-001 -> spec-deps-022 (1 resolved + 1 new); the DECISION-PENDING churn is unrelated time-drift. Baselines left untouched per constraint (owned by task-release-pipeline-baseline-new-collisions).
+
+Renames (old -> new), spec+plan families paired, lighter-cited renumbered per the ADR 0024 precedent:
+  exploration-cheap-path-to-prod-001 -> -026        (keep token-context-001)
+  spec-deps-001 -> -022      | plan-deps-001 -> -019
+  spec-update-channel-015 -> -023 | plan-update-channel-015 -> -020
+  (kept spec/plan-sync-001 and spec/plan-release-pipeline-015)
+
+Citations updated (6 files): docs/adr/0005 (link), docs/plans/plan-deps-019 (spec: frontmatter + prose), docs/plans/plan-update-channel-020 (spec: frontmatter + prose), README (dropped the now-resolved collision example + --file path), cli/src/spec.test.ts (copyRealDocs real-doc names — execution-critical for npm test). Renumber notes added to all 5 renamed docs (ADR 0016/0019 idiom). Detector NOT made blocking (spec.ts untouched).
+
+Repo gates: npm test 2858 pass, npm run build ok, npm run check:plugin exit 0, npm run lint exit 0.
+
+OUT OF SCOPE (reported to delivery lead): stale citations to renamed stems remain in OTHER work-item files (tracker items) and comment-only code refs (board/filter/list/next tests, next.ts:32, spec.ts:309, adopt.test.ts fixtures) — not edited per the "do not touch other work items' files" constraint.
