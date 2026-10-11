@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-done-gate-whole-body-scan-counts-fenced-repro-boxes
 title: "The done gate's box scan counts fenced repro content: a bug item whose repro legitimately contains `- [ ]` can never be flipped done, and the auto-flip wedge follows ADR 0025's \"dated comment blocks excluded\" only sometimes"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: [spec-pipeline, kernel]
 created: "2026-10-11"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T13:00:31.335Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-done-gate-whole-body-scan-counts-fenced-repro-boxes
 ---
 <!--
