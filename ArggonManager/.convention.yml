@@ -14,7 +14,7 @@ x-generated:
   projectName: "ArggonManager"
   .agents/skills/arggon-cli/SKILL.md:
     template: "skills/arggon-cli/SKILL.md"
-    checksum: "sha256:286002efa361b207cbf32d26fdd85d22ccce4d12b13e0b60089508e24945e3da"
+    checksum: "sha256:d1ba7a2355ec415ed37b383be5d26e9aa15ad36937d7ee38e1ccd08a1aa9dea1"
     arggonVersion: "0.6.0"
     generatedAt: "2026-10-11T08:57:22.000Z"
   .agents/skills/arggon-cli/references/exploration.md:

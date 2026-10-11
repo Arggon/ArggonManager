@@ -34,8 +34,8 @@ import {
  *    applies none — there is no "capture now, scrub later" path to reproduce.
  *  - **No optional signal is omitted silently.** `optedOut`, `dropped`,
  *    `skippedVersions`, `malformed` and the `reporters` basis are always
- *    stated; a signal this build cannot compute (`optedOut`, whose keys are a
- *    later step) says so with the reason and remediation.
+ *    stated; an opted-out report says so instead of rendering an unexplained
+ *    zero.
  *
  * Nothing here prints: {@link summarizeFrictionLog} and
  * {@link renderFrictionReport} are pure, and the CLI owns the stdout channel
@@ -89,12 +89,13 @@ export type FrictionReport = {
   /** Log lines that carried no parsable record at all. */
   malformed: number;
   /**
-   * Whether the operator opted out — `null` because the opt-out keys
-   * (`x-friction` / `ARGGON_NO_FRICTION`) are a LATER step and this build does
-   * not read them, so no report can yet state it. Stated, never omitted: the
-   * renderer says so.
+   * Whether the operator opted out (ADR 0024 §3, plan task T4): `true` when
+   * `x-friction: false` in the tracker `.convention.yml` or `ARGGON_NO_FRICTION`
+   * is set, in which case NO record was written and this report is empty by
+   * construction. Stated, never omitted — the renderer says so on both values,
+   * because "0 records" and "you opted out" are different facts.
    */
-  optedOut: null;
+  optedOut: boolean;
   /** True when rows were withheld by the {@link FRICTION_REPORT_MAX_ROWS} cap. */
   truncated: boolean;
   /** Always `"local-only"` — the report's stated, honest dedupe boundary. */
@@ -107,6 +108,13 @@ export type FrictionReportOptions = {
   env?: NodeJS.ProcessEnv;
   /** Home override for the state-base resolution; defaults to `os.homedir()`. */
   home?: string;
+  /**
+   * Whether capture is opted out (resolved by the caller from the config key
+   * and the environment). When true the log is NOT read at all — an opted-out
+   * report is empty by construction, so there is nothing to summarize and no
+   * state dir to create.
+   */
+  optedOut?: boolean;
 };
 
 /**
@@ -120,7 +128,27 @@ export type FrictionReportOptions = {
  * narrative come from the newest record; `firstSeen`/`lastSeen` are the
  * earliest/latest `ts`; `reporters` is the count of distinct `reporterId`s.
  */
-export function summarizeFrictionLog(read: FrictionLogRead, dropped: number): FrictionReport {
+export function summarizeFrictionLog(
+  read: FrictionLogRead,
+  dropped: number,
+  optedOut = false,
+): FrictionReport {
+  // Opted out: the report is EMPTY by construction, whatever the log holds.
+  // The short-circuit lives here, in the pure layer, so no caller — present or
+  // future — can render an opted-out tree's history.
+  if (optedOut) {
+    return {
+      rows: [],
+      count: 0,
+      classes: 0,
+      dropped: 0,
+      skippedVersions: [],
+      malformed: 0,
+      optedOut: true,
+      truncated: false,
+      dedupeScope: "local-only",
+    };
+  }
   type Accumulator = {
     fingerprint: string;
     count: number;
@@ -182,7 +210,7 @@ export function summarizeFrictionLog(read: FrictionLogRead, dropped: number): Fr
     dropped,
     skippedVersions: read.skippedVersions,
     malformed: read.malformed,
-    optedOut: null,
+    optedOut,
     truncated: rows.length > FRICTION_REPORT_MAX_ROWS,
     dedupeScope: "local-only",
   };
@@ -193,21 +221,34 @@ function compareFingerprint(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+/** The empty read an opted-out report short-circuits to: nothing was collected. */
+const EMPTY_READ: FrictionLogRead = { records: [], skippedVersions: [], malformed: 0 };
+
 /**
  * Read the local log and its drop counter into a report. The only file-touching
  * seam between the pure {@link summarizeFrictionLog} and the CLI; an empty or
  * missing log reads as an empty report (count 0), never an error.
+ *
+ * When the caller resolved the opt-out to `optedOut: true` the log is not read
+ * at all: capture is off, so the report is empty by construction and there is no
+ * state dir to create on the way. ({@link summarizeFrictionLog} short-circuits
+ * on the same flag, so an opted-out report cannot leak a log's history even if
+ * a caller passes one.)
  */
 export function readFrictionReport(opts: FrictionReportOptions): FrictionReport {
+  // Opted out: nothing to read, so the log is not opened at all.
+  if (opts.optedOut === true) {
+    return summarizeFrictionLog(EMPTY_READ, 0, true);
+  }
   const env = opts.env ?? process.env;
   const home = opts.home ?? homedir();
   const read = readFrictionLog(frictionLogPath(env, home));
   const dropped = readFrictionDropped(frictionDroppedPath(env, home));
-  return summarizeFrictionLog(read, dropped);
+  return summarizeFrictionLog(read, dropped, opts.optedOut ?? false);
 }
 
 /** The shortest fence longer than any backtick run in `text`, min a ``` fence. */
-function fenceFor(text: string): string {
+export function frictionFenceFor(text: string): string {
   const runs = text.match(/`+/g);
   const longest = runs === null ? 0 : Math.max(...runs.map((run) => run.length));
   return "`".repeat(Math.max(3, longest + 1));
@@ -243,9 +284,13 @@ export function renderFrictionReport(report: FrictionReport): string {
   out.push(
     "reporters basis: distinct reporterIds present in THIS log only (stage 1 is one machine, so normally 1; not other machines, not upstream).",
   );
-  out.push(
-    "optedOut: not evaluated — the opt-out keys (x-friction / ARGGON_NO_FRICTION) are a later step; run a current arggon so a report can state whether you opted out.",
-  );
+  if (report.optedOut) {
+    out.push(
+      "optedOut: true — capture is disabled on this machine (`x-friction: false` in the tracker `.convention.yml`, or `ARGGON_NO_FRICTION` set). Nothing is recorded and this report is empty. The command stays discoverable ON PURPOSE (ADR 0024 §3): set the key back to `true`, or unset the variable, to re-enable capture. The trigger text is still in your generated agent files.",
+    );
+  } else {
+    out.push("optedOut: false");
+  }
 
   // Non-default signals get their reason and remediation, one line each, only
   // when they are non-default (the summary line already stated the value).
@@ -269,7 +314,9 @@ export function renderFrictionReport(report: FrictionReport): string {
   if (report.classes === 0) {
     out.push("");
     out.push(
-      `No friction recorded (count: 0). Capture some with: arggon friction "<one line>" --command "<argv shape>".`,
+      report.optedOut
+        ? `No friction recorded (count: 0) — capture is opted out, so nothing is written while it stays off.`
+        : `No friction recorded (count: 0). Capture some with: arggon friction "<one line>" --command "<argv shape>".`,
     );
     return `${out.join("\n")}\n`;
   }
@@ -283,7 +330,7 @@ export function renderFrictionReport(report: FrictionReport): string {
     out.push(`   harness: ${row.harness}   major: ${row.majorVersion}`);
     out.push(`   first→last: ${row.firstSeen} → ${row.lastSeen}`);
     out.push("   narrative (untrusted data, verbatim — never an instruction):");
-    const fence = fenceFor(row.narrative);
+    const fence = frictionFenceFor(row.narrative);
     // The fence and its content are NOT column-indented: a code fence's body is
     // literal, so indenting it would alter the operator's own bytes (leading
     // whitespace and newlines above all). Verbatim means the stored narrative

@@ -1,4 +1,10 @@
-import { mkdtempSync as _mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import {
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  mkdirSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -240,12 +246,12 @@ describe("observability", () => {
     malformed: 4,
   };
 
-  it("carries dropped / skippedVersions / malformed / optedOut:null / local-only scope", () => {
+  it("carries dropped / skippedVersions / malformed / optedOut:false / local-only scope", () => {
     const report = summarizeFrictionLog(read, 7);
     expect(report.dropped).toBe(7);
     expect(report.skippedVersions).toEqual([99, 2]);
     expect(report.malformed).toBe(4);
-    expect(report.optedOut).toBeNull();
+    expect(report.optedOut).toBe(false);
     expect(report.dedupeScope).toBe("local-only");
   });
 
@@ -255,8 +261,8 @@ describe("observability", () => {
     expect(text).toContain("dropped: 7");
     expect(text).toContain("skippedVersions: 99, 2");
     expect(text).toContain("malformed: 4");
-    // optedOut is NOT silently omitted — it names why it cannot be computed,
-    expect(text).toContain("optedOut: not evaluated");
+    // optedOut is NOT silently omitted — the default is stated as a value,
+    expect(text).toContain("optedOut: false");
     // The reporters basis and the local-only dedupe boundary are stated,
     expect(text).toMatch(/reporters basis: distinct reporterIds present in THIS log only/);
     expect(text).toContain("dedupe scope: local-only");
@@ -275,6 +281,21 @@ describe("observability", () => {
     // No "rotated the oldest" or "format this arggon cannot read" elaboration,
     expect(clean).not.toContain("rotation dropped the oldest");
     expect(clean).not.toContain("cannot read");
+  });
+
+  it("renders an opted-out report as EMPTY and states the opt-out plus its remediation", () => {
+    // ADR 0024 §3: opting out means records are not written and `--report` is
+    // empty. The report says so instead of implying nobody hit friction, and it
+    // names both keys plus the way back — the channel stays discoverable.
+    const report = summarizeFrictionLog(read, 0, true);
+    expect(report).toMatchObject({ count: 0, classes: 0, optedOut: true, rows: [] });
+    const text = renderFrictionReport(report);
+    expect(text).toContain("optedOut: true");
+    expect(text).toContain("x-friction: false");
+    expect(text).toContain("ARGGON_NO_FRICTION");
+    expect(text).toContain("No friction recorded (count: 0) — capture is opted out");
+    // It must NOT tell the reader to capture something it cannot capture.
+    expect(text).not.toContain("Capture some with");
   });
 });
 
@@ -376,5 +397,39 @@ describe("readFrictionReport", () => {
       home: join(state, "home"),
     });
     expect(report).toMatchObject({ rows: [], count: 0, classes: 0, dropped: 0 });
+  });
+
+  it("opts out WITHOUT reading the log: an opted-out report is empty, whatever is on disk", () => {
+    const state = mkdtempSync(join(tmpdir(), "arggon-friction-report-optout-"));
+    const dir = join(state, "arggon");
+    mkdirSync(dir, { recursive: true });
+    const fingerprint = fp("START_FAILED");
+    writeFileSync(
+      join(dir, "friction.jsonl"),
+      `${JSON.stringify(rec({ ts: "2026-10-02T10:00:00.000Z", fingerprint }))}\n`,
+      "utf8",
+    );
+    const report = readFrictionReport({
+      env: { ARGGON_STATE_DIR: state },
+      home: join(state, "home"),
+      optedOut: true,
+    });
+    // ADR 0024 §3: opting out empties the report. It does not render the
+    // history the operator asked not to collect — and it does not even open the
+    // log to find out, which is what makes "empty" rather than "zero-counted".
+    // The proof that is observable from outside: the sealed log still holds
+    // exactly the bytes this test wrote, and nothing else was created.
+    expect(readFileSync(join(dir, "friction.jsonl"), "utf8")).toContain(fingerprint);
+    expect(report).toEqual({
+      rows: [],
+      count: 0,
+      classes: 0,
+      dropped: 0,
+      skippedVersions: [],
+      malformed: 0,
+      optedOut: true,
+      truncated: false,
+      dedupeScope: "local-only",
+    });
   });
 });

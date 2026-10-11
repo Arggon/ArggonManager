@@ -137,6 +137,63 @@ describe("x-playbooks (playbook staleness)", () => {
   });
 });
 
+describe("x-friction (adopter-friction opt-out, ADR 0024 §3)", () => {
+  it("defaults to capture null when the file or the key is missing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-xfr-missing-"));
+    try {
+      expect(readConventionConfig(dir).friction).toEqual({ capture: null });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    expect(parseConventionConfig("version: 5\n").friction).toEqual({ capture: null });
+  });
+
+  it("reads the documented scalar spelling x-friction: false", () => {
+    expect(parseConventionConfig("x-friction: false\n").friction).toEqual({ capture: false });
+    expect(parseConventionConfig("x-friction: true\n").friction).toEqual({ capture: true });
+    // A trailing comment is still a comment, not a value.
+    expect(parseConventionConfig("x-friction: false # later\n").friction).toEqual({
+      capture: false,
+    });
+  });
+
+  it("reads the mapping spelling and IGNORES an unknown nested key", () => {
+    const config = parseConventionConfig(
+      ["version: 5", "x-friction:", "  capture: false", "  future-option: 7", ""].join("\n"),
+    );
+    expect(config.friction).toEqual({ capture: false });
+    expect(parseConventionConfig("x-friction:\n  future-option: 7\n").friction).toEqual({
+      capture: null,
+    });
+  });
+
+  it("refuses a scalar x-friction that is not a boolean token", () => {
+    // The YAML-1.1-only spellings, a quoted boolean, and a stray word are all
+    // refused: an opt-out read out of a string is how an opted-out tree
+    // captures anyway (bug-convention-parser-rejects-valid-yaml-force-rescaffolds).
+    expect(() => parseConventionConfig("x-friction: yes\n")).toThrow(
+      /'x-friction' must be a boolean/,
+    );
+    expect(() => parseConventionConfig("x-friction: 'false'\n")).toThrow(
+      /'x-friction' must be a boolean/,
+    );
+    expect(() => parseConventionConfig("x-friction: nope\n")).toThrow(
+      /'x-friction' must be a boolean/,
+    );
+    expect(() => parseConventionConfig("x-friction:\n  capture: yes\n")).toThrow(
+      /'capture' must be a boolean/,
+    );
+  });
+
+  it("is unaffected by x-tracker's own options and vice versa", () => {
+    const config = parseConventionConfig(
+      ["x-tracker:", "  auto-commit: false", "x-friction: false", ""].join("\n"),
+    );
+    expect(config.tracker.autoCommit).toBe(false);
+    expect(config.friction).toEqual({ capture: false });
+  });
+});
+
 describe("x-views (saved views)", () => {
   it("defaults to no views when the file is missing", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-xviews-missing-"));

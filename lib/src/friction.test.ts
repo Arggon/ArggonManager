@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync as _mkdtempSync,
   readFileSync,
@@ -23,6 +24,7 @@ import {
   FrictionError,
   appendFrictionRecord,
   buildFrictionRecord,
+  clearFrictionLog,
   frictionFingerprint,
   frictionFingerprintMaterial,
   frictionLogPath,
@@ -1229,5 +1231,41 @@ describe("redaction at write", () => {
     expect(record.harness).toBe("opencode");
     expect(record.commandShape).toBe("start --worktree <arg>");
     expect(record.narrative).toBe("arggon start --worktree failed twice");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `--clear` — the complete local rollback (plan T4, spec §Persistence)
+// ---------------------------------------------------------------------------
+
+describe("clearFrictionLog", () => {
+  it("removes the whole log and reports what it held", () => {
+    const state = mkdtempSync(join(tmpdir(), "arggon-friction-clear-"));
+    const logPath = join(state, "arggon", "friction.jsonl");
+    const droppedPath = join(state, "arggon", "friction.dropped");
+    mkdirSync(join(state, "arggon"), { recursive: true });
+    writeFileSync(
+      logPath,
+      `${JSON.stringify({ v: 1, ts: "2026-01-01T00:00:00.000Z", fingerprint: "a" })}\nnot json\n`,
+      "utf8",
+    );
+    writeFileSync(droppedPath, "9\n", "utf8");
+    const result = clearFrictionLog(logPath, droppedPath);
+    expect(result).toEqual({ path: logPath, cleared: 2 });
+    expect(existsSync(logPath)).toBe(false);
+    // The cumulative drop counter goes with it: a cleared log starts fresh.
+    expect(existsSync(droppedPath)).toBe(false);
+  });
+
+  it("is idempotent on a missing file and on an empty file (cleared: 0, never an error)", () => {
+    const state = mkdtempSync(join(tmpdir(), "arggon-friction-clear-"));
+    const logPath = join(state, "arggon", "friction.jsonl");
+    const droppedPath = join(state, "arggon", "friction.dropped");
+    expect(clearFrictionLog(logPath, droppedPath)).toEqual({ path: logPath, cleared: 0 });
+    // Clearing must not create the state dir just to empty it.
+    expect(existsSync(join(state, "arggon"))).toBe(false);
+    mkdirSync(join(state, "arggon"), { recursive: true });
+    writeFileSync(logPath, "", "utf8");
+    expect(clearFrictionLog(logPath, droppedPath).cleared).toBe(0);
   });
 });
