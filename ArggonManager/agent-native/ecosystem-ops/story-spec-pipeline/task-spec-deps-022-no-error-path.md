@@ -23,11 +23,14 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-spec-deps-022-no-error-p
 
 ## Context
 
-<!-- Why this task exists. -->
+After the renumber wave (PR #680) and the decision-pending fix (PR #679) landed, `spec analyze --baseline ArggonManager/spec-analyze-baseline.json` on clean main reads **1 new, 2 resolved, 4 unchanged, exit 1**. The single NEW finding is a *relocation*, not a new defect: the pre-existing `no-error-path` finding recorded against `spec-deps-001.md` (resolved by the rename) reappears against the renamed `spec-deps-022.md`, which still published no error/failure path. This task fixes the spec, so re-baselining records a clean state instead of hiding one (`task-release-pipeline-baseline-new-collisions`).
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [x] `spec analyze` (fresh, no `--baseline`) no longer reports `no-error-path` for `docs/specs/spec-deps-022.md` (before/after evidence in the PR)
+- [x] The fix is a real failure-path section describing the spec's error/failure behavior — §5 `Especificación de errores` (table + caller obligations), matching the `spec-sync-001.md` house idiom and citing `lib/src/update.ts`, `lib/src/validate.ts`, `lib/src/filter.ts`, `ArggonManager/docs/convention.md` and `ArggonManager/docs/json-output.md`
+- [x] No changes to either baseline JSON and no renumber-style renames (diff is the single spec file: §5 added, the old §5/§6 renumbered to §6/§7, plus the dated renumber-note amendment)
+- [x] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green; `arggon validate` ok
 
 ## Notes
 
