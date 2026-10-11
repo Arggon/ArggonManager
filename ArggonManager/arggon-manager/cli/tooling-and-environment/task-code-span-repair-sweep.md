@@ -110,3 +110,17 @@ CI green on PR #391 @ efff977 (draft, base opencode2): `cli` pass (3m25s, run 35
 
 ### 2026-09-22 @Arggon
 Coordinator note: 13 docs repaired with the #387 technique (+5 found in the same class) and the guard now carries the corpus-wide rule 'prettier never rewrites a code span's source text' with mutation coverage (reverting node.md fails with the exact span); tracker quotes left as history with documented exclusion. Gates 1491 tests, lint, validate, spec validate, prettier check/write byte-stable; CI pass on 48f2eca. Merged with merge commit; item flipped to done.
+
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — context + acceptance
+
+**Context.** Filed from the prettier-idempotency maker's report (PR #707): 45 spans in the prose corpus sit at prettier's settled column-0 state (the "glued to column 0" shape the drift converges to). They render correctly again once settled — prettier --check passes them — but their SOURCE is mangled (the line ending plus surplus indent inside the parsed span value), so future edits near them are fragile and every future prettier pass is one more chance for the drift to reappear in a new position.
+
+After PR #707 the drift cannot be WRITTEN again (rule 5 in cli/src/prose-format.test.ts) — the remaining work is repairing what is already written down.
+
+Acceptance:
+- [ ] The 45 spans are enumerated (the maker's finding; reproduce the count with a grep/counts script before starting — do not trust the number blindly)
+- [ ] Each span is rewritten to the convergent form (what a prettier --write would produce on the SAFE form — see the SPAN_NEAR_WRAP_SAFE keycase) with no semantic change to the prose
+- [ ] After the sweep: prettier --check still names the identical (or smaller) file set than before; prose-format rules 4+5 stay green; no NEW prettier churn anywhere
+- [ ] A count-metrics comment on this item records before/after per the same samples the maker used
+- [ ] npm test, npm run build, npm run check:plugin, npm run lint green
