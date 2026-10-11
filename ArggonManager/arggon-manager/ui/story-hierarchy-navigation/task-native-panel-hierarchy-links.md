@@ -54,3 +54,7 @@ Gates observed (all in worktree):
 PR impact class (for delivery lead to state on PR): Behavioral (panel is a shipped adapter seam) with the ADR 0016 adopter-upgrade-channel reference per agents.md Changing the methodology itself.
 
 Not done: acceptance boxes unticked, status untouched (delivery lead flips after merge). No tracker items filed.
+
+### handoff 2026-10-11 @arggon-maker — next: Open PR from feat/task-native-panel-hierarchy-links stating Behavioral impact plus ADR 0016 channel
+- branch: feat/task-native-panel-hierarchy-links
+- open questions: Digit binds 1-9 unit-pinned only, no live OpenCode runtime probe; playbook TUI key table update deferred to lead
