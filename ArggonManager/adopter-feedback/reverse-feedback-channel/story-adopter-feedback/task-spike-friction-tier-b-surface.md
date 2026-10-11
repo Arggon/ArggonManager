@@ -1,15 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-spike-friction-tier-b-surface
 title: "Spike: Issues or Discussions as the tier-B prefilled surface?"
+assignee: arggon-delivery-lead
+branch: feat/task-spike-friction-tier-b-surface
 parent: story-adopter-feedback
 labels: [research]
 priority: p3
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-11"
+claimed_at: "2026-10-11T04:19:15.714Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-spike-friction-tier-b-surface
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-spike-friction-tier-b-surface.md
   Leaves live only under a story. id is the filename stem: task-spike-friction-tier-b-surface.
