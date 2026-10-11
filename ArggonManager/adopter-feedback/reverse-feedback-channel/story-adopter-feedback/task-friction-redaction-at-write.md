@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-friction-redaction-at-write
 title: Redact friction records at write time (never at render)
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [method]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T09:28:35.044Z"
 depends_on: [task-friction-capture-command]
 worktree_path: /home/arggon/Projects/ArggonManager-task-friction-redaction-at-write
 ---
