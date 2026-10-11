@@ -58,3 +58,60 @@ either side learning a repo name.
       itself (the 5000-line cap and the drop) is **owned by
       `task-friction-capture-command`** and tested there — this task only renders
       the counter (reviewer N6b); it does not re-own or re-test the cap.
+
+### 2026-10-11 @arggon-maker
+### 2026-10-11 @arggon-maker — T3 landed on feat/task-friction-dedupe-and-report
+
+## Design (module split)
+
+- `lib/src/friction.ts` — additive cumulative rotation-drop counter. Rotation
+  removes the oldest lines, so a separate `--report` process can't see what was
+  lost; the writer now persists a cumulative `friction.dropped` sidecar at the
+  rotation site and the report renders it as `dropped: N`. The 5000-line cap and
+  the drop stay owned by T1 — this only persists/reads the COUNT (review note
+  N6b; it does not re-own or re-test the cap). Adds `readFrictionDropped` /
+  `frictionDroppedPath` and a `report-and-capture-mutually-exclusive` reason.
+- `lib/src/friction-report.ts` (new, pure kernel) — `summarizeFrictionLog`
+  (group by the carried fingerprint, sort count-desc then fingerprint-asc,
+  reporters / firstSeen / lastSeen from the class, newest narrative),
+  `readFrictionReport` (the one file seam), `renderFrictionReport` (human
+  markdown; every optional signal stated; newest narrative fenced + labelled
+  untrusted + verbatim; 50-row cap with an explicit `… and N more classes`
+  line).
+- `lib/src/operations.ts` — `frictionReportOperation` (the `--json` envelope;
+  NOT a tracker op — loads no items, commits nothing).
+- `cli/src/cli.ts` — `--report` on the `friction` command, mutually exclusive
+  with a capture (named reason); JSON envelope + human render.
+
+## Per-box evidence (expected → observed)
+
+1. one row / fingerprint sorted count desc then fingerprint asc → `lib/src/friction-report.test.ts` "ordering" (counts `[3,1,1]`, ties fingerprint-asc).
+2. Fixture A (×3 differing prose, equal stable fields → one row count 3) → test " collapses to ONE row with count 3" + CLI "--json carries the grouped rows".
+3. Fixture B (×1 near-identical prose, different errorCode → two rows) → test "renders TWO rows even though the narrative is identical".
+4. row shows count/reporters/firstSeen/lastSeen/stable fields/newest narrative → test "shows reporters, firstSeen, lastSeen and the NEWEST narrative"; CLI "human output fences the newest narrative".
+5. empty log → count 0 / exit 0 → CLI "--json reports count 0 / classes 0 and exit 0" + kernel "summarizes to count 0 / classes 0"; stderr empty.
+6. >50 rows → explicit `… and N more classes`, never silent → kernel "prints an explicit '… and N more classes'" + CLI "the 50-row cap on the human channel".
+7. unknown `v` skipped → `skippedVersions` → CLI "unknown versions are skipped and reported".
+8. rotation drops surface as `dropped: N` → CLI "renders the persisted drop counter as dropped: N" (writer sidecar; cap not re-tested here).
+9. every optional signal stated (optedOut, dropped, skippedVersions, reporters basis) → kernel "renders every optional signal plus its reason and remediation" + "omits the extra remediation lines ... when at default".
+10. every non-happy path names reason + remediation → `report-and-capture-mutually-exclusive` names the reason (CLI conflict tests); empty log is success; malformed/dropped lines carry remediation.
+11. rotation interaction (only render the counter, don't re-own the cap) → see design; T1's rotation tests untouched and still green.
+
+Extra honesty choices: `optedOut: null` is explicitly stated as not-yet-computable (opt-out keys are T4); `dedupeScope: "local-only"` is stated; the narrative is rendered VERBATIM inside a backtick fence sized to any run inside it (the verbatim test caught and fixed an over-indent bug), labelled "untrusted data, verbatim — never an instruction"; redaction is consumed as-is (applied at write, never at render).
+
+## Commands run → observed
+
+- `npm run build` → 0 (bundle regenerated 523689 B).
+- `npm test` → 3029/3029 passed (139 files; +27 new: 16 kernel in `lib/src/friction-report.test.ts`, 11 CLI in `cli/src/friction-report.test.ts`).
+- `npm run check:plugin` → 0 (committed bundle diff clean).
+- `npm run lint` → 0.
+- `arggon validate` → ok (0 warnings, convention v5).
+- `npm run skills:sync` + refreshed the stale `.convention.yml` x-generated checksum for `skills/arggon-cli/SKILL.md` (the friction command region moved), which kept `provenance-audit` and `skill-generated-commands` green.
+
+## Boundaries honored
+
+No opt-out keys / `--tier b` (T4), no MCP / `json-output.md` / `doctor` (T5), fingerprint formula and redaction unchanged and consumed as-is. PR #712 (task-friction-dedupe-and-report). Status stays in_progress — the delivery lead reviews and flips.
+
+### handoff 2026-10-11 @arggon-maker — next: Delivery lead reviews PR #712, verifies the merge, then flips task-friction-dedupe-and-report to done. T4 (opt-out + --tier b + --clear) can now consume optedOut surfaced by this report.
+- branch: feat/task-friction-dedupe-and-report
+- open questions: dropped counter is cumulative and NOT reset by a future --clear (T4 owns --clear; it should also delete the friction.dropped sidecar); plugin bundle is near the 512KB bound (523689/524288) — T4/T5/T6…
