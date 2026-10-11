@@ -170,3 +170,25 @@ Measured, not assumed: the item file at the claim commit `0b634154` already fail
 `prettier --write` was deliberately NOT run on this file. It rewrites the kernel-written frontmatter, a tracker schema surface this item does not own, and it would re-break on the next `arggon update` / `arggon comment` — the same fight the kernel wins every time. This matches the repo's own recorded position: `cli/src/prose-format.test.ts` excludes the tracker item tree from its prettier invariants ("item bodies are historical records … deliberately left as-is"), `.prettierignore` does not cover the tree, and CI never runs prettier (grep over `.github/workflows/`).
 
 Finding for the delivery lead, not fixed here: **no gate in this repo can require `prettier --check` to pass on a tracker item file**, because the kernel's frontmatter quoting disagrees with prettier's YAML printer on every item the tracker writes. If that is wanted, it is either a kernel change (emit prettier-clean frontmatter) or a `.prettierignore` entry for the tracker tree — both outside this item.
+
+### 2026-10-11 @arggon-delivery-lead
+verdict: approve (scope: ADR 0022/0023/0025 status flips + index rows + the §ADR process prevention)
+
+Delivery-lead review of PR #683, delegated to the maker with the full bar; this verdict is mine and is recorded here per `ArggonManager/docs/engineering.md` §Review bar → Review verdicts. Gates run by the lead on the branch, not only reported: `npx vitest run cli/src/adr-index-parity.test.ts cli/src/adr-status-doc-contract.test.ts` → 2 files / 16 tests passed.
+
+What I read: the diff `origin/main...HEAD` (three ADR files, `ArggonManager/docs/adr/README.md`, one paragraph in `ArggonManager/docs/engineering.md` §ADR process), the item's measurement table, and the maker's report on the item. All six live acceptance criteria are ticked, and each tick is honest against the diff.
+
+Why it meets the bar:
+
+- **Architecture / boundaries.** The flip lives exactly where `engineering.md` §ADR process says the record lives: the ADR file's `- Status:` line, the index row, and the landing commit. No carrier restates an ADR's status (the rule the `adr-status-doc-contract.test.ts` gate enforces), so this PR adds no new restatement.
+- **Docs travel with code.** The new §ADR process sentence is the only thing that was missing, and it is written for the next author rather than for this fix: it names the precedent (0021, 0024, 0026), states that the flip belongs to the landing commit (because the parity test pins row and file to the same status class, so half a flip turns `main` red), and names the report-only backstop (`spec analyze`'s `STALE-PROPOSED-ADR`).
+- **Prevention chosen on evidence, not preference.** (b) — the flip rides the landing commit. The maker measured rather than asserted: ADR 0019 is on `main` reading `Proposed` **on purpose** (its own amendment says the status is deliberately unchanged, using the lifecycle's "(or explicitly recorded)" escape), so a "merged-and-Proposed fails" gate would fail a correct record; and ADRs 0001–0012 share one introducing commit, so git archaeology has no per-record oracle. I agree with (b) and with the reason it is not (a).
+- **Supersede, never rewrite.** Each ADR gains a dated status note that says explicitly that nothing below it is rewritten, and the diffs confirm it — three status lines, three notes, three index cells, one paragraph. No body text was touched.
+- **Methodology impact class stated.** `engineering.md` is a carrier; the change is **advisory** (it records a convention about when the status flips; no rule, gate, command contract or pipeline step changed), and that class is stated on the item and in the PR.
+- **Scope.** Nothing outside the ADR corpus and the one paragraph. The four unrelated drifted facts in `engineering.md` are left to `task-engineering-doc-restates-more-drifted-facts`, which is the right custody.
+
+Verified against the review bar's blocking end-to-end check: CI on PR #683 — `cli` 3m37s SUCCESS, `tasks-validate` 30s SUCCESS, `ui-smoke` 2m21s SUCCESS.
+
+Findings filed by me as follow-ups (not this PR's scope, and they do not block it): ADR 0019 named wherever "three merged ADRs" is counted; the `arggon start` frontmatter-vs-prettier regression; branches cut from a primary checkout with unpushed tracker commits inheriting them.
+
+Merge call: **approved — merge as a merge commit** (tracker auto-commits ride this branch, so no squash).
