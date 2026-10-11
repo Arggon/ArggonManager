@@ -91,3 +91,7 @@ Exact ops change, no code: Settings → General → Features → enable **Discus
 ## How this feeds `task-friction-tier-b-url-and-optout`
 
 That task **stays `todo`** (it depends on `task-friction-dedupe-and-report`) and is untouched by this spike. The answer pins its tier-B URL constant to **Issues** — unchanged from the spec — with amendments (1) and (2) above landing in the same PR that implements it; that PR also creates the `adopter-friction` label and the Issue Forms template, which do not exist yet. No new items filed: the only new fact worth acting on (the `gh discussion` subcommand postdating the plan's stage-2 wording) is recorded here and travels with that task's feed rather than as new scope.
+
+### handoff 2026-10-11 @ses_ed69ddc7affeBPLsLP78ghgbNf (session: ses_ed69ddc7affeBPLsLP78ghgbNf) — next: Delivery lead reviews the 2026-10-11 comment (recommendation: Issues) and hands the URL constant + Issue Forms template amendments to task-friction-tier-b-url-and-optout, which stays todo.
+- branch: feat/task-spike-friction-tier-b-surface
+- open questions: Product owner may prefer the Discussions fallback (one repo setting, named in the comment); if so the spec tier section and the tier-B acceptance change with the URL constant.
