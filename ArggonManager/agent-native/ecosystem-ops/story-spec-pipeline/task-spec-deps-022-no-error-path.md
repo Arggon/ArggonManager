@@ -77,3 +77,7 @@ GATES (worktree; npm run build ran first because headless-ci asserts dist/ exist
     arggon validate ..... ok (0 warning(s), convention v5)
 
 Item not flipped to done — completion is the delivery lead's call after merge.
+
+### handoff 2026-10-11 @arggon-maker — next: Merge PR #686, then let task-release-pipeline-baseline-new-collisions re-save both baselines: spec analyze now reads 0 new / 2 resolved / 4 unchanged (exit 0) instead of 1 new.
+- branch: feat/task-spec-deps-022-no-error-path
+- open questions: Does the delivery lead want an acceptance row added in spec-deps-022 §7 for the filter-token row too, or is the §5 reference row enough?;Should spec-opencode-seam-010.md (the other no-error-path surv…
