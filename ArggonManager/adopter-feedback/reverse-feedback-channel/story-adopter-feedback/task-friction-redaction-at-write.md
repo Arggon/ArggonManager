@@ -82,16 +82,16 @@ Decisions the reviewer should confirm: path placeholders exempt from the 50% rat
 ### handoff 2026-10-11 @Arggon — next: Review PR #701 on branch feat/task-friction-redaction-at-write: confirm the recorded redaction decisions (path-exempt 50% rate, github_pat_, PEM-before-assignment pass order) and merge; T3 (report re…
 - branch: feat/task-friction-redaction-at-write
 - open questions: Should unquoted multi-word assignment values (password=correct horse) be redacted too, or stay the recorded token-shaped boundary? Does the standards reviewer want scp-style git@host:owner/repo URLs …
-- [ ] Redaction is applied on the write path; the persisted line and the `--report` output are byte-identical in their non-placeholder content.
-- [ ] `-----BEGIN … PRIVATE KEY-----` blocks are replaced whole.
-- [ ] `gh[pousr]_…`, `sk-…`, `npm_…`, `AKIA…`, JWTs and `key|token|secret|password|passwd|credential=<8+ chars>` assignments are replaced.
-- [ ] URLs keep the host; query and fragment are dropped.
-- [ ] `C:\Users\a\b`, `c:/Users/a/b`, `\\?\C:\Users\a\b`, `/c/Users/a/b` and `/private/var/folders/x` collapse to one placeholder (tests for every form).
-- [ ] A child path is replaced before its parent, so a replaced parent cannot orphan a leaked child (test).
-- [ ] At most 20 substitutions per field; a field whose redaction rate exceeds 50% is replaced wholesale with `[redacted: >50% of field]`.
-- [ ] The end-to-end path is covered: `arggon friction --evidence <file>` persists a redacted `--evidence` value (test with a file containing a private key and an absolute path).
-- [ ] `--error` values and `commandShape` are redacted through the same pass (a token can arrive in argv).
-- [ ] **Non-goal honored:** no "capture everything and scrub later" path exists — only the whitelisted fields are ever persisted.
+- [x] Redaction is applied on the write path; the persisted line and the `--report` output are byte-identical in their non-placeholder content.
+- [x] `-----BEGIN … PRIVATE KEY-----` blocks are replaced whole.
+- [x] `gh[pousr]_…`, `sk-…`, `npm_…`, `AKIA…`, JWTs and `key|token|secret|password|passwd|credential=<8+ chars>` assignments are replaced.
+- [x] URLs keep the host; query and fragment are dropped.
+- [x] `C:\Users\a\b`, `c:/Users/a/b`, `\\?\C:\Users\a\b`, `/c/Users/a/b` and `/private/var/folders/x` collapse to one placeholder (tests for every form).
+- [x] A child path is replaced before its parent, so a replaced parent cannot orphan a leaked child (test).
+- [x] At most 20 substitutions per field; a field whose redaction rate exceeds 50% is replaced wholesale with `[redacted: >50% of field]`.
+- [x] The end-to-end path is covered: `arggon friction --evidence <file>` persists a redacted `--evidence` value (test with a file containing a private key and an absolute path).
+- [x] `--error` values and `commandShape` are redacted through the same pass (a token can arrive in argv).
+- [x] **Non-goal honored:** no "capture everything and scrub later" path exists — only the whitelisted fields are ever persisted.
 
 ### 2026-10-11 @arggon-delivery-lead
 ### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merge (PR #701)
