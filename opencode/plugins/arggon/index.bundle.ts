@@ -30,6 +30,7 @@ __arggonEdges.set("lib/src/create.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/create.ts\u0000./relations.js", "lib/src/relations.ts")
 __arggonEdges.set("lib/src/create.ts\u0000./status.js", "lib/src/status.ts")
 __arggonEdges.set("lib/src/create.ts\u0000./tracker-commit.js", "lib/src/tracker-commit.ts")
+__arggonEdges.set("lib/src/friction.ts\u0000./worktree.js", "lib/src/worktree.ts")
 __arggonEdges.set("lib/src/get-open-prs.ts\u0000./detect-repo.js", "lib/src/detect-repo.ts")
 __arggonEdges.set("lib/src/handoff.ts\u0000./comment.js", "lib/src/comment.ts")
 __arggonEdges.set("lib/src/import-issues.ts\u0000./convention.js", "lib/src/convention.ts")
@@ -50,6 +51,7 @@ __arggonEdges.set("lib/src/index.ts\u0000./convention.js", "lib/src/convention.t
 __arggonEdges.set("lib/src/index.ts\u0000./create.js", "lib/src/create.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./dates.js", "lib/src/dates.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./filter.js", "lib/src/filter.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./friction.js", "lib/src/friction.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./frontmatter.js", "lib/src/frontmatter.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./get-open-prs.js", "lib/src/get-open-prs.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./handoff.js", "lib/src/handoff.ts")
@@ -102,6 +104,7 @@ __arggonEdges.set("lib/src/operations.ts\u0000./comment.js", "lib/src/comment.ts
 __arggonEdges.set("lib/src/operations.ts\u0000./contract.js", "lib/src/contract.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./convention.js", "lib/src/convention.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./create.js", "lib/src/create.ts")
+__arggonEdges.set("lib/src/operations.ts\u0000./friction.js", "lib/src/friction.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./handoff.js", "lib/src/handoff.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./import-issues.js", "lib/src/import-issues.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./items.js", "lib/src/items.ts")
@@ -1860,6 +1863,415 @@ function matchesPredicate(item, pred, blockedByIndex, ancestorIndex) {
 }
 })
 
+__arggonModules.set("lib/src/friction.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FrictionError = exports.FRICTION_DEFAULT_HARNESS = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SALT_BYTES = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_HARNESS_CAP = exports.FRICTION_ERROR_CODE_CAP = exports.FRICTION_COMMAND_SHAPE_CAP = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_MAX_LINES = exports.FRICTION_FORMAT_VERSION = void 0;
+exports.normalizeCommandShape = normalizeCommandShape;
+exports.frictionFingerprint = frictionFingerprint;
+exports.frictionReporterId = frictionReporterId;
+exports.frictionMajorVersion = frictionMajorVersion;
+exports.frictionStateBase = frictionStateBase;
+exports.frictionStateDir = frictionStateDir;
+exports.frictionLogPath = frictionLogPath;
+exports.frictionSaltPath = frictionSaltPath;
+exports.readOrCreateMachineSalt = readOrCreateMachineSalt;
+exports.resolveRepoAbsPath = resolveRepoAbsPath;
+exports.buildFrictionRecord = buildFrictionRecord;
+exports.appendFrictionRecord = appendFrictionRecord;
+exports.readFrictionLog = readFrictionLog;
+const node_crypto_1 = require("node:crypto");
+const node_child_process_1 = require("node:child_process");
+const node_fs_1 = require("node:fs");
+const node_os_1 = require("node:os");
+const node_path_1 = require("node:path");
+const worktree_js_1 = require("./worktree.js");
+exports.FRICTION_FORMAT_VERSION = 1;
+exports.FRICTION_MAX_LINES = 5000;
+exports.FRICTION_LOG_FILE_NAME = "friction.jsonl";
+exports.FRICTION_SALT_FILE_NAME = "machine-salt";
+const SHAPE_PLACEHOLDER = "<arg>";
+const NEWLINE = "\n";
+const MARKER = "…";
+const LONE_SURROGATE = /\p{Cs}/gu;
+const ABSENT = "";
+exports.FRICTION_COMMAND_SHAPE_CAP = 200;
+exports.FRICTION_ERROR_CODE_CAP = 64;
+exports.FRICTION_HARNESS_CAP = 32;
+exports.FRICTION_NARRATIVE_CAP = 2000;
+exports.FRICTION_EVIDENCE_CAP = 4000;
+exports.FRICTION_ENV_FACT_CAP = 64;
+exports.FRICTION_FINGERPRINT_CHARS = 16;
+exports.FRICTION_REPORTER_ID_CHARS = 12;
+exports.FRICTION_SALT_BYTES = 32;
+exports.FRICTION_STATE_SUBDIR = "arggon";
+exports.FRICTION_DEFAULT_HARNESS = "unknown";
+var ShapeTokenKind;
+(function (ShapeTokenKind) {
+    ShapeTokenKind[ShapeTokenKind["Keep"] = 0] = "Keep";
+    ShapeTokenKind[ShapeTokenKind["Value"] = 1] = "Value";
+})(ShapeTokenKind || (ShapeTokenKind = {}));
+const FLAG_TOKEN = /^--?[A-Za-z][\w-]*(=\S*)?$/;
+const VALUE_TOKENS = [
+    /[/\\]/,
+    /^[A-Za-z0-9][A-Za-z0-9._-]*\.[A-Za-z0-9]+$/,
+    /^[0-9a-f]{7,64}$/i,
+    /^(gh[pousr]_|npm_|sk-|AKIA)[A-Za-z0-9_-]{8,}$/,
+    /^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$/,
+    /^[A-Za-z][A-Za-z0-9]*(-[A-Za-z0-9]+)+$/,
+    /^\d+(?:-\d+){2,}$/,
+];
+const BINARY_TOKEN = "arggon";
+const PLACEHOLDER_TOKEN = /^<[a-z][a-z0-9-]*>$/;
+function classifyShapeToken(token) {
+    if (FLAG_TOKEN.test(token))
+        return ShapeTokenKind.Keep;
+    if (PLACEHOLDER_TOKEN.test(token))
+        return ShapeTokenKind.Value;
+    return VALUE_TOKENS.some((re) => re.test(token)) ? ShapeTokenKind.Value : ShapeTokenKind.Keep;
+}
+function normalizeCommandShape(raw) {
+    const tokens = raw
+        .trim()
+        .split(/\s+/)
+        .filter((token) => token !== "");
+    if (tokens[0] === BINARY_TOKEN)
+        tokens.shift();
+    const kept = [];
+    for (const token of tokens) {
+        if (classifyShapeToken(token) === ShapeTokenKind.Value) {
+            if (kept[kept.length - 1] === SHAPE_PLACEHOLDER)
+                continue;
+            kept.push(SHAPE_PLACEHOLDER);
+            continue;
+        }
+        const eq = token.indexOf("=");
+        if (eq > 0 && FLAG_TOKEN.test(token.slice(0, eq))) {
+            const flag = token.slice(0, eq);
+            const value = token.slice(eq + 1);
+            kept.push(`${flag}=${classifyShapeToken(value) === ShapeTokenKind.Value ? SHAPE_PLACEHOLDER : value}`);
+            continue;
+        }
+        kept.push(token);
+    }
+    return kept.join(" ");
+}
+function capField(value, cap) {
+    const clean = value.replace(LONE_SURROGATE, "");
+    if (clean.length <= cap)
+        return clean;
+    let end = cap - MARKER.length;
+    const last = clean.charCodeAt(end - 1);
+    if (last >= 0xd800 && last <= 0xdbff)
+        end -= 1;
+    return clean.slice(0, end) + MARKER;
+}
+function sha256Hex(value) {
+    return (0, node_crypto_1.createHash)("sha256").update(value, "utf8").digest("hex");
+}
+function frictionFingerprint(args) {
+    const material = [
+        args.commandShape,
+        args.errorCode ?? ABSENT,
+        args.harness,
+        args.majorVersion,
+    ].join("\u001f");
+    return sha256Hex(material).slice(0, exports.FRICTION_FINGERPRINT_CHARS);
+}
+function frictionReporterId(machineSalt, repoAbsPath) {
+    return sha256Hex(machineSalt + repoAbsPath).slice(0, exports.FRICTION_REPORTER_ID_CHARS);
+}
+function frictionMajorVersion(version) {
+    const first = version.trim().replace(/^v/, "").split(".")[0] ?? "";
+    return /^\d+$/.test(first) ? first : "unknown";
+}
+function frictionStateBase(env, home) {
+    const override = env.ARGGON_STATE_DIR?.trim();
+    return override !== undefined && override !== "" ? override : (0, worktree_js_1.worktreeStateBase)(env, home);
+}
+function frictionStateDir(env, home) {
+    return (0, node_path_1.join)(frictionStateBase(env, home), exports.FRICTION_STATE_SUBDIR);
+}
+function frictionLogPath(env, home) {
+    return (0, node_path_1.join)(frictionStateDir(env, home), exports.FRICTION_LOG_FILE_NAME);
+}
+function frictionSaltPath(env, home) {
+    return (0, node_path_1.join)(frictionStateDir(env, home), exports.FRICTION_SALT_FILE_NAME);
+}
+const SALT_HEX = /^[0-9a-f]{64}$/;
+function errorMessage(error) {
+    return (error instanceof Error ? error.message : String(error)).split("\n")[0] ?? "unknown error";
+}
+class FrictionError extends Error {
+    reason;
+    path;
+    constructor(reason, message, path) {
+        super(message);
+        this.name = "FrictionError";
+        this.reason = reason;
+        if (path !== undefined)
+            this.path = path;
+    }
+}
+exports.FrictionError = FrictionError;
+function mkdirP(dir) {
+    try {
+        (0, node_fs_1.mkdirSync)(dir, { recursive: true });
+    }
+    catch (error) {
+        throw new FrictionError("log-unwritable", `could not create the friction state directory ${dir}: ${errorMessage(error)}`, dir);
+    }
+}
+function readOrCreateMachineSalt(saltPath) {
+    try {
+        const existing = (0, node_fs_1.readFileSync)(saltPath, "utf8").trim();
+        if (SALT_HEX.test(existing))
+            return existing;
+    }
+    catch {
+    }
+    const salt = (0, node_crypto_1.randomBytes)(exports.FRICTION_SALT_BYTES).toString("hex");
+    mkdirP((0, node_path_1.join)(saltPath, ".."));
+    try {
+        const fd = (0, node_fs_1.openSync)(saltPath, "wx", 0o600);
+        try {
+            (0, node_fs_1.writeSync)(fd, salt + NEWLINE, 0, "utf8");
+        }
+        finally {
+            (0, node_fs_1.closeSync)(fd);
+        }
+        return salt;
+    }
+    catch (error) {
+        try {
+            const existing = (0, node_fs_1.readFileSync)(saltPath, "utf8").trim();
+            if (SALT_HEX.test(existing))
+                return existing;
+        }
+        catch {
+        }
+        throw new FrictionError("log-unwritable", `could not create the per-machine friction salt at ${saltPath}: ${errorMessage(error)}`, saltPath);
+    }
+}
+function resolveRepoAbsPath(cwd) {
+    try {
+        const top = (0, node_child_process_1.execFileSync)("git", ["rev-parse", "--show-toplevel"], {
+            cwd,
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+            timeout: 2000,
+        }).trim();
+        if (top !== "")
+            return (0, node_path_1.resolve)(top);
+    }
+    catch {
+    }
+    return (0, node_path_1.resolve)(cwd);
+}
+const EVIDENCE_READ_BYTES = 16 * 1024;
+function readEvidenceContents(path) {
+    let fd;
+    try {
+        fd = (0, node_fs_1.openSync)(path, "r");
+        const size = (0, node_fs_1.fstatSync)(fd).size;
+        const want = Math.min(size, EVIDENCE_READ_BYTES);
+        const buffer = Buffer.allocUnsafe(want);
+        const read = (0, node_fs_1.readSync)(fd, buffer, 0, want, 0);
+        return buffer.toString("utf8", 0, read);
+    }
+    catch (error) {
+        throw new FrictionError("evidence-unreadable", `could not read the --evidence file ${path}: ${errorMessage(error)}`, path);
+    }
+    finally {
+        if (fd !== undefined) {
+            try {
+                (0, node_fs_1.closeSync)(fd);
+            }
+            catch {
+            }
+        }
+    }
+}
+function buildFrictionRecord(input, opts) {
+    const observation = input.observation.replace(LONE_SURROGATE, "").trim();
+    if (observation === "") {
+        throw new FrictionError("no-observation", 'arggon friction requires an observation: friction "<one line about what broke>" --command "<argv shape>"');
+    }
+    const commandShape = normalizeCommandShape(input.command);
+    if (commandShape === "") {
+        throw new FrictionError("no-command-shape", 'arggon friction requires --command "<argv shape>" (the command that failed; pass "help" if you cannot name it)');
+    }
+    const env = opts.env ?? process.env;
+    const home = opts.home ?? (0, node_os_1.homedir)();
+    const stateDir = frictionStateDir(env, home);
+    try {
+        (0, node_fs_1.mkdirSync)(stateDir, { recursive: true });
+    }
+    catch (error) {
+        throw new FrictionError("log-unwritable", `could not create the friction state directory ${stateDir}: ${errorMessage(error)}`, stateDir);
+    }
+    const machineSalt = opts.machineSalt ?? readOrCreateMachineSalt((0, node_path_1.join)(stateDir, exports.FRICTION_SALT_FILE_NAME));
+    const version = opts.version.trim() === "" ? "unknown" : opts.version;
+    const majorVersion = frictionMajorVersion(version);
+    const errorTrimmed = input.error?.trim();
+    const errorCode = errorTrimmed === undefined || errorTrimmed === ""
+        ? undefined
+        : capField(errorTrimmed, exports.FRICTION_ERROR_CODE_CAP);
+    const harness = capField(input.harness?.trim() || exports.FRICTION_DEFAULT_HARNESS, exports.FRICTION_HARNESS_CAP);
+    const commandShapeCapped = capField(commandShape, exports.FRICTION_COMMAND_SHAPE_CAP);
+    const narrative = capField(observation, exports.FRICTION_NARRATIVE_CAP);
+    const evidence = input.evidencePath
+        ? capField(readEvidenceContents(input.evidencePath), exports.FRICTION_EVIDENCE_CAP)
+        : undefined;
+    const ts = (opts.now ?? new Date()).toISOString();
+    return {
+        v: exports.FRICTION_FORMAT_VERSION,
+        ts,
+        fingerprint: frictionFingerprint({
+            commandShape: commandShapeCapped,
+            errorCode,
+            harness,
+            majorVersion,
+        }),
+        reporterId: frictionReporterId(machineSalt, opts.repoAbsPath ?? resolveRepoAbsPath(opts.cwd)),
+        commandShape: commandShapeCapped,
+        ...(errorCode !== undefined ? { errorCode } : {}),
+        harness,
+        arggonVersion: capField(version, exports.FRICTION_ENV_FACT_CAP),
+        majorVersion,
+        os: capField(process.platform, exports.FRICTION_ENV_FACT_CAP),
+        arch: capField(process.arch, exports.FRICTION_ENV_FACT_CAP),
+        node: capField(process.version, exports.FRICTION_ENV_FACT_CAP),
+        narrative,
+        ...(evidence !== undefined ? { evidence } : {}),
+    };
+}
+function appendFrictionRecord(record, logPath) {
+    const dir = (0, node_path_1.join)(logPath, "..");
+    try {
+        (0, node_fs_1.mkdirSync)(dir, { recursive: true });
+    }
+    catch (error) {
+        throw new FrictionError("log-unwritable", `could not create the friction log directory ${dir}: ${errorMessage(error)}`, dir);
+    }
+    const line = `${JSON.stringify(record)}${NEWLINE}`;
+    const existing = readLogLines(logPath);
+    const terminate = logEndsPartial(logPath);
+    let fd;
+    try {
+        fd = (0, node_fs_1.openSync)(logPath, "a", 0o600);
+        if (terminate)
+            (0, node_fs_1.writeSync)(fd, NEWLINE, null, "utf8");
+    }
+    catch {
+    }
+    if (existing.length + 1 > exports.FRICTION_MAX_LINES) {
+        const kept = existing.slice(existing.length + 1 - exports.FRICTION_MAX_LINES);
+        const rotated = `${kept.map((entry) => entry + NEWLINE).join("")}${line}`;
+        try {
+            (0, node_fs_1.writeFileSync)(logPath, rotated, "utf8");
+        }
+        catch (error) {
+            throw new FrictionError("log-unwritable", `could not rotate the friction log at ${logPath}: ${errorMessage(error)}`, logPath);
+        }
+        return { path: logPath, lines: kept.length + 1, dropped: existing.length - kept.length };
+    }
+    if (fd === undefined) {
+        throw new FrictionError("log-unwritable", `could not append to the friction log at ${logPath}: the log could not be opened`, logPath);
+    }
+    try {
+        (0, node_fs_1.writeSync)(fd, line, null, "utf8");
+    }
+    catch (error) {
+        throw new FrictionError("log-unwritable", `could not append to the friction log at ${logPath}: ${errorMessage(error)}`, logPath);
+    }
+    finally {
+        if (fd !== undefined) {
+            try {
+                (0, node_fs_1.closeSync)(fd);
+            }
+            catch {
+            }
+        }
+    }
+    return { path: logPath, lines: existing.length + 1, dropped: 0 };
+}
+function readLogLines(logPath) {
+    if (!(0, node_fs_1.existsSync)(logPath))
+        return [];
+    let raw;
+    try {
+        raw = (0, node_fs_1.readFileSync)(logPath, "utf8");
+    }
+    catch {
+        return [];
+    }
+    if (raw === "")
+        return [];
+    const lines = raw.split(NEWLINE);
+    if (lines[lines.length - 1] === "")
+        lines.pop();
+    return lines;
+}
+function logEndsPartial(logPath) {
+    if (!(0, node_fs_1.existsSync)(logPath))
+        return false;
+    let raw;
+    try {
+        raw = (0, node_fs_1.readFileSync)(logPath, "utf8");
+    }
+    catch {
+        return false;
+    }
+    return raw !== "" && !raw.endsWith(NEWLINE);
+}
+function readFrictionLog(logPath) {
+    const out = { records: [], skippedVersions: [], malformed: 0 };
+    if (!(0, node_fs_1.existsSync)(logPath))
+        return out;
+    let raw;
+    try {
+        raw = (0, node_fs_1.readFileSync)(logPath, "utf8");
+    }
+    catch {
+        return out;
+    }
+    for (const line of raw.split(NEWLINE)) {
+        if (line.trim() === "")
+            continue;
+        let parsed;
+        try {
+            parsed = JSON.parse(line);
+        }
+        catch {
+            out.malformed += 1;
+            continue;
+        }
+        if (typeof parsed !== "object" || parsed === null) {
+            out.malformed += 1;
+            continue;
+        }
+        const v = parsed.v;
+        if (typeof v !== "number" || !Number.isFinite(v)) {
+            out.malformed += 1;
+            continue;
+        }
+        if (v !== exports.FRICTION_FORMAT_VERSION) {
+            if (!out.skippedVersions.includes(v))
+                out.skippedVersions.push(v);
+            continue;
+        }
+        const candidate = parsed;
+        if (typeof candidate.ts !== "string" || typeof candidate.fingerprint !== "string") {
+            out.malformed += 1;
+            continue;
+        }
+        out.records.push(candidate);
+    }
+    return out;
+}
+})
+
 __arggonModules.set("lib/src/frontmatter.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -2621,9 +3033,10 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.liveAcceptanceUnchecked = exports.liveAcceptanceRows = exports.liveAcceptanceRegion = exports.liveAcceptanceCriteria = exports.itemsById = exports.acceptanceUnchecked = exports.acceptanceRows = exports.acceptanceGate = exports.acceptanceCriteria = exports.acceptanceComplete = exports.acceptanceBody = void 0;
 exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = void 0;
-exports.worktreeReleaseRefusal = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = void 0;
-exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = void 0;
+exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.resolveRepoAbsPath = exports.readOrCreateMachineSalt = exports.readFrictionLog = exports.normalizeCommandShape = exports.frictionStateDir = exports.frictionStateBase = exports.frictionSaltPath = exports.frictionReporterId = exports.frictionMajorVersion = exports.frictionLogPath = exports.frictionFingerprint = exports.buildFrictionRecord = exports.appendFrictionRecord = exports.FrictionError = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_MAX_LINES = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_HARNESS_CAP = exports.FRICTION_FORMAT_VERSION = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_DEFAULT_HARNESS = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = void 0;
+exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeReleaseRefusal = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = void 0;
+exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceBody", { enumerable: true, get: function () { return items_js_1.acceptanceBody; } });
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
@@ -2751,6 +3164,33 @@ Object.defineProperty(exports, "JSON_SCHEMA_VERSION", { enumerable: true, get: f
 Object.defineProperty(exports, "compactWorkItem", { enumerable: true, get: function () { return json_js_1.compactWorkItem; } });
 Object.defineProperty(exports, "failEnvelope", { enumerable: true, get: function () { return json_js_1.failEnvelope; } });
 Object.defineProperty(exports, "successEnvelope", { enumerable: true, get: function () { return json_js_1.successEnvelope; } });
+var friction_js_1 = require("./friction.js");
+Object.defineProperty(exports, "FRICTION_DEFAULT_HARNESS", { enumerable: true, get: function () { return friction_js_1.FRICTION_DEFAULT_HARNESS; } });
+Object.defineProperty(exports, "FRICTION_ENV_FACT_CAP", { enumerable: true, get: function () { return friction_js_1.FRICTION_ENV_FACT_CAP; } });
+Object.defineProperty(exports, "FRICTION_EVIDENCE_CAP", { enumerable: true, get: function () { return friction_js_1.FRICTION_EVIDENCE_CAP; } });
+Object.defineProperty(exports, "FRICTION_FINGERPRINT_CHARS", { enumerable: true, get: function () { return friction_js_1.FRICTION_FINGERPRINT_CHARS; } });
+Object.defineProperty(exports, "FRICTION_FORMAT_VERSION", { enumerable: true, get: function () { return friction_js_1.FRICTION_FORMAT_VERSION; } });
+Object.defineProperty(exports, "FRICTION_HARNESS_CAP", { enumerable: true, get: function () { return friction_js_1.FRICTION_HARNESS_CAP; } });
+Object.defineProperty(exports, "FRICTION_LOG_FILE_NAME", { enumerable: true, get: function () { return friction_js_1.FRICTION_LOG_FILE_NAME; } });
+Object.defineProperty(exports, "FRICTION_MAX_LINES", { enumerable: true, get: function () { return friction_js_1.FRICTION_MAX_LINES; } });
+Object.defineProperty(exports, "FRICTION_NARRATIVE_CAP", { enumerable: true, get: function () { return friction_js_1.FRICTION_NARRATIVE_CAP; } });
+Object.defineProperty(exports, "FRICTION_REPORTER_ID_CHARS", { enumerable: true, get: function () { return friction_js_1.FRICTION_REPORTER_ID_CHARS; } });
+Object.defineProperty(exports, "FRICTION_SALT_FILE_NAME", { enumerable: true, get: function () { return friction_js_1.FRICTION_SALT_FILE_NAME; } });
+Object.defineProperty(exports, "FRICTION_STATE_SUBDIR", { enumerable: true, get: function () { return friction_js_1.FRICTION_STATE_SUBDIR; } });
+Object.defineProperty(exports, "FrictionError", { enumerable: true, get: function () { return friction_js_1.FrictionError; } });
+Object.defineProperty(exports, "appendFrictionRecord", { enumerable: true, get: function () { return friction_js_1.appendFrictionRecord; } });
+Object.defineProperty(exports, "buildFrictionRecord", { enumerable: true, get: function () { return friction_js_1.buildFrictionRecord; } });
+Object.defineProperty(exports, "frictionFingerprint", { enumerable: true, get: function () { return friction_js_1.frictionFingerprint; } });
+Object.defineProperty(exports, "frictionLogPath", { enumerable: true, get: function () { return friction_js_1.frictionLogPath; } });
+Object.defineProperty(exports, "frictionMajorVersion", { enumerable: true, get: function () { return friction_js_1.frictionMajorVersion; } });
+Object.defineProperty(exports, "frictionReporterId", { enumerable: true, get: function () { return friction_js_1.frictionReporterId; } });
+Object.defineProperty(exports, "frictionSaltPath", { enumerable: true, get: function () { return friction_js_1.frictionSaltPath; } });
+Object.defineProperty(exports, "frictionStateBase", { enumerable: true, get: function () { return friction_js_1.frictionStateBase; } });
+Object.defineProperty(exports, "frictionStateDir", { enumerable: true, get: function () { return friction_js_1.frictionStateDir; } });
+Object.defineProperty(exports, "normalizeCommandShape", { enumerable: true, get: function () { return friction_js_1.normalizeCommandShape; } });
+Object.defineProperty(exports, "readFrictionLog", { enumerable: true, get: function () { return friction_js_1.readFrictionLog; } });
+Object.defineProperty(exports, "readOrCreateMachineSalt", { enumerable: true, get: function () { return friction_js_1.readOrCreateMachineSalt; } });
+Object.defineProperty(exports, "resolveRepoAbsPath", { enumerable: true, get: function () { return friction_js_1.resolveRepoAbsPath; } });
 var tracker_commit_js_1 = require("./tracker-commit.js");
 Object.defineProperty(exports, "commitPayload", { enumerable: true, get: function () { return tracker_commit_js_1.commitPayload; } });
 var create_js_1 = require("./create.js");
@@ -2852,6 +3292,7 @@ Object.defineProperty(exports, "resolveImportType", { enumerable: true, get: fun
 var operations_js_1 = require("./operations.js");
 Object.defineProperty(exports, "commentOperation", { enumerable: true, get: function () { return operations_js_1.commentOperation; } });
 Object.defineProperty(exports, "createOperation", { enumerable: true, get: function () { return operations_js_1.createOperation; } });
+Object.defineProperty(exports, "frictionOperation", { enumerable: true, get: function () { return operations_js_1.frictionOperation; } });
 Object.defineProperty(exports, "handoffOperation", { enumerable: true, get: function () { return operations_js_1.handoffOperation; } });
 Object.defineProperty(exports, "importIssuesOperation", { enumerable: true, get: function () { return operations_js_1.importIssuesOperation; } });
 Object.defineProperty(exports, "listOperation", { enumerable: true, get: function () { return operations_js_1.listOperation; } });
@@ -3760,7 +4201,9 @@ exports.handoffOperation = handoffOperation;
 exports.priorityOperation = priorityOperation;
 exports.syncOperation = syncOperation;
 exports.importIssuesOperation = importIssuesOperation;
+exports.frictionOperation = frictionOperation;
 const node_path_1 = require("node:path");
+const node_os_1 = require("node:os");
 const acceptance_js_1 = require("./acceptance.js");
 const brief_js_1 = require("./brief.js");
 const convention_js_1 = require("./convention.js");
@@ -3775,6 +4218,7 @@ const list_js_1 = require("./list.js");
 const next_js_1 = require("./next.js");
 const priority_js_1 = require("./priority.js");
 const report_js_1 = require("./report.js");
+const friction_js_1 = require("./friction.js");
 const show_js_1 = require("./show.js");
 const sync_command_js_1 = require("./sync-command.js");
 const tracker_commit_js_1 = require("./tracker-commit.js");
@@ -4030,6 +4474,36 @@ function importIssuesOperation(opts) {
     }
     catch (err) {
         return fail("import-issues", opts.cwd, "IMPORT_FAILED", err);
+    }
+}
+function frictionOperation(opts) {
+    const cwd = opts.cwd;
+    try {
+        const record = (0, friction_js_1.buildFrictionRecord)(opts, opts);
+        const env = opts.env ?? process.env;
+        const home = opts.home ?? (0, node_os_1.homedir)();
+        const appended = (0, friction_js_1.appendFrictionRecord)(record, (0, friction_js_1.frictionLogPath)(env, home));
+        return succeed("friction", { path: appended.path, dropped: appended.dropped, record }, (0, convention_js_1.readConventionVersion)(cwd));
+    }
+    catch (err) {
+        if (err instanceof friction_js_1.FrictionError) {
+            return {
+                ok: false,
+                envelope: (0, json_js_1.failEnvelope)({
+                    command: "friction",
+                    message: err.message,
+                    code: "FRICTION_FAILED",
+                    conventionVersion: (0, convention_js_1.readConventionVersion)(cwd),
+                    payload: {
+                        reason: err.reason,
+                        ...(err.path !== undefined ? { path: err.path } : {}),
+                    },
+                }),
+                exitCode: 1,
+                error: err,
+            };
+        }
+        return fail("friction", cwd, "FRICTION_FAILED", err);
     }
 }
 function relativePath(root, path) {
