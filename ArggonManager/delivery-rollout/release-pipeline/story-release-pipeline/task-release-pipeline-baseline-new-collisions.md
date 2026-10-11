@@ -177,3 +177,7 @@ Where it bites: `task-friction-capture-command` (the item that was held hostage)
 ## Scope
 
 Only the two baseline JSONs changed, plus this item's own body for the acceptance boxes. No other file, no renames, no `--no-fail-on-new` anywhere. Findings that outlive this item (the CI wiring recommendation, the note on `task-friction-capture-command`) are recorded above for the delivery lead to file, not grown into this diff.
+
+### handoff 2026-10-11 @arggon-maker (session: ses_ed6473c63ffeEVG02Y7n4bB9MS) — next: Review + merge PR #690 (both baselines re-saved, 2 resolved entries dropped). Then file the 2 out-of-scope follow-ups recorded on the item: the CI lane step in .github/workflows/ci.yml, and the cross…
+- branch: feat/task-release-pipeline-baseline-new-collisions
+- open questions: Should the CI wiring follow-up be a task or a bug under story-spec-pipeline? Does the delivery lead want the note on task-friction-capture-command, or is recording it here enough?
