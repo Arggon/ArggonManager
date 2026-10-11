@@ -13,6 +13,7 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T04:23:44.958Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-skill-exploration-reference-fails-prettier
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-skill-exploration-reference-fails-prettier.md
   Leaves live only under a story. id is the filename stem: bug-skill-exploration-reference-fails-prettier.
@@ -28,11 +29,15 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-skill-exploration-referen
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] `npx prettier --check skills/arggon-cli/references/exploration.md` passes
+- [ ] Semantically identical — formatting fix only, no sentence changes
+- [ ] `cli/src/skill-copy.test.ts` green (the `.agents/skills/` copy stays byte-equal modulo the generated marker)
+- [ ] `npx prettier --check` over the whole `skills/` tree passes, so this is not the last one
 
 ## Notes
 
 ### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+
 ## Context
 
 `skills/arggon-cli/references/exploration.md` fails `npx prettier --check` at HEAD —
