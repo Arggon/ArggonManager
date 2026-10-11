@@ -44,17 +44,17 @@ either side learning a repo name.
 
 ## Acceptance
 
-- [ ] `arggon friction --report` renders one row per fingerprint, sorted by `count` desc then fingerprint asc.
-- [ ] Fixture A: one class ×3 with differing prose but equal stable fields → one row, `count: 3` (proves narrative is excluded from the fingerprint).
-- [ ] Fixture B: two classes ×1 whose prose is near-identical but whose `errorCode` differs → two rows (proves the fingerprint does not over-merge).
-- [ ] Each row shows `count`, `reporters`, `firstSeen`, `lastSeen`, the stable fields, and the newest narrative.
-- [ ] An empty log succeeds with `count: 0` and exit 0 — empty is success, matching `list`'s zero-match contract.
-- [ ] Beyond 50 rows the renderer prints an explicit `… and N more classes` line; it never truncates silently.
-- [ ] A record whose `v` is unknown is skipped and reported as `skippedVersions`.
-- [ ] Rotation drops surface as `dropped: N` in the next report.
-- [ ] Every optional signal the report could not compute (`optedOut`, `dropped`, `skippedVersions`, the `reporters` basis) is stated in the output, never omitted silently.
-- [ ] Every non-happy path names its `reason` and the remediation.
-- [ ] A log that has been rotated by the writer surfaces `dropped: N` here. Rotation
+- [x] `arggon friction --report` renders one row per fingerprint, sorted by `count` desc then fingerprint asc.
+- [x] Fixture A: one class ×3 with differing prose but equal stable fields → one row, `count: 3` (proves narrative is excluded from the fingerprint).
+- [x] Fixture B: two classes ×1 whose prose is near-identical but whose `errorCode` differs → two rows (proves the fingerprint does not over-merge).
+- [x] Each row shows `count`, `reporters`, `firstSeen`, `lastSeen`, the stable fields, and the newest narrative.
+- [x] An empty log succeeds with `count: 0` and exit 0 — empty is success, matching `list`'s zero-match contract.
+- [x] Beyond 50 rows the renderer prints an explicit `… and N more classes` line; it never truncates silently.
+- [x] A record whose `v` is unknown is skipped and reported as `skippedVersions`.
+- [x] Rotation drops surface as `dropped: N` in the next report.
+- [x] Every optional signal the report could not compute (`optedOut`, `dropped`, `skippedVersions`, the `reporters` basis) is stated in the output, never omitted silently.
+- [x] Every non-happy path names its `reason` and the remediation.
+- [x] A log that has been rotated by the writer surfaces `dropped: N` here. Rotation
       itself (the 5000-line cap and the drop) is **owned by
       `task-friction-capture-command`** and tested there — this task only renders
       the counter (reviewer N6b); it does not re-own or re-test the cap.
