@@ -13,7 +13,6 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T22:29:04.116Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-measure-kernel-refusal-rate
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-measure-kernel-refusal-rate.md
   Leaves live only under a story. id is the filename stem: task-measure-kernel-refusal-rate.
@@ -175,3 +174,6 @@ surface) to pin the done-gate merge-time refusal rate with flip attempts as
 denominator; pattern set and per-run command are in this session's
 `/tmp/opencode/autodone-runs.txt` lineage. If that rate is also ~0, link this
 report from exploration-021's Recommendation and close P1 for this repo.
+
+### 2026-10-11 @ses_ed2ea49e2ffe6ovgjOhUgxj1iP
+Evidence for standards review (all in worktree, branch feat/task-measure-kernel-refusal-rate, commit 8512f734): report --trend mines +status: completions only (trend.ts header); fail() returns envelope with no commit (operations.ts) so refusals leave no git trace by design; 181 throw sites (17 in *.test.ts, 164 shipped) vs 171 stated; strict frontmatter status additions in window: 1224 (511 done / 355 todo / 258 in_progress / 10 cancelled / 4 blocked); 0 done->todo or cancelled->todo transitions across 513 terminal items; only done->cancelled (13bbb6fb) is a direct-edit kernel bypass (table says done: [todo], unchanged since introduction); ADR 0025 static 117/482 would-be-refused is not an attempt rate; auto-done CI spot sample 19 runs: 0 refusal warnings / 19 flips. Prettier check clean on the touched file; arggon validate ok, 0 warnings. Live Acceptance boxes left unticked for the lead.
