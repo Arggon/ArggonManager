@@ -11,6 +11,7 @@ created: "2026-10-11"
 updated: "2026-10-11"
 worktree_path: /home/arggon/Projects/ArggonManager-task-spec-deps-022-no-error-path
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/task-spec-deps-022-no-error-path.md
   Leaves live only under a story. id is the filename stem: task-spec-deps-022-no-error-path.
@@ -22,7 +23,7 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-spec-deps-022-no-error-p
 
 ## Context
 
-After the renumber wave (PR #680) and the decision-pending fix (PR #679) landed, `spec analyze --baseline ArggonManager/spec-analyze-baseline.json` on clean main reads **1 new, 2 resolved, 4 unchanged, exit 1**. The single NEW finding is a *relocation*, not a new defect: the pre-existing `no-error-path` finding recorded against `spec-deps-001.md` (resolved by the rename) reappears against the renamed `spec-deps-022.md`, which still published no error/failure path. This task fixes the spec, so re-baselining records a clean state instead of hiding one (`task-release-pipeline-baseline-new-collisions`).
+After the renumber wave (PR #680) and the decision-pending fix (PR #679) landed, `spec analyze --baseline ArggonManager/spec-analyze-baseline.json` on clean main reads **1 new, 2 resolved, 4 unchanged, exit 1**. The single NEW finding is a _relocation_, not a new defect: the pre-existing `no-error-path` finding recorded against `spec-deps-001.md` (resolved by the rename) reappears against the renamed `spec-deps-022.md`, which still published no error/failure path. This task fixes the spec, so re-baselining records a clean state instead of hiding one (`task-release-pipeline-baseline-new-collisions`).
 
 ## Acceptance
 
@@ -34,19 +35,22 @@ After the renumber wave (PR #680) and the decision-pending fix (PR #679) landed,
 ## Notes
 
 ### 2026-10-11 @arggon-delivery-lead
+
 ### 2026-10-11 @arggon-delivery-lead — context + acceptance
 
-**Context.** After the renumber wave landed (PR #680) and the decision-pending fix (PR #679), `spec analyze --baseline ArggonManager/spec-analyze-baseline.json` on clean main reads: **1 new, 2 resolved, 4 unchanged, exit 1**. The single NEW finding is a *relocation*, not a new defect: the same pre-existing `no-error-path` finding recorded against `spec-deps-001.md` (now resolved by the rename) reappears against the renamed `spec-deps-022.md` — the spec still publishes no error/failure path anywhere.
+**Context.** After the renumber wave landed (PR #680) and the decision-pending fix (PR #679), `spec analyze --baseline ArggonManager/spec-analyze-baseline.json` on clean main reads: **1 new, 2 resolved, 4 unchanged, exit 1**. The single NEW finding is a _relocation_, not a new defect: the same pre-existing `no-error-path` finding recorded against `spec-deps-001.md` (now resolved by the rename) reappears against the renamed `spec-deps-022.md` — the spec still publishes no error/failure path anywhere.
 
 This finding must be FIXED (or explicitly justified as not applicable), not baselined: `task-release-pipeline-baseline-new-collisions` re-saves both baselines after this lands, and its recorded rule is that re-baselining must record a clean state, never hide one.
 
 Acceptance:
-- [ ] `spec analyze` (fresh, no --baseline) no longer reports `no-error-path` for `docs/specs/spec-deps-022.md` (before/after evidence in the PR)
-- [ ] The fix is a real failure-path section describing the spec's error/failure behavior, OR an explicit, cited justification that the spec's domain has no failure path (check how sibling specs satisfy this rule and match that idiom — do not write theater text)
-- [ ] No changes to either baseline JSON (owned by the baseline item) and no renumber-style renames
-- [ ] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green; `arggon validate` ok
+
+- [x] `spec analyze` (fresh, no --baseline) no longer reports `no-error-path` for `docs/specs/spec-deps-022.md` (before/after evidence in the PR)
+- [x] The fix is a real failure-path section describing the spec's error/failure behavior, OR an explicit, cited justification that the spec's domain has no failure path (check how sibling specs satisfy this rule and match that idiom — do not write theater text)
+- [x] No changes to either baseline JSON (owned by the baseline item) and no renumber-style renames
+- [x] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green; `arggon validate` ok
 
 ### 2026-10-11 @arggon-maker
+
 Maker evidence (branch feat/task-spec-deps-022-no-error-path, commit 58c0e4fc, PR https://github.com/Arggon/ArggonManager/pull/686).
 
 CHANGE — ArggonManager/docs/specs/spec-deps-022.md only (+44/-3):
@@ -78,16 +82,20 @@ GATES (worktree; npm run build ran first because headless-ci asserts dist/ exist
 Item not flipped to done — completion is the delivery lead's call after merge.
 
 ### handoff 2026-10-11 @arggon-maker — next: Merge PR #686, then let task-release-pipeline-baseline-new-collisions re-save both baselines: spec analyze now reads 0 new / 2 resolved / 4 unchanged (exit 0) instead of 1 new.
+
 - branch: feat/task-spec-deps-022-no-error-path
 - open questions: Does the delivery lead want an acceptance row added in spec-deps-022 §7 for the filter-token row too, or is the §5 reference row enough?;Should spec-opencode-seam-010.md (the other no-error-path surv…
 
 ### 2026-10-11 @arggon-maker
+
 Out-of-scope observation for the delivery lead (NOT filed as an item, NOT fixed here): spec-opencode-seam-010.md is the other surviving no-error-path finding on spec analyze (spec-opencode2-009.md and spec-spec-import-openspec-005.md carry the 3 vague-quantifier warnings). Fixing it is separate work — the delivery lead decides whether it becomes its own item under story-spec-pipeline. Also note the handoff open-questions field capped at 200 chars, so the truncated tail was: "Should spec-opencode-seam-010.md (the other no-error-path survivor) get its own follow-up item?"
 
 ### 2026-10-11 @arggon-maker
+
 Out-of-scope observation for the delivery lead (NOT filed as an item, NOT fixed here): spec-opencode-seam-010.md is the other surviving no-error-path finding on spec analyze (spec-opencode2-009.md and spec-spec-import-openspec-005.md carry the 3 vague-quantifier warnings). Fixing it is separate work — the delivery lead decides whether it becomes its own item under story-spec-pipeline. Also note the handoff open-questions field capped at 200 chars, so the truncated tail was: "Should spec-opencode-seam-010.md (the other no-error-path survivor) get its own follow-up item?"
 
 ### 2026-10-11 @arggon-delivery-lead
+
 ### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merged (PR #686)
 
 Reviewed against engineering.md §Review bar: scope stayed on the item (one spec + its own body); the fix is a real, code-grounded error-handling section (per-surface error.code table citing update/validate/list implementations), matching the house idiom found in spec-sync-001.md, and the renumber note was amended with a dated Update so "Spec content unchanged" stays honest — the docs travel with the change; evidence travels with it (spec analyze before: the no-error-path finding, 5 findings, exit 1; after: 4 findings, exit 0; bonus: the --baseline lane on this branch reads 0 new); gates + CI green; baselines untouched per constraint.
