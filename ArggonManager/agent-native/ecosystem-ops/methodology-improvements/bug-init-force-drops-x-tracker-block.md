@@ -197,3 +197,25 @@ Nothing else touched: the diff is `cli/src/cli.ts`, `cli/src/init.test.ts`, `REA
 ### handoff 2026-10-11 @ses_ed63e4e08ffer7eI6EfB0xc4oF (session: ses_ed63e4e08ffer7eI6EfB0xc4oF) — next: Re-review commit 18463798 on fix/bug-init-force-drops-x-tracker-block (apply-path convention report on both init surfaces, 3 CLI-surface tests) and merge PR #681 — MERGE, never squash
 - branch: fix/bug-init-force-drops-x-tracker-block
 - open questions: Merge conflicts only in the item file: the verdict + my review-round comment landed on the primary checkout's unpushed local main (15357248) — keep both blocks; pushing primary main is the lead's call
+
+### 2026-10-11 @arggon-delivery-lead
+verdict: approve (scope: PR #681 in full — the preservation fix, the apply-path report, the `--force` help text and the wording)
+
+Delivery-lead review, second round. The first round was `request-changes` on one blocking finding (F1) plus two wording items (F2/F3); all three were addressed on the branch and re-verified here. The standards reviewer's approval of the underlying fix stands — the architecture, the plan/apply truth and the tests were verified good in round one and are unchanged.
+
+What I verified in this round, myself:
+
+- **F1 closed.** `cli/src/cli.ts` now spreads `result.convention` into **both** `--json` builders (dry-run and real run) and `printInitHuman` prints one line naming what was preserved/replaced — and a different, explicit line for the rescaffolded arm, where the configuration genuinely is discarded. Three new tests drive the **CLI** surface (`runCli`), which no test in this branch did before: the forced run asserted on `--json`, on human stdout and on the still-armed flags on disk; a non-forced run asserts the key is absent; and the rescaffolded arm is driven with **one fixture per run**, because a forced run repairs the file so a second run on the same tree is an ordinary preserve. That fixture trap being pinned in a test is the mark of someone who hit it rather than imagined it.
+- **F3 closed.** `--force`'s help text now describes what the command does; the old string appears nowhere else in the tree (grepped).
+- **F2 closed in the docs.** README and `json-output.md` say the existing file "cannot be read by this arggon" instead of "no longer parses", and the new `convention` row spells out the strict-line-parser gate with the `allow-steal: true # armed` example. The emitted reason string and its reporting were deliberately left unchanged (`cli/src/init.ts` untouched) — the wording fix belongs to the docs, not to a code change that was not asked for.
+- **Envelope/drift check.** `json-output.md` gained the additive `convention` field row, inserted at the table's existing column width so the diff is one added row plus one reworded row. `prettier --write` is a no-op on that file, so `prose-format.test.ts` rule 3 holds. Doc-contract suites enumerate the MCP surface, not init's result fields, so nothing else needed updating — I checked rather than assumed.
+
+Gates, run by the lead on the **merged** tree (not only the maker's report): `npm test` → 134 files / 2866 tests passed; `npx prettier --check` on all five touched files → clean; `npm run lint` → clean; `npm run build` → exit 0. CI on PR #681: `cli` SUCCESS, `tasks-validate` SUCCESS, `ui-smoke` SUCCESS.
+
+Scope: `cli/src/init.ts`, `cli/src/cli.ts`, `cli/src/init.test.ts`, `README.md`, `ArggonManager/docs/json-output.md`, and the item file. Nothing unrelated rides this PR — I merged `origin/main` into the branch and resolved the item-file conflict by keeping both comment blocks after the branch had inherited unpushed tracker commits from the primary checkout (that inheritance is now filed as `bug-start-claim-branch-inherits-unpushed-tracker-commits`).
+
+Follow-ups filed, none of which blocks this merge: `bug-convention-parser-rejects-valid-yaml-force-rescaffolds` (the real remaining half of F2 — a real YAML parse before rescaffolding), `task-init-force-residual-followups` (the `x-generated` relocation to EOF, "survives byte-for-byte" vs EOLs, the `plan.conventionWrite!` invariant), `bug-start-claim-commit-frontmatter-fails-prettier`, `bug-session-formatter-normalizes-tracker-item-files`, `bug-goal-contract-unreadable-for-agent-held-claim`.
+
+Item state: every box in the live `## Acceptance` section is ticked, and each tick is honest against the diff. Methodology impact class: **advisory** for the docs; the CLI change is behaviour behind `--force`, no carrier rule changed.
+
+Merge call: **approved — merge as a merge commit** (tracker auto-commits ride this branch, so no squash).
