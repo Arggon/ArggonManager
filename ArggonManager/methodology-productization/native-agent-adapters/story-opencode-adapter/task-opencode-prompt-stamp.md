@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-opencode-prompt-stamp
 title: OpenCode prompt-admission stamp + compaction retention (plan T4)
+assignee: arggon-delivery-lead
+branch: feat/task-opencode-prompt-stamp
 parent: story-opencode-adapter
 labels: []
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-11"
+claimed_at: "2026-10-11T09:58:21.268Z"
 depends_on: [task-adapter-selection-flags, task-capability-matrix]
+worktree_path: /home/arggon/Projects/ArggonManager-task-opencode-prompt-stamp
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/task-opencode-prompt-stamp.md
