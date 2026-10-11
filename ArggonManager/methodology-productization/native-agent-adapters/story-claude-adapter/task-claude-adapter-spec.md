@@ -110,3 +110,7 @@ The new story body's Context carries the link to `spec-claude-code-adapter-024` 
 | `git status` after commit | docs-only diff | clean; `spec-methodology-adapters-017.md` (+6 lines, link + superseded-detail note) and the item file changed, nothing else |
 
 **One pre-existing trap I hit and corrected (worth a finding):** the item file's `depends_on:` line is 131 chars, so prettier wraps it into a multi-line YAML flow sequence — which the tracker's line-based frontmatter parser rejects (`BROKEN_YAML`, `arggon validate` fails). I restored the single-line form after the edit. This is `prettier -w .` versus the tracker frontmatter parser, pre-existing and tracker-wide (other committed item files already fail `prettier --check` for the same class of reason), so I left it alone rather than growing the diff.
+
+### handoff 2026-10-11 @arggon-maker (session: ses_ed5430784ffeKRUj7DWUgBRv2Q) — next: Delivery lead writes the drafted story body into story-claude-adapter (comment above), then ticks the last live acceptance box and flips task-claude-adapter-spec done; implementation wave then follow…
+- branch: feat/task-claude-adapter-spec
+- open questions: Does claude plugin marketplace add accept a repo-local .claude-plugin/marketplace.json root? What is the namespaced slash-command form for a flat commands/arggon-*.md? Does carrying key arggon in bot…
