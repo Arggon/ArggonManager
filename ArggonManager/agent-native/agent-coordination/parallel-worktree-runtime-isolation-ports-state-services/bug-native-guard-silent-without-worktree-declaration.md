@@ -9,7 +9,6 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [native-seam, worktree, hygiene]
 created: "2026-10-05"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-native-guard-silent-without-worktree-declaration
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-native-guard-silent-without-worktree-declaration.md

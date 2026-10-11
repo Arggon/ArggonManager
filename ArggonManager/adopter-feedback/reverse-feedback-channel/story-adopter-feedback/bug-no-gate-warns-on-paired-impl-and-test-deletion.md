@@ -9,7 +9,6 @@ parent: story-adopter-feedback
 labels: [ci, tests]
 created: "2026-10-06"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-no-gate-warns-on-paired-impl-and-test-deletion
 ---
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/bug-no-gate-warns-on-paired-impl-and-test-deletion.md
