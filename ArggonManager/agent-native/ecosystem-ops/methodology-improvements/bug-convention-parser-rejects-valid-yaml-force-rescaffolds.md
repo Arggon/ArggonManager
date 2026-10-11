@@ -140,3 +140,7 @@ carries the wholesale-replace arm.
   `branch_patterns: {bug: "fix/{id}"}` likewise; the adopter must use block
   style. Anything that throws is reported by `init --force` rather than
   silently dropped, which is the PR #681 contract.
+
+### handoff 2026-10-11 @ses_ed5c8dd3effeeiVxpj8Ufcbw4b (session: ses_ed5c8dd3effeeiVxpj8Ufcbw4b) — next: Delivery lead: review PR on fix/bug-convention-parser-rejects-valid-yaml-force-rescaffolds (5 commits, item id referenced in title/body); gates green on the worktree — npm test 134 files / 2888 tests…
+- branch: fix/bug-convention-parser-rejects-valid-yaml-force-rescaffolds
+- open questions: None blocking. Residual, reported not fixed: flow-style x-* sections (x-tracker: {allow-steal: true}) are still refused by name — verdict is the reviewer's, and any decision to also accept flow style…
