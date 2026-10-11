@@ -1,6 +1,6 @@
 ---
 type: bug
-status: blocked
+status: in_progress
 id: bug-convention-md-links-nonexistent-adr-0015
 title: "convention.md links a nonexistent ADR 0015 path, and that one dead link is what keeps PR #618's link-resolution rule scoped to 1 of 4 carriers"
 assignee: arggon-delivery-lead
@@ -8,8 +8,9 @@ branch: fix/bug-convention-md-links-nonexistent-adr-0015
 parent: methodology-improvements
 labels: [docs]
 created: "2026-10-03"
-updated: "2026-10-06"
-blocked_reason: "Superseded 2026-10-06 — the original block is half-lifted and this reason was stale. The link fix merged long ago (PR #649) and the trigger PR #618 has now merged too (bbe1f4eb), so 'unblocks when #618 merges' is satisfied. Measured on main: (a) the defect itself is FIXED — convention.md:142 now reads [ADR 0015](./adr/0015-done-gate-acceptance-waiver.md), the real filename, so there is no dead link left; (b) acceptance box 2, widening #618's link-resolution rule, is still UNDONE but is now partially feasible. #618 shipped LINK_CARRIERS = ['ArggonManager/docs/engineering.md'] — rule 2 still covers one carrier — while rule 1 (STATUS_CARRIERS) already covers all three methodology carriers (engineering.md, agents.md, convention.md). So agents.md and convention.md can join rule 2 today. The fourth carrier, skills/arggon-cli/**, still cannot: 0 of its files carry a real ./adr/ link, so a link-resolution rule over it would pass vacuously. Blocked on the real remaining work — widen LINK_CARRIERS to the three methodology carriers and record why the skills carrier is excluded until its markdown carries real links — not on a PR that is still open. Not agent-waivable; no waiver is needed, since the honest end state is that the widening is unstarted."
+updated: "2026-10-11"
+claimed_at: "2026-10-11T20:43:26.802Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-convention-md-links-nonexistent-adr-0015
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-convention-md-links-nonexistent-adr-0015.md
