@@ -181,3 +181,13 @@ Only the two baseline JSONs changed, plus this item's own body for the acceptanc
 ### handoff 2026-10-11 @arggon-maker (session: ses_ed6473c63ffeEVG02Y7n4bB9MS) — next: Review + merge PR #690 (both baselines re-saved, 2 resolved entries dropped). Then file the 2 out-of-scope follow-ups recorded on the item: the CI lane step in .github/workflows/ci.yml, and the cross…
 - branch: feat/task-release-pipeline-baseline-new-collisions
 - open questions: Should the CI wiring follow-up be a task or a bug under story-spec-pipeline? Does the delivery lead want the note on task-friction-capture-command, or is recording it here enough?
+- [ ] `spec analyze --baseline ArggonManager/spec-analyze-baseline.json` exits **0** on a clean `main` — today it exits 1, which is a red gate on the default branch
+- [ ] All 5 `duplicate-doc-number` findings are gone (via `task-renumber-colliding-doc-numbers`), not absorbed by re-saving the baseline. Widening the baseline makes the gate green without fixing anything
+- [ ] Whether `main` exiting 1 on this lane is surfaced anywhere a human sees before merge. A required-check failure would have caught it; `spec analyze` evidently is not one
+- [ ] The cross-story coupling is recorded where it bites: the ADR 0017 zero-NEW gate is global, so any story's stale baseline entry blocks any other story's implementation tasks
+- [ ] If re-saving the baseline is ever chosen, record the decision and its reason — the current temptation is to make the gate green by widening the net
+
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merge (PR #690)
+
+Reviewed against engineering.md §Review bar: the change is exactly the recorded decision (re-baseline after the corpus was made clean, not a blanket refresh, not `--no-fail-on-new` pinning); the entry-by-entry before/after shows 2 deletions and 0 insertions — the 2 findings the fixes actually closed (exploration-ui-improvements-012 DECISION-PENDING via PR #679, spec-deps-001 no-error-path via #680 renumber + #686 §5) — while the 4 genuinely-open findings persist; the deviation from my predicted diff was REPORTED rather than committed away (the 5 duplicate-doc-number keys and the 014 key were never baseline entries — they were NEWs that the renumber/decision fixes removed, and both lanes already read 0 new before the re-save); verification includes a negative control (a removed entry reads back as 1 new, exit 1 — the gate still bites); gates green. The recorded answer to the surfacing question (no workflow runs spec analyze; only `cli` is required) is filed as task-ci-required-check-missing-spec-analyze-baseline.
