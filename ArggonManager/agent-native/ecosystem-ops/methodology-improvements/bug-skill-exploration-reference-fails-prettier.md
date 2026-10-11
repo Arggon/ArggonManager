@@ -13,7 +13,6 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T04:23:44.958Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-skill-exploration-reference-fails-prettier
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-skill-exploration-reference-fails-prettier.md
   Leaves live only under a story. id is the filename stem: bug-skill-exploration-reference-fails-prettier.
@@ -54,3 +53,7 @@ next agent either reformats silently or leaves forever.
 - [ ] Semantically identical — formatting fix only, no sentence changes
 - [ ] `cli/src/skill-copy.test.ts` green (the `.agents/skills/` copy stays byte-equal modulo the generated marker)
 - [ ] `npx prettier --check` over the whole `skills/` tree passes, so this is not the last one
+
+### handoff 2026-10-11 @ses_ed66601e2ffeHpdTuTzlHO1MJx (session: ses_ed66601e2ffeHpdTuTzlHO1MJx) — next: Delivery lead: review PR #687 (format-only fix + x-generated checksum refresh + acceptance ticks); file the 3 sibling skills/ prettier failures as their own items.
+- branch: fix/bug-skill-exploration-reference-fails-prettier
+- open questions: One item per sibling (EVALS.md, evals/run.mjs, argonne-upgrade/SKILL.md) or one chore?; headless-ci.test.ts fails in fresh worktrees without dist/ — confirm the CI lane is green on the PR.
