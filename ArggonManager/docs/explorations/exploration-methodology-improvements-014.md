@@ -162,8 +162,7 @@ verdicts before the linter proves itself (criterion 2).
 
 ## Decision
 
-<!-- ADR reference placeholder: ArggonManager/docs/adr/0000-<slug>.md once the ADR lands. -->
+- C1 — adopted, recorded as [ADR 0015 — Done gate: enforce acceptance-checklist completeness on the terminal flip, with an explicit waiver](../adr/0015-done-gate-acceptance-waiver.md) (2026-09-29, via `task-done-gate-acceptance-waiver`; amended 2026-10-06 by [ADR 0025](../adr/0025-done-gate-live-acceptance-section.md)).
+- C3 — adopted as the report-only `spec analyze` decision-pipeline pass, landed as [spec-analyze-decision-gaps-013](../specs/spec-analyze-decision-gaps-013.md) (`status: implemented`; DECISION-PENDING-EXPLORATION / STALE-PROPOSED-ADR / SPEC-STATUS-DRIFT). No ADR required — it extends the existing report-only scanner under spec-analyze-004's invariants, so it is spec-level work, and this exploration is the decision record for the strategy.
 
-- C1 needs an ADR (kernel/contract change: terminal-transition gate + waiver
-  semantics); C3 needs a spec (`spec-spec-analyze` follow-up); C2/C5 start
-  report-only and need no ADR yet; C4 waits on the adopter-upgrade-channel ADR.
+The remaining perils are decided in place, per the plan this exploration recommended: C2 and C5 start report-only and need no ADR yet; C4 waits on the adopter-upgrade-channel ADR ([ADR 0016](../adr/0016-adopter-upgrade-channel.md)).
