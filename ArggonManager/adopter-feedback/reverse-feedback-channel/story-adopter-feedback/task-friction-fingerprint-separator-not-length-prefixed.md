@@ -107,3 +107,7 @@ Why: a separator delimits by VALUE, so `(a, U+001F‖b, c, d)` and `(a‖U+001F,
 **Scope:** the spec (table row + new subsection) and the item's acceptance boxes, `lib/src/friction.ts`, `lib/src/friction.test.ts`, one export line in `lib/src/index.ts`, the regenerated plugin bundle. The report renderer (T2, `task-friction-dedupe-and-report`), the redaction rules (merged), the MCP surface / `json-output.md` (T5) and the baseline JSONs are untouched.
 
 **Impact class: behavioral** — a derived field changes value for identical inputs. The record schema, the caps, the reader contract and the `v` discipline do not change.
+
+### handoff 2026-10-11 @arggon-maker — next: Review and merge PR #704 (length-prefixed fingerprint pre-image): confirm the recorded decision in spec-friction-capture-020, then unblock T2 task-friction-dedupe-and-report.
+- branch: feat/task-friction-fingerprint-separator-not-length-prefixed
+- open questions: Does the reviewer want the exhaustive adversarial-alphabet check moved into a *.property.test.ts file, or is it fine in friction.test.ts? Should a pre-amendment fingerprint ever be re-derived for com…
