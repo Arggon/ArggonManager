@@ -26,3 +26,15 @@ updated: "2026-10-11"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — context + acceptance
+
+**Context.** Recorded by the T2 (friction report) maker, PR #712: the generated plugin bundle sits at 523,689 of 524,288 `MAX_BUNDLE_BYTES` — 599 bytes of headroom. The remaining adopter-friction chain is additive to the same bundle: T4 (tier-B URL + opt-out keys), T5 (MCP surface `arggon_friction` + `json-output.md` + `doctor.friction`), then the trigger carrier. The next feature-sized commit likely fails `check:plugin` with a ceiling error rather than a code error — a confusing failure at the worst moment.
+
+Acceptance:
+- [ ] Reproduce the measurement (`check:plugin` reports the current size; state it)
+- [ ] Decide and record: raise `MAX_BUNDLE_BYTES` to a bound with headroom (state the new number and why that is safe — what the bound protects), OR split the bundle (module boundary + what moves), OR another recorded option
+- [ ] If the cap is raised: the new value carries the same protection intent (an accidental runaway bundle still fails); evidence that a deliberately oversized bundle still trips the gate
+- [ ] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green; `arggon validate` ok
+- [ ] This item does not gate the friction chain's other items — record that coupling where T4/T5 will see it (a note on the respective items or here suffices; do not add depends_on edges retroactively to filed items without their owners)
