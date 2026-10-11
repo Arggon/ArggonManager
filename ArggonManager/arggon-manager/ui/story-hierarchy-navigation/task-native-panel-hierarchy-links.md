@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-native-panel-hierarchy-links
 title: "OpenCode board panel: parent and children navigation"
+assignee: arggon-delivery-lead
+branch: feat/task-native-panel-hierarchy-links
 parent: story-hierarchy-navigation
 labels: []
 created: "2026-10-11"
 updated: "2026-10-11"
+claimed_at: "2026-10-11T23:20:22.742Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-native-panel-hierarchy-links
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/task-native-panel-hierarchy-links.md
   Leaves live only under a story. id is the filename stem: task-native-panel-hierarchy-links.
