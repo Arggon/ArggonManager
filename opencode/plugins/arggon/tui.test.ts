@@ -454,6 +454,16 @@ describe("board panel controller (selection, jumps, detail)", () => {
       "arggon.board.last": "shift+g",
       "arggon.board.last.end": "end",
       "arggon.board.detail": "return",
+      "arggon.board.parent": "p",
+      "arggon.board.child.1": "1",
+      "arggon.board.child.2": "2",
+      "arggon.board.child.3": "3",
+      "arggon.board.child.4": "4",
+      "arggon.board.child.5": "5",
+      "arggon.board.child.6": "6",
+      "arggon.board.child.7": "7",
+      "arggon.board.child.8": "8",
+      "arggon.board.child.9": "9",
       "arggon.board.next": "n",
       "arggon.board.active": "a",
       "arggon.board.fullscreen": "f",
@@ -462,5 +472,70 @@ describe("board panel controller (selection, jumps, detail)", () => {
     });
     // Every action is inert-safe without a host panel (no throws).
     for (const command of commands) expect(() => command.run()).not.toThrow();
+  });
+
+  it("opens the parent detail with p and each child detail with its digit", () => {
+    const root = fixture();
+    const toasts: string[] = [];
+    const controller = controllerFor(root, {
+      readSnapshot: () => boardSnapshot(root, { envItem: null }),
+      toast: (message) => toasts.push(message),
+    });
+    controller.jump("story-a", "test");
+    controller.toggleDetail();
+    expect(controller.lines().join("\n")).toContain("parent: core — Core");
+    expect(controller.lines().join("\n")).toContain("children (2):");
+
+    // Parent jump selects the parent AND opens its detail.
+    controller.jumpParent();
+    expect(controller.selection().id).toBe("core");
+    expect(controller.detail()?.id).toBe("core");
+    expect(controller.lines().join("\n")).toContain("parent: launch — Launch");
+    expect(toasts).toEqual([]);
+
+    // Child jumps are id-sorted like the tree: bug-two before task-one.
+    controller.jump("story-a", "test");
+    controller.jumpChild(0);
+    expect(controller.selection().id).toBe("bug-two");
+    expect(controller.detail()?.id).toBe("bug-two");
+    controller.jump("story-a", "test");
+    controller.jumpChild(1);
+    expect(controller.selection().id).toBe("task-one");
+    expect(controller.detail()?.id).toBe("task-one");
+
+    // Out of range and parent-less selections toast and keep the cursor.
+    controller.jump("story-a", "test");
+    controller.jumpChild(2);
+    expect(toasts.at(-1)).toBe("arggon board: no child 3");
+    expect(controller.selection().id).toBe("story-a");
+    controller.jump("launch", "test");
+    controller.jumpParent();
+    expect(toasts.at(-1)).toBe("arggon board: no parent");
+    expect(controller.selection().id).toBe("launch");
+
+    // A parent edge to an unknown id reports itself instead of misfiring.
+    write(
+      root,
+      "ArggonManager/arggon-manager/launch/orphan.md",
+      [
+        "---",
+        "type: task",
+        "status: todo",
+        "id: orphan",
+        "title: Orphan",
+        "parent: ghost-parent",
+        "---",
+        "",
+        "# Orphan",
+        "",
+      ].join("\n"),
+    );
+    controller.reload();
+    controller.jump("orphan", "test");
+    controller.toggleDetail();
+    expect(controller.lines().join("\n")).toContain("parent: ghost-parent (missing)");
+    controller.jumpParent();
+    expect(toasts.at(-1)).toBe("arggon board: parent not found");
+    expect(controller.selection().id).toBe("orphan");
   });
 });
