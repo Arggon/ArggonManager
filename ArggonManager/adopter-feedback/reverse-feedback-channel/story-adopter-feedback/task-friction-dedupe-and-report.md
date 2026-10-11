@@ -7,10 +7,9 @@ parent: story-adopter-feedback
 labels: [method]
 priority: p1
 created: "2026-10-02"
-updated: "2026-10-02"
-depends_on: [task-friction-capture-command]
+updated: "2026-10-11"
+depends_on: [task-friction-capture-command, task-friction-fingerprint-separator-not-length-prefixed]
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-dedupe-and-report.md
   Leaves live only under a story. id is the filename stem: task-friction-dedupe-and-report.
