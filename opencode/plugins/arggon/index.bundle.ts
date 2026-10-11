@@ -944,7 +944,7 @@ function readConventionVersion(dir) {
         return exports.CONVENTION_VERSION_DEFAULT;
     try {
         const raw = (0, node_fs_1.readFileSync)(path, "utf8");
-        const match = raw.match(/^version\s*:\s*(\d+)/m);
+        const match = raw.match(/^["']?version["']?\s*:\s*(\d+)/m);
         if (!match)
             return exports.CONVENTION_VERSION_DEFAULT;
         const parsed = Number.parseInt(match[1] ?? "", 10);
@@ -1030,6 +1030,126 @@ function stripQuotes(value) {
     }
     return value;
 }
+function stripInlineComment(raw) {
+    if (raw.startsWith("#"))
+        return "";
+    let quote = null;
+    for (let i = 0; i < raw.length; i += 1) {
+        const ch = raw[i];
+        if (quote === '"') {
+            if (ch === "\\")
+                i += 1;
+            else if (ch === '"')
+                quote = null;
+            continue;
+        }
+        if (quote === "'") {
+            if (ch === "'") {
+                if (raw[i + 1] === "'")
+                    i += 1;
+                else
+                    quote = null;
+            }
+            continue;
+        }
+        if (ch === '"' || ch === "'") {
+            quote = ch;
+            continue;
+        }
+        if (ch === "#" && (raw[i - 1] === " " || raw[i - 1] === "\t")) {
+            return raw.slice(0, i).trimEnd();
+        }
+    }
+    return raw;
+}
+function blockScalarHeader(raw) {
+    const match = /^([|>])([0-9+-]*)$/.exec(raw);
+    if (!match)
+        return null;
+    let indent = null;
+    let chomp = null;
+    for (const ch of match[2]) {
+        if (ch === "-" || ch === "+")
+            chomp = ch;
+        else {
+            const digit = Number.parseInt(ch, 10);
+            if (Number.isNaN(digit))
+                return null;
+            indent = indent === null ? digit : indent * 10 + digit;
+        }
+    }
+    return { style: match[1], indent, chomp };
+}
+function collectBlockScalar(lines, from, parentIndent) {
+    const body = [];
+    let index = from;
+    for (; index < lines.length; index += 1) {
+        const line = lines[index];
+        if (line.trim() === "") {
+            body.push(line);
+            continue;
+        }
+        if (line.length - line.trimStart().length <= parentIndent)
+            break;
+        body.push(line);
+    }
+    return { body, next: index };
+}
+function foldBlockScalar(core) {
+    let out = "";
+    let previousWasFolded = false;
+    for (const line of core) {
+        if (line === "") {
+            out += "\n";
+            previousWasFolded = false;
+            continue;
+        }
+        if (/^[ \t]/.test(line)) {
+            out += `${line}\n`;
+            previousWasFolded = false;
+            continue;
+        }
+        if (previousWasFolded)
+            out += " ";
+        out += line;
+        previousWasFolded = true;
+    }
+    return out.endsWith("\n") ? out.slice(0, -1) : out;
+}
+function decodeBlockScalar(body, header) {
+    let blockIndent = header.indent;
+    if (blockIndent === null) {
+        for (const line of body) {
+            if (line.trim() === "")
+                continue;
+            blockIndent = line.length - line.trimStart().length;
+            break;
+        }
+    }
+    if (blockIndent === null)
+        return "";
+    const content = body.map((line) => (line.length >= blockIndent ? line.slice(blockIndent) : ""));
+    let last = content.length;
+    while (last > 0 && content[last - 1].trim() === "")
+        last -= 1;
+    const core = content.slice(0, last);
+    const trailingBlanks = content.length - last;
+    if (core.length === 0)
+        return header.chomp === "+" ? "\n".repeat(trailingBlanks) : "";
+    const joined = header.style === "|" ? core.join("\n") : foldBlockScalar(core);
+    if (header.chomp === "-")
+        return joined;
+    if (header.chomp === "+")
+        return `${joined}\n${"\n".repeat(trailingBlanks)}`;
+    return `${joined}\n`;
+}
+function requireEmptyMapping(sourcePath, key, rawValue) {
+    if (rawValue === "")
+        return;
+    throw new Error(`${sourcePath}: '${key}' must be a mapping, one option per line ` +
+        `(got ${JSON.stringify(rawValue)}; this parser reads BLOCK style only — ` +
+        `flow style { }, anchors (&id), aliases (*id) and tags (!!tag) are not supported)`);
+}
 function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}/.convention.yml`) {
     const branchPatterns = { ...exports.DEFAULT_BRANCH_PATTERNS };
     const views = {};
@@ -1057,71 +1177,67 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
     let section = null;
     let generatedDest = null;
     let importOption = null;
-    for (const line of raw.split(/\r?\n/)) {
+    const lines = raw.split(/\r?\n/);
+    if (lines.length > 1 && lines[lines.length - 1] === "")
+        lines.pop();
+    for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index];
         if (!line.trim() || line.trimStart().startsWith("#"))
             continue;
         const indent = line.length - line.trimStart().length;
         const idx = line.indexOf(":");
         if (idx === -1) {
-            throw new Error(`${sourcePath}: invalid line ${JSON.stringify(line)}`);
+            throw new Error(`${sourcePath}: invalid line ${JSON.stringify(line)} (expected 'key: value')`);
         }
-        const key = line.slice(0, idx).trim();
-        const value = line.slice(idx + 1).trim();
+        const key = stripQuotes(line.slice(0, idx).trim());
+        let rawValue = stripInlineComment(line.slice(idx + 1).trim());
+        let value = stripQuotes(rawValue);
+        const header = blockScalarHeader(rawValue);
+        if (header !== null) {
+            const block = collectBlockScalar(lines, index + 1, indent);
+            index = block.next - 1;
+            rawValue = decodeBlockScalar(block.body, header);
+            value = rawValue;
+        }
         if (indent === 0) {
             section = null;
             generatedDest = null;
             importOption = null;
             if (key === "version") {
-                const parsed = Number.parseInt(value, 10);
+                const parsed = Number.parseInt(rawValue, 10);
                 if (Number.isFinite(parsed))
                     version = parsed;
             }
             else if (key === "branch_patterns") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'branch_patterns' must be a mapping, one type per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "branch_patterns";
             }
             else if (key === "x-views") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'x-views' must be a mapping, one view per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-views";
             }
             else if (key === "x-playbooks") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'x-playbooks' must be a mapping, one option per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-playbooks";
             }
             else if (key === "x-tracker") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'x-tracker' must be a mapping, one option per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-tracker";
             }
             else if (key === "x-import") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'x-import' must be a mapping, one option per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-import";
             }
             else if (key === "x-worktree") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'x-worktree' must be a mapping, one option per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-worktree";
             }
             else if (key === "x-github") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'x-github' must be a mapping, one option per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-github";
             }
             else if (key === "x-generated") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'x-generated' must be a mapping, one destination per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-generated";
             }
             continue;
@@ -1129,10 +1245,10 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
         if (section === "x-generated") {
             if (indent <= 2) {
                 if (key === "projectName") {
-                    generatedProjectName = stripQuotes(value) || null;
+                    generatedProjectName = value || null;
                     continue;
                 }
-                const dest = stripQuotes(key);
+                const dest = key;
                 generatedDest = dest !== "" ? dest : null;
                 if (generatedDest !== null && !(generatedDest in generated)) {
                     generated[generatedDest] = {
@@ -1148,68 +1264,68 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
                 continue;
             const entry = generated[generatedDest];
             if (key === "template")
-                entry.template = stripQuotes(value);
+                entry.template = value;
             else if (key === "checksum")
-                entry.checksum = stripQuotes(value);
+                entry.checksum = value;
             else if (key === "arggonVersion")
-                entry.arggonVersion = stripQuotes(value);
+                entry.arggonVersion = value;
             else if (key === "generatedAt")
-                entry.generatedAt = stripQuotes(value);
+                entry.generatedAt = value;
             else if (key === "acknowledged")
-                entry.acknowledged = value === "true";
+                entry.acknowledged = rawValue === "true";
             continue;
         }
         if (section === "x-playbooks") {
             if (key !== "max-age-days")
                 continue;
-            if (!/^\d+$/.test(value) || Number.parseInt(value, 10) <= 0) {
-                throw new Error(`${sourcePath}: 'max-age-days' must be a positive integer (got ${JSON.stringify(value)})`);
+            if (!/^\d+$/.test(rawValue) || Number.parseInt(rawValue, 10) <= 0) {
+                throw new Error(`${sourcePath}: 'max-age-days' must be a positive integer (got ${JSON.stringify(rawValue)})`);
             }
-            playbooks.maxAgeDays = Number.parseInt(value, 10);
+            playbooks.maxAgeDays = Number.parseInt(rawValue, 10);
             continue;
         }
         if (section === "x-tracker") {
             if (key === "allow-steal") {
-                if (value !== "true" && value !== "false") {
-                    throw new Error(`${sourcePath}: 'allow-steal' must be a boolean (got ${JSON.stringify(value)})`);
+                if (rawValue !== "true" && rawValue !== "false") {
+                    throw new Error(`${sourcePath}: 'allow-steal' must be a boolean (got ${JSON.stringify(rawValue)})`);
                 }
-                tracker.allowSteal = value === "true";
+                tracker.allowSteal = rawValue === "true";
                 continue;
             }
             if (key === "strict-gate-bins") {
-                if (value !== "true" && value !== "false") {
-                    throw new Error(`${sourcePath}: 'strict-gate-bins' must be a boolean (got ${JSON.stringify(value)})`);
+                if (rawValue !== "true" && rawValue !== "false") {
+                    throw new Error(`${sourcePath}: 'strict-gate-bins' must be a boolean (got ${JSON.stringify(rawValue)})`);
                 }
-                tracker.strictGateBins = value === "true";
+                tracker.strictGateBins = rawValue === "true";
                 continue;
             }
             if (key === "strict-worktree-writes") {
-                if (value !== "true" && value !== "false") {
-                    throw new Error(`${sourcePath}: 'strict-worktree-writes' must be a boolean (got ${JSON.stringify(value)})`);
+                if (rawValue !== "true" && rawValue !== "false") {
+                    throw new Error(`${sourcePath}: 'strict-worktree-writes' must be a boolean (got ${JSON.stringify(rawValue)})`);
                 }
-                tracker.strictWorktreeWrites = value === "true";
+                tracker.strictWorktreeWrites = rawValue === "true";
                 continue;
             }
             if (key === "product-acceptance") {
-                if (value !== "true" && value !== "false") {
-                    throw new Error(`${sourcePath}: 'product-acceptance' must be a boolean (got ${JSON.stringify(value)})`);
+                if (rawValue !== "true" && rawValue !== "false") {
+                    throw new Error(`${sourcePath}: 'product-acceptance' must be a boolean (got ${JSON.stringify(rawValue)})`);
                 }
-                tracker.productAcceptance = value === "true";
+                tracker.productAcceptance = rawValue === "true";
                 continue;
             }
             if (key === "reap-acked-orphans") {
-                if (value !== "true" && value !== "false") {
-                    throw new Error(`${sourcePath}: 'reap-acked-orphans' must be a boolean (got ${JSON.stringify(value)})`);
+                if (rawValue !== "true" && rawValue !== "false") {
+                    throw new Error(`${sourcePath}: 'reap-acked-orphans' must be a boolean (got ${JSON.stringify(rawValue)})`);
                 }
-                tracker.reapAckedOrphans = value === "true";
+                tracker.reapAckedOrphans = rawValue === "true";
                 continue;
             }
             if (key !== "auto-commit")
                 continue;
-            if (value !== "true" && value !== "false") {
-                throw new Error(`${sourcePath}: 'auto-commit' must be a boolean (got ${JSON.stringify(value)})`);
+            if (rawValue !== "true" && rawValue !== "false") {
+                throw new Error(`${sourcePath}: 'auto-commit' must be a boolean (got ${JSON.stringify(rawValue)})`);
             }
-            tracker.autoCommit = value === "true";
+            tracker.autoCommit = rawValue === "true";
             continue;
         }
         if (section === "x-import") {
@@ -1217,7 +1333,7 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
                 importOption = key === "label-types" ? "label-types" : null;
                 if (importOption !== null) {
                     importHasLabelTypes = true;
-                    if (value !== "") {
+                    if (rawValue !== "") {
                         throw new Error(`${sourcePath}: 'label-types' must be a mapping, one label per line`);
                     }
                 }
@@ -1225,17 +1341,17 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
             }
             if (importOption !== "label-types")
                 continue;
-            const label = stripQuotes(key);
+            const label = key;
             if (!label) {
                 throw new Error(`${sourcePath}: invalid x-import entry ${JSON.stringify(line)}`);
             }
             if (label in importLabelTypes) {
                 throw new Error(`${sourcePath}: duplicate label '${label}' in x-import.label-types`);
             }
-            const mapped = stripQuotes(value);
+            const mapped = value;
             if (!(0, ids_js_1.isItemType)(mapped)) {
                 throw new Error(`${sourcePath}: 'label-types' values must be work-item types ` +
-                    `(initiative | epic | story | task | bug), got ${JSON.stringify(value)} for label '${label}'`);
+                    `(initiative | epic | story | task | bug), got ${JSON.stringify(rawValue)} for label '${label}'`);
             }
             importLabelTypes[label] = mapped;
             importHasLabelTypes = true;
@@ -1243,42 +1359,42 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
         }
         if (section === "x-worktree") {
             if (key === "post-start-shell") {
-                const shell = stripQuotes(value);
+                const shell = value;
                 if (shell !== "inherit" && shell !== "login") {
-                    throw new Error(`${sourcePath}: 'post-start-shell' must be "inherit" or "login" (got ${JSON.stringify(value)})`);
+                    throw new Error(`${sourcePath}: 'post-start-shell' must be "inherit" or "login" (got ${JSON.stringify(rawValue)})`);
                 }
                 worktree.postStartShell = shell;
                 continue;
             }
             if (key === "env") {
-                if (value !== "true" && value !== "false") {
-                    throw new Error(`${sourcePath}: 'env' must be a boolean (got ${JSON.stringify(value)})`);
+                if (rawValue !== "true" && rawValue !== "false") {
+                    throw new Error(`${sourcePath}: 'env' must be a boolean (got ${JSON.stringify(rawValue)})`);
                 }
-                worktree.env = value === "true";
+                worktree.env = rawValue === "true";
                 continue;
             }
             if (key === "services") {
-                if (value === "true") {
+                if (rawValue === "true") {
                     worktree.services = "true";
                     continue;
                 }
-                if (value === "false") {
+                if (rawValue === "false") {
                     worktree.services = null;
                     continue;
                 }
-                const base = stripQuotes(value);
+                const base = value;
                 if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(base)) {
                     throw new Error(`${sourcePath}: 'services' must be true, false, or a Compose project base name ` +
-                        `([A-Za-z0-9][A-Za-z0-9_-]*, got ${JSON.stringify(value)})`);
+                        `([A-Za-z0-9][A-Za-z0-9_-]*, got ${JSON.stringify(rawValue)})`);
                 }
                 worktree.services = base;
                 continue;
             }
             if (key !== "post-start")
                 continue;
-            const command = stripQuotes(value);
+            const command = value;
             if (!command) {
-                throw new Error(`${sourcePath}: 'post-start' must be a non-empty string (got ${JSON.stringify(value)})`);
+                throw new Error(`${sourcePath}: 'post-start' must be a non-empty string (got ${JSON.stringify(rawValue)})`);
             }
             worktree.postStart = command;
             continue;
@@ -1286,10 +1402,10 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
         if (section === "x-github") {
             if (key !== "issue-roundtrip")
                 continue;
-            if (value !== "true" && value !== "false") {
-                throw new Error(`${sourcePath}: 'issue-roundtrip' must be a boolean (got ${JSON.stringify(value)})`);
+            if (rawValue !== "true" && rawValue !== "false") {
+                throw new Error(`${sourcePath}: 'issue-roundtrip' must be a boolean (got ${JSON.stringify(rawValue)})`);
             }
-            github.issueRoundtrip = value === "true";
+            github.issueRoundtrip = rawValue === "true";
             continue;
         }
         if (section === "x-views") {
@@ -1299,7 +1415,7 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
             if (key in views) {
                 throw new Error(`${sourcePath}: duplicate view '${key}' in x-views`);
             }
-            const expr = stripQuotes(value);
+            const expr = value;
             if (!expr) {
                 throw new Error(`${sourcePath}: empty expression for view '${key}'`);
             }
@@ -1311,7 +1427,7 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
         if (!(0, ids_js_1.isItemType)(key)) {
             throw new Error(`${sourcePath}: unknown type '${key}' in branch_patterns (expected: initiative | epic | story | task | bug)`);
         }
-        const pattern = stripQuotes(value);
+        const pattern = value;
         if (!pattern) {
             throw new Error(`${sourcePath}: empty pattern for type '${key}'`);
         }
