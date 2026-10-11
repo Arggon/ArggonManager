@@ -13,6 +13,7 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T04:23:07.989Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-init-force-drops-x-tracker-block
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-init-force-drops-x-tracker-block.md
   Leaves live only under a story. id is the filename stem: bug-init-force-drops-x-tracker-block.
@@ -28,11 +29,24 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-init-force-drops-x-tracke
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] `init --force` **preserves** an existing `x-tracker` block (and the other `x-*`
+      extensions) instead of overwriting it with the scaffold's fixed string
+- [ ] Where a force genuinely must replace a value, it is reported explicitly — a silent
+      configuration loss is the defect, not the overwrite itself
+- [ ] A test drives it: arm two flags, run a forced re-init, assert both survive and the run
+      says what it kept
+- [ ] The interaction is documented where `--force` is described (README +
+      `docs/json-output.md`), including that it no longer discards configuration
+- [ ] If preserving is impossible for some field, that field is enumerated with its reason
+      rather than left to fail silently
+- [ ] Consider the same question for the **generated docs** under `--force`: does a forced
+      re-init drop `x-generated` provenance the same way? Answered either way, on the item
+- [ ] `arggon validate` ok, `npm test` green
 
 ## Notes
 
 ### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+
 ## Context
 
 Found while reviewing PR #640 (`task-adapter-orphan-reaping`), reported by the worker rather
@@ -40,6 +54,7 @@ than fixed in passing: **`init --force` regenerates `.convention.yml` from a fix
 string and drops the entire `x-tracker` block.**
 
 Every arming flag therefore silently disarms on a forced re-scaffold:
+
 - `x-tracker.allow-steal` — the human-only claim-takeover double gate
 - `x-tracker.strict-gate-bins` — the strict `start` gate
 - `x-tracker.strict-worktree-writes` — the single-writer gate
