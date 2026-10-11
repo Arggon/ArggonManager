@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: [docs, adr]
 created: "2026-10-06"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-adr-status-drift-merged-adr-proposed
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-adr-status-drift-merged-adr-proposed.md

@@ -9,9 +9,7 @@ parent: story-spec-pipeline
 labels: [spec-pipeline, docs]
 created: "2026-10-11"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-task-spec-deps-022-no-error-path
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/task-spec-deps-022-no-error-path.md
   Leaves live only under a story. id is the filename stem: task-spec-deps-022-no-error-path.

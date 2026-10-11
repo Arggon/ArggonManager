@@ -10,7 +10,6 @@ labels: [spec-pipeline, docs]
 created: "2026-10-03"
 updated: "2026-10-11"
 depends_on: [bug-spec-analyze-does-not-detect-duplicate-doc-numbers]
-worktree_path: /home/arggon/Projects/ArggonManager-task-renumber-colliding-doc-numbers
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/task-renumber-colliding-doc-numbers.md

@@ -10,7 +10,6 @@ labels: [cli, safety, convention]
 priority: p2
 created: "2026-10-04"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-init-force-drops-x-tracker-block
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-init-force-drops-x-tracker-block.md

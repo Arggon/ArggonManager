@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: [spec-pipeline, docs]
 created: "2026-10-11"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-task-decision-pending-methodology-improvements-014
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-decision-pending-methodology-improvements-014.md

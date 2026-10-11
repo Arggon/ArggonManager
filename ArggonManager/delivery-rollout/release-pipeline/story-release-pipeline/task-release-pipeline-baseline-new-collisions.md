@@ -10,7 +10,6 @@ labels: [spec-pipeline]
 created: "2026-10-03"
 updated: "2026-10-11"
 depends_on: [task-renumber-colliding-doc-numbers]
-worktree_path: /home/arggon/Projects/ArggonManager-task-release-pipeline-baseline-new-collisions
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-release-pipeline-baseline-new-collisions.md

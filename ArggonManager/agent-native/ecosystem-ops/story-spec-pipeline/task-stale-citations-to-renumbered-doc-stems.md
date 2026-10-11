@@ -9,7 +9,6 @@ parent: story-spec-pipeline
 labels: [spec-pipeline, docs]
 created: "2026-10-11"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-task-stale-citations-to-renumbered-doc-stems
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/task-stale-citations-to-renumbered-doc-stems.md

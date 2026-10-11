@@ -10,7 +10,6 @@ labels: [docs, chore, skills]
 priority: p3
 created: "2026-10-04"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-skill-exploration-reference-fails-prettier
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-skill-exploration-reference-fails-prettier.md
