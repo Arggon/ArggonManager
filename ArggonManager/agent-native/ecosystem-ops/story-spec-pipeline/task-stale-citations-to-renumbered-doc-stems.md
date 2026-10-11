@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-stale-citations-to-renumbered-doc-stems
 title: Residual stale citations to the five renumbered doc stems in other work-item bodies and comment-only code refs
+assignee: arggon-delivery-lead
+branch: feat/task-stale-citations-to-renumbered-doc-stems
 parent: story-spec-pipeline
 labels: [spec-pipeline, docs]
 created: "2026-10-11"
 updated: "2026-10-11"
+claimed_at: "2026-10-11T05:59:51.270Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-stale-citations-to-renumbered-doc-stems
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/task-stale-citations-to-renumbered-doc-stems.md
