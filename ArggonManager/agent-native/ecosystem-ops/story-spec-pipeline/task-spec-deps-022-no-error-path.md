@@ -84,3 +84,6 @@ Item not flipped to done — completion is the delivery lead's call after merge.
 
 ### 2026-10-11 @arggon-maker
 Out-of-scope observation for the delivery lead (NOT filed as an item, NOT fixed here): spec-opencode-seam-010.md is the other surviving no-error-path finding on spec analyze (spec-opencode2-009.md and spec-spec-import-openspec-005.md carry the 3 vague-quantifier warnings). Fixing it is separate work — the delivery lead decides whether it becomes its own item under story-spec-pipeline. Also note the handoff open-questions field capped at 200 chars, so the truncated tail was: "Should spec-opencode-seam-010.md (the other no-error-path survivor) get its own follow-up item?"
+
+### 2026-10-11 @arggon-maker
+Out-of-scope observation for the delivery lead (NOT filed as an item, NOT fixed here): spec-opencode-seam-010.md is the other surviving no-error-path finding on spec analyze (spec-opencode2-009.md and spec-spec-import-openspec-005.md carry the 3 vague-quantifier warnings). Fixing it is separate work — the delivery lead decides whether it becomes its own item under story-spec-pipeline. Also note the handoff open-questions field capped at 200 chars, so the truncated tail was: "Should spec-opencode-seam-010.md (the other no-error-path survivor) get its own follow-up item?"
