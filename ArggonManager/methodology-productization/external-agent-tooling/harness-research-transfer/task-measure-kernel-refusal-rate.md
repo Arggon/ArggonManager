@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-measure-kernel-refusal-rate
 title: "Measure our illegal-action rate: how often do agents attempt transitions the kernel refuses? (AutoHarness's opening datum)"
+assignee: arggon-delivery-lead
+branch: feat/task-measure-kernel-refusal-rate
 parent: harness-research-transfer
 labels: [methodology, telemetry, research]
 priority: p2
 created: "2026-10-05"
-updated: "2026-10-05"
+updated: "2026-10-11"
+claimed_at: "2026-10-11T22:29:04.116Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-measure-kernel-refusal-rate
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-measure-kernel-refusal-rate.md
