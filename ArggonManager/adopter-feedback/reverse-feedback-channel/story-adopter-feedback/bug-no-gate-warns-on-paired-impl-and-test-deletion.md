@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-no-gate-warns-on-paired-impl-and-test-deletion
 title: "Nothing gates a `D` row that removes an implementation and its paired test together — the silent shape that goes green, and it has been reported twice and tracked zero times"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-adopter-feedback
 labels: [ci, tests]
 created: "2026-10-06"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T11:00:45.402Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-no-gate-warns-on-paired-impl-and-test-deletion
 ---
 <!--
