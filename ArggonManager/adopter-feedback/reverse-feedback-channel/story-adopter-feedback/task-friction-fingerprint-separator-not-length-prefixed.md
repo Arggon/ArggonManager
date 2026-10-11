@@ -9,7 +9,6 @@ parent: story-adopter-feedback
 labels: [method, spec]
 created: "2026-10-11"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-task-friction-fingerprint-separator-not-length-prefixed
 ---
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-fingerprint-separator-not-length-prefixed.md
