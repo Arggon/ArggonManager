@@ -59,6 +59,21 @@ export const FRICTION_LOG_FILE_NAME = "friction.jsonl";
 /** The per-machine salt file name under `<stateBase>/arggon/`. */
 export const FRICTION_SALT_FILE_NAME = "machine-salt";
 
+/**
+ * The rotation-drop counter file name under `<stateBase>/arggon/`
+ * (task-friction-dedupe-and-report, plan T3). Rotation physically REMOVES the
+ * oldest lines, so the surviving log cannot tell a later reader how much
+ * history was lost; this sidecar makes that drop observable so `--report` can
+ * render `dropped: N` (spec §Limits: "the drop is reported by the next
+ * --report"). The cap and the drop themselves stay owned by the capture task
+ * (T1); this file is only the cumulative counter the report reads — the writer
+ * increments it at the rotation site, `--report` (and a future `--clear`)
+ * reads/resets it. A sidecar, not a line in the JSONL: `readFrictionLog` counts
+ * a non-record line as `malformed`, and the log-is-not-the-tracker discipline
+ * keeps it a plain data file beside the log.
+ */
+export const FRICTION_DROPPED_FILE_NAME = "friction.dropped";
+
 /** Placeholder every normalized commandShape value collapses to. */
 const SHAPE_PLACEHOLDER = "<arg>";
 
@@ -573,6 +588,51 @@ export function frictionSaltPath(env: NodeJS.ProcessEnv, home: string): string {
   return join(frictionStateDir(env, home), FRICTION_SALT_FILE_NAME);
 }
 
+/**
+ * `<stateBase>/arggon/friction.dropped` — the cumulative rotation-drop counter
+ * `--report` renders. Derivable from the log path too (it lives in the same
+ * dir); the env/home form matches the other readers.
+ */
+export function frictionDroppedPath(env: NodeJS.ProcessEnv, home: string): string {
+  return join(frictionStateDir(env, home), FRICTION_DROPPED_FILE_NAME);
+}
+
+/**
+ * The cumulative lines rotation has dropped so far, or `0` when there is no
+ * counter yet (a log that never rotated, or a fresh `--clear`d one). Tolerant:
+ * a missing, blank or non-integer file reads as `0` — a counter the report
+ * cannot parse must not fail the read, exactly like the log reader tolerates a
+ * bad line.
+ */
+export function readFrictionDropped(droppedPath: string): number {
+  let raw: string;
+  try {
+    raw = readFileSync(droppedPath, "utf8").trim();
+  } catch {
+    return 0; // no counter: nothing has been dropped (or the file is unreadable)
+  }
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+
+/**
+ * Add `add` to the cumulative rotation-drop counter beside `dir` (the log's
+ * directory). Best-effort and idempotent-by-read: it reads the current value,
+ * adds, and rewrites one small file. A rotate already wrote the log atomically,
+ * so this write is metadata — it must not turn a successful capture into a
+ * `log-unwritable` failure, and it swallows its own error for exactly that
+ * reason. The next `persistFrictionDropped` re-reads whatever is on disk, so a
+ * swallow degrades to an under-counted `dropped`, never a corrupt counter.
+ */
+function persistFrictionDropped(dir: string, add: number): void {
+  try {
+    const path = join(dir, FRICTION_DROPPED_FILE_NAME);
+    writeFileSync(path, `${readFrictionDropped(path) + add}\n`, "utf8");
+  } catch {
+    // Metadata only: the log is already safely rotated. Leave the counter as-is.
+  }
+}
+
 /** A salt is exactly `FRICTION_SALT_BYTES` bytes of hex; anything else is not ours. */
 const SALT_HEX = /^[0-9a-f]{64}$/;
 
@@ -597,7 +657,11 @@ export class FrictionError extends Error {
 
 /** Every non-happy path names its reason (spec §Observability). */
 export type FrictionFailureReason =
-  "no-observation" | "no-command-shape" | "log-unwritable" | "evidence-unreadable";
+  | "no-observation"
+  | "no-command-shape"
+  | "log-unwritable"
+  | "evidence-unreadable"
+  | "report-and-capture-mutually-exclusive";
 
 /** `mkdir -p` one directory, naming it on failure. */
 function mkdirP(dir: string): void {
@@ -930,6 +994,13 @@ export function appendFrictionRecord(
         logPath,
       );
     }
+    // Persist the cumulative drop so a LATER `--report` — a separate process
+    // that cannot see what rotation removed — can render `dropped: N`. This is
+    // additive to the cap (which stays T1's): it records the count, it does not
+    // decide it. Best-effort: the rotation above already succeeded, so a
+    // failing counter write must not fail the capture (T3 reviewer note N6b);
+    // the log stays correct either way and only the reported count is stale.
+    persistFrictionDropped(dir, existing.length - kept.length);
     return { path: logPath, lines: kept.length + 1, dropped: existing.length - kept.length };
   }
   if (fd === undefined) {

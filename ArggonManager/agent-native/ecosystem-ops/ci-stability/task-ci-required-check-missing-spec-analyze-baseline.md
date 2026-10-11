@@ -9,7 +9,6 @@ parent: ci-stability
 labels: [ci, spec-pipeline]
 created: "2026-10-11"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-task-ci-required-check-missing-spec-analyze-baseline
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/ci-stability/task-ci-required-check-missing-spec-analyze-baseline.md

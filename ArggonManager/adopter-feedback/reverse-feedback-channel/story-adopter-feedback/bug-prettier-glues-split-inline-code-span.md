@@ -10,7 +10,6 @@ labels: [docs, formatter]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-prettier-glues-split-inline-code-span
 ---
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/bug-prettier-glues-split-inline-code-span.md
