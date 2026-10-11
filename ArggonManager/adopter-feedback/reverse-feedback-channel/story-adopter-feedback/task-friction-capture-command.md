@@ -97,3 +97,10 @@ T1 stays unreleased. Wave A (all file-disjoint from each other and from this tas
 3. `task-spike-friction-tier-b-surface` — story's own research spike, touches only its item file.
 
 Then `task-release-pipeline-baseline-new-collisions` re-baselines after the corpus is clean (NOT before, and never by widening the net). Only claim T1 when the zero-NEW condition holds on main again.
+
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — gate CLEARED: T1 released, claiming now
+
+`spec analyze --baseline ArggonManager/spec-analyze-baseline.json` on clean main: **0 new, 0 resolved, 4 unchanged, exit 0**. The release condition from the 2026-10-06 note holds on both counts: the renumber half landed via PR #680 (task-renumber-colliding-doc-numbers) and the zero-NEW half via PRs #679 (decision fix), #686 (spec-deps-022 error path) and #690 (both baselines re-saved honestly, 2 closed findings dropped, 4 open ones persist).
+
+T1 is claimed and dispatched. The story's remaining chain (task-friction-dedupe-and-report, task-friction-redaction-at-write) stays behind its declared depends_on until T1 merges.
