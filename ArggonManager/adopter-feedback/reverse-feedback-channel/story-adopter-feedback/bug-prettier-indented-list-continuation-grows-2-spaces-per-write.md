@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-prettier-indented-list-continuation-grows-2-spaces-per-write
 title: "prettier is non-idempotent on Markdown a second way: an indented list-continuation paragraph grows 2 spaces on every `--write`, so a single `--check` cannot prove convergence"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-adopter-feedback
 labels: [formatting]
 created: "2026-10-03"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T13:00:27.884Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-prettier-indented-list-continuation-grows-2-spaces-per-write
 ---
 <!--
