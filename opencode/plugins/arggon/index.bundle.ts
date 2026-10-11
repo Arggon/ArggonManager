@@ -4020,19 +4020,48 @@ function acceptanceComplete(body) {
 const ACCEPTANCE_HEADING = /^##[ \t]+acceptance[ \t]*$/i;
 const SECTION_END_HEADING = /^#{1,2}[ \t]/;
 const COMMENT_BLOCK_HEADING = /^###[ \t]+(?:\d{4}-\d{2}-\d{2}[ \t]+@|Waiver\b)/;
-function withoutCommentBlocks(body) {
+const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+function opensFence(line) {
+    const match = FENCE_LINE.exec(line);
+    if (!match)
+        return false;
+    if (match[1][0] !== "`")
+        return true;
+    return !match[2].includes("`");
+}
+function closesFence(line, fence) {
+    const match = FENCE_LINE.exec(line);
+    if (!match)
+        return false;
+    const run = match[1];
+    if (run[0] !== fence.char || run.length < fence.length)
+        return false;
+    return /^[ \t]*$/.test(match[2]);
+}
+function liveAcceptanceLines(body) {
     const out = [];
+    let fence = null;
     let inComment = false;
     for (const line of body.split(ACCEPTANCE_LINE_BREAK)) {
+        if (fence) {
+            if (closesFence(line, fence))
+                fence = null;
+            continue;
+        }
+        if (opensFence(line)) {
+            const run = FENCE_LINE.exec(line)[1];
+            fence = { char: run[0], length: run.length };
+            continue;
+        }
         if (COMMENT_BLOCK_HEADING.test(line))
             inComment = true;
         if (!inComment)
             out.push(line);
     }
-    return out.join("\n");
+    return out;
 }
 function liveAcceptanceRegion(body) {
-    const lines = withoutCommentBlocks(body).split(ACCEPTANCE_LINE_BREAK);
+    const lines = liveAcceptanceLines(body);
     let start = -1;
     for (let i = 0; i < lines.length; i += 1) {
         if (ACCEPTANCE_HEADING.test(lines[i])) {
