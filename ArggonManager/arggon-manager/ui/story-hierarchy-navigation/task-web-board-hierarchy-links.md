@@ -43,3 +43,7 @@ evidence (maker probe + gates, 2026-10-11, commit 3294f22f):
 - playwright drive (chromium) on served board: leaf-a drawer shows parent link mid-in_progress + children none; clicking parent opens Mid with both child links; clicking leaf-b opens Leaf B; Esc returns focus to leaf-a card; zero img nodes in drawer
 - e2e: 5/5 drawer+axe specs green (ready-board, lens, static-export, static-details drawer incl. drawer axe scan, serve drawer); no new axe violations, no exclusions
 - push: origin feat/task-web-board-hierarchy-links, new branch, exit 0
+
+### handoff 2026-10-11 @arggon-maker — next: Review 3294f22f + browser re-drive, then merge and flip done
+- branch: feat/task-web-board-hierarchy-links
+- open questions: none open; e2e needed a worktree build (dist absent) before running
