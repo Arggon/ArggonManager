@@ -82,3 +82,7 @@ Maker follow-up — branch synced onto main; measurement restated at main's real
 **Gates, re-run on the merged tree.** `npm run build` green; `npm test` 3032 passed / 140 files (the 27 extra tests are PR #712's, arriving with the merge); `npm run check:plugin` green; `npm run lint` exit 0; `arggon validate` ok (0 warnings); `test:structure`, `lint:structure`, `spec analyze --baseline` (0 new), `smoke:native-start-cold`, `smoke:worktree-playwright` green. Note the pre-commit hook (`arggon validate`) needs the worktree's `lib/dist` rebuilt after a merge — `npm run build` does that, then the hook passes.
 
 **Nothing about the decision changed.** 512 KiB -> 640 KiB stands: the bound is a noise gate protecting against accidental dependency creep and a runaway bundle, ~25% above the largest measured size in this chain, with the durable boundary proof in `cli/src/plugin-bundle.test.ts` (exactly-on-bound builds, one byte over throws `plugin bundle: 655361 bytes > 655360 bound`).
+
+### handoff 2026-10-11 @arggon-maker — next: Delivery lead: review and merge PR #716 (bound 524288 -> 655360, durable bite proof in cli/src/plugin-bundle.test.ts); PR #713 then rebases onto it at its 524472 bytes.
+- branch: feat/task-plugin-bundle-near-byte-ceiling
+- open questions: None blocking; CI green on #716 (cli + ui-smoke + tasks-validate). Force-push stays seam-denied (bug-force-push-gate), so any later main sync is a merge, never a rebase.
