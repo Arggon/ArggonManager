@@ -8816,6 +8816,8 @@ exports.resolveToolCwd = resolveToolCwd;
 exports.readWorktreeEnv = readWorktreeEnv;
 exports.findWorktreeEnv = findWorktreeEnv;
 exports.processWorktreeIdentity = processWorktreeIdentity;
+exports.parseWorktreeList = parseWorktreeList;
+exports.itemClaimWorktree = itemClaimWorktree;
 exports.trackerBinding = trackerBinding;
 exports.trackerRootMismatch = trackerRootMismatch;
 exports.trackerRootMismatchMessage = trackerRootMismatchMessage;
@@ -9755,6 +9757,7 @@ exports.WORKTREE_ENV_KEYS = {
 };
 const MAX_ENV_WALK_DEPTH = 8;
 const MAX_ENV_FILE_BYTES = 8_192;
+const MAX_CLAIM_WORKTREE_SCAN = 64;
 exports.PROCESS_ENV_SOURCE = "process.env";
 const IDENTITY_FIELDS = [
     ["worktreePath", exports.WORKTREE_ENV_KEYS.worktreePath],
@@ -9821,6 +9824,36 @@ function processWorktreeIdentity(env = process.env) {
             fields.set(key, value);
     }
     return parseWorktreeEnv(fields, exports.PROCESS_ENV_SOURCE);
+}
+function parseWorktreeList(output) {
+    if (typeof output !== "string")
+        return [];
+    const paths = [];
+    for (const line of output.split("\n")) {
+        if (!line.startsWith("worktree "))
+            continue;
+        const path = line.slice("worktree ".length).trim();
+        if (path !== "")
+            paths.push(path);
+    }
+    return paths;
+}
+async function itemClaimWorktree(root, itemId, limit = MAX_CLAIM_WORKTREE_SCAN) {
+    if (itemId === "")
+        return undefined;
+    const listing = await run("git", ["worktree", "list", "--porcelain"], root, 2_000);
+    if (listing.code !== 0)
+        return undefined;
+    const resolvedRoot = (0, node_path_1.resolve)(root);
+    for (const path of parseWorktreeList(listing.stdout).slice(0, Math.max(limit, 0))) {
+        const absolute = (0, node_path_1.resolve)(path);
+        if (absolute === resolvedRoot)
+            continue;
+        const identity = readWorktreeEnv((0, node_path_1.join)(absolute, exports.WORKTREE_ENV_FILE));
+        if (identity?.item === itemId && identity.worktreePath !== undefined)
+            return identity;
+    }
+    return undefined;
 }
 function trackerBinding(kernel, cwd, env = process.env) {
     const root = resolvedTrackerRoot(kernel, cwd);
@@ -10075,6 +10108,7 @@ const TOOL_SPECS = [
             agent: true,
         }),
         mutates: true,
+        itemScoped: true,
     },
     {
         name: "show",
@@ -10112,6 +10146,7 @@ const TOOL_SPECS = [
             body: input.body === true,
             tailComments: typeof input.tail_comments === "number" ? input.tail_comments : undefined,
         }),
+        itemScoped: true,
     },
     {
         name: "next",
@@ -10198,6 +10233,7 @@ const TOOL_SPECS = [
             author: asString(input.author) ?? sessionToken(tool?.sessionID),
         }),
         mutates: true,
+        itemScoped: true,
     },
     {
         name: "handoff",
@@ -10250,6 +10286,7 @@ const TOOL_SPECS = [
             });
         },
         mutates: true,
+        itemScoped: true,
     },
     {
         name: "priority",
@@ -11731,8 +11768,19 @@ function argonToolDefinitions(kernel, options) {
             if ("error" in resolved)
                 throw resolved.error;
             const binding = trackerBinding(kernel, resolved.cwd, options.worktreeEnv ?? process.env);
+            if (spec.itemScoped === true && binding.declared.length === 0) {
+                const claim = await itemClaimWorktree(binding.root, asString(input?.id) ?? "");
+                if (claim !== undefined) {
+                    binding.claim = claim;
+                    const absolute = (0, node_path_1.resolve)(claim.worktreePath ?? "");
+                    if (absolute !== "" && !binding.declared.includes(absolute)) {
+                        binding.declared.push(absolute);
+                        binding.sources.push(claim.source);
+                    }
+                }
+            }
             const mismatch = trackerRootMismatch(binding);
-            if (mismatch !== undefined && spec.mutates === true) {
+            if (mismatch !== undefined && spec.mutates === true && binding.claim === undefined) {
                 throw new ArgonToolError(kernel.failEnvelope({
                     command: spec.name,
                     code: exports.TRACKER_ROOT_MISMATCH,
