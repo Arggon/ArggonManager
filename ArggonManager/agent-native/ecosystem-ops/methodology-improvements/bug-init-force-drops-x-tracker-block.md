@@ -29,19 +29,19 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-init-force-drops-x-tracke
 
 ## Acceptance
 
-- [ ] `init --force` **preserves** an existing `x-tracker` block (and the other `x-*`
+- [x] `init --force` **preserves** an existing `x-tracker` block (and the other `x-*`
       extensions) instead of overwriting it with the scaffold's fixed string
-- [ ] Where a force genuinely must replace a value, it is reported explicitly — a silent
+- [x] Where a force genuinely must replace a value, it is reported explicitly — a silent
       configuration loss is the defect, not the overwrite itself
-- [ ] A test drives it: arm two flags, run a forced re-init, assert both survive and the run
+- [x] A test drives it: arm two flags, run a forced re-init, assert both survive and the run
       says what it kept
-- [ ] The interaction is documented where `--force` is described (README +
+- [x] The interaction is documented where `--force` is described (README +
       `docs/json-output.md`), including that it no longer discards configuration
-- [ ] If preserving is impossible for some field, that field is enumerated with its reason
+- [x] If preserving is impossible for some field, that field is enumerated with its reason
       rather than left to fail silently
-- [ ] Consider the same question for the **generated docs** under `--force`: does a forced
+- [x] Consider the same question for the **generated docs** under `--force`: does a forced
       re-init drop `x-generated` provenance the same way? Answered either way, on the item
-- [ ] `arggon validate` ok, `npm test` green
+- [x] `arggon validate` ok, `npm test` green
 
 ## Notes
 
