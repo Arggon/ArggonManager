@@ -159,3 +159,6 @@ No MCP tool and no `tools.arggon.friction` in this PR: `arggon_friction` + `tool
 ### handoff 2026-10-11 @Arggon — next: T2 (task-friction-redaction-at-write): apply the 4-step redaction pass on the write path over the capped field values buildFrictionRecord already produces
 - branch: feat/task-friction-capture-command
 - open questions: fingerprint separator U+001F is not length-prefixed — spec decision wanted; commandShape cap semantics for the human line
+
+### 2026-10-11 @Arggon
+PR: https://github.com/Arggon/ArggonManager/pull/695 (base main, head feat/task-friction-capture-command). CI dispatched on push. Status stays in_progress — the delivery lead reviews, verifies the merge and flips to done.
