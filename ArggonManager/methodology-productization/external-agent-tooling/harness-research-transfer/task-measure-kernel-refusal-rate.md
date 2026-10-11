@@ -184,3 +184,14 @@ Evidence for standards review (all in worktree, branch feat/task-measure-kernel-
 
 - branch: feat/task-measure-kernel-refusal-rate
 - open questions: Full 497-run auto-done sweep unfinished; exploration-021 link pending lead call
+
+### 2026-10-11 @ses_ed2ed434cffdHsqB0EV526IjUT
+
+verdict: approve (advisory measurement — 0 recorded refusals per 1,224 transitions)
+
+- Read the worktree diff (1 non-tracker file, the item report +107/-5) — no templates/cli/lib/skills/plugin touches; scope stays on the item
+- Standards-reviewer pass: approve, no blocking findings; throw-site split corrected 17/164 → 18/163 in the fix commit
+- Verifier probes first round: validate green, prettier red (exit 1); maker fixed with prettier --write (e38f5247), lead re-ran both gates green in the worktree
+- Evidence travels with the change: window 2026-08-16→2026-10-11, 6 sources, rate with denominator, honest why-none by-rule, limits, never-reopen cross-check (0 transitions + done→cancelled bypass exhibit), one-line AutoHarness verdict, follow-up proposed as text (not filed)
+- Advisory holds: no telemetry surface built, no gate/command added, live Acceptance left unticked for the lead
+- Recommendation: merge PR #726 (merge, not squash), then lead ticks Acceptance, links exploration-021, files the sweep follow-up
