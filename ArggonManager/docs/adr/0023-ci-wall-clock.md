@@ -1,8 +1,19 @@
 # 0023 CI wall clock: concurrency groups, duration-aware sharding, and the `cli` required check
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-05
 - Deciders: @gonzalo (product owner), Arggon delivery lead
+
+> Status note (2026-10-11): flipped from `Proposed` to **Accepted** retroactively.
+> This record reached `main` as `66035a4a` (2026-10-05), a first-parent commit
+> rather than a merge — the repo carries no merge commit for it — and the status
+> line was left behind: the drift tracked as
+> `bug-adr-status-drift-merged-adr-proposed`. `docs/engineering.md` §ADR process
+> declares the lifecycle "Proposed in a PR → Accepted when merged (or explicitly
+> recorded)", so the line now states the state the record has been in since that
+> commit. Nothing below this note is rewritten: the three ordered steps, the
+> "explicitly not part of this decision" scope and the consequences stand as
+> landed.
 
 Exploration of record:
 [exploration-ci-pipeline-wall-clock-022](../explorations/exploration-ci-pipeline-wall-clock-022.md)
