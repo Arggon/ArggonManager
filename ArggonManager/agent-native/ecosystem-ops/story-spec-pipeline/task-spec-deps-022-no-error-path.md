@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-spec-deps-022-no-error-path
 title: "spec-deps-022.md publishes no error/failure path — the renumber wave relocated a pre-existing no-error-path finding and main's baseline lane now reads it as NEW"
+assignee: arggon-delivery-lead
+branch: feat/task-spec-deps-022-no-error-path
 parent: story-spec-pipeline
 labels: [spec-pipeline, docs]
 created: "2026-10-11"
 updated: "2026-10-11"
+claimed_at: "2026-10-11T05:59:47.983Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-spec-deps-022-no-error-path
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/task-spec-deps-022-no-error-path.md
