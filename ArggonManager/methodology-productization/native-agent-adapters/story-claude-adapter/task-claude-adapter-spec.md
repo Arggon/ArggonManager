@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-claude-adapter-spec
 title: "Claude Code adapter: spec + story filing (plan T6)"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-claude-adapter
 labels: []
 created: "2026-10-02"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T09:58:50.239Z"
 depends_on: [task-opencode-prompt-stamp, task-opencode-event-panel, task-zcode-goal-mode, task-zcode-automations]
 worktree_path: /home/arggon/Projects/ArggonManager-task-claude-adapter-spec
 ---
