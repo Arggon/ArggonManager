@@ -202,3 +202,7 @@ verdict: approve (advisory measurement — 0 recorded refusals per 1,224 transit
 
 ### 2026-10-11 @ses_ed2ea49e2ffe6ovgjOhUgxj1iP
 Full auto-done sweep landed after the report (background job sh_12d1bdb48001ZBpoCsZ586k2UV, completed): 497/497 runs, 2026-09-11 to 2026-10-11, executed log lines only (script echoes excluded by $variable filter). Aggregate: 0 done-gate refusals, 0 unexpected update failures, 0 illegal-transition attempts, 220 success flips. 5 merge-time skips never consulted the kernel (4 status 'missing', 1 status 'todo' warned-and-skipped on bug-native-cleanup-unverified-worktree-removal). Done-gate merge-time refusal rate: 0/220 = 0%. Report body updated to the full-sweep numbers; verdict now cites 497 runs / 220 flips instead of the 0/19 spot sample.
+
+### handoff 2026-10-11 @ses_ed2ea49e2ffe6ovgjOhUgxj1iP (session: ses_ed2ea49e2ffe6ovgjOhUgxj1iP) — next: Lead: verify full-sweep report, tick Acceptance, merge PR #726, link exploration-021
+- branch: feat/task-measure-kernel-refusal-rate
+- open questions: None open; closure + exploration link are lead calls
