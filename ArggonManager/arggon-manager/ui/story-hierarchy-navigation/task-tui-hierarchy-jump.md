@@ -8,6 +8,7 @@ labels: []
 created: "2026-10-11"
 updated: "2026-10-11"
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/task-tui-hierarchy-jump.md
   Leaves live only under a story. id is the filename stem: task-tui-hierarchy-jump.
@@ -19,10 +20,14 @@ updated: "2026-10-11"
 
 ## Context
 
-<!-- Why this task exists. -->
+Parent story `story-hierarchy-navigation`: the TUI detail pane (`buildTuiDetailLines`, `cli/src/tui.ts`) prints `parent: <id>` as inert text and no key walks the tree. Terminal users get the board plus a read-only pane with no way up or down.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] A key from an open detail pane jumps to the parent's detail, and a key (or section) lists the children with a way to open each child's detail; keys documented in the help/shortcut surface
+- [ ] Items with no parent / no children report that in-pane instead of misfiring
+- [ ] Read-only preserved: the new keys never write (reducer stays write-free); rendering goes through the existing sanitize path
+- [ ] `npm run smoke:tui-board` green plus new scripted steps covering the jump (or documented manual check in the verdict if unscriptable); `tui.test.ts` pins the bindings
+- [ ] `arggon validate` green; prettier clean; PR opened
 
 ## Notes

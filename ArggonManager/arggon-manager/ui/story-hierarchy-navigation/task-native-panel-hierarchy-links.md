@@ -8,6 +8,7 @@ labels: []
 created: "2026-10-11"
 updated: "2026-10-11"
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/task-native-panel-hierarchy-links.md
   Leaves live only under a story. id is the filename stem: task-native-panel-hierarchy-links.
@@ -19,10 +20,12 @@ updated: "2026-10-11"
 
 ## Context
 
-<!-- Why this task exists. -->
+Parent story `story-hierarchy-navigation`: the OpenCode board panel (`opencode/plugins/arggon/tui.tsx`) renders no parent/child/breadcrumb/ancestor information at all — the thinnest of the three surfaces. Panel users cannot see, let alone walk, the hierarchy.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] The panel's detail/selection surface shows the parent (activatable to open the parent) and the children (each activatable), or documents with owner sign-off why the panel's component model cannot carry it and what the fallback is
+- [ ] Resolution reads the inlined kernel's `parent` edges; bundle regenerated (`npm run check:plugin` green) with no board-surface export broken
+- [ ] `arggon validate` green; prettier clean; PR opened with impact class (panel is a shipped adapter seam — likely Behavioral with the ADR 0016 channel reference)
 
 ## Notes
