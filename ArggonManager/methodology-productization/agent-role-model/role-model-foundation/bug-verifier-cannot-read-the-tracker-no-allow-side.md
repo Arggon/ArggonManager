@@ -209,3 +209,62 @@ than three discovers per wave.
 merge decision (the verdict and the follow-up record) both persisted. The loss is confined
 to a superseded brief whose content I restated in a later comment, so no decision is lost.
 Filed because the class is what repeats, not this instance.
+
+### 2026-10-11 @ses_ed6d9b22effexLQQ1jvoDJGIMi
+### 2026-10-11 @arggon-delivery-lead
+## Correction to the finding above - I now have the reproducer, and it is not what I guessed
+
+My first write-up proposed two hypotheses and labelled both as untrusted. Both are now
+falsified by controlled experiment, and the real pattern is different and simpler. Recording
+the correction because a bug filed with a wrong mechanism wastes the maker's first hour.
+
+**The actual pattern (both observed failures, identical shape).** A comment body is lost and
+what remains in the item file is:
+
+    <existing comment ends>
+    ### 2026-10-11 @<session-id>          <-- heading written, body missing
+    ### 2026-10-11 @arggon-delivery-lead   <-- heading written, body present, immediately after
+    ## <real first line of the body I passed>
+
+So the heading is written TWICE and the body lands only after the second one. Net effect on
+disk: an empty heading pair with the body under the second.
+
+**What the controlled experiment ruled out** (scratch item
+`task-scratch-comment-persistence-probe`, now `cancelled` - do not resurrect it):
+
+- large body (~54 KB, 400 paragraphs): persisted
+- 5000-char fenced code block, inline: persisted
+- default (session-id) author, used by both probes: persisted
+- `##` heading as the body's first line: persisted
+
+So size, fences, default author and nested headings are all innocent. The two failures share
+a property I have NOT isolated, and I should not guess at it a third time.
+
+**What the two failures share, descriptively.** Both were comments I made while another
+`tools.arggon.*` write was in flight in the same session - in one case the branch rebase I was
+driving by hand, in the other a `create` whose auto-commit landed in the same window. Both
+times the item file was concurrently read-modified-written by more than one writer. That
+points at the comment append being a LOST UPDATE, not a serialization failure of the text
+itself - a different and more serious class, because it means the append is not atomic.
+
+This is consistent with known sibling hazards: `bug-comment-race-no-lock` ("comment race:
+unlocked read-modify-write loses concurrent comments") is marked `done`, and
+`bug-comment-torn-read` ("comment initial loadItems can read a torn in-place write") is also
+`done`. If those fixes are correct, a concurrent-writer race should be closed - so either my
+reasoning is wrong or those fixes have a gap on the NATIVE surface (the MCP path via
+`lib/src`, as opposed to the CLI's direct call). I do not know which, and that is the thing to
+determine first.
+
+**Recommended first step for the maker (revised).** Do NOT chase body size, fences or
+authorship. Start from the concurrency angle - two writers appending to one item file through
+the native `tools.arggon.comment` path - and check whether the lock `bug-comment-race-no-lock`
+added is actually taken on that path. A reproducer is two foreground `tools.arggon.comment`
+calls to the same item fired concurrently, asserting both bodies survive. Cheap, and it either
+reproduces immediately or eliminates the whole concurrency family.
+
+**Status of the loss.** Still a loss, still silent, still worth the bug - and now rated HIGHER
+than I first wrote, not lower: if the append is not atomic then any concurrent pair of tracker
+writes can lose one, and the methodology's "comments are the agent handoff channel" premise
+carries the whole reviewer -> verifier -> owner decision chain on top of it. The two comments I
+lost were superseded and recoverable by restatement, which is the only reason this did not
+cost a decision.
