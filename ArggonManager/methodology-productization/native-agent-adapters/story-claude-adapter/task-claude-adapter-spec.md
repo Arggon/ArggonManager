@@ -39,7 +39,7 @@ Expanded from the plan's T6 one-liner ("story filed with checklist, linked from 
 - [x] `arggon validate` is green and `npx prettier --check` is clean on both touched files
 - [x] Impact class stated: this wave is docs-only and touches no methodology carrier, so no class applies; the implementation wave is **Behavioral** under `ArggonManager/docs/agents.md` §Changing the methodology itself (it edits `agents.md` and the bundled skill)
 - [x] The ADR 0017 decision is stated, not assumed: a Claude bundle is a **bounded port of the shipped ZCode shape**, so no exploration artifact is owed — with the one-way ratchet named so a contradicting client shape stops the wave and files the exploration
-- [ ] `story-claude-adapter` carries the full acceptance checklist with a link to `spec-claude-code-adapter-024` so both directions resolve — the delivery lead's write (the story file has been a placeholder shell since 2026-10-02); the complete draft is in the comment on this item, and the spec → story direction already resolves
+- [x] `story-claude-adapter` carries the full acceptance checklist with a link to `spec-claude-code-adapter-024` so both directions resolve — the delivery lead's write (the story file has been a placeholder shell since 2026-10-02); the complete draft is in the comment on this item, and the spec → story direction already resolves
 
 ## Notes
 
