@@ -93,6 +93,46 @@ jobs:
         # last: a failing run keeps its fixture for inspection, with nothing
         # after it".
         run: npm run arggon -- spec analyze --baseline ArggonManager/spec-analyze-baseline.json
+      - name: "Paired-deletion guard: a D row that takes an implementation AND its test"
+        # bug-no-gate-warns-on-paired-impl-and-test-deletion: the silent shape.
+        # `npm test` / `npm run build` fire when a deletion breaks compilation
+        # or orphans a test; deleting an implementation AND its paired test in
+        # one change leaves nothing to fail and goes green. PR #586 produced
+        # exactly that pair (`D cli/src/adapters.ts` +
+        # `D cli/src/adapter-selection.test.ts`) and the only reason anyone
+        # could tell was manual `git diff --name-status` inspection.
+        #
+        # REPORT-ONLY on purpose, and this is the recorded decision. A paired
+        # deletion is a legitimate, reviewed refactor step as often as it is an
+        # accident — measured over the last 500 commits of this repo it occurs
+        # ZERO times out of 40 `D` rows, so a blocking gate would buy nothing
+        # today and would cost a `continue-on-error`-shaped bypass on the first
+        # intentional module removal. The `cli` shell is `bash -e`, so the step
+        # still fails on the one thing that must fail: a run that COULD NOT
+        # look. `node cli/paired-deletion-guard.mjs` exits 2 on an unresolvable
+        # base or no merge base — never a quiet pass, which is the vacuity
+        # bug-verification-regex-matching-nothing is about. Deliberately no
+        # `|| true` and no `continue-on-error`: the only exit code this step
+        # may produce on a healthy run is 0, and 2 means "the fetch is wrong".
+        # Promoting it to blocking is `--strict` plus its own call.
+        #
+        # THREE-DOT, always. The guard diffs merge-base -> head. A two-dot
+        # comparison against a base that moved ahead of the branch point
+        # reports every file the base gained as `D` on the branch side — a
+        # paired deletion that never happened, i.e. the #586 false positive,
+        # recreated by the gate itself. The default checkout is shallow, so both
+        # sides are fetched by SHA with enough depth for `git merge-base` to
+        # find the real branch point; the guard prints the merge base it used
+        # and warns when that base sits on the shallow boundary.
+        #
+        # PR-only: a `push` run has no base branch name to fetch, and
+        # main-vs-main is empty by construction.
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=250 origin \
+            "+${{ github.event.pull_request.base.sha }}:refs/remotes/pull/base" \
+            "+${{ github.event.pull_request.head.sha }}:refs/remotes/pull/head"
+          node cli/paired-deletion-guard.mjs --base refs/remotes/pull/base --head refs/remotes/pull/head
       - name: Native start cold-start smoke (tools.arggon.start worktree path)
         # task-wire-native-start-cold-smoke-into-ci: the deterministic,
         # MODEL-FREE gate for the native worktree/start path, run in this job
