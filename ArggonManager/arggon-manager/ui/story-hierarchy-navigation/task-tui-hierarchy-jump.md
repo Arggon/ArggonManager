@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-tui-hierarchy-jump
 title: "TUI detail pane: jump to parent and list children"
+assignee: arggon-delivery-lead
+branch: feat/task-tui-hierarchy-jump
 parent: story-hierarchy-navigation
 labels: []
 created: "2026-10-11"
 updated: "2026-10-11"
+claimed_at: "2026-10-11T23:19:54.665Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-tui-hierarchy-jump
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/task-tui-hierarchy-jump.md
   Leaves live only under a story. id is the filename stem: task-tui-hierarchy-jump.
