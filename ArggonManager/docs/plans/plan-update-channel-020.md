@@ -1,14 +1,16 @@
 ---
-plan_id: update-channel-015
+plan_id: update-channel-020
 title: Plan for Bounded opt-out update channel
-spec: ArggonManager/docs/specs/spec-update-channel-015.md
+spec: ArggonManager/docs/specs/spec-update-channel-023.md
 status: proposed
 created: 2026-10-01
 ---
 
-# Plan: Bounded opt-out update channel (update-channel-015)
+# Plan: Bounded opt-out update channel (update-channel-020)
 
-Derived from `ArggonManager/docs/specs/spec-update-channel-015.md` (contract,
+> **Renumber note (2026-10-11):** originally filed as `plan-update-channel-015` in collision with `plan-release-pipeline-015.md` (task-renumber-colliding-doc-numbers); renumbered to the next FREE plan number (020), paired with its renumbered spec `spec-update-channel-023.md` (its `spec:` pointer updated in kind). Plan content unchanged.
+
+Derived from `ArggonManager/docs/specs/spec-update-channel-023.md` (contract,
 ADR 0018 §3). Each task carries a verifiable acceptance criterion and links
 back to the spec. Design-only today: this plan is the implementation backlog
 filed under `story-update-channel`; no `cli/src` change belongs to the spec PR.
