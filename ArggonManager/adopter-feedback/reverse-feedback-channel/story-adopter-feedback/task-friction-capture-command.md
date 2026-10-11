@@ -155,3 +155,7 @@ lib/src/friction.test.ts (46) and cli/src/friction.test.ts (15).
 ## Surface note
 
 No MCP tool and no `tools.arggon.friction` in this PR: `arggon_friction` + `tools.arggon.friction` + `json-output.md` + `doctor.friction` are plan T5's acceptance (`task-friction-surface-parity-and-docs`), and T2/T4 still owe redaction and `--report`/`--clear`/`--tier`/`opt-out`. Shipping a half surface under MCP now would add a tool whose payload changes twice before it is documented.
+
+### handoff 2026-10-11 @Arggon — next: T2 (task-friction-redaction-at-write): apply the 4-step redaction pass on the write path over the capped field values buildFrictionRecord already produces
+- branch: feat/task-friction-capture-command
+- open questions: fingerprint separator U+001F is not length-prefixed — spec decision wanted; commandShape cap semantics for the human line
