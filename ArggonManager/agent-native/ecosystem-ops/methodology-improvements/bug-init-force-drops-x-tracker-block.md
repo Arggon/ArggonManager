@@ -143,3 +143,7 @@ The live `## Acceptance` boxes were all already ticked on this branch (commit `e
 - making the `plan.conventionWrite!` non-null invariant explicit.
 
 Nothing else touched: the diff is `cli/src/cli.ts`, `cli/src/init.test.ts`, `README.md`, `ArggonManager/docs/json-output.md` and nothing else. `cli/src/init.ts` was NOT modified (the emitted reason string stays as is, per the verdict's "keep the exception's reporting unchanged").
+
+### handoff 2026-10-11 @ses_ed63e4e08ffer7eI6EfB0xc4oF (session: ses_ed63e4e08ffer7eI6EfB0xc4oF) — next: Re-review commit 18463798 on fix/bug-init-force-drops-x-tracker-block (apply-path convention report on both init surfaces, 3 CLI-surface tests) and merge PR #681 — MERGE, never squash
+- branch: fix/bug-init-force-drops-x-tracker-block
+- open questions: Merge conflicts only in the item file: the verdict + my review-round comment landed on the primary checkout's unpushed local main (15357248) — keep both blocks; pushing primary main is the lead's call
