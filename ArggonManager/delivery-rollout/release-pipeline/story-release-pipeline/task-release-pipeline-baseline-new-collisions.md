@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-release-pipeline-baseline-new-collisions
 title: "`story-release-pipeline` baseline reads the 5 new duplicate-doc-number findings as NEW, so its next `--baseline` wave would exit 1"
 assignee: arggon-delivery-lead
@@ -9,9 +9,7 @@ parent: story-release-pipeline
 labels: [spec-pipeline]
 created: "2026-10-03"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T06:48:23.426Z"
 depends_on: [task-renumber-colliding-doc-numbers]
-worktree_path: /home/arggon/Projects/ArggonManager-task-release-pipeline-baseline-new-collisions
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-release-pipeline-baseline-new-collisions.md
@@ -100,6 +98,7 @@ That is the argument for treating this as more than bookkeeping: the baseline is
 - [x] If re-saving the baseline is ever chosen, record the decision and its reason — the current temptation is to make the gate green by widening the net
 
 ### 2026-10-11 @arggon-maker
+
 ### 2026-10-11 @arggon-maker (task-release-pipeline-baseline-new-collisions, branch feat/task-release-pipeline-baseline-new-collisions)
 
 Re-saved BOTH committed spec-analyze baselines with `npm run arggon -- spec analyze --save-baseline <file>`. The mechanism is deterministic and idempotent (re-saving twice produced the identical sha256 `6b011739…` on both files), and no `--no-fail-on-new` pin was used anywhere.
@@ -114,14 +113,14 @@ Important scope correction: **the re-save is not what fixes the gate, and it is 
 
 Before (`count: 6`, sha256 `0847f354…`, both files) → after (`count: 4`, sha256 `6b011739…`, both files). The whole diff is 2 deletions, 0 insertions:
 
-| # | Entry (before) | After | Why |
-|---|---|---|---|
-| 1 | `ArggonManager/docs/explorations/exploration-ui-improvements-012.md:165` — `DECISION-PENDING-EXPLORATION`, "…no decision after 9 day(s)…" | **dropped as RESOLVED** | `bug-aged-exploration-decisions` (#679) recorded the refrain: the Decision section now carries `No ADR required — the recommendation was an **execution plan inside the packages that already exist**…` (with a rationale, so it cannot be a bare marker). Genuine resolution. |
-| 2 | `ArggonManager/docs/specs/spec-deps-001.md` — `no-error-path`, no line | **dropped as RESOLVED** | PR #680 renumbered the doc to `spec-deps-022.md` and PR #686 (`task-spec-deps-022-no-error-path`) added section 5 `Especificación de errores` with per-surface error conditions, `error.code` and exit codes. The spec now publishes an error/failure path. Genuine resolution, not a rename hiding it (verified by reading §5, not just by the key change). |
-| 3 | `ArggonManager/docs/specs/spec-opencode-seam-010.md` — `no-error-path` | **unchanged, kept** | Still a real, open finding, still baselined. |
-| 4 | `ArggonManager/docs/specs/spec-opencode2-009.md:14` — `vague-quantifier` 'efficient' | **unchanged, kept** | Still a real, open finding, still baselined. |
-| 5 | `ArggonManager/docs/specs/spec-spec-import-openspec-005.md:117` — `vague-quantifier` 'several' | **unchanged, kept** | Still a real, open finding, still baselined. |
-| 6 | `ArggonManager/docs/specs/spec-spec-import-openspec-005.md:131` — `vague-quantifier` 'several' | **unchanged, kept** | Still a real, open finding, still baselined. |
+| #   | Entry (before)                                                                                                                            | After                   | Why                                                                                                                                                                                                                                                                                                                                                          |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `ArggonManager/docs/explorations/exploration-ui-improvements-012.md:165` — `DECISION-PENDING-EXPLORATION`, "…no decision after 9 day(s)…" | **dropped as RESOLVED** | `bug-aged-exploration-decisions` (#679) recorded the refrain: the Decision section now carries `No ADR required — the recommendation was an **execution plan inside the packages that already exist**…` (with a rationale, so it cannot be a bare marker). Genuine resolution.                                                                               |
+| 2   | `ArggonManager/docs/specs/spec-deps-001.md` — `no-error-path`, no line                                                                    | **dropped as RESOLVED** | PR #680 renumbered the doc to `spec-deps-022.md` and PR #686 (`task-spec-deps-022-no-error-path`) added section 5 `Especificación de errores` with per-surface error conditions, `error.code` and exit codes. The spec now publishes an error/failure path. Genuine resolution, not a rename hiding it (verified by reading §5, not just by the key change). |
+| 3   | `ArggonManager/docs/specs/spec-opencode-seam-010.md` — `no-error-path`                                                                    | **unchanged, kept**     | Still a real, open finding, still baselined.                                                                                                                                                                                                                                                                                                                 |
+| 4   | `ArggonManager/docs/specs/spec-opencode2-009.md:14` — `vague-quantifier` 'efficient'                                                      | **unchanged, kept**     | Still a real, open finding, still baselined.                                                                                                                                                                                                                                                                                                                 |
+| 5   | `ArggonManager/docs/specs/spec-spec-import-openspec-005.md:117` — `vague-quantifier` 'several'                                            | **unchanged, kept**     | Still a real, open finding, still baselined.                                                                                                                                                                                                                                                                                                                 |
+| 6   | `ArggonManager/docs/specs/spec-spec-import-openspec-005.md:131` — `vague-quantifier` 'several'                                            | **unchanged, kept**     | Still a real, open finding, still baselined.                                                                                                                                                                                                                                                                                                                 |
 
 Every entry is accounted for: no unexplained appearance, no unexplained disappearance. Nothing was covertly absorbed into the baseline — the 2 removed entries are the 2 findings the merged fix items closed, and the 4 survivors are the 4 findings that are genuinely still open. A regression against this state (a 5th, NEW finding) still exits 1 — proved with a negative control: dropping one entry into a scratch copy and comparing against it gave `1 new, 0 resolved, 3 unchanged, 4 total`, exit 1.
 
@@ -156,7 +155,7 @@ Evidence, no code changed (this item is docs-only):
 
 **The option that would have caught it:** add a blocking step to the existing `cli` job in `.github/workflows/ci.yml` — e.g. `- run: npm run arggon -- spec analyze --baseline ArggonManager/spec-analyze-baseline.json` next to `npm run lint`. The job is already required on `main`, so it would have failed the check on the PR that merged PR #603 (the PR whose detector change made the 5 findings visible). That is a workflow change, outside this item's two-file scope, so it is recorded here as the recommendation rather than done.
 
-Alternative, weaker: promote `spec analyze` to the `arggon` workflow's validate job, which is also model-free and headless. But that job runs a *released* install of the bin, not this checkout's build, so a detector change cannot be gated there until it ships — the `cli` job is the correct home.
+Alternative, weaker: promote `spec analyze` to the `arggon` workflow's validate job, which is also model-free and headless. But that job runs a _released_ install of the bin, not this checkout's build, so a detector change cannot be gated there until it ships — the `cli` job is the correct home.
 
 ## Cross-story coupling — record where it bites
 
@@ -179,15 +178,17 @@ Where it bites: `task-friction-capture-command` (the item that was held hostage)
 Only the two baseline JSONs changed, plus this item's own body for the acceptance boxes. No other file, no renames, no `--no-fail-on-new` anywhere. Findings that outlive this item (the CI wiring recommendation, the note on `task-friction-capture-command`) are recorded above for the delivery lead to file, not grown into this diff.
 
 ### handoff 2026-10-11 @arggon-maker (session: ses_ed6473c63ffeEVG02Y7n4bB9MS) — next: Review + merge PR #690 (both baselines re-saved, 2 resolved entries dropped). Then file the 2 out-of-scope follow-ups recorded on the item: the CI lane step in .github/workflows/ci.yml, and the cross…
+
 - branch: feat/task-release-pipeline-baseline-new-collisions
 - open questions: Should the CI wiring follow-up be a task or a bug under story-spec-pipeline? Does the delivery lead want the note on task-friction-capture-command, or is recording it here enough?
-- [ ] `spec analyze --baseline ArggonManager/spec-analyze-baseline.json` exits **0** on a clean `main` — today it exits 1, which is a red gate on the default branch
-- [ ] All 5 `duplicate-doc-number` findings are gone (via `task-renumber-colliding-doc-numbers`), not absorbed by re-saving the baseline. Widening the baseline makes the gate green without fixing anything
-- [ ] Whether `main` exiting 1 on this lane is surfaced anywhere a human sees before merge. A required-check failure would have caught it; `spec analyze` evidently is not one
-- [ ] The cross-story coupling is recorded where it bites: the ADR 0017 zero-NEW gate is global, so any story's stale baseline entry blocks any other story's implementation tasks
-- [ ] If re-saving the baseline is ever chosen, record the decision and its reason — the current temptation is to make the gate green by widening the net
+- [x] `spec analyze --baseline ArggonManager/spec-analyze-baseline.json` exits **0** on a clean `main` — today it exits 1, which is a red gate on the default branch
+- [x] All 5 `duplicate-doc-number` findings are gone (via `task-renumber-colliding-doc-numbers`), not absorbed by re-saving the baseline. Widening the baseline makes the gate green without fixing anything
+- [x] Whether `main` exiting 1 on this lane is surfaced anywhere a human sees before merge. A required-check failure would have caught it; `spec analyze` evidently is not one
+- [x] The cross-story coupling is recorded where it bites: the ADR 0017 zero-NEW gate is global, so any story's stale baseline entry blocks any other story's implementation tasks
+- [x] If re-saving the baseline is ever chosen, record the decision and its reason — the current temptation is to make the gate green by widening the net
 
 ### 2026-10-11 @arggon-delivery-lead
+
 ### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merge (PR #690)
 
 Reviewed against engineering.md §Review bar: the change is exactly the recorded decision (re-baseline after the corpus was made clean, not a blanket refresh, not `--no-fail-on-new` pinning); the entry-by-entry before/after shows 2 deletions and 0 insertions — the 2 findings the fixes actually closed (exploration-ui-improvements-012 DECISION-PENDING via PR #679, spec-deps-001 no-error-path via #680 renumber + #686 §5) — while the 4 genuinely-open findings persist; the deviation from my predicted diff was REPORTED rather than committed away (the 5 duplicate-doc-number keys and the 014 key were never baseline entries — they were NEWs that the renumber/decision fixes removed, and both lanes already read 0 new before the re-save); verification includes a negative control (a removed entry reads back as 1 new, exit 1 — the gate still bites); gates green. The recorded answer to the surfacing question (no workflow runs spec analyze; only `cli` is required) is filed as task-ci-required-check-missing-spec-analyze-baseline.

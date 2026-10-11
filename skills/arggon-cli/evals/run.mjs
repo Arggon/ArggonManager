@@ -17,7 +17,8 @@ let fail = 0;
 const results = [];
 function check(id, name, cond, extra = "") {
   const ok = Boolean(cond);
-  if (ok) pass++; else fail++;
+  if (ok) pass++;
+  else fail++;
   results.push(`${ok ? "PASS" : "FAIL"} ${id} ${name}${ok ? "" : " — " + extra}`);
 }
 
@@ -30,7 +31,11 @@ function run(args, opts = {}) {
     });
     return { status: 0, stdout };
   } catch (err) {
-    return { status: err.status ?? 1, stdout: String(err.stdout ?? ""), stderr: String(err.stderr ?? "") };
+    return {
+      status: err.status ?? 1,
+      stdout: String(err.stdout ?? ""),
+      stderr: String(err.stderr ?? ""),
+    };
   }
 }
 function jsonOf(res) {
@@ -54,36 +59,72 @@ for (const a of seed) {
 // E1: find open work
 let r = run(["list", "--status", "todo", "--json"], { cwd: dir });
 let body = jsonOf(r);
-check("E1", "find-todo", r.status === 0 && body.ok === true && Array.isArray(body.items) && body.items.length > 0 && body.items.every((i) => i.status === "todo"), r.stdout.slice(0, 200));
+check(
+  "E1",
+  "find-todo",
+  r.status === 0 &&
+    body.ok === true &&
+    Array.isArray(body.items) &&
+    body.items.length > 0 &&
+    body.items.every((i) => i.status === "todo"),
+  r.stdout.slice(0, 200),
+);
 
 // E2: zero-match filter is success
 r = run(["list", "--status", "done", "--json"], { cwd: dir });
 body = jsonOf(r);
-check("E2", "empty-filter", r.status === 0 && body.ok === true && Array.isArray(body.items) && body.items.length === 0, r.stdout.slice(0, 200));
+check(
+  "E2",
+  "empty-filter",
+  r.status === 0 && body.ok === true && Array.isArray(body.items) && body.items.length === 0,
+  r.stdout.slice(0, 200),
+);
 
 // E3: claim
-r = run(["update", "task-probe", "--status", "in_progress", "--assignee", "qa-bot", "--json"], { cwd: dir });
+r = run(["update", "task-probe", "--status", "in_progress", "--assignee", "qa-bot", "--json"], {
+  cwd: dir,
+});
 body = jsonOf(r);
-check("E3", "claim", r.status === 0 && body.item.status === "in_progress" && body.item.assignee === "qa-bot", r.stdout.slice(0, 200));
+check(
+  "E3",
+  "claim",
+  r.status === 0 && body.item.status === "in_progress" && body.item.assignee === "qa-bot",
+  r.stdout.slice(0, 200),
+);
 
 // E4: claim conflict without --force
-r = run(["update", "task-probe", "--status", "in_progress", "--assignee", "intruder", "--json"], { cwd: dir });
+r = run(["update", "task-probe", "--status", "in_progress", "--assignee", "intruder", "--json"], {
+  cwd: dir,
+});
 let e4 = r.status !== 0;
 try {
   e4 = e4 && jsonOf(r).error.code === "UPDATE_FAILED";
-} catch { e4 = false; }
-const still = jsonOf(run(["list", "--type", "task", "--json"], { cwd: dir })).items.find((i) => i.id === "task-probe");
+} catch {
+  e4 = false;
+}
+const still = jsonOf(run(["list", "--type", "task", "--json"], { cwd: dir })).items.find(
+  (i) => i.id === "task-probe",
+);
 check("E4", "claim-conflict", e4 && still.assignee === "qa-bot", r.stdout.slice(0, 200));
 
 // E5: create task under story
 r = run(["create", "task", "Second", "--parent", "story-login", "--json"], { cwd: dir });
 body = jsonOf(r);
-check("E5", "create-task", r.status === 0 && body.item.id.startsWith("task-") && body.item.path.includes("story-login/"), r.stdout.slice(0, 200));
+check(
+  "E5",
+  "create-task",
+  r.status === 0 && body.item.id.startsWith("task-") && body.item.path.includes("story-login/"),
+  r.stdout.slice(0, 200),
+);
 
 // E6: missing parent
 r = run(["create", "task", "Orphan", "--parent", "nope", "--json"], { cwd: dir });
 let e6 = r.status !== 0;
-try { e6 = e6 && jsonOf(r).error.code === "CREATE_FAILED"; } catch { e6 = false; }
+try {
+  e6 = e6 && jsonOf(r).error.code === "CREATE_FAILED";
+} catch {
+  e6 = false;
+}
 check("E6", "bad-parent", e6, r.stdout.slice(0, 200));
 
 // E7: blocked without reason
@@ -94,7 +135,12 @@ check("E7", "blocked-no-reason", r.status !== 0, r.stdout.slice(0, 200));
 run(["update", "task-second", "--labels", "sec,net", "--json"], { cwd: dir });
 r = run(["update", "task-second", "--labels", "net", "--json"], { cwd: dir });
 body = jsonOf(r);
-check("E8", "labels-replace", r.status === 0 && JSON.stringify(body.item.labels) === JSON.stringify(["net"]), r.stdout.slice(0, 200));
+check(
+  "E8",
+  "labels-replace",
+  r.status === 0 && JSON.stringify(body.item.labels) === JSON.stringify(["net"]),
+  r.stdout.slice(0, 200),
+);
 
 // E9: validate clean
 r = run(["validate", "--json"], { cwd: dir });
@@ -106,7 +152,12 @@ const sub = join(dir, "docs", "deep");
 mkdirSync(sub, { recursive: true });
 r = run(["board", "--json"], { cwd: sub });
 body = jsonOf(r);
-check("E10", "board-root-path", r.status === 0 && existsSync(join(dir, "board.html")) && !existsSync(join(sub, "board.html")), r.stdout.slice(0, 200));
+check(
+  "E10",
+  "board-root-path",
+  r.status === 0 && existsSync(join(dir, "board.html")) && !existsSync(join(sub, "board.html")),
+  r.stdout.slice(0, 200),
+);
 
 // E11: envelope shape across commands
 const samples = [
@@ -122,14 +173,21 @@ for (const [cmd, a] of samples) {
   try {
     const b = jsonOf(rr);
     if (b.schemaVersion !== 1 || b.command !== cmd) e11 = false;
-  } catch { e11 = false; }
+  } catch {
+    e11 = false;
+  }
 }
 check("E11", "envelope-shape", e11);
 
 // E12: @me resolution via GITHUB_USER
 r = run(["list", "--assignee", "@me", "--json"], { cwd: dir, env: { GITHUB_USER: "qa-bot" } });
 body = jsonOf(r);
-check("E12", "assignee-me", r.status === 0 && body.items.length > 0 && body.items.every((i) => i.assignee === "qa-bot"), r.stdout.slice(0, 200));
+check(
+  "E12",
+  "assignee-me",
+  r.status === 0 && body.items.length > 0 && body.items.every((i) => i.assignee === "qa-bot"),
+  r.stdout.slice(0, 200),
+);
 
 // --- Round 2: adversarial (naive skill readings must still land correctly) ---
 
@@ -138,32 +196,63 @@ r = run(["update", "task-second", "--labels", "Bad Label", "--json"], { cwd: dir
 check("E13", "labels-validated", r.status !== 0, r.stdout.slice(0, 200));
 
 // E14: --id still gets the leaf prefix
-r = run(["create", "task", "Whatever", "--parent", "story-login", "--id", "probe2", "--json"], { cwd: dir });
+r = run(["create", "task", "Whatever", "--parent", "story-login", "--id", "probe2", "--json"], {
+  cwd: dir,
+});
 body = jsonOf(r);
 check("E14", "id-prefix", r.status === 0 && body.item.id === "task-probe2", r.stdout.slice(0, 200));
 
 // E15: human-readable list for quick scans
 r = run(["list", "--status", "todo"], { cwd: dir });
-check("E15", "human-list", r.status === 0 && r.stdout.includes("task-second") && (() => { try { JSON.parse(r.stdout.trim()); return false; } catch { return true; } })(), r.stdout.slice(0, 200));
+check(
+  "E15",
+  "human-list",
+  r.status === 0 &&
+    r.stdout.includes("task-second") &&
+    (() => {
+      try {
+        JSON.parse(r.stdout.trim());
+        return false;
+      } catch {
+        return true;
+      }
+    })(),
+  r.stdout.slice(0, 200),
+);
 
 // E17: todo-transition unclaims (runs before E16 breaks the tree)
 r = run(["update", "task-probe", "--status", "todo", "--json"], { cwd: dir });
 body = jsonOf(r);
-check("E17", "unclaim", r.status === 0 && body.item.status === "todo" && body.item.assignee === null, r.stdout.slice(0, 200));
+check(
+  "E17",
+  "unclaim",
+  r.status === 0 && body.item.status === "todo" && body.item.assignee === null,
+  r.stdout.slice(0, 200),
+);
 
 // E16: broken tree -> validate fails loudly
-writeFileSync(join(dir, "tasks", "eval-mvp", "auth", "story-login", "task-broken.md"),
-  '---\ntype: task\nstatus: bogus\nid: task-broken\nparent: story-login\n---\n# Broken\n');
+writeFileSync(
+  join(dir, "tasks", "eval-mvp", "auth", "story-login", "task-broken.md"),
+  "---\ntype: task\nstatus: bogus\nid: task-broken\nparent: story-login\n---\n# Broken\n",
+);
 r = run(["validate", "--json"], { cwd: dir });
 let e16 = r.status !== 0;
-try { e16 = e16 && jsonOf(r).ok === false && jsonOf(r).error.code === "VALIDATE_FAILED"; } catch { e16 = false; }
+try {
+  e16 = e16 && jsonOf(r).ok === false && jsonOf(r).error.code === "VALIDATE_FAILED";
+} catch {
+  e16 = false;
+}
 check("E16", "validate-broken", e16, r.stdout.slice(0, 200));
 
 // E18: outside any repo fails with a usable error
 const outside = mkdtempSync(join(tmpdir(), "arggon-eval-outside-"));
 r = run(["list", "--json"], { cwd: outside });
 let e18 = r.status !== 0;
-try { e18 = e18 && jsonOf(r).error.code === "LIST_FAILED"; } catch { e18 = false; }
+try {
+  e18 = e18 && jsonOf(r).error.code === "LIST_FAILED";
+} catch {
+  e18 = false;
+}
 rmSync(outside, { recursive: true, force: true });
 check("E18", "outside-repo", e18, r.stdout.slice(0, 200));
 

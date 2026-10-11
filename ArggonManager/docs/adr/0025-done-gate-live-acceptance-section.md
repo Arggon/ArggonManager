@@ -1,9 +1,18 @@
 # 0025 Done gate scope: the live `## Acceptance` section, and no contract means no flip
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-06
 - Deciders: product owner (Gonzalo), coordinator/architect (Arggon)
 - Programme: `methodology-improvements` (bug-done-gate-counts-checkboxes-inside-comment-blocks)
+
+> Status note (2026-10-11): flipped from `Proposed` to **Accepted** retroactively.
+> This record reached `main` in merge `81828441` (PR #656, 2026-10-06) and the
+> status line was left behind — the drift tracked as
+> `bug-adr-status-drift-merged-adr-proposed`. `docs/engineering.md` §ADR process
+> declares the lifecycle "Proposed in a PR → Accepted when merged (or explicitly
+> recorded)", so the line now states the state the record has been in since that
+> merge. Nothing below this note is rewritten: the six decisions, the measured
+> consequence counts and the alternatives considered stand as merged.
 
 ## Context
 
