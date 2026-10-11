@@ -1,14 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-adr-status-drift-merged-adr-proposed
-title: 'Three merged ADRs (0022, 0023, 0025) still read `Status: Proposed` — `engineering.md`''s lifecycle is "Accepted when merged", and ADR 0021 already needed a status-fix item for exactly this drift'
+title: "Three merged ADRs (0022, 0023, 0025) still read `Status: Proposed` — `engineering.md`'s lifecycle is \"Accepted when merged\", and ADR 0021 already needed a status-fix item for exactly this drift"
+assignee: arggon-delivery-lead
+branch: fix/bug-adr-status-drift-merged-adr-proposed
 parent: methodology-improvements
 labels: [docs, adr]
 created: "2026-10-06"
-updated: "2026-10-06"
+updated: "2026-10-11"
+claimed_at: "2026-10-11T04:23:26.228Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-adr-status-drift-merged-adr-proposed
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-adr-status-drift-merged-adr-proposed.md
   Leaves live only under a story. id is the filename stem: bug-adr-status-drift-merged-adr-proposed.
