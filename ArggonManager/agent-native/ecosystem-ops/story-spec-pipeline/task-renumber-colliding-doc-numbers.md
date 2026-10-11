@@ -68,3 +68,7 @@ Citations updated (6 files): docs/adr/0005 (link), docs/plans/plan-deps-019 (spe
 Repo gates: npm test 2858 pass, npm run build ok, npm run check:plugin exit 0, npm run lint exit 0.
 
 OUT OF SCOPE (reported to delivery lead): stale citations to renamed stems remain in OTHER work-item files (tracker items) and comment-only code refs (board/filter/list/next tests, next.ts:32, spec.ts:309, adopt.test.ts fixtures) — not edited per the "do not touch other work items' files" constraint.
+
+### handoff 2026-10-11 @arggon-maker — next: Merge this renumber PR; then task-release-pipeline-baseline-new-collisions re-baselines both analyze baselines (left untouched here per constraint).
+- branch: feat/task-renumber-colliding-doc-numbers
+- open questions: Route residual stale citations to renamed stems in OTHER work-item files + comment-only code refs (board/filter/list/next tests, next.ts:32, spec.ts:309, adopt.test.ts fixtures) to a follow-up; confi…
