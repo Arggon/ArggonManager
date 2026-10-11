@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-ci-required-check-missing-spec-analyze-baseline
 title: No required check runs `spec analyze --baseline` — main exited 1 on the shared ADR 0017 lane for 5 days with zero human-visible signal before merge
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: ci-stability
 labels: [ci, spec-pipeline]
 created: "2026-10-11"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T09:28:38.435Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-ci-required-check-missing-spec-analyze-baseline
 ---
 <!--
