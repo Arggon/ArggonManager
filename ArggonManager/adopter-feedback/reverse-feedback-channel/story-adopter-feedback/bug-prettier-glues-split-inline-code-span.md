@@ -132,3 +132,43 @@ unreliable for the affected file, but it cannot lose work or corrupt the tracker
 Found incidentally while filing
 [`task-explore-adopter-feedback-channel`](task-explore-adopter-feedback-channel.md);
 not a blocker for that PR, whose text was reworded instead.
+
+### 2026-10-11 @ses_ed55fd9c6ffeLaCrnZUBxvBLuH
+**Fix evidence — bug-prettier-glues-split-inline-code-span** (branch `fix/bug-prettier-glues-split-inline-code-span`, prettier 3.9.6, repo worktree).
+
+### Root cause (measured, not asserted)
+
+prettier 3.9.6's Markdown printer moves the continuation line of an inline code span **two spaces (one tabWidth) to the LEFT on every `--write`**, and stops only when that continuation reaches column 0. Trigger: a span whose delimiters sit on different lines **and** whose continuation line is indented.
+
+Before (the shape, and what `prettier --write` does to it, with the repo config `printWidth: 100`):
+
+- source continuation at 6 spaces → write 1 → 4 → write 2 → 2 → write 3 → 0 → then stable
+- `prettier --check` fails after write 1 and write 2 (it passes only on the settled column-0 bytes)
+
+The item body's original "pass 1" sample is that settled state. Two corrections to the original report: the render is corrupted only in flight (the parsed span value keeps the line ending plus the surplus indent, so the mid-drift states render with extra spaces inside the span; the settled column-0 state renders correctly), and the trigger is the printer, not the unset `proseWrap`.
+
+### What changed
+
+1. `.prettierrc.json`: `"proseWrap": "preserve"` made explicit. Rejection evidence for the alternative: `proseWrap: "always"` rewrites 817/996 tracked `.md` files vs 615 for `preserve`, so it avoids the straddle only by reflowing every paragraph. Verified reflow-free: `npx prettier --check .` names the **identical** file set before (651) and after (the only difference is my own untracked scratch files, since removed) — the repo's markdown was not prettier-clean before and is unchanged after; there is no prettier step in CI (`grep -rn prettier .github/workflows` → no matches).
+2. `cli/src/prose-format.test.ts`: rules 4 and 5 added to the existing guard (the repo's only markdown formatter gate, run by `npm test`).
+   - rule 4 — convergence where a span wraps: for every prose doc carrying a span that crosses a line break, `format(format(x)) === format(x)`. A single `--check` compares committed bytes against one pass, so it cannot see a file that still moves.
+   - rule 5 — no span may straddle a wrap onto an **indented** continuation, i.e. the pre-drift shape cannot be written down at all.
+   - keycase `SPAN_NEAR_WRAP_SAFE` / `SPAN_SPLIT_AT_WRAP` (the item's literal repro): safe form is a `--write` no-op, convergent, and its span survives as one `inlineCode` with value `arggon spec analyze`; the drift shape is detected by the rule-5 detector (so the rule is not vacuous).
+
+### Mutation evidence (guard is not vacuous)
+
+- injecting the drift shape into `ArggonManager/docs/playbooks/opencode.md` → rule 5 names `opencode.md:585 span "`arggon spec<NL>      analyze`" wraps onto a 6-space continuation (line 586)` and rule 4 names the file as non-convergent (file reverted after the probe).
+- pointing the keycase's safe constant at the drift shape → keycase fails on the detector self-check.
+- `npx vitest run cli/src/prose-format.test.ts` → 5/5 green.
+
+### Gates (declared order, this worktree)
+
+`npm run build` ok · `npm test` 136 files / 2969 tests pass · `npm run check:plugin` no drift · `npm run lint` clean · `arggon validate` ok (0 warnings, convention v5).
+
+### Out of scope, reported to the delivery lead
+
+Five item bodies under the tracker tree are non-convergent today — the drift is live there, and they are other items' files: `task-strict-attach-dead-owner-hatch`, `bug-formatter-glues-markdown-spaces`, `task-opencode-v2-plugin`, `task-mcp-full-surface`, `task-matrix-reaches-adopters`. A convergence rule for that subtree belongs to `bug-prettier-indented-list-continuation-grows-2-spaces-per-write` (its own acceptance already carries it). Separately, 45 spans in the prose corpus sit at the settled column-0 state (renders fine, source mangled) — a `task-code-span-repair-sweep`-shaped follow-up, not filed here. Nothing was filed: no tracker item was created by this worker.
+
+### handoff 2026-10-11 @ses_ed55fd9c6ffeLaCrnZUBxvBLuH (session: ses_ed55fd9c6ffeLaCrnZUBxvBLuH) — next: Review PR: root cause pinned (prettier walks a straddling span's indented continuation left 2 spaces per --write to column 0); fix = explicit proseWrap:preserve + prose-format rules 4/5 + keycase; de…
+- branch: fix/bug-prettier-glues-split-inline-code-span
+- open questions: Who repairs the 5 non-convergent item bodies (sibling bug's scope)?; is a column-0 code-span repair sweep over 45 prose spans worth a follow-up item?; prose-format.test.ts heaviest tests are timeout-…
