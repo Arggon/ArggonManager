@@ -94,3 +94,7 @@ Negative controls (both reverted; `lib/src/convention.ts` is unmodified in the f
 2. Same branch carrying `undocumented-by-design` → 18/18 green again.
 
 Scope boundary: `templates/docs/**` untouched (the adopter template's abbreviated `x-tracker` row names only `auto-commit`/`allow-steal`, but that file defers to this repo's convention.md as the normative reference and is another item's scope). README.md's bug-note enumeration of the x-tracker flags is not pinned — dated bug notes describe what was true when written. Deliverable covers the delivery lead's four extensions; x-github included as noted; x-views/x-generated exclusions stated above per item rule "if not, say so".
+
+### handoff 2026-10-11 @ses_ed596d14bffevSx3fVtpoz6NsL (session: ses_ed596d14bffevSx3fVtpoz6NsL) — next: Delivery lead reviews and merges the branch; the maker's work is complete (acceptance boxes ticked, gates green, negative controls reverted).
+- branch: fix/bug-x-tracker-option-list-has-no-doc-drift-guard
+- open questions: 1) Templates: templates/docs/docs/convention.md §Namespaced extensions row still names only auto-commit/allow-steal (defers to this repo as normative, so not a guard target) — adopt the guard there o…
