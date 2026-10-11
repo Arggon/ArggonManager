@@ -146,3 +146,7 @@ findings for other items (not fixed here, filed by the delivery lead):
 1. ADR 0019 is a fourth merged-while-`Proposed` record; it is CORRECT as written (explicitly-recorded `Proposed`), but the item's Context table measured only 0022/0023/0024/0025, so the corpus count behind "three merged ADRs" is now known to include one deliberate case. Worth naming wherever the three are counted.
 2. ADR 0024's metadata block orders its notes differently from every other ADR (numbering note, status note, then `- Date:`/`- Deciders:`/`- Input:`), so its `- Status: Accepted` is followed by three blockquote notes before the rest of the list. Cosmetic ordering only — not drift, not touched.
 3. `arggon goal <id>` refuses when the claim is held by an agent id rather than the invoking identity, so a maker cannot self-read the goal contract for an item the lead dispatched. Recorded here because it shaped how the acceptance completeness was verified above; a `--as-claim-owner`-style read is not proposed, just noted.
+
+### handoff 2026-10-11 @ses_ed6995b8cffePDwIh3viZwoIaR (session: ses_ed6995b8cffePDwIh3viZwoIaR) — next: Delivery lead: review PR #683 (docs(adr) 97a6a6d0 + docs(tasks) 3a6e4436 + evidence comment 4828027d) and merge; the live Acceptance section is complete (6/6 criteria, gate ungated).
+- branch: fix/bug-adr-status-drift-merged-adr-proposed
+- open questions: Does the story need a note that ADR 0019 is a fourth merged-Proposed record (correct as written)? Leave ADR 0024's odd metadata note order alone?
