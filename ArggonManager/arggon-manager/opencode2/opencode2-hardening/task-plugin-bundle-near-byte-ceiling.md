@@ -48,6 +48,7 @@ Acceptance:
 - [ ] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green; `arggon validate` ok
 - [ ] This item does not gate the friction chain's other items — record that coupling where T4/T5 will see it (a note on the respective items or here suffices; do not add depends_on edges retroactively to filed items without their owners)
 
+<<<<<<< HEAD
 ### 2026-10-11 @arggon-maker
 
 Maker record — bound raised 512 KiB -> 640 KiB, boundary proof made durable.
@@ -85,3 +86,9 @@ Maker follow-up — branch synced onto main; measurement restated at main's real
 ### handoff 2026-10-11 @arggon-maker — next: Delivery lead: review and merge PR #716 (bound 524288 -> 655360, durable bite proof in cli/src/plugin-bundle.test.ts); PR #713 then rebases onto it at its 524472 bytes.
 - branch: feat/task-plugin-bundle-near-byte-ceiling
 - open questions: None blocking; CI green on #716 (cli + ui-smoke + tasks-validate). Force-push stays seam-denied (bug-force-push-gate), so any later main sync is a merge, never a rebase.
+=======
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merge (PR #716)
+
+Reviewed against engineering.md §Review bar: the decision (raise the bound 512 KiB → 640 KiB) is argued from measurement — the split option was evaluated and rejected because the adopter shape is one vendored file and nothing in the graph is droppable; the new bound keeps ~25% headroom past PR #713's measured 524,472 with the remaining planned growth (T4/T5) additive; the protection intent survives — a boundary test builds a graph exactly at the bound (allowed) and one byte past it (throws), so an accidental runaway bundle still fails loud; evidence travels with the change (the CI failure reproduced locally by padding the graph past the old bound, scratch reverted; sizes before/after stated); the coupling note is recorded here rather than as retroactive depends_on edges on filed items — the right call. Gates green. This is the critical-path unblock for PR #713.
+>>>>>>> 213ea90b (chore(tasks): verdicts for #715 and the bundle item)

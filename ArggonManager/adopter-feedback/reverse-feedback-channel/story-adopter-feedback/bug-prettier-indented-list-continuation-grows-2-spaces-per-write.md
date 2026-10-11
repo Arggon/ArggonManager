@@ -145,3 +145,12 @@ Convergence generalization: unchanged and covered — rule 4 does NOT see my sha
 ### handoff 2026-10-11 @ses_ed467de75ffekufDO5jLfnHPF6 (session: ses_ed467de75ffekufDO5jLfnHPF6) — next: Delivery lead: review PR #715 (fix = rule 6 + keycase in cli/src/prose-format.test.ts); merge, then flip done.
 - branch: fix/bug-prettier-indented-list-continuation-grows-2-spaces-per-write
 - open questions: none — tracker-subtree convergence rule stays deferred until task-code-span-repair-sweep repairs the 5 span-drift bodies
+- [ ] Both manifestations (span splitting AND 2-space indent growth) are covered by one item's repro, so the class is tracked once
+- [ ] A convergence check exists — format twice and assert the second pass produces no diff — because a single `--check` provably cannot detect this
+- [ ] The repo's docs/prettier guidance states the rule an author needs (avoid indented list continuations and multi-word inline spans near the wrap boundary, or accept the format churn)
+- [ ] Decide whether the fix is prettier config (printWidth/proseWrap), a `.prettierignore` scope for the long decision records, or authoring convention — and record the decision rather than leaving the next author to rediscover it
+
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merge (PR #715)
+
+Reviewed against engineering.md §Review bar: the fix continues the sibling's established shape (no config option repairs the printer's drift — pin the convergent authoring form by test): rule 6 + keycase for the indented list-continuation growth, in the same cli/src/prose-format.test.ts idiom, mutation-verified per the sibling's discipline; the generalized lesson from the 2026-10-03 comment (a single prettier --check is not convergence evidence) is recorded with the enforcement point named; the tracker-subtree sweep was verified against this shape and the disposition of the 5 non-convergent bodies is recorded with the split between this shape and task-code-span-repair-sweep's span-drift shape; evidence travels with the change; scope stayed on the item (done-gate kernel untouched, sibling item's repro fences untouched). Gates green.
