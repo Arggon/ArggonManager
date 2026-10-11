@@ -468,15 +468,17 @@ arggon board --tui            # interactive terminal kanban (raw ANSI, no deps; 
 | `m`                        | move the selected item: menu of kernel-legal targets → reason/assignee prompt if needed → `y/N` confirm; writes go through `runUpdate`                            |
 | `q` / `Ctrl-C`             | quit, restoring the screen (`Ctrl-C` quits even mid-action-prompt)                                                                                                |
 
-| Key             | Detail pane (`enter` on a card)                                   |
-| --------------- | ----------------------------------------------------------------- |
-| `↑` / `↓`       | scroll the content one line                                       |
-| `PgUp` / `PgDn` | scroll one page                                                   |
-| `Home` / `End`  | jump to the top / bottom of the content                           |
-| `esc` / `enter` | back to the board — selection, filter and scroll window untouched |
-| `q` / `Ctrl-C`  | quit, restoring the screen                                        |
+| Key             | Detail pane (`enter` on a card)                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------- |
+| `↑` / `↓`       | scroll the content one line                                                                             |
+| `PgUp` / `PgDn` | scroll one page                                                                                         |
+| `Home` / `End`  | jump to the top / bottom of the content                                                                 |
+| `p`             | open the parent's detail (reports in-pane when there is none)                                           |
+| `1`–`9` · `c`   | open a child's detail — the number opens that child, `c` the first (reports in-pane when there is none) |
+| `esc` / `enter` | back to the board — selection, filter and scroll window untouched                                       |
+| `q` / `Ctrl-C`  | quit, restoring the screen                                                                              |
 
-The detail pane reads one item without leaving the board: title, type, status, priority, assignee, labels, milestone, parent, branch, worktree path, file path, dependencies (each with its status; open deps carry the `⌫` marker), the acceptance checkbox rows with their count (the same task-list rule the container cascade checks) and the full markdown body (prose + comment history). The pane is **read-only** — it never writes the tracker — and every repo-controlled value and body line goes through the same human-text escaping as the cards. Bodies wrap to the terminal width: values are wrapped, never clipped, and long bodies are capped at 400 source lines / 1000 rendered lines (each cap is named by a marker line when it truncates). Below 40 columns the pane falls back to a stacked layout (one field per line, values wrapped) because packed field lines wrap mid-pair in a narrow terminal.
+The detail pane reads one item without leaving the board: title, type, status, priority, assignee, labels, milestone, parent, branch, worktree path, file path, dependencies (each with its status; open deps carry the `⌫` marker), the children section (each child with its number, id, status and title, in id order — `children: (none)` when there are none), the acceptance checkbox rows with their count (the same task-list rule the container cascade checks) and the full markdown body (prose + comment history). From an open pane `p` jumps to the parent's detail and `1`–`9` / `c` open a child's detail (the number opens that child, `c` the first) — all resolved through the kernel's recorded `parent` edges in the same snapshot the board renders, so the pane can never disagree with the board about the tree; a jump with no target (no parent / no such child) reports that in the pane footer instead of misfiring. The pane is **read-only** — it never writes the tracker — and every repo-controlled value and body line goes through the same human-text escaping as the cards. Bodies wrap to the terminal width: values are wrapped, never clipped, and long bodies are capped at 400 source lines / 1000 rendered lines (each cap is named by a marker line when it truncates). Below 40 columns the pane falls back to a stacked layout (one field per line, values wrapped) because packed field lines wrap mid-pair in a narrow terminal.
 
 The static export is a snapshot: re-run after tree changes to refresh (or use `--serve`). The generated file is a build artifact — safe to gitignore; deleting it loses nothing.
 
