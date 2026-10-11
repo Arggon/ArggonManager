@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-plugin-bundle-near-byte-ceiling
 title: "The OpenCode plugin bundle is at 523689/524288 MAX_BUNDLE_BYTES — the friction chain's remaining items (T4/T5/MCP surface) will cross it; raise the cap or split the module before it bites"
+assignee: arggon-delivery-lead
+branch: feat/task-plugin-bundle-near-byte-ceiling
 parent: opencode2-hardening
 labels: [tooling, plugin]
 created: "2026-10-11"
 updated: "2026-10-11"
+claimed_at: "2026-10-11T15:43:39.582Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-plugin-bundle-near-byte-ceiling
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2/opencode2-hardening/task-plugin-bundle-near-byte-ceiling.md
