@@ -22,7 +22,9 @@ import {
   formatTrendMarkdown,
   formatTrendTable,
   formatValidateHuman,
+  FrictionError,
   frictionOperation,
+  frictionReportOperation,
   handoffOperation,
   importIssuesOperation,
   jsonEnabled,
@@ -32,6 +34,8 @@ import {
   parseCsvList,
   priorityOperation,
   readConventionVersion,
+  readFrictionReport,
+  renderFrictionReport,
   renderShowText,
   reportOperation,
   runComment,
@@ -1554,15 +1558,15 @@ program
 program
   .command("friction")
   .description(
-    "Record friction in ArggonManager itself into the local append-only friction log (never the tracker, never the network)",
+    "Record friction in ArggonManager itself into the local append-only friction log (never the tracker, never the network), or render its deduped report with --report",
   )
   .argument(
-    "<observation>",
-    "one line about what broke (capped 2000 chars; verbatim, never parsed)",
+    "[observation]",
+    "one line about what broke (capped 2000 chars; verbatim, never parsed); omitted when --report is given",
   )
   .option(
     "--command <shape>",
-    "the command that failed, as an argv shape (required; ids/paths/URLs/tokens/SHAs normalized to <arg>)",
+    "the command that failed, as an argv shape (required for a capture; ids/paths/URLs/tokens/SHAs normalized to <arg>)",
   )
   .option(
     "--error <code>",
@@ -1573,23 +1577,87 @@ program
     "--evidence <file>",
     "a file whose CONTENTS (never its path) are captured, capped 4000 chars",
   )
+  .option(
+    "--report",
+    "render the fingerprint-deduped report (one row per class, count desc) instead of capturing; mutually exclusive with a capture",
+    false,
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
-      observation: string,
+      observation: string | undefined,
       opts: {
         command?: string;
         error?: string;
         harness?: string;
         evidence?: string;
+        report?: boolean;
         json?: boolean;
       },
     ) => {
       const json = jsonEnabled(opts);
+
+      // --- report mode (plan task T3): `arggon friction --report` ---
+      if (opts.report) {
+        // The report is mutually exclusive with a capture — a positional
+        // observation OR any capture flag — and the conflict is named rather
+        // than silently dropping the capture input (spec §Empty/error states;
+        // the --clear half of this exclusivity lands with opt-out, T4).
+        const hasCapture =
+          observation !== undefined ||
+          opts.command !== undefined ||
+          opts.error !== undefined ||
+          opts.harness !== undefined ||
+          opts.evidence !== undefined;
+        if (hasCapture) {
+          const err = new FrictionError(
+            "report-and-capture-mutually-exclusive",
+            'arggon friction --report and a capture are mutually exclusive: run --report alone, or a capture ("<observation>" --command <shape>) without --report',
+          );
+          if (json) {
+            failJson({
+              command: "friction",
+              message: err.message,
+              code: "FRICTION_FAILED",
+              conventionVersion: readConventionVersion(process.cwd()),
+              payload: { report: true, reason: err.reason },
+            });
+            return;
+          }
+          printHumanError("arggon friction", err.message);
+          process.exitCode = 1;
+          return;
+        }
+        if (json) {
+          const outcome = frictionReportOperation({ cwd: process.cwd() });
+          emitJson(outcome.envelope);
+          if (!outcome.ok) process.exitCode = 1;
+          return;
+        }
+        try {
+          const report = readFrictionReport({});
+          // Rendered VERBATIM on purpose: the narrative is the operator's own
+          // local data, and the spec instructs the report to pass it through
+          // literally — fenced and labelled as untrusted, never reordered,
+          // escaped or truncated. So the display-sanitizer applied to other
+          // human lines (a hostile-REPO guard) is deliberately NOT used here;
+          // the field was redacted at write and the log is not a hostile repo.
+          process.stdout.write(renderFrictionReport(report));
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          printHumanError("arggon friction", message);
+          process.exitCode = 1;
+        }
+        return;
+      }
+
+      // --- capture mode (plan task T1): `arggon friction "<obs>" --command <shape>` ---
       const options = () => ({
         cwd: process.cwd(),
         version: arggonVersion(),
-        observation,
+        // An omitted observation reaches the kernel as "" so it fails with the
+        // named `no-observation` reason rather than an uncaught TypeError.
+        observation: observation ?? "",
         command: opts.command ?? "",
         error: opts.error,
         harness: opts.harness,
