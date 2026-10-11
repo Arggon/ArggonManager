@@ -1,12 +1,14 @@
 ---
-spec_id: deps-001
+spec_id: deps-022
 title: Dependency graph — depends_on, blocked_by y next --ready (convención v3)
 status: implemented
 created: 2026-09-11
 adr: ArggonManager/docs/adr/0004-milestone-deps-v3.md
 ---
 
-# Spec: dependency graph (deps-001)
+# Spec: dependency graph (deps-022)
+
+> **Renumber note (2026-10-11):** originally filed as `spec-deps-001` in collision with `spec-sync-001.md` (task-renumber-colliding-doc-numbers); renumbered to the next FREE spec number (022). Renumbered the fewer-referenced of the pair — one inbound reference (`plan-deps-019.md`, updated in kind) versus the other spec's two — the ADR 0024 precedent. Spec content unchanged.
 
 ## 1. Propósito
 

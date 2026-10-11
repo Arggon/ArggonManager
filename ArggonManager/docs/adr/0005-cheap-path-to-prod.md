@@ -14,7 +14,7 @@ files in the repo, cost near zero at small scale, and survive the industry
 trend of free-tier cuts (Oracle halved its Always-Free ARM allocation in
 2026; Hetzner raised VPS prices in June 2026; Netlify moved its free plan to
 a credit model — sources with access dates in
-[exploration cheap-path-to-prod-001](../explorations/exploration-cheap-path-to-prod-001.md)).
+[exploration cheap-path-to-prod-026](../explorations/exploration-cheap-path-to-prod-026.md)).
 
 ## Decision
 
