@@ -686,6 +686,24 @@ ${"y".repeat(MAX_DETAIL_COMMENT_BYTES + 512)}`,
     expect(body.detail.hidden_comments).toBe(2);
   });
 
+  it("serves the parent edge and the child list for hierarchy navigation", async () => {
+    const task = (await (
+      await fetch(`${detailHandle.url}/api/item?id=task-detail`)
+    ).json()) as BoardDetailPayload;
+    expect(task.detail.parent).toEqual({ id: "detail-entries", status: "todo" });
+    expect(task.detail.children).toEqual([]);
+    const entries = (await (
+      await fetch(`${detailHandle.url}/api/item?id=detail-entries`)
+    ).json()) as BoardDetailPayload;
+    expect(entries.detail.parent).toEqual({ id: "detail-core", status: "todo" });
+    expect(entries.detail.children).toEqual([
+      { id: "task-dep-open", status: "todo" },
+      { id: "task-dep-terminal", status: "cancelled" },
+      { id: "task-detail", status: "todo" },
+      { id: "task-huge", status: "todo" },
+    ]);
+  });
+
   it("bounds the payload: prose cap, per-comment cap, no PR without a branch match", async () => {
     const huge = (await (
       await fetch(`${detailHandle.url}/api/item?id=task-huge`)
