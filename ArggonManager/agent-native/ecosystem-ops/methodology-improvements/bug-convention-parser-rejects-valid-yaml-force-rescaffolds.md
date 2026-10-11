@@ -144,3 +144,31 @@ carries the wholesale-replace arm.
 ### handoff 2026-10-11 @ses_ed5c8dd3effeeiVxpj8Ufcbw4b (session: ses_ed5c8dd3effeeiVxpj8Ufcbw4b) — next: Delivery lead: review PR on fix/bug-convention-parser-rejects-valid-yaml-force-rescaffolds (5 commits, item id referenced in title/body); gates green on the worktree — npm test 134 files / 2888 tests…
 - branch: fix/bug-convention-parser-rejects-valid-yaml-force-rescaffolds
 - open questions: None blocking. Residual, reported not fixed: flow-style x-* sections (x-tracker: {allow-steal: true}) are still refused by name — verdict is the reviewer's, and any decision to also accept flow style…
+
+### 2026-10-11 @arggon-delivery-lead
+verdict: approve (scope: PR #699 — the widened line parser, the quoted-section report, the tests and the syntax documentation)
+
+Delivery-lead review. I read the kernel diff myself rather than relying on the report, because this is a safety-adjacent change: it widens what the parser accepts, and the parser is what decides whether an arming flag is armed.
+
+What I verified, myself:
+
+- **The safety property is preserved, and preserved deliberately.** Every boolean option still compares against the comment-stripped but **still quoted** raw token, so `allow-steal: "true"`, `'true'`, `maybe`, `yes`, `on`, `1` and `acknowledged: "true"` remain parse errors exactly as before. The reasoning is written down in the code and in `convention.md`: accepting `allow-steal: "true"` is precisely how an armed gate reads as unset, so that strictness is a safety property and not a limitation. The maker verified it with a probe before and after (identical refusals) — I asked for that evidence because it is the one widening that must not happen.
+- **What is widened is exactly what a real YAML read handles without judgement**: a trailing comment (`#` at line start or after whitespace, never inside a quoted scalar or without preceding whitespace), a block scalar (literal and folded, both indentation indicators, both chomping indicators, in either order, decoded literally and never re-read as a quoted scalar), and a quoted key (decoded wherever a key is read, nested included).
+- **What is still refused is refused by name.** Flow style, anchors, aliases and tags now produce an error that names the construct instead of a bare "must be a mapping". That matters here specifically because `init --force` answers an unreadable file by re-deriving it from the scaffold: a diagnosable error is the difference between fixing a typo and losing configuration.
+- **`readConventionVersion` and `topLevelSections` were widened in the same commit** so two readers of one file give one answer — the report can no longer under-promise ("preserved no existing sections") about a section it really kept. That is the kind of co-widening that gets missed, and it was not.
+- **No dependency added.** The widening route was chosen over a YAML dependency, with the reason stated (two runtime dependencies today; a new one needs security/scalability justification per the review bar). I agree: the constructs being read are read without judgement.
+- **Negative-test evidence is real, not structural:** on the pre-fix kernel the new suite was 19 failed / 91 passed — one case per refused construct, plus the cases pinning the *unchanged* strictness, plus six init cases where the armed block was re-derived from the scaffold and gone from disk on both the `runInit` and CLI apply paths. Each accepted construct also carries a `readConventionConfig` round-trip case.
+- **Docs travel with the change.** `ArggonManager/docs/convention.md` gains a syntax subsection (what is read, what is refused and why the boolean strictness is a safety property) and README's `--force` paragraph now names the widened constructs and links to it. Both read as true against the code — I checked the claims sentence by sentence, including the `#`-inside-a-quoted-scalar case.
+
+Gates, re-run by the lead on the branch: `npm test` → 134 files / 2888 tests passed; `npm run build` → ok; `npx prettier --check` on the touched files → clean; `npm run lint` → clean; `npm run arggon -- validate` → ok. CI on PR #699: `cli` (in progress at verdict time), `tasks-validate` SUCCESS, `ui-smoke` SUCCESS.
+
+Scope: `lib/src/convention.ts`, `cli/src/init.ts` (one regex, quoted section names), the two test files, the two docs, and the regenerated `opencode/plugins/arggon/index.bundle.ts`. The bundle regeneration is a mechanical consequence of the `plugin-copy.test.ts` parity gate (it inlines `lib/src`), and the maker flagged it explicitly rather than letting a parity failure explain it later. No behavioural change to the native seam rides in that file.
+
+Two notes, neither blocking:
+
+1. **The maker's finding about `validate`'s reader is resolved, not outstanding.** It flagged that `validate`'s branch-pattern reader might share `readConventionVersion`'s single-key regex family. It does not: `lib/src/validate.ts` delegates to `readConventionVersion` (fixed here) and `parseConventionConfig` (widened here). I checked the call sites rather than accepting the worry as a finding. No follow-up item.
+2. **Flow style (`x-tracker: {allow-steal: true}`) is still refused, by name.** Deliberately left out of this change and reported, not fixed — extending a line parser into a flow parser is real surface with real risk and nothing in the contract requires it. I agree with that boundary.
+
+Item state: all six boxes in the live `## Acceptance` section are ticked and each is honest against the diff.
+
+Merge call: **approved — merge as a merge commit** (tracker auto-commits ride this branch, so no squash).
