@@ -1,14 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-friction-dedupe-and-report
 title: Fingerprint dedupe and the friction report renderer
+assignee: arggon-delivery-lead
+branch: feat/task-friction-dedupe-and-report
 parent: story-adopter-feedback
 labels: [method]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-11"
+claimed_at: "2026-10-11T13:00:24.463Z"
 depends_on: [task-friction-capture-command, task-friction-fingerprint-separator-not-length-prefixed]
+worktree_path: /home/arggon/Projects/ArggonManager-task-friction-dedupe-and-report
 ---
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-dedupe-and-report.md
