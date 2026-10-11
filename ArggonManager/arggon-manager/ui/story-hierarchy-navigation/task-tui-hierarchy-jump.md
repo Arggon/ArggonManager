@@ -8,7 +8,6 @@ labels: []
 created: "2026-10-11"
 updated: "2026-10-11"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/task-tui-hierarchy-jump.md
   Leaves live only under a story. id is the filename stem: task-tui-hierarchy-jump.
@@ -31,3 +30,10 @@ Parent story `story-hierarchy-navigation`: the TUI detail pane (`buildTuiDetailL
 - [ ] `arggon validate` green; prettier clean; PR opened
 
 ## Notes
+
+### 2026-10-11 @ses_ed2ed434cffdHsqB0EV526IjUT
+verdict: approve (pane p/1-9/c jumps, read-only preserved, smoke green)
+- Read the worktree diff (tui.ts + tui.test.ts + smoke + README + own item file) — no board.ts, no plugins/, no templates/; scope stays on the item
+- Standards-reviewer: approve, no blocking findings (same-snapshot resolvers, write-free reducer, modal c honestly scoped+documented, sanitize on all new rows, honest-empty notices, real live round-trip test)
+- Verifier, all 5 probes green: vitest 159/159, tsc exit 0, prettier clean, smoke:tui-board pass incl. the 3 new jump steps, validate ok
+- Recommendation: merge PR #729 (merge, not squash) on green CI; lead ticks Acceptance after merge and flips done
