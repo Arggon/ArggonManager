@@ -65,3 +65,7 @@ Maker record — bound raised 512 KiB -> 640 KiB, boundary proof made durable.
 **Acceptance lives in the live section.** The five criteria are transcribed and ticked in the live `## Acceptance` section; the dated comment block above is left as history (unticked) on purpose — `agents.md` section 5 is explicit that comment boxes are history and never the contract, and the gate is scoped to the live section (verified: `acceptanceGate` over the canonical body reports `gated: false`).
 
 **Coupling for the rest of the chain.** No `depends_on` edge added to T4/T5 or their filed siblings: the ceiling watch is now durable in-tree — the bound's rationale and arithmetic live in `cli/src/plugin-bundle.ts` and its boundary proof in `cli/src/plugin-bundle.test.ts` — so those items land additive against 640 KiB without a new edge, and the next raise repeats the recorded arithmetic (~25% headroom above the measured size plus the growth still planned).
+
+### handoff 2026-10-11 @arggon-maker — next: Delivery lead: review the raised 640 KiB bound and merge so PR #713 can rebase onto main; the durable bite proof is in cli/src/plugin-bundle.test.ts.
+- branch: feat/task-plugin-bundle-near-byte-ceiling
+- open questions: None blocking. Comment-filed acceptance boxes left unticked per agents.md §5 (the live section gates; verified). smoke:native-start-cold flaked one provider leg on run 1, green on both re-runs.
