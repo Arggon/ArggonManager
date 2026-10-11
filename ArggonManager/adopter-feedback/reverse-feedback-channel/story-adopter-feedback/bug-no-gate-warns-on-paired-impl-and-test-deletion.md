@@ -82,3 +82,66 @@ That is the same failure the repo already tracks as `bug-stale-merge-can-delete-
 - [x] Two-dot vs three-dot stated explicitly wherever it is invoked — the incident that motivated this item was a **two-dot** diff against a stale branch reporting deletions that did not exist
 - [x] Report-only is recorded as the decision, with a note that promoting it to a blocking gate is a separate call with its own item
 - [x] Impact class stated per `docs/agents.md` §Changing the methodology
+
+### 2026-10-11 @arggon-maker
+
+Landed on `fix/bug-no-gate-warns-on-paired-impl-and-test-deletion` — PR #705. Design, evidence and the loudness decision below.
+
+## Where it lives (house pattern, not a new mechanism)
+
+The repo's CI-shaped guards are `cli/<name>.mjs` + a colocated `.test.ts` + a step in the `cli` job (`version-guard.mjs`, `auto-done-refusal.mjs`). I followed that exactly:
+
+- `cli/paired-deletion-guard.mjs` — lists every `D` row of a PR's **three-dot** diff (`merge-base -> head`) and warns when a `D` row removes an implementation and its paired test together.
+- `cli/paired-deletion-guard.test.ts` — 20 tests.
+- `.github/workflows/ci.yml` — PR-only step, after `lint:structure` and the spec-analyze lane, before the smoke steps (the "cheap and last" rationale).
+- `ArggonManager/docs/engineering.md` — the CI-tier entry.
+
+The ast-grep lanes were considered and rejected as the home: they are source-structure rules, and this check's input is a git diff.
+
+## Pairing rule
+
+Same directory, same basename, one of the pair carrying a test marker (`.test`, `.spec`, plus the repo's `.property.test` convention). Fires only when **both** sides are deleted, so it under-reports by design: the #586 pair itself (`adapters.ts` vs `adapter-selection.test.ts`) does not pair, nor do cross-directory matches, renames (`R100`), or non-code deletions (`.md`/`.json`/`.yml`).
+
+## Detection evidence (negative controls, real git fixtures — not hand-written diff strings)
+
+| #   | crafted state                                                                       | expected                                 | observed                                                                                                                                                   |
+| --- | ----------------------------------------------------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | paired `D cli/src/adapters.ts` + `D cli/src/adapters.test.ts` + `D docs/old.md`     | every `D` row listed, the pair warned    | 3 rows listed, `::warning:: paired deletion — cli/src/adapters.ts (implementation) and cli/src/adapters.test.ts (test) … compiles and stays green`, exit 0 |
+| 2   | same state with `--strict`                                                          | exit 1                                   | exit 1                                                                                                                                                     |
+| 3   | `D` implementation only / `D` test only / `D docs/old.md`                           | listed, never paired                     | listed, `verdict: no paired deletions`, exit 0                                                                                                             |
+| 4   | branch deletes NOTHING; base moved ahead and gained a module + its test (three-dot) | no pair                                  | `verdict: no deletions in this diff`, exit 0                                                                                                               |
+| 5   | same state, two-dot view (raw git)                                                  | both `D` rows present = the #586 phantom | `D cli/src/late.test.ts`, `D cli/src/late.ts` — demonstrated in the suite, not just described                                                              |
+| 6   | unrecognizable `--base refs/heads/does-not-exist`                                   | exit 2, never a quiet pass               | exit 2, message names the shallow-fetch remedy                                                                                                             |
+| 7   | this branch as it stands                                                            | no deletions                             | `verdict: no deletions in this diff`, exit 0                                                                                                               |
+
+Also pinned: the lane fires on `board-serve.property.test.ts` + `board-serve.ts` (the repo's property-test convention) and does not fire on `adapters.ts` + `adapter-selection.test.ts`.
+
+## Loudness decision: WARN, report-only (recorded reasoning)
+
+1. **Legitimate-but-suspicious, not defective.** Measured: across the last 500 commits this repo has 40 `D` rows and **zero** paired deletions. A blocking gate buys nothing today and costs a bypass on the first intentional module removal — and a bypass in a workflow is the knob that rots into the default.
+2. **The motivating incident was a false positive from a stale base.** A blocking gate turns an unresolvable/stale base into a red lane indistinguishable from the real thing. Report-only degrades that to an annotation; the guard also prints the merge base it used and warns when it sits on the shallow boundary.
+3. **The pairing rule is a heuristic** with known non-matching shapes in this very repo. A heuristic that blocks needs an exemption list from day one, and an exemption list is the first thing to go stale.
+4. **Report-only is not vacuous.** `--strict` exits 1 on a pair and is asserted on a real git fixture in every `npm test`, so a broken detection reddens the lane that blocks merges — the opposite of `bug-verification-regex-matching-nothing`.
+5. **The one thing that DOES fail the lane is exit 2** — the run could not look (unresolvable base, no merge base, usage error). Deliberately no `|| true` and no `continue-on-error` in the step. **Promotion to blocking is its own call with its own item**; `--strict` is the promotion path (one line in the CI step).
+
+## Gates run (declared order)
+
+```
+npm run build            0
+npm test                 137 files / 2987 tests
+npm run check:plugin     0
+npm run lint             0
+npm run test:structure   5 passed
+npm run lint:structure   0
+arggon validate          ok (0 warnings, convention v5)
+actionlint ci.yml        0 (v1.7.12)
+spec analyze --baseline  0 new / 0 resolved / 4 unchanged  (baseline JSON untouched)
+prettier -c              all matched files clean
+```
+
+## Open questions for the delivery lead
+
+- Promotion to blocking: the item records it as a separate call. The evidence it needs (this report run over N PRs showing zero legitimate pairs) is partly in hand from the 500-commit scan.
+- `--depth=250` on the CI fetch is a judgement call; a deeper PR would land on the shallow boundary and the guard warns loudly rather than guessing. `fetch-depth` on the shared checkout step was deliberately NOT changed.
+
+> > > > > > > origin/main
