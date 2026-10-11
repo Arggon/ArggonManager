@@ -54,12 +54,18 @@
  * does not have, and that failure is in the code's own file header as much as in
  * the prose.
  *
- * Scope: rule 1 covers all three methodology carriers (`STATUS_CARRIERS`).
- * Rule 2 covers `engineering.md` only (`LINK_CARRIERS`), because
- * `convention.md:124` links to `./adr/0015-done-gate.md`, a file that no longer
- * exists — a dead link owned by
+ * Scope: both rules cover the same three methodology carriers — rule 1 via
+ * `STATUS_CARRIERS`, rule 2 via `LINK_CARRIERS`. They are separate constants
+ * because they are separate rules, not because their scope differs: rule 2 used
+ * to stop at `engineering.md` because `convention.md` linked
+ * `./adr/0015-done-gate.md`, a file that does not exist — the one dead link
+ * tracked by
  * `ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-convention-md-links-nonexistent-adr-0015.md`,
- * and the reason both constants are separate. ADRs, plans, specs, explorations
+ * fixed in PR #649 (the real file is `0015-done-gate-acceptance-waiver.md`; the
+ * number was right, the pre-rename filename was stale). `skills/arggon-cli/**`
+ * is deliberately outside both: none of its markdown files carries a
+ * `./adr/`-shape link, so neither rule has anything to read there — measured,
+ * not asserted, at `LINK_CARRIERS`. ADRs, plans, specs, explorations
  * and tracker items are deliberately NOT pinned: they are dated records of what
  * was true when written, and this repo supersedes rather than rewrites them.
  */
@@ -85,16 +91,42 @@ const STATUS_CARRIERS: readonly string[] = [
 ];
 
 /**
- * Rule 2's carriers: narrower, deliberately. `convention.md:124` links
- * `./adr/0015-done-gate.md`, which does not exist (the file is
- * `0015-done-gate-acceptance-waiver.md`), so rule 2 would fail on it today.
- * That dead link is
- * `ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-convention-md-links-nonexistent-adr-0015.md`;
- * adding `convention.md` here is a one-line change once it lands. Rule 2 is not
- * split per-carrier anywhere else — a status restated in a carrier this list
- * omits is still caught by rule 1.
+ * Rule 2's carriers: the same three methodology carriers rule 1 covers. The
+ * lists are identical, and that is the point — rule 2 used to stop at
+ * `engineering.md` because `convention.md` linked `./adr/0015-done-gate.md`,
+ * a file that does not exist (the real one is
+ * `0015-done-gate-acceptance-waiver.md`). That single dead link, tracked as
+ * `bug-convention-md-links-nonexistent-adr-0015` and fixed in PR #649, was the
+ * whole reason the constants diverged; a restated status in a carrier this list
+ * omits was still caught by rule 1, but a DEAD link in one was not caught by
+ * anything.
+ *
+ * `skills/arggon-cli/**` stays out, and the exclusion is measured rather than
+ * asserted: 0 of its 7 markdown files (`SKILL.md`, `EVALS.md`, the five
+ * `references/*.md`) carries a link in this suite's own shape — grep for
+ * `\(\./adr/[0-9]{4}-[a-z0-9-]+\.md\)` over the subtree returns no file.
+ * Rule 1 pins at least one reference per carrier; rule 2 has no such guard, so
+ * an all-zero carrier would make it a silent no-op rather than a green check —
+ * exactly the vacuous pass this suite is built to avoid. The skill set does
+ * name ADRs (`references/methodology.md` cites the `ArggonManager/docs/adr/`
+ * directory; `references/pitfalls.md` writes the 0021 path as a
+ * repo-root-relative code span, and that file resolves), but neither is the
+ * relative `./adr/` link this rule reads, and giving the carrier real links is
+ * a content change under the `skills:sync` drift gate
+ * (`cli/src/skill-generated-commands.test.ts`) — separate work, not a dead-link
+ * repair.
+ *
+ * One boundary is a recorded choice, not an oversight: the link shape is
+ * `./adr/`, and `convention.md` writes 6 of its 14 ADR references bare
+ * (`adr/NNNN-….md`, no `./`), which this rule skips. Widening the SHAPE is a
+ * separate decision with its own blast radius; widening the CARRIERS is this
+ * one, and it is safe to do independently.
  */
-const LINK_CARRIERS: readonly string[] = ["ArggonManager/docs/engineering.md"];
+const LINK_CARRIERS: readonly string[] = [
+  "ArggonManager/docs/engineering.md",
+  "ArggonManager/docs/agents.md",
+  "ArggonManager/docs/convention.md",
+];
 
 /** `./adr/0003-milestone-field.md` — the ADR index link `./adr/README.md` is not one. */
 const ADR_LINK = /\(\.\/adr\/(\d{4})-([a-z0-9-]+)\.md\)/g;

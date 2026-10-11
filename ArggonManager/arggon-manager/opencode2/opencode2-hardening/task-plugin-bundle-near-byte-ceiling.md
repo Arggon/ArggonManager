@@ -9,7 +9,6 @@ parent: opencode2-hardening
 labels: [tooling, plugin]
 created: "2026-10-11"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-task-plugin-bundle-near-byte-ceiling
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2/opencode2-hardening/task-plugin-bundle-near-byte-ceiling.md

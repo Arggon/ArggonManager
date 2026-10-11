@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: [spec-pipeline, kernel]
 created: "2026-10-11"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-done-gate-whole-body-scan-counts-fenced-repro-boxes
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-done-gate-whole-body-scan-counts-fenced-repro-boxes.md
