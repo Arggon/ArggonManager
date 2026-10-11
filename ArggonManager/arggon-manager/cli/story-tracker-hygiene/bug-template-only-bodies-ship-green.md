@@ -8,6 +8,7 @@ labels: []
 created: "2026-10-11"
 updated: "2026-10-11"
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/bug-template-only-bodies-ship-green.md
   Leaves live only under a story. id is the filename stem: bug-template-only-bodies-ship-green.
@@ -34,7 +35,9 @@ Scale (same-day grep, open `todo`/`in_progress`/`blocked` items only): 12 open c
 ## Notes
 
 ### 2026-10-11 @ses_ed2ed434cffdHsqB0EV526IjUT
+
 decide: how loudly should the tracker complain about placeholder item bodies (the empty Context and Acceptance sections this bug names)?
+
 - The question: when an open item still carries its scaffold placeholder text, should the toolchain refuse (a red gate) or only report it (a warning you can read and ignore)?
 - Why it matters: today the silence is total — 12 open containers and 26 open tasks in this repo carry placeholders with every gate green, so nobody learns a body was never written until a human trips over it. Whatever we choose becomes the behavior in every adopting repo too.
 - The options: A — blocking: `validate` fails on placeholder bodies in open items, so no PR with one goes green, at the cost that 38 currently-open items in this repo must be fixed or waived first and every adopter with a placeholder gets a red lane on upgrade. B — report-only: a `validate` warning (or equivalent finding) names the items without failing anything, so nothing breaks and the list is always visible, at the cost that warnings get ignored and the rot can persist exactly as it did here. C — split: containers report-only (their prose is product judgment, often legitimately brief) while task/bug leaves block (their checklist is the done contract the kernel already gates).
