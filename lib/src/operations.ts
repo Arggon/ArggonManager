@@ -18,6 +18,7 @@
  *   into a typed tool error without try/catch.
  */
 import { relative, sep } from "node:path";
+import { homedir } from "node:os";
 import { classifyAcceptance, type AcceptanceState } from "./acceptance.js";
 import { classifyDecisionBrief, type DecisionBriefState } from "./brief.js";
 import { readConventionVersion } from "./convention.js";
@@ -40,6 +41,15 @@ import {
   type PriorityMigrateOptions,
 } from "./priority.js";
 import { runReport, type ReportGroup } from "./report.js";
+import {
+  FrictionError,
+  appendFrictionRecord,
+  buildFrictionRecord,
+  frictionLogPath,
+  type FrictionInput,
+  type FrictionOptions,
+  type FrictionRecord,
+} from "./friction.js";
 import { runShow, type ShowComment, type ShowOptions } from "./show.js";
 import { runSync } from "./sync-command.js";
 import type { SyncFilled, SyncResult } from "./sync-types.js";
@@ -557,6 +567,74 @@ export function importIssuesOperation(
     );
   } catch (err) {
     return fail("import-issues", opts.cwd, "IMPORT_FAILED", err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// friction (the local adopter-friction log — NOT the tracker)
+// ---------------------------------------------------------------------------
+
+/**
+ * `arggon friction` capture (plan-friction-capture-018 T1).
+ *
+ * Deliberately unlike every other operation here: it does not load the tracker,
+ * does not parse frontmatter and does not commit — the log is not the tracker
+ * (ADR 0024 §1). The envelope still carries `conventionVersion` (the house
+ * contract reads it from `cwd`, so a non-tracker tree reports `0`), because the
+ * shape is stable across commands rather than because this command consumes it.
+ *
+ * `version` is the one thing the CLI owns and the kernel cannot read: the
+ * record must name the arggon that captured it, and the kernel ships no
+ * manifest.
+ */
+export type FrictionOperationOptions = FrictionOptions & FrictionInput;
+
+export type FrictionPayload = {
+  /** Absolute log path the record was appended to. */
+  path?: string;
+  /** Lines rotation dropped on this write (0 unless the bound was crossed). */
+  dropped?: number;
+  /** The record exactly as persisted. */
+  record?: FrictionRecord;
+  /** Failure only: the reason a machine acts on (spec §Observability). */
+  reason?: string;
+};
+
+export function frictionOperation(opts: FrictionOperationOptions): CommandOutcome<FrictionPayload> {
+  const cwd = opts.cwd;
+  try {
+    const record = buildFrictionRecord(opts, opts);
+    const env = opts.env ?? process.env;
+    const home = opts.home ?? homedir();
+    const appended = appendFrictionRecord(record, frictionLogPath(env, home));
+    return succeed(
+      "friction",
+      { path: appended.path, dropped: appended.dropped, record },
+      readConventionVersion(cwd),
+    );
+  } catch (err) {
+    if (err instanceof FrictionError) {
+      return {
+        ok: false,
+        envelope: failEnvelope({
+          command: "friction",
+          message: err.message,
+          code: "FRICTION_FAILED",
+          conventionVersion: readConventionVersion(cwd),
+          // The reason a machine acts on rides beside the error, not inside
+          // the prose: `no-observation` / `no-command-shape` /
+          // `log-unwritable` / `evidence-unreadable`. `path` is present exactly
+          // when the failure is about a path — `log-unwritable` names it.
+          payload: {
+            reason: err.reason,
+            ...(err.path !== undefined ? { path: err.path } : {}),
+          },
+        }) as KernelFailureEnvelope<FrictionPayload>,
+        exitCode: 1,
+        error: err,
+      };
+    }
+    return fail("friction", cwd, "FRICTION_FAILED", err);
   }
 }
 
