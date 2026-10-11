@@ -127,3 +127,7 @@ Regression check: I ran \`--json doctor --agents\` before and after the change a
 1. The \`agents\` section's JSON sample is a 2026-10-02 snapshot whose numbers have drifted with the seam: it shows \`zcode total: 19 / present: 16\` where the seam is now 23 and fully \`present\`, and its caption's "9 adopter-edited rows / 12 modified" also describes that older tree. Re-measuring it means a real \`doctor --json --agents\` run against a tree that reproduces those states (ack the docs first), which is its own item — I did not want this item's numbers silently disagreeing with each other either.
 2. \`README.md:222\`'s "never overwritten, not even with \`--force\`" for generated docs is a third phrasing of the protection claim; it looks true (\`--force\` only re-copies the scaffold \`.convention.yml\` and \`templates/*\`) but it is unverified here.
 3. The \`arggon-prover.md\` / pre-round-2 agent names that appear nowhere after these edits.
+
+### handoff 2026-10-11 @arggon-maker (session: ses_ed543078fffeOz1k5gNQ7Y2rB9) — next: Open the PR for 33720115; all seven acceptance rows are ticked and green. Standards reviewer: note F1 and F3's contract row were already fixed upstream (d4a7a436, 7f0191252) — check the diff only cla…
+- branch: feat/task-adapter-report-nits-from-review
+- open questions: Should the agents JSON sample be re-measured (zcode 19/16 vs the live 23/all-present) in its own item? Does README:293 'refuses to rewrite' need the same one-claim tightening as json-output.md? Is RE…
