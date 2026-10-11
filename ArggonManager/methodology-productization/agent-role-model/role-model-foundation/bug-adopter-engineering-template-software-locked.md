@@ -96,3 +96,161 @@ sweep now has a fourth member. Add it to this item's file set and to the guard c
 Note for whoever picks this up: PR #641 renamed the ids the *shipped* seam generates. The
 **adopter templates** are a separate copy and were deliberately out of that PR's scope — which
 is why this item exists.
+
+### 2026-10-11 @ses_ed596d14affebT3A7Wx22iqJPB
+## 2026-10-11 @arggon-maker (worktree fix/bug-adopter-engineering-template-software-locked, commit 6ea424dc) — done, evidence
+
+### Path caveat resolved (paths in the notes above do not exist)
+
+I read the tree instead of trusting the note:
+
+- `templates/docs/docs/AGENTS.md` — **absent**. The adopter router lives one level up at
+  `templates/docs/AGENTS.md` (it renders to the adopting repo's ROOT).
+- `templates/docs/docs/viewer-spike.md` — **absent**, and no `viewer-spike` anywhere under
+  `templates/` at all. `viewer-spike` exists only under `ArggonManager/` and `README.md`
+  as *task* stems (opencode2-native/native-redesign, ui/ui-web-board-v2) — it is an item
+  id, never an adopter template. So there is no viewer-spike work-loop-parity statement
+  to leave alone.
+- `templates/docs/docs/agents.md` — **absent**. `templates/docs/docs/` holds exactly
+  convention.md, deploy.md, engineering.md, runbooks/.
+
+Resolved file set: `templates/docs/AGENTS.md` (+1), `templates/docs/docs/convention.md`,
+`templates/docs/docs/engineering.md`, and the new guard. `templates/docs/docs/AGENTS.md`
+and `viewer-spike.md` were NOT invented. Work-loop-parity statements that DO exist and were
+left alone: `templates/docs/AGENTS.md` line 3 ("For humans and AI agents working on…" — a
+router preamble, not a rules parity claim) and "Subagents follow the same rules" in the
+Orchestration paragraph (correct under the two-axis rule).
+
+### The two templates
+
+`templates/docs/docs/engineering.md` — the operating principle, the reviewable checklist,
+the non-functional bar, the smoke gate, the definition of done and the testing rows are now
+stated as what the adopting project **declares**; the software case survives as two
+clearly-marked worked examples (`_Worked example (software):_` for the principle,
+`_Worked examples (software):_` for the end-to-end check). Bar teeth unchanged:
+
+- "It does one thing" · verification the project declares exists and covers the change
+  (new checks for new behavior, updated for changed) · docs in the same PR · item id in the
+  PR · `arggon validate` passes — all five kept verbatim-ish.
+- "Smoke gate (blocks merge)" → "**Blocking end-to-end check (blocks merge)**": still
+  blocking, still evidenced ("record expected-vs-observed evidence in the review verdict"),
+  still owned ("Blocking means the verdict says so, the evidence is attached, and someone
+  owns the call").
+
+"Software-noun table headers": **this template has no markdown tables** — the row headers it
+does have are the CLI/UI clause labels, "Tests green locally and in CI (including lint/typecheck
+gates)" and "unit vs integration split". Those are what I generalized ("The verification this
+project declares… (all of its gates, not only the fastest)", "part-level / whole-behavior").
+
+`templates/docs/docs/convention.md` — line 3's "Humans and agents follow the same rules." is
+replaced by the two-axis rule restated in adopter-local words (work-loop parity + authority
+asymmetric and named), plus the carriers' byte-identical `- **Invariants:**` block. It now
+also carries `- **Scope:** any project — not only software.`
+
+`templates/docs/AGENTS.md` — "coordinator" → the shipped **delivery lead**; the review clause
+is now "code-reviews every subagent change against the project's own bar" (the pre-rename
+wording also carried the software job title "lead architect", which ADR 0021 §6 remaps). The
+invariant pointer is one clause in Docs & gates — AGENTS.md is budget-bounded at 2048 bytes
+(ADR 0006) and the generated file lands at 2033 bytes (15 bytes headroom), so it POINTS at the
+carrier instead of carrying the block. That forced five small trims elsewhere in the file
+(dropped "(Code Mode tools.arggon.*)", "`--no-agents` omits it", "claim rules"→"claims",
+"Claim before starting"→"Claim first", "for a full scan"→"for a scan") — the old file's render
+was already 2036 bytes, so it had 12 bytes of slack.
+
+### The guard (cli/src/adopter-template-invariant-drift.test.ts, 6 tests)
+
+Clause 1 — the four carriers (ArggonManager/docs/agents.md, engineering.md, convention.md,
+README.md) carry ONE byte-identical `- **Invariants:**` block and ONE `- **Scope:**` line
+(PR #636's parity had nothing pinning it). Clause 2 — the whole adopter template family is
+walked as one set (every .md under templates/docs/ except the opencode/ and zcode/ seam
+subtrees, which PR #641 owns) and no member may carry the superseded flat-parity sentence
+(whitespace/case-normalized), a retired agent id, or the pre-rename role word; a member that
+restates an invariant or the scope must restate it byte-identically to the carriers, which are
+read at run time. Clause 3 — the family cannot shrink: the members the guard leans on are
+required to exist and to carry the block.
+
+Why the seams are out of the walk: the OpenCode/ZCode templates are generated agent contracts
+whose id sweep is PR #641's, not the governing docs a new adopter reads first.
+
+### Gates — expected vs observed
+
+| Gate | Expected | Observed |
+| --- | --- | --- |
+| `npx vitest run` (after `npm run build`, dist was absent in the worktree) | 0 failures | **137 files / 2933 tests passed** |
+| `npm run arggon -- validate` | ok, 0 warnings | **ok (0 warning(s), convention v5)** |
+| `npx prettier --check` on the 5 files I touched | clean | **clean** |
+| `npx prettier --check CHANGELOG.md` | no NEW violations | prettier wants 905 changed lines on it — **exactly the 905 it wants at HEAD** (pre-existing `*`→`-` release-please churn; my section is written `-`, adding 0). Repo-wide `prettier --check .` is red for 648 files at HEAD and 646 after this change (convention.md + engineering.md became clean). |
+| `npm run lint` / `npm run test:structure` | clean | **clean** |
+| `x-generated` provenance | re-running `init` must not read my edit as adopter-edited | this repo's AGENTS.md / ArggonManager/docs/{engineering,convention}.md are NOT in x-generated (they are hand-maintained carriers), so `init` skips them as adopter content; the audit test (`provenance-audit.test.ts`, repo-self block) stays green and `headless-ci.test.ts`'s packed drift gate passed. |
+
+### Demonstrated red — the guard is a real drift guard, not theatre
+
+Each break below was applied to a copy, run, and restored; all five went red:
+
+1. Superseded sentence re-inserted into `templates/docs/docs/convention.md` →
+   `"templates/docs/docs/convention.md: carries the superseded flat-parity sentence…"`
+2. `- **Invariants:**` bullet in `templates/docs/docs/engineering.md` reworded (one word) →
+   `"- **Invariants:** diverges from the carriers' block"` × 2 (byte-identity + required-block)
+3. **A carrier** (`ArggonManager/docs/agents.md`) rewrote its own invariant line →
+   `expected 2 to be 1` (the one-block precondition)
+4. "a coordinator" restored in `templates/docs/AGENTS.md` →
+   `"uses the pre-rename role word "coordinator""`; and `cli/src/init-docs.test.ts` went red twice for the same reason (its new `not.toMatch(/\bcoordinat/i)` assertion, plus the 2 KB budget at 2067 bytes)
+5. The invariant block deleted from `templates/docs/docs/convention.md` →
+   `"templates/docs/docs/convention.md must carry the invariant block: expected null not to be null"`
+
+I also updated `cli/src/init-docs.test.ts`'s orchestration assertions (`coordinator` /
+`lead architect` → `delivery lead` / `project's own bar`) — the template fix would otherwise
+have left that suite red.
+
+### ADR 0016: release-notes note, and the `init --propose` decision
+
+CHANGELOG.md gains a `## [Unreleased]` section with an explicit **"Adopter upgrade channel
+(ADR 0016)"** subsection: `init` never overwrites, an acked/modified doc is skipped on every
+re-run, so the corrected templates reach **new** trees only and existing adopters must
+reconcile their own copies (doctor's `outdated` bucket → `init --dry-run` → `init --propose`
+side files → re-ack).
+
+**Decision: `init --propose` IS the carrier, and no new flag is needed.** Proven on a fixture
+adopter (git init → `init --full` → old template bytes restored into the three dests →
+`adopt --ack`): plain `init` left the adopter's superseded sentence byte-identical (never
+overwrite honoured), while `init --propose` wrote exactly three side files
+(`AGENTS.md.proposed-0.6.0`, `ArggonManager/docs/convention.md.proposed-0.6.0`,
+`ArggonManager/docs/engineering.md.proposed-0.6.0`); the engineering proposal carries
+"_Worked example (software):_" and the blocking end-to-end check, the convention proposal
+carries "work-loop parity" and zero occurrences of the superseded sentence, the AGENTS proposal
+carries "delivery lead", and all three originals stayed untouched. Every affected destination is
+exactly the acked-or-modified case `--propose` exists for.
+
+### Acceptance checklist (ticked here — the boxes live in the comment record, not the live section)
+
+- [x] Operating principle + testing rows restated as what the project declares; software kept as a worked example
+- [x] Software-noun row headers generalized (no tables in this template — see above)
+- [x] Review bar keeps its teeth: generic but still blocking, evidenced, owned
+- [x] `x-generated` provenance respected — re-running `init` does not read as adopter-edited
+- [x] `cli/src/init.test.ts` + prose-format suite green; `arggon validate` ok; prettier clean
+- [x] Cross-checked `templates/docs/docs/agents.md` (absent) and `convention.md` (had the lock, fixed it); the other family members are now guarded family-wide
+- [x] `templates/docs/docs/convention.md` carries the two-axis rule
+- [x] A guard exists and asserts the templates' invariant statement matches the carriers' block
+- [x] The guard covers the whole family as one set (walked, not hand-listed)
+- [x] ADR 0016 upgrade-channel note in the release notes + `--propose` decision proven
+- [x] `templates/docs/AGENTS.md:17` uses the shipped role vocabulary
+- [x] The work-loop-parity statements that exist are left alone (see the path resolution above)
+
+**The live `## Acceptance` section of this item is still the boilerplate placeholder** — the
+contract lives in the dated comment record above, and `tools.arggon.comment` is append-only,
+so I could not tick it in place. Filling that section (or flipping the item to done) is the
+delivery lead's call at merge, per §Done.
+
+### Findings for the delivery lead — not fixed here, please file
+
+1. **`templates/docs/CONTRIBUTING.md:32`** — "- [ ] Tests pass locally (`npm test` or the
+   project equivalent)" names the software noun first; **`templates/docs/github/PULL_REQUEST_TEMPLATE.md:18`** —
+   "- [ ] Tests pass locally" has no project-equivalent escape at all. Same class as this item
+   but outside its named file set, and the cross-check row says report rather than edit.
+2. **`templates/docs/zcode/arggon/commands/arggon-goal.md:29`** — "so the coordinator can
+   follow the claim", a pre-rename role word surviving in a shipped seam template. Outside my
+   walk by design (the seam belongs to PR #641's sweep + the adapter tests, which are another
+   maker's file set).
+3. This repo's own `CHANGELOG.md` carries 905 lines of pre-existing prettier drift
+   (`*`→`-`), so repo-wide `prettier --check .` is red at HEAD (648 files) and cannot be used
+   as a gate until someone runs `prettier -w` over the tree.
