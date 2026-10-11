@@ -71,3 +71,10 @@ OUT OF SCOPE (reported to delivery lead): stale citations to renamed stems remai
 ### handoff 2026-10-11 @arggon-maker — next: Merge this renumber PR; then task-release-pipeline-baseline-new-collisions re-baselines both analyze baselines (left untouched here per constraint).
 - branch: feat/task-renumber-colliding-doc-numbers
 - open questions: Route residual stale citations to renamed stems in OTHER work-item files + comment-only code refs (board/filter/list/next tests, next.ts:32, spec.ts:309, adopt.test.ts fixtures) to a follow-up; confi…
+
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merged (PR #680)
+
+Reviewed against engineering.md §Review bar: scope stayed on the item (renames + citations + execution-critical test-fixture doc names; the maker reverted an inadvertent formatter sweep to keep the diff clean); conventions honored — renumber notes per the ADR 0016/0019 idiom, next-FREE-number scheme documented, spec:/plan frontmatter citations updated, detector left report-only per acceptance box 5; evidence travels with the change (spec validate 5 warnings → 0; spec analyze 11 findings → 6 with 0 duplicate-doc-number; npm gates + CI green); baselines untouched per constraint.
+
+Out-of-scope finding routed: residual stale citations to the renamed stems in other work-item bodies and comment-only code refs → task-stale-citations-to-renumbered-doc-stems (Wave B).
