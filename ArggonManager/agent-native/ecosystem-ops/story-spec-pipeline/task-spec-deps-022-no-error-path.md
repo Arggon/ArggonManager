@@ -46,3 +46,34 @@ Acceptance:
 - [ ] The fix is a real failure-path section describing the spec's error/failure behavior, OR an explicit, cited justification that the spec's domain has no failure path (check how sibling specs satisfy this rule and match that idiom — do not write theater text)
 - [ ] No changes to either baseline JSON (owned by the baseline item) and no renumber-style renames
 - [ ] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green; `arggon validate` ok
+
+### 2026-10-11 @arggon-maker
+Maker evidence (branch feat/task-spec-deps-022-no-error-path, commit 58c0e4fc, PR https://github.com/Arggon/ArggonManager/pull/686).
+
+CHANGE — ArggonManager/docs/specs/spec-deps-022.md only (+44/-3):
+
+1. New "## 5. Especificación de errores": a per-surface table (superficie / condicion / mensaje + error.code / exit code) plus "lo que ve y debe hacer el caller". Every row is grounded in the shipped code, not theater:
+   - update: empty --add-depends-on and an unknown depends_on id fail BEFORE the item file is mutated (lib/src/update.ts:483 throws `depends_on id '<id>' does not resolve to an existing item`; UPDATE_FAILED; exit 1 via lib/src/operations.ts fail()).
+   - validate: SELF_DEPENDENCY / UNKNOWN_DEPENDENCY / DEPENDENCY_CYCLE arrive in errors[] ({path,message,code}) with ok:false and error.code VALIDATE_FAILED, exit 1 (lib/src/validate.ts:166-236); each cycle is reported once, anchored at its lexicographically smallest member, plus the documented caveat that WHICH cycles a report names is traversal-order dependent (docs/convention.md "Dependency graph (v3)") — consumers rely on the verdict and the per-cycle chains.
+   - list: malformed filter tokens fail with `bad filter token ...` / `unknown filter field ...` / `empty value in filter token ...`, LIST_FAILED, exit 1 (lib/src/filter.ts:84-106).
+   - Prose on the near-misses: advisory blocking never fails update; an unknown dep counts as open so next degrades instead of breaking (the inverse passes downstreamWeight / blocked-by index are cycle-safe); an empty pool is suggestion:null with ok:true; a v0-v2 tree without the field validates clean.
+2. Sections renumbered in kind (JSON contract 5->6, acceptance 6->7); the renumber note is amended with a dated Update (2026-10-11) so "Spec content unchanged" stays honest; one new acceptance row in section 7 covers section 5.
+3. House idiom matched to the Spanish sibling spec-sync-001.md ("## 7. Especificación de errores" table). No other file touched: both baselines untouched, no renames, no code change.
+
+BEFORE/AFTER — `npm run arggon -- spec analyze` (fresh, no --baseline, in the worktree):
+
+    before: warn ArggonManager/docs/specs/spec-deps-022.md: no error/failure path mentioned anywhere in the spec [no-error-path]
+            arggon spec analyze: 5 finding(s) across 23 spec(s) — report only, nothing was edited
+    after:  arggon spec analyze: 4 finding(s) across 23 spec(s) — report only, nothing was edited   (exit 0; no spec-deps-022 finding)
+
+Bonus lane evidence: `npm run arggon -- spec analyze --baseline ArggonManager/spec-analyze-baseline.json` on this branch reads "0 new, 2 resolved, 4 unchanged, 4 total" (exit 0) instead of the relocated "1 new ... exit 1" — so task-release-pipeline-baseline-new-collisions can re-baseline a clean state.
+
+GATES (worktree; npm run build ran first because headless-ci asserts dist/ exists):
+
+    npm test ............ 134 files / 2858 tests passed, 5 skipped. The first run (before build) failed ONLY on the pre-existing headless-ci "run `npm run build` first" assertion; green after the build.
+    npm run build ....... ok (incl. build:plugin — 43 modules, index.bundle.ts byte-identical)
+    npm run check:plugin  ok
+    npm run lint ........ ok (eslint, no findings)
+    arggon validate ..... ok (0 warning(s), convention v5)
+
+Item not flipped to done — completion is the delivery lead's call after merge.
