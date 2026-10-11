@@ -14,7 +14,6 @@ claimed_at: "2026-10-11T17:12:43.982Z"
 depends_on: [task-friction-dedupe-and-report]
 worktree_path: /home/arggon/Projects/ArggonManager-task-friction-tier-b-url-and-optout
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-tier-b-url-and-optout.md
   Leaves live only under a story. id is the filename stem: task-friction-tier-b-url-and-optout.
@@ -60,3 +59,66 @@ gate **capture**, never **discoverability**.
 - [x] An unknown nested key inside `x-friction` is ignored (extension policy); a scalar `x-friction` is a parse error (test both).
 - [x] `arggon friction --clear` removes the whole log, is idempotent on an empty or missing file, and reports `cleared: 0` rather than an error.
 - [x] `--report` and `--clear` are mutually exclusive with a capture position, and the conflict is a named error.
+
+### 2026-10-11 @arggon-maker
+Maker evidence for the standards reviewer — task-friction-tier-b-url-and-optout (plan task T4 of spec-friction-capture-020, the load-bearing half of ADR 0024). PR: https://github.com/Arggon/ArggonManager/pull/724 (branch `feat/task-friction-tier-b-url-and-optout`). All 11 acceptance boxes are ticked in the live section; evidence per box below.
+
+## The URL construction (encoding rules)
+
+`--tier b` prints exactly
+`https://github.com/Arggon/ArggonManager/issues/new?title=…&body=…&labels=adopter-friction`
+(params in that order, `lib/src/friction-publish.ts`):
+
+- **Encoding**: `encodeURIComponent` per param VALUE, joined with `&`. Not `URLSearchParams` — that is the form encoding and spells a space `+`, while GitHub's prefill contract is percent-encoding. A narrative carrying `&`, `=`, `#` or `?` therefore cannot forge a param, and a newline rides as `%0A`.
+- **Title**: `[adopter-friction] ` prefix + the top-count class summary, capped at 120 chars AFTER the prefix (marker inclusive), so the stable search key survives a long `--command` shape. Empty log → `no friction recorded (0 records)`; opted-out tree → `opted out — nothing captured (…)`.
+- **Body**: human-readable markdown (counts, local-only dedupe boundary, reporters basis, untrusted-narrative note, one fenced narrative per class) whose FINAL fenced block is `arggon-fingerprint` — one stanza per class with `fingerprint`, `count`, `reporters`, `commandShape`, `errorCode`, `harness`, `majorVersion`, `firstSeen`, `lastSeen`, `arggonVersion`, `os`, `arch`, `node`. No YAML front matter, asserted.
+- **Length bound**: whole URL ≤ 6000 chars (spike-measured 414 ceiling ~8.2 KB). Classes drop off the TAIL (lowest counts) and the drop is stated in the body (`… and N more classes not included … Run arggon friction --report locally`), never silent. At most 10 classes in the body; narrative capped 400 chars per class there.
+- **Label**: `labels=adopter-friction` per the acceptance's URL constant. Caveat recorded in code + PR: an outside adopter lacks the triage permission for the `labels` param to land, so it is best-effort until the repo-side Issue Forms template (ops change, below).
+
+## The opt-out semantics as implemented (keys, precedence, what each gates)
+
+Two keys, one meaning (`lib/src/friction-optout.ts` + `lib/src/convention.ts`):
+
+1. `x-friction: false` in `ArggonManager/.convention.yml` — tree-wide. Scalar spelling is the documented one; the mapping spelling (`x-friction:` + nested `capture:`) is accepted alongside so the section reads like its `x-*` siblings. An unknown nested key is IGNORED (extension policy). A non-boolean scalar (`yes`, `'false'`, `nope`) is a parse error — a quoted boolean denotes the STRING "false", and reading an opt-out out of a string is how an opted-out tree captures anyway.
+2. `ARGGON_NO_FRICTION=1` — per invocation; empty value reads as unset (mirrors `ARGGON_NO_UPDATE_CHECK`, spec-update-channel-023: `opt-out = value !== ""`).
+
+**Precedence**: the per-invocation key WINS over the tree-wide one, mirroring `--no-commit` over `x-tracker.auto-commit` (the narrower scope is the one the operator just typed). There is deliberately NO per-invocation opt-IN: a tree that opted out at the config level re-enables by editing the config, never by an ambient variable.
+
+**What it gates**: CAPTURE only, never DISCOVERABILITY (ADR 0024 §3). Opted out → no record is written (not even the state dir), the capture envelope reports `optedOut: true` and exits 0, `--report` renders empty with `optedOut: true` and the named remediation, and `--tier b` still emits a well-formed URL whose title/body state the opt-out. The trigger text is NOT removed from generated agent files and the command stays on `--help` (asserted by a carrier test). `--clear` is NOT gated (a rollback the operator asked for is not capture).
+
+## Acceptance-box evidence (all 11, each ticked in the live section)
+
+1. `--tier a` default, report only, PATH-stripped — `cli/src/friction-tier-b.test.ts` "tier a (default)" (PATH `""`, all proxy vars blackholed, tokens emptied): report printed, no `issues/new`, no `tier b`, exit 0. Explicit `--tier a` likewise. Live re-run below.
+2. `--tier b` prints the URL — same file, "tier b" describe; URL starts with the exact base and carries `labels=adopter-friction`; report comes first.
+3. Title prefix + ≤120 after prefix — asserted on the built URL (`params.title`), unit-pinned with a 400-char `commandShape`.
+4. Body markdown, final `arggon-fingerprint` fence, no YAML front matter — asserted (`body.startsWith("---")` false; no `---` line anywhere; last fence's info string is `arggon-fingerprint`; body ends ```` ``` ````). Stable fields asserted per stanza.
+5. No tier auto-submits; no code path writes to GitHub — source-level guard test scans the four friction modules for `node:http|undici|node-fetch`, `fetch(`, `"gh"`, `api.github|graphql`; plus the envelope-shape test (publish carries only `body`/`tier`/`title`/`url`; no `issue`/`number`/`html_url`/`created_at`/`api.github` anywhere in the envelope).
+6. `x-friction: false` → nothing written, `--report` empty with `optedOut: true`, exit 0 — CLI test (config fixture `version: 5\nx-friction: false\n`): capture envelope `optedOut: true`, no `record`, zero log lines, state dir never created; human report states `optedOut: true`; `--json` report `{ optedOut: true, count: 0, rows: [] }`.
+7. `ARGGON_NO_FRICTION=1` → same — CLI test; live re-run below.
+8. Opt-out leaves the carrier discoverable — CLI test writes the spec's trigger block verbatim into a generated agent file, runs capture + report, asserts the file bytes and the repo file-set are unchanged, and `friction --help` still lists `--report`.
+9. Unknown nested key ignored / scalar parse error — `cli/src/convention.test.ts` "x-friction" describe: mapping + `future-option: 7` ignored; `x-friction: yes` / `'false'` / `nope` and `capture: yes` all throw `must be a boolean`.
+10. `--clear` — removes log + drop counter, `cleared: N`; idempotent on missing/empty with `cleared: 0` and no state dir created; machine salt survives; unit tests in `lib/src/friction.test.ts` + CLI tests.
+11. Named conflicts — `report-and-capture-mutually-exclusive`, `clear-and-capture-mutually-exclusive`, `report-and-clear-mutually-exclusive`, plus `tier-without-report` and `unknown-tier` for the tier rules; each asserted on both channels.
+
+## Live PATH-stripped evidence (built dist/cli.js, `env -i PATH=""`, empty GH_TOKEN/GITHUB_TOKEN, all proxies blackholed, fixture state dir + seeded 2-record log)
+
+- `friction --report` → report, no URL, exit 0 (expected: tier a is the report only; observed as expected).
+- `friction --report --tier b` → report, then the URL line; title decodes to `[adopter-friction] start --worktree <arg> — START_FAILED (×2 of 1 class)`; body ends with the `arggon-fingerprint` fence; `labels=adopter-friction`; exit 0.
+- `friction --report --tier c --json` → exit 1, `{"reason":"unknown-tier","report":true,…}`.
+- cwd in a fixture tree with `ArggonManager/.convention.yml` = `version: 5\nx-friction: false\n`: capture → `{"optedOut":true,…}` exit 0, no log file on disk; `--report` → `optedOut: true` remediation line, exit 0.
+- `ARGGON_NO_FRICTION=1` capture → `optedOut: true`, exit 0.
+- `--clear --json` → `cleared: 3`; again → `cleared: 0`; `machine-salt` survives.
+
+## Issue Forms template disposition (spike amendment 1)
+
+NOT in this diff. The item's acceptance pins the URL constant to `?title=…&body=…&labels=adopter-friction` and does not require the repo-side template, so per the maker boundary it is recorded as the named OPS CHANGE in the PR description: create the `adopter-friction` label, add `.github/ISSUE_TEMPLATE/adopter-friction.yml` (Issue Forms, claude-code's `bug_report.yml` pattern: `title: "[adopter-friction] "`, `labels: ["adopter-friction"]`), and only then consider emitting `&template=adopter-friction.yml&`. Notably `arggon init` deliberately never writes `.github/ISSUE_TEMPLATE` (asserted in `cli/src/init-docs.test.ts`), so the template is a maintainer ops change, not a generated file. Spike amendment 2 (the carve-out sentence in the trigger block) feeds `task-friction-trigger-carrier` (todo) — the trigger block itself has not landed, so there is nothing to carve out of here. MCP surface, `json-output.md` and `doctor.friction` are T5 (`task-friction-surface-parity-and-docs`) — untouched.
+
+## Gates (declared order)
+
+- `npm run build` → ok (postbuild bundle: 47 modules inlined, 540,886 bytes; `dist/cli.js` rebuilt).
+- `npm test` → 143 files, 3104 tests, all passed.
+- `npm run check:plugin` → exit 0 AFTER the commit (the gate compares the committed bundle to a fresh build; verifying it pre-commit is meaningless on a dirty tree). Committed bundle is byte-identical to the rebuild.
+- `npm run lint` → exit 0. Prettier `--check` clean on every touched file (no format churn).
+- `arggon validate` → ok (0 warnings, convention v5). `arggon doctor --json` reports no generated-doc drift (the `x-generated` checksum for `skills/arggon-cli/SKILL.md` was refreshed for the moved command region, same discipline as T2).
+
+Impact class: behavioral (ADR 0024 §2 / docs/agents.md §Changing the methodology itself) — the agent-facing skill carrier gained the `--report [--tier a|b]` / `--clear` wording in its generated-commands region, with the bundled `.agents/skills` copy byte-equal (skill-copy + skill-generated-commands tests green).
