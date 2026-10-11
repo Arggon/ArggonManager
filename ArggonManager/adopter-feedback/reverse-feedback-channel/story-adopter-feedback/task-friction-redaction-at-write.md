@@ -1,16 +1,19 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-friction-redaction-at-write
 title: Redact friction records at write time (never at render)
+assignee: arggon-delivery-lead
+branch: feat/task-friction-redaction-at-write
 parent: story-adopter-feedback
 labels: [method]
 priority: p1
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-11"
+claimed_at: "2026-10-11T09:28:35.044Z"
 depends_on: [task-friction-capture-command]
+worktree_path: /home/arggon/Projects/ArggonManager-task-friction-redaction-at-write
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-redaction-at-write.md
   Leaves live only under a story. id is the filename stem: task-friction-redaction-at-write.
