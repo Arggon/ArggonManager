@@ -122,3 +122,7 @@ NOT in this diff. The item's acceptance pins the URL constant to `?title=…&bod
 - `arggon validate` → ok (0 warnings, convention v5). `arggon doctor --json` reports no generated-doc drift (the `x-generated` checksum for `skills/arggon-cli/SKILL.md` was refreshed for the moved command region, same discipline as T2).
 
 Impact class: behavioral (ADR 0024 §2 / docs/agents.md §Changing the methodology itself) — the agent-facing skill carrier gained the `--report [--tier a|b]` / `--clear` wording in its generated-commands region, with the bundled `.agents/skills` copy byte-equal (skill-copy + skill-generated-commands tests green).
+
+### handoff 2026-10-11 @arggon-maker — next: Delivery lead reviews PR #724 (gates green, 11/11 acceptance ticked); on merge flip the item to done and take the Issue Forms ops change.
+- branch: feat/task-friction-tier-b-url-and-optout
+- open questions: Owner may prefer the Discussions fallback (one repo setting, named on the spike item); T5 owns MCP parity/json-output/doctor.friction; add &template= after the ops change lands.
