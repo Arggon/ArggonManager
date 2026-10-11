@@ -1,14 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-convention-parser-rejects-valid-yaml-force-rescaffolds
 title: "`parseConventionConfig`'s strict line-parser rejects valid YAML (`allow-steal: true # armed`, a `post-start: |` block scalar, a quoted top-level key), so `init --force` re-derives the file wholesale and discards the adopter's configuration — the loss is reported, but it should not happen"
+assignee: arggon-delivery-lead
+branch: fix/bug-convention-parser-rejects-valid-yaml-force-rescaffolds
 parent: methodology-improvements
 labels: [cli, convention, safety]
 created: "2026-10-11"
 updated: "2026-10-11"
+claimed_at: "2026-10-11T09:06:02.964Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-convention-parser-rejects-valid-yaml-force-rescaffolds
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-convention-parser-rejects-valid-yaml-force-rescaffolds.md
   Leaves live only under a story. id is the filename stem: bug-convention-parser-rejects-valid-yaml-force-rescaffolds.
