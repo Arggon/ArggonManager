@@ -134,3 +134,24 @@ Split argv on whitespace; drop a leading `arggon`; keep flags (including `--flag
 ## Tests — 61 new, 2919 total green
 
 lib/src/friction.test.ts (46) and cli/src/friction.test.ts (15).
+
+### 2026-10-11 @Arggon
+## Per-box evidence (before → after)
+
+1. command exists / one line per invocation — BEFORE: no `friction` command. AFTER: `arggon friction <obs> --command <shape> [--error] [--harness] [--evidence] [--json]`; two invocations leave exactly 2 lines in `<stateBase>/arggon/friction.jsonl` (cli test: 'appends exactly one line per invocation').
+2. caps — BEFORE: n/a. AFTER: narrative 2000, commandShape 200, errorCode 64, harness 32, evidence 4000, env facts 64; a 2500-char narrative stores 2000 chars ending in `…` (never dropped) — kernel tests 'caps narrative at 2000'/'caps commandShape'/'caps errorCode and harness'/'caps evidence'.
+3. fingerprint — BEFORE: n/a. AFTER: 16 hex chars, built only from commandShape/errorCode/harness/majorVersion. 'never derives from the narrative' proves two records with different prose share one fingerprint. NOTE: the U+001F separator is not length-prefixed, so a crafted `--command` containing U+001F CAN forge another tuple's digest. That is the spec's mandated construction; I implemented it verbatim and the test records the boundary rather than asserting a property it does not have. Flagging for the delivery lead / a spec decision.
+4. reporterId — BEFORE: n/a. AFTER: 12 hex chars, stable per state dir + repo path, different salt ⇒ different id; the salt appears in neither record nor stdout (kernel tests + cli test 'writes a human line without --json and never the salt').
+5. ts — BEFORE: n/a. AFTER: `toISOString()` of the kernel clock; round-trips through the one parser used (`new Date(ts).toISOString() === ts`) — test 'emits ISO-8601 UTC and never a locale string'.
+6. v / reader — BEFORE: n/a. AFTER: every record `v: 1`; `readFrictionLog` skips an unknown `v` and reports it in `skippedVersions` instead of failing — test 'skips an unknown v instead of failing the file, and reports it'.
+7. path resolution — BEFORE: n/a. AFTER: `frictionStateBase` returns `ARGGON_STATE_DIR` when set, else the existing `worktreeStateBase`; `mkdir -p` before anything is written — kernel tests 'honors ARGGON_STATE_DIR'/'falls back to the per-OS state base' + cli test 'honors ARGGON_STATE_DIR and falls back to the per-OS base without it'.
+8. failures — BEFORE: n/a. AFTER: empty observation ⇒ `ok:false`, `FRICTION_FAILED`, `reason:"no-observation"`, zero lines written; unwritable log ⇒ `reason:"log-unwritable"` + `path` and the file byte-identical afterwards (cli tests 'fails FRICTION_FAILED / no-observation' and 'fails log-unwritable with the named path and leaves no partial line'). Two extra named reasons were needed and are additive: `no-command-shape` (spec makes commandShape required) and `evidence-unreadable`.
+9. concurrency — BEFORE: n/a. AFTER: two real `node` processes in two worktrees, same `ARGGON_STATE_DIR`, 1900-char narratives: 2 well-formed lines, both parse, equal fingerprints, no splice — cli test 'produce well-formed, non-interleaved lines with equal fingerprints'.
+10. RTL/CJK — BEFORE: n/a. AFTER: Arabic + Hebrew + Japanese + Korean + emoji + combining accents round-trip byte-identical; an astral pair at the 2000-char cut is never split (the cut backs off) — kernel tests 'round-trips an RTL/CJK narrative verbatim' and 'never truncates mid-surrogate-pair'.
+11. rotation — BEFORE: n/a. AFTER: at 5000 lines the oldest is dropped on write, `dropped: 1`, the log stays at exactly 5000 — kernel test 'rotates past 5000 lines' + cli test 'drops the oldest line past 5000 and reports the drop'. A crash-left partial line is terminated on the next append rather than glued onto (test 'drops a partial trailing line from a crashed writer').
+12. no network — BEFORE: n/a. AFTER: capture succeeds with all proxies pointed at a dead port and the record contains no `http`; stdout/stderr asserted empty — cli test 'succeeds with every outbound socket blocked'.
+13. gates — BEFORE: n/a. AFTER: `npm run build` 0, `npm test` 2919/2919 0, `npm run lint` 0, `arggon validate` ok. `npm run check:plugin` reports the regenerated `index.bundle.ts` as uncommitted HERE — expected: the build regenerated it, the bytes are deterministic (regenerating twice is identical), and committing it is what turns the gate green in CI.
+
+## Surface note
+
+No MCP tool and no `tools.arggon.friction` in this PR: `arggon_friction` + `tools.arggon.friction` + `json-output.md` + `doctor.friction` are plan T5's acceptance (`task-friction-surface-parity-and-docs`), and T2/T4 still owe redaction and `--report`/`--clear`/`--tier`/`opt-out`. Shipping a half surface under MCP now would add a tool whose payload changes twice before it is documented.
