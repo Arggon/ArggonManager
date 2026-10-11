@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-friction-dedupe-and-report
 title: Fingerprint dedupe and the friction report renderer
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [method]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T13:00:24.463Z"
 depends_on: [task-friction-capture-command, task-friction-fingerprint-separator-not-length-prefixed]
 worktree_path: /home/arggon/Projects/ArggonManager-task-friction-dedupe-and-report
 ---
@@ -115,3 +114,7 @@ No opt-out keys / `--tier b` (T4), no MCP / `json-output.md` / `doctor` (T5), fi
 ### handoff 2026-10-11 @arggon-maker — next: Delivery lead reviews PR #712, verifies the merge, then flips task-friction-dedupe-and-report to done. T4 (opt-out + --tier b + --clear) can now consume optedOut surfaced by this report.
 - branch: feat/task-friction-dedupe-and-report
 - open questions: dropped counter is cumulative and NOT reset by a future --clear (T4 owns --clear; it should also delete the friction.dropped sidecar); plugin bundle is near the 512KB bound (523689/524288) — T4/T5/T6…
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merge (PR #712)
+
+Reviewed against engineering.md §Review bar. Architecture: the renderer is a pure kernel module (`lib/src/friction-report.ts`) with a single file seam (`readFrictionReport`) behind the house envelope assembler — not a tracker operation; the additive drop-counter sidecar solves the rotation-visibility problem without re-owning T1's 5000-line cap (noted and accepted); `--report` is mutually exclusive with capture with a named reason. Conventions: the `--json` envelope + human renderer mirror T1's call shape; SKILL.md and the convention checksum moved through the documented `skills:sync`, the same mechanical refresh T1 recorded. Evidence travels with the change: Fixture A (×3 differing prose → one row) and Fixture B (near-identical prose, different errorCode → two rows) prove both halves of the fingerprint contract in the renderer, empty-log success and the 50-row explicit-overflow line are tested, unknown-v → skippedVersions and rotation → dropped: N are tested, and every optional signal (`optedOut: null` as explicitly not-yet-computable, dedupeScope, skippedVersions basis) is stated rather than omitted; the maker caught and fixed its own over-indent bug (the narrative renders verbatim — the operator's bytes unaltered). Docs travel with code. Scope stayed on the item (no opt-out keys, no MCP/json-output/doctor). Gates: 3029 tests + build/check:plugin/lint/validate green, CI green. The bundle-ceiling watch note (523689/524288 MAX_BUNDLE_BYTES) is filed as task-plugin-bundle-near-byte-ceiling.
