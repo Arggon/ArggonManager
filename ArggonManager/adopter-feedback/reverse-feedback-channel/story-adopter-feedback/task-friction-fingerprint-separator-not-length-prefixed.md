@@ -115,3 +115,13 @@ Why: a separator delimits by VALUE, so `(a, U+001F‖b, c, d)` and `(a‖U+001F,
 
 - branch: feat/task-friction-fingerprint-separator-not-length-prefixed
 - open questions: Does the reviewer want the exhaustive adversarial-alphabet check moved into a *.property.test.ts file, or is it fine in friction.test.ts? Should a pre-amendment fingerprint ever be re-derived for com…
+- [ ] Decide and record the formula fix: length-prefix each component, or domain-separate (e.g. `sha256("v1|" + ...)` with explicit component boundaries), or record an explicit "keep verbatim formula; accepted ambiguity — <reason>" decision
+- [ ] The decision is recorded in `spec-friction-capture-020` (the normative source) AND reflected in the T1 implementation + its recorded-boundary test, in the SAME change or a follow-up PR that names both items
+- [ ] A test demonstrates the chosen property: two tuples whose components could collide under plain concatenation produce different fingerprints (for the length-prefix/domain-separation options)
+- [ ] Backward compatibility addressed: existing log lines carry `v: 1` fingerprints under the old formula — either the reader continues to read them (grouping across the change degrades gracefully) or the record version bumps with a documented reason
+- [ ] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green
+
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merge (PR #704)
+
+Reviewed against engineering.md §Review bar: the decision (length-prefix, Option A) is argued, not asserted — a separator delimits by value (the exact forge), a length prefix delimits by count; Option B is shown to name the same guarantee and C is rejected on the record. The spec (the normative source) is amended with the old formula kept verbatim, the new encoding, the ambiguity argument and the rejected alternatives — documentation travels with the behavior change, and the impact class (behavioral) is stated in the PR. Evidence travels: the boundary-recording test became a real property test that first asserts the old pair really is byte-identical under the old encoding (so the property is about that ambiguity), plus an exhaustive 4-alphabet 256-tuple check and a fast-check injectivity run; the backward-compatibility decision (v stays 1; the reader never recomputes — a log spanning the change shows one class as two rows, a count split, never a wrong merge) is recorded in the spec and asserted end-to-end in the reader test. Scope stayed on the item. Gates + CI green. Confirmed: the depends_on edge and the done flips riding this PR are my intended tracker state.
