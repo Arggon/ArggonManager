@@ -44,9 +44,9 @@ x-generated:
     generatedAt: "2026-10-10T00:41:12.326Z"
   .agents/skills/arggon-upgrade/SKILL.md:
     template: "skills/arggon-upgrade/SKILL.md"
-    checksum: "sha256:73a65eb3b3fb3b0ca0d9d9c8bc6a113cd3a9fbc2871c63626c798b7b4db1ef8d"
+    checksum: "sha256:dfaefcd25f116aa7984edf3a7d4c8548918613c9d7a96c063070e6e4de579871"
     arggonVersion: "0.6.0"
-    generatedAt: "2026-10-10T00:41:12.326Z"
+    generatedAt: "2026-10-11T08:03:28.000Z"
   .editorconfig:
     template: "docs/editorconfig"
     checksum: "sha256:13683ae1820c1cf4ef46cc076940c7b43c7e895890ea93dfb885029163793698"
