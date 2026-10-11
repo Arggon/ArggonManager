@@ -12,7 +12,6 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T09:06:06.254Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-native-guard-silent-without-worktree-declaration
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-native-guard-silent-without-worktree-declaration.md
   Leaves live only under a story. id is the filename stem: bug-native-guard-silent-without-worktree-declaration.
@@ -104,3 +103,28 @@ unsourced session"` drives the incident state (session bound to checkout A, work
 - Impact class: **behavioral** (ADR 0016) — an agent's operating contract changes (a silent
   write now reports; docs change), no envelope schema change (`schemaVersion: 1` unchanged,
   no new fields).
+
+### 2026-10-11 @ses_ed571bfafffe0DJ8dqvMYrw67y
+Maker evidence (arggon-maker, 2026-10-11) — PR #706, branch fix/bug-native-guard-silent-without-worktree-declaration. Impact class: behavioral (ADR 0016) — an agent's operating contract changes; no envelope schema change (no new fields, schemaVersion 1).
+
+WHAT LANDED
+1. The claim footprint is a third declaration source: for an item-scoped call (update/show/comment/handoff) that declares nothing, the sibling worktrees of the resolved checkout are scanned (git worktree list --porcelain, ≤64 roots, one bounded .arggon.env read each) for one whose ARGON_ITEM names the call's item; that worktree becomes the expectation. Established by the dispatch surface — start --worktree already writes that .arggon.env at claim time — so the expectation exists before the worker's first write, nothing sourced.
+2. Disposition (decided explicitly, recorded in docs/opencode2.md §The binding guard → Design decision): a CALLER-declared disagreement still REFUSES a write (TRACKER_ROOT_MISMATCH, unchanged); a claim-footprint disagreement is REPORTED on every item-scoped envelope, read or write (trackerRoot + trackerRootMismatch naming the claiming worktree and the file its declaration was read from). Why report and not refuse: the claim's own lifecycle legitimately writes from the canonical checkout — the post-merge terminal flip (/arggon-done) and the unclaim of a dropped claim both run update from the primary while the worktree still exists, and moving the session would land those on an already-merged branch. Measured, not assumed: with a refusing footprint, 26 of the repo's own lifecycle tests (W4 cleanup, native release, compose parity) fail on their arrange phase. Recovery path survives: reads never refuse, the CLI is native-guard-free and always complete, and a checkout with no claiming worktree anywhere stays byte-identical to the CLI. Exempt by shape: start/branch/cleanup are never held to the footprint; the pool reads name no item.
+3. agents.md §Orchestration rule 1: no longer the ONLY protection (the write now reports), still load-bearing (a report informs, it does not reroute) — stated plainly in the doc.
+4. Design decision recorded as a doc line in docs/opencode2.md (who declares, when, what a legitimate unsourced primary write looks like, bounds, exemptions) — the item's scope excludes a new ADR file, so the doc line is the chosen carrier.
+
+GATES (command / expected / observed / exit)
+- npm run build / 0 / 0 (postbuild rebuilt the bundle; then npm run check:plugin on the committed tree / bundle matches source / exit 0)
+- npm test (vitest run) / green baseline 136 files 2949 tests / 136 files, 2958 tests passed / 0
+- npm run smoke:native-start-cold / pass (start/worktree path touched by the guard) / passed — no smoke change needed: the move leg still commits in the worktree, the negative leg still refuses SESSION_ROOT_UNRESOLVED, start legs attach as before / 0
+- npx prettier --check on every touched file / clean / clean / 0
+- npm run lint / 0 / 0
+- npm run arggon -- validate / ok / ok (0 warnings, convention v5) / 0
+
+REGRESSION EVIDENCE
+opencode/plugins/arggon/tools.test.ts → "the claim footprint declares for an unsourced session" (8 tests) drives the incident state — session bound to checkout A (primary), worktree B claiming the item, NOTHING sourced: the write reports trackerRoot + trackerRootMismatch (declared: [B], sources: [B/.arggon.env]) instead of proceeding silently, lands where the session resolved, never silently redirects into the worktree; the same read reports it; the caller-declared refusal is unchanged once a declaration IS sourced; the claim's own lifecycle still works from the canonical checkout (post-merge flip reported and landed; start attaches, never held to the footprint); pool reads (list/next) stay byte-identical; the scan pins the porcelain parser, hit/miss/skip-the-resolved-root, the 64-root bound and the degrade-when-git-cannot-answer path. Measured mutation signal: neutralizing trackerRootMismatch fails 10 of the 22 binding tests (5 caller-declared, 4 claim-footprint, 1 parsing); the survivors pin deliberately unchanged behavior.
+
+NOT DONE / FINDINGS FOR THE LEAD
+- docs/json-output.md §native receipt fields now under-describes the footprint case ("No declaration anywhere … means no expectation"; "on a write it is refused instead"): true for the CLI surface that file documents, incomplete for the native footprint. OUTSIDE this item's file scope (opencode2.md is the doc carrier here and is updated) — reported, not touched.
+- repo-root README's sourced-.arggon.env pairing is documented as the way to declare; it stays supported but is no longer load-bearing. Not restated (README outside scope).
+- The item body's "three faces" note (faces 1 and 3: claim pool from main, reap blind to worktree_path-less done items) is explicitly NOT covered here; face 2 (read path / this guard) is.
