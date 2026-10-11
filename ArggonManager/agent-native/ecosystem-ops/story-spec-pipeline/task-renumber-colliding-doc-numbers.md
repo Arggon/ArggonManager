@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-renumber-colliding-doc-numbers
 title: "Renumber the 5 live doc-number collisions in this corpus (exploration -001 x2, spec -001/-015, plan -001/-015) plus every citation"
+assignee: arggon-delivery-lead
+branch: feat/task-renumber-colliding-doc-numbers
 parent: story-spec-pipeline
 labels: [spec-pipeline, docs]
 created: "2026-10-03"
-updated: "2026-10-03"
+updated: "2026-10-11"
+claimed_at: "2026-10-11T04:18:59.442Z"
 depends_on: [bug-spec-analyze-does-not-detect-duplicate-doc-numbers]
+worktree_path: /home/arggon/Projects/ArggonManager-task-renumber-colliding-doc-numbers
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/task-renumber-colliding-doc-numbers.md
