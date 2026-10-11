@@ -8944,7 +8944,7 @@ function linkedWorkspacePackages(primaryRoot, worktreePath) {
 __arggonModules.set("opencode/plugins/arggon/board.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_SELECTION_MARK = exports.BOARD_SELECTION_PAGE = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_TYPE_BADGES = exports.ARGON_BOARD_PANEL = void 0;
+exports.BOARD_HIERARCHY_CHILD_KEYS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_SELECTION_MARK = exports.BOARD_SELECTION_PAGE = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_TYPE_BADGES = exports.ARGON_BOARD_PANEL = void 0;
 exports.boardRoot = boardRoot;
 exports.emptyBoardSnapshot = emptyBoardSnapshot;
 exports.activeBoardId = activeBoardId;
@@ -8959,6 +8959,8 @@ exports.clipBoardLine = clipBoardLine;
 exports.boardHeaderLine = boardHeaderLine;
 exports.boardCountsLine = boardCountsLine;
 exports.boardItemLine = boardItemLine;
+exports.boardParentId = boardParentId;
+exports.boardChildrenOf = boardChildrenOf;
 exports.boardItemDetail = boardItemDetail;
 exports.boardDetailLines = boardDetailLines;
 exports.boardTreeLines = boardTreeLines;
@@ -9155,6 +9157,21 @@ function boardItemLine(entry, options = {}) {
 }
 exports.BOARD_DETAIL_MAX_ROWS = 16;
 exports.BOARD_DETAIL_MAX_LINE_CHARS = 200;
+exports.BOARD_HIERARCHY_CHILD_KEYS = 9;
+function boardParentId(items, id) {
+    const wanted = id.trim();
+    if (wanted === "")
+        return null;
+    const item = items.find((entry) => entry.id === wanted);
+    const parent = (item?.parent ?? "").trim();
+    return parent === "" ? null : parent;
+}
+function boardChildrenOf(items, id) {
+    const wanted = id.trim();
+    if (wanted === "")
+        return [];
+    return (0, lib_1.sortById)(items.filter((entry) => (entry.parent ?? "").trim() === wanted));
+}
 function acceptanceRenderRows(item) {
     return (0, lib_1.acceptanceRows)((0, lib_1.acceptanceBody)(item)).map((row) => {
         const mark = row.checked ? "x" : " ";
@@ -9196,6 +9213,8 @@ function boardItemDetail(cwd, id, options = {}) {
         acceptanceDone: 0,
         acceptanceTotal: 0,
         truncated: false,
+        parent: null,
+        children: [],
         error: (0, lib_1.sanitizeHumanError)(error),
     });
     if (requested === "")
@@ -9208,6 +9227,32 @@ function boardItemDetail(cwd, id, options = {}) {
         const shownAcceptance = acceptance.slice(0, budget);
         const shownBody = body.slice(0, Math.max(budget - shownAcceptance.length, 0));
         const row = (value) => clipBoardLine((0, lib_1.sanitizeHumanTextUncapped)(value), exports.BOARD_DETAIL_MAX_LINE_CHARS);
+        const link = (item) => ({
+            id: (0, lib_1.sanitizeHumanTextUncapped)(item.id),
+            title: (0, lib_1.sanitizeHumanTextUncapped)(item.title),
+            status: item.status,
+            missing: false,
+        });
+        const snapshotItems = options.items ?? boardSnapshot(cwd).items;
+        const parentId = snapshotItems.length > 0
+            ? boardParentId(snapshotItems, requested)
+            : (shown.item.parent ?? "").trim() || null;
+        const byId = snapshotItems.length > 0
+            ? new Map(snapshotItems.map((entry) => [entry.id, entry]))
+            : new Map();
+        const parent = parentId === null
+            ? null
+            : byId.get(parentId) !== undefined
+                ? link(byId.get(parentId))
+                : {
+                    id: (0, lib_1.sanitizeHumanTextUncapped)(parentId),
+                    title: null,
+                    status: null,
+                    missing: true,
+                };
+        const children = snapshotItems.length > 0
+            ? boardChildrenOf(snapshotItems, requested).map(link)
+            : [];
         return {
             id: requested,
             title: (0, lib_1.sanitizeHumanTextUncapped)(shown.item.title ?? requested),
@@ -9217,6 +9262,8 @@ function boardItemDetail(cwd, id, options = {}) {
             acceptanceDone: criteria.filter((entry) => entry.checked).length,
             acceptanceTotal: criteria.length,
             truncated: acceptance.length + body.length > budget,
+            parent,
+            children,
             error: null,
         };
     }
@@ -9231,6 +9278,29 @@ function boardDetailLines(detail, options = {}) {
         return [clip(`  ┌ argon detail · ${detail.id}`), clip(`  └ ${detail.error}`)];
     }
     const lines = [clip(`  ┌ argon detail · ${detail.id} — ${detail.title ?? detail.id}`)];
+    const safe = (value) => (0, lib_1.sanitizeHumanTextUncapped)(value);
+    const parentRow = detail.parent === null
+        ? "parent: none"
+        : detail.parent.missing
+            ? `parent: ${safe(detail.parent.id)} (missing) [p]`
+            : `parent: ${safe(detail.parent.id)} — ${safe(detail.parent.title ?? detail.parent.id)}${detail.parent.status !== null ? ` (${detail.parent.status})` : ""} [p]`;
+    lines.push(clip(`  │ ${parentRow}`));
+    if (detail.children.length === 0) {
+        lines.push(clip("  │ children: none"));
+    }
+    else {
+        lines.push(clip(`  │ children (${detail.children.length}):`));
+        const shown = detail.children.slice(0, Math.max(exports.BOARD_HIERARCHY_CHILD_KEYS, 0));
+        shown.forEach((child, index) => {
+            const label = child.missing
+                ? `${safe(child.id)} (missing)`
+                : `${safe(child.id)} — ${safe(child.title ?? child.id)}${child.status !== null ? ` (${child.status})` : ""}`;
+            lines.push(clip(`  │   [${index + 1}] ${label}`));
+        });
+        const hidden = detail.children.length - shown.length;
+        if (hidden > 0)
+            lines.push(clip(`  │   … +${hidden} more — walk the tree`));
+    }
     const row = (value) => (value === "" ? "  │" : `  │ ${value}`);
     for (const entry of detail.acceptance)
         lines.push(clip(row(entry)));
@@ -9325,7 +9395,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.TRACKER_ROOT_MISMATCH = exports.PROCESS_ENV_SOURCE = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
+exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardParentId = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.boardChildrenOf = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_HIERARCHY_CHILD_KEYS = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.TRACKER_ROOT_MISMATCH = exports.PROCESS_ENV_SOURCE = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
 exports.isArggonItemId = isArggonItemId;
 exports.parseArggonItemFromCommand = parseArggonItemFromCommand;
 exports.parseArggonItemFromCode = parseArggonItemFromCode;
@@ -12442,17 +12512,20 @@ var board_js_1 = require("./board.js");
 Object.defineProperty(exports, "ARGON_BOARD_PANEL", { enumerable: true, get: function () { return board_js_1.ARGON_BOARD_PANEL; } });
 Object.defineProperty(exports, "BOARD_DETAIL_MAX_LINE_CHARS", { enumerable: true, get: function () { return board_js_1.BOARD_DETAIL_MAX_LINE_CHARS; } });
 Object.defineProperty(exports, "BOARD_DETAIL_MAX_ROWS", { enumerable: true, get: function () { return board_js_1.BOARD_DETAIL_MAX_ROWS; } });
+Object.defineProperty(exports, "BOARD_HIERARCHY_CHILD_KEYS", { enumerable: true, get: function () { return board_js_1.BOARD_HIERARCHY_CHILD_KEYS; } });
 Object.defineProperty(exports, "BOARD_SELECTION_MARK", { enumerable: true, get: function () { return board_js_1.BOARD_SELECTION_MARK; } });
 Object.defineProperty(exports, "BOARD_SELECTION_PAGE", { enumerable: true, get: function () { return board_js_1.BOARD_SELECTION_PAGE; } });
 Object.defineProperty(exports, "BOARD_STATUS_MARKS", { enumerable: true, get: function () { return board_js_1.BOARD_STATUS_MARKS; } });
 Object.defineProperty(exports, "BOARD_STATUS_ORDER", { enumerable: true, get: function () { return board_js_1.BOARD_STATUS_ORDER; } });
 Object.defineProperty(exports, "BOARD_TYPE_BADGES", { enumerable: true, get: function () { return board_js_1.BOARD_TYPE_BADGES; } });
 Object.defineProperty(exports, "activeBoardId", { enumerable: true, get: function () { return board_js_1.activeBoardId; } });
+Object.defineProperty(exports, "boardChildrenOf", { enumerable: true, get: function () { return board_js_1.boardChildrenOf; } });
 Object.defineProperty(exports, "boardCountsLine", { enumerable: true, get: function () { return board_js_1.boardCountsLine; } });
 Object.defineProperty(exports, "boardDetailLines", { enumerable: true, get: function () { return board_js_1.boardDetailLines; } });
 Object.defineProperty(exports, "boardHeaderLine", { enumerable: true, get: function () { return board_js_1.boardHeaderLine; } });
 Object.defineProperty(exports, "boardItemDetail", { enumerable: true, get: function () { return board_js_1.boardItemDetail; } });
 Object.defineProperty(exports, "boardItemLine", { enumerable: true, get: function () { return board_js_1.boardItemLine; } });
+Object.defineProperty(exports, "boardParentId", { enumerable: true, get: function () { return board_js_1.boardParentId; } });
 Object.defineProperty(exports, "boardRoot", { enumerable: true, get: function () { return board_js_1.boardRoot; } });
 Object.defineProperty(exports, "boardSnapshot", { enumerable: true, get: function () { return board_js_1.boardSnapshot; } });
 Object.defineProperty(exports, "boardTreeEntries", { enumerable: true, get: function () { return board_js_1.boardTreeEntries; } });
@@ -12471,7 +12544,10 @@ exports.default = definition;
 const __arggonEntry = __arggonRequire("opencode/plugins/arggon/index.ts", undefined)
 export default __arggonEntry.default
 export const ARGON_BOARD_PANEL = __arggonEntry.ARGON_BOARD_PANEL
+export const BOARD_HIERARCHY_CHILD_KEYS = __arggonEntry.BOARD_HIERARCHY_CHILD_KEYS
+export const boardChildrenOf = __arggonEntry.boardChildrenOf
 export const boardItemDetail = __arggonEntry.boardItemDetail
+export const boardParentId = __arggonEntry.boardParentId
 export const boardSnapshot = __arggonEntry.boardSnapshot
 export const boardTreeLines = __arggonEntry.boardTreeLines
 export const emptyBoardSelection = __arggonEntry.emptyBoardSelection
