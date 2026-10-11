@@ -319,7 +319,24 @@ Non-trivial items are **orchestrated by default**: the delivery lead delegates t
   1. **Move the session, then confirm it.** After `opencode.session_move`, one read settles it: `tools.arggon.show({ id, meta: true })` must answer with the item's claimed state (`status: in_progress` + `assignee` + `branch`). If it answers `todo` with no assignee, the session is still bound to the primary — move it, do not start writing.
   2. **Never rely on the write to report where it landed.** When a worktree is involved the envelope carries `trackerRoot` (the checkout that answered), `trackerWorktree` (the `.arggon.env` identity read from it — spec [worktree-env-contract-016](specs/spec-worktree-env-contract-016.md)) and, when the caller declares a worktree the call did not resolve into, `trackerRootMismatch`. A **write** in that state is **refused** with `error.code: "TRACKER_ROOT_MISMATCH"` naming the resolved-vs-expected mismatch; a **read** reports it instead of failing, so the state is detectable without a mutation. The remedy is named in the refusal: move the session into the declared worktree, or clear the stale declaration.
 
-  Sourcing a worktree's `.arggon.env` (the pairing the README documents) is what gives the seam an expectation to hold the resolution against — an unsourced session has no declaration, so the guard stays silent and rule 1 is the only thing protecting it.
+  Sourcing a worktree's `.arggon.env` (the pairing the README documents) is ONE
+  way to give the seam an expectation — it is no longer the only one, and it is
+  no longer load-bearing. Since bug-native-guard-silent-without-worktree-declaration
+  the **claim itself declares**: `start --worktree` writes the worktree's
+  `.arggon.env` at claim time, and an item-scoped call that declares nothing
+  reads that footprint from the sibling worktrees of the resolved checkout
+  (`git worktree list`, keyed by the call's item id). A write from an unsourced,
+  unmoved session to an item whose claim lives in a worktree therefore
+  **reports** `trackerRoot` + `trackerRootMismatch` — the claiming worktree named,
+  with the file its declaration was read from — instead of proceeding silently:
+  the state the incident hid now rides every item-scoped envelope, read or write.
+  It reports rather than refuses because the claim's own lifecycle legitimately
+  writes from the canonical checkout (the post-merge terminal flip, the unclaim
+  of a dropped claim); the decision, its bounds and the exemptions are in
+  [opencode2.md](opencode2.md) §The binding guard → Design decision. **Rule 1 is
+  still load-bearing** — a report tells you a write landed in the wrong place, it
+  does not reroute it — but it is no longer the only thing protecting the
+  unsourced case.
 
 - **Evidence harness**: `npm run smoke:opencode:wave` runs headless `opencode run` sessions on a fixture with a **local bare remote** — permission probes (standards reviewer edit denied, maker subagent denied, delivery-lead allow-list), then a scripted four-phase wave (plan → two foreground makers in disjoint worktrees → reviewer verdicts → merge verification and done flips) and the run's context accounting. Separate from `npm test` and from `npm run smoke:opencode`; both are **model-driven and timing sensitive — run each one alone**, never beside a test suite or another headless harness (a stalled provider call can leave a scenario half-done past the per-command timeout); exits 0 with `skipped: opencode not installed` when the binary is absent.
 - **Deterministic native-start gate**: `npm run smoke:native-start-cold` is the model-free, offline counterpart for the worktree path itself (needs `npm run build` first): on a disposable fixture it proves a dependency-requiring `pre-commit` gate fails in a cold worktree, then drives the real `tools.arggon.start` seam and requires a bounded readiness/claim-commit receipt, a claim commit containing only the item file, a deterministic re-run attach, and untouched primary installs. Run it whenever `start`/worktree behavior changes — it needs no provider, so it is safe beside anything and it complements (never replaces) the wave transcripts above.
