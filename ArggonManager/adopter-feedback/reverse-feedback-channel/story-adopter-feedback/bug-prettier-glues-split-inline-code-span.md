@@ -1,15 +1,18 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-prettier-glues-split-inline-code-span
 title: "prettier is non-idempotent on Markdown: a multi-word inline code span near the wrap boundary gets split and its continuation glued to column 0"
+assignee: arggon-delivery-lead
+branch: fix/bug-prettier-glues-split-inline-code-span
 parent: story-adopter-feedback
 labels: [docs, formatter]
 priority: p3
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-11"
+claimed_at: "2026-10-11T11:00:48.832Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-prettier-glues-split-inline-code-span
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/bug-prettier-glues-split-inline-code-span.md
   Leaves live only under a story. id is the filename stem: bug-prettier-glues-split-inline-code-span.
