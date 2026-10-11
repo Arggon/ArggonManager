@@ -511,6 +511,111 @@ describe("init --force and the convention's x-* extensions (bug-init-force-drops
     });
   });
 
+  // The apply path is where the item lives: nothing above drives the CLI
+  // surface, so before this change `arggon init --force` printed nothing about
+  // what it kept and `--force --json` dropped the report entirely — the
+  // in-process report was unreachable for every real caller (`runInit` has no
+  // MCP tool and no library export).
+  it("the CLI apply path reports it: --force --json carries the report and the human run names it", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-cli-"));
+    armTree(dir);
+    gitInit(dir);
+
+    const json = runCli(["init", "--force", "--json", dir], dir);
+    expect(json.status, json.stderr).toBe(0);
+    const body = JSON.parse(json.stdout) as {
+      ok: boolean;
+      convention?: { preserved: string[]; replaced: string[]; rescaffolded: boolean };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.convention).toEqual({
+      preserved: ["version", "branch_patterns", "x-tracker", "x-views"],
+      replaced: ["x-generated"],
+      rescaffolded: false,
+    });
+
+    // Human output names what the forced write kept and replaced.
+    const human = runCli(["init", "--force", dir], dir);
+    expect(human.status, human.stderr).toBe(0);
+    expect(human.stdout).toContain(
+      "arggon init: .convention.yml preserved version, branch_patterns, x-tracker, x-views; " +
+        "replaced x-generated",
+    );
+
+    // And the armed flags are still armed after the CLI's own forced run.
+    const after = readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8");
+    const config = parseConventionConfig(after);
+    expect(config.tracker.allowSteal).toBe(true);
+    expect(config.tracker.reapAckedOrphans).toBe(true);
+  });
+
+  it("a run that force-re-scaffolds nothing carries no convention key (fresh scaffold, idempotent re-init)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-nokey-"));
+    const fresh = runCli(["init", "--json", dir], dir);
+    expect(fresh.status, fresh.stderr).toBe(0);
+    const body = JSON.parse(fresh.stdout) as { ok: boolean; convention?: unknown };
+    expect(body.ok).toBe(true);
+    expect(body.convention).toBeUndefined();
+    expect("convention" in body).toBe(false);
+
+    // Already initialized, no --force: the convention file is not rewritten.
+    const again = runCli(["init", "--json", dir], dir);
+    expect(again.status, again.stderr).toBe(0);
+    const second = JSON.parse(again.stdout) as { ok: boolean; convention?: unknown };
+    expect(second.ok).toBe(true);
+    expect("convention" in second).toBe(false);
+  });
+
+  it("the CLI apply path names the exception: a file this arggon cannot read is re-derived, on both surfaces", () => {
+    // F2 characterization, pinned where the follow-up will find it: valid YAML
+    // (an inline comment is legal there) that this arggon's strict line
+    // parser rejects, so the whole file is re-derived from the scaffold.
+    // One fixture per run: the first forced run repairs the file, so a second
+    // run on the same tree is an ordinary preserve and would say so.
+    const unreadable = (dir: string): void => {
+      mkdirSync(join(dir, "ArggonManager"), { recursive: true });
+      writeFileSync(
+        join(dir, "ArggonManager/.convention.yml"),
+        "x-tracker:\n  allow-steal: true # armed\n",
+        "utf8",
+      );
+    };
+    const expected = { preserved: [], replaced: ["x-generated"], rescaffolded: true };
+
+    const previewDir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-cli-bad-dry-"));
+    unreadable(previewDir);
+    const dry = runCli(["init", "--force", "--dry-run", "--json", previewDir], previewDir);
+    expect(dry.status, dry.stderr).toBe(0);
+    const preview = JSON.parse(dry.stdout) as {
+      convention?: { preserved: string[]; replaced: string[]; rescaffolded: boolean };
+    };
+    expect(preview.convention).toEqual(expected);
+    // Pure read: the unreadable file is still exactly as the adopter left it.
+    expect(readFileSync(join(previewDir, "ArggonManager/.convention.yml"), "utf8")).toBe(
+      "x-tracker:\n  allow-steal: true # armed\n",
+    );
+
+    const jsonDir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-cli-bad-json-"));
+    unreadable(jsonDir);
+    const json = runCli(["init", "--force", "--json", jsonDir], jsonDir);
+    expect(json.status, json.stderr).toBe(0);
+    const body = JSON.parse(json.stdout) as {
+      convention?: { preserved: string[]; replaced: string[]; rescaffolded: boolean };
+    };
+    expect(body.convention).toEqual(expected);
+
+    // The human line names the wholesale replacement instead of saying
+    // nothing: the rescaffold is the one arm where configuration IS lost.
+    const humanDir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-cli-bad-human-"));
+    unreadable(humanDir);
+    const human = runCli(["init", "--force", humanDir], humanDir);
+    expect(human.status, human.stderr).toBe(0);
+    expect(human.stdout).toContain(
+      "arggon init: .convention.yml could not be read by this arggon — re-derived from " +
+        "the scaffold; its previous configuration was NOT preserved",
+    );
+  });
+
   it("does not drop the docs' x-generated provenance either: a modified doc stays skipped under force and keeps its state entry", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-docs-"));
     runInit({ dir, force: false, full: true, now: NOW });
