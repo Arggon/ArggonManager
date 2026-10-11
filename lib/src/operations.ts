@@ -50,6 +50,7 @@ import {
   type FrictionOptions,
   type FrictionRecord,
 } from "./friction.js";
+import { readFrictionReport, type FrictionReport } from "./friction-report.js";
 import { runShow, type ShowComment, type ShowOptions } from "./show.js";
 import { runSync } from "./sync-command.js";
 import type { SyncFilled, SyncResult } from "./sync-types.js";
@@ -635,6 +636,70 @@ export function frictionOperation(opts: FrictionOperationOptions): CommandOutcom
       };
     }
     return fail("friction", cwd, "FRICTION_FAILED", err);
+  }
+}
+
+/**
+ * `arggon friction --report` — the fingerprint-dedupe report (plan task T3).
+ *
+ * Like capture, deliberately NOT a tracker operation: it reads the local log
+ * and its drop counter, loads no items and commits nothing (the log is not the
+ * tracker). The envelope carries the whole `FrictionReport` flattened onto the
+ * house base — the same rows the human renderer prints, plus the honesty
+ * signals (`dropped`, `skippedVersions`, `malformed`, `optedOut`) so a machine
+ * sees exactly what a human does. Rows are NOT capped here: the 50-row cap and
+ * the "… and N more classes" line are a human-channel concern
+ * ({@link renderFrictionReport}); `--json` is the complete contract.
+ *
+ * An empty or missing log is success with `count: 0` and `classes: 0`, matching
+ * `list`'s zero-match contract — empty is not an error.
+ */
+export type FrictionReportOperationOptions = {
+  cwd: string;
+  /** Environment for the state-base resolution; defaults to `process.env`. */
+  env?: NodeJS.ProcessEnv;
+  /** Home override; defaults to `os.homedir()`. */
+  home?: string;
+};
+
+export type FrictionReportPayload = FrictionReport & {
+  /** Discriminant that marks this envelope as a report, not a capture. */
+  report: true;
+  /** Absolute log path the report was derived from (the operator's own state). */
+  path: string;
+};
+
+export function frictionReportOperation(
+  opts: FrictionReportOperationOptions,
+): CommandOutcome<FrictionReportPayload> {
+  try {
+    const report = readFrictionReport({ env: opts.env, home: opts.home });
+    const payload: FrictionReportPayload = {
+      report: true,
+      path: frictionLogPath(opts.env ?? process.env, opts.home ?? homedir()),
+      ...report,
+    };
+    return succeed("friction", payload, readConventionVersion(opts.cwd));
+  } catch (err) {
+    if (err instanceof FrictionError) {
+      return {
+        ok: false,
+        envelope: failEnvelope({
+          command: "friction",
+          message: err.message,
+          code: "FRICTION_FAILED",
+          conventionVersion: readConventionVersion(opts.cwd),
+          payload: {
+            report: true,
+            reason: err.reason,
+            ...(err.path !== undefined ? { path: err.path } : {}),
+          },
+        }) as KernelFailureEnvelope<FrictionReportPayload>,
+        exitCode: 1,
+        error: err,
+      };
+    }
+    return fail("friction", opts.cwd, "FRICTION_FAILED", err);
   }
 }
 
