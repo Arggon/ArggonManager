@@ -54,3 +54,51 @@ because the index silently rotted three times.
 - [ ] A deliberate escape hatch: an inline marker or an explicit allow-list, documented, so a genuinely undocumented-by-design option is possible and visible in review
 - [ ] `npx prettier --check` clean; `arggon validate` + `npm test` green
 - [ ] The test reads the doc and the source, not a copy of either — a guard that restates the list in the test is the same bug one level down
+
+### 2026-10-11 @ses_ed4c5d320ffeScEzxxks3AMgTV
+verdict: approve (drift guard + 3 doc clauses)
+
+## What I read
+
+- `git -C /home/arggon/Projects/ArggonManager-bug-x-tracker-option-list-has-no-doc-drift-guard diff main...HEAD` (3 non-tracker files: the new 397-line test, 3 clause edits to `ArggonManager/docs/convention.md`, plus the item file).
+- The kernel: `lib/src/convention.ts` — `TrackerConfig`/`PlaybooksConfig`/`ImportConfig`/`WorktreeConfig`/`GitHubConfig` declarations (L48-180), the runtime default objects (L341-363), and every `if (section === "x-…")` parse block (L429-680).
+- `ArggonManager/docs/convention.md` §Saved views / §Technology playbooks / §Tracker hygiene / §Import type mapping / §Worktree bootstrap / §Issue round-trip / §Generated-doc provenance (L506-660).
+- `templates/docs/docs/convention.md:71` (the adopter template's "full normative reference lives in the ArggonManager repository" deferral).
+
+## What I checked, expected vs observed
+
+**(a) Derives from the kernel and the doc, restates nothing.** Expected: option names come from the kernel, never from a list in the test. Observed: `readKernelSections` walks the kernel text for `key [!=]== "…"` branches under each `if (section === "x-…")` dispatch; `typeMembers` reads the exported type declaration; `documentedOptions` slices the doc's own "the official options today are …" sentence; `documentedBooleans` slices the doc's own `or an \`k\` … value that is not \`true\`/\`false\`` window. The only literals are the `SECTIONS` table (section key ↔ kernel type ↔ projection — structure, no option names), `UNGUARDED_SECTIONS` and the marker string. I traced all 18 assertions by hand:
+
+| Section | type members | parser read-keys | default-object keys |
+| --- | --- | --- | --- |
+| `x-tracker` | 6 | 6 (allow-steal, strict-gate-bins, strict-worktree-writes, product-acceptance, reap-acked-orphans, auto-commit) | 6 |
+| `x-playbooks` | 1 | 1 | 1 |
+| `x-import` | 1 | 1 | 1 |
+| `x-worktree` | 4 | 4 | 4 |
+| `x-github` | 1 | 1 | 1 |
+
+All three faces agree on every section, and `typeMembers`' boolean members = the parser's `'…' must be a boolean` validations on every section. Rule 1 is real, not decorative.
+
+**(b) The boolean window, both directions.** Expected: a boolean option outside the doc sentence fails, and a doc-named non-boolean fails. Observed: `BOOLEAN_WINDOW` is anchored on the doc's own wording, and the assertion is `toEqual` over the exact set — both directions. I confirmed the two real gaps the maker claims the guard found: before the edit, §Worktree bootstrap's parse-error sentence carried no boolean window at all while the kernel validates `env` as boolean ([`lib/src/convention.ts:592`], "\`'env' must be a boolean\`"), and §Issue round-trip likewise for `issue-roundtrip`. Both would have failed. The completions are the minimal correct fix, not a decoration.
+
+**(c) The escape hatch is real, documented and discriminating.** Expected: a marker that cannot silently exempt a new option. Observed: `undocumented-by-design` appears nowhere in `lib/src/convention.ts` today (grep: 0 hits outside the test), so no option is currently laundered. The doc's new §Tracker hygiene bullet names the marker, the test file, and that documenting is the default. The premise test builds synthetic branches — `documented-option` unmarked, `legacy-alias` carrying the marker, `typed-option` boolean-validated and unmarked — and asserts `exempt` is true for exactly the marked one. I traced the walk: it fails if the marker were ignored, and fails if it were applied to the whole block rather than the one line. Discrimination confirmed by reading.
+
+**(d) `x-views` / `x-generated` exclusions.** Expected: honest, not a hole. Observed: honest. `x-views`'s parser reads `views[key] = expr` over an open vocabulary — there is genuinely no kernel-owned option list to derive, and the guard's own section test forces any new `### … (\`x-name\`)` section to join `SECTIONS` **or** `UNGUARDED_SECTIONS` with a reason, so the exclusion table cannot rot into a silent widening. `x-generated` does have a fixed key set (`projectName`, `template`, `checksum`, `arggonVersion`, `generatedAt`, `acknowledged`) but it is machine-written state with no adopter-facing enumeration sentence in the doc, so there is nothing to derive against; the exclusion is a defensible judgment call and it is named rather than implied.
+
+**(e) `x-github` widening.** Expected: justified or creep. Observed: justified. The acceptance row asked for the four named namespaces "if the derivation is cheap; if not, say so in the item". The derivation was cheap and uniform, the maker said so in the item, and `x-github` has the identical shape to `x-worktree` — leaving it a known hole one clause down is precisely the PR #637 failure mode this item exists to close. Cost: one doc line. `templates/docs/**` is correctly untouched (`templates/docs/docs/convention.md:71` defers to this repo as normative), and the README bug-note is not pinned, both with reasons stated.
+
+## Findings (none blocking)
+
+1. `boundAdmissionStamp` — see the reverse-direction note: `expected` is filtered by `exempt` but `documented` is not, so a doc parse-error sentence naming a *marked* boolean option fails with a message that reads as a kernel mismatch. Fail-loud, so acceptable; worth a one-line comment.
+2. The `undocumented-by-design` marker is **line**-scoped (`line.includes(marker)`), not branch-scoped: a marker placed on the `throw` line below the `if (key === "…")` line silently does not apply. It fails the doc rule afterwards, so it is not a silent disarm, but the doc says "carries the marker on its parse branch" without saying the branch's *first* line.
+3. `readKernelSections` keys sections by name and `sections.set` overwrites; a future duplicate dispatch for one section would drop the first block's keys. The "one branch per option" assertion makes that fail rather than pass silently.
+
+## What remains unverified
+
+Execution. I ran nothing: no `vitest`, no `prettier --check`, no `npm run build`. The claims I could not check by reading are the gate results (18/18, 2945 tests, prettier clean on both files, `arggon validate` ok) and the maker's reverted negative controls. Everything above is from reading the diff, the kernel and the doc.
+
+## Probes needed
+
+1. `cd /home/arggon/Projects/ArggonManager-bug-x-tracker-option-list-has-no-doc-drift-guard && npx vitest run cli/src/convention-option-doc-contract.test.ts` — demonstrates the 18 assertions actually pass on this tree. If it fails, my hand-trace of the derivations is wrong somewhere and the derivation claim (a) falls.
+2. Same cwd: `npx vitest run cli/src/convention-option-doc-contract.test.ts` with `git stash` of the `ArggonManager/docs/convention.md` hunk restored (i.e. run the test against the pre-edit doc) — demonstrates the two doc completions were load-bearing, not cosmetic. If the test passes without the doc edits, the guard does not actually govern the parse-error sentence.
+3. `cd /home/arggon/Projects/ArggonManager-bug-x-tracker-option-list-has-no-doc-drift-guard && git diff --exit-code -- lib/src/convention.ts && npx prettier --check cli/src/convention-option-doc-contract.test.ts ArggonManager/docs/convention.md` — demonstrates the escape hatch is unused in the shipped kernel and both touched files are prettier-clean.
