@@ -115,11 +115,11 @@ Why: a separator delimits by VALUE, so `(a, U+001F‖b, c, d)` and `(a‖U+001F,
 
 - branch: feat/task-friction-fingerprint-separator-not-length-prefixed
 - open questions: Does the reviewer want the exhaustive adversarial-alphabet check moved into a *.property.test.ts file, or is it fine in friction.test.ts? Should a pre-amendment fingerprint ever be re-derived for com…
-- [ ] Decide and record the formula fix: length-prefix each component, or domain-separate (e.g. `sha256("v1|" + ...)` with explicit component boundaries), or record an explicit "keep verbatim formula; accepted ambiguity — <reason>" decision
-- [ ] The decision is recorded in `spec-friction-capture-020` (the normative source) AND reflected in the T1 implementation + its recorded-boundary test, in the SAME change or a follow-up PR that names both items
-- [ ] A test demonstrates the chosen property: two tuples whose components could collide under plain concatenation produce different fingerprints (for the length-prefix/domain-separation options)
-- [ ] Backward compatibility addressed: existing log lines carry `v: 1` fingerprints under the old formula — either the reader continues to read them (grouping across the change degrades gracefully) or the record version bumps with a documented reason
-- [ ] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green
+- [x] Decide and record the formula fix: length-prefix each component, or domain-separate (e.g. `sha256("v1|" + ...)` with explicit component boundaries), or record an explicit "keep verbatim formula; accepted ambiguity — <reason>" decision
+- [x] The decision is recorded in `spec-friction-capture-020` (the normative source) AND reflected in the T1 implementation + its recorded-boundary test, in the SAME change or a follow-up PR that names both items
+- [x] A test demonstrates the chosen property: two tuples whose components could collide under plain concatenation produce different fingerprints (for the length-prefix/domain-separation options)
+- [x] Backward compatibility addressed: existing log lines carry `v: 1` fingerprints under the old formula — either the reader continues to read them (grouping across the change degrades gracefully) or the record version bumps with a documented reason
+- [x] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green
 
 ### 2026-10-11 @arggon-delivery-lead
 ### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merge (PR #704)
