@@ -12,6 +12,7 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T09:06:02.964Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-convention-parser-rejects-valid-yaml-force-rescaffolds
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-convention-parser-rejects-valid-yaml-force-rescaffolds.md
   Leaves live only under a story. id is the filename stem: bug-convention-parser-rejects-valid-yaml-force-rescaffolds.
@@ -41,19 +42,19 @@ wholesale-replace arm should be reserved for files a real YAML parser cannot rea
 
 ## Acceptance
 
-- [ ] `parseConventionConfig` accepts a valid-YAML `.convention.yml` carrying an inline
+- [x] `parseConventionConfig` accepts a valid-YAML `.convention.yml` carrying an inline
       comment after a boolean value, a block scalar (`post-start: |`) and a quoted top-level
       key — or, where it deliberately refuses, the refusal names the construct
-- [ ] `init --force` never re-derives a file a real YAML parse can read: the decision is made
+- [x] `init --force` never re-derives a file a real YAML parse can read: the decision is made
       against a real parse (or the parser's tolerance is widened) so the wholesale-replace arm
       is reserved for genuinely unreadable files
-- [ ] The worst case is pinned by a test: the armed block **survives** a forced re-init under
+- [x] The worst case is pinned by a test: the armed block **survives** a forced re-init under
       each construct above (a negative test for the current behaviour, kept red until fixed)
-- [ ] Each accepted construct gains a `readConventionConfig` round-trip case, so a future
+- [x] Each accepted construct gains a `readConventionConfig` round-trip case, so a future
       tightening cannot silently re-open the loss
-- [ ] The legal syntax is documented where adopters read it (README /
+- [x] The legal syntax is documented where adopters read it (README /
       `ArggonManager/docs/convention.md`), with the inline-comment case named — it is the one
       an adopter writes naturally
-- [ ] `npm test` green, `npm run build` ok, `arggon validate` ok
+- [x] `npm test` green, `npm run build` ok, `arggon validate` ok
 
 ## Notes
