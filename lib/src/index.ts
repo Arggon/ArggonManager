@@ -233,6 +233,7 @@ export {
   appendFrictionRecord,
   buildFrictionRecord,
   frictionFingerprint,
+  frictionFingerprintMaterial,
   frictionLogPath,
   frictionMajorVersion,
   frictionReporterId,
