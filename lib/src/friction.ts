@@ -39,9 +39,12 @@ import { worktreeStateBase } from "./worktree.js";
  * request, no `gh`, no auth, no token, no session — the only outbound anything
  * is a tier-B URL a HUMAN opens, which is stage 2 work (plan T4).
  *
- * Redaction (plan T2) runs at WRITE time on top of this module: T1 owns the
- * caps, the normalization and the append discipline; T2's pass composes with
- * the (already capped) field values.
+ * Redaction (plan T2) lives IN this module, on the write path: every field a
+ * caller can put arbitrary bytes into is redacted BEFORE it is capped and
+ * before the line is persisted, so no unredacted byte exists on disk for a
+ * renderer — or a later `--report` bug — to leak. T1 owns the caps, the
+ * normalization and the append discipline; the redaction pass composes with
+ * them: normalize → redact → cap → append.
  */
 
 /** The format version every record carries; readers skip an unknown `v`. */
@@ -235,6 +238,218 @@ function capField(value: string, cap: number): string {
   // dropped above), so back off to drop both.
   if (last >= 0xd800 && last <= 0xdbff) end -= 1;
   return clean.slice(0, end) + MARKER;
+}
+
+// ---------------------------------------------------------------------------
+// Redaction (at write, never at render) — spec §Redaction (at write, not at
+// render). The pass runs here, before the caps and before the append, so the
+// record that reaches the log — and therefore everything a renderer can ever
+// print — is already redacted: there is no "capture now, scrub later" path and
+// no renderer that applies redaction.
+// ---------------------------------------------------------------------------
+
+/**
+ * The canonical placeholder every cross-OS path form collapses to (spec rule
+ * 1): `C:\Users\a\b`, `c:/Users/a/b`, `\\?\C:\Users\a\b`, `/c/Users/a/b` and
+ * `/private/var/folders/x` all become this one token.
+ */
+export const FRICTION_PATH_PLACEHOLDER = "<path>";
+
+/** The placeholder every secret-shaped span collapses to (spec rule 2). */
+export const FRICTION_SECRET_PLACEHOLDER = "<redacted>";
+
+/**
+ * A field whose SECRET-shaped material exceeds 50% of the field, or that
+ * needed more substitutions than the bound allows, is replaced by THIS string
+ * (spec rule 4): a field that is mostly secret is not safe to publish in any
+ * part. Path normalization does not count toward the rate — a `<path>`
+ * placeholder is already safe to publish.
+ */
+export const FRICTION_REDACTED_FIELD = "[redacted: >50% of field]";
+
+/** At most this many substitutions per field (spec rule 4). */
+export const FRICTION_REDACTION_MAX_SUBSTITUTIONS = 20;
+
+// --- Rule 1: cross-OS path normalization -----------------------------------
+
+/**
+ * Every absolute path root across Windows, MSYS and POSIX, in ONE alternation
+ * so the scan is leftmost-longest, which is what makes a CHILD path replace
+ * before its parent: at a given start position the longest fitting root wins,
+ * so `/home/u/repo/sub/secret.txt` is replaced whole and `/home/u/repo` later
+ * on cannot consume the shared prefix and orphan the child's tail.
+ *
+ * The three guards at the head exist for the OTHER rules:
+ *
+ *  - `(?![A-Za-z][A-Za-z0-9+.-]+:)` — a multi-letter scheme (`https:`) is not
+ *    a one-letter drive root, so a URL survives whole for rule 3;
+ *  - `(?<![\w./\\-])` — a root inside a word, after a dot or after another
+ *    separator (`and/or`, `example.com//x`) is not a path start; this is also
+ *    what keeps every non-initial slash of a URL out of this rule;
+ *  - `(?<![A-Za-z]:)` — a slash immediately after a scheme's colon belongs to
+ *    the URL, not to this rule.
+ *
+ * Alternatives in order: extended-length Windows roots (`\\?\C:\…`), UNC roots
+ * (`\\server\share\dir`), drive roots in both slash flavors (`C:\…`, `c:/…`),
+ * POSIX absolute roots and MSYS mounts (`/home/u/…`, `/c/Users/…`) and
+ * home-relative roots (`~/repo`). The POSIX lookahead keeps a bare `/` and a
+ * protocol-relative `//host` from matching.
+ */
+const PATH_PATTERN =
+  /(?![A-Za-z][A-Za-z0-9+.-]+:)(?<![\w./\\-])(?<![A-Za-z]:)(?:\\\\\?\\[A-Za-z]:[/\\](?:[\w.+@%~=-]+[/\\])*[\w.+@%~=-]*|\\\\[\w.$@%?-]+(?:\\[\w.+@%~=-]+)+|[A-Za-z]:[/\\](?:[\w.+@%~=-]+[/\\])*[\w.+@%~=-]*|\/(?=[\w.+@%~=-])(?:[\w.+@%~=-]+\/)*[\w.+@%~=-]*|~(?:\/[\w.+@%~=-]+)+)/g;
+
+// --- Rule 2: secret shapes -------------------------------------------------
+
+/**
+ * The PEM shapes, on their OWN pass ahead of the token/assignment shapes: the
+ * assignment rule's value class would otherwise match `key: -----BEGIN` at an
+ * EARLIER position than the block's header, and the leftmost match would
+ * consume the header, leaving the key body orphaned (and unredacted) behind
+ * it. Longest, most specific secret first — the same "children before
+ * parents" discipline as the path rule.
+ *
+ * Ordered full-block-first so a complete `-----BEGIN …-----` …
+ * `-----END …-----` is replaced whole; a TRUNCATED paste (no END — cut off)
+ * falls to header + base64 body lines, and a bare header alone still goes,
+ * because the header by itself would leave the key material behind.
+ */
+const PEM_PATTERN =
+  /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----|-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----(?:[ \t]*\r?\n[A-Za-z0-9+/]{20,}={0,2})+|-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/g;
+
+/**
+ * The spec's token and assignment shapes. The assignment rule matches the
+ * spec's `key|token|secret|password|passwd|credential` names as substrings of
+ * a longer identifier (`apiKey`, `auth_token`, `client_secret`), in `=`, JSON
+ * and YAML spellings, with the spec's 8+ char value threshold. The
+ * `github_pat_` continuation of the GitHub family is a conservative extension
+ * of the spec's `gh[pousr]_` shape — the current fine-grained PAT prefix —
+ * recorded on the item.
+ */
+const SECRET_PATTERN =
+  /\b(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{20,}|\bsk-[A-Za-z0-9_-]{8,}|\bnpm_[A-Za-z0-9_-]{8,}|\bAKIA[A-Za-z0-9]{8,}|\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*|[A-Za-z0-9_.-]*(?:key|token|secret|password|passwd|credential)[A-Za-z0-9_.-]*["']?[ \t]*[:=][ \t]*(?:[^\s"'`]{8,}|["'][^"'\n]{8,}["'])/gi;
+
+// --- Rule 3: URLs ----------------------------------------------------------
+
+/** A scheme URL: `https://…`, `file:/…` (the slashes are part of the match). */
+const URL_PATTERN = /\b[a-zA-Z][a-zA-Z0-9+.-]*:\/+[^\s]+/g;
+
+/**
+ * Rewrite one URL per spec rule 3: host preserved, query and fragment dropped.
+ * Two deliberate extensions, both conservative and both recorded on the item:
+ *
+ *  - `user:pass@` userinfo is dropped — a credential is not the host;
+ *  - a `file:` URL is a path in disguise, so the whole thing collapses to the
+ *    canonical path placeholder.
+ */
+function redactUrl(match: string): string {
+  const colon = match.indexOf(":");
+  const scheme = match.slice(0, colon + 1);
+  if (scheme.toLowerCase() === "file:") return FRICTION_PATH_PLACEHOLDER;
+  let rest = match.slice(colon + 1).replace(/^\/+/, "");
+  // Query and fragment go first: a query is where tokens ride.
+  const cut = rest.search(/[?#]/);
+  if (cut >= 0) rest = rest.slice(0, cut);
+  // Then userinfo: everything up to the last `@` in the authority is not host.
+  const slash = rest.indexOf("/");
+  const authority = slash < 0 ? rest : rest.slice(0, slash);
+  const at = authority.lastIndexOf("@");
+  const host = at >= 0 ? authority.slice(at + 1) : authority;
+  return `${scheme}//${host}${slash < 0 ? "" : rest.slice(slash)}`;
+}
+
+/** Mutable accounting for one field's pass. */
+type RedactionStats = { substitutions: number; redacted: number };
+
+/** One rule: what it matches, what replaces a match, and what counts against the rate. */
+type RedactionRule = {
+  pattern: RegExp;
+  replace: (match: string) => string;
+  /**
+   * Whether this rule's redacted material counts toward the field's 50% rate.
+   * Path normalization is EXEMPT: a `<path>` placeholder is already safe to
+   * publish, so the wholesale rule — which exists because "a field that is
+   * mostly SECRET is not safe to publish in any part" — measures secret
+   * material (secret shapes and dropped URL parts), never path spans.
+   */
+  countsTowardRate?: boolean;
+  /**
+   * How much of a match counts as redacted material. The default is the whole
+   * matched span; the URL rule counts only what it actually drops, because the
+   * preserved host is not redacted content.
+   */
+  redacted?: (match: string, replacement: string) => number;
+};
+
+const REDACTION_RULES: readonly RedactionRule[] = [
+  { pattern: PATH_PATTERN, replace: () => FRICTION_PATH_PLACEHOLDER, countsTowardRate: false },
+  // PEM before the token/assignment shapes: see the note on PEM_PATTERN — the
+  // assignment rule's leftmost match can otherwise orphan a block's body.
+  { pattern: PEM_PATTERN, replace: () => FRICTION_SECRET_PLACEHOLDER },
+  { pattern: SECRET_PATTERN, replace: () => FRICTION_SECRET_PLACEHOLDER },
+  {
+    pattern: URL_PATTERN,
+    replace: redactUrl,
+    redacted: (match, replacement) => match.length - replacement.length,
+  },
+];
+
+/**
+ * Redact one field value: the spec's four rules, in the spec's order, with the
+ * spec's bound. Idempotent — every placeholder this returns is inert under the
+ * rules — so the append-time guard in {@link appendFrictionRecord} re-runs the
+ * pass on an already-redacted record as a no-op.
+ *
+ * The bound is applied where the spec applies it: a field that needs more than
+ * {@link FRICTION_REDACTION_MAX_SUBSTITUTIONS} substitutions (any rule), or
+ * whose SECRET material exceeds half of the field, is replaced WHOLESALE —
+ * skipping the 21st substitution would leak it.
+ */
+export function redactFrictionText(value: string): string {
+  if (value === "") return value;
+  const stats: RedactionStats = { substitutions: 0, redacted: 0 };
+  let text = value;
+  for (const rule of REDACTION_RULES) {
+    const measure = rule.redacted ?? ((match: string) => match.length);
+    const countsTowardRate = rule.countsTowardRate ?? true;
+    text = text.replace(rule.pattern, (match) => {
+      const replacement = rule.replace(match);
+      if (replacement === match) return match; // already clean: not a substitution
+      stats.substitutions += 1;
+      if (countsTowardRate) stats.redacted += measure(match, replacement);
+      return replacement;
+    });
+  }
+  if (
+    stats.substitutions > FRICTION_REDACTION_MAX_SUBSTITUTIONS ||
+    stats.redacted * 2 > value.length
+  ) {
+    return FRICTION_REDACTED_FIELD;
+  }
+  return text;
+}
+
+/**
+ * Re-apply the pass to a whole record. The write path redacts inside
+ * {@link buildFrictionRecord} (before the caps, so a secret that straddles a
+ * cap boundary is redacted whole rather than cut into a fragment no rule can
+ * recognize); this second, idempotent application is what makes the log-level
+ * invariant structural rather than procedural — an append is where bytes land
+ * on disk, so a record that did NOT come from the builder (a test, a future
+ * caller) cannot smuggle an unredacted field into the log.
+ *
+ * Only the caller-supplied free-text surfaces are covered; `v`, `ts`,
+ * `fingerprint`, `reporterId`, `arggonVersion`, `os`, `arch`, `node` and
+ * `majorVersion` are kernel-owned or derived, never arbitrary caller bytes.
+ */
+function redactFrictionRecord(record: FrictionRecord): FrictionRecord {
+  return {
+    ...record,
+    commandShape: redactFrictionText(record.commandShape),
+    ...(record.errorCode !== undefined ? { errorCode: redactFrictionText(record.errorCode) } : {}),
+    harness: redactFrictionText(record.harness),
+    narrative: redactFrictionText(record.narrative),
+    ...(record.evidence !== undefined ? { evidence: redactFrictionText(record.evidence) } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -513,10 +728,15 @@ function readEvidenceContents(path: string): string {
 }
 
 /**
- * Build the record for one capture: caps applied, shape normalized, fingerprint
- * and reporterId derived from the stable fields only. Pure apart from the two
- * reads it names (`--evidence`, and the salt through {@link readOrCreateMachineSalt})
- * — no write happens here, so a caller can inspect a record before persisting.
+ * Build the record for one capture: shape normalized, redacted, capped, and
+ * fingerprint / reporterId derived from the stable fields only. Redaction runs
+ * HERE, before the caps (a secret straddling a cap boundary must be redacted
+ * whole, not cut into a fragment no rule can recognize) and before anything is
+ * persisted — so the record this returns, and the line
+ * {@link appendFrictionRecord} writes, is already redacted. Pure apart from
+ * the two reads it names (`--evidence`, and the salt through
+ * {@link readOrCreateMachineSalt}) — no write happens here, so a caller can
+ * inspect a record before persisting.
  */
 export function buildFrictionRecord(input: FrictionInput, opts: FrictionOptions): FrictionRecord {
   const observation = input.observation.replace(LONE_SURROGATE, "").trim();
@@ -553,17 +773,22 @@ export function buildFrictionRecord(input: FrictionInput, opts: FrictionOptions)
   const version = opts.version.trim() === "" ? "unknown" : opts.version;
   const majorVersion = frictionMajorVersion(version);
   // An absent, empty or whitespace-only error code is ABSENT — it hashes as the
-  // empty string and never rides in the record. Anything else is capped.
+  // empty string and never rides in the record. Anything else is redacted and
+  // then capped (redaction FIRST, so a secret that straddles the cap boundary
+  // is redacted whole rather than cut into a fragment no rule can recognize).
   const errorTrimmed = input.error?.trim();
   const errorCode =
     errorTrimmed === undefined || errorTrimmed === ""
       ? undefined
-      : capField(errorTrimmed, FRICTION_ERROR_CODE_CAP);
-  const harness = capField(input.harness?.trim() || FRICTION_DEFAULT_HARNESS, FRICTION_HARNESS_CAP);
-  const commandShapeCapped = capField(commandShape, FRICTION_COMMAND_SHAPE_CAP);
-  const narrative = capField(observation, FRICTION_NARRATIVE_CAP);
+      : capField(redactFrictionText(errorTrimmed), FRICTION_ERROR_CODE_CAP);
+  const harness = capField(
+    redactFrictionText(input.harness?.trim() || FRICTION_DEFAULT_HARNESS),
+    FRICTION_HARNESS_CAP,
+  );
+  const commandShapeCapped = capField(redactFrictionText(commandShape), FRICTION_COMMAND_SHAPE_CAP);
+  const narrative = capField(redactFrictionText(observation), FRICTION_NARRATIVE_CAP);
   const evidence = input.evidencePath
-    ? capField(readEvidenceContents(input.evidencePath), FRICTION_EVIDENCE_CAP)
+    ? capField(redactFrictionText(readEvidenceContents(input.evidencePath)), FRICTION_EVIDENCE_CAP)
     : undefined;
   const ts = (opts.now ?? new Date()).toISOString();
   return {
@@ -605,6 +830,10 @@ export type FrictionAppendResult = {
 
 /**
  * Append one record to the log, creating the state dir `mkdir -p` on the way.
+ * The record is passed through the (idempotent) redaction guard first: an
+ * append is where bytes land on disk, so the log-level invariant — what lands
+ * in `<stateBase>/arggon/friction.jsonl` is already redacted — holds for every
+ * caller, not only for records that came from {@link buildFrictionRecord}.
  *
  * The append itself is ONE `write()` of a complete, newline-terminated record
  * on an `O_APPEND` descriptor, which is what makes two concurrent writers in
@@ -633,7 +862,7 @@ export function appendFrictionRecord(
       dir,
     );
   }
-  const line = `${JSON.stringify(record)}${NEWLINE}`;
+  const line = `${JSON.stringify(redactFrictionRecord(record))}${NEWLINE}`;
   const existing = readLogLines(logPath);
   // A crashed writer can leave a partial trailing line with no terminator. The
   // next append must NOT glue its own record onto that fragment: one `write()`
