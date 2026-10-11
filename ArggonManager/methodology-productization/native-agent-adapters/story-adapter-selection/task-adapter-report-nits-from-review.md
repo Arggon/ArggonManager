@@ -12,6 +12,7 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T09:57:59.738Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adapter-report-nits-from-review
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-adapter-selection/task-adapter-report-nits-from-review.md
   Leaves live only under a story. id is the filename stem: task-adapter-report-nits-from-review.
@@ -36,5 +37,19 @@ Still informational from round 1, also unfiled: `runAdapterReport` re-reads `.co
 ## Acceptance
 
 <!-- The real acceptance criteria; tick each box when met. -->
+
+Each row is one of the round-2 findings from PR #606 (plus the round-1
+informational one), checked against the shipped CLI and the pinned tests on
+branch `feat/task-adapter-report-nits-from-review`. A finding already resolved
+upstream is ticked with the commit that resolved it rather than re-fixed here.
+
+- [x] README `doctor --agents` sample emits only strings the shipped CLI can emit, cross-checked against the pinned inline snapshot in `cli/src/adapter-selection.test.ts` (`0 adopter-edited (yours; init skips it unless --backup)`; `claude` 2 / `opencode` 18 / `zcode` 23 `file(s)`). Finding 1's pre-round-2 `never overwritten` line was already fixed upstream in `d4a7a436`; the drift still live on this base (`zcode: 19` → `23`) is fixed here.
+- [x] `json-output.md`'s `agents.agents[].files` row carries ONE claim for `adopter-edited` — the superseded "never overwrites it" clause and its dangling `)` are gone (finding 2).
+- [x] `json-output.md` documents every `agents.agents[].counts` key the code emits and the pinned `Object.keys(entry.counts)` asserts: `total, present, acknowledged, acknowledged-drifted, adopter-edited, stale, missing, unverified, orphaned` (finding 3). The doc's JSON sample's three `counts` blocks are also valid JSON now — each was missing the comma before `orphaned`, so the one JSON sample in that section did not parse.
+- [x] The sample caption no longer mis-describes the 9th `adopter-edited` row: 8 of the 9 are among the 12 `docs` reports as `modified`, and the 9th carries no `x-generated` entry at all, so `docs` cannot see it and the `agents` block is the only surface that reports it (finding 4).
+- [x] The matrix honesty assertion enforces the shipped identity `written + replaced + skipped === total` (finding 5).
+- [x] The read-once argument is applied to the state file: `runDoctor` reads the convention once and hands `config.generated` to `runAdapterReport`, which no longer re-reads `.convention.yml` through `readGeneratedState`.
+- [x] `npx prettier --check` clean on every file this item touches, `arggon validate` green, `npm test` green (pre-existing repo-wide prettier drift reported, not reformatted).
+- [x] Every doc edit matches the implemented behavior — each changed field grepped across `README.md`, `ArggonManager/docs/json-output.md`, `ArggonManager/docs/convention.md` and `ArggonManager/docs/agents.md` (§Verification before opening the PR).
 
 ## Notes

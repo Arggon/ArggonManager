@@ -132,9 +132,9 @@ function onDisk(root: string, agent: string): string[] {
   // localeCompare: the comparator BY_AGENT itself is sorted with (matches
   // doctor's file-row order), not a case-sensitive `.sort()` that would rank
   // an uppercase entry (the seam README.md) ahead of lowercase directories.
-  return (BY_AGENT[agent] ?? []).filter((rel) => existsIn(root, rel)).sort((a, b) =>
-    a.localeCompare(b),
-  );
+  return (BY_AGENT[agent] ?? [])
+    .filter((rel) => existsIn(root, rel))
+    .sort((a, b) => a.localeCompare(b));
 }
 
 /** The `adapters` rows for one agent in an init result. */
@@ -282,7 +282,15 @@ describe("adapter selection: init flag matrix", () => {
       // counts are honest: every adapter destination is accounted for exactly once.
       const total = AGENT_IDS.reduce((n, agent) => n + (BY_AGENT[agent]?.length ?? 0), 0);
       expect(result.adapters.counts.total).toBe(total);
-      expect(result.adapters.counts.written + result.adapters.counts.skipped).toBe(total);
+      // The FULL identity, `replaced` included. This table never runs `--backup`,
+      // so the bucket is 0 today — asserting it anyway keeps the identity the code
+      // ships (and the `--backup` case below proves) enforced at every call site
+      // rather than only at the one that happens to exercise it.
+      expect(
+        result.adapters.counts.written +
+          result.adapters.counts.replaced +
+          result.adapters.counts.skipped,
+      ).toBe(total);
       const selectedTotal = row.selected.reduce(
         (n, agent) => n + (BY_AGENT[agent]?.length ?? 0),
         0,
