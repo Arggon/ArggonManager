@@ -2,7 +2,7 @@
 type: bug
 status: in_progress
 id: bug-adr-status-drift-merged-adr-proposed
-title: 'Three merged ADRs (0022, 0023, 0025) still read `Status: Proposed` — `engineering.md`''s lifecycle is "Accepted when merged", and ADR 0021 already needed a status-fix item for exactly this drift'
+title: "Three merged ADRs (0022, 0023, 0025) still read `Status: Proposed` — `engineering.md`'s lifecycle is \"Accepted when merged\", and ADR 0021 already needed a status-fix item for exactly this drift"
 assignee: arggon-delivery-lead
 branch: fix/bug-adr-status-drift-merged-adr-proposed
 parent: methodology-improvements
@@ -12,7 +12,6 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T04:23:26.228Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-adr-status-drift-merged-adr-proposed
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-adr-status-drift-merged-adr-proposed.md
   Leaves live only under a story. id is the filename stem: bug-adr-status-drift-merged-adr-proposed.
@@ -121,3 +120,29 @@ the three drifts also found ADR 0019 merged-`Proposed` (correct, see above) and
 ADR 0024 whose `- Status: Accepted` sits above three notes in a different order
 from every other ADR (a numbering note, then a status note, then the `- Date:`
 line) — cosmetic, not drift, and not touched. No new item was filed from here.
+
+### 2026-10-11 @ses_ed6995b8cffePDwIh3viZwoIaR
+### 2026-10-11 @arggon-maker
+
+evidence: gates run in worktree `/home/arggon/Projects/ArggonManager-bug-adr-status-drift-merged-adr-proposed` on branch `fix/bug-adr-status-drift-merged-adr-proposed` at commit `97a6a6d0`. PR: https://github.com/Arggon/ArggonManager/pull/683 (not merged, not squashed).
+
+| Command | Expected | Observed (exit) |
+| --- | --- | --- |
+| `npx vitest run cli/src/adr-index-parity.test.ts cli/src/adr-status-doc-contract.test.ts` | green | 2 files / 16 tests passed (0) |
+| `npm test` | 134 files / 2858 tests (main baseline) | 134 files / 2858 tests passed, 93.96 s (0) |
+| `npm run build` | exit 0 | exit 0 (0) |
+| `npx prettier --check` (3 ADRs, docs/adr/README.md, docs/engineering.md, item file) | clean | "All matched files use Prettier code style!" (0) |
+| `npm run arggon -- validate` | ok | `arggon validate: ok (0 warning(s), convention v5)` (0) |
+
+Kernel's own read of the live `## Acceptance` section after the ticks: `acceptanceGate` returns `{"gated":false}` — 6 live criteria, 0 unchecked, so the flip is not gated (checked via `liveAcceptanceCriteria`/`liveAcceptanceUnchecked` over the item body, because `arggon goal` correctly refuses to target a claim held by `arggon-delivery-lead`).
+
+Changed files (5 + item file): `ArggonManager/docs/adr/0022-decline-autoharness-autocontext-autocompact.md`, `0023-ci-wall-clock.md`, `0025-done-gate-live-acceptance-section.md`, `ArggonManager/docs/adr/README.md`, `ArggonManager/docs/engineering.md` (one paragraph in §ADR process). No new test file: the chosen prevention is (b), so the negative-case requirement for (a) does not apply.
+
+prevention: (b) — documented in `engineering.md` §ADR process. (a) is ruled out by measurement, not preference: ADR 0019 is on `main` reading `Proposed` on purpose (its own amendment: "(still Proposed): this closes one decision point's open hatch, it does not accept the record"), and ADRs 0001–0012 share one introducing commit (`e6dfd6b5`), so neither the file nor git history answers "was this ADR accepted on merge". The existing backstop is `spec analyze`'s report-only `STALE-PROPOSED-ADR` (14-day threshold) — measured at 0 findings on this branch, correct because the four `Proposed` ADRs are ≤10 days old.
+
+methodology impact class: advisory — no rule, gate, command, adapter or schema change.
+
+findings for other items (not fixed here, filed by the delivery lead):
+1. ADR 0019 is a fourth merged-while-`Proposed` record; it is CORRECT as written (explicitly-recorded `Proposed`), but the item's Context table measured only 0022/0023/0024/0025, so the corpus count behind "three merged ADRs" is now known to include one deliberate case. Worth naming wherever the three are counted.
+2. ADR 0024's metadata block orders its notes differently from every other ADR (numbering note, status note, then `- Date:`/`- Deciders:`/`- Input:`), so its `- Status: Accepted` is followed by three blockquote notes before the rest of the list. Cosmetic ordering only — not drift, not touched.
+3. `arggon goal <id>` refuses when the claim is held by an agent id rather than the invoking identity, so a maker cannot self-read the goal contract for an item the lead dispatched. Recorded here because it shaped how the acceptance completeness was verified above; a `--as-claim-owner`-style read is not proposed, just noted.
