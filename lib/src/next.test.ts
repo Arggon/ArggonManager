@@ -227,7 +227,7 @@ describe("runNext", () => {
   });
 });
 
-describe("runNext dependency awareness (spec-deps-001)", () => {
+describe("runNext dependency awareness (spec-deps-022)", () => {
   function depTree(): string {
     const root = mkdtempSync(join(tmpdir(), "arggon-next-deps-"));
     write(root, "tasks/.convention.yml", "version: 3\n");

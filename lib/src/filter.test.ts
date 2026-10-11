@@ -90,7 +90,7 @@ describe("matchesPredicate", () => {
   });
 });
 
-describe("dependency predicates (spec-deps-001)", () => {
+describe("dependency predicates (spec-deps-022)", () => {
   it("parses depends-on: and blocked-by: like the other fields", () => {
     expect(parseFilter("depends-on:task-x blocked-by:story-y")).toEqual([
       { field: "depends-on", value: "task-x", negated: false },
