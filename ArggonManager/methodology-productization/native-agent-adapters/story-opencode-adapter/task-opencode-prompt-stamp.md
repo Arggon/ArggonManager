@@ -165,3 +165,7 @@ quota, no network.
   do not, so on this box they may be exercising the global copy rather than the
   fixture bundle. That is a harness-validity question, not a code defect, and it
   is not this item's scope.
+
+### handoff 2026-10-11 @ses_ed543078effeMABEBvMjeiHJGq (session: ses_ed543078effeMABEBvMjeiHJGq) — next: Review/merge 109fecec (T4 hooks + tests + smoke + docs); if package.json frees up, add the smoke:opencode-prompt-stamp script; task-opencode-event-panel owns the event-stream panel half of T4.
+- branch: feat/task-opencode-prompt-stamp
+- open questions: Should the other plugin smokes also serve with a hermetic HOME (the global ~/.config/opencode/plugins/arggon shadows fixture bundles by id)? Is the stamp's `source` best named as the .arggon.env path…
