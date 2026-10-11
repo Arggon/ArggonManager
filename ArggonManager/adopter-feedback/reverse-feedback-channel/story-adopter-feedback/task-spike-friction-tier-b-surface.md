@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-spike-friction-tier-b-surface
 title: "Spike: Issues or Discussions as the tier-B prefilled surface?"
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [research]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T04:19:15.714Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-spike-friction-tier-b-surface
 ---
 <!--
