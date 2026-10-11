@@ -1,6 +1,7 @@
 import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   acceptanceComplete,
@@ -9,6 +10,7 @@ import {
   acceptanceUnchecked,
   findTasksDir,
   liveAcceptanceCriteria,
+  liveAcceptanceRows,
   liveAcceptanceUnchecked,
   itemsById,
   loadItems,
@@ -714,3 +716,422 @@ function tickAcceptanceBody(dir: string, id: string): void {
     "utf8",
   );
 }
+
+// ---------------------------------------------------------------------------
+// Fenced code blocks are content, not the contract
+// (bug-done-gate-whole-body-scan-counts-fenced-repro-boxes)
+//
+// The gate's rule, in one sentence: it reads the item's LIVE `## Acceptance`
+// section, with dated comment blocks and fenced code blocks excluded, and
+// refuses the flip when that section publishes no criterion at all OR when one
+// of its own boxes is unticked. Nothing else in the body gates the flip.
+//
+// The boundary cases below are the two shapes observed in the wild: a bug whose
+// repro legitimately contains `- [ ]` rows inside a fence, and a filing comment
+// that quotes the criteria verbatim, unticked.
+// ---------------------------------------------------------------------------
+
+/**
+ * A claimed task whose `## Acceptance` section holds `criteria`, with `tail`
+ * appended verbatim after it — the shape for repro fences and comment records
+ * that must not be read as the contract.
+ */
+function taskWithTail(
+  criteria: string,
+  tail: string,
+  opts?: { id?: string; title?: string },
+): { dir: string; id: string } {
+  const withEol = criteria.endsWith("\n") ? criteria : `${criteria}\n`;
+  const dir = mkdtempSync(join(tmpdir(), "arggon-done-gate-fence-"));
+  runInit({ dir, force: false });
+  const story = seedChain(dir, "story-s");
+  const task = runCreate({
+    cwd: dir,
+    type: "task",
+    title: opts?.title ?? "Fenced content",
+    parent: story,
+    id: opts?.id ?? "fenced-content",
+    body: `## Context\n\nFixture.\n\n## Acceptance\n\n${withEol}${tail}`,
+    now: NOW,
+  });
+  claim(dir, task.id);
+  return { dir, id: task.id };
+}
+
+/** The repo root, so a test can read a REAL item body off the tree. */
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+
+/**
+ * `bug-prettier-glues-split-inline-code-span`: the item whose own REPRO is a
+ * fenced markdown sample containing three literal `- [ ]` rows. Read from the
+ * tree at test time (frontmatter dropped) rather than pasted, so the assertion
+ * cannot drift away from the item it exists to protect.
+ */
+const PRETTIER_SPAN_ITEM =
+  "ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/bug-prettier-glues-split-inline-code-span.md";
+
+function bodyOf(path: string): string {
+  const raw = readFileSync(join(repoRoot, path), "utf8");
+  const end = raw.indexOf("\n---\n");
+  if (end < 0) throw new Error(`bodyOf: no frontmatter terminator in ${path}`);
+  return raw.slice(end + 5);
+}
+
+describe("done gate: fenced repro boxes do not gate the flip", () => {
+  it("flips with a ticked live section and a fenced repro in another section (the observed shape)", () => {
+    // THE DEFECT, as observed. The live section is fully ticked; the item's own
+    // repro — a fenced markdown sample demonstrating what a formatter does to a
+    // `- [ ]` list item — carries three literal unticked rows. The gate read
+    // them as criteria and refused the flip forever.
+    const fence = [
+      "Literal repro — input:",
+      "",
+      "```markdown",
+      "- [ ] **Spec + plan written** from the edge-case table, then `arggon spec analyze` reports no NEW findings — the gate that releases implementation tasks",
+      "```",
+      "",
+      "What prettier produces (pass 1):",
+      "",
+      "```markdown",
+      "- [ ] **Spec + plan written** from the edge-case table, then `arggon spec",
+      "analyze` reports no NEW findings — the gate that releases implementation",
+      "       tasks",
+      "```",
+      "",
+      "The settled bytes, which `--check` then accepts:",
+      "",
+      "```markdown",
+      "- [ ] **Spec + plan written** from the edge-case table, then `arggon spec",
+      "analyze` reports no NEW findings — the gate that releases implementation tasks",
+      "```",
+      "",
+    ].join("\n");
+    const { dir, id } = taskWithTail(
+      "- [x] repro pinned as a regression test\n- [x] gates green",
+      `## Context\n\nThe formatter's drift, literally:\n\n${fence}`,
+    );
+    const body = itemOf(dir, id).body;
+    // Preconditions, so this cannot pass for the wrong reason: the fenced rows
+    // ARE rows (the row parser is deliberately fence-blind) and they ARE
+    // unticked, and the whole-body question therefore still refuses.
+    expect(acceptanceUnchecked(body).length).toBe(3);
+    expect(acceptanceComplete(body)).toBe(false);
+    // …and the gate's question is the live section, which publishes none of them.
+    expect(liveAcceptanceRows(body).map((row) => row.text)).toEqual([
+      "repro pinned as a regression test",
+      "gates green",
+    ]);
+    expect(acceptanceGate(body)).toEqual({ gated: false });
+    expect(() => runUpdate({ cwd: dir, id, status: "done", now: NOW })).not.toThrow();
+    const item = itemOf(dir, id);
+    expect(item.status).toBe("done");
+    expect(item.body).not.toContain("### Waiver");
+    // The fence is untouched: the flip edits no history and no repro.
+    expect(item.body).toContain("- [ ] **Spec + plan written** from the edge-case table");
+  });
+
+  it("flips with the fenced repro INSIDE the live section, between two real criteria", () => {
+    // The harder shape: the fence sits between the criteria it documents, so a
+    // region extractor that only looked at lines would read its rows as the
+    // section's own.
+    const { dir, id } = taskWithTail(
+      [
+        "- [x] first real criterion",
+        "",
+        "The literal repro:",
+        "",
+        "```markdown",
+        "- [ ] fenced row",
+        "```",
+        "",
+        "- [x] second real criterion",
+      ].join("\n"),
+      "",
+    );
+    const body = itemOf(dir, id).body;
+    expect(acceptanceUnchecked(body).map((row) => row.text)).toEqual(["fenced row"]);
+    expect(liveAcceptanceUnchecked(body)).toEqual([]);
+    expect(liveAcceptanceCriteria(body)).toHaveLength(2);
+    expect(acceptanceGate(body)).toEqual({ gated: false });
+    expect(() => runUpdate({ cwd: dir, id, status: "done", now: NOW })).not.toThrow();
+    expect(itemOf(dir, id).status).toBe("done");
+  });
+
+  it("flips the real bug-prettier-glues-split-inline-code-span body, waiver-free and repro-untouched", () => {
+    // THE end-to-end case from the report: the item's live Acceptance is 6/6
+    // ticked, its own repro fences carry three literal `- [ ]` rows, and its
+    // dated comments carry the same criteria unticked. Nothing in that body
+    // except the live section may gate the flip.
+    const body = bodyOf(PRETTIER_SPAN_ITEM);
+    // The fenced rows are really there, and really unticked.
+    expect(body).toContain("- [ ] **Spec + plan written** from the edge-case table");
+    expect(acceptanceUnchecked(body).length).toBe(3);
+    expect(acceptanceComplete(body)).toBe(false);
+    // The dated comment blocks are really there, and their boxes are really
+    // unticked too (they quote the criteria as filed).
+    expect(body).toMatch(/^### 2026-10-11 @\S+$/m);
+    expect(acceptanceGate(body)).toEqual({ gated: false });
+    expect(liveAcceptanceCriteria(body).length).toBe(6);
+    expect(liveAcceptanceUnchecked(body)).toEqual([]);
+    // …and the flip itself goes through on a temp item carrying that exact body.
+    const dir = mkdtempSync(join(tmpdir(), "arggon-done-gate-real-"));
+    runInit({ dir, force: false });
+    const story = seedChain(dir, "story-s");
+    const task = runCreate({
+      cwd: dir,
+      type: "bug",
+      title: "prettier glues a split inline code span",
+      parent: story,
+      id: "prettier-span",
+      body,
+      now: NOW,
+    });
+    claim(dir, task.id);
+    expect(() => runUpdate({ cwd: dir, id: task.id, status: "done", now: NOW })).not.toThrow();
+    const item = itemOf(dir, task.id);
+    expect(item.status).toBe("done");
+    expect(item.body).not.toContain("### Waiver");
+    // The repro survives verbatim: no waiver section, no rewritten fence.
+    expect(item.body).toContain("- [ ] **Spec + plan written** from the edge-case table");
+  });
+
+  it("flips with a ticked live section and an unticked filing comment (the second observed shape)", () => {
+    // The other observed shape: the live section is ticked and the FILING
+    // comment quotes the same criteria, unticked — `arggon comment` writes them
+    // verbatim, and a dated block is history that is never edited.
+    const { dir, id } = taskWithTail(
+      "- [x] p95 under 100ms\n- [x] load test recorded",
+      "## Notes\n\n",
+    );
+    datedComment(dir, id, "Acceptance:\n\n- [ ] p95 under 100ms\n- [ ] load test recorded", {
+      date: "2026-10-11",
+      author: "arggon-delivery-lead",
+    });
+    const body = itemOf(dir, id).body;
+    // Preconditions: the comment's rows are real rows, and unticked.
+    expect(acceptanceUnchecked(body).map((row) => row.text)).toEqual([
+      "p95 under 100ms",
+      "load test recorded",
+    ]);
+    expect(liveAcceptanceUnchecked(body)).toEqual([]);
+    expect(acceptanceGate(body)).toEqual({ gated: false });
+    expect(() => runUpdate({ cwd: dir, id, status: "done", now: NOW })).not.toThrow();
+    // The flip rewrites no history: the comment block stays exactly as filed.
+    const item = itemOf(dir, id);
+    expect(item.status).toBe("done");
+    expect(item.body).toContain("### 2026-10-11 @arggon-delivery-lead");
+    expect(item.body).toContain("- [ ] load test recorded");
+  });
+
+  it("a fence wins over a comment heading: a fenced `### <date> @author` never strips the live section", () => {
+    // The reverse defect, and the reason the fence is consulted before the
+    // comment-block rule: a repro that shows what `arggon comment` writes
+    // contains a literal `### <date> @author` line. Reading it as a comment
+    // heading deleted everything after it — including the live `## Acceptance`
+    // section — and turned a satisfied item into a `no-live-contract` refusal.
+    const { dir, id } = taskWithTail(
+      "- [x] real criterion",
+      [
+        "## Context",
+        "",
+        "What `arggon comment` writes:",
+        "",
+        "```markdown",
+        "## Acceptance",
+        "",
+        "- [ ] criterion quoted by the reporter",
+        "",
+        "### 2026-10-11 @worker",
+        "",
+        "- [ ] still nested inside the fence",
+        "```",
+        "",
+      ].join("\n"),
+    );
+    const body = itemOf(dir, id).body;
+    // The fenced comment heading is NOT a block boundary: the section after the
+    // fence is still the live one, and its single criterion still counts.
+    expect(liveAcceptanceCriteria(body)).toHaveLength(1);
+    expect(acceptanceGate(body)).toEqual({ gated: false });
+    expect(() => runUpdate({ cwd: dir, id, status: "done", now: NOW })).not.toThrow();
+    expect(itemOf(dir, id).status).toBe("done");
+  });
+
+  it("a fenced `## Acceptance` heading is not a section: the real one below it is still the contract", () => {
+    const { dir, id } = taskWithTail(
+      "- [x] real criterion",
+      [
+        "## Context",
+        "",
+        "```markdown",
+        "## Acceptance",
+        "",
+        "- [ ] the template, as pasted into the report",
+        "```",
+        "",
+      ].join("\n"),
+    );
+    const body = itemOf(dir, id).body;
+    // The fenced heading opens nothing, so the FIRST live `## Acceptance` is the
+    // task's own — not the pasted one, whose unticked row would refuse forever.
+    expect(liveAcceptanceUnchecked(body)).toEqual([]);
+    expect(acceptanceGate(body)).toEqual({ gated: false });
+  });
+
+  it("an UNCLOSED fence runs to the end of the body, as CommonMark says", () => {
+    const { dir, id } = taskWithTail(
+      "- [x] real criterion",
+      ["## Context", "", "```markdown", "- [ ] fenced, never closed", ""].join("\n"),
+    );
+    // Nothing after an unclosed fence is live, so the section above it is all
+    // there is — and it is satisfied.
+    expect(acceptanceGate(itemOf(dir, id).body)).toEqual({ gated: false });
+  });
+
+  it("reads the fence grammar: tildes, four runs, and an info string carrying a backtick", () => {
+    // `~~~` opens, a 4-run needs a 4-run to close, and a backtick in a backtick
+    // fence's info string means the line is text, not a fence — so the rows
+    // after it are live again.
+    const tilde = taskWithTail(
+      "- [x] real criterion",
+      ["## Context", "", "~~~", "- [ ] tilde-fenced", "~~~~", ""].join("\n"),
+    );
+    expect(acceptanceGate(itemOf(tilde.dir, tilde.id).body)).toEqual({ gated: false });
+    const long = taskWithTail(
+      "- [x] real criterion",
+      ["## Context", "", "````", "- [ ] four-run fenced", "```", ""].join("\n"),
+    );
+    // A 3-run does not close a 4-run fence, so the row stays fenced content.
+    expect(liveAcceptanceCriteria(itemOf(long.dir, long.id).body)).toHaveLength(1);
+    const infoString = taskWithTail(
+      ["- [x] real criterion", "", "``` js `inline`", "", "- [ ] NOT fenced"].join("\n"),
+      "",
+    );
+    // The backtick in the info string means no fence opened, so the line is
+    // live prose inside the section: an unticked criterion that refuses.
+    expect(acceptanceGate(itemOf(infoString.dir, infoString.id).body)).toEqual({
+      gated: true,
+      reason: "unchecked-live-criteria",
+    });
+    expect(
+      liveAcceptanceUnchecked(itemOf(infoString.dir, infoString.id).body).map((r) => r.text),
+    ).toEqual(["NOT fenced"]);
+  });
+});
+
+describe("done gate: the two refusals still refuse around fences", () => {
+  it("refuses an unticked criterion in the LIVE section, fenced content or not", () => {
+    // The negative control. A fence-heavy body must not read as a gate that was
+    // switched off: the live section's own unticked box still refuses, and the
+    // message still names the section and the escape hatch.
+    const { dir, id } = taskWithTail(
+      "- [ ] the real, open criterion",
+      [
+        "## Context",
+        "",
+        "```markdown",
+        "- [ ] fenced content, never an obligation",
+        "```",
+        "",
+        "### 2026-10-11 @worker",
+        "",
+        "- [ ] history, never an obligation",
+        "",
+      ].join("\n"),
+    );
+    expect(acceptanceGate(itemOf(dir, id).body)).toEqual({
+      gated: true,
+      reason: "unchecked-live-criteria",
+    });
+    expect(() => runUpdate({ cwd: dir, id, status: "done", now: NOW })).toThrow(
+      /live '## Acceptance' section still has unchecked boxes/,
+    );
+    expect(itemOf(dir, id).status).toBe("in_progress");
+  });
+
+  it("refuses as `no-live-contract` when the live section's only boxes are inside a fence", () => {
+    // ADR 0025 decision 2's shape reached through a fence: criteria that exist
+    // nowhere but inside a fence have published no contract, so this reads as
+    // "no live criteria", never as "unchecked".
+    const { dir, id } = taskWithTail(
+      ["```markdown", "- [ ] the whole contract, fenced", "```"].join("\n"),
+      "",
+    );
+    const body = itemOf(dir, id).body;
+    expect(liveAcceptanceCriteria(body)).toEqual([]);
+    expect(acceptanceUnchecked(body)).toHaveLength(1);
+    expect(acceptanceGate(body)).toEqual({ gated: true, reason: "no-live-contract" });
+    expect(() => runUpdate({ cwd: dir, id, status: "done", now: NOW })).toThrow(
+      /has no acceptance criteria/,
+    );
+    expect(itemOf(dir, id).status).toBe("in_progress");
+    // The honest path is transcription: write the criteria outside the fence.
+    setBody(dir, id, "## Acceptance\n\n- [x] the whole contract, transcribed\n");
+    expect(acceptanceGate(itemOf(dir, id).body)).toEqual({ gated: false });
+    expect(() => runUpdate({ cwd: dir, id, status: "done", now: NOW })).not.toThrow();
+    expect(itemOf(dir, id).status).toBe("done");
+  });
+
+  it("keeps the container cascade on its own whole-body question (the scan is not shared)", () => {
+    // ADR 0025 decision 6: containers stay exempt, and the acceptance-aware
+    // cascade keeps asking `acceptanceComplete` — whole-body and fence-blind —
+    // so a container whose repro fences carry unticked rows is still skipped,
+    // exactly as before this change. Widening the cascade is carried by
+    // `task-cascade-whole-body-acceptance-defers-this-defect`, not here.
+    const dir = mkdtempSync(join(tmpdir(), "arggon-done-gate-fence-cascade-"));
+    runInit({ dir, force: false });
+    seedChain(dir, "story-s");
+    setBody(
+      dir,
+      "story-s",
+      "## Acceptance\n\n```markdown\n- [ ] fenced, and the cascade still counts it\n```\n",
+    );
+    // Claim the container so "not auto-completed" reads as a real refusal and
+    // not as a container that was never claimed in the first place.
+    runUpdate({ cwd: dir, id: "story-s", status: "in_progress", assignee: "worker", now: NOW });
+    const task = runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Leaf",
+      parent: "story-s",
+      id: "leaf",
+      body: "## Acceptance\n\n- [x] done\n",
+      now: NOW,
+    });
+    claim(dir, task.id);
+    const result = runUpdate({ cwd: dir, id: task.id, status: "done", now: NOW });
+    expect(result.autoCompleted).toEqual([]);
+    expect(result.cascadeSkipped).toEqual([
+      { id: "story-s", type: "story", reason: "acceptance-incomplete" },
+    ]);
+    // …while the leaf itself, whose live section is satisfied, flipped.
+    expect(itemOf(dir, task.id).status).toBe("done");
+    expect(itemOf(dir, "story-s").status).toBe("in_progress");
+  });
+});
+
+describe("done gate over MCP: the fence rule reaches the refusal-only surface identically", () => {
+  it("allows the flip on a fence-heavy body through updateOperation (no waive parameter there)", () => {
+    // `tools.arggon.update` shares the kernel: `updateOperation` -> `runUpdate`
+    // -> `acceptanceGate`, and the MCP layer exposes no waive parameter, so the
+    // gate must answer the same question there or an agent can never finish a
+    // markdown-shaped item at all.
+    const { dir, id } = taskWithTail(
+      "- [x] repro pinned",
+      ["## Context", "", "```markdown", "- [ ] fenced repro row", "```", ""].join("\n"),
+    );
+    const outcome = updateOperation({ cwd: dir, id, status: "done", agent: true });
+    expect(outcome.ok).toBe(true);
+    expect(itemOf(dir, id).status).toBe("done");
+  });
+
+  it("still surfaces UPDATE_FAILED for the live section's unticked box", () => {
+    const { dir, id } = taskWithTail("- [ ] still open", "");
+    const outcome = updateOperation({ cwd: dir, id, status: "done", agent: true });
+    expect(outcome.ok).toBe(false);
+    const envelope = outcome.envelope as { error?: { code?: string; message?: string } };
+    expect(envelope.error?.code).toBe("UPDATE_FAILED");
+    expect(envelope.error?.message).toMatch(/unchecked boxes[\s\S]*--waive "<reason>"/);
+    expect(itemOf(dir, id).status).toBe("in_progress");
+  });
+});

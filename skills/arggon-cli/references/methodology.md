@@ -40,8 +40,10 @@ lean. A 40-line spec beats a 4-page one nobody reads.
   (ADR 0015, scoped by ADR 0025): a task/bug whose live section has an unticked
   criterion, or publishes no criterion at all, refuses `--status done` unless a
   HUMAN passes `--waive "<reason>"` (recorded in the body). Boxes inside dated
-  comment blocks are history, not the contract: transcribe criteria into the live
-  section, never tick history. That checklist is the **domain invariant**: it is
+  comment blocks are history, and rows inside a fenced code block are content —
+  neither gates the flip, so a bug whose repro shows what a formatter does to a
+  `- [ ]` list item is still completable. Transcribe criteria into the live
+  section, never tick history and never fence a criterion. That checklist is the **domain invariant**: it is
   what the project declares as done, whatever it checks it with.
 - **Docs travel with code:** any change that makes a doc statement false updates
   that doc in the same PR (change-type → doc mapping in `ArggonManager/docs/agents.md`

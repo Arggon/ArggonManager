@@ -535,6 +535,11 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     // the LIVE section rather than the whole body, because a dated comment block
     // is append-only history: an unticked box in one records what the criteria
     // were, not an open obligation (bug-done-gate-counts-checkboxes-inside-comment-blocks).
+    // Fenced code blocks are excluded for the same reason with a different
+    // label — a fence is CONTENT, so a repro that demonstrates what a formatter
+    // does to a `- [ ]` row writes literal rows the gate must not read as
+    // criteria (bug-done-gate-whole-body-scan-counts-fenced-repro-boxes); both
+    // exclusions live in one place, `liveAcceptanceRegion`.
     // The waiver never overrides the transition table — an illegal `→ done`
     // transition (todo/blocked) is refused by the rules layer above, waive or
     // not; the only legal path this gates is in_progress → done. Every refusal

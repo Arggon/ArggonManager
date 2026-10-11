@@ -13,6 +13,44 @@
 > recorded)", so the line now states the state the record has been in since that
 > merge. Nothing below this note is rewritten: the six decisions, the measured
 > consequence counts and the alternatives considered stand as merged.
+>
+> Amendment (2026-10-11, `bug-done-gate-whole-body-scan-counts-fenced-repro-boxes`):
+> **fenced code blocks are excluded from the scan, on the same footing as dated
+> comment blocks.** Decision 1 said the gate reads the live `## Acceptance`
+> section with dated comment blocks excluded; the shipped implementation scoped
+> the region and stripped comment blocks but still parsed every surviving LINE,
+> so a `- [ ]` row inside a fenced block counted as a criterion. Two observed
+> sessions today:
+>
+> 1. a bug item whose own repro is a fenced markdown sample of what a formatter
+>    does to a `- [ ]` list item (`bug-prettier-glues-split-inline-code-span`,
+>    live section 6/6 ticked, three literal fenced rows) was refused on every
+>    flip attempt and the auto-flip automation wedged on it;
+> 2. the exclusion ran the OTHER way too — a fenced `### <date> @author` line
+>    (a repro of what `arggon comment` writes) opened a comment block and deleted
+>    the live section that followed the fence, turning a satisfied item into a
+>    `no-live-contract` refusal.
+>
+> So the rule the gate implements is now ONE sentence, not two:
+>
+> **The gate reads the item's live `## Acceptance` section; dated comment blocks
+> (`### <date> @author`, `### Waiver <date>`) and fenced code blocks are
+> excluded from the scan. A flip is refused when that section publishes no
+> criterion at all (decision 2 unchanged) OR when the section's own boxes are
+> unticked (decision 1 unchanged). Nothing else in the body gates the flip.**
+>
+> The fence is consulted BEFORE the heading rules, because a fence is content: a
+> fenced `## Acceptance` heading cannot open a section, a fenced
+> `### <date> @author` heading cannot open a comment block, and an unclosed
+> fence runs to the end of the body (CommonMark). Consequences, named: an item
+> whose criteria exist only inside a fence has published no contract and refuses
+> as `no-live-contract` (never as `unchecked-live-criteria`), which is the same
+> trade decision 3 already made for bare boxes — the region decides what the row
+> parser is asked about, never the other way round. The row parser
+> (`acceptanceRows`) stays fence-blind so renderers keep listing an item's rows
+> as written, exactly as decision 5 says, and the container cascade keeps the
+> whole-body question (decision 6) — widening it is carried by
+> `task-cascade-whole-body-acceptance-defers-this-defect`, not here.
 
 ## Context
 
@@ -81,9 +119,13 @@ honour it.
    reporter pasted into one. Comment blocks are stripped _before_ the section is
    located, so a `## Acceptance` pasted inside a comment cannot become the
    contract. History is never edited to satisfy a gate.
+   *(Amended 2026-10-11, see the note at the top: fenced code blocks are
+   excluded on the same footing, and the fence is consulted before the heading
+   rules.)*
 2. **A missing contract is refused too.** The flip is also refused when the live
    section publishes **no criterion at all** — absent, empty, whitespace-only,
-   still the template placeholder, or nothing but bare `- [ ]` rows. One predicate
+   still the template placeholder, nothing but bare `- [ ]` rows, or nothing but
+   rows that sit inside a fenced code block. One predicate
    (zero criteria in the live section) covers all of them, so no fourth spelling
    of "no contract" is a way past it, and ticked boxes in a comment record are
    never evidence for a flip that has no live contract to satisfy.

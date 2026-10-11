@@ -23,11 +23,31 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-done-gate-whole-body-scan
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+See the delivery lead's dated comment below (the two observed sessions). The
+short version: the gate's box scan counted `- [ ]` rows it must not read — rows
+inside a fenced code block, and (before ADR 0025 landed) rows inside a dated
+comment block — so a bug item whose own repro legitimately contains `- [ ]`
+could never be flipped done.
+
+**Root cause of the observed refusals, measured:** both sessions reproduce
+verbatim against the repo-global `arggon@0.5.0` install
+(`~/.local/share/mise/installs/node/.../bin/arggon`), which predates ADR 0025
+and scans the whole body. Against this checkout's kernel the prettier item's
+body already read `{gated: false}` before this change, because ADR 0025's
+live-section scoping and comment-block stripping had landed on 2026-10-06.
+What was still genuinely broken here — and is what this item fixes — is the
+FENCE: the region extractor parsed every surviving line, so a fenced `- [ ]`
+inside the live section counted as a criterion, and a fenced
+`### <date> @author` line opened a comment block that deleted the live section
+below it. Both directions are now fixed.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [x] The done gate's scan ignores `- [ ]`/`- [x]` inside fenced code blocks — the fence is content, never a criterion, and a fenced `## Acceptance` heading opens no section while a fenced `### <date> @author` heading opens no comment block (an unclosed fence runs to the end of the body, CommonMark)
+- [x] ONE rule implemented and recorded: the gate reads the live `## Acceptance` section with dated comment blocks (`### <date> @author`, `### Waiver <date>`) AND fenced code blocks excluded; it refuses when that section publishes no criterion at all (ADR 0025 decision 2) OR when the section's own boxes are unticked (ADR 0015 decision 1). Nothing else in the body gates the flip. Recorded in ADR 0025's 2026-10-11 amendment, `convention.md`, `agents.md`, `json-output.md` and the bundled skill
+- [x] Tests cover the two observed shapes and both refusals stay refused: a fenced repro outside the live section (3 literal `- [ ]` rows), a fenced repro INSIDE the live section between two real criteria, the real `bug-prettier-glues-split-inline-code-span` body end-to-end, a ticked live section with an unticked filing comment, an unticked live box (refused), a live section whose only boxes are fenced (refused as `no-live-contract`), plus the fence grammar (tildes, 4-run, info-string backtick, unclosed), the container-cascade split, and the MCP surface both ways
+- [x] `bug-prettier-glues-split-inline-code-span` flips done without a waiver and without editing its repro — demonstrated on a scratch branch (`scratch/verify-done-gate-fence` off `origin/main`) with the item restored to its pre-flip state: the pre-fix CLI refuses, the fixed kernel flips, the body is byte-identical to `origin/main`, no `### Waiver` written, all three fenced repro rows intact (the real flip is the delivery lead's after merge)
+- [x] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green; `arggon validate` ok — in the declared order
 
 ## Notes
 
@@ -43,8 +63,8 @@ Two sessions of evidence:
 **Why it matters beyond hygiene:** the done gate is the repo's completion contract. A gate that reads fenced content as criteria will wedge exactly the items whose subject matter IS markdown-shaped — formatter bugs, tracker-shaped repros, docs items — i.e. the tracker eating its own dogfood in reverse.
 
 Acceptance:
-- [ ] The done gate's scan ignores `- [ ]`/`- [x]` inside fenced code blocks (the ADR 0025 live-section read is the contract; fences are content)
-- [ ] The scan honors ADR 0025's "dated comment blocks excluded" — a `### <date> @author` block's boxes do not gate the flip (today they do, per evidence 1). Pick ONE rule and implement it; record which
-- [ ] Tests cover: fence-embedded boxes, comment-block boxes, ticked live section with unticked comment (today's exact two shapes)
-- [ ] `bug-prettier-glues-split-inline-code-span` flips done without a waiver and without editing its repro, once this lands (the item stays in_progress until then — honest state)
-- [ ] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green; `arggon validate` ok
+- [x] The done gate's scan ignores `- [ ]`/`- [x]` inside fenced code blocks (the ADR 0025 live-section read is the contract; fences are content)
+- [x] The scan honors ADR 0025's "dated comment blocks excluded" — a `### <date> @author` block's boxes do not gate the flip (today they do, per evidence 1). Pick ONE rule and implement it; record which
+- [x] Tests cover: fence-embedded boxes, comment-block boxes, ticked live section with unticked comment (today's exact two shapes)
+- [x] `bug-prettier-glues-split-inline-code-span` flips done without a waiver and without editing its repro, once this lands (the item stays in_progress until then — honest state)
+- [x] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green; `arggon validate` ok
