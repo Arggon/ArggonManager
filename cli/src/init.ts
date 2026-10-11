@@ -222,11 +222,18 @@ function ensureTemplates(root: string, force: boolean): string[] {
  * comments, blank lines and nested content never register as a section — and
  * an unknown (future) key is listed exactly like a known one: what gets
  * preserved is decided from the bytes, not from what this version knows.
+ *
+ * bug-convention-parser-rejects-valid-yaml-force-rescaffolds: the key is
+ * decoded the same way `parseConventionConfig` decodes it, quotes included, so
+ * `"x-tracker":` is reported as the `x-tracker` section it is. Without that the
+ * report would under-promise (say "preserved no existing sections") about a
+ * section it really did keep — and the whole point of the report is that a
+ * section can no longer disappear without being named.
  */
 function topLevelSections(raw: string): string[] {
   const keys: string[] = [];
   for (const line of raw.split(/\r?\n/)) {
-    const match = /^([A-Za-z0-9_.-]+)\s*:/.exec(line);
+    const match = /^["']?([A-Za-z0-9_.-]+)["']?\s*:/.exec(line);
     if (match && !keys.includes(match[1]!)) keys.push(match[1]!);
   }
   return keys;
