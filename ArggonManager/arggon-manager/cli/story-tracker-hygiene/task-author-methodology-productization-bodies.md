@@ -8,7 +8,6 @@ labels: []
 created: "2026-10-11"
 updated: "2026-10-11"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-methodology-productization-bodies.md
   Leaves live only under a story. id is the filename stem: task-author-methodology-productization-bodies.
@@ -36,3 +35,11 @@ Source material (do not invent direction): ADR 0020 (methodology-first productiz
 - [ ] `x-generated` untouched (these are tracker items, not generated docs); prettier clean; `arggon validate` green; PR opened with impact class Advisory
 
 ## Notes
+
+### 2026-10-11 @ses_ed2ed434cffdHsqB0EV526IjUT
+verdict: approve (10 container bodies, docs-only, smoke-exempt)
+- Read the worktree diff (10 container index files + own item file, +168/-22) — no code/carrier/config; scope stays on the item
+- Standards-reviewer: approve, no blocking findings; traceability to ADR 0020/0021/0022/0026 + spec-017 + children titles verified, domain neutrality verified, protected stories byte-identical
+- Verifier: validate ok (0 warnings), prettier clean on all 10 files
+- Lead calls: (1) task-body '12 containers' count is stale (tree holds 11 todo, 10 placeholders authored) — prose, not a scope error, left as history; (2) done-with-placeholder stories (methodology-carriers, zcode-adapter) stay untouched as history per the guard bug's exclusion; (3) PR impact class n/a is the compliant answer (impact class owed only by carrier PRs)
+- Recommendation: merge PR #727 (merge, not squash); lead ticks Acceptance after merge and flips done
