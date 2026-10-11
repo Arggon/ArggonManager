@@ -1,16 +1,19 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-friction-tier-b-url-and-optout
 title: Tier B prefilled publish URL and the friction opt-out keys
+assignee: arggon-delivery-lead
+branch: feat/task-friction-tier-b-url-and-optout
 parent: story-adopter-feedback
 labels: [method]
 priority: p2
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-11"
+claimed_at: "2026-10-11T17:12:43.982Z"
 depends_on: [task-friction-dedupe-and-report]
+worktree_path: /home/arggon/Projects/ArggonManager-task-friction-tier-b-url-and-optout
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-tier-b-url-and-optout.md
   Leaves live only under a story. id is the filename stem: task-friction-tier-b-url-and-optout.
