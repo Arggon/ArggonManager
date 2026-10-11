@@ -14,6 +14,7 @@ claimed_at: "2026-10-11T17:12:43.982Z"
 depends_on: [task-friction-dedupe-and-report]
 worktree_path: /home/arggon/Projects/ArggonManager-task-friction-tier-b-url-and-optout
 ---
+
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-tier-b-url-and-optout.md
   Leaves live only under a story. id is the filename stem: task-friction-tier-b-url-and-optout.
@@ -48,14 +49,14 @@ gate **capture**, never **discoverability**.
 
 ## Acceptance
 
-- [ ] `--tier a` (default) prints the report only and works with no `gh` on `PATH`, no token and no network (test with `PATH` stripped).
-- [ ] `--tier b` additionally prints `https://github.com/Arggon/ArggonManager/issues/new?title=…&body=…&labels=adopter-friction`.
-- [ ] The URL's `title` starts `[adopter-friction] ` and is ≤120 chars after the prefix.
-- [ ] The URL's `body` is human-readable markdown ending in a fenced `arggon-fingerprint` block carrying the fingerprint and the stable fields; it contains **no YAML front matter** (test asserts).
-- [ ] No tier auto-submits; no code path writes to GitHub. (Non-goal, ADR 0024 §4.)
-- [ ] `x-friction: false` in `ArggonManager/.convention.yml` → records are not written, `--report` renders empty with `optedOut: true`, exit 0 (test).
-- [ ] `ARGGON_NO_FRICTION=1` → same (test).
-- [ ] Opting out does **not** remove the trigger text from generated agent files and does not make the command undiscoverable — asserted by a test that the agent-file carrier is untouched by the opt-out.
-- [ ] An unknown nested key inside `x-friction` is ignored (extension policy); a scalar `x-friction` is a parse error (test both).
-- [ ] `arggon friction --clear` removes the whole log, is idempotent on an empty or missing file, and reports `cleared: 0` rather than an error.
-- [ ] `--report` and `--clear` are mutually exclusive with a capture position, and the conflict is a named error.
+- [x] `--tier a` (default) prints the report only and works with no `gh` on `PATH`, no token and no network (test with `PATH` stripped).
+- [x] `--tier b` additionally prints `https://github.com/Arggon/ArggonManager/issues/new?title=…&body=…&labels=adopter-friction`.
+- [x] The URL's `title` starts `[adopter-friction] ` and is ≤120 chars after the prefix.
+- [x] The URL's `body` is human-readable markdown ending in a fenced `arggon-fingerprint` block carrying the fingerprint and the stable fields; it contains **no YAML front matter** (test asserts).
+- [x] No tier auto-submits; no code path writes to GitHub. (Non-goal, ADR 0024 §4.)
+- [x] `x-friction: false` in `ArggonManager/.convention.yml` → records are not written, `--report` renders empty with `optedOut: true`, exit 0 (test).
+- [x] `ARGGON_NO_FRICTION=1` → same (test).
+- [x] Opting out does **not** remove the trigger text from generated agent files and does not make the command undiscoverable — asserted by a test that the agent-file carrier is untouched by the opt-out.
+- [x] An unknown nested key inside `x-friction` is ignored (extension policy); a scalar `x-friction` is a parse error (test both).
+- [x] `arggon friction --clear` removes the whole log, is idempotent on an empty or missing file, and reports `cleared: 0` rather than an error.
+- [x] `--report` and `--clear` are mutually exclusive with a capture position, and the conflict is a named error.

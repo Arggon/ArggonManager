@@ -234,6 +234,7 @@ export {
   FrictionError,
   appendFrictionRecord,
   buildFrictionRecord,
+  clearFrictionLog,
   frictionDroppedPath,
   frictionFingerprint,
   frictionFingerprintMaterial,
@@ -252,13 +253,38 @@ export {
 } from "./friction.js";
 export {
   FRICTION_REPORT_MAX_ROWS,
+  frictionFenceFor,
   readFrictionReport,
   renderFrictionReport,
   summarizeFrictionLog,
 } from "./friction-report.js";
 export type { FrictionClassRow, FrictionReport, FrictionReportOptions } from "./friction-report.js";
+export {
+  FRICTION_OPT_OUT_ENV,
+  readFrictionOptOut,
+  resolveFrictionOptOut,
+} from "./friction-optout.js";
+export type { FrictionOptOut, FrictionOptOutSource } from "./friction-optout.js";
+export {
+  FRICTION_PUBLISH_FENCE_INFO,
+  FRICTION_PUBLISH_LABEL,
+  FRICTION_PUBLISH_MAX_CLASSES,
+  FRICTION_PUBLISH_MAX_URL_CHARS,
+  FRICTION_PUBLISH_NARRATIVE_CAP,
+  FRICTION_PUBLISH_TIERS,
+  FRICTION_PUBLISH_TITLE_MAX_CHARS,
+  FRICTION_PUBLISH_TITLE_PREFIX,
+  FRICTION_PUBLISH_URL_BASE,
+  buildFrictionPublishBody,
+  buildFrictionPublishDoc,
+  buildFrictionPublishTitle,
+  buildFrictionPublishUrl,
+  isFrictionPublishTier,
+} from "./friction-publish.js";
+export type { FrictionPublishDoc, FrictionPublishTier } from "./friction-publish.js";
 export type {
   FrictionAppendResult,
+  FrictionClearResult,
   FrictionFailureReason,
   FrictionInput,
   FrictionLogRead,
@@ -414,6 +440,7 @@ export {
 export {
   commentOperation,
   createOperation,
+  frictionClearOperation,
   frictionOperation,
   frictionReportOperation,
   handoffOperation,
@@ -433,6 +460,7 @@ export type {
   CreateOperationOptions,
   CreatePayload,
   EnvelopePayload,
+  FrictionClearPayload,
   FrictionOperationOptions,
   FrictionPayload,
   FrictionReportOperationOptions,

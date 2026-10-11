@@ -89,7 +89,7 @@ describe("empty log is success, not an error", () => {
       count: 0,
       classes: 0,
       dropped: 0,
-      optedOut: null,
+      optedOut: false,
       dedupeScope: "local-only",
     });
     expect(envelope.rows).toEqual([]);

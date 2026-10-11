@@ -30,6 +30,7 @@ __arggonEdges.set("lib/src/create.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/create.ts\u0000./relations.js", "lib/src/relations.ts")
 __arggonEdges.set("lib/src/create.ts\u0000./status.js", "lib/src/status.ts")
 __arggonEdges.set("lib/src/create.ts\u0000./tracker-commit.js", "lib/src/tracker-commit.ts")
+__arggonEdges.set("lib/src/friction-optout.ts\u0000./convention.js", "lib/src/convention.ts")
 __arggonEdges.set("lib/src/friction-report.ts\u0000./friction.js", "lib/src/friction.ts")
 __arggonEdges.set("lib/src/friction.ts\u0000./worktree.js", "lib/src/worktree.ts")
 __arggonEdges.set("lib/src/get-open-prs.ts\u0000./detect-repo.js", "lib/src/detect-repo.ts")
@@ -52,6 +53,8 @@ __arggonEdges.set("lib/src/index.ts\u0000./convention.js", "lib/src/convention.t
 __arggonEdges.set("lib/src/index.ts\u0000./create.js", "lib/src/create.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./dates.js", "lib/src/dates.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./filter.js", "lib/src/filter.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./friction-optout.js", "lib/src/friction-optout.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./friction-publish.js", "lib/src/friction-publish.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./friction-report.js", "lib/src/friction-report.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./friction.js", "lib/src/friction.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./frontmatter.js", "lib/src/frontmatter.ts")
@@ -106,6 +109,7 @@ __arggonEdges.set("lib/src/operations.ts\u0000./comment.js", "lib/src/comment.ts
 __arggonEdges.set("lib/src/operations.ts\u0000./contract.js", "lib/src/contract.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./convention.js", "lib/src/convention.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./create.js", "lib/src/create.ts")
+__arggonEdges.set("lib/src/operations.ts\u0000./friction-publish.js", "lib/src/friction-publish.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./friction-report.js", "lib/src/friction-report.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./friction.js", "lib/src/friction.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./handoff.js", "lib/src/handoff.ts")
@@ -931,6 +935,7 @@ exports.readConventionVersion = readConventionVersion;
 exports.parseConventionConfig = parseConventionConfig;
 exports.readConventionConfig = readConventionConfig;
 exports.readGeneratedState = readGeneratedState;
+exports.readFrictionConfig = readFrictionConfig;
 exports.readGeneratedProjectName = readGeneratedProjectName;
 exports.parseGeneratedProjectName = parseGeneratedProjectName;
 exports.serializeGeneratedSection = serializeGeneratedSection;
@@ -1153,6 +1158,12 @@ function requireEmptyMapping(sourcePath, key, rawValue) {
         `(got ${JSON.stringify(rawValue)}; this parser reads BLOCK style only — ` +
         `flow style { }, anchors (&id), aliases (*id) and tags (!!tag) are not supported)`);
 }
+function parseBooleanOption(sourcePath, key, rawValue) {
+    if (rawValue !== "true" && rawValue !== "false") {
+        throw new Error(`${sourcePath}: '${key}' must be a boolean (got ${JSON.stringify(rawValue)})`);
+    }
+    return rawValue === "true";
+}
 function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}/.convention.yml`) {
     const branchPatterns = { ...exports.DEFAULT_BRANCH_PATTERNS };
     const views = {};
@@ -1176,6 +1187,7 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
         services: null,
     };
     const github = { issueRoundtrip: false };
+    const friction = { capture: null };
     let version = exports.CONVENTION_VERSION_DEFAULT;
     let section = null;
     let generatedDest = null;
@@ -1242,6 +1254,13 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
             else if (key === "x-generated") {
                 requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-generated";
+            }
+            else if (key === "x-friction") {
+                if (rawValue === "") {
+                    section = "x-friction";
+                    continue;
+                }
+                friction.capture = parseBooleanOption(sourcePath, key, rawValue);
             }
             continue;
         }
@@ -1411,6 +1430,13 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
             github.issueRoundtrip = rawValue === "true";
             continue;
         }
+        if (section === "x-friction") {
+            if (key === "capture") {
+                friction.capture = parseBooleanOption(sourcePath, "capture", rawValue);
+                continue;
+            }
+            continue;
+        }
         if (section === "x-views") {
             if (!key) {
                 throw new Error(`${sourcePath}: invalid x-views entry ${JSON.stringify(line)}`);
@@ -1448,6 +1474,7 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
         import: { labelTypes: importHasLabelTypes ? importLabelTypes : null },
         worktree,
         github,
+        friction,
         generated,
         generatedProjectName,
     };
@@ -1471,6 +1498,7 @@ function readConventionConfig(dir) {
             import: { labelTypes: null },
             worktree: { postStart: null, postStartShell: null, env: null, services: null },
             github: { issueRoundtrip: false },
+            friction: { capture: null },
             generated: {},
             generatedProjectName: null,
         };
@@ -1486,6 +1514,17 @@ function readGeneratedState(dir) {
     }
     catch {
         return {};
+    }
+}
+function readFrictionConfig(dir) {
+    const path = (0, paths_js_1.conventionPathForRoot)(dir);
+    if (!(0, node_fs_1.existsSync)(path))
+        return { capture: null };
+    try {
+        return parseConventionConfig((0, node_fs_1.readFileSync)(path, "utf8"), path).friction;
+    }
+    catch {
+        return { capture: null };
     }
 }
 function readGeneratedProjectName(dir) {
@@ -1982,17 +2021,214 @@ function matchesPredicate(item, pred, blockedByIndex, ancestorIndex) {
 }
 })
 
+__arggonModules.set("lib/src/friction-optout.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FRICTION_OPT_OUT_ENV = void 0;
+exports.resolveFrictionOptOut = resolveFrictionOptOut;
+exports.readFrictionOptOut = readFrictionOptOut;
+const convention_js_1 = require("./convention.js");
+exports.FRICTION_OPT_OUT_ENV = "ARGGON_NO_FRICTION";
+function resolveFrictionOptOut(config, env) {
+    const fromEnv = env[exports.FRICTION_OPT_OUT_ENV];
+    if (fromEnv !== undefined && fromEnv !== "") {
+        return { optedOut: true, source: "env" };
+    }
+    const capture = config?.capture ?? null;
+    if (capture === false) {
+        return { optedOut: true, source: "config" };
+    }
+    return { optedOut: false, source: null };
+}
+function readFrictionOptOut(dir, env) {
+    return resolveFrictionOptOut((0, convention_js_1.readFrictionConfig)(dir), env);
+}
+})
+
+__arggonModules.set("lib/src/friction-publish.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FRICTION_PUBLISH_TIERS = exports.FRICTION_PUBLISH_MAX_URL_CHARS = exports.FRICTION_PUBLISH_NARRATIVE_CAP = exports.FRICTION_PUBLISH_MAX_CLASSES = exports.FRICTION_PUBLISH_FENCE_INFO = exports.FRICTION_PUBLISH_LABEL = exports.FRICTION_PUBLISH_URL_BASE = exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = exports.FRICTION_PUBLISH_TITLE_PREFIX = void 0;
+exports.isFrictionPublishTier = isFrictionPublishTier;
+exports.buildFrictionPublishTitle = buildFrictionPublishTitle;
+exports.buildFrictionPublishBody = buildFrictionPublishBody;
+exports.buildFrictionPublishUrl = buildFrictionPublishUrl;
+exports.buildFrictionPublishDoc = buildFrictionPublishDoc;
+exports.FRICTION_PUBLISH_TITLE_PREFIX = "[adopter-friction] ";
+exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = 120;
+exports.FRICTION_PUBLISH_URL_BASE = "https://github.com/Arggon/ArggonManager/issues/new";
+exports.FRICTION_PUBLISH_LABEL = "adopter-friction";
+exports.FRICTION_PUBLISH_FENCE_INFO = "arggon-fingerprint";
+exports.FRICTION_PUBLISH_MAX_CLASSES = 10;
+exports.FRICTION_PUBLISH_NARRATIVE_CAP = 400;
+exports.FRICTION_PUBLISH_MAX_URL_CHARS = 6000;
+const MARKER = "…";
+exports.FRICTION_PUBLISH_TIERS = ["a", "b"];
+function isFrictionPublishTier(value) {
+    return exports.FRICTION_PUBLISH_TIERS.includes(value);
+}
+function capText(text, cap) {
+    if (text.length <= cap)
+        return text;
+    return text.slice(0, cap - MARKER.length) + MARKER;
+}
+function fenceFor(text) {
+    const runs = text.match(/`+/g);
+    const longest = runs === null ? 0 : Math.max(...runs.map((run) => run.length));
+    return "`".repeat(Math.max(3, longest + 1));
+}
+function plural(n, one, many) {
+    return n === 1 ? one : many;
+}
+function buildFrictionPublishTitle(report) {
+    const top = report.rows[0];
+    let summary;
+    if (report.optedOut) {
+        summary = "opted out — nothing captured (x-friction: false / ARGGON_NO_FRICTION=1)";
+    }
+    else if (top === undefined) {
+        summary = "no friction recorded (0 records)";
+    }
+    else {
+        const command = top.commandShape === "" ? "(no command shape)" : top.commandShape;
+        const error = top.errorCode !== undefined && top.errorCode !== "" ? ` — ${top.errorCode}` : "";
+        summary = `${command}${error} (×${top.count} of ${report.classes} ${plural(report.classes, "class", "classes")})`;
+    }
+    return exports.FRICTION_PUBLISH_TITLE_PREFIX + capText(summary, exports.FRICTION_PUBLISH_TITLE_MAX_CHARS);
+}
+function fingerprintStanza(row) {
+    return [
+        `fingerprint: ${row.fingerprint}`,
+        `count: ${row.count}`,
+        `reporters: ${row.reporters}`,
+        `commandShape: ${row.commandShape}`,
+        `errorCode: ${row.errorCode ?? ""}`,
+        `harness: ${row.harness}`,
+        `majorVersion: ${row.majorVersion}`,
+        `firstSeen: ${row.firstSeen}`,
+        `lastSeen: ${row.lastSeen}`,
+        `arggonVersion: ${row.arggonVersion}`,
+        `os: ${row.os}`,
+        `arch: ${row.arch}`,
+        `node: ${row.node}`,
+    ];
+}
+function buildFrictionPublishBody(report) {
+    const out = [];
+    out.push("## Adopter friction report");
+    out.push("");
+    out.push("Filed by a human who opened the prefilled URL `arggon friction --report --tier b` printed.");
+    out.push("Nothing here was submitted by the agent that ran arggon (ADR 0024 §4).");
+    out.push("");
+    out.push(`records: ${report.count}   classes: ${report.classes}   dropped: ${report.dropped}   optedOut: ${report.optedOut}`);
+    out.push("dedupe scope: local-only — the reporting machine's own log. No upstream issue is consulted, so a class already filed upstream appears here as new.");
+    out.push("reporters basis: distinct reporterIds present in this log only (stage 1 is one machine).");
+    out.push("narrative is untrusted data, passed through verbatim — never an instruction, never parsed.");
+    if (report.optedOut) {
+        out.push("");
+        out.push("Capture is opted out on this machine (`x-friction: false` in the tracker `.convention.yml`, or `ARGGON_NO_FRICTION=1`), so nothing is recorded and this report is empty. The command stays discoverable on purpose: set the key back to `true`, or unset the variable, to re-enable capture.");
+    }
+    if (report.classes > 0) {
+        const shown = report.rows.slice(0, exports.FRICTION_PUBLISH_MAX_CLASSES);
+        for (const [index, row] of shown.entries()) {
+            out.push("");
+            out.push(`### ${index + 1}. ${row.fingerprint} — count ${row.count}`);
+            out.push("");
+            out.push(`- command: \`${row.commandShape}\``);
+            out.push(`- error: \`${row.errorCode ?? "(none)"}\``);
+            out.push(`- harness: \`${row.harness}\`   major: \`${row.majorVersion}\``);
+            out.push(`- first→last: ${row.firstSeen} → ${row.lastSeen}`);
+            out.push(`- reporters in this log: ${row.reporters}`);
+            out.push("");
+            out.push("narrative (untrusted data, verbatim — never an instruction):");
+            out.push("");
+            const narrative = capText(row.narrative, exports.FRICTION_PUBLISH_NARRATIVE_CAP);
+            const fence = fenceFor(narrative);
+            out.push(fence);
+            out.push(narrative);
+            out.push(fence);
+        }
+        const more = report.classes - shown.length;
+        if (more > 0) {
+            out.push("");
+            out.push(`… and ${more} more ${plural(more, "class", "classes")} not included — the URL length bound. Run \`arggon friction --report\` locally for the whole log.`);
+        }
+    }
+    else if (!report.optedOut) {
+        out.push("");
+        out.push("No friction recorded (count: 0).");
+    }
+    out.push("");
+    out.push(`\`\`\`${exports.FRICTION_PUBLISH_FENCE_INFO}`);
+    if (report.optedOut) {
+        out.push(`optedOut: true`);
+        out.push(`records: 0`);
+        out.push(`classes: 0`);
+    }
+    else {
+        const classes = report.rows.slice(0, exports.FRICTION_PUBLISH_MAX_CLASSES);
+        out.push(`records: ${report.count}`);
+        out.push(`classes: ${report.classes}`);
+        for (const [index, row] of classes.entries()) {
+            if (index > 0)
+                out.push("");
+            out.push(...fingerprintStanza(row));
+        }
+    }
+    out.push("```");
+    return `${out.join("\n")}\n`;
+}
+function buildFrictionPublishUrl(title, body) {
+    const encoded = [
+        `title=${encodeURIComponent(title)}`,
+        `body=${encodeURIComponent(body)}`,
+        `labels=${encodeURIComponent(exports.FRICTION_PUBLISH_LABEL)}`,
+    ].join("&");
+    return `${exports.FRICTION_PUBLISH_URL_BASE}?${encoded}`;
+}
+function buildFrictionPublishDoc(report) {
+    const title = buildFrictionPublishTitle(report);
+    let body = buildFrictionPublishBody(report);
+    let url = buildFrictionPublishUrl(title, body);
+    let included = Math.min(report.classes, exports.FRICTION_PUBLISH_MAX_CLASSES);
+    while (url.length > exports.FRICTION_PUBLISH_MAX_URL_CHARS && included > 0) {
+        included -= 1;
+        const narrowed = {
+            ...report,
+            rows: report.rows.slice(0, included),
+        };
+        body = buildFrictionPublishBody(narrowed);
+        url = buildFrictionPublishUrl(title, body);
+    }
+    return { tier: "b", url, title, body };
+}
+})
+
 __arggonModules.set("lib/src/friction-report.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FRICTION_REPORT_MAX_ROWS = void 0;
 exports.summarizeFrictionLog = summarizeFrictionLog;
 exports.readFrictionReport = readFrictionReport;
+exports.frictionFenceFor = frictionFenceFor;
 exports.renderFrictionReport = renderFrictionReport;
 const node_os_1 = require("node:os");
 const friction_js_1 = require("./friction.js");
 exports.FRICTION_REPORT_MAX_ROWS = 50;
-function summarizeFrictionLog(read, dropped) {
+function summarizeFrictionLog(read, dropped, optedOut = false) {
+    if (optedOut) {
+        return {
+            rows: [],
+            count: 0,
+            classes: 0,
+            dropped: 0,
+            skippedVersions: [],
+            malformed: 0,
+            optedOut: true,
+            truncated: false,
+            dedupeScope: "local-only",
+        };
+    }
     const byFingerprint = new Map();
     for (const record of read.records) {
         let acc = byFingerprint.get(record.fingerprint);
@@ -2042,7 +2278,7 @@ function summarizeFrictionLog(read, dropped) {
         dropped,
         skippedVersions: read.skippedVersions,
         malformed: read.malformed,
-        optedOut: null,
+        optedOut,
         truncated: rows.length > exports.FRICTION_REPORT_MAX_ROWS,
         dedupeScope: "local-only",
     };
@@ -2050,14 +2286,18 @@ function summarizeFrictionLog(read, dropped) {
 function compareFingerprint(a, b) {
     return a < b ? -1 : a > b ? 1 : 0;
 }
+const EMPTY_READ = { records: [], skippedVersions: [], malformed: 0 };
 function readFrictionReport(opts) {
+    if (opts.optedOut === true) {
+        return summarizeFrictionLog(EMPTY_READ, 0, true);
+    }
     const env = opts.env ?? process.env;
     const home = opts.home ?? (0, node_os_1.homedir)();
     const read = (0, friction_js_1.readFrictionLog)((0, friction_js_1.frictionLogPath)(env, home));
     const dropped = (0, friction_js_1.readFrictionDropped)((0, friction_js_1.frictionDroppedPath)(env, home));
-    return summarizeFrictionLog(read, dropped);
+    return summarizeFrictionLog(read, dropped, opts.optedOut ?? false);
 }
-function fenceFor(text) {
+function frictionFenceFor(text) {
     const runs = text.match(/`+/g);
     const longest = runs === null ? 0 : Math.max(...runs.map((run) => run.length));
     return "`".repeat(Math.max(3, longest + 1));
@@ -2070,7 +2310,12 @@ function renderFrictionReport(report) {
     const skipped = report.skippedVersions.length > 0 ? report.skippedVersions.join(", ") : "none";
     out.push(`records: ${report.count}   classes: ${report.classes}   dropped: ${report.dropped}   skippedVersions: ${skipped}   malformed: ${report.malformed}`);
     out.push("reporters basis: distinct reporterIds present in THIS log only (stage 1 is one machine, so normally 1; not other machines, not upstream).");
-    out.push("optedOut: not evaluated — the opt-out keys (x-friction / ARGGON_NO_FRICTION) are a later step; run a current arggon so a report can state whether you opted out.");
+    if (report.optedOut) {
+        out.push("optedOut: true — capture is disabled on this machine (`x-friction: false` in the tracker `.convention.yml`, or `ARGGON_NO_FRICTION` set). Nothing is recorded and this report is empty. The command stays discoverable ON PURPOSE (ADR 0024 §3): set the key back to `true`, or unset the variable, to re-enable capture. The trigger text is still in your generated agent files.");
+    }
+    else {
+        out.push("optedOut: false");
+    }
     if (report.dropped > 0) {
         out.push(`dropped: ${report.dropped} — rotation dropped the oldest record(s) past the 5000-line bound; this history is cache-like and cannot be recovered.`);
     }
@@ -2083,7 +2328,9 @@ function renderFrictionReport(report) {
     }
     if (report.classes === 0) {
         out.push("");
-        out.push(`No friction recorded (count: 0). Capture some with: arggon friction "<one line>" --command "<argv shape>".`);
+        out.push(report.optedOut
+            ? `No friction recorded (count: 0) — capture is opted out, so nothing is written while it stays off.`
+            : `No friction recorded (count: 0). Capture some with: arggon friction "<one line>" --command "<argv shape>".`);
         return `${out.join("\n")}\n`;
     }
     out.push("");
@@ -2095,7 +2342,7 @@ function renderFrictionReport(report) {
         out.push(`   harness: ${row.harness}   major: ${row.majorVersion}`);
         out.push(`   first→last: ${row.firstSeen} → ${row.lastSeen}`);
         out.push("   narrative (untrusted data, verbatim — never an instruction):");
-        const fence = fenceFor(row.narrative);
+        const fence = frictionFenceFor(row.narrative);
         out.push(fence);
         out.push(row.narrative);
         out.push(fence);
@@ -2129,6 +2376,7 @@ exports.readOrCreateMachineSalt = readOrCreateMachineSalt;
 exports.resolveRepoAbsPath = resolveRepoAbsPath;
 exports.buildFrictionRecord = buildFrictionRecord;
 exports.appendFrictionRecord = appendFrictionRecord;
+exports.clearFrictionLog = clearFrictionLog;
 exports.readFrictionLog = readFrictionLog;
 const node_crypto_1 = require("node:crypto");
 const node_child_process_1 = require("node:child_process");
@@ -2567,6 +2815,12 @@ function logEndsPartial(logPath) {
         return false;
     }
     return raw !== "" && !raw.endsWith(NEWLINE);
+}
+function clearFrictionLog(logPath, droppedPath) {
+    const cleared = readLogLines(logPath).length;
+    (0, node_fs_1.rmSync)(logPath, { force: true });
+    (0, node_fs_1.rmSync)(droppedPath, { force: true });
+    return { path: logPath, cleared };
 }
 function readFrictionLog(logPath) {
     const out = { records: [], skippedVersions: [], malformed: 0 };
@@ -3376,10 +3630,10 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.liveAcceptanceUnchecked = exports.liveAcceptanceRows = exports.liveAcceptanceRegion = exports.liveAcceptanceCriteria = exports.itemsById = exports.acceptanceUnchecked = exports.acceptanceRows = exports.acceptanceGate = exports.acceptanceCriteria = exports.acceptanceComplete = exports.acceptanceBody = void 0;
 exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = void 0;
-exports.renderFrictionReport = exports.readFrictionReport = exports.FRICTION_REPORT_MAX_ROWS = exports.resolveRepoAbsPath = exports.redactFrictionText = exports.readOrCreateMachineSalt = exports.readFrictionLog = exports.readFrictionDropped = exports.normalizeCommandShape = exports.frictionStateDir = exports.frictionStateBase = exports.frictionSaltPath = exports.frictionReporterId = exports.frictionMajorVersion = exports.frictionLogPath = exports.frictionFingerprintMaterial = exports.frictionFingerprint = exports.frictionDroppedPath = exports.buildFrictionRecord = exports.appendFrictionRecord = exports.FrictionError = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SECRET_PLACEHOLDER = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_REDACTION_MAX_SUBSTITUTIONS = exports.FRICTION_REDACTED_FIELD = exports.FRICTION_PATH_PLACEHOLDER = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_MAX_LINES = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_HARNESS_CAP = exports.FRICTION_FORMAT_VERSION = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_DROPPED_FILE_NAME = exports.FRICTION_DEFAULT_HARNESS = exports.FRICTION_COMMAND_SHAPE_CAP = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = void 0;
-exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeReleaseRefusal = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.summarizeFrictionLog = void 0;
-exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = void 0;
+exports.frictionFenceFor = exports.FRICTION_REPORT_MAX_ROWS = exports.resolveRepoAbsPath = exports.redactFrictionText = exports.readOrCreateMachineSalt = exports.readFrictionLog = exports.readFrictionDropped = exports.normalizeCommandShape = exports.frictionStateDir = exports.frictionStateBase = exports.frictionSaltPath = exports.frictionReporterId = exports.frictionMajorVersion = exports.frictionLogPath = exports.frictionFingerprintMaterial = exports.frictionFingerprint = exports.frictionDroppedPath = exports.clearFrictionLog = exports.buildFrictionRecord = exports.appendFrictionRecord = exports.FrictionError = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SECRET_PLACEHOLDER = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_REDACTION_MAX_SUBSTITUTIONS = exports.FRICTION_REDACTED_FIELD = exports.FRICTION_PATH_PLACEHOLDER = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_MAX_LINES = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_HARNESS_CAP = exports.FRICTION_FORMAT_VERSION = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_DROPPED_FILE_NAME = exports.FRICTION_DEFAULT_HARNESS = exports.FRICTION_COMMAND_SHAPE_CAP = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = void 0;
+exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.isFrictionPublishTier = exports.buildFrictionPublishUrl = exports.buildFrictionPublishTitle = exports.buildFrictionPublishDoc = exports.buildFrictionPublishBody = exports.FRICTION_PUBLISH_URL_BASE = exports.FRICTION_PUBLISH_TITLE_PREFIX = exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = exports.FRICTION_PUBLISH_TIERS = exports.FRICTION_PUBLISH_NARRATIVE_CAP = exports.FRICTION_PUBLISH_MAX_URL_CHARS = exports.FRICTION_PUBLISH_MAX_CLASSES = exports.FRICTION_PUBLISH_LABEL = exports.FRICTION_PUBLISH_FENCE_INFO = exports.resolveFrictionOptOut = exports.readFrictionOptOut = exports.FRICTION_OPT_OUT_ENV = exports.summarizeFrictionLog = exports.renderFrictionReport = exports.readFrictionReport = void 0;
+exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeReleaseRefusal = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.frictionClearOperation = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceBody", { enumerable: true, get: function () { return items_js_1.acceptanceBody; } });
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
@@ -3529,6 +3783,7 @@ Object.defineProperty(exports, "FRICTION_STATE_SUBDIR", { enumerable: true, get:
 Object.defineProperty(exports, "FrictionError", { enumerable: true, get: function () { return friction_js_1.FrictionError; } });
 Object.defineProperty(exports, "appendFrictionRecord", { enumerable: true, get: function () { return friction_js_1.appendFrictionRecord; } });
 Object.defineProperty(exports, "buildFrictionRecord", { enumerable: true, get: function () { return friction_js_1.buildFrictionRecord; } });
+Object.defineProperty(exports, "clearFrictionLog", { enumerable: true, get: function () { return friction_js_1.clearFrictionLog; } });
 Object.defineProperty(exports, "frictionDroppedPath", { enumerable: true, get: function () { return friction_js_1.frictionDroppedPath; } });
 Object.defineProperty(exports, "frictionFingerprint", { enumerable: true, get: function () { return friction_js_1.frictionFingerprint; } });
 Object.defineProperty(exports, "frictionFingerprintMaterial", { enumerable: true, get: function () { return friction_js_1.frictionFingerprintMaterial; } });
@@ -3546,9 +3801,29 @@ Object.defineProperty(exports, "redactFrictionText", { enumerable: true, get: fu
 Object.defineProperty(exports, "resolveRepoAbsPath", { enumerable: true, get: function () { return friction_js_1.resolveRepoAbsPath; } });
 var friction_report_js_1 = require("./friction-report.js");
 Object.defineProperty(exports, "FRICTION_REPORT_MAX_ROWS", { enumerable: true, get: function () { return friction_report_js_1.FRICTION_REPORT_MAX_ROWS; } });
+Object.defineProperty(exports, "frictionFenceFor", { enumerable: true, get: function () { return friction_report_js_1.frictionFenceFor; } });
 Object.defineProperty(exports, "readFrictionReport", { enumerable: true, get: function () { return friction_report_js_1.readFrictionReport; } });
 Object.defineProperty(exports, "renderFrictionReport", { enumerable: true, get: function () { return friction_report_js_1.renderFrictionReport; } });
 Object.defineProperty(exports, "summarizeFrictionLog", { enumerable: true, get: function () { return friction_report_js_1.summarizeFrictionLog; } });
+var friction_optout_js_1 = require("./friction-optout.js");
+Object.defineProperty(exports, "FRICTION_OPT_OUT_ENV", { enumerable: true, get: function () { return friction_optout_js_1.FRICTION_OPT_OUT_ENV; } });
+Object.defineProperty(exports, "readFrictionOptOut", { enumerable: true, get: function () { return friction_optout_js_1.readFrictionOptOut; } });
+Object.defineProperty(exports, "resolveFrictionOptOut", { enumerable: true, get: function () { return friction_optout_js_1.resolveFrictionOptOut; } });
+var friction_publish_js_1 = require("./friction-publish.js");
+Object.defineProperty(exports, "FRICTION_PUBLISH_FENCE_INFO", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_FENCE_INFO; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_LABEL", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_LABEL; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_MAX_CLASSES", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_MAX_CLASSES; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_MAX_URL_CHARS", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_MAX_URL_CHARS; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_NARRATIVE_CAP", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_NARRATIVE_CAP; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_TIERS", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_TIERS; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_TITLE_MAX_CHARS", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_TITLE_MAX_CHARS; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_TITLE_PREFIX", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_TITLE_PREFIX; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_URL_BASE", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_URL_BASE; } });
+Object.defineProperty(exports, "buildFrictionPublishBody", { enumerable: true, get: function () { return friction_publish_js_1.buildFrictionPublishBody; } });
+Object.defineProperty(exports, "buildFrictionPublishDoc", { enumerable: true, get: function () { return friction_publish_js_1.buildFrictionPublishDoc; } });
+Object.defineProperty(exports, "buildFrictionPublishTitle", { enumerable: true, get: function () { return friction_publish_js_1.buildFrictionPublishTitle; } });
+Object.defineProperty(exports, "buildFrictionPublishUrl", { enumerable: true, get: function () { return friction_publish_js_1.buildFrictionPublishUrl; } });
+Object.defineProperty(exports, "isFrictionPublishTier", { enumerable: true, get: function () { return friction_publish_js_1.isFrictionPublishTier; } });
 var tracker_commit_js_1 = require("./tracker-commit.js");
 Object.defineProperty(exports, "commitPayload", { enumerable: true, get: function () { return tracker_commit_js_1.commitPayload; } });
 var create_js_1 = require("./create.js");
@@ -3650,6 +3925,7 @@ Object.defineProperty(exports, "resolveImportType", { enumerable: true, get: fun
 var operations_js_1 = require("./operations.js");
 Object.defineProperty(exports, "commentOperation", { enumerable: true, get: function () { return operations_js_1.commentOperation; } });
 Object.defineProperty(exports, "createOperation", { enumerable: true, get: function () { return operations_js_1.createOperation; } });
+Object.defineProperty(exports, "frictionClearOperation", { enumerable: true, get: function () { return operations_js_1.frictionClearOperation; } });
 Object.defineProperty(exports, "frictionOperation", { enumerable: true, get: function () { return operations_js_1.frictionOperation; } });
 Object.defineProperty(exports, "frictionReportOperation", { enumerable: true, get: function () { return operations_js_1.frictionReportOperation; } });
 Object.defineProperty(exports, "handoffOperation", { enumerable: true, get: function () { return operations_js_1.handoffOperation; } });
@@ -4591,6 +4867,7 @@ exports.syncOperation = syncOperation;
 exports.importIssuesOperation = importIssuesOperation;
 exports.frictionOperation = frictionOperation;
 exports.frictionReportOperation = frictionReportOperation;
+exports.frictionClearOperation = frictionClearOperation;
 const node_path_1 = require("node:path");
 const node_os_1 = require("node:os");
 const acceptance_js_1 = require("./acceptance.js");
@@ -4608,6 +4885,7 @@ const next_js_1 = require("./next.js");
 const priority_js_1 = require("./priority.js");
 const report_js_1 = require("./report.js");
 const friction_js_1 = require("./friction.js");
+const friction_publish_js_1 = require("./friction-publish.js");
 const friction_report_js_1 = require("./friction-report.js");
 const show_js_1 = require("./show.js");
 const sync_command_js_1 = require("./sync-command.js");
@@ -4869,11 +5147,17 @@ function importIssuesOperation(opts) {
 function frictionOperation(opts) {
     const cwd = opts.cwd;
     try {
+        if (opts.optedOut) {
+            return succeed("friction", {
+                optedOut: true,
+                path: (0, friction_js_1.frictionLogPath)(opts.env ?? process.env, opts.home ?? (0, node_os_1.homedir)()),
+            }, (0, convention_js_1.readConventionVersion)(cwd));
+        }
         const record = (0, friction_js_1.buildFrictionRecord)(opts, opts);
         const env = opts.env ?? process.env;
         const home = opts.home ?? (0, node_os_1.homedir)();
         const appended = (0, friction_js_1.appendFrictionRecord)(record, (0, friction_js_1.frictionLogPath)(env, home));
-        return succeed("friction", { path: appended.path, dropped: appended.dropped, record }, (0, convention_js_1.readConventionVersion)(cwd));
+        return succeed("friction", { optedOut: false, path: appended.path, dropped: appended.dropped, record }, (0, convention_js_1.readConventionVersion)(cwd));
     }
     catch (err) {
         if (err instanceof friction_js_1.FrictionError) {
@@ -4898,11 +5182,16 @@ function frictionOperation(opts) {
 }
 function frictionReportOperation(opts) {
     try {
-        const report = (0, friction_report_js_1.readFrictionReport)({ env: opts.env, home: opts.home });
+        const report = (0, friction_report_js_1.readFrictionReport)({
+            env: opts.env,
+            home: opts.home,
+            optedOut: opts.optedOut,
+        });
         const payload = {
             report: true,
             path: (0, friction_js_1.frictionLogPath)(opts.env ?? process.env, opts.home ?? (0, node_os_1.homedir)()),
             ...report,
+            ...(opts.tier === "b" ? { publish: (0, friction_publish_js_1.buildFrictionPublishDoc)(report) } : {}),
         };
         return succeed("friction", payload, (0, convention_js_1.readConventionVersion)(opts.cwd));
     }
@@ -4925,6 +5214,17 @@ function frictionReportOperation(opts) {
                 error: err,
             };
         }
+        return fail("friction", opts.cwd, "FRICTION_FAILED", err);
+    }
+}
+function frictionClearOperation(opts) {
+    try {
+        const env = opts.env ?? process.env;
+        const home = opts.home ?? (0, node_os_1.homedir)();
+        const cleared = (0, friction_js_1.clearFrictionLog)((0, friction_js_1.frictionLogPath)(env, home), (0, friction_js_1.frictionDroppedPath)(env, home));
+        return succeed("friction", { clear: true, ...cleared }, (0, convention_js_1.readConventionVersion)(opts.cwd));
+    }
+    catch (err) {
         return fail("friction", opts.cwd, "FRICTION_FAILED", err);
     }
 }

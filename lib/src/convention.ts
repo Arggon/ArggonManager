@@ -184,6 +184,24 @@ export type GitHubConfig = {
   issueRoundtrip: boolean;
 };
 
+/** `x-friction` namespaced extension options (ADR 0024 §3, plan T4). */
+export type FrictionConfig = {
+  /**
+   * Friction-capture opt-out from `x-friction` (spec-friction-capture-020
+   * §Opt-out). `false` disables capture tree-wide: `arggon friction "<obs>"`
+   * writes no record and `--report` renders empty with `optedOut: true`. It
+   * gates **capture only** — never discoverability (ADR 0024 §3): the trigger
+   * text stays in the generated agent files and the command stays on PATH and
+   * in `--help`, so an adopter who opts out and later wants the channel back
+   * can still find it.
+   *
+   * `null` when unset (capture is the default). `ARGGON_NO_FRICTION=1` is the
+   * per-invocation off-switch and WINS over this key, mirroring the
+   * `--no-commit` / `x-tracker.auto-commit` precedence.
+   */
+  capture: boolean | null;
+};
+
 /**
  * One generated-doc provenance record (`x-generated` namespaced extension,
  * story-adoption-state): destination path -> entry, written by
@@ -223,6 +241,8 @@ export type ConventionConfig = {
   worktree: WorktreeConfig;
   /** GitHub round-trip options (`x-github` extension key). */
   github: GitHubConfig;
+  /** Adopter-friction options (`x-friction` extension key). */
+  friction: FrictionConfig;
   /**
    * Generated-doc provenance (`x-generated` extension key): destination path
    * (posix, relative to the repo root) -> provenance entry.
@@ -496,13 +516,28 @@ function requireEmptyMapping(sourcePath: string, key: string, rawValue: string):
 }
 
 /**
+ * Read one boolean option off its RAW token (comment stripped, still quoted):
+ * only the exact tokens `true`/`false` are accepted, and a *quoted* boolean is
+ * refused — `allow-steal: "true"` denotes the STRING "true", and reading an
+ * arming flag (or an opt-out) out of a string is exactly how an armed gate
+ * reads as unset (bug-convention-parser-rejects-valid-yaml-force-rescaffolds).
+ * The YAML-1.1-only spellings (`yes`/`on`) are refused for the same reason.
+ */
+function parseBooleanOption(sourcePath: string, key: string, rawValue: string): boolean {
+  if (rawValue !== "true" && rawValue !== "false") {
+    throw new Error(`${sourcePath}: '${key}' must be a boolean (got ${JSON.stringify(rawValue)})`);
+  }
+  return rawValue === "true";
+}
+
+/**
  * Parse the tracker's `.convention.yml` (line-oriented, no YAML dependency).
  * Unknown top-level keys are ignored for forward compatibility;
  * `x-views` (saved views), `x-playbooks` (playbook staleness options),
  * `x-tracker` (tracker-hygiene options), `x-import` (issue-import options),
  * `x-worktree` (worktree-bootstrap options), `x-github` (GitHub round-trip
- * options), and `x-generated` (generated-doc
- * provenance) are the official namespaced extensions.
+ * options), `x-friction` (adopter-friction opt-out) and `x-generated`
+ * (generated-doc provenance) are the official namespaced extensions.
  * Throws with file context on malformed `branch_patterns`, `x-views`,
  * `x-playbooks`, `x-tracker`, `x-import`, `x-worktree`, or `x-github`; `x-generated`
  * parses tolerantly (machine-written state).
@@ -549,6 +584,7 @@ export function parseConventionConfig(
     services: null,
   };
   const github: GitHubConfig = { issueRoundtrip: false };
+  const friction: FrictionConfig = { capture: null };
   let version = CONVENTION_VERSION_DEFAULT;
   let section: string | null = null;
   let generatedDest: string | null = null;
@@ -618,6 +654,22 @@ export function parseConventionConfig(
       } else if (key === "x-generated") {
         requireEmptyMapping(sourcePath, key, rawValue);
         section = "x-generated";
+      } else if (key === "x-friction") {
+        // The one namespaced extension whose SCALAR spelling is the documented
+        // one: the spec, the ADR and the plan all write `x-friction: false`
+        // (spec-friction-capture-020 §Opt-out, ADR 0024 §3). The mapping
+        // spelling (`x-friction:` + a nested `capture:` option) is accepted
+        // alongside it, so the section reads like its `x-*` siblings and an
+        // unknown nested key is ignored per the extension policy. A scalar that
+        // is not a boolean token is a parse error, exactly like every other
+        // boolean option here — a quoted `"false"` denotes the STRING "false",
+        // and reading an opt-out out of a string is how an opted-out tree
+        // captures anyway.
+        if (rawValue === "") {
+          section = "x-friction";
+          continue;
+        }
+        friction.capture = parseBooleanOption(sourcePath, key, rawValue);
       }
       continue;
     }
@@ -856,6 +908,16 @@ export function parseConventionConfig(
       github.issueRoundtrip = rawValue === "true";
       continue;
     }
+    if (section === "x-friction") {
+      // Namespaced extension (ADR 0024 §3, plan T4): unknown nested keys are
+      // ignored (ignore-unknown, forward compat); the official `capture` option
+      // is the boolean capture opt-out the scalar spelling sets directly.
+      if (key === "capture") {
+        friction.capture = parseBooleanOption(sourcePath, "capture", rawValue);
+        continue;
+      }
+      continue; // unknown nested key: ignored, never fatal
+    }
     if (section === "x-views") {
       if (!key) {
         throw new Error(`${sourcePath}: invalid x-views entry ${JSON.stringify(line)}`);
@@ -897,6 +959,7 @@ export function parseConventionConfig(
     import: { labelTypes: importHasLabelTypes ? importLabelTypes : null },
     worktree,
     github,
+    friction,
     generated,
     generatedProjectName,
   };
@@ -922,6 +985,7 @@ export function readConventionConfig(dir: string): ConventionConfig {
       import: { labelTypes: null },
       worktree: { postStart: null, postStartShell: null, env: null, services: null },
       github: { issueRoundtrip: false },
+      friction: { capture: null },
       generated: {},
       generatedProjectName: null,
     };
@@ -942,6 +1006,31 @@ export function readGeneratedState(dir: string): Record<string, GeneratedEntry> 
     return parseConventionConfig(readFileSync(path, "utf8"), path).generated;
   } catch {
     return {};
+  }
+}
+
+/**
+ * Tolerant read of the `x-friction` capture opt-out. Like
+ * {@link readGeneratedState} this never throws: a missing file, an unreadable
+ * one, or a `.convention.yml` this parser refuses yields `{ capture: null }`
+ * (capture ON, the documented default).
+ *
+ * The direction is deliberate and it is the FAIL-OPEN one. A tree that opted
+ * out with a token this reader refuses (`x-friction: yes`) is not silently
+ * captured-and-forgotten: every OTHER surface that reads the config
+ * (`list`, `show`, `validate`, `init`, …) already fails that file with the
+ * named parse error, so the adopter sees it immediately. Refusing the friction
+ * capture here too would turn one bad line into "ArggonManager's escape hatch
+ * for broken tooling stopped working", which is exactly the friction this
+ * channel exists to hear about.
+ */
+export function readFrictionConfig(dir: string): FrictionConfig {
+  const path = conventionPathForRoot(dir);
+  if (!existsSync(path)) return { capture: null };
+  try {
+    return parseConventionConfig(readFileSync(path, "utf8"), path).friction;
+  } catch {
+    return { capture: null };
   }
 }
 

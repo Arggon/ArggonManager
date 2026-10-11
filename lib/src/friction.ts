@@ -8,6 +8,7 @@ import {
   readFileSync,
   readSync,
   fstatSync,
+  rmSync,
   writeFileSync,
   writeSync,
 } from "node:fs";
@@ -661,7 +662,11 @@ export type FrictionFailureReason =
   | "no-command-shape"
   | "log-unwritable"
   | "evidence-unreadable"
-  | "report-and-capture-mutually-exclusive";
+  | "report-and-capture-mutually-exclusive"
+  | "clear-and-capture-mutually-exclusive"
+  | "report-and-clear-mutually-exclusive"
+  | "unknown-tier"
+  | "tier-without-report";
 
 /** `mkdir -p` one directory, naming it on failure. */
 function mkdirP(dir: string): void {
@@ -1068,9 +1073,49 @@ function logEndsPartial(logPath: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// The reader: skip an unknown `v` rather than failing the file
+// `--clear`: the complete local rollback (spec §Persistence / migration /
+// rollback). Deleting the log is the whole rollback — the log is cache-like and
+// holds nothing the user authored as work, so there is no migration and nothing
+// to recover afterwards.
 // ---------------------------------------------------------------------------
 
+/** What one clear reports back: how many records left, and the path they left. */
+export type FrictionClearResult = {
+  /** Absolute log path that was cleared (the file is gone afterwards). */
+  path: string;
+  /** Records removed. `0` — never an error — when there was nothing to remove. */
+  cleared: number;
+};
+
+/**
+ * Remove the whole log (and the cumulative drop counter beside it), reporting
+ * how many records it held.
+ *
+ * Idempotent by construction: a missing or empty log clears `0` and exits 0,
+ * because "already cleared" is the state the operator asked for, not a failure
+ * (spec §Failure / retry: "`--clear` is idempotent on an already-empty log and
+ * on a missing file, reporting `cleared: 0` rather than an error"). The count
+ * comes from the same tolerant reader `--report` uses, so a log holding only
+ * malformed lines reports those lines as cleared rather than pretending the file
+ * was empty.
+ *
+ * The machine SALT survives on purpose: it identifies "same machine, same repo"
+ * for `reporterId` across the log's lifetime, and removing it would silently
+ * re-identify the machine rather than clear its history.
+ */
+export function clearFrictionLog(logPath: string, droppedPath: string): FrictionClearResult {
+  const cleared = readLogLines(logPath).length;
+  // `force` makes a missing file a no-op; the directory is never created here —
+  // `--clear` must not leave a state dir behind on a machine that never
+  // captured anything.
+  rmSync(logPath, { force: true });
+  rmSync(droppedPath, { force: true });
+  return { path: logPath, cleared };
+}
+
+// ---------------------------------------------------------------------------
+// The reader: skip an unknown `v` rather than failing the file
+// ---------------------------------------------------------------------------
 /** What a tolerant read reports (spec §Persistence / migration / rollback). */
 export type FrictionLogRead = {
   /** Every record this reader understands, in file order. */
