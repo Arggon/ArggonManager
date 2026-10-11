@@ -142,3 +142,7 @@ Gates (declared order, after rebasing the branch onto current origin/main — 15
 Scope: 2 files vs main (cli/src/prose-format.test.ts +177; the item body). Sibling item's file untouched; no baseline JSONs, friction module, or done-gate kernel edits; prettier-on-save churn reverted (git status clean).
 
 Convergence generalization: unchanged and covered — rule 4 does NOT see my shape (its herd counts wrapping inlineCode spans; a bare continuation paragraph sets none), which is why rule 6 carries its own detector (listCodeReport). Enforcement = the shared double-write shape + trigger ban, recorded in the test file's header comment and in the body's Acceptance #3.
+
+### handoff 2026-10-11 @ses_ed467de75ffekufDO5jLfnHPF6 (session: ses_ed467de75ffekufDO5jLfnHPF6) — next: Delivery lead: review PR #715 (fix = rule 6 + keycase in cli/src/prose-format.test.ts); merge, then flip done.
+- branch: fix/bug-prettier-indented-list-continuation-grows-2-spaces-per-write
+- open questions: none — tracker-subtree convergence rule stays deferred until task-code-span-repair-sweep repairs the 5 span-drift bodies
