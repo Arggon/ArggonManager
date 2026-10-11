@@ -86,3 +86,8 @@ Out-of-scope observation for the delivery lead (NOT filed as an item, NOT fixed 
 
 ### 2026-10-11 @arggon-maker
 Out-of-scope observation for the delivery lead (NOT filed as an item, NOT fixed here): spec-opencode-seam-010.md is the other surviving no-error-path finding on spec analyze (spec-opencode2-009.md and spec-spec-import-openspec-005.md carry the 3 vague-quantifier warnings). Fixing it is separate work — the delivery lead decides whether it becomes its own item under story-spec-pipeline. Also note the handoff open-questions field capped at 200 chars, so the truncated tail was: "Should spec-opencode-seam-010.md (the other no-error-path survivor) get its own follow-up item?"
+
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merged (PR #686)
+
+Reviewed against engineering.md §Review bar: scope stayed on the item (one spec + its own body); the fix is a real, code-grounded error-handling section (per-surface error.code table citing update/validate/list implementations), matching the house idiom found in spec-sync-001.md, and the renumber note was amended with a dated Update so "Spec content unchanged" stays honest — the docs travel with the change; evidence travels with it (spec analyze before: the no-error-path finding, 5 findings, exit 1; after: 4 findings, exit 0; bonus: the --baseline lane on this branch reads 0 new); gates + CI green; baselines untouched per constraint.
