@@ -39,3 +39,7 @@ Source material (do not invent direction): ADR 0020 (methodology-first productiz
 - [ ] `x-generated` untouched (these are tracker items, not generated docs); prettier clean; `arggon validate` green; PR opened with impact class Advisory
 
 ## Notes
+
+### handoff 2026-10-11 @ses_ed2caf24bffejg5yc641LmkH43 (session: ses_ed2caf24bffejg5yc641LmkH43) — next: Push branch, open PR (impact class Advisory), route to standards review
+- branch: feat/task-author-methodology-productization-bodies
+- open questions: Scope said 9 files but listed 10; tree has 11 open not 12; 2 done stories still placeholder — left untouched, confirm
