@@ -78,3 +78,7 @@ Leak scan of the persisted line: ghp_aaaaaaaa, BEGIN RSA, MIIEowIB, sk-abcdefgh1
 Negative/adversarial coverage: a crafted narrative (JWT + path inside a URL query, a PEM block, a quoted multi-word passphrase, and a decoy `key: -----BEGIN …` that would let the assignment rule's leftmost match orphan the block body) is covered by the rule set; one-dash-misspelled marker, fullwidth `＝`, zero-width-split token and newline-split name are asserted as recorded boundaries with reasons (see the test file).
 
 Decisions the reviewer should confirm: path placeholders exempt from the 50% rate (a <path> is safe to publish); github_pat_ added to the gh family; quoted multi-word assignment values redacted while unquoted multi-word values stay a recorded boundary; PEM shapes run as their own pass before token/assignment shapes; redaction before capping; the append re-applies the idempotent pass as a log-level guard. All are commented in lib/src/friction.ts and listed in the PR description.
+
+### handoff 2026-10-11 @Arggon — next: Review PR #701 on branch feat/task-friction-redaction-at-write: confirm the recorded redaction decisions (path-exempt 50% rate, github_pat_, PEM-before-assignment pass order) and merge; T3 (report re…
+- branch: feat/task-friction-redaction-at-write
+- open questions: Should unquoted multi-word assignment values (password=correct horse) be redacted too, or stay the recorded token-shaped boundary? Does the standards reviewer want scp-style git@host:owner/repo URLs …
