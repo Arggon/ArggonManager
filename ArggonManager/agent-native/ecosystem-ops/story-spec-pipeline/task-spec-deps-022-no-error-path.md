@@ -81,3 +81,6 @@ Item not flipped to done — completion is the delivery lead's call after merge.
 ### handoff 2026-10-11 @arggon-maker — next: Merge PR #686, then let task-release-pipeline-baseline-new-collisions re-save both baselines: spec analyze now reads 0 new / 2 resolved / 4 unchanged (exit 0) instead of 1 new.
 - branch: feat/task-spec-deps-022-no-error-path
 - open questions: Does the delivery lead want an acceptance row added in spec-deps-022 §7 for the filter-token row too, or is the §5 reference row enough?;Should spec-opencode-seam-010.md (the other no-error-path surv…
+
+### 2026-10-11 @arggon-maker
+Out-of-scope observation for the delivery lead (NOT filed as an item, NOT fixed here): spec-opencode-seam-010.md is the other surviving no-error-path finding on spec analyze (spec-opencode2-009.md and spec-spec-import-openspec-005.md carry the 3 vague-quantifier warnings). Fixing it is separate work — the delivery lead decides whether it becomes its own item under story-spec-pipeline. Also note the handoff open-questions field capped at 200 chars, so the truncated tail was: "Should spec-opencode-seam-010.md (the other no-error-path survivor) get its own follow-up item?"
