@@ -128,3 +128,7 @@ NOT DONE / FINDINGS FOR THE LEAD
 - docs/json-output.md §native receipt fields now under-describes the footprint case ("No declaration anywhere … means no expectation"; "on a write it is refused instead"): true for the CLI surface that file documents, incomplete for the native footprint. OUTSIDE this item's file scope (opencode2.md is the doc carrier here and is updated) — reported, not touched.
 - repo-root README's sourced-.arggon.env pairing is documented as the way to declare; it stays supported but is no longer load-bearing. Not restated (README outside scope).
 - The item body's "three faces" note (faces 1 and 3: claim pool from main, reap blind to worktree_path-less done items) is explicitly NOT covered here; face 2 (read path / this guard) is.
+
+### handoff 2026-10-11 @ses_ed571bfafffe0DJ8dqvMYrw67y (session: ses_ed571bfafffe0DJ8dqvMYrw67y) — next: Delivery lead: review PR #706 (behavioral, ADR 0016) — the footprint reports rather than refuses; merge after standards review; the json-output.md drift noted on the item is a separate follow-up.
+- branch: fix/bug-native-guard-silent-without-worktree-declaration
+- open questions: Should a verdict find the report-only disposition sufficient, or does the lead want a follow-up item exploring a refusal for unmERGED-branch writes only?; does json-output.md get a footprint line in …
