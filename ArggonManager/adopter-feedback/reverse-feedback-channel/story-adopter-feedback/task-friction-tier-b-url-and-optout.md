@@ -126,3 +126,19 @@ Impact class: behavioral (ADR 0024 §2 / docs/agents.md §Changing the methodolo
 ### handoff 2026-10-11 @arggon-maker — next: Delivery lead reviews PR #724 (gates green, 11/11 acceptance ticked); on merge flip the item to done and take the Issue Forms ops change.
 - branch: feat/task-friction-tier-b-url-and-optout
 - open questions: Owner may prefer the Discussions fallback (one repo setting, named on the spike item); T5 owns MCP parity/json-output/doctor.friction; add &template= after the ops change lands.
+- [ ] `--tier a` (default) prints the report only and works with no `gh` on `PATH`, no token and no network (test with `PATH` stripped).
+- [ ] `--tier b` additionally prints `https://github.com/Arggon/ArggonManager/issues/new?title=…&body=…&labels=adopter-friction`.
+- [ ] The URL's `title` starts `[adopter-friction] ` and is ≤120 chars after the prefix.
+- [ ] The URL's `body` is human-readable markdown ending in a fenced `arggon-fingerprint` block carrying the fingerprint and the stable fields; it contains **no YAML front matter** (test asserts).
+- [ ] No tier auto-submits; no code path writes to GitHub. (Non-goal, ADR 0024 §4.)
+- [ ] `x-friction: false` in `ArggonManager/.convention.yml` → records are not written, `--report` renders empty with `optedOut: true`, exit 0 (test).
+- [ ] `ARGGON_NO_FRICTION=1` → same (test).
+- [ ] Opting out does **not** remove the trigger text from generated agent files and does not make the command undiscoverable — asserted by a test that the agent-file carrier is untouched by the opt-out.
+- [ ] An unknown nested key inside `x-friction` is ignored (extension policy); a scalar `x-friction` is a parse error (test both).
+- [ ] `arggon friction --clear` removes the whole log, is idempotent on an empty or missing file, and reports `cleared: 0` rather than an error.
+- [ ] `--report` and `--clear` are mutually exclusive with a capture position, and the conflict is a named error.
+
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merge (PR #724)
+
+Reviewed against engineering.md §Review bar. Architecture/boundaries: tier B stays an emission surface — `encodeURIComponent` (form encoding's `+` would break the prefill contract) with a 6000-char bound well past the spike's measured 414 ceiling and tail drops stated in the body; a source-level guard test scans all four friction modules for HTTP/fetch/`gh`/API-host so "no code path writes to GitHub" is enforced structurally, not by review; opt-out semantics implement the ADR 0024 §3 ruling exactly — the keys gate CAPTURE, never DISCOVERABILITY (opted-out report is empty-but-successful with `optedOut: true`, trigger text and `--help` untouched, `--clear` ungated as a requested rollback) — and the env var's precedence over the tree-wide key mirrors the repo's own `--no-commit`-over-`x-tracker.auto-commit` idiom. Evidence travels: PATH-stripped/`env -i` runs for tiers a/b/c, the opt-out write-nothing run, the `--clear` count sequence, and 3104 tests. Scope stayed on the item: the Issue Forms template is the named ops change in the PR (correctly not invented into the diff), MCP/json-output/doctor untouched, and the spike's amendment 2 is routed to T6 rather than absorbed. The maker also audited and repaired the inherited partial work it found in the worktree (missing import, misleading `tier-without-report` reason, template-implying comments) — that is the right use of a fresh pair of eyes on stranded work. Impact class stated behavioral.
