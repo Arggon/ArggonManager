@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-web-board-hierarchy-links
 title: "Web board detail drawer: link parent and list children"
+assignee: arggon-delivery-lead
+branch: feat/task-web-board-hierarchy-links
 parent: story-hierarchy-navigation
 labels: []
 created: "2026-10-11"
 updated: "2026-10-11"
+claimed_at: "2026-10-11T23:17:33.108Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-web-board-hierarchy-links
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/task-web-board-hierarchy-links.md
   Leaves live only under a story. id is the filename stem: task-web-board-hierarchy-links.
