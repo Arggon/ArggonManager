@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-init-force-drops-x-tracker-block
 title: "`init --force` re-scaffolds `.convention.yml` from a fixed string, silently dropping the whole `x-tracker` block — it disarms `allow-steal`, `strict-gate-bins`, `strict-worktree-writes` and `reap-acked-orphans`"
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [cli, safety, convention]
 priority: p2
 created: "2026-10-04"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T04:23:07.989Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-init-force-drops-x-tracker-block
 ---
 <!--
