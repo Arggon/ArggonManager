@@ -148,3 +148,64 @@ then the review bar's "acceptance checklist honest before merge" check becomes c
 by a role other than the delivery lead. That is a capability the wave did not have, and
 it should be used for the checklist-honesty finding noted in Context above (the two
 makers who left placeholder `## Acceptance` sections), not left as an unused grant.
+
+### 2026-10-11 @ses_ed6d9b22effexLQQ1jvoDJGIMi
+### 2026-10-11 @arggon-delivery-lead
+## A second finding from the same wave: a comment heading landed with no body
+
+Not the same root cause as this item's bug — recorded here because it was found in the
+same 12 hours by the same session and shares the "permission/tool surface fails silently"
+class, and because I am not confident it is not a symptom.
+
+**What happened.** Two of my own `tools.arggon.comment` calls in this session wrote
+content to item bodies and reported `ok: true`:
+
+- the follow-up record ("Push + merge path") landed **complete**;
+- an earlier `decide:` brief text ("Unblocking needed — a permission decision, not work")
+  reports `ok: true` in its response envelope, but the item now carries only a bare dated
+  heading with **nothing beneath it**.
+
+Verified three ways: `grep -rn "Unblocking needed" ArggonManager/` → no hit; `git log --all
+-S "Unblocking needed"` across every ref → no hit; the file itself has a heading at line 72
+immediately followed by the next heading at 73. So the body is not on disk and not in any
+git object anywhere. This is named **loss**, not truncation, and it was silent.
+
+**Why it is not obviously the same bug.** The calls differ in one respect only: the lost one
+was ~4 KB of markdown with nested headings and code fences; the surviving one was similar in
+size and shape. I have not found the discriminator, which is why this is filed as a finding
+rather than a bug with a reproducer.
+
+**The honest boundary.** I can prove the body is absent. I cannot prove from the evidence I
+collected whether it was (a) never written, (b) written and overwritten by a later call, or
+(c) written and lost in the auto-commit. The `ok: true` envelope is not evidence of
+persistence, and this is the second time this wave has taught that lesson — the first was
+the verifier's Code Mode refusal, where an agent reported a refusal rather than a success
+and it was diagnosable only because the refusal was reported rather than swallowed.
+
+**Why it matters beyond me.** `ArggonManager/docs/engineering.md` §Review bar → docs that
+travel with the change, and the decision-brief convention, both assume a comment on an item
+is durable. A silently-dropped comment body breaks both: a `decide:` brief that vanishes
+leaves a heading an owner could answer into with nothing to answer, and a reviewer verdict
+record that evaporates leaves an approvable change with no record. The append-only,
+never-overwrite promise in `agents.md` §0 ("Comments are the agent handoff channel") is
+load-bearing for the whole methodology, so its failure mode should be a named class rather
+than three discovers per wave.
+
+## Suggested work (whoever picks this up)
+
+1. Reproduce: write a >2 KB comment body containing nested `##` headings and a fenced code
+   block to a tracker item, then re-read the item and assert the body is byte-present. Run it
+   against both surfaces (native `tools.arggon.comment` and headless `arggon comment <id>`).
+2. If it reproduces, find the discriminator. My only working hypothesis is that a body whose
+   first heading matches the comment's own heading marker (`## ...` immediately after
+   `### <date> @<author>`) interacts badly with the section parser — the surviving comment
+   had `## Push + merge path` directly under its heading and survived, so this hypothesis is
+   already partly falsified and should not be trusted.
+3. If it does not reproduce, instrument rather than guess: `arggon comment` should return a
+   receipt that can be re-read and verified later, so a dropped body is detectable without a
+   human re-reading the item.
+
+**Not a blocker for the work already merged** — the two comments that mattered for the
+merge decision (the verdict and the follow-up record) both persisted. The loss is confined
+to a superseded brief whose content I restated in a later comment, so no decision is lost.
+Filed because the class is what repeats, not this instance.
