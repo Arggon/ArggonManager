@@ -12,6 +12,7 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T09:06:06.254Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-native-guard-silent-without-worktree-declaration
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-native-guard-silent-without-worktree-declaration.md
   Leaves live only under a story. id is the filename stem: bug-native-guard-silent-without-worktree-declaration.
@@ -33,20 +34,21 @@ That is exactly the incident that made **7 open PRs** invisible to the tracker o
 
 ## Acceptance
 
-- [ ] The declaration is established by the **dispatch surface** (or `start`), not by the worker
+- [x] The declaration is established by the **dispatch surface** (or `start`), not by the worker
       remembering to source it — so the expectation exists before the first tracker write
-- [ ] The undeclared-and-unmoved case is either refused or reported, decided explicitly and
+- [x] The undeclared-and-unmoved case is either refused or reported, decided explicitly and
       documented; "silently proceeds" is not an acceptable outcome
-- [ ] A regression test covers it: a write from a session bound to checkout A while a worktree
+- [x] A regression test covers it: a write from a session bound to checkout A while a worktree
       B is the intended target, with **no** env sourced — today this is the silent case
-- [ ] The design decision (who declares, when, and what a legitimate unsourced primary-checkout
+- [x] The design decision (who declares, when, and what a legitimate unsourced primary-checkout
       write looks like) is recorded as an ADR or a doc line, not left implicit in code
-- [ ] `agents.md` rule 1 stops being load-bearing on its own once this lands, or says plainly
+- [x] `agents.md` rule 1 stops being load-bearing on its own once this lands, or says plainly
       that it still is
 
 ## Notes
 
 ### 2026-10-06 @ses_ef169b774ffddLlcycmzGGeU5Q
+
 Measured reproduction from a delivery-lead session on 2026-10-05, offered as evidence for this item rather than as a new report. **This is the same guard and the same `ARGGON_WORKTREE_PATH` root — I did not open a separate item.**
 
 ### What happens
@@ -60,7 +62,7 @@ Same item, same moment, two different answers. The native tool read the **primar
 
 ### Why this is worse than "the guard is silent"
 
-The silent-guard framing says the failure is *absent output*. This is **present, plausible, wrong output**, and it survived every check I ran. I built a wave plan on it. Two of the five "in-flight" items I identified were only caught because I happened to run `git worktree list` and `git show <branch>:<item>` by hand — nothing in the native surface prompted me to. Had I not cross-checked, I would have dispatched a maker into a worktree another writer already held, which is a claim conflict the kernel refuses but the maker would have walked into.
+The silent-guard framing says the failure is _absent output_. This is **present, plausible, wrong output**, and it survived every check I ran. I built a wave plan on it. Two of the five "in-flight" items I identified were only caught because I happened to run `git worktree list` and `git show <branch>:<item>` by hand — nothing in the native surface prompted me to. Had I not cross-checked, I would have dispatched a maker into a worktree another writer already held, which is a claim conflict the kernel refuses but the maker would have walked into.
 
 It also corrupts the ordinary read path: `next` returns `task-explore-adopter-feedback-channel` as the top claimable item, and `show` reports it unclaimed, while its worktree holds a two-round-reviewed PR on a branch claimed by `Arggon`.
 
@@ -77,3 +79,28 @@ Face 3 has a cheap standalone check: a `done` item with a matching `../<repo>-<i
 ### One adjacent trap, in case it is in scope
 
 The same session, `doctor` reported `vendored plugin STALE`, so the native catalog was whatever was on disk at session start. `tools.arggon.cleanup` exposed only `{prune, no_gh, no_commit}` — no `release`, no `take_over_worktree` — while the CLI has both and `cli/src/mcp-server.ts` declares both. I nearly filed that as a seam-drift defect. It is **not** one: `doctor` had already named the cause and the fix. Worth a line here only because the failure presents as "the tool is missing a flag" and the real answer is "restart the session".
+
+### 2026-10-11 @arggon-maker
+
+Landed. The guard gained a third declaration source — the **claim footprint** — and the
+undeclared-and-unmoved case is now **reported**, not silent:
+
+- `opencode/plugins/arggon/index.ts`: for an item-scoped call (`update`/`show`/`comment`/
+  `handoff`) that declares nothing, the sibling worktrees of the resolved checkout are
+  scanned (`git worktree list --porcelain`, at most 64 roots, one bounded `.arggon.env`
+  read each) for one whose `ARGON_ITEM` names the call's item. That worktree becomes the
+  expectation, so the envelope carries `trackerRoot` + `trackerRootMismatch` on every such
+  call, read or write. A caller-declared disagreement still **refuses** a write (unchanged);
+  the footprint reports, because the claim's own lifecycle legitimately writes from the
+  canonical checkout (post-merge terminal flip, unclaim of a dropped claim). `start`/`branch`/
+  `cleanup` are exempt by shape — they manage the claim from the primary by design.
+- Decision recorded as a doc line in `ArggonManager/docs/opencode2.md` §The binding guard →
+  Design decision (who declares, when, legitimate unsourced writes, bounds, exemptions).
+- Regression: `opencode/plugins/arggon/tools.test.ts` → `"the claim footprint declares for an
+unsourced session"` drives the incident state (session bound to checkout A, worktree B
+  claiming the item, nothing sourced) and pins the report on write and read, the unchanged
+  caller-declared refusal, the lifecycle exemption and the silent pool reads; neutralizing
+  `trackerRootMismatch` fails 10 of the 22 binding tests.
+- Impact class: **behavioral** (ADR 0016) — an agent's operating contract changes (a silent
+  write now reports; docs change), no envelope schema change (`schemaVersion: 1` unchanged,
+  no new fields).
