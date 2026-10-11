@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-release-pipeline-baseline-new-collisions
 title: "`story-release-pipeline` baseline reads the 5 new duplicate-doc-number findings as NEW, so its next `--baseline` wave would exit 1"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-release-pipeline
 labels: [spec-pipeline]
 created: "2026-10-03"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T06:48:23.426Z"
 depends_on: [task-renumber-colliding-doc-numbers]
 worktree_path: /home/arggon/Projects/ArggonManager-task-release-pipeline-baseline-new-collisions
 ---
