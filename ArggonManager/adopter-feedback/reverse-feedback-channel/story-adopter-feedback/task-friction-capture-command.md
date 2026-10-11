@@ -85,3 +85,15 @@ So the release condition fails on a defect that belongs to a different story. Tw
 2. Re-save the baseline to record the five as known. **I would not recommend this as the first move**: it makes the gate green by widening the net rather than by fixing anything, and `main` currently exits 1, so the lane is red either way until one of these lands.
 
 Until then T1 stays unreleased, and `task-spike-friction-volume-threshold` / the compliance spike stay behind their declared `depends_on` edges.
+
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — gate re-measured, still red; Wave A dispatched to clear it
+
+`spec analyze --baseline ArggonManager/spec-analyze-baseline.json` on clean `main` today: **6 new, 1 resolved, 5 unchanged, exit 1**. Same 5 duplicate-doc-number pairs as the 2026-10-06 note, **plus a sixth NEW finding** that was not there then: DECISION-PENDING-EXPLORATION at `docs/explorations/exploration-methodology-improvements-014.md:163`.
+
+T1 stays unreleased. Wave A (all file-disjoint from each other and from this task's future code):
+1. `task-renumber-colliding-doc-numbers` — dependency bug (spec-analyze duplicate-doc-number detector) is done, so this item is claimable; it clears the 5 collisions.
+2. `task-decision-pending-methodology-improvements-014` (new, filed today) — links ADR 0015 for C1; clears the sixth finding.
+3. `task-spike-friction-tier-b-surface` — story's own research spike, touches only its item file.
+
+Then `task-release-pipeline-baseline-new-collisions` re-baselines after the corpus is clean (NOT before, and never by widening the net). Only claim T1 when the zero-NEW condition holds on main again.
