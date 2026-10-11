@@ -19,9 +19,9 @@ x-generated:
     generatedAt: "2026-10-10T00:41:12.326Z"
   .agents/skills/arggon-cli/references/exploration.md:
     template: "skills/arggon-cli/references/exploration.md"
-    checksum: "sha256:31addc987d6c9f760faee03649e435f49f69308e4142c6063511d967c691bd70"
+    checksum: "sha256:d9ab2e7dc76ab8aa5b80fbdb659b7879c9348b593318ba0acfe0e2bb738f92ee"
     arggonVersion: "0.6.0"
-    generatedAt: "2026-10-10T00:41:12.326Z"
+    generatedAt: "2026-10-11T03:26:00.000Z"
   .agents/skills/arggon-cli/references/json-contract.md:
     template: "skills/arggon-cli/references/json-contract.md"
     checksum: "sha256:964c9ece51a8669df2d50d33bf97e0f286c1e648700fa0daa4e35593a069cd0b"
@@ -44,9 +44,9 @@ x-generated:
     generatedAt: "2026-10-10T00:41:12.326Z"
   .agents/skills/arggon-upgrade/SKILL.md:
     template: "skills/arggon-upgrade/SKILL.md"
-    checksum: "sha256:73a65eb3b3fb3b0ca0d9d9c8bc6a113cd3a9fbc2871c63626c798b7b4db1ef8d"
+    checksum: "sha256:dfaefcd25f116aa7984edf3a7d4c8548918613c9d7a96c063070e6e4de579871"
     arggonVersion: "0.6.0"
-    generatedAt: "2026-10-10T00:41:12.326Z"
+    generatedAt: "2026-10-11T08:03:28.000Z"
   .editorconfig:
     template: "docs/editorconfig"
     checksum: "sha256:13683ae1820c1cf4ef46cc076940c7b43c7e895890ea93dfb885029163793698"
