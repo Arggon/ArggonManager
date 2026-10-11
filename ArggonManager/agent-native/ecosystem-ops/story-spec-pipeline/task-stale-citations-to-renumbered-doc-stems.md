@@ -86,3 +86,8 @@ Acceptance:
 ### handoff 2026-10-11 @ses_ed6739347ffeW6uEKPbGppaiXb (session: ses_ed6739347ffeW6uEKPbGppaiXb) — next: Delivery lead: review branch, open/merge PR for feat/task-stale-citations-to-renumbered-doc-stems (20 stale citations updated, all gates green). Do NOT flip to done until merged.
 - branch: feat/task-stale-citations-to-renumbered-doc-stems
 - open questions: Accept documented no-ops (spec.ts:309 same-number example; adopt.test.ts decorative fixtures; preserved collision-snapshot bodies)?; some file:line refs may have shifted on renumber.
+
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merged (PR #688)
+
+Reviewed against engineering.md §Review bar: scope stayed on the item (stem-only updates, no formatter churn — the maker reverted a prettier-on-save sweep and re-applied raw); the judgment calls are documented per-file under a stated decision rule — live single-name pointers updated to follow the rename; records of properties that depended on the old name (collision pairs, renumber provenance, resolved-collision snapshots) preserved because swapping one side fabricates a falsehood; decorative fixtures preserved with reasons. That is the right reading of "update every citation" against "keep the record honest", and the maker corrected my stale paths (lib/src/next.ts:32; cli/src/commands/* no longer exist). Evidence travels with the change (per-stem before→after counts on the item); gates green. The maker also flagged forward-friction: some file:line numbers may have shifted post-renumber, and two items still assert "5 pre-existing collisions" now stale beyond the stem — left to their owning items, acceptable as historical record.
