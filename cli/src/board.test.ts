@@ -14,6 +14,7 @@ import {
   escapeHtml,
   applyBoardFilter,
   bootBoardTheme,
+  buildBoardDetailMap,
   dropNeedsClaimPrompt,
   evaluateDrop,
   renderBoardDetail,
@@ -1199,6 +1200,8 @@ describe("static export --details (task-board-static-details)", () => {
         comments: [],
         hidden_comments: 0,
         dependencies: [],
+        parent: null,
+        children: [],
         pr: null,
         ...overrides,
       },
@@ -1390,6 +1393,274 @@ describe("static export --details (task-board-static-details)", () => {
     expect(html).not.toContain("BOARD_DETAILS");
     expect(html).not.toContain("board-drawer");
     expect(html).not.toContain("/api/item");
+  });
+});
+
+/**
+ * Minimal dependency-free DOM stub for the drawer renderer tests below: this
+ * repo ships no jsdom/happy-dom (dependency surface stays minimal), and
+ * `renderBoardDetail` only needs createElement/appendChild/textContent plus
+ * attribute and form-field property writes.
+ */
+type FakeElement = {
+  tagName: string;
+  className: string;
+  children: FakeElement[];
+  attributes: Record<string, string>;
+  ownerDocument: FakeDocument | null;
+  type: string;
+  disabled: boolean;
+  checked: boolean;
+  href: string;
+  target: string;
+  rel: string;
+  textContent: string;
+  appendChild(child: FakeElement): FakeElement;
+  setAttribute(name: string, value: string): void;
+  getAttribute(name: string): string | null;
+};
+type FakeDocument = { createElement(tag: string): FakeElement };
+
+function makeFakeTree(): { container: FakeElement } {
+  const doc: FakeDocument = {
+    createElement(tag: string): FakeElement {
+      const el: FakeElement = {
+        tagName: tag.toUpperCase(),
+        className: "",
+        children: [],
+        attributes: {},
+        ownerDocument: doc,
+        type: "",
+        disabled: false,
+        checked: false,
+        href: "",
+        target: "",
+        rel: "",
+        textContent: "",
+        appendChild(child: FakeElement): FakeElement {
+          el.children.push(child);
+          return child;
+        },
+        setAttribute(name: string, value: string): void {
+          el.attributes[name] = value;
+        },
+        getAttribute(name: string): string | null {
+          return el.attributes[name] ?? null;
+        },
+      };
+      return el;
+    },
+  };
+  return { container: doc.createElement("div") };
+}
+
+function fakeDescendants(root: FakeElement): FakeElement[] {
+  const out: FakeElement[] = [];
+  const visit = (node: FakeElement): void => {
+    for (const child of node.children) {
+      out.push(child);
+      visit(child);
+    }
+  };
+  visit(root);
+  return out;
+}
+
+function fakeRow(root: FakeElement, key: string): FakeElement | undefined {
+  return fakeDescendants(root).find(
+    (node) =>
+      node.tagName === "DIV" &&
+      node.className === "drawer-row" &&
+      node.children.some((kid) => kid.tagName === "SPAN" && kid.textContent === key),
+  );
+}
+
+function fakeSection(root: FakeElement, title: string): FakeElement | undefined {
+  return fakeDescendants(root).find(
+    (node) =>
+      node.tagName === "SECTION" &&
+      node.children.some((kid) => kid.tagName === "H3" && kid.textContent === title),
+  );
+}
+
+function fakeDetailLinks(root: FakeElement): FakeElement[] {
+  return fakeDescendants(root).filter(
+    (node) => node.tagName === "A" && node.getAttribute("data-detail-id") !== null,
+  );
+}
+
+describe("detail drawer hierarchy (task-web-board-hierarchy-links)", () => {
+  function hierarchyPayload(
+    detailOverrides: Partial<BoardDetailPayload["detail"]> = {},
+    itemOverrides: Partial<WorkItem> = {},
+  ): BoardDetailPayload {
+    return {
+      ok: true,
+      item: item({
+        id: "story-a",
+        type: "story",
+        status: "in_progress",
+        title: "A",
+        ...itemOverrides,
+      }),
+      detail: {
+        prose: "body",
+        prose_truncated: false,
+        acceptance: [],
+        acceptance_truncated: false,
+        acceptance_complete: true,
+        comments: [],
+        hidden_comments: 0,
+        dependencies: [],
+        parent: null,
+        children: [],
+        pr: null,
+        ...detailOverrides,
+      },
+    };
+  }
+
+  function writeSiblingTree(dir: string): void {
+    writeBranchedTree(dir);
+    writeFileSync(
+      join(dir, "tasks/launch/auth/story-a/task-two.md"),
+      '---\ntype: task\nstatus: done\nid: task-two\nparent: story-a\nlabels: []\ncreated: "2026-09-07"\nupdated: "2026-09-07"\n---\n\n# Task Two\n',
+      "utf8",
+    );
+  }
+
+  it("resolves parent and children through the kernel parent edges", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-hierarchy-"));
+    writeSiblingTree(dir);
+    const items = loadItems(findTasksDir(dir));
+    const map = buildBoardDetailMap({ root: dir, items });
+    expect(map["task-one"].detail.parent).toEqual({ id: "story-a", status: "in_progress" });
+    expect(map["task-one"].detail.children).toEqual([]);
+    expect(map["story-a"].detail.parent).toEqual({ id: "launch", status: "todo" });
+    expect(map["story-a"].detail.children).toEqual([
+      { id: "task-one", status: "in_progress" },
+      { id: "task-two", status: "done" },
+    ]);
+    expect(map["launch"].detail.parent).toBeNull();
+    expect(map["launch"].detail.children).toEqual([{ id: "story-a", status: "in_progress" }]);
+  });
+
+  it("reports a dangling parent id with a null status instead of inventing one", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-hierarchy-dangling-"));
+    writeSiblingTree(dir);
+    writeFileSync(
+      join(dir, "tasks/launch/auth/story-a/task-ghost.md"),
+      '---\ntype: task\nstatus: todo\nid: task-ghost\nparent: ghost-parent\nlabels: []\ncreated: "2026-09-07"\nupdated: "2026-09-07"\n---\n\n# Task Ghost\n',
+      "utf8",
+    );
+    const items = loadItems(findTasksDir(dir));
+    const map = buildBoardDetailMap({ root: dir, items });
+    expect(map["task-ghost"].detail.parent).toEqual({ id: "ghost-parent", status: null });
+    expect(map["task-ghost"].detail.children).toEqual([]);
+    // Nobody claims the ghost as a child.
+    for (const payload of Object.values(map)) {
+      expect(payload.detail.children.map((child) => child.id)).not.toContain("ghost-parent");
+    }
+  });
+
+  it("links the parent and every child through data-detail-id anchors", () => {
+    const { container } = makeFakeTree();
+    renderBoardDetail(
+      container as unknown as HTMLElement,
+      hierarchyPayload(
+        {
+          parent: { id: "launch", status: "todo" },
+          children: [
+            { id: "task-one", status: "in_progress" },
+            { id: "task-two", status: "done" },
+          ],
+        },
+        { id: "story-a", type: "story", status: "in_progress", title: "A", parent: "launch" },
+      ),
+    );
+    const parent = fakeRow(container, "parent");
+    expect(parent).toBeDefined();
+    const parentLinks = fakeDetailLinks(parent!);
+    expect(parentLinks).toHaveLength(1);
+    expect(parentLinks[0].getAttribute("data-detail-id")).toBe("launch");
+    expect(parentLinks[0].getAttribute("href")).toBe("#launch");
+    expect(parentLinks[0].textContent).toBe("launch · todo");
+    const children = fakeSection(container, "children");
+    expect(children).toBeDefined();
+    const childLinks = fakeDetailLinks(children!);
+    expect(childLinks.map((link) => link.getAttribute("data-detail-id"))).toEqual([
+      "task-one",
+      "task-two",
+    ]);
+    expect(childLinks.map((link) => link.textContent)).toEqual([
+      "task-one · in_progress",
+      "task-two · done",
+    ]);
+    // Every hierarchy anchor is keyboard-reachable through the drawer's
+    // existing tab order: the focus trap collects exactly `a[href]`.
+    for (const link of [...parentLinks, ...childLinks]) {
+      expect(link.getAttribute("href")).not.toBeNull();
+    }
+  });
+
+  it("renders honest empty states: parent none, children none, never a dead link", () => {
+    const { container } = makeFakeTree();
+    renderBoardDetail(
+      container as unknown as HTMLElement,
+      hierarchyPayload({ parent: null, children: [] }, { id: "launch", type: "initiative" }),
+    );
+    expect(fakeRow(container, "parent")?.children.map((kid) => kid.textContent)).toContain("none");
+    const children = fakeSection(container, "children");
+    expect(children).toBeDefined();
+    expect(children?.children.map((kid) => kid.textContent)).toContain("none");
+    expect(fakeDetailLinks(container)).toEqual([]);
+  });
+
+  it("renders a dangling parent as honest text, never a link", () => {
+    const { container } = makeFakeTree();
+    renderBoardDetail(
+      container as unknown as HTMLElement,
+      hierarchyPayload(
+        { parent: { id: "ghost-parent", status: null }, children: [] },
+        { id: "task-ghost", type: "task", status: "todo", parent: "ghost-parent" },
+      ),
+    );
+    expect(fakeRow(container, "parent")?.children.map((kid) => kid.textContent)).toContain(
+      "ghost-parent · missing",
+    );
+    expect(fakeDetailLinks(container)).toEqual([]);
+  });
+
+  it("renders hostile hierarchy ids as text, never markup", () => {
+    const hostile = '<img src=x onerror="alert(1)">';
+    const { container } = makeFakeTree();
+    renderBoardDetail(
+      container as unknown as HTMLElement,
+      hierarchyPayload(
+        { parent: { id: hostile, status: "todo" }, children: [{ id: hostile, status: "todo" }] },
+        { id: "task-x", type: "task", status: "todo", parent: hostile },
+      ),
+    );
+    const links = fakeDetailLinks(container);
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      // Text node, not elements: nothing to execute, nothing to style-break.
+      expect(link.children).toEqual([]);
+      expect(link.textContent).toBe(hostile + " · todo");
+      expect(link.getAttribute("href")).toBe("#" + encodeURIComponent(hostile));
+      expect(link.getAttribute("data-detail-id")).toBe(hostile);
+    }
+    expect(
+      fakeDescendants(container).some(
+        (node) => node.tagName === "IMG" || node.tagName === "SCRIPT",
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps hierarchy navigation in the text-only renderer and the delegated click", () => {
+    expect(renderBoardDetail.toString()).toContain("data-detail-id");
+    expect(renderBoardDetail.toString()).not.toContain("innerHTML");
+    expect(wireBoardDetail.toString()).toContain("a[data-detail-id]");
   });
 });
 
