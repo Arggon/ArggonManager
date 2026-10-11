@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-friction-capture-command
 title: arggon friction capture and the local friction log
+assignee: arggon-delivery-lead
+branch: feat/task-friction-capture-command
 parent: story-adopter-feedback
 labels: [method]
 priority: p1
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-11"
+claimed_at: "2026-10-11T07:13:58.073Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-friction-capture-command
 ---
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-capture-command.md
