@@ -29,9 +29,9 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-skill-exploration-referen
 
 ## Acceptance
 
-- [ ] `npx prettier --check skills/arggon-cli/references/exploration.md` passes
-- [ ] Semantically identical — formatting fix only, no sentence changes
-- [ ] `cli/src/skill-copy.test.ts` green (the `.agents/skills/` copy stays byte-equal modulo the generated marker)
+- [x] `npx prettier --check skills/arggon-cli/references/exploration.md` passes
+- [x] Semantically identical — formatting fix only, no sentence changes
+- [x] `cli/src/skill-copy.test.ts` green (the `.agents/skills/` copy stays byte-equal modulo the generated marker)
 - [ ] `npx prettier --check` over the whole `skills/` tree passes, so this is not the last one
 
 ## Notes
