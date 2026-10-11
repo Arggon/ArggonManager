@@ -2,7 +2,7 @@
 type: bug
 status: in_progress
 id: bug-adr-status-drift-merged-adr-proposed
-title: "Three merged ADRs (0022, 0023, 0025) still read `Status: Proposed` — `engineering.md`'s lifecycle is \"Accepted when merged\", and ADR 0021 already needed a status-fix item for exactly this drift"
+title: 'Three merged ADRs (0022, 0023, 0025) still read `Status: Proposed` — `engineering.md`''s lifecycle is "Accepted when merged", and ADR 0021 already needed a status-fix item for exactly this drift'
 assignee: arggon-delivery-lead
 branch: fix/bug-adr-status-drift-merged-adr-proposed
 parent: methodology-improvements
@@ -12,6 +12,7 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T04:23:26.228Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-adr-status-drift-merged-adr-proposed
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-adr-status-drift-merged-adr-proposed.md
   Leaves live only under a story. id is the filename stem: bug-adr-status-drift-merged-adr-proposed.
@@ -52,11 +53,71 @@ that only checks internal consistency cannot detect a status that never moved.
 
 ## Acceptance
 
-- [ ] ADR 0022, 0023 and 0025 each read `- Status: Accepted`, and each gains a **dated status note** in the house style of ADR 0021's — naming the merge that accepted it, and stating that nothing below the note is rewritten
-- [ ] `ArggonManager/docs/adr/README.md` status cells for 0022 / 0023 / 0025 updated to `Accepted` so the index agrees
-- [ ] A **prevention** is recorded, not just the three fixes. Choose one and say why: (a) a check that fails when an ADR is merged while still `Proposed`, (b) a documented convention that the merge commit carries the flip (what ADR 0026 does), or (c) accepting the drift as a known, owned cost — in which case the reason belongs in `engineering.md` §ADR process so the next ADR's author knows not to rely on the status line
-- [ ] If (a): the check is added to the gates that already carry `adr-index-parity.test.ts`, and it is proven with a negative case — a fixture ADR that is merged-and-Proposed must **fail**, not pass
-- [ ] `npx vitest run cli/src/adr-index-parity.test.ts` green; `npm run arggon -- validate` green; `prettier --check` clean on the files touched
-- [ ] The fix is a status line plus a dated note. **No ADR body text is rewritten** — supersede, never rewrite (`engineering.md` §ADR process)
+- [x] ADR 0022, 0023 and 0025 each read `- Status: Accepted`, and each gains a **dated status note** in the house style of ADR 0021's — naming the merge that accepted it, and stating that nothing below the note is rewritten
+- [x] `ArggonManager/docs/adr/README.md` status cells for 0022 / 0023 / 0025 updated to `Accepted` so the index agrees
+- [x] A **prevention** is recorded, not just the three fixes. Choose one and say why: (a) a check that fails when an ADR is merged while still `Proposed`, (b) a documented convention that the merge commit carries the flip (what ADR 0026 does), or (c) accepting the drift as a known, owned cost — in which case the reason belongs in `engineering.md` §ADR process so the next ADR's author knows not to rely on the status line. **Chosen: (b)**, recorded in `engineering.md` §ADR process; rationale in §Notes
+- [x] If (a): **not applicable — (b) was chosen.** No check was added and no fixture exists, because no check can decide the question from the file (see §Notes for the measurement that rules (a) out)
+- [x] `npx vitest run cli/src/adr-index-parity.test.ts cli/src/adr-status-doc-contract.test.ts` green (16/16); `npm test` green (134 files / 2858 tests); `npm run build` green; `npm run arggon -- validate` ok (0 warnings); `prettier --check` clean on every file touched
+- [x] The fix is a status line plus a dated note. **No ADR body text is rewritten** — supersede, never rewrite (`engineering.md` §ADR process)
 
 ## Notes
+
+2026-10-11 — maker (`arggon-maker`), branch `fix/bug-adr-status-drift-merged-adr-proposed`.
+
+**The three fixes.** Each ADR gained a dated status note above its first block of
+body prose, naming the merge that accepted it, and a `- Status: Accepted` line. No
+body text below any note was touched.
+
+| ADR  | Accepted by                            | Note names                        |
+| ---- | -------------------------------------- | --------------------------------- |
+| 0022 | PR #642, merge `25fde21a` (2026-10-04) | merge `25fde21a` (PR #642)        |
+| 0023 | direct commit `66035a4a` on `main`     | `66035a4a`, a first-parent commit |
+| 0025 | PR #656, merge `81828441` (2026-10-06) | merge `81828441` (PR #656)        |
+
+The item's Context table names the _content_ commits (`8643c32b`, `66035a4a`,
+`6d3bef0c`); the notes name the **merge** that accepted each record, which is the
+house style ADR 0021 and ADR 0026 use. 0023 needed the distinction: it is on
+`main`'s first-parent history with no merge commit at all, so its note says so
+instead of inventing a merge.
+
+**Prevention: (b), the flip rides the landing commit.** Recorded as a paragraph in
+`ArggonManager/docs/engineering.md` §ADR process, immediately after the
+`**Lifecycle:**` line, so the convention sits with the lifecycle it belongs to.
+(a) was measured and rejected, not dismissed:
+
+1. **A merged-`Proposed` ADR is not always drift.** ADR 0019 is on `main` reading
+   `Proposed` and its own amendment (2026-10-02, PRs #573/#579) says the status is
+   deliberately unchanged: _"(still Proposed): this closes one decision point's
+   open hatch, it does not accept the record."_ A gate that fails an ADR merged
+   while `Proposed` would fail ADR 0019 — correct prose, exactly the gate-poisoning
+   failure `adr-status-doc-contract.test.ts` documents. The lifecycle's own
+   "(or explicitly recorded)" is the escape that makes 0019 legal, so the
+   convention needs the explicit record written down, not a gate that cannot see
+   it.
+2. **Git archaeology has no per-record answer.** ADRs 0001–0012 were all
+   introduced by one commit (`e6dfd6b5`), so "the commit that introduced this ADR"
+   is not a per-ADR oracle in this repo's own history, and 0023 landed with no
+   merge commit.
+3. **The backstop already exists and is report-only.** `spec analyze`'s
+   `STALE-PROPOSED-ADR` finding fires on a `Proposed` line older than
+   `STALE_PROPOSED_DAYS = 14` days (`cli/src/spec.ts:784`) with the message
+   "accept, reject, or supersede it". Measured on this branch: 0 findings, exit 0
+   — correct, because 0022/0023/0025/0019 are 7/6/5/10 days old. It would have
+   flagged ADR 0022 on 2026-10-18. It is a warning by design; promoting it to a
+   gate would repeat (1).
+
+(c) was not chosen: the cost is ownable for one line each, and the fix cost is
+three status lines — cheaper than documenting why nobody should trust the status
+line.
+
+**Methodology impact class: advisory.** No rule, gate, command or schema contract
+changes with this item. The `engineering.md` edit adds one convention paragraph to
+§ADR process; it names no new carrier, so `adr-status-doc-contract.test.ts`'s
+coverage sentence is untouched, and the paragraph carries no ADR link, so rule 1 is
+unaffected.
+
+**Out of scope, reported to the delivery lead.** The corpus sweep that measured
+the three drifts also found ADR 0019 merged-`Proposed` (correct, see above) and
+ADR 0024 whose `- Status: Accepted` sits above three notes in a different order
+from every other ADR (a numbering note, then a status note, then the `- Date:`
+line) — cosmetic, not drift, and not touched. No new item was filed from here.
