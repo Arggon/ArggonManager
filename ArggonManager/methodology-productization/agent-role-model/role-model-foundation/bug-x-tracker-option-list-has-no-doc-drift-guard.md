@@ -13,7 +13,6 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T09:57:18.134Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-x-tracker-option-list-has-no-doc-drift-guard
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-x-tracker-option-list-has-no-doc-drift-guard.md
   Leaves live only under a story. id is the filename stem: bug-x-tracker-option-list-has-no-doc-drift-guard.
@@ -67,3 +66,31 @@ because the index silently rotted three times.
 - [ ] A deliberate escape hatch: an inline marker or an explicit allow-list, documented, so a genuinely undocumented-by-design option is possible and visible in review
 - [ ] `npx prettier --check` clean; `arggon validate` + `npm test` green
 - [ ] The test reads the doc and the source, not a copy of either — a guard that restates the list in the test is the same bug one level down
+
+### 2026-10-11 @ses_ed596d14bffevSx3fVtpoz6NsL
+## Delivery evidence (arggon-maker)
+
+Change on branch fix/bug-x-tracker-option-list-has-no-doc-drift-guard (3 commits, pushed):
+
+- `cli/src/convention-option-doc-contract.test.ts` (new, 18 assertions): the guard. Every list is DERIVED, never restated — `lib/src/convention.ts` text (exported config type members, the parser's own `key === "…"` branches, the `must be a boolean` validations), the runtime `parseConventionConfig("")` projection, and convention.md's own enumeration / parse-error sentences. Only literals: the section↔type↔projection table (structure, no option names) and the marker string.
+  - Rule 1 — one source, three faces agree (type members = parser read-keys = runtime default keys; type `boolean` members = parser boolean-validated options).
+  - Rule 2 — kernel→doc: every option the parser reads is named in the doc's "official options" sentence (the PR #637 shape), plus the reverse direction over hyphenated names only (deliberate narrowing, documented in the file header: the enumeration's trailing gloss legitimately backticks non-option words, e.g. x-github's "flipped to `done`").
+  - Rule 3 — the parse-error sentence is exact, BOTH directions, over the "or an `k` … value that is not `true`/`false`" window.
+  - Escape hatch: `undocumented-by-design` on a parse branch exempts exactly that key; a premise test proves the marker discriminates (same option marked vs unmarked over synthetic branches). A test fails if convention.md stops documenting the marker.
+  - Coverage: `x-tracker`, `x-playbooks`, `x-import`, `x-worktree`, `x-github`. `x-views` + `x-generated` are the two exclusions, named with reasons in the suite; a new documented `x-*` section must join the table or fail the section test.
+- `ArggonManager/docs/convention.md` (3 minimal clause edits, carrier otherwise untouched):
+  - §Tracker hygiene: new bullet documenting the `undocumented-by-design` escape hatch.
+  - §Worktree bootstrap: parse-error sentence now enumerates `env` as boolean-only (the guard found this real gap — `x-worktree.env` is boolean-validated but its sentence enumerated neither boolean option).
+  - §Issue round-trip: same completion for `issue-roundtrip` (not in the delivery lead's four; identical shape, one line, so the guard is uniform instead of one section down).
+
+Gates (run in the worktree):
+- `npx prettier --check` on both changed files + the item file: all use Prettier code style. Repo-wide `prettier --check .` reports 648 pre-existing warnings — byte-identical count before and after this change (verified by stashing), so this diff introduces none.
+- `arggon validate`: ok, 0 errors, 0 warnings (also run by the repo pre-commit hook on each of my 3 commits).
+- `npx vitest run cli/src/convention-option-doc-contract.test.ts`: 18/18 pass. Before the doc edits it failed on exactly the three real gaps (x-worktree env, x-github issue-roundtrip, undocumented hatch) — then the edits closed them.
+- `npm test` (full, after `npm run build` in the worktree): 137 files / 2945 tests passed, 0 failed. Without the build, `headless-ci.test.ts` fails on the missing prebuilt `dist/` — a worktree gap, not the change; the build also kept the pinned plugin bundle byte-identical.
+
+Negative controls (both reverted; `lib/src/convention.ts` is unmodified in the final diff):
+1. New boolean option in all three kernel faces, undocumented → failed exactly rule 2 and rule 3 with actionable messages ("`x-tracker.future-option` is read by the parser but not named … the PR #637 shape"). One-face-only → rule 1 caught it ("the runtime default object vs TrackerConfig's members").
+2. Same branch carrying `undocumented-by-design` → 18/18 green again.
+
+Scope boundary: `templates/docs/**` untouched (the adopter template's abbreviated `x-tracker` row names only `auto-commit`/`allow-steal`, but that file defers to this repo's convention.md as the normative reference and is another item's scope). README.md's bug-note enumeration of the x-tracker flags is not pinned — dated bug notes describe what was true when written. Deliverable covers the delivery lead's four extensions; x-github included as noted; x-views/x-generated exclusions stated above per item rule "if not, say so".
