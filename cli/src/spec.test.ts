@@ -41,14 +41,14 @@ function copyRealDocs(dir: string): void {
   // the copied docs' canonical `ArggonManager/docs/` pointers are remapped to
   // the legacy form — same content, layout the temp tree actually has.
   const legacy = (text: string) => text.replaceAll("ArggonManager/docs", "docs");
-  for (const name of ["spec-deps-001.md", "spec-sync-001.md"]) {
+  for (const name of ["spec-deps-022.md", "spec-sync-001.md"]) {
     writeFileSync(
       join(dir, "docs", "specs", name),
       legacy(readFileSync(join(repoRoot, "ArggonManager", "docs", "specs", name), "utf8")),
       "utf8",
     );
   }
-  for (const name of ["plan-deps-001.md", "plan-sync-001.md"]) {
+  for (const name of ["plan-deps-019.md", "plan-sync-001.md"]) {
     writeFileSync(
       join(dir, "docs", "plans", name),
       legacy(readFileSync(join(repoRoot, "ArggonManager", "docs", "plans", name), "utf8")),
@@ -107,7 +107,7 @@ describe("spec validate (real docs)", () => {
     expect(result.checked).toBeGreaterThanOrEqual(4);
   });
 
-  it("passes on copies of the real spec-deps-001 / spec-sync-001 and plans", () => {
+  it("passes on copies of the real spec-deps-022 / spec-sync-001 and plans", () => {
     const dir = makeRepo();
     copyRealDocs(dir);
     const result = runSpecValidate({ cwd: dir });

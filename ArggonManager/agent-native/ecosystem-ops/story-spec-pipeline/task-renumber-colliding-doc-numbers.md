@@ -36,10 +36,10 @@ The renumber precedent exists and is painful: ADR 0016 carries a renumber note, 
 
 ## Acceptance
 
-- [ ] Depends on PR #603 landing first, so the renumber is verifiable against the detector (record the dependency in frontmatter via \`depends_on\`)
-- [ ] All 5 collisions resolved; \`arggon spec validate\` and \`spec analyze --baseline\` report 0 duplicate-doc-number findings
-- [ ] Every citation updated: ADR cross-references, spec \`spec:\` frontmatter, plan links, exploration Decision sections, and any \`docs/\` reference to a renamed file
-- [ ] Renumber notes recorded in the affected documents, following the existing ADR 0016 / 0019 idiom, so the history is auditable
-- [ ] The detector finding is NOT made blocking in this PR (per the reviewer's recommendation: land the gate after the corpus is clean, so it does not fire on every commit meanwhile)
+- [x] Depends on PR #603 landing first, so the renumber is verifiable against the detector (record the dependency in frontmatter via \`depends_on\`)
+- [x] All 5 collisions resolved; \`arggon spec validate\` and \`spec analyze --baseline\` report 0 duplicate-doc-number findings
+- [x] Every citation updated: ADR cross-references, spec \`spec:\` frontmatter, plan links, exploration Decision sections, and any \`docs/\` reference to a renamed file
+- [x] Renumber notes recorded in the affected documents, following the existing ADR 0016 / 0019 idiom, so the history is auditable
+- [x] The detector finding is NOT made blocking in this PR (per the reviewer's recommendation: land the gate after the corpus is clean, so it does not fire on every commit meanwhile)
 
 ## Notes
