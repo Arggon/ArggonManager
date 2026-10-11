@@ -317,7 +317,9 @@ describe("x-worktree (worktree bootstrap, task-start-post-hook)", () => {
     // Canonical worktree naming (the project IS `<repo>-<item-id>`).
     expect(parseConventionConfig("x-worktree:\n  services: true\n").worktree.services).toBe("true");
     // A declared base project name (the pattern doc's `name: "<base>${WORKTREE_SUFFIX:-}"`).
-    expect(parseConventionConfig("x-worktree:\n  services: myapp\n").worktree.services).toBe("myapp");
+    expect(parseConventionConfig("x-worktree:\n  services: myapp\n").worktree.services).toBe(
+      "myapp",
+    );
     expect(parseConventionConfig("x-worktree:\n  services: my_app-2\n").worktree.services).toBe(
       "my_app-2",
     );
@@ -336,7 +338,9 @@ describe("x-worktree (worktree bootstrap, task-start-post-hook)", () => {
     );
     // Unknown sibling keys stay ignored (ignore-unknown).
     expect(() => parseConventionConfig("x-worktree:\n  services-typo: myapp\n")).not.toThrow();
-    expect(parseConventionConfig("x-worktree:\n  services-typo: myapp\n").worktree.services).toBeNull();
+    expect(
+      parseConventionConfig("x-worktree:\n  services-typo: myapp\n").worktree.services,
+    ).toBeNull();
   });
 });
 
@@ -598,5 +602,254 @@ x-generated:
     runInit({ dir, force: false, commit: false, now });
     expectStable("init 2");
     expect(readFileSync(path, "utf8")).toBe(afterFirst);
+  });
+});
+
+/**
+ * bug-convention-parser-rejects-valid-yaml-force-rescaffolds: `.convention.yml`
+ * is YAML and this kernel reads it with a line parser, so the two must not
+ * disagree about what is READABLE. Where a strictness protects an arming flag
+ * it stays — a boolean that is not exactly `true`/`false` is a parse error, and
+ * so is a *quoted* boolean, because the string `"true"` is not a flag. Where
+ * the strictness could only ever cost the adopter their configuration it goes:
+ * an inline comment after a value, a `post-start: |` block scalar and a quoted
+ * key are all valid YAML the parser used to refuse, and `init --force` answered
+ * a refusal by re-deriving the whole file from the fixed scaffold — dropping
+ * the adopter's configuration on the floor.
+ *
+ * The line parser was WIDENED (not replaced by a YAML dependency: this repo
+ * ships `commander` and `@arggondev/lib` and nothing else, and a config reader
+ * that cannot run is worse than one that reads less). Every construct is
+ * pinned twice — here at the parse level and as a `readConventionConfig`
+ * round-trip over a real file — so a future tightening cannot silently re-open
+ * the loss.
+ */
+describe("valid-YAML tolerance (bug-convention-parser-rejects-valid-yaml-force-rescaffolds)", () => {
+  /** Write a `.convention.yml` into a fresh tree and read it back through the file path. */
+  function readBack(raw: string) {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-conv-yaml-"));
+    mkdirSync(join(dir, "ArggonManager"), { recursive: true });
+    writeFileSync(join(dir, "ArggonManager/.convention.yml"), raw, "utf8");
+    return readConventionConfig(dir);
+  }
+
+  it("accepts a valid-YAML file carrying each of the three constructs", () => {
+    const constructs = [
+      "x-tracker:\n  allow-steal: true # armed\n",
+      "x-worktree:\n  post-start: |\n    npm ci\n    echo ready\n",
+      '"x-tracker":\n  allow-steal: true\n',
+    ];
+    for (const raw of constructs) {
+      expect(() => parseConventionConfig(raw), JSON.stringify(raw)).not.toThrow();
+    }
+  });
+
+  it("accepts an inline comment after a boolean value", () => {
+    expect(
+      parseConventionConfig("x-tracker:\n  allow-steal: true # armed\n").tracker.allowSteal,
+    ).toBe(true);
+    expect(
+      parseConventionConfig("x-tracker:\n  allow-steal: false # disarmed\n").tracker.allowSteal,
+    ).toBe(false);
+  });
+
+  it("accepts an inline comment after every boolean option", () => {
+    const config = parseConventionConfig(
+      [
+        "x-tracker: # hygiene",
+        "  auto-commit: false # no auto commits",
+        "  allow-steal: true # armed",
+        "  strict-gate-bins: true # strict",
+        "  strict-worktree-writes: true # single writer",
+        "  product-acceptance: true # ADR 0021",
+        "  reap-acked-orphans: true # reap them",
+        "x-worktree:",
+        "  env: false # no env file",
+        "x-github:",
+        "  issue-roundtrip: true # close issues",
+        "",
+      ].join("\n"),
+    );
+    expect(config.tracker).toEqual({
+      autoCommit: false,
+      allowSteal: true,
+      reapAckedOrphans: true,
+      strictGateBins: true,
+      strictWorktreeWrites: true,
+      productAcceptance: true,
+    });
+    expect(config.worktree.env).toBe(false);
+    expect(config.github.issueRoundtrip).toBe(true);
+  });
+
+  it("strips a trailing comment from a string value too, but never from inside quotes", () => {
+    expect(
+      parseConventionConfig("x-worktree:\n  post-start: npm ci # install\n").worktree.postStart,
+    ).toBe("npm ci");
+    // A `#` inside a quoted scalar is content, not a comment.
+    expect(parseConventionConfig('x-views:\n  hot: "status:todo # tagged"\n').views.hot).toBe(
+      "status:todo # tagged",
+    );
+    // A `#` with no whitespace before it is content: YAML starts a comment at a
+    // `#` that is at the start of the line or preceded by whitespace.
+    expect(parseConventionConfig("x-views:\n  hot: status:todo#tag\n").views.hot).toBe(
+      "status:todo#tag",
+    );
+    // A comment directly after the colon comments out the whole value, leaving
+    // the section header still opening a mapping.
+    expect(
+      parseConventionConfig("x-tracker: # hygiene\n  allow-steal: true\n").tracker.allowSteal,
+    ).toBe(true);
+    expect(parseConventionConfig("version: 5 # v5\n").version).toBe(5);
+  });
+
+  it("accepts a post-start block scalar", () => {
+    const config = parseConventionConfig(
+      ["x-worktree:", "  post-start: |", "    npm ci", "    echo ready", ""].join("\n"),
+    );
+    // Literal style keeps the line breaks; `|` (clip) leaves exactly one.
+    expect(config.worktree.postStart).toBe("npm ci\necho ready\n");
+  });
+
+  it("decodes the chomping and folding indicators of a block scalar", () => {
+    const hook = (indicator: string, body: string[]): string | null =>
+      parseConventionConfig(["x-worktree:", `  post-start: ${indicator}`, ...body, ""].join("\n"))
+        .worktree.postStart;
+    expect(hook("|", ["    npm ci", "    echo hi"])).toBe("npm ci\necho hi\n");
+    expect(hook("|-", ["    npm ci", "    echo hi"])).toBe("npm ci\necho hi");
+    expect(hook("|+", ["    npm ci", "", ""])).toBe("npm ci\n\n\n");
+    expect(hook("|-", ["    npm ci", "", ""])).toBe("npm ci");
+    // Folded style: a single break between two lines becomes a space, a blank
+    // line stays a break.
+    expect(hook(">", ["    npm ci", "    echo hi"])).toBe("npm ci echo hi\n");
+    expect(hook(">-", ["    npm ci", "", "    echo hi"])).toBe("npm ci\necho hi");
+    // The indicators may carry an explicit indentation, in either order: the
+    // block's indent then comes from the indicator, not from its first line.
+    expect(hook("|2-", ["      npm ci", "        echo hi"])).toBe("    npm ci\n      echo hi");
+    expect(hook("|-2", ["      npm ci", "        echo hi"])).toBe("    npm ci\n      echo hi");
+  });
+
+  it("keeps block-scalar content literal: a comment or a colon inside it is content", () => {
+    const config = parseConventionConfig(
+      ["x-worktree:", "  post-start: |", "    # not a comment", "    echo a:b", ""].join("\n"),
+    );
+    expect(config.worktree.postStart).toBe("# not a comment\necho a:b\n");
+  });
+
+  it("ends a block scalar at the next key at its own indent", () => {
+    const config = parseConventionConfig(
+      [
+        "x-worktree:",
+        "  post-start: |",
+        "    npm ci",
+        "  post-start-shell: login",
+        "  env: false",
+        "",
+      ].join("\n"),
+    );
+    expect(config.worktree.postStart).toBe("npm ci\n");
+    expect(config.worktree.postStartShell).toBe("login");
+    expect(config.worktree.env).toBe(false);
+  });
+
+  it("reads a nested mapping under post-start as the refused empty scalar it always was", () => {
+    // Not a block scalar (no indicator): the refused-reading is unchanged.
+    expect(() => parseConventionConfig("x-worktree:\n  post-start:\n    npm: ci\n")).toThrow(
+      /'post-start' must be a non-empty string/,
+    );
+  });
+
+  it("accepts a quoted top-level key", () => {
+    expect(parseConventionConfig('"x-tracker":\n  allow-steal: true\n').tracker.allowSteal).toBe(
+      true,
+    );
+    expect(parseConventionConfig("'x-tracker':\n  allow-steal: true\n").tracker.allowSteal).toBe(
+      true,
+    );
+  });
+
+  it("decodes a quoted key wherever a key is read, nested keys included", () => {
+    const config = parseConventionConfig(
+      [
+        '"branch_patterns":',
+        '  "bug": "hotfix/{id}"',
+        '"x-views":',
+        '  "my-bugs": "type:bug status:todo"',
+        '"x-tracker":',
+        '  "allow-steal": true',
+        "",
+      ].join("\n"),
+    );
+    expect(config.branchPatterns.bug).toBe("hotfix/{id}");
+    expect(config.views["my-bugs"]).toBe("type:bug status:todo");
+    expect(config.tracker.allowSteal).toBe(true);
+  });
+
+  it("keeps the unknown-key forward-compat behaviour", () => {
+    const config = parseConventionConfig(
+      ['"x-future":', "  whatever: true", "unquoted_unknown: 1", ""].join("\n"),
+    );
+    // Neither known nor refused: a future extension rides along untouched.
+    expect(config.version).toBe(0);
+    expect(config.tracker.allowSteal).toBeNull();
+  });
+
+  it("round-trips each accepted construct through readConventionConfig", () => {
+    // The three flagged cases: an adopter who writes any of them must still
+    // get their configuration on the next read.
+    expect(readBack("x-tracker:\n  allow-steal: true # armed\n").tracker.allowSteal).toBe(true);
+    expect(
+      readBack("x-worktree:\n  post-start: |\n    npm ci\n    echo ready\n").worktree.postStart,
+    ).toBe("npm ci\necho ready\n");
+    expect(readBack('"x-tracker":\n  allow-steal: true\n').tracker.allowSteal).toBe(true);
+    // And the same file written back byte-for-byte stays readable.
+    const once = readBack("x-tracker:\n  allow-steal: true # armed\n");
+    expect(readBack('"x-tracker":\n  allow-steal: true\n').version).toBe(once.version);
+  });
+
+  it("reads a quoted version key like the config parser does (one reader, one answer)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-conv-yaml-ver-"));
+    mkdirSync(join(dir, "ArggonManager"), { recursive: true });
+    writeFileSync(join(dir, "ArggonManager/.convention.yml"), '"version": 5\n', "utf8");
+    expect(readConventionVersion(dir)).toBe(5);
+    expect(readConventionConfig(dir).version).toBe(5);
+  });
+
+  it("still refuses what it cannot read, and names the construct", () => {
+    // Flow style, anchors and aliases are valid YAML this line parser does not
+    // read. The refusal names the construct rather than leaving the adopter to
+    // guess (the alternative is `init --force` re-deriving the whole file).
+    expect(() => parseConventionConfig("x-tracker: {allow-steal: true}\n")).toThrow(
+      /'x-tracker' must be a mapping.*flow style/,
+    );
+    expect(() => parseConventionConfig("x-tracker: &t\n  allow-steal: true\n")).toThrow(
+      /'x-tracker' must be a mapping.*flow style/,
+    );
+    // A line that is not even `key: value` keeps naming the line.
+    expect(() => parseConventionConfig("not a convention file\n")).toThrow(/invalid line/);
+  });
+
+  it("keeps every strictness that protects an arming flag", () => {
+    // A boolean that is not exactly true/false is still a parse error ...
+    expect(() => parseConventionConfig("x-tracker:\n  allow-steal: maybe\n")).toThrow(
+      /'allow-steal' must be a boolean/,
+    );
+    // ... including the YAML 1.1-only spellings: YAML 1.2 reads `yes` as the
+    // STRING "yes", so arming from it would be reading a flag out of a string.
+    expect(() => parseConventionConfig("x-tracker:\n  allow-steal: yes\n")).toThrow(
+      /'allow-steal' must be a boolean/,
+    );
+    // A QUOTED boolean is still refused for the same reason: the string "true"
+    // is not a flag, and accepting it is exactly how an armed gate reads as
+    // unset.
+    expect(() => parseConventionConfig('x-tracker:\n  allow-steal: "true"\n')).toThrow(
+      /'allow-steal' must be a boolean/,
+    );
+    expect(() => parseConventionConfig("x-github:\n  issue-roundtrip: 'true'\n")).toThrow(
+      /'issue-roundtrip' must be a boolean/,
+    );
+    // `version` is read from its raw text too, so a quoted number still reads
+    // as the default rather than as a guessed number.
+    expect(parseConventionConfig('version: "5"\n').version).toBe(0);
   });
 });

@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-friction-capture-command
 title: arggon friction capture and the local friction log
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [method]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T07:13:58.073Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-friction-capture-command
 ---
 <!--
