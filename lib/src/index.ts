@@ -209,6 +209,45 @@ export type {
 
 export { JSON_SCHEMA_VERSION, compactWorkItem, failEnvelope, successEnvelope } from "./json.js";
 export type { JsonEnvelopeBase, JsonError } from "./json.js";
+
+// --- Adopter friction capture (ADR 0024 stage 1; the log is not the tracker) -
+
+export {
+  FRICTION_DEFAULT_HARNESS,
+  FRICTION_ENV_FACT_CAP,
+  FRICTION_EVIDENCE_CAP,
+  FRICTION_FINGERPRINT_CHARS,
+  FRICTION_FORMAT_VERSION,
+  FRICTION_HARNESS_CAP,
+  FRICTION_LOG_FILE_NAME,
+  FRICTION_MAX_LINES,
+  FRICTION_NARRATIVE_CAP,
+  FRICTION_REPORTER_ID_CHARS,
+  FRICTION_SALT_FILE_NAME,
+  FRICTION_STATE_SUBDIR,
+  FrictionError,
+  appendFrictionRecord,
+  buildFrictionRecord,
+  frictionFingerprint,
+  frictionLogPath,
+  frictionMajorVersion,
+  frictionReporterId,
+  frictionSaltPath,
+  frictionStateBase,
+  frictionStateDir,
+  normalizeCommandShape,
+  readFrictionLog,
+  readOrCreateMachineSalt,
+  resolveRepoAbsPath,
+} from "./friction.js";
+export type {
+  FrictionAppendResult,
+  FrictionFailureReason,
+  FrictionInput,
+  FrictionLogRead,
+  FrictionOptions,
+  FrictionRecord,
+} from "./friction.js";
 export { commitPayload } from "./tracker-commit.js";
 export type { CommitPayload, TrackerCommitResult } from "./tracker-commit.js";
 export type { SyncFilled } from "./sync-types.js";
@@ -358,6 +397,7 @@ export {
 export {
   commentOperation,
   createOperation,
+  frictionOperation,
   handoffOperation,
   importIssuesOperation,
   listOperation,
@@ -375,6 +415,8 @@ export type {
   CreateOperationOptions,
   CreatePayload,
   EnvelopePayload,
+  FrictionOperationOptions,
+  FrictionPayload,
   HandoffPayload,
   ImportIssuesOperationOptions,
   ImportIssuesPayload,
