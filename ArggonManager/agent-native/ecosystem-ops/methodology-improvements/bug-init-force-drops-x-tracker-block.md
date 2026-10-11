@@ -112,3 +112,7 @@ Evidence: pre-existing test "`--force` carries the provenance section across a r
 
 - `version` and `branch_patterns` are preserved verbatim too (they live in the existing bytes) — consistent with the idempotent re-run path, which never rewrites them either. `validate` only errors on a NEWER convention version, so a preserved older version stays legal, and the report names it (`preserved`).
 - The CLI `--json` init envelope is built field-by-field in `cli/src/cli.ts` (out of this item's scope), so the new `convention` report rides the init result and the dry-run `plan[]` row but is not yet a key in that envelope — recommend a follow-up item for the one-line additive change there.
+
+### handoff 2026-10-11 @arggon-maker (session: ses_ed6c92b21ffebHkXoyNjSx5Isr) — next: Review/merge PR #681: init --force writes .convention.yml from the existing bytes; only x-generated is refreshed; keep/replace reported (convention report + dry-run plan reason). All gates green (npm…
+- branch: fix/bug-init-force-drops-x-tracker-block
+- open questions: Should the CLI --json init envelope (cli/src/cli.ts, out of scope) gain the additive convention report — follow-up item suggested; the delivery lead decides.
