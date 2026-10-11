@@ -45,3 +45,7 @@ Evidence (maker, task-tui-hierarchy-jump, commit dedb83ce):
 - Expected vs observed (smoke): c on childless seeded task keeps `arggon detail \u00b7 <seeded>` + `children: (none)` + footer `has no children` (observed); p shows `arggon detail \u00b7 entries` + `children (4)` + `[1] <seeded>` (observed); 1 returns to `arggon detail \u00b7 <seeded>` (observed)
 - Read-only: handleDetailKey returns new state only, no runUpdate/write; loop passes live `detailItems: items` snapshot; children/notice lines via `safe()` = `sanitizeHumanTextUncapped`, footer notice sanitized (hostile-input tests in tui.test.ts)
 - Push: `git push -u origin feat/task-tui-hierarchy-jump` -> new remote branch, exit 0 (PR not opened from here; left for delivery lead)
+
+### handoff 2026-10-11 @ses_ed2abf7e2ffeI4uJqBAYeqwL9z (session: ses_ed2abf7e2ffeI4uJqBAYeqwL9z) — next: Delivery lead: open PR from feat/task-tui-hierarchy-jump and run standards review
+- branch: feat/task-tui-hierarchy-jump
+- open questions: None; c-in-pane vs board-claim overload documented as modal
