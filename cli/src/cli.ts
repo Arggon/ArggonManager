@@ -22,6 +22,7 @@ import {
   formatTrendMarkdown,
   formatTrendTable,
   formatValidateHuman,
+  frictionOperation,
   handoffOperation,
   importIssuesOperation,
   jsonEnabled,
@@ -47,6 +48,8 @@ import {
   runUpdate,
   runValidate,
   sanitizeHumanError,
+  sanitizeHumanText,
+  sanitizeHumanValue,
   showOperation,
   successEnvelope,
   successJson,
@@ -1543,6 +1546,74 @@ program
           return;
         }
         printHumanError("arggon handoff", message);
+        process.exitCode = 1;
+      }
+    },
+  );
+
+program
+  .command("friction")
+  .description(
+    "Record friction in ArggonManager itself into the local append-only friction log (never the tracker, never the network)",
+  )
+  .argument(
+    "<observation>",
+    "one line about what broke (capped 2000 chars; verbatim, never parsed)",
+  )
+  .option(
+    "--command <shape>",
+    "the command that failed, as an argv shape (required; ids/paths/URLs/tokens/SHAs normalized to <arg>)",
+  )
+  .option(
+    "--error <code>",
+    "the error.code from the failed envelope, e.g. START_FAILED (capped 64; class, not prose)",
+  )
+  .option("--harness <id>", "the agent harness you run in (capped 32; default unknown)")
+  .option(
+    "--evidence <file>",
+    "a file whose CONTENTS (never its path) are captured, capped 4000 chars",
+  )
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action(
+    (
+      observation: string,
+      opts: {
+        command?: string;
+        error?: string;
+        harness?: string;
+        evidence?: string;
+        json?: boolean;
+      },
+    ) => {
+      const json = jsonEnabled(opts);
+      const options = () => ({
+        cwd: process.cwd(),
+        version: arggonVersion(),
+        observation,
+        command: opts.command ?? "",
+        error: opts.error,
+        harness: opts.harness,
+        evidencePath: opts.evidence,
+      });
+      if (json) {
+        const outcome = frictionOperation(options());
+        emitJson(outcome.envelope);
+        if (!outcome.ok) process.exitCode = 1;
+        return;
+      }
+      try {
+        const result = frictionOperation(options());
+        if (!result.ok) {
+          printHumanError("arggon friction", result.envelope.error.message);
+          process.exitCode = 1;
+          return;
+        }
+        console.log(
+          `arggon friction: recorded ${sanitizeHumanValue(result.envelope.record?.fingerprint ?? "")} — ${sanitizeHumanText(result.envelope.path ?? "")}`,
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        printHumanError("arggon friction", message);
         process.exitCode = 1;
       }
     },
