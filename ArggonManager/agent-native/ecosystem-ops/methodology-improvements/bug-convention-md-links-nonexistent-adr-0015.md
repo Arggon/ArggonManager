@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: [docs]
 created: "2026-10-03"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-convention-md-links-nonexistent-adr-0015
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-convention-md-links-nonexistent-adr-0015.md

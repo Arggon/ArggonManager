@@ -10,7 +10,6 @@ labels: []
 created: "2026-10-02"
 updated: "2026-10-11"
 depends_on: [task-opencode-prompt-stamp, task-opencode-event-panel, task-zcode-goal-mode, task-zcode-automations]
-worktree_path: /home/arggon/Projects/ArggonManager-task-claude-adapter-spec
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-claude-adapter/task-claude-adapter-spec.md

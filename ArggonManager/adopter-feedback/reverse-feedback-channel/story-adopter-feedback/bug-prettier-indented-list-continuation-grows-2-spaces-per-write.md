@@ -9,7 +9,6 @@ parent: story-adopter-feedback
 labels: [formatting]
 created: "2026-10-03"
 updated: "2026-10-11"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-prettier-indented-list-continuation-grows-2-spaces-per-write
 ---
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/bug-prettier-indented-list-continuation-grows-2-spaces-per-write.md
