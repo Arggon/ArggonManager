@@ -111,3 +111,7 @@ Tracker-subtree sweep (data-driven): scanned all 597 tracker item-tree .md files
 Item body itself: prettier-idempotent (pass1 === pass2) and write-clean on the committed body; live `## Acceptance` all ticked; no unticked or fenced-box `- [ ]` anywhere in the body.
 
 Decision (original acceptance #4): authoring convention, not config — `proseWrap: "preserve"` (explicit from the span bug) does not stop this drift and `"always"` reflows 817/996 files; the rule "write the continuation as one physical line" is pinned by rule 6 + keycase.
+
+### handoff 2026-10-11 @Arggon — next: Delivery lead: review + merge PR (fix = rule 6 + keycase in prose-format.test.ts); flip done after merge. My shape touches 0 tracker bodies; the 5 non-convergent ones are span-drift for task-code-spa…
+- branch: fix/bug-prettier-indented-list-continuation-grows-2-spaces-per-write
+- open questions: tracker-subtree convergence rule stays deferred until task-code-span-repair-sweep repairs the 5 span-drift bodies (must tolerate quoted-mangled-evidence fences).
