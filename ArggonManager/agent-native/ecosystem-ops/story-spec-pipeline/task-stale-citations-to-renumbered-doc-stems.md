@@ -82,3 +82,7 @@ Acceptance:
 **Gates (all green):** arggon validate ok (0 err/0 warn); npm run lint (eslint) clean; npm run build ok; npm run check:plugin exit 0 (bundle unchanged — comments stripped); npm test -> 134 files / 2858 tests passed (run after build; headless-ci requires dist/). Note: the edit tool runs prettier-on-save, which reformatted untouched code/markdown during the first pass — reverted with git checkout and re-applied via raw text edit so the PR stays stem-only.
 
 **Forward-friction found (flag only, not in scope):** task-spec-owner-decision-brief + task-explore-agent-primary-role-model still assert that 5 pre-existing collisions / duplicate-doc-number exist — those snapshots are now stale beyond the stem rename. Left to their owning items.
+
+### handoff 2026-10-11 @ses_ed6739347ffeW6uEKPbGppaiXb (session: ses_ed6739347ffeW6uEKPbGppaiXb) — next: Delivery lead: review branch, open/merge PR for feat/task-stale-citations-to-renumbered-doc-stems (20 stale citations updated, all gates green). Do NOT flip to done until merged.
+- branch: feat/task-stale-citations-to-renumbered-doc-stems
+- open questions: Accept documented no-ops (spec.ts:309 same-number example; adopt.test.ts decorative fixtures; preserved collision-snapshot bodies)?; some file:line refs may have shifted on renumber.
