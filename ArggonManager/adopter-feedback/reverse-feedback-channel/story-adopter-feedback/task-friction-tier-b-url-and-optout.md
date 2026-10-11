@@ -11,7 +11,6 @@ priority: p2
 created: "2026-10-02"
 updated: "2026-10-11"
 depends_on: [task-friction-dedupe-and-report]
-worktree_path: /home/arggon/Projects/ArggonManager-task-friction-tier-b-url-and-optout
 ---
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-tier-b-url-and-optout.md
