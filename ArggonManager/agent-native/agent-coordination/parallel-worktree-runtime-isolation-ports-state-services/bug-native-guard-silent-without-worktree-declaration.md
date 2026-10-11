@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-native-guard-silent-without-worktree-declaration
 title: "The native tracker-root guard is silent when no worktree is declared, so the incident that made 7 PRs invisible still reproduces for an unsourced session"
+assignee: arggon-delivery-lead
+branch: fix/bug-native-guard-silent-without-worktree-declaration
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [native-seam, worktree, hygiene]
 created: "2026-10-05"
-updated: "2026-10-05"
+updated: "2026-10-11"
+claimed_at: "2026-10-11T09:06:06.254Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-native-guard-silent-without-worktree-declaration
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-native-guard-silent-without-worktree-declaration.md
