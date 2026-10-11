@@ -152,3 +152,70 @@ Execution. I ran no gate. spec validate (38 docs / 0 warnings), spec analyze (4 
 
 1. cd /home/arggon/Projects/ArggonManager-task-claude-adapter-spec && npm run arggon -- spec validate && npm run arggon -- spec analyze --baseline ArggonManager/spec-analyze-baseline.json — demonstrates the new spec is structurally valid and introduces no NEW finding. This is the load-bearing gate: ADR 0017's "no implementation task is claimed before a spec with clean spec analyze" is only satisfied if the baseline is genuinely unchanged, so a NEW finding here blocks the wave, not the spec.
 2. Same cwd: npm run arggon -- spec audit — demonstrates spec 024 is not a duplicate or a merge candidate against spec-zcode-native-seam-012 / spec-methodology-adapters-017 (the two it most resembles). A DUPLICATE/MERGE verdict would mean the bounded-port argument in (d) has gone too far.
+
+### 2026-10-11 @ses_ed6d9b22effexLQQ1jvoDJGIMi
+### 2026-10-11 @arggon-delivery-lead
+## Push + merge path (answering my own brief)
+
+The `git push --force-with-lease` wall was real but was **not actually necessary**, and I should
+have caught that before writing the brief. Here is the record.
+
+**What I got wrong first.** I rebased the branch onto `origin/main` on the assumption that
+the 48 commits of drift made a rebase mandatory. That rebase is what orphaned the remote
+tip and made a force-push the only way out — I created the problem the gate then blocked.
+
+**What was actually true.** The lane's three files were byte-identical to the remote tip
+(both the rebased tree and the pre-rebase tree), so the drift never touched this lane's
+content at all. The rebase was cosmetic.
+
+**The fix, and why it needed no force-push.** Reset the branch back to the remote tip,
+`git merge --no-edit origin/main` instead. One conflict, in `task-claude-adapter-spec.md`:
+`main`'s friction work had appended a comment to the same item, and the lane had appended a
+different one. Both sides were pure appends with no overlapping content, so both were kept
+in chronological order (maker draft, then reviewer verdict) rather than either being
+dropped. Result: the remote tip stayed an ancestor of HEAD, so `git push -u` was a plain
+fast-forward, and the `git push --force*` gate was never touched and never violated.
+
+**So the three options in my brief were not the only ones, and my recommendation was wrong.**
+I offered "you push" / "delete-and-repush" / "widen the rule" and recommended the first. The
+actual best answer was a fourth: **merge instead of rebase**, which needed no permission
+change at all. I presented three options as if exhaustive and recommended one, when the
+cheapest correct action was available and required nothing from anyone. The brief was
+well-formed and its default (hold, don't widen protection) was right, but the option set
+was incomplete, and an incomplete option set in a `decide:` is a real failure of the
+brief's purpose.
+
+**Recorded consequence for the filed bug.** `bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use`
+is still a genuine defect — a rebase is sometimes the right integration and the gate then
+blocks it with no escape but a permission change. But its standing is lower than the brief
+implied: in this instance the same goal was reachable by a gate-respecting route that I
+simply did not look for first. I left that note on the bug too, so its fix is not justified
+by a claim that turns out to be avoidable.
+
+## Story write + the done flip (the last two things owed)
+
+- **`story-claude-adapter` body written** from the maker's verbatim draft (Context + the
+  12-box acceptance checklist), into the placeholder shell that had stood empty since
+  2026-10-02. Both link directions now resolve: 024's header links the story, and the
+  story's Context links 024.
+- The last live acceptance box on this item (the story write) is ticked. Live `## Acceptance`
+  is 10/10 ticked by a fenced-comment-aware count — the remaining `- [ ]` strings in the
+  file are inside the maker's dated code-fenced draft, which the ADR 0025 gate excludes by
+  design.
+- **`arggon validate` ok** after both writes. **`git status` clean.**
+
+## Deliberately not done here
+
+The two non-blocking reviewer findings stay open and belong under `story-claude-adapter`,
+not this item: (1) spec 024's client-surface list carries no citations while the spec says
+"cited above" — close before the implementation wave claims tasks; (2) spec 024's
+frontmatter `adr:` field is a repo-root-relative path while every other link in the file is
+relative — cosmetic. Neither is a gate and neither was silently dropped.
+
+## What the maker got right worth recording
+
+The maker refused to tick a box `arggon` could not have seen through: it wrote the real
+checklist into the live section rather than into a comment, and flagged that comments are
+append-only so a box ticked inside one would not satisfy the ADR 0025 gate. That is the
+correct read of the gate and the exact trap `task-migrate-7-leaves-with-no-live-acceptance-contract`
+exists for.
