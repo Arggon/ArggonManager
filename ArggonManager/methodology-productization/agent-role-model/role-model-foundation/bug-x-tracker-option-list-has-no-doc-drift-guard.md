@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-x-tracker-option-list-has-no-doc-drift-guard
 title: "No test guards the `x-tracker` option list in convention.md against drift — `product-acceptance` shipped implemented-but-undocumented through PR #637's green CI"
+assignee: arggon-delivery-lead
+branch: fix/bug-x-tracker-option-list-has-no-doc-drift-guard
 parent: role-model-foundation
 labels: [tests, docs, cli]
 priority: p2
 created: "2026-10-04"
-updated: "2026-10-04"
+updated: "2026-10-11"
+claimed_at: "2026-10-11T09:57:18.134Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-x-tracker-option-list-has-no-doc-drift-guard
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-x-tracker-option-list-has-no-doc-drift-guard.md
