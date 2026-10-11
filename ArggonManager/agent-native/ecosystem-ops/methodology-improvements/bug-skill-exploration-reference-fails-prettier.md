@@ -141,3 +141,56 @@ Typo corrections to the evidence note above (no technical change): the path is `
 ### handoff 2026-10-11 @ses_ed60f90e0ffesSyd6JEZC3V1oG (session: ses_ed60f90e0ffesSyd6JEZC3V1oG) — next: Delivery lead: re-review PR #687 — criterion 4 is met and ticked; all gates green except the pre-existing headless-ci.test.ts (needs dist/). Then merge and flip done.
 - branch: fix/bug-skill-exploration-reference-fails-prettier
 - open questions: Confirm CI lanes on #687 after the push; should the session editor's markdown normalisation of tracked tracker files get its own item?
+
+### 2026-10-11 @arggon-delivery-lead
+verdict: approve (scope: PR #687 in full — the item's own file plus the three sibling `skills/` files)
+
+Delivery-lead review, second round. Round one was a narrow `request-changes` on acceptance
+criterion 4 — `npx prettier --check skills/` had to pass over the whole tree — reversing the
+maker's scope call rather than finding a defect in what it shipped. The change request was
+answered on the branch and re-verified here.
+
+What I verified in this round, myself:
+
+- **Criterion 4 met.** `npx prettier --check skills/` now exits 0. The three siblings are
+  fixed: `skills/arggon-cli/EVALS.md` (20 lines, all inside the eval matrix),
+  `skills/arggon-upgrade/SKILL.md` (one line: `*proposals you judge*` → `_proposals you
+  judge_`), `skills/arggon-cli/evals/run.mjs` (layout re-wrapping plus one single-quoted
+  literal respelled double-quoted, per the config's `singleQuote: false`).
+- **The formatting-only proof is mechanical, not asserted.** Per file: the markdown AST is
+  byte-identical (positions stripped, node census identical, 22066 B both sides for EVALS.md,
+  15483 B for SKILL.md with frontmatter byte-identical); the JS is `node --check` clean on both
+  sides with an identical acorn AST (134300 B canonical, 1502 nodes, 304 literals identical
+  values, 24 comments identical text) and the sole residual difference in the whole tree is
+  the one quoted literal, same value. For SKILL.md the byte residual is exactly two
+  characters — the same CommonMark emphasis delimiter pair.
+- **The stop condition was not triggered.** All three were fixable by `prettier --write`
+  alone; nothing was forced or hand-tweaked around a semantic change. That is the outcome the
+  gate existed to distinguish.
+- **The ledger consequence is proven, not assumed.** `provenance-audit.test.ts` passes at
+  clean HEAD (6/6), fails with exactly one `stale-checksum` violation for
+  `.agents/skills/arggon-upgrade/SKILL.md` after the byte change, and passes again after the
+  one-row refresh (2-line diff). `EVALS.md` and `run.mjs` carry no ledger row because they are
+  not in `BUNDLED_SKILLS`.
+- **My own comment's bytes survived.** Round one's verdict was posted before this pass; the
+  maker noticed that its first item-file edit had normalised six blank lines and rewritten
+  `*x*` → `_x_` inside my comment, proved the mechanism on a gitignored copy, and rebuilt the
+  commit so the item file's diff is the single checkbox. That recovery is the right one, and
+  the underlying defect is filed as `bug-session-formatter-normalizes-tracker-item-files`.
+
+Gates: `npx prettier --check skills/` → exit 0; `npx vitest run cli/src/skill-copy.test.ts` →
+8 passed; `npx vitest run cli/src/provenance-audit.test.ts` → 6 passed; `npm test` → the one
+failing file is `cli/src/headless-ci.test.ts`, pre-existing and environmental in a fresh
+worktree with no gitignored `dist/` (proven by stashing the whole widened change at clean HEAD
+and re-running: identical assertion). CI on PR #687: `cli` SUCCESS, `tasks-validate` SUCCESS,
+`ui-smoke` SUCCESS — the CI lane runs `npm run build` first, which is the arbiter for that
+file.
+
+Scope: three skill files, one `.convention.yml` ledger row, and the item file. Methodology
+impact class: **advisory** (pure formatting across `skills/**`; no rule, gate, command contract
+or pipeline step changed), stated on the item and in the PR.
+
+Item state: all four boxes in the live `## Acceptance` section are ticked, and each is honest.
+
+Merge call: **approved — merge as a merge commit** (tracker auto-commits ride this branch, so
+no squash).
