@@ -13,7 +13,6 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T22:29:04.116Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-measure-kernel-refusal-rate
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-measure-kernel-refusal-rate.md
   Leaves live only under a story. id is the filename stem: task-measure-kernel-refusal-rate.
@@ -113,9 +112,12 @@ Sources checked, in the order the item names them:
 5. Auto-done CI warnings — the one rule with an event-level source:
    `auto-done.yml` emits `::warning::` for done-gate refusals, unexpected
    update failures, and illegal `todo`/`blocked → done` flips at merge time.
-   497 runs, 2026-09-11 → 2026-10-11. Spot sample (first 19 runs):
-   **0 refusal warnings / 19 success flips**. The full 497-run read did not
-   finish in-session; it is proposed as text below, not built here.
+   Full sweep 2026-10-11: all **497 runs** (2026-09-11 → 2026-10-11), executed
+   lines only (script-source echoes excluded): **0 done-gate refusals,
+   0 unexpected failures, 0 illegal-transition attempts, 220 success flips**,
+   plus 5 merge-time skips that never consulted the kernel (4 `status
+'missing'`, 1 `status 'todo' — not flipped`: warned-and-skipped, not
+   refused).
 6. Local session store (`session_v2`: 4,241 sessions) — exists but is
    machine-local, unattributed across projects, mixes refusal prose (agents
    read item files full of these strings) with tool results, and covers none
@@ -128,7 +130,9 @@ Rate finding: durable-source refusal count = **0** over denominator candidates
 tracker mutations, **4,362** commits. Stated honestly: the attempt rate is
 **unmeasurable from durable sources**; the observed rate is 0 events per 1,224
 transitions. That zero is the finding the item asked for ("if no source
-records them, that is itself the finding").
+records them, that is itself the finding"). For the one rule with an
+event-level denominator the rate is exact, not bounded: done-gate merge-time
+refusals **0 / 220 flip attempts = 0%** (full 497-run sweep, source 5).
 
 By-rule breakdown: no observed breakdown exists (nothing observed). Static
 refusal surface instead (`throw new Error` sites, `lib/src/`): **181 total —
@@ -143,7 +147,8 @@ start/TTY gates), invalid transition (`rules.ts` ×1; `done: ["todo"]`,
 (`create.ts` 11, `relations.ts` 3), cleanup still-claimed (`cleanup.ts`), plus
 binding-guard and start/worktree input validation. Observed events per rule in
 durable sources: **0 across the board**; only the done-gate has an event-level
-source at all (CI warnings, spot 0/19).
+source at all (CI warnings: full sweep 0 refusals / 220 flips, 5
+non-refusal skips).
 
 Limits (why the rate could be understated): refusals are ephemeral by design,
 so zero observed ≠ zero attempted; a doc-compliant agent shows zero refusals
@@ -165,16 +170,15 @@ refused under the old whole-body done-gate — the gate has teeth when consulted
 
 One-line verdict: **No — AutoHarness's thesis has no measurable target in this
 repo: 0 recorded kernel refusals per 1,224 lifecycle transitions over the
-8-week window (auto-done CI spot-check 0/19), so the illegal-action rate is
-unmeasurable-and-observably-zero, not high.**
+8-week window (auto-done CI: 0 refusals across 497 runs / 220 flips), so the
+illegal-action rate is unmeasurable-and-observably-zero, not high.**
 
-Proposed follow-up (text only — not filed; delivery lead consolidates):
-sweep the 497 auto-done run logs for executed `::warning::` refusal /
-illegal-transition lines (bounded read of an existing source, ~15 min, no new
-surface) to pin the done-gate merge-time refusal rate with flip attempts as
-denominator; pattern set and per-run command are in this session's
-`/tmp/opencode/autodone-runs.txt` lineage. If that rate is also ~0, link this
-report from exploration-021's Recommendation and close P1 for this repo.
+Proposed follow-up (text only — not filed; delivery lead consolidates): the
+sweep proposed here already executed after the report first landed (same
+existing source, same patterns — no new surface): outcome 0/220 with 5
+non-refusal skips. Remaining is a lead call: link this report from
+exploration-021's Recommendation and close P1 for this repo (needs the
+Recommendation edit, out of maker scope).
 
 ### 2026-10-11 @ses_ed2ea49e2ffe6ovgjOhUgxj1iP
 
@@ -195,3 +199,6 @@ verdict: approve (advisory measurement — 0 recorded refusals per 1,224 transit
 - Evidence travels with the change: window 2026-08-16→2026-10-11, 6 sources, rate with denominator, honest why-none by-rule, limits, never-reopen cross-check (0 transitions + done→cancelled bypass exhibit), one-line AutoHarness verdict, follow-up proposed as text (not filed)
 - Advisory holds: no telemetry surface built, no gate/command added, live Acceptance left unticked for the lead
 - Recommendation: merge PR #726 (merge, not squash), then lead ticks Acceptance, links exploration-021, files the sweep follow-up
+
+### 2026-10-11 @ses_ed2ea49e2ffe6ovgjOhUgxj1iP
+Full auto-done sweep landed after the report (background job sh_12d1bdb48001ZBpoCsZ586k2UV, completed): 497/497 runs, 2026-09-11 to 2026-10-11, executed log lines only (script echoes excluded by $variable filter). Aggregate: 0 done-gate refusals, 0 unexpected update failures, 0 illegal-transition attempts, 220 success flips. 5 merge-time skips never consulted the kernel (4 status 'missing', 1 status 'todo' warned-and-skipped on bug-native-cleanup-unverified-worktree-removal). Done-gate merge-time refusal rate: 0/220 = 0%. Report body updated to the full-sweep numbers; verdict now cites 497 runs / 220 flips instead of the 0/19 spot sample.
