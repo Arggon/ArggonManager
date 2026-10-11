@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+// Ordering assertions go through assertOrder, never a bare `indexOf`
+// comparison: `-1 < n` makes a renamed clause pass as if it were still
+// ordered (bug-vacuous-substring-ordering-assertions).
+import { assertOrder } from "../../test/assert-order.js";
 import {
   FRICTION_PUBLISH_FENCE_INFO,
   FRICTION_PUBLISH_LABEL,
@@ -188,8 +192,10 @@ describe("the tier-B body", () => {
     const body = buildFrictionPublishBody(report([row(), row({ fingerprint: "bbb", count: 1 })]));
     expect(body).toContain("fingerprint: 9f2c1a4b7d3e5c60");
     expect(body).toContain("fingerprint: bbb");
-    // Highest count first — the report's own ordering, preserved.
-    expect(body.indexOf("9f2c1a4b7d3e5c60")).toBeLessThan(body.indexOf("fingerprint: bbb"));
+    // Highest count first — the report's own ordering, preserved. assertOrder
+    // re-asserts presence as a precondition of the ORDER, so a renamed or
+    // dropped fingerprint fails loudly instead of comparing against -1.
+    assertOrder(body, "9f2c1a4b7d3e5c60", "fingerprint: bbb");
   });
 
   it("fences the narrative so its own backticks cannot break the block", () => {

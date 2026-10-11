@@ -12,6 +12,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { FRICTION_PUBLISH_TITLE_PREFIX } from "@arggondev/lib";
 import { runCli } from "./test-spawn.js";
+// Ordering assertions go through assertOrder, never a bare `indexOf`
+// comparison: `-1 < n` makes a renamed clause pass as if it were still
+// ordered (bug-vacuous-substring-ordering-assertions).
+import { assertOrder } from "../../test/assert-order.js";
 
 /**
  * The tier-B / opt-out / clear CLI surface — plan task T4 of
@@ -203,7 +207,10 @@ describe("tier b", () => {
     expect(out.stderr).toBe("");
     const url = urlFrom(out.stdout);
     // The report still came first — the URL is an addition, not a replacement.
-    expect(out.stdout.indexOf("arggon friction report")).toBeLessThan(out.stdout.indexOf(url));
+    // assertOrder makes the report header's PRESENCE a precondition of the
+    // order claim; a bare `indexOf` comparison would pass on `-1` if the
+    // header were ever renamed out from under this test.
+    assertOrder(out.stdout, "arggon friction report", url);
     const params = paramsOf(url);
     expect(url.startsWith("https://github.com/Arggon/ArggonManager/issues/new?")).toBe(true);
     expect(params.labels).toBe("adopter-friction");
