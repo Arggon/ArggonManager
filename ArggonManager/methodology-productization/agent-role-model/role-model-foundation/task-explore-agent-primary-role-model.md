@@ -52,7 +52,7 @@ worktree, expected vs observed):
 
 - `npm run arggon -- validate` → expected `ok (0 warnings, convention v5)`; observed `arggon validate: ok (0 warning(s), convention v5)`
 - `npm run arggon -- spec validate` → expected ok; observed `arggon spec: ok (32 doc(s), 5 warning(s))` — all 5 are pre-existing `DOC_NUMBER_COLLISION` on specs/plans/explorations 001/005/015; **none names `exploration-agent-primary-workers-019` or ADR 0021**
-- `npm run arggon -- spec analyze` → 10 findings, all pre-existing (`duplicate-doc-number`, `no-error-path` on spec-deps-001/spec-opencode-seam-010, `vague-quantifier` on specs 009/005); grepped for `DECISION-PENDING|STALE-PROPOSED|SPEC-STATUS-DRIFT|019|0021` → **no matches**, i.e. the exploration's Decision names an ADR that now exists and introduced no NEW finding
+- `npm run arggon -- spec analyze` → 10 findings, all pre-existing (`duplicate-doc-number`, `no-error-path` on spec-deps-022/spec-opencode-seam-010, `vague-quantifier` on specs 009/005); grepped for `DECISION-PENDING|STALE-PROPOSED|SPEC-STATUS-DRIFT|019|0021` → **no matches**, i.e. the exploration's Decision names an ADR that now exists and introduced no NEW finding
 - `tools.arggon.validate` → `ok: true`, 0 errors, 0 warnings after the four follow-up items and their `depends_on` wiring
 - Doc-number choice: `-019` is the next FREE number in `docs/explorations/` (highest in use 018, per `agents.md:447`); ADR `0021` is next free after 0020
 - Every one of the 12 edge-case rows resolves to a spec AC, an explicit non-goal, or a deferred-with-evidence item — none left `unknown`

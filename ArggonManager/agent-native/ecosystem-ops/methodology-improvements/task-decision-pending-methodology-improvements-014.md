@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-decision-pending-methodology-improvements-014
 title: "exploration-methodology-improvements-014 Decision section still records no landed ADR after 12 days — DECISION-PENDING-EXPLORATION is a sixth NEW finding on main's baseline lane"
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: methodology-improvements
 labels: [spec-pipeline, docs]
 created: "2026-10-11"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T04:19:07.201Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-decision-pending-methodology-improvements-014
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-decision-pending-methodology-improvements-014.md
   Leaves live only under a story. id is the filename stem: task-decision-pending-methodology-improvements-014.

@@ -1575,7 +1575,7 @@ describe("runBoard github overlay", () => {
   });
 });
 
-describe("renderBoardHtml dependency edges (spec-deps-001)", () => {
+describe("renderBoardHtml dependency edges (spec-deps-022)", () => {
   it("shows a blocked-by line per open dependency and none for terminal deps", () => {
     const html = renderBoardHtml(
       [
