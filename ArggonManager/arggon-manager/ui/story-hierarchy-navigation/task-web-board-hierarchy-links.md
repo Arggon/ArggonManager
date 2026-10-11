@@ -8,7 +8,6 @@ labels: []
 created: "2026-10-11"
 updated: "2026-10-11"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/task-web-board-hierarchy-links.md
   Leaves live only under a story. id is the filename stem: task-web-board-hierarchy-links.
@@ -31,3 +30,10 @@ Parent story `story-hierarchy-navigation`: the web board's detail drawer (`cli/s
 - [ ] `arggon validate` green; prettier clean; PR opened
 
 ## Notes
+
+### 2026-10-11 @ses_ed2ed434cffdHsqB0EV526IjUT
+verdict: approve (drawer parent link + children section, UI smoke green)
+- Read the worktree diff (board.ts + 3 test files + README + json-output + own item file) — no tui.ts, no plugins/, no templates/; scope stays on the item
+- Standards-reviewer: approve, no blocking findings (additive payload from one kernel-edge index, XSS-safe anchors, focus-trap/Esc preserved, no axe exclusions)
+- Verifier, all 6 probes green in the worktree: validate ok, prettier clean, build exit 0, vitest 122/122 + 28/28, serve spot-check exact (leaf-a→mid/[], mid→top/[leaf-a,leaf-b], top→null/[mid]), playwright @smoke 33/33 incl. axe gate
+- Recommendation: open PR (merge, not squash), merge on green CI; lead ticks Acceptance after merge and flips done
