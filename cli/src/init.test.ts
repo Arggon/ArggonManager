@@ -15,7 +15,12 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runInit, dryRunInit, type ProposalEntry } from "./init.js";
 import { arggonVersion, renderGeneratedDoc } from "./docs.js";
-import { readGeneratedState, updateGeneratedSection } from "@arggondev/lib";
+import {
+  parseConventionConfig,
+  readConventionConfig,
+  readGeneratedState,
+  updateGeneratedSection,
+} from "@arggondev/lib";
 import { runCli } from "./test-spawn.js";
 // Ordering assertions go through assertOrder, never a bare `indexOf`
 // comparison: `-1 < n` makes a renamed clause pass as if it were still
@@ -364,6 +369,165 @@ describe("init", () => {
     gitInit(dir);
     const result = runInit({ dir, force: false });
     expect(result.warning).toBeUndefined();
+  });
+});
+
+// bug-init-force-drops-x-tracker-block: `init --force` used to re-scaffold
+// `.convention.yml` from the fixed scaffold string, silently dropping the
+// whole `x-tracker` block — `allow-steal` (the human-only claim-takeover
+// double gate), `strict-gate-bins`, `strict-worktree-writes`,
+// `reap-acked-orphans`, `product-acceptance` — plus any adopter-set
+// `branch_patterns`. It erred "safe" (a gate that was armed became unarmed)
+// while losing configuration the adopter set on purpose, with nothing
+// reporting the loss. The forced write now starts from the existing file's
+// bytes and rewrites only the `x-generated` provenance section, and the run
+// reports what it kept and what it replaced.
+describe("init --force and the convention's x-* extensions (bug-init-force-drops-x-tracker-block)", () => {
+  const NOW = new Date("2026-09-17T12:00:00Z");
+
+  /**
+   * An adopter-armed tree: two `x-tracker` safety flags armed, a custom
+   * branch pattern, a saved view and a recorded project name — the
+   * configuration a forced re-scaffold used to erase.
+   */
+  function armTree(dir: string): void {
+    mkdirSync(join(dir, "ArggonManager"), { recursive: true });
+    writeFileSync(
+      join(dir, "ArggonManager/.convention.yml"),
+      [
+        "version: 5",
+        "branch_patterns:",
+        '  bug: "hotfix/{id}"',
+        "",
+        "x-tracker:",
+        "  allow-steal: true",
+        "  reap-acked-orphans: true",
+        "",
+        "x-views:",
+        '  mine: "status:todo"',
+        "",
+        "x-generated:",
+        '  projectName: "armed-repo"',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+  }
+
+  it("a forced re-init keeps the armed x-tracker flags, the custom pattern and the view — and says what it kept", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-"));
+    armTree(dir);
+
+    const result = runInit({ dir, force: true, full: true, now: NOW });
+
+    // Both armed flags survive ON DISK ...
+    const after = readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8");
+    expect(after).toContain("allow-steal: true");
+    expect(after).toContain("reap-acked-orphans: true");
+    // ... and in the parsed config, so the safety gates stay ARMED ...
+    const config = parseConventionConfig(after);
+    expect(config.tracker.allowSteal).toBe(true);
+    expect(config.tracker.reapAckedOrphans).toBe(true);
+    // ... together with the adopter's own configuration (custom branch
+    // pattern, saved view) ...
+    expect(config.branchPatterns.bug).toBe("hotfix/{id}");
+    expect(config.views.mine).toBe("status:todo");
+    // ... and the x-generated provenance this run refreshed (project name
+    // carried over, fresh entries for the docs it generated).
+    expect(config.generatedProjectName).toBe("armed-repo");
+    expect(config.generated["AGENTS.md"]).toBeDefined();
+
+    // The run says what it kept and what it replaced: no silent loss.
+    expect(result.convention).toEqual({
+      preserved: ["version", "branch_patterns", "x-tracker", "x-views"],
+      replaced: ["x-generated"],
+      rescaffolded: false,
+    });
+  });
+
+  it("--dry-run previews the same keep/replace report and the scaffold row says it — writing nothing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-dry-"));
+    armTree(dir);
+    const before = readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8");
+
+    const dry = dryRunInit({ dir, force: true, full: true, now: NOW });
+
+    expect(dry.convention).toEqual({
+      preserved: ["version", "branch_patterns", "x-tracker", "x-views"],
+      replaced: ["x-generated"],
+      rescaffolded: false,
+    });
+    const row = dry.plan.find((e) => e.dest === "ArggonManager/.convention.yml");
+    expect(row?.decision).toBe("overwritten");
+    expect(row?.reason).toBe(
+      "force re-scaffold — preserved version, branch_patterns, x-tracker, x-views; " +
+        "x-generated provenance refreshed",
+    );
+    // Pure read: the armed file is byte-identical after the preview.
+    expect(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")).toBe(before);
+  });
+
+  it("enumerates the exception: an unparseable .convention.yml is re-derived from the scaffold and reported, not silently preserved", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-bad-"));
+    mkdirSync(join(dir, "ArggonManager"), { recursive: true });
+    writeFileSync(
+      join(dir, "ArggonManager/.convention.yml"),
+      "not a convention file\na line with no colon at all\n",
+      "utf8",
+    );
+
+    // The preview names the wholesale replacement before anything is written.
+    const dry = dryRunInit({ dir, force: true, now: NOW });
+    expect(dry.convention).toEqual({
+      preserved: [],
+      replaced: ["x-generated"],
+      rescaffolded: true,
+    });
+    expect(dry.plan.find((e) => e.dest === "ArggonManager/.convention.yml")?.reason).toMatch(
+      /unreadable or unparseable; re-derived from the scaffold/,
+    );
+
+    const result = runInit({ dir, force: true, full: true, now: NOW });
+    expect(result.convention).toEqual({
+      preserved: [],
+      replaced: ["x-generated"],
+      rescaffolded: true,
+    });
+    // The file is repaired from the fixed scaffold (current version, default
+    // branch patterns) — the one case where a force genuinely discards.
+    const after = readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8");
+    expect(after).toContain("version: 5");
+    expect(after).toContain('  bug: "fix/{id}"');
+  });
+
+  it("a forced re-init of a scaffolded tree keeps its own sections and refreshes only the provenance", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-vanilla-"));
+    runInit({ dir, force: false, now: NOW });
+    const result = runInit({ dir, force: true, now: NOW });
+    expect(result.convention).toEqual({
+      preserved: ["version", "branch_patterns"],
+      replaced: ["x-generated"],
+      rescaffolded: false,
+    });
+  });
+
+  it("does not drop the docs' x-generated provenance either: a modified doc stays skipped under force and keeps its state entry", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-docs-"));
+    runInit({ dir, force: false, full: true, now: NOW });
+    const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
+    writeFileSync(join(dir, "AGENTS.md"), `${agents}\nadopter edit\n`, "utf8");
+
+    const result = runInit({ dir, force: true, full: true, now: NOW });
+
+    // Adopter-modified docs are never overwritten — force does not lift that
+    // rule — and their provenance entry survives the forced convention
+    // rewrite, which is exactly why the rewrite starts from the existing file.
+    expect(result.modified).toContain("AGENTS.md");
+    expect(result.skipped).toContain("AGENTS.md");
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(`${agents}\nadopter edit\n`);
+    const config = readConventionConfig(dir);
+    expect(config.generated["AGENTS.md"]).toBeDefined();
+    expect(config.generated[".editorconfig"]).toBeDefined();
   });
 });
 
