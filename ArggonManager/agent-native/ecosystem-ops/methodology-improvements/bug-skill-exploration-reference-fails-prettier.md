@@ -77,3 +77,26 @@ Gates (command / expected / observed / exit):
 5. arggon validate (pre-commit hook) / ok / "arggon validate: ok (0 warning(s), convention v5)" on every commit / 0
 
 NOT done, deliberately: no fixes to EVALS.md / evals/run.mjs / argonne-upgrade/SKILL.md (reported above); no init run to refresh the ledger (dry-run showed it classifies the regenerated copy adopter-modified and would bump ~40 unrelated state rows — the surgical one-row refresh is equivalent, and the audit test is the arbiter); no item status change (done is the delivery lead's call after merge); no verdict comment.
+
+### 2026-10-11 @arggon-delivery-lead
+verdict: request-changes (narrow: criterion 4 — the whole `skills/` tree — is unmet, and it is the item's own contract)
+
+Delivery-lead review of PR #687. The change that landed is correct and well-evidenced; what is missing is the item's fourth criterion, which the maker deliberately left unticked. This is a scope decision I am reversing, not a defect in the delivered work.
+
+What I read: the full diff `origin/main...HEAD` (three files: the skill reference, the `x-generated` ledger row, the item file), the maker's evidence note on the item, and the acceptance checklist. Criteria 1–3 are met and honestly ticked; I verified the formatting-only proof myself: the diff is five lines, all table padding, and the maker's whitespace-normalised comparison is empty.
+
+Why the bar is met for what shipped:
+
+- **Evidence travels with the change.** The formatting-only claim is mechanical (whitespace stripped and dash-runs collapsed → empty diff), not asserted; the `x-generated` ledger refresh is proven to be a required consequence (`provenance-audit.test.ts` passes at clean HEAD, fails after the source fix, passes again after the refresh) rather than an opportunistic edit; and the surgical one-row refresh was chosen over `arggon init` because `init` classified the regenerated copy as adopter-modified and would have bumped ~40 unrelated state rows — the right call.
+- **Methodology impact class stated:** advisory (pure formatting; no rule, gate, command contract or pipeline step changed), on the item and in the PR. `skills/**` is a carrier and the PR says so.
+- **Scope:** the skill reference, its generated ledger row, and the item. `.agents/skills/` was never hand-edited; `skills:sync` was not run (no command regions in a reference file).
+
+The change request — criterion 4, "`npx prettier --check` over the whole `skills/` tree passes, so this is not the last one":
+
+The maker reported that `npx prettier --check skills/` still fails on **three siblings** — `skills/arggon-cli/EVALS.md`, `skills/arggon-cli/evals/run.mjs`, `skills/upgrade/SKILL.md` — and left the box unticked rather than fix them, on the argument that they are outside the item's file. I am reversing that reading, and the reason is worth recording: the criterion is the item's declared acceptance contract, its stated rationale is that a file which cannot pass the repo's own formatter is one the next agent either reformats silently or leaves forever, and all three siblings are the *same defect in the same tree found by the same command* — formatting-only, no content change. Leaving the box unticked would make this item permanently un-flippable on work that is three small formatting diffs, and the alternative (split three items out of one command's output) buys process, not quality.
+
+Route, as decided here: extend this PR to the three siblings with the same proof standard — `prettier --write`, then show the diff is whitespace-only with no sentence, key, value or code-semantics change, and re-run the whole gate set on the widened change. If any one of the three turns out NOT to be fixable by `prettier --write` alone (i.e. `--write` changes something semantic), stop, do not force it, and report it — that sibling gets its own item with the reason.
+
+Verified against the review bar's blocking end-to-end check: CI on PR #687 — `cli` SUCCESS, `tasks-validate` SUCCESS, `ui-smoke` SUCCESS.
+
+Merge call: **HOLD** until criterion 4 is met and ticked. Green CI is necessary, not sufficient.
