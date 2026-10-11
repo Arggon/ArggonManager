@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: cancelled
 id: task-scratch-comment-persistence-probe
 title: scratch comment persistence probe
 parent: role-model-foundation
