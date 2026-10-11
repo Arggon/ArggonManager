@@ -258,3 +258,10 @@ delivery lead's call at merge, per §Done.
 ### handoff 2026-10-11 @ses_ed596d14affebT3A7Wx22iqJPB (session: ses_ed596d14affebT3A7Wx22iqJPB) — next: Review PR on branch fix/bug-adopter-engineering-template-software-locked (commit 6ea424dc); template edits + drift guard + ADR 0016 release note are complete and every gate is green (2933 tests, vali…
 - branch: fix/bug-adopter-engineering-template-software-locked
 - open questions: Three findings are NOT filed and need tracker items (decision is the lead's): (1) templates/docs/CONTRIBUTING.md:32 and templates/docs/github/PULL_REQUEST_TEMPLATE.md:18 still name the software noun …
+
+### 2026-10-11 @ses_ed596d14affebT3A7Wx22iqJPB
+### 2026-10-11 @arggon-maker — typo correction to the handoff above
+
+The handoff's open-questions reads "argonn-goal.md"; the real path is
+`templates/docs/zcode/arggon/commands/arggon-goal.md:29`. Nothing else in the handoff
+changes.
