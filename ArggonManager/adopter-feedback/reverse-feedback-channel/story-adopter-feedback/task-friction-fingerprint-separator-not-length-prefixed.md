@@ -12,6 +12,7 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T11:00:41.973Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-friction-fingerprint-separator-not-length-prefixed
 ---
+
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-fingerprint-separator-not-length-prefixed.md
   Leaves live only under a story. id is the filename stem: task-friction-fingerprint-separator-not-length-prefixed.
@@ -23,11 +24,11 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-friction-fingerprint-sep
 
 ## Context
 
-`spec-friction-capture-020` mandating a separator-joined fingerprint pre-image is
-ambiguous by construction, so the one field the whole dedupe design leans on can
-be forged. Full context, the bounded impact and the accept/reject reasoning:
-the filing comment below (`### 2026-10-11 @arggon-delivery-lead — context +
-acceptance`).
+`spec-friction-capture-020` mandated a separator-joined fingerprint pre-image,
+which is ambiguous by construction: a crafted `--command` could forge another
+tuple's digest in the one field the whole dedupe design leans on. Full context,
+the bounded impact and the accept/reject reasoning live in the filing comment
+below (`### 2026-10-11 @arggon-delivery-lead — context + acceptance`).
 
 ## Acceptance
 
@@ -58,11 +59,13 @@ Acceptance:
 - [x] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green
 
 ### 2026-10-11 @arggon-maker
+
 Maker evidence for task-friction-fingerprint-separator-not-length-prefixed. This change also amends the recorded-boundary test that `task-friction-capture-command` (T1, PR #695) shipped, so it names both items.
 
 **Decision: Option A — length-prefix each component.**
 
 Rationale, including why the alternatives lost:
+
 - **Option B (domain separation) names the same guarantee**, so it is one mechanism rather than two: a structured encoding "with explicit component boundaries" is what a length prefix already produces. And there is exactly one derivation over this material — `reporterId` hashes a different tuple, and no second fingerprint derivation exists yet — so a domain tag would guard against a collision that does not exist.
 - **Option C (keep the verbatim formula) is rejected**: the boundary would stay recorded-in-a-test rather than fixed, and an accepted ambiguity should be a decision this spec makes out loud, not one it inherits from a sentence nobody re-read.
 
@@ -89,6 +92,7 @@ Why: a separator delimits by VALUE, so `(a, U+001F‖b, c, d)` and `(a‖U+001F,
 **Implementation** (`lib/src/friction.ts`): new exported `frictionFingerprintMaterial` (exported so the property can be asserted on the pre-image itself, exactly, with no truncation in the way) + `frictionFingerprint` hashing it. `frictionReporterId` is deliberately unchanged: its salt is fixed-width (exactly 64 hex chars, enforced by `SALT_HEX`), so where the salt ends and the path begins was never in doubt. That reasoning is now a comment on it rather than an accident.
 
 **Tests** (`lib/src/friction.test.ts` — the boundary-RECORDING test is replaced by tests that ASSERT the property):
+
 1. `cannot be forged: a crafted component cannot shift a field boundary` — the old collision pair `("a\u001fb","c")` vs `("a","b\u001fc")` now differs, AND the test first asserts that pair really is byte-identical under the old separator encoding, so the property is about that ambiguity rather than about two arbitrary inputs.
 2. `is injective over tuples wherever the boundary moves (property)` — a seeded fast-check property through `test/property-runner.ts` (25 runs, seed 20260928, the shared bounded/seeded policy): generated (head, tail, harness, version); the boundary-injected tuple and the boundary-shifted tuple must never share a digest. Never vacuous — the two commandShapes always differ.
 3. `encodes every component unambiguously (exhaustive over the adversarial alphabet)` — every 4-tuple over `{"", "a", U+001F, "a\u001f"}` (4^4 = 256 tuples) yields its own pre-image AND its own digest.
@@ -98,6 +102,7 @@ Why: a separator delimits by VALUE, so `(a, U+001F‖b, c, d)` and `(a‖U+001F,
 **Backward compatibility: `v` stays `1`, deliberately (reason recorded in the spec and in the test).** A record's `v` answers "can this reader parse this line", NOT "does this line carry the fingerprint formula I compute now". Bumping to `2` would make an upgraded `arggon` **skip** every `v: 1` line the adopter already recorded — the reader's documented behaviour for an unknown `v` — destroying a local history that is cache-like and cheap to re-earn, to fix a grouping ambiguity the bump does not fix either (two logs written either side of the change would still split the class). Staying at `1` degrades honestly instead: the reader never recomputes a fingerprint, it groups by the one each line carries, so a log spanning the change shows one class as two rows (a count split, never a wrong merge) and rotation ages the old-formula lines out within the 5000-line bound.
 
 **Gates** — declared order, all from the worktree:
+
 - `npm run build` — expected exit 0, observed exit 0 (lib + cli + typecheck + e2e; postbuild regenerated `opencode/plugins/arggon/index.bundle.ts`, committed with this change).
 - `npm test` — expected all suites green, observed 136 files / 2971 tests passed (was 2945; `lib/src/friction.test.ts` 46 → 68).
 - `npm run check:plugin` — expected no diff, observed exit 0 after committing the regenerated bundle.
@@ -109,5 +114,6 @@ Why: a separator delimits by VALUE, so `(a, U+001F‖b, c, d)` and `(a‖U+001F,
 **Impact class: behavioral** — a derived field changes value for identical inputs. The record schema, the caps, the reader contract and the `v` discipline do not change.
 
 ### handoff 2026-10-11 @arggon-maker — next: Review and merge PR #704 (length-prefixed fingerprint pre-image): confirm the recorded decision in spec-friction-capture-020, then unblock T2 task-friction-dedupe-and-report.
+
 - branch: feat/task-friction-fingerprint-separator-not-length-prefixed
 - open questions: Does the reviewer want the exhaustive adversarial-alphabet check moved into a *.property.test.ts file, or is it fine in friction.test.ts? Should a pre-amendment fingerprint ever be re-derived for com…
