@@ -222,8 +222,12 @@ export {
   FRICTION_LOG_FILE_NAME,
   FRICTION_MAX_LINES,
   FRICTION_NARRATIVE_CAP,
+  FRICTION_PATH_PLACEHOLDER,
+  FRICTION_REDACTED_FIELD,
+  FRICTION_REDACTION_MAX_SUBSTITUTIONS,
   FRICTION_REPORTER_ID_CHARS,
   FRICTION_SALT_FILE_NAME,
+  FRICTION_SECRET_PLACEHOLDER,
   FRICTION_STATE_SUBDIR,
   FrictionError,
   appendFrictionRecord,
@@ -238,6 +242,7 @@ export {
   normalizeCommandShape,
   readFrictionLog,
   readOrCreateMachineSalt,
+  redactFrictionText,
   resolveRepoAbsPath,
 } from "./friction.js";
 export type {
