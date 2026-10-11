@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-author-methodology-productization-bodies
 title: Author Context and Acceptance for the 12 open methodology-productization containers
+assignee: arggon-delivery-lead
+branch: feat/task-author-methodology-productization-bodies
 parent: story-tracker-hygiene
 labels: []
 created: "2026-10-11"
 updated: "2026-10-11"
+claimed_at: "2026-10-11T23:02:11.824Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-author-methodology-productization-bodies
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-methodology-productization-bodies.md
   Leaves live only under a story. id is the filename stem: task-author-methodology-productization-bodies.
