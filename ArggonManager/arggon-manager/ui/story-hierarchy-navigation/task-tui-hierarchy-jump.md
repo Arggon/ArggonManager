@@ -12,6 +12,7 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T23:19:54.665Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-tui-hierarchy-jump
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/task-tui-hierarchy-jump.md
   Leaves live only under a story. id is the filename stem: task-tui-hierarchy-jump.
@@ -36,7 +37,9 @@ Parent story `story-hierarchy-navigation`: the TUI detail pane (`buildTuiDetailL
 ## Notes
 
 ### 2026-10-11 @ses_ed2abf7e2ffeI4uJqBAYeqwL9z
+
 Evidence (maker, task-tui-hierarchy-jump, commit dedb83ce):
+
 - `npm run arggon -- validate` -> ok (0 warnings, convention v5), incl. pre-commit hook on commit
 - `npx prettier --check README.md cli/src/tui.ts cli/src/tui.test.ts smoke/tui-board-smoke.ts` -> All matched files use Prettier code style
 - `npx vitest run cli/src/tui.test.ts` -> 159 passed (was 143 before; +16 hierarchy cases)
@@ -47,5 +50,15 @@ Evidence (maker, task-tui-hierarchy-jump, commit dedb83ce):
 - Push: `git push -u origin feat/task-tui-hierarchy-jump` -> new remote branch, exit 0 (PR not opened from here; left for delivery lead)
 
 ### handoff 2026-10-11 @ses_ed2abf7e2ffeI4uJqBAYeqwL9z (session: ses_ed2abf7e2ffeI4uJqBAYeqwL9z) — next: Delivery lead: open PR from feat/task-tui-hierarchy-jump and run standards review
+
 - branch: feat/task-tui-hierarchy-jump
 - open questions: None; c-in-pane vs board-claim overload documented as modal
+
+### 2026-10-11 @ses_ed2ed434cffdHsqB0EV526IjUT
+
+verdict: approve (pane p/1-9/c jumps, read-only preserved, smoke green)
+
+- Read the worktree diff (tui.ts + tui.test.ts + smoke + README + own item file) — no board.ts, no plugins/, no templates/; scope stays on the item
+- Standards-reviewer: approve, no blocking findings (same-snapshot resolvers, write-free reducer, modal c honestly scoped+documented, sanitize on all new rows, honest-empty notices, real live round-trip test)
+- Verifier, all 5 probes green: vitest 159/159, tsc exit 0, prettier clean, smoke:tui-board pass incl. the 3 new jump steps, validate ok
+- Recommendation: merge PR #729 (merge, not squash) on green CI; lead ticks Acceptance after merge and flips done
