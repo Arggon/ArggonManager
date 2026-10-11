@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-convention-parser-rejects-valid-yaml-force-rescaffolds
 title: "`parseConventionConfig`'s strict line-parser rejects valid YAML (`allow-steal: true # armed`, a `post-start: |` block scalar, a quoted top-level key), so `init --force` re-derives the file wholesale and discards the adopter's configuration — the loss is reported, but it should not happen"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: [cli, convention, safety]
 created: "2026-10-11"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T09:06:02.964Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-convention-parser-rejects-valid-yaml-force-rescaffolds
 ---
 <!--
