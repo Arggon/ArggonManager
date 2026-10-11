@@ -32,3 +32,25 @@ Parent story `story-hierarchy-navigation`: the OpenCode board panel (`opencode/p
 - [ ] `arggon validate` green; prettier clean; PR opened with impact class (panel is a shipped adapter seam — likely Behavioral with the ADR 0016 channel reference)
 
 ## Notes
+
+### 2026-10-11 @arggon-maker
+Evidence for standards review (maker report; commit b139246c on feat/task-native-panel-hierarchy-links, pushed).
+
+What changed (7 files, scope-kept; cli/src/board.ts, cli/src/tui.ts, templates/ untouched):
+- opencode/plugins/arggon/board.ts: BOARD_HIERARCHY_CHILD_KEYS=9, boardParentId/boardChildrenOf pure resolvers over the inlined kernel parent edges; BoardItemDetail gains parent/children; boardDetailLines renders parent ([p] hint) + numbered children ([1]..[9]) with honest none/missing/overflow rows outside the acceptance/body budget, sanitized at render.
+- opencode/plugins/arggon/tui.tsx: controller gains jumpParent/jumpChild (select + open detail); keymap adds p + 1..9; header documents the activation model (plain-text rows, no click surface; keyboard activation is the agreed mechanism, not display-only).
+- opencode/plugins/arggon/index.ts + cli/src/plugin-bundle.ts: forward the 3 new board names (BUNDLE_EXPORTS parity kept); index.bundle.ts regenerated.
+- board.test.ts + tui.test.ts: hierarchy resolvers, detail fields/rendering, none/missing/overflow, hostile bytes, parent/child jumps + toasts, keymap table.
+
+Activation: Enter opens detail showing parent + children; p opens parent detail; 1..9 open the Nth child detail (id-sorted). No-parent toasts 'no parent'; missing edge shows '(missing)' and toasts 'parent not found'; out-of-range digit toasts 'no child N'; 9+ children show first 9 + overflow row (rest via tree cursor).
+
+Gates observed (all in worktree):
+- arggon validate --json: ok true, 0 errors
+- prettier --check on all 7 touched files: clean
+- vitest board+tui: 40/40 pass; full opencode/plugins/arggon + plugin-copy: 242/242 pass
+- npm run build:plugin: 47 modules, 544652 bytes; npm run check:plugin exit 0 (post-commit)
+- push git push -u origin feat/task-native-panel-hierarchy-links: new branch, exit 0
+
+PR impact class (for delivery lead to state on PR): Behavioral (panel is a shipped adapter seam) with the ADR 0016 adopter-upgrade-channel reference per agents.md Changing the methodology itself.
+
+Not done: acceptance boxes unticked, status untouched (delivery lead flips after merge). No tracker items filed.
