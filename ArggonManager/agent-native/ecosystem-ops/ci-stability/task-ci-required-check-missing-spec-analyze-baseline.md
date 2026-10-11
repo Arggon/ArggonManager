@@ -121,3 +121,13 @@ Consequence for `main`: because the gate is global (any story's stale entry bloc
 5. The real bite: the `cli` CI job on this PR runs the new step against this checkout — its result is pasted in the PR description.
 
 **Placement / duplicate-lane decision.** `arggon.yml`'s `tasks-validate` job installs the RELEASED bin (`npm install -g arggon-manager@$ARGGON_VERSION`), so a detector change in this checkout cannot fail a gate until the release ships — the exact lag that hid this lane. `cli` runs `npm run arggon` = `tsx cli/src/cli.ts`, this checkout's source. Only the repo-root baseline is wired: the story-scoped `spec-analyze-baseline-release-pipeline-015.json` is a snapshot of the same whole-corpus scan with the identical 4-entry finding set, so a second step would print the same answer and add a second place to go stale.
+- [ ] A blocking step in the already-required `cli` job of .github/workflows/ci.yml runs `npm run arggon -- spec analyze --baseline ArggonManager/spec-analyze-baseline.json` (the repo-root gate; the release-pipeline-scoped baseline belongs to that story's lane if at all — decide and record why, don't wire both blind)
+- [ ] The step is verified to bite: a deliberately-removed baseline entry (or a fresh no-error-path style finding) fails the job in a test PR — evidence pasted in the PR description
+- [ ] Verify the gate uses THIS checkout's build (the released-bin validate job cannot gate detector changes — record why the cli job is the right home)
+- [ ] No other workflow behavior changed; `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green
+- [ ] Record on the item what the gate should do when a finding is genuinely pre-existing (the --no-fail-on-new escape needs a recorded reason per the baseline item's rule)
+
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merge (PR #697)
+
+Reviewed against engineering.md §Review bar: scope stayed on the item (one workflow step + the item body); the step is blocking by construction (bash -e job, no continue-on-error/|| true/advisory if — verified in the hunk) and runs THIS checkout's source via `npm run arggon` in the already-required `cli` job, with the released-bin alternative refuted inline (a detector change cannot fail a gate until the release carrying it ships — exactly the lag that hid this lane); only the repo-root baseline is wired, with the duplicate-lane reasoning recorded (the story-scoped baseline is a field-for-field snapshot of the same scan); evidence travels with the change (bite-verification evidence in the PR); CI green on the PR itself — which is the live proof the gate bites in its new home.
