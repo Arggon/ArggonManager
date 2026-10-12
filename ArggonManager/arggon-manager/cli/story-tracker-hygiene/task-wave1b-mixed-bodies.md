@@ -62,3 +62,7 @@ Findings for the lead (not filed as items, per instructions):
 - No file had live Acceptance already; no box ticked anywhere (all 12 files' boxes unticked, including transcribed ones).
 - Verifier item scope note: its Notes deny-list names arggon_branch as denied while its transcribed Acceptance box 1 grants arggon_branch (read-side) — faithfully transcribed, for that bug's maker to resolve, not this wave.
 - No single-line depends_on exceeds printWidth in any touched file.
+
+### handoff 2026-10-12 @ses_ed1cf0451ffecacHCLC9mjdfZT (session: ses_ed1cf0451ffecacHCLC9mjdfZT) — next: Lead reviews 12 bodies, opens PR, merges to unblock guard commit
+- branch: feat/task-wave1b-mixed-bodies
+- open questions: Accept x-tracker prettier exception; file zcode seam-id sweep noted in nits verdict?
