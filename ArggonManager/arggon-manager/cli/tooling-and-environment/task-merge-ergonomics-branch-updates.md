@@ -96,3 +96,13 @@ Measured evidence stays in this item: on 2026-10-12 the wave hit `#746 BEHIND �
 ### handoff 2026-10-12 @ses_ecd832dcaffeNprCV9oommyP6g (session: ses_ecd832dcaffeNprCV9oommyP6g) — next: Delivery lead: review + merge the PR; on BEHIND use engineering.md §Naming, commits, PRs refresh flow; observe the box-4 after-cost during this wave.
 - branch: feat/task-merge-ergonomics-branch-updates
 - open questions: Merge queue needs a merge_group trigger in ci.yml + a push:main ordering check (ADR 0018 C3, auto-done) — follow-up not filed here; box 4 after-observation pending.
+
+### 2026-10-12 @ses_ecd832dcaffeNprCV9oommyP6g
+**Live demo of the documented flow (box 1's "demo/report on a real PR") — and one gate caveat.**
+
+PR #753 opened `BEHIND` (main had moved while the branch was open). Ran the doc's default path, refresh only:
+- `gh api -X PUT repos/Arggon/ArggonManager/pulls/753/update-branch` → `{"message":"Updating pull request branch."}`, exit 0 — no 422, no conflict, no worktree dance.
+- Observed after: `mergeStateStatus` `BEHIND` → `BLOCKED` with `mergeable: MERGEABLE` (required checks re-running on the refreshed head); local fast-forward to `0a4206bb Merge branch 'main' into feat/task-merge-ergonomics-branch-updates` (18 files from main, none touching this PR's two files).
+- Auto-merge deliberately NOT armed — merging is the delivery lead's call, not the maker's.
+
+Gate caveat (expected vs observed, for the standards reviewer): `npx prettier --check ArggonManager/docs/engineering.md` is clean. The item file was prettier-clean at the authored commit (`6f6b3f81`), but the native `comment`/`handoff` appends rewrote it into the tracker tool's standard shape (no blank line after the frontmatter, none after the appended headings) — the same shape as 18/18 sibling items in this folder, all of which fail `prettier --check`; no workflow runs prettier (grep across `.github/workflows/` is empty). I deliberately did not reformat the tracker file. Re-ran on the refreshed head: `npm run arggon -- validate` ok, doc-contract backstop 3 files / 46 tests passed.
