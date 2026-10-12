@@ -141,6 +141,16 @@ export type CleanupOptions = {
    */
   noGh?: boolean;
   /**
+   * Force opt-in (bug-cleanup-prune-untracked-artifacts-no-force): with
+   * `prune`, a terminal+merged worktree whose ONLY removal blockers are
+   * untracked files is removed anyway — the removal passes `git worktree
+   * remove --force`, and the classification (`entry.forced`) says so.
+   * Default OFF, so unknown untracked content still blocks; tracked
+   * modifications are never force-discarded, with or without this flag. Never
+   * inferred — only the caller's flag arms it.
+   */
+  pruneForce?: boolean;
+  /**
    * Release the named item's claim footprint (bug-unclaim-leaves-worktree-record-without-reaper):
    * remove the recorded worktree, delete its branch, reap the start-created
    * `.arggon.env` + `arggon-claim.json` stamp and clear the `worktree_path`
@@ -173,6 +183,13 @@ export type CleanupAction = {
   error?: string;
   /** Present when the branch could not be deleted (worktree already removed). */
   leftoverBranch?: string;
+  /**
+   * Additive (bug-cleanup-prune-untracked-artifacts-no-force): present on a
+   * `removed worktree` action whose removal passed `--force` because the
+   * entry's only blockers were untracked (its classification carried
+   * `forced: true`). Never set for a plain removal, never for tracked content.
+   */
+  forced?: boolean;
   /**
    * Present when the prune was enabled by the squash-merge fallback rather
    * than git ancestry (task-cleanup-squash-merge), e.g. "squash-merged PR #12".
@@ -246,8 +263,12 @@ export type CleanupDeps = {
  * mode only lists; `prune: true` removes removable worktrees (git worktree
  * remove), deletes their merged branches (git branch -d), and clears the
  * record. Items that are not done/cancelled and branches that are not fully
- * merged are reported as skipped and never touched. Before anything is
- * removed, both the local branch AND its remote counterpart (when
+ * merged are reported as skipped and never touched. A removable entry must
+ * also be free of removal-blocking content: untracked blockers keep the
+ * conservative skip unless the caller armed `pruneForce`
+ * (bug-cleanup-prune-untracked-artifacts-no-force — the skip names the flag and
+ * the manual sequence), while tracked modifications are never force-discarded.
+ * Before anything is removed, both the local branch AND its remote counterpart (when
  * `origin/<branch>` exists) must be merged into the base, so a lost push can
  * never leave a stranded remote tip (bug-cleanup-partial-failure). When the
  * repo's convention declares services (`x-worktree.services`, ADR 0019 layer
@@ -279,6 +300,14 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
       "--take-over-worktree requires --release <id> (it authorizes a release of a worktree whose stamped owner is presumed dead)",
     );
   }
+  if (opts.pruneForce === true && !opts.prune) {
+    // The prune force opt-in is meaningless without the prune it authorizes
+    // (bug-cleanup-prune-untracked-artifacts-no-force): refuse loudly instead
+    // of reading a flag that would never be used.
+    throw new Error(
+      "--force requires --prune (it discards the untracked content of terminal+merged worktrees)",
+    );
+  }
   const base = gitRunner.defaultBranch(root);
   // Captured before any release can remove this run's own working directory.
   const conventionVersionAtStart = readConventionVersion(root);
@@ -294,7 +323,11 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
   const entries =
     opts.release === undefined
       ? tracked.map((item) =>
-          classifyCleanupEntry(item, root, base, gitRunner, { noGh: opts.noGh, gh: deps.gh }),
+          classifyCleanupEntry(item, root, base, gitRunner, {
+            noGh: opts.noGh,
+            gh: deps.gh,
+            force: opts.pruneForce === true,
+          }),
         )
       : [];
 
@@ -383,10 +416,16 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
           // way; only start-created shape (the six documented KEY=value lines)
           // is ever removed here, never an adopter-customized one.
           unlinkWorktreeEnv(entry.path);
-          gitRunner.removeWorktree(root, entry.path);
+          // `forced` is the classification's per-entry decision — terminal +
+          // merged, untracked-only blockers, caller armed --force. Every other
+          // removal stays exactly as strict as before
+          // (bug-cleanup-prune-untracked-artifacts-no-force).
+          const force = entry.forced === true;
+          gitRunner.removeWorktree(root, entry.path, { force });
           pruned.push({
             id: entry.id,
             action: `removed worktree ${entry.path}`,
+            ...(force ? { forced: true } : {}),
             ...(entry.via ? { via: entry.via } : {}),
           });
         }

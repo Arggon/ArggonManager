@@ -4232,35 +4232,119 @@ describe("worktree domain tools (W4)", () => {
     ]);
   });
 
-  it("cleanup prune never force-removes a foreign node_modules install and keeps the record", async () => {
+  it("cleanup prune skips a foreign node_modules install instead of force-removing it without force", async () => {
     const dir = seedGitTree();
-    const { worktreePath, defs } = await completedWorktree(dir);
+    const { worktreePath, defs, calls } = await completedWorktree(dir);
     // A real install start never created (no link, no link-farm marker) is not
-    // ours to delete: the unlink helper leaves it alone, git still refuses the
-    // dirty worktree, and the candidate is reported instead of forced.
+    // ours to delete: the unlink helper leaves it alone, and the honest
+    // classification says so instead of classifying the worktree removable and
+    // then failing on git's raw refusal
+    // (bug-cleanup-prune-untracked-artifacts-no-force).
     const foreign = join(worktreePath, "node_modules", "foreign-dep");
     mkdirSync(foreign, { recursive: true });
     writeFileSync(join(foreign, "package.json"), '{"name":"foreign-dep"}\n', "utf8");
 
     const output = await tool(defs, "cleanup").execute({ prune: true });
     const envelope = output.output as Record<string, unknown>;
-    const actions = envelope.pruned as Array<Record<string, unknown>>;
-    expect(actions.map((action) => action.action)).toEqual(["failed"]);
-    expect(actions[0]).toMatchObject({
-      id: "task-rate-limit",
-      leftoverPath: worktreePath,
-      leftoverBranch: "feat/task-rate-limit",
-    });
-    expect(String(actions[0].error)).toContain("git worktree removal failed");
-    expect(envelope.failures).toHaveLength(1);
-    expect(envelope.commit).toBeUndefined();
-    // The foreign install, the worktree, the branch and the record all survive.
+    expect(envelope.pruned).toEqual([]);
+    expect(envelope.failures).toEqual([]);
+    const candidate = (envelope.candidates as Array<Record<string, unknown>>)[0];
+    expect(candidate.removable).toBe(false);
+    expect(candidate.blockingPaths).toEqual(["node_modules/"]);
+    expect(candidate.blockingTracked).toBeUndefined();
+    expect(String(candidate.reason)).toContain("untracked");
+    expect(String(candidate.reason)).toContain("force");
+    // Nothing was attempted through the domain, and the install, the worktree,
+    // the branch and the record all survive.
+    expect(calls.remove).toEqual([]);
     expect(existsSync(join(foreign, "package.json"))).toBe(true);
     expect(existsSync(worktreePath)).toBe(true);
     expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain(
       "feat/task-rate-limit",
     );
     expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+  });
+
+  it("cleanup prune reaps untracked blockers only with force, and reports the forced discard", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(dir);
+    // The 2026-10-12 incident shape: untracked generated scaffolding that lives
+    // only in the worktree (agent-harness output), never committed.
+    mkdirSync(join(worktreePath, "generated"), { recursive: true });
+    writeFileSync(join(worktreePath, "generated", "spec.json"), "{}\n", "utf8");
+
+    const skipped = await tool(defs, "cleanup").execute({ prune: true });
+    const skippedEnvelope = skipped.output as Record<string, unknown>;
+    expect(skippedEnvelope.pruned).toEqual([]);
+    expect(skippedEnvelope.failures).toEqual([]);
+    expect(calls.remove).toEqual([]);
+    const candidate = (skippedEnvelope.candidates as Array<Record<string, unknown>>)[0];
+    expect(candidate.removable).toBe(false);
+    expect(candidate.blockingPaths).toEqual(["generated/"]);
+    expect(candidate.blockingTotal).toBe(1);
+    expect(String(candidate.reason)).toContain("cleanup({ prune: true, force: true })");
+    expect(existsSync(worktreePath)).toBe(true);
+
+    const forced = await tool(defs, "cleanup").execute({ prune: true, force: true });
+    const forcedEnvelope = forced.output as Record<string, unknown>;
+    expect(forcedEnvelope.failures).toEqual([]);
+    expect(forcedEnvelope.pruned).toEqual([
+      { id: "task-rate-limit", action: `removed worktree ${worktreePath}`, forced: true },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    // The domain removal is forced for exactly this entry.
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: true },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+  });
+
+  it("cleanup prune never force-discards uncommitted tracked work", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(dir);
+    // A tracked file committed on the branch (then merged, so the entry stays
+    // eligible) and modified afterwards: the tracked change vetoes the forced
+    // removal even when the untracked artifact would otherwise allow it.
+    writeFileSync(join(worktreePath, "tracked.txt"), "committed\n", "utf8");
+    git(worktreePath, ["add", "tracked.txt"]);
+    git(worktreePath, ["commit", "-qm", "feat: tracked file"]);
+    git(dir, ["merge", "--no-ff", "feat/task-rate-limit", "-m", "Merge PR (stubbed)"]);
+    writeFileSync(join(worktreePath, "tracked.txt"), "modified\n", "utf8");
+    writeFileSync(join(worktreePath, "artifact.json"), "{}\n", "utf8");
+
+    const output = await tool(defs, "cleanup").execute({ prune: true, force: true });
+    const envelope = output.output as Record<string, unknown>;
+    const candidate = (envelope.candidates as Array<Record<string, unknown>>)[0];
+    expect(candidate.removable).toBe(false);
+    expect(candidate.blockingTracked).toEqual(["tracked.txt"]);
+    expect(candidate.blockingTrackedTotal).toBe(1);
+    expect(candidate.forced).toBeUndefined();
+    expect(String(candidate.reason)).toContain("never discards tracked work");
+    expect(calls.remove).toEqual([]);
+    expect(envelope.pruned).toEqual([]);
+    expect(envelope.failures).toEqual([]);
+    // The uncommitted work is intact, not merely reported.
+    expect(readFileSync(join(worktreePath, "tracked.txt"), "utf8")).toBe("modified\n");
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+  });
+
+  it("cleanup force without prune fails typed (CLI parity: --force requires --prune)", async () => {
+    const dir = seedGitTree();
+    const { defs } = await completedWorktree(dir);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "cleanup").execute({ force: true });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    expect((caught as ArgonToolError).code).toBe("CLEANUP_FAILED");
+    const forceError = (caught as ArgonToolError).envelope.error as Record<string, unknown>;
+    expect(String(forceError.message)).toContain("force requires prune");
   });
 
   it("cleanup prune keeps the rest of the run honest when one removal cannot be observed", async () => {

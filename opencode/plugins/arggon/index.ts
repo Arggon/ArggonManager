@@ -4555,7 +4555,11 @@ function nativeComposeDown(project: string, cwd: string): Promise<void> {
  * A removal that is not observably complete reports a per-candidate failure
  * and preserves both the branch and the record.
  * Skips (non-terminal item, unmerged branch, missing/foreign path) are
- * reported, never touched.
+ * reported, never touched, and so is removal-blocking content
+ * (bug-cleanup-prune-untracked-artifacts-no-force): untracked blockers keep the
+ * conservative skip unless the caller armed `force` (then the removal passes
+ * --force for exactly that entry), and tracked modifications are never
+ * force-discarded, with or without the flag.
  *
  * `release: <id>` takes the OTHER arm of the worktree domain: the inverse of
  * `start` for a claim that was dropped (bug-unclaim-leaves-worktree-record-
@@ -4626,6 +4630,17 @@ async function nativeCleanup(
       version,
     )
   }
+  if (input.force === true && input.prune !== true) {
+    // The prune force opt-in authorizes a prune; without one it is a silent
+    // no-op — refuse loudly (CLI parity: `--force requires --prune`).
+    return worktreeFail(
+      kernel,
+      "cleanup",
+      "CLEANUP_FAILED",
+      "force requires prune (it discards the untracked content of terminal+merged worktrees)",
+      version,
+    )
+  }
 
   const inventory = await domainWorktrees(options)
   const runner = {
@@ -4640,7 +4655,17 @@ async function nativeCleanup(
   const entries =
     releaseId === undefined
       ? tracked.map((item) =>
-          kernel.classifyCleanupEntry(item, root, base, runner, { noGh: input.no_gh === true }),
+          kernel.classifyCleanupEntry(item, root, base, runner, {
+            noGh: input.no_gh === true,
+            // The force opt-in (bug-cleanup-prune-untracked-artifacts-no-force)
+            // widens eligibility to untracked-only blockers; tracked
+            // modifications keep their refusal either way.
+            force: input.force === true,
+            // Exactly what the removal below unlinks against (canonical + this
+            // root), so classification and removal can never disagree about a
+            // start-created install entry.
+            primaryRoots: [canonicalRoot(options, root), root],
+          }),
         )
       : []
 
@@ -4709,9 +4734,11 @@ async function nativeCleanup(
           kernel.unlinkWorktreeEnv(entry.path)
           // The SAME observed removal the start rollback uses, without its force
           // policy: a dirty worktree must still be refused by git (bug-native-
-          // cleanup-unverified-worktree-removal).
+          // cleanup-unverified-worktree-removal). The one exception is the
+          // classification's own `forced` decision (terminal+merged, blockers
+          // all untracked, caller armed `force`) — never tracked modifications.
           const removal = await removeWorktreeObserved(options, entry.path, root, {
-            force: false,
+            force: entry.forced === true,
           })
           if (!removal.removed) {
             // A domain that resolves without removing (or a failing domain plus
@@ -4732,6 +4759,7 @@ async function nativeCleanup(
           pruned.push({
             id: entry.id,
             action: `removed worktree ${entry.path}`,
+            ...(entry.forced === true ? { forced: true } : {}),
             ...(entry.via !== undefined ? { via: entry.via } : {}),
           })
         }
@@ -5104,6 +5132,9 @@ const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
       type: "object",
       properties: {
         prune: BOOLEAN,
+        // Bare by budget (ADR 0006): the force contract is named in the prune
+        // reason and documented in ArggonManager/docs/agents.md §Cleanup.
+        force: BOOLEAN,
         release: ID,
         take_over_worktree: BOOLEAN,
         no_gh: {

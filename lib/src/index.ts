@@ -363,7 +363,11 @@ export {
   classifyReleaseEntry,
   defaultCleanupGit,
   findMergedPr,
+  parseRemovalBlockers,
+  parseRemovalBlockingPaths,
   worktreeReleaseRefusal,
+  worktreeTrackedRefusal,
+  worktreeUntrackedRefusal,
 } from "./cleanup.js";
 export type {
   ClassifyCleanupDeps,
@@ -372,6 +376,7 @@ export type {
   MergedPr,
   ReleaseEntry,
   ReleaseRequest,
+  RemovalBlockers,
 } from "./cleanup.js";
 export {
   buildLocalWorkspaces,
@@ -379,6 +384,8 @@ export {
   freshWorktreeInstallRefusal,
   inspectDeclaredDependencies,
   inspectGateBinResolution,
+  isStartOwnedNodeModulesInstall,
+  isStartOwnedWorktreeEnv,
   linkNodeModules,
   linkNodeModulesDetailed,
   linkedWorkspacePackages,
@@ -406,7 +413,9 @@ export {
   MAX_MISSING_DEPENDENCIES,
   MAX_GATE_BINS,
   MAX_PREP_STEPS,
+  WORKTREE_ENV_FILE,
   WORKTREE_ENV_KEYS,
+  WORKTREE_NODE_MODULES_ENTRY,
 } from "./worktree.js";
 export type {
   CheckIgnoreRunner,
