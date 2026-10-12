@@ -45,3 +45,7 @@ Maker evidence (bodies authored, commit 9ad90acc, pushed to origin/feat/task-aut
 - depends_on exception not needed: none of the 3 files carries depends_on.
 - Tooling note: the story edit call returned a spurious oldString-mismatch error yet wrote the content (verified byte-identical via cat -A + git diff); the other two edits returned success. No content impact.
 - Staged explicit paths only (never git add -A); committed 9ad90acc; push exit 0, branch tracks origin/feat/task-author-ci-wall-clock-bodies. No PR opened (delivery lead owns PR/merge/done). Own Acceptance boxes NOT ticked, status left in_progress.
+
+### handoff 2026-10-12 @ses_ed22024a4ffe8UUDQDGBJjYTv3 (session: ses_ed22024a4ffe8UUDQDGBJjYTv3) — next: Review diff 9ad90acc, open PR from feat/task-author-ci-wall-clock-bodies, verify, merge, flip done
+- branch: feat/task-author-ci-wall-clock-bodies
+- open questions: None; all 3 files had Notes so zero direction invented
