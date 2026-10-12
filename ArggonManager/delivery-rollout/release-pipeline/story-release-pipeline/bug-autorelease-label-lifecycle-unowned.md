@@ -193,3 +193,12 @@ verdict: approve (lead merge call) — review approved; both P3 findings fixed p
 - Pre-merge P3 fixes: (1) `renderPending` now dereferences defensively (`pr?.number ?? "?"`) with a new test pinning exit 0 on a malformed `[null]` verification payload — the pre-fix code reproduced a throwing exit; (2) the permission comment corrected to the GraphQL write path (`addLabelsToLabelable`/`removeLabelsFromLabelable`; cli/cli#10714/#13280 for the projectCards read).
 - Verifier evidence (this wave): focused suites 25/25; standalone fake-gh `[null]` probe → exit 0 with the warning + manual-recovery line and the defensive `#? (untitled)` render; live read-only no-op → `OK — nothing to flip` with the predicate empty ([]).
 - Residual, recorded: the flip's live write path first exercises at the next release cut (the owner's act; the tagged-then-flipped ordering keeps it correct even on a partial run), and the backstop reddens within one push if a label is ever left pending. Merging now; auto-done flips this item on merge.
+
+### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead — first LIVE flip exercise (release v0.7.0, run 38296293861)
+
+The owner merged release PR #744; the release run exercised the new flip for the first time:
+
+- `release-label-flip: flipped #744 chore: release main: 'autorelease: pending' -> 'autorelease: tagged'` — the deadlock's bookkeeping is now closed automatically in the run that tags (release success: tag v0.7.0, both packages published, both tarballs attached claimed in earlier verification).
+- The script then printed a WARNING ("still 'autorelease: pending' on 1 merged release PR(s) after the flip") — adjudicated as a **false positive**: the post-flip verification re-queried GitHub's eventually-consistent search ~0.4s after the edit; live state is clean (`[]`; #744 → tagged). Filed as `bug-release-label-flip-verification-index-lag` with a fix path (authoritative per-PR read or bounded retry).
+- Steady state after: release-please opened **#749** (next release proposal, correctly `autorelease: pending` while open); the backstop's query excludes open PRs by design.
