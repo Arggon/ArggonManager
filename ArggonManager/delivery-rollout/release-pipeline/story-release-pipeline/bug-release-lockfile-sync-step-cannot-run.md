@@ -12,7 +12,6 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T17:27:25.869Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-lockfile-sync-step-cannot-run
 ---
-
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-lockfile-sync-step-cannot-run.md
   Leaves live only under a story. id is the filename stem: bug-release-lockfile-sync-step-cannot-run.
@@ -407,3 +406,12 @@ Re-derived by enumerating **all 377 runs** of this workflow through the API (`ac
 - The other 13 workflow failures in the window are not this defect: release-please-action (10, one on the tag-pinned `@v4`), the abort step (1), two with no failing step recorded.
 
 Gates re-run after the correction: `arggon validate` ok (0 warnings) · `actionlint` exit 0 · `prettier --check` clean on both changed files · `test:structure` 5/5 · `lint:structure` exit 0. Branch re-pushed with the verdict commit `2f2ab18a` riding along. The one acceptance box for the real post-merge run stays unticked, as instructed.
+
+### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead
+verdict: approve (lead merge call) — the standards request-changes (evidence fidelity) is resolved by the maker's correction, and the verifier replicated the core claim
+
+- Review finding accepted and corrected: first exposure is run **36908073600 (2026-10-01)**, the run that created release PR **#556** — not the #664 window; **49 failures across three release-PR windows** (#556 39, #664 8, #744 2). The corrected workflow comment + item Notes carry the full inventory and keep the "latent, not a runner change" conclusion (now supported on both image builds). This supersedes the request-changes.
+- Verifier replication (this wave): fixed invocation in a scratch copy of `origin/release-please--branches--main` → exit 0, `dep ^0.7.0` / `lib 0.7.0` (matching the branch), **no node_modules**, lockfile diff 2 lines; without the flag locally → lifecycle failure (structural cause corroborated, env caveat stated); diff scope = the step line + comments; actionlint clean.
+- CI green on the fixed head (cli 4m15s, tasks-validate, ui-smoke).
+- Merging now. The real-run acceptance box stays open and is mine: the merge push re-runs release-please.yml with release PR #744 open, and the fixed sync step must push the reconciled lockfile — that observation completes this item before its `done` flip.
