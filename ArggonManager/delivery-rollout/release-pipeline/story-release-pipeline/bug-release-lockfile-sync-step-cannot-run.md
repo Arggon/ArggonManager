@@ -287,3 +287,24 @@ aborted release`, not in the sync step (the sync step was skipped) — that is
 ### handoff 2026-10-12 @ses_eced77ddeffe7RDZa3wt3P1UKS (session: ses_eced77ddeffe7RDZa3wt3P1UKS) — next: Post-merge: watch the next release-please.yml run with PR #744 open; the sync step must complete and push the reconciled lockfile (^0.7.0 / 0.7.0), the run green, then tick the last acceptance box.
 - branch: fix/bug-release-lockfile-sync-step-cannot-run
 - open questions: Next sync also strips npm-10 libc fields (formatting only); whether to pin the step's npm left open; run 38282448930's abort-step failure is sibling scope, reported not filed.
+
+### 2026-10-12 @ses_eced77ddeffe7RDZa3wt3P1UKS
+### Maker evidence
+
+Branch `fix/bug-release-lockfile-sync-step-cannot-run`, PR #745 (not merged). Fix: the sync step now runs `npm install --package-lock-only --ignore-scripts` with a comment carrying the why. Full evidence, including the inspected-runs table, lives in **Notes** on this branch.
+
+**Root cause — latent, not a runner change.** All 9 runs that had an open release PR failed in exactly this step; the first was **37648763109** (2026-10-07T16:04, the same run that created PR #664) — 5 days before 38283343454, on equivalent images (ubuntu-24.04 `20260927.320` vs `20261004.327`, both Node.js 22.23.3 / npm 10.9.9). Every run outside that window took the `no open release PR` early exit (earliest inspected: 37065003701, 2026-10-02T21:08). Correction: #664 was created 2026-10-07T16:04:23Z, not open from 10-02.
+
+**Reproduction** (scratch worktree of `origin/release-please--branches--main`, no `node_modules`):
+
+- `npm install --package-lock-only` → exit 127 locally (`tsc: command not found`) / exit 2 with TS2591 on the runner.
+- the same command + `--ignore-scripts` → exit 0, and the produced lockfile is **byte-identical** with and without the flag (sha256 `e17c67460ac43bbcf96dcbce3a9e015677e38db77604392734c70559d7a8d328`, runner npm 10.9.9) — resolution is unchanged.
+- `jq` before/after: `packages[""].dependencies["@arggondev/lib"]` `^0.4.0` → `^0.7.0`; `packages["lib"].version` `0.4.0` → `0.7.0`.
+- **Negative control**: an unsatisfiable registry dep makes the fixed command exit 1 (`ETARGET`) and leaves `package-lock.json` untouched; no `|| true` was added — the step stays fail-loud under `set -euo pipefail`.
+- `npm ci` on the reconciled branch (runner npm): exit 0, `added 160 packages`, full prepare→build→postbuild. Honest scope: it is also exit 0 with the stale lockfile (workspace `link: true` resolution), so the restored observable is the reconciled lockfile plus the green run.
+
+**Gates (expected vs observed):** `arggon validate` ok, 0 warnings · `actionlint v1.7.12` exit 0, no findings (`npx actionlint` does not resolve — actionlint ships as a Go binary on PATH) · `prettier --check` clean on both changed files · `test:structure` 5 passed / 0 failed · `lint:structure` exit 0.
+
+Left unticked as instructed: *Verified on a real release-please.yml run after the fix lands* (delivery lead, post-merge).
+
+**Out of scope, reported not filed:** run 38282448930 failed in `Surface an aborted release` (sibling `bug-autorelease-label-lifecycle-unowned` territory); both runs annotate Node.js 20-deprecated actions forced onto Node.js 24.
