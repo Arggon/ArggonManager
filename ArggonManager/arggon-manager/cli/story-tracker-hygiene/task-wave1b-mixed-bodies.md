@@ -8,7 +8,6 @@ labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-wave1b-mixed-bodies.md
   Leaves live only under a story. id is the filename stem: task-wave1b-mixed-bodies.
@@ -30,3 +29,12 @@ Wave-1b of `decided: A`: the blocking guard (`task-validate-refuses-placeholder-
 - [ ] Prettier clean (modulo a disclosed single-line depends_on exception); `arggon validate` green; PR opened
 
 ## Notes
+
+### 2026-10-12 @ses_ed2ed434cffdHsqB0EV526IjUT
+verdict: approve (12 mixed-area bodies, docs-only, smoke-exempt)
+- Read the worktree diff (12 files + own item file) — nothing else; scope stays on the item
+- Standards-reviewer: approve, no blocking findings (frontmatter untouched incl. YAML-identical requotes; 4 transcriptions spot-checked; 2 Context-pre-existing files clean outside new Acceptance; zero-Notes file grounded with all pins resolving at HEAD; all boxes checkable)
+- Ruling accepted with reasons: the x-tracker 3-space exception ships (no CI prettier gate; content beats formatter; disclosed with proof recipe)
+- Verifier, all 6 probes green: prettier exactly-one-flagged (the accepted exception), validate ok, exception proof recovered (glued form confirmed), no markers, no ticks, both requotes YAML-identical
+- Lead notes for close-out: amend own Acceptance box 4 to name the x-tracker exception (currently names a depends_on exception that does not exist) before ticking
+- Recommendation: merge PR #738 (merge, not squash) on green CI; lead ticks Acceptance after merge and flips done
