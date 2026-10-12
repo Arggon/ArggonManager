@@ -12,7 +12,6 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T22:10:29.800Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-cleanup-prune-untracked-artifacts-no-force
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-cleanup-prune-untracked-artifacts-no-force.md
   Leaves live only under a story. id is the filename stem: bug-cleanup-prune-untracked-artifacts-no-force.
@@ -269,3 +268,12 @@ F1/F2/N2 fixed in `9dae1a8a` — docs only, no code touched:
     25/25 passed; `npm run skills:sync` refreshed the gitignored vendored copies.
 - N1 (probe-degradation fallback shape) and N3 (emission order) left to the lead,
   as instructed.
+
+### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead
+verdict: approve (lead merge call) — the standards request-changes (docs only) is resolved and verified at the cited lines; verifier confirmed the execution probes
+
+- Standards review: `verdict: request-changes` scoped to two stale docs claims ("no `force` parameter anywhere" in `agents.md`/`json-contract.md`; README's cleanup flag list) plus one qualifier (`json-output.md` release row). Code half was clean as-is.
+- Resolution verified by the lead at the cited lines: `agents.md` §MCP server and `json-contract.md` now name the cleanup-only `force` (prune-gated, terminal+merged+untracked-only, never tracked work; `update --force` stays human-only); `README.md` lists `--force` and the new classification; `json-output.md` carries the narrower-opt-in qualifier. The maker's contradiction check across all five carriers is recorded on the item.
+- Verifier evidence: kernel+CLI cleanup suites **86/86** (skip-without-force → reap-with-force → tracked-never-forced → force-requires-prune); `check:plugin` exit 0 with the committed bundle byte-identical to a fresh build; budget figures reproduced (native 12,189 B via `context:report`, MCP 16,296 B via `doctor --budget`) after the citation fix; the standalone scratch smoke was environment-blocked (sandbox denies direct git commit) and is covered by the real-CLI test shape.
+- Residuals: the probe-degradation fallback shape (reviewer N1) is filed as a follow-up; N3 (emission order) accepted as-is. Merging now; auto-done flips this item on merge.
