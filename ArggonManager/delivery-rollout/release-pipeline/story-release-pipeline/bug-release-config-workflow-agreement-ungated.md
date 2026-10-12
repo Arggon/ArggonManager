@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-release-config-workflow-agreement-ungated
 title: "Nothing gates the release-please config against the tags `release.yml` actually creates — a one-word omission (`include-component-in-tag`) silently killed releases for five days, and every aborted run reported `success`"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-release-pipeline
 labels: [ci, release, gate-fidelity]
 created: "2026-10-07"
 updated: "2026-10-12"
-claimed_at: "2026-10-12T13:30:32.525Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-config-workflow-agreement-ungated
 ---
 <!--
