@@ -1,14 +1,16 @@
 ---
-plan_id: deps-001
+plan_id: deps-019
 title: Plan de implementación del grafo de dependencias
-spec: ArggonManager/docs/specs/spec-deps-001.md
+spec: ArggonManager/docs/specs/spec-deps-022.md
 status: implemented
 created: 2026-09-11
 ---
 
-# Plan: dependency graph (deps-001)
+# Plan: dependency graph (deps-019)
 
-Derivado del spec `ArggonManager/docs/specs/spec-deps-001.md`. Cada tarea tiene criterio de
+> **Renumber note (2026-10-11):** originally filed as `plan-deps-001` in collision with `plan-sync-001.md` (task-renumber-colliding-doc-numbers); renumbered to the next FREE plan number (019), paired with its renumbered spec `spec-deps-022.md` (its `spec:` pointer updated in kind). Plan content unchanged.
+
+Derivado del spec `ArggonManager/docs/specs/spec-deps-022.md`. Cada tarea tiene criterio de
 aceptación verificable; los ítems del árbol son `story-deps-schema` /
 `story-deps-queries`.
 

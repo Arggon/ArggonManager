@@ -82,9 +82,16 @@ the session keeps running after a tool error.
 
 `arggon mcp` is the optional stdio MCP server — it is **not** part of the
 OpenCode V2 default path (the native tools replace it); agents that want it
-register it through their MCP client (`.mcp.json`), never by typing it. For
-clients with no code-mode tool API (ZCode, ADR 0014) it IS the native tool
-surface. **Fifteen tools**: the core nine `arggon_list`, `arggon_create`,
+register it through their MCP client, never by typing it. For clients with no
+code-mode tool API (ADR 0014) it IS the native tool surface, and registration
+is per-client seam data — adding a client is one more registration in its
+seam, never a new surface. **ZCode** registers it in the plugin bundle's
+`mcpServers` manifest (`templates/docs/zcode/arggon/`, installed through the
+local marketplace); **Claude Code** registers it through the init-generated
+`.mcp.json` (the `claude` seam, beside the generated `CLAUDE.md` ->
+`@AGENTS.md` pointer) — the `zcode:mcp` / `claude:mcp` mechanisms the
+capability matrix (`adapters/capability-matrix.json`) declares. **Fifteen
+tools**: the core nine `arggon_list`, `arggon_create`,
 `arggon_update`, `arggon_comment`, `arggon_handoff`, `arggon_show`,
 `arggon_next`, `arggon_report`, `arggon_validate`, plus `arggon_priority`,
 `arggon_sync`, `arggon_import_issues` (kernel operations, in-process) and the

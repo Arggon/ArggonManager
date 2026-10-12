@@ -16,6 +16,7 @@ import {
   TRACKER_DIR_NAME,
   commitTrackerMutation,
   conventionPathForLayout,
+  parseConventionConfig,
   readAutoCommitConfig,
   readGeneratedProjectName,
   readGeneratedState,
@@ -162,6 +163,18 @@ export type InitResult = {
   reapRefused: ReapRefusal[];
   restored: string[];
   conventionPath: string;
+  /**
+   * What the forced re-scaffold did with the tracker `.convention.yml`
+   * (bug-init-force-drops-x-tracker-block) — present only when this run
+   * force-re-scaffolded an existing file. Names the top-level sections kept
+   * byte-for-byte (`preserved`: the namespaced extensions, `version`,
+   * `branch_patterns` — a whole extension can no longer disappear without
+   * being named), the sections rewritten (`replaced`: `x-generated`, the
+   * provenance that must track the fresh scaffold), and the enumerated
+   * exception (`rescaffolded`: the existing file carried no readable
+   * configuration, so the fixed scaffold string was the base).
+   */
+  convention?: ConventionRewriteReport;
   /** Side-file upgrade proposals (--propose, task-init-propose-acked-updates, additive). */
   proposals?: ProposalEntry[];
   /**
@@ -201,6 +214,92 @@ function ensureTemplates(root: string, force: boolean): string[] {
     copied.push(name);
   }
   return copied;
+}
+
+/**
+ * Top-level mapping keys of raw `.convention.yml` text, in document order
+ * (`version`, `branch_patterns`, `x-tracker`, ...). A line-oriented scan, so
+ * comments, blank lines and nested content never register as a section — and
+ * an unknown (future) key is listed exactly like a known one: what gets
+ * preserved is decided from the bytes, not from what this version knows.
+ *
+ * bug-convention-parser-rejects-valid-yaml-force-rescaffolds: the key is
+ * decoded the same way `parseConventionConfig` decodes it, quotes included, so
+ * `"x-tracker":` is reported as the `x-tracker` section it is. Without that the
+ * report would under-promise (say "preserved no existing sections") about a
+ * section it really did keep — and the whole point of the report is that a
+ * section can no longer disappear without being named.
+ */
+function topLevelSections(raw: string): string[] {
+  const keys: string[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const match = /^["']?([A-Za-z0-9_.-]+)["']?\s*:/.exec(line);
+    if (match && !keys.includes(match[1]!)) keys.push(match[1]!);
+  }
+  return keys;
+}
+
+/**
+ * The base a forced re-scaffold writes `.convention.yml` from
+ * (bug-init-force-drops-x-tracker-block): the EXISTING file's bytes, so
+ * everything outside the provenance section survives — the namespaced
+ * extensions (`x-tracker` with its `allow-steal` / `strict-gate-bins` /
+ * `strict-worktree-writes` / `reap-acked-orphans` / `product-acceptance`
+ * options, `x-views`, `x-playbooks`, `x-import`, `x-worktree`, `x-github`),
+ * `version`, `branch_patterns` and comments alike. The old fixed-string
+ * rewrite silently dropped all of it, which is the bug this answers. The
+ * enumerated exception: a file that is unreadable, empty, or does not parse
+ * carries no configuration worth keeping, so the fixed scaffold string is the
+ * base and `rescaffolded` reports the wholesale replacement instead of
+ * failing silently.
+ */
+function conventionScaffoldBase(conventionPath: string): {
+  bytes: string;
+  preserved: string[];
+  rescaffolded: boolean;
+} {
+  let raw: string;
+  try {
+    raw = readFileSync(conventionPath, "utf8");
+  } catch {
+    raw = "";
+  }
+  if (raw.trim() !== "") {
+    try {
+      // Strict on purpose: a file the kernel can still read is worth keeping
+      // verbatim (unknown top-level keys are ignored by the parser, so a
+      // future extension rides along untouched); a file that no longer
+      // parses is repaired from the scaffold and reported as such.
+      parseConventionConfig(raw, conventionPath);
+    } catch {
+      raw = "";
+    }
+  }
+  if (raw.trim() === "") {
+    return { bytes: CONVENTION_YML, preserved: [], rescaffolded: true };
+  }
+  return {
+    bytes: raw,
+    preserved: topLevelSections(raw).filter((key) => key !== "x-generated"),
+    rescaffolded: false,
+  };
+}
+
+/**
+ * The scaffold row reason for a forced re-scaffold: what was kept, what was
+ * replaced (the `x-generated` provenance must track the fresh scaffold — the
+ * one replacement a force genuinely makes), and the enumerated exception where
+ * the whole file was re-derived. A silent configuration loss is the defect, so
+ * every arm names itself.
+ */
+function forcedScaffoldReason(base: { preserved: string[]; rescaffolded: boolean }): string {
+  if (base.rescaffolded) {
+    return "force re-scaffold — existing .convention.yml unreadable or unparseable; re-derived from the scaffold";
+  }
+  if (base.preserved.length === 0) {
+    return "force re-scaffold — no existing sections to preserve; x-generated provenance refreshed";
+  }
+  return `force re-scaffold — preserved ${base.preserved.join(", ")}; x-generated provenance refreshed`;
 }
 
 /**
@@ -261,6 +360,29 @@ export type InitPlanEntry = {
 };
 
 /**
+ * What a run did with the tracker `.convention.yml`
+ * (bug-init-force-drops-x-tracker-block): a forced re-scaffold used to
+ * re-derive the file from the fixed scaffold string, silently discarding the
+ * whole `x-tracker` extension block — `allow-steal`, `strict-gate-bins`,
+ * `strict-worktree-writes`, `reap-acked-orphans`, `product-acceptance` — and
+ * any adopter-set `branch_patterns` with it. `preserved` names every top-level
+ * section the write kept byte-for-byte; `replaced` names the sections it
+ * rewrote (`x-generated`: the provenance must track the fresh scaffold — the
+ * one replacement a force genuinely must make, and it is named). `rescaffolded`
+ * is the enumerated exception: the existing file carried no readable
+ * configuration (unreadable, empty, or unparseable), so the fixed scaffold
+ * string was the base instead — reported, never silent.
+ */
+export type ConventionRewriteReport = {
+  preserved: string[];
+  replaced: string[];
+  rescaffolded: boolean;
+};
+
+/** The planned `.convention.yml` write: the exact bytes plus what they keep/replace. */
+export type ConventionWrite = ConventionRewriteReport & { content: string };
+
+/**
  * Pure plan of a full init run (task-init-dry-run-plan): scaffold decisions +
  * the per-destination doc plan, computed with ZERO writes. Shared by runInit
  * (plan, then apply) and the `--dry-run` preview, so there is exactly one
@@ -276,6 +398,16 @@ export type InitPlan = {
   layout: TrackerLayout;
   /** Absolute `.convention.yml` path this run writes (layout-aware). */
   conventionPath: string;
+  /**
+   * The exact `.convention.yml` bytes this run writes plus what that write
+   * keeps and replaces (bug-init-force-drops-x-tracker-block) — present only
+   * when this run (re)scaffolds the file (the idempotent path leaves it
+   * untouched). The apply step writes THESE bytes and the result reports the
+   * same keep/replace object, so a `--dry-run` preview and the real run cannot
+   * disagree about the convention file. The keep/replace fields are only
+   * meaningful on the forced re-scaffold of an existing file.
+   */
+  conventionWrite?: ConventionWrite;
   /** `<tracker>/.convention.yml` + templates/ decisions (doc dests live in `docs`). */
   scaffold: InitPlanEntry[];
   /** Per-destination doc plan (pure; includes bytes a real run would write). */
@@ -379,20 +511,37 @@ export function planInit(opts: InitOptions): InitPlan {
     };
   }
 
-  // Fresh scaffold, or a forced re-scaffold (x-generated provenance carried
-  // over so untouched docs keep regenerating instead of degrading to
-  // adopter-modified — the doc plan must see the carried state).
-  const carried = opts.force && alreadyInitialized ? readGeneratedState(root) : {};
+  // Fresh scaffold, or a forced re-scaffold. Two things ride a force across
+  // the re-scaffold of an existing tree: the `x-generated` provenance state,
+  // so untouched docs keep regenerating instead of degrading to
+  // adopter-modified (the doc plan must see the carried state), and the rest
+  // of the file itself as the write base (bug-init-force-drops-x-tracker-block)
+  // — the old fixed-string rewrite silently dropped the whole `x-tracker`
+  // extension block and any adopter-set `branch_patterns`. `alreadyInitialized`
+  // with `!opts.force` returned above, so past this line `alreadyInitialized`
+  // implies `opts.force`.
+  const forced = opts.force && alreadyInitialized;
+  const carried = forced ? readGeneratedState(root) : {};
   // Carry the recorded project name over the re-scaffold too
   // (bug-project-name-dir-derived): the plan must record the same name the
   // tree already uses, not re-derive it from the (possibly worktree) dirname.
-  const carriedName = opts.force && alreadyInitialized ? readGeneratedProjectName(root) : null;
+  const carriedName = forced ? readGeneratedProjectName(root) : null;
+  // The bytes the convention write starts from: the existing file on a forced
+  // re-scaffold (its namespaced extensions, version, branch_patterns and
+  // comments survive byte-for-byte; only the `x-generated` section is
+  // rewritten), the fixed scaffold string on a fresh one. The whole-file
+  // fallback is the one case where a force genuinely discards the old file,
+  // and `conventionScaffoldBase` reports it instead of failing silently.
+  const scaffoldBase = forced
+    ? conventionScaffoldBase(conventionPath)
+    : { bytes: CONVENTION_YML, preserved: [] as string[], rescaffolded: false };
+  const conventionContent = updateGeneratedSection(scaffoldBase.bytes, carried, carriedName);
   const scaffold: InitPlanEntry[] = [
     alreadyInitialized
       ? {
           dest: `${trackerName}/.convention.yml`,
           decision: "overwritten",
-          reason: "force re-scaffold — x-generated provenance carried over",
+          reason: forcedScaffoldReason(scaffoldBase),
         }
       : {
           dest: `${trackerName}/.convention.yml`,
@@ -418,6 +567,20 @@ export function planInit(opts: InitOptions): InitPlan {
   return {
     ...base,
     scaffold,
+    // The exact bytes the apply step writes for `.convention.yml`, plus what
+    // that write keeps and replaces (bug-init-force-drops-x-tracker-block):
+    // one computation, shared by the write, the docs plan's pending state
+    // rewrite and the result's `convention` report, so the run and its
+    // `--dry-run` preview cannot disagree. The keep/replace fields are only
+    // meaningful on the forced re-scaffold of an existing file — a fresh
+    // scaffold preserves and replaces nothing, and an idempotent re-run
+    // writes no convention file at all.
+    conventionWrite: {
+      content: conventionContent,
+      preserved: scaffoldBase.preserved,
+      replaced: forced ? ["x-generated"] : [],
+      rescaffolded: scaffoldBase.rescaffolded,
+    },
     docs: planGenerateDocs({
       root,
       full: Boolean(opts.full),
@@ -430,10 +593,10 @@ export function planInit(opts: InitOptions): InitPlan {
       // The resolved adapter selection (spec §S2), so the fresh-scaffold path
       // honors --agents / --no-agents exactly like the already-initialized one.
       agents: adapters.selected,
-      // The scaffold write (above, in runInit) lands before docs are applied,
-      // so the plan sees the convention file it will exist by then and plans
-      // the pending x-generated rewrite against the scaffolded content.
-      rawState: updateGeneratedSection(CONVENTION_YML, carried, carriedName),
+      // The scaffold write (in runInit) lands before docs are applied, so the
+      // plan sees the convention content that will exist by then and plans the
+      // pending x-generated rewrite against it.
+      rawState: conventionContent,
     }),
     adapters,
   };
@@ -988,6 +1151,14 @@ export type InitDryRunResult = {
   full: boolean;
   backup: boolean;
   conventionPath: string;
+  /**
+   * What a forced re-scaffold would keep and replace in the tracker
+   * `.convention.yml` (bug-init-force-drops-x-tracker-block) — the same
+   * keep/replace report the real run carries, so the preview says what the
+   * run would preserve before anything is written. Absent unless this run
+   * force-re-scaffolds an existing file.
+   */
+  convention?: ConventionRewriteReport;
   /** Every planned action: scaffold decisions first, then docs by dest. */
   plan: InitPlanEntry[];
   /** Buckets exactly as a real run with the same flags would report them. */
@@ -1124,6 +1295,18 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
     backedUp: plan.docs.backedUp,
     skipped: plan.docs.skipped,
     restored: [],
+    // Same keep/replace report the real run would carry
+    // (bug-init-force-drops-x-tracker-block): the preview says what the
+    // forced re-scaffold would keep and replace before anything is written.
+    ...(plan.conventionWrite && plan.alreadyInitialized && opts.force
+      ? {
+          convention: {
+            preserved: plan.conventionWrite.preserved,
+            replaced: plan.conventionWrite.replaced,
+            rescaffolded: plan.conventionWrite.rescaffolded,
+          },
+        }
+      : {}),
     reaped: plan.docs.reaped,
     reapRefused: reapRefusals(plan.docs.reapRefused),
     adapters,
@@ -1238,14 +1421,18 @@ export function runInit(opts: InitOptions): InitResult {
   }
 
   mkdirSync(tasksDir, { recursive: true });
-  // A forced re-scaffold carries the x-generated provenance section over so
-  // untouched docs keep regenerating instead of degrading to adopter-modified.
-  const carried = opts.force && plan.alreadyInitialized ? readGeneratedState(root) : {};
-  const carriedName = opts.force && plan.alreadyInitialized ? readGeneratedProjectName(root) : null;
+  // The plan already computed the exact bytes (the write base — the existing
+  // file on a forced re-scaffold, so its namespaced extensions survive — plus
+  // the carried x-generated provenance spliced in), so the apply step writes
+  // THESE bytes and never re-derives them: a forced re-init that started from
+  // the fixed scaffold string dropped the whole x-tracker block
+  // (bug-init-force-drops-x-tracker-block), and one shared computation keeps
+  // the plan, the docs state rewrite and this write in agreement. The
+  // early-return paths above guarantee a plan that reaches here carries one.
   // Atomic (bug-atomic-write-followups F3): a concurrent reader
   // (readConventionConfig in branch/list/view paths) must never observe the
   // truncate window of this rewrite.
-  writeFileAtomic(conventionPath, updateGeneratedSection(CONVENTION_YML, carried, carriedName));
+  writeFileAtomic(conventionPath, plan.conventionWrite!.content);
   const copiedTemplates = ensureTemplates(root, opts.force).map((name) => `templates/${name}`);
   const docs = applyDocsPlan(root, plan.docs);
   const created = [`${trackerName}/.convention.yml`, ...copiedTemplates, ...docs.created].sort();
@@ -1262,6 +1449,20 @@ export function runInit(opts: InitOptions): InitResult {
     skipped: docs.skipped,
     restored: [],
     conventionPath,
+    // What the forced re-scaffold kept and replaced in `.convention.yml`
+    // (bug-init-force-drops-x-tracker-block) — the keep/replace half of the
+    // plan's conventionWrite, so the run states what it preserved instead of
+    // silently dropping configuration. Only the forced re-scaffold of an
+    // existing file has something to keep; a fresh scaffold creates the file.
+    ...(plan.conventionWrite && plan.alreadyInitialized && opts.force
+      ? {
+          convention: {
+            preserved: plan.conventionWrite.preserved,
+            replaced: plan.conventionWrite.replaced,
+            rescaffolded: plan.conventionWrite.rescaffolded,
+          },
+        }
+      : {}),
     reaped: docs.reaped,
     reapRefused: reapRefusals(docs.reapRefused),
     adapters,

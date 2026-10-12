@@ -15,12 +15,15 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   ARGON_BOARD_PANEL,
   BOARD_DETAIL_MAX_LINE_CHARS,
+  BOARD_HIERARCHY_CHILD_KEYS,
   activeBoardId,
+  boardChildrenOf,
   boardCountsLine,
   boardDetailLines,
   boardHeaderLine,
   boardItemDetail,
   boardItemLine,
+  boardParentId,
   boardRoot,
   boardSnapshot,
   boardTreeEntries,
@@ -487,6 +490,11 @@ describe("board inline detail block (kernel-backed, bounded, sanitized)", () => 
     expect(detail.acceptanceTotal).toBe(2);
     expect(detail.body).toEqual(["## Context", "", "Context line one.", "", "## Acceptance"]);
     expect(detail.truncated).toBe(false);
+    // Hierarchy through the kernel's `parent` edges: task-one hangs under
+    // story-a with no children of its own.
+    expect(detail.parent?.id).toBe("story-a");
+    expect(detail.parent?.missing).toBe(false);
+    expect(detail.children).toEqual([]);
 
     // Embedded under the selected line as one width-clipped block.
     const lines = boardTreeLines(boardSnapshot(root), {
@@ -497,8 +505,12 @@ describe("board inline detail block (kernel-backed, bounded, sanitized)", () => 
     const treeIndex = lines.findIndex((line) => line.includes("T task-one — First task"));
     expect(treeIndex).toBeGreaterThan(0);
     expect(lines[treeIndex]?.startsWith("❯")).toBe(true);
-    expect(lines.slice(treeIndex + 1, treeIndex + 9)).toEqual([
+    // Header + parent + children rows sit outside the acceptance/body budget,
+    // so a long checklist can never hide the walk.
+    expect(lines.slice(treeIndex + 1, treeIndex + 11)).toEqual([
       "  ┌ argon detail · task-one — First task",
+      "  │ parent: story-a — Story A (todo) [p]",
+      "  │ children: none",
       "  │ [ ] first criterion",
       "  │ [x] second criterion",
       "  │ ## Context",
@@ -507,7 +519,7 @@ describe("board inline detail block (kernel-backed, bounded, sanitized)", () => 
       "  │",
       "  │ ## Acceptance",
     ]);
-    expect(lines[treeIndex + 9]?.startsWith("  └ 1/2 acceptance")).toBe(true);
+    expect(lines[treeIndex + 11]?.startsWith("  └ 1/2 acceptance")).toBe(true);
     for (const line of lines) expect(line.length).toBeLessThanOrEqual(60);
   });
 
@@ -586,5 +598,132 @@ describe("board inline detail block (kernel-backed, bounded, sanitized)", () => 
     expect(lines[2]).toBe("… 3 earlier item(s)");
     expect(lines[5]?.startsWith("❯")).toBe(true);
     expect(lines[5]).toContain("T task-two");
+  });
+});
+
+describe("board hierarchy (kernel parent edges)", () => {
+  it("resolves parent edges and id-sorted children purely", () => {
+    const snapshot = boardSnapshot(fixture());
+    expect(boardParentId(snapshot.items, "task-one")).toBe("story-a");
+    expect(boardParentId(snapshot.items, "story-a")).toBe("core");
+    expect(boardParentId(snapshot.items, "launch")).toBeNull();
+    expect(boardParentId(snapshot.items, "ghost")).toBeNull();
+    expect(boardParentId(snapshot.items, "  ")).toBeNull();
+    expect(boardChildrenOf(snapshot.items, "story-a").map((entry) => entry.id)).toEqual([
+      "bug-three",
+      "task-one",
+      "task-two",
+    ]);
+    expect(boardChildrenOf(snapshot.items, "launch").map((entry) => entry.id)).toEqual(["core"]);
+    expect(boardChildrenOf(snapshot.items, "task-one")).toEqual([]);
+    expect(boardChildrenOf(snapshot.items, "ghost")).toEqual([]);
+    expect(boardChildrenOf(snapshot.items, "  ")).toEqual([]);
+    expect(BOARD_HIERARCHY_CHILD_KEYS).toBe(9);
+  });
+
+  it("carries the parent and children on the detail read", () => {
+    const root = fixture();
+    const snapshot = boardSnapshot(root);
+    const story = boardItemDetail(root, "story-a", { items: snapshot.items });
+    expect(story.error).toBeNull();
+    expect(story.parent?.id).toBe("core");
+    expect(story.parent?.missing).toBe(false);
+    expect(story.children.map((entry) => entry.id)).toEqual([
+      "bug-three",
+      "task-one",
+      "task-two",
+    ]);
+    const launch = boardItemDetail(root, "launch", { items: snapshot.items });
+    expect(launch.parent).toBeNull();
+    expect(launch.children.map((entry) => entry.id)).toEqual(["core"]);
+    // Without an explicit snapshot the same edges resolve through a fresh read.
+    const reread = boardItemDetail(root, "story-a");
+    expect(reread.parent?.id).toBe("core");
+    expect(reread.children.map((entry) => entry.id)).toEqual([
+      "bug-three",
+      "task-one",
+      "task-two",
+    ]);
+  });
+
+  it("renders no-parent / no-children honestly instead of hiding the rows", () => {
+    const root = fixture();
+    const launch = boardItemDetail(root, "launch");
+    const launchBlock = boardDetailLines(launch, { width: 80 });
+    expect(launchBlock[1]).toBe("  │ parent: none");
+    expect(launchBlock[2]).toBe("  │ children (1):");
+    expect(launchBlock[3]).toContain("[1] core — Core (todo)");
+
+    const leaf = boardItemDetail(root, "task-two");
+    const leafBlock = boardDetailLines(leaf, { width: 80 });
+    expect(leafBlock[1]).toBe("  │ parent: story-a — Story A (todo) [p]");
+    expect(leafBlock[2]).toBe("  │ children: none");
+  });
+
+  it("marks a parent edge to an unknown id instead of dropping it", () => {
+    const root = fixture();
+    write(
+      root,
+      "ArggonManager/arggon-manager/launch/core/story-a/orphan.md",
+      item("orphan", { parent: "ghost-parent" }, "Orphan"),
+    );
+    const detail = boardItemDetail(root, "orphan");
+    expect(detail.error).toBeNull();
+    expect(detail.parent?.id).toBe("ghost-parent");
+    expect(detail.parent?.missing).toBe(true);
+    expect(boardDetailLines(detail, { width: 80 })[1]).toBe(
+      "  │ parent: ghost-parent (missing) [p]",
+    );
+  });
+
+  it("numbers the first nine children and names the overflow honestly", () => {
+    const root = fixture();
+    const base = "ArggonManager/arggon-manager/launch/core/story-a";
+    for (let index = 1; index <= 11; index += 1) {
+      const id = `task-kid-${String(index).padStart(2, "0")}`;
+      write(root, `${base}/${id}.md`, item(id, { parent: "story-a" }, `Kid ${index}`));
+    }
+    const detail = boardItemDetail(root, "story-a");
+    expect(detail.error).toBeNull();
+    expect(detail.children).toHaveLength(14); // 3 seeded + 11 added
+    const block = boardDetailLines(detail, { width: 120 });
+    expect(block[1]).toContain("[p]");
+    expect(block[2]).toBe("  │ children (14):");
+    expect(block[3]).toContain("[1] bug-three");
+    expect(block[11]).toContain("[9]");
+    expect(block[12]).toBe("  │   … +5 more — walk the tree");
+    for (const line of block) expect(line.length).toBeLessThanOrEqual(120);
+  });
+
+  it("escapes hostile hierarchy bytes like every other row", () => {
+    const hostile = boardItem("task-\u001b[31mred", {
+      parent: "story-a",
+      title: "boom\u001b]0;pwn\u0007",
+    });
+    const snapshot = boardSnapshot(fixture());
+    const detail = boardItemDetail(fixture(), "task-one", {
+      items: [...snapshot.items, hostile],
+    });
+    const childIds = detail.children.map((entry) => entry.id);
+    expect(childIds).not.toContain("task-\u001b[31mred");
+    const block = boardDetailLines(
+      {
+        ...detail,
+        parent: {
+          id: "story-\u001b[2m",
+          title: "t\u001b[0m",
+          status: "todo",
+          missing: false,
+        },
+        children: [
+          { id: "kid-\u001b[1m", title: "k\u0007", status: "todo", missing: false },
+        ],
+      },
+      { width: 80 },
+    );
+    for (const line of block) {
+      expect(line).not.toContain("\u001b");
+      expect(line).not.toContain("\u0007");
+    }
   });
 });

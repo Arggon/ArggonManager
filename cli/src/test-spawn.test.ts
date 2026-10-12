@@ -3,6 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  assertRunCliOptionsShape,
   classifySpawnFailure,
   cliEntryPath,
   cliNodeArgs,
@@ -12,8 +13,12 @@ import {
   nodeImportArgs,
   readEnvelope,
   runCli,
+  runCliJson,
+  RUN_CLI_OPTION_KEYS,
+  RunCliOptionsShapeError,
   SpawnHarnessError,
   tsxLoaderPath,
+  type RunCliOptions,
   type SpawnOutcome,
 } from "./test-spawn.js";
 
@@ -553,4 +558,103 @@ describe("envelope reading (bug-mcp-parity-branch-test-json-parse-of-human-stdou
     expect(read.envelope.command).toBe("branch");
     expect(read.exact).toBe(false);
   });
+});
+
+// task-plugin-test-type-coverage: one env-injection convention. Every runner
+// here takes the SAME options shape (`options.env`); the plugin suite's former
+// local `runCli(args, cwd, env)` wrapper — a positional env MAP silently
+// confusable with these options OBJECT slots — is gone, and the one wrong shape
+// structural typing cannot reject (an env-MAP VARIABLE as `options`) is
+// rejected at this boundary instead of running the child with the HOST
+// environment.
+describe("runCli/runCliJson options shape (task-plugin-test-type-coverage)", () => {
+  it("accepts the shapes callers write: omitted, empty, and any known key", () => {
+    expect(() => assertRunCliOptionsShape({})).not.toThrow();
+    expect(() => assertRunCliOptionsShape({ env: { FOO: "bar" } })).not.toThrow();
+    expect(() => assertRunCliOptionsShape({ timeout: 60_000 })).not.toThrow();
+    expect(() =>
+      assertRunCliOptionsShape({ env: { FOO: "bar" }, timeout: 60_000, windowsHide: false }),
+    ).not.toThrow();
+  });
+
+  it("rejects an options object whose every key is unknown — an env MAP as options", () => {
+    // The historical silent failure: each entry would be dropped by spawnSync
+    // and the child would inherit the HOST environment, so an isolation test
+    // passed for the wrong reason.
+    //
+    // Declared as an env-MAP-typed variable ON PURPOSE: a FRESH env-map literal
+    // is already a compile error at every options slot (weak-type/excess checks
+    // — the negative control in tools.test.ts pins that), so the guard's
+    // runtime jurisdiction is exactly the shapes that compile: a variable the
+    // checker sees as an env map.
+    const envMap: Record<string, string> = { FOO: "bar", PATH: "/bin", ARGGON_TEST: "1" };
+    let caught: unknown;
+    try {
+      assertRunCliOptionsShape(envMap as RunCliOptions);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(RunCliOptionsShapeError);
+    const shapeError = caught as RunCliOptionsShapeError;
+    expect(shapeError.unknownKeys).toEqual(["FOO", "PATH", "ARGGON_TEST"]);
+    // The message names the fix, not just the failure.
+    expect(shapeError.message).toContain("options.env");
+    expect(shapeError.message).toContain("HOST");
+  });
+
+  it("rejects the env MAP through runCliJson too, BEFORE any child is spawned", () => {
+    // The boundary the plugin suite actually calls: the guard runs first —
+    // before the 60s default merges in — so the failure is immediate and
+    // legible, with no spawn at all.
+    let caught: unknown;
+    try {
+      runCliJson(["list"], "/tmp/never-spawned", {
+        FOO: "bar",
+        ARGGON_TEST: "1",
+      } as RunCliOptions);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(RunCliOptionsShapeError);
+    expect((caught as RunCliOptionsShapeError).unknownKeys).toEqual(["FOO", "ARGGON_TEST"]);
+  });
+
+  it("does not police mixes: one known key reaches spawnSync untouched", () => {
+    // spawnSync has always ignored unknown keys; the guard narrows only the
+    // historically silent env-MAP-as-options case.
+    const mix = { env: { FOO: "bar" }, NOT_AN_OPTION: "x" } as RunCliOptions;
+    expect(() => assertRunCliOptionsShape(mix)).not.toThrow();
+  });
+
+  it("the known-key list covers every named key of SpawnSyncOptionsWithStringEncoding", () => {
+    // Pinned so a node-types addition that misses RUN_CLI_OPTION_KEYS becomes a
+    // review comment here instead of a false-positive throw on a real caller.
+    expect([...RUN_CLI_OPTION_KEYS].sort()).toEqual(
+      [
+        "argv0",
+        "cwd",
+        "encoding",
+        "env",
+        "gid",
+        "input",
+        "killSignal",
+        "maxBuffer",
+        "serialization",
+        "shell",
+        "signal",
+        "stdio",
+        "timeout",
+        "uid",
+        "windowsHide",
+        "windowsVerbatimArguments",
+      ].sort(),
+    );
+  });
+
+  // The `--json` prefix, the 60s default timeout and the flat
+  // `{ status, stdout, stderr }` triple are wired END-TO-END by the plugin
+  // contract tests (opencode/plugins/arggon/tools.test.ts asserts tool
+  // envelopes byte-equal against `runCliJson` runs), which the plugin type gate
+  // keeps shape-checked — a second unit-level spawn here would duplicate that
+  // at real-process cost.
 });

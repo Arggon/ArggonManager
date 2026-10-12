@@ -2,7 +2,7 @@
 plan_id: zcode-native-seam-012
 title: Plan for ZCode native seam
 spec: ArggonManager/docs/specs/spec-zcode-native-seam-012.md
-status: proposed
+status: implemented
 created: "2026-09-29"
 ---
 

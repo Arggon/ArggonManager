@@ -54,6 +54,7 @@ export {
   liveAcceptanceRegion,
   liveAcceptanceRows,
   liveAcceptanceUnchecked,
+  liveContextRegion,
   loadItems,
   softTryLoadItem,
   tryLoadItem,
@@ -209,6 +210,88 @@ export type {
 
 export { JSON_SCHEMA_VERSION, compactWorkItem, failEnvelope, successEnvelope } from "./json.js";
 export type { JsonEnvelopeBase, JsonError } from "./json.js";
+
+// --- Adopter friction capture (ADR 0024 stage 1; the log is not the tracker) -
+
+export {
+  FRICTION_COMMAND_SHAPE_CAP,
+  FRICTION_DEFAULT_HARNESS,
+  FRICTION_DROPPED_FILE_NAME,
+  FRICTION_ENV_FACT_CAP,
+  FRICTION_EVIDENCE_CAP,
+  FRICTION_FINGERPRINT_CHARS,
+  FRICTION_FORMAT_VERSION,
+  FRICTION_HARNESS_CAP,
+  FRICTION_LOG_FILE_NAME,
+  FRICTION_MAX_LINES,
+  FRICTION_NARRATIVE_CAP,
+  FRICTION_PATH_PLACEHOLDER,
+  FRICTION_REDACTED_FIELD,
+  FRICTION_REDACTION_MAX_SUBSTITUTIONS,
+  FRICTION_REPORTER_ID_CHARS,
+  FRICTION_SALT_FILE_NAME,
+  FRICTION_SECRET_PLACEHOLDER,
+  FRICTION_STATE_SUBDIR,
+  FrictionError,
+  appendFrictionRecord,
+  buildFrictionRecord,
+  clearFrictionLog,
+  frictionDroppedPath,
+  frictionFingerprint,
+  frictionFingerprintMaterial,
+  frictionLogPath,
+  frictionMajorVersion,
+  frictionReporterId,
+  frictionSaltPath,
+  frictionStateBase,
+  frictionStateDir,
+  normalizeCommandShape,
+  readFrictionDropped,
+  readFrictionLog,
+  readOrCreateMachineSalt,
+  redactFrictionText,
+  resolveRepoAbsPath,
+} from "./friction.js";
+export {
+  FRICTION_REPORT_MAX_ROWS,
+  frictionFenceFor,
+  readFrictionReport,
+  renderFrictionReport,
+  summarizeFrictionLog,
+} from "./friction-report.js";
+export type { FrictionClassRow, FrictionReport, FrictionReportOptions } from "./friction-report.js";
+export {
+  FRICTION_OPT_OUT_ENV,
+  readFrictionOptOut,
+  resolveFrictionOptOut,
+} from "./friction-optout.js";
+export type { FrictionOptOut, FrictionOptOutSource } from "./friction-optout.js";
+export {
+  FRICTION_PUBLISH_FENCE_INFO,
+  FRICTION_PUBLISH_LABEL,
+  FRICTION_PUBLISH_MAX_CLASSES,
+  FRICTION_PUBLISH_MAX_URL_CHARS,
+  FRICTION_PUBLISH_NARRATIVE_CAP,
+  FRICTION_PUBLISH_TIERS,
+  FRICTION_PUBLISH_TITLE_MAX_CHARS,
+  FRICTION_PUBLISH_TITLE_PREFIX,
+  FRICTION_PUBLISH_URL_BASE,
+  buildFrictionPublishBody,
+  buildFrictionPublishDoc,
+  buildFrictionPublishTitle,
+  buildFrictionPublishUrl,
+  isFrictionPublishTier,
+} from "./friction-publish.js";
+export type { FrictionPublishDoc, FrictionPublishTier } from "./friction-publish.js";
+export type {
+  FrictionAppendResult,
+  FrictionClearResult,
+  FrictionFailureReason,
+  FrictionInput,
+  FrictionLogRead,
+  FrictionOptions,
+  FrictionRecord,
+} from "./friction.js";
 export { commitPayload } from "./tracker-commit.js";
 export type { CommitPayload, TrackerCommitResult } from "./tracker-commit.js";
 export type { SyncFilled } from "./sync-types.js";
@@ -236,6 +319,13 @@ export type { ParsedLog } from "./trend.js";
 export { parseOlderThan } from "./list.js";
 export { runValidate } from "./validate.js";
 export type { ValidateOptions, ValidateResult } from "./validate.js";
+export {
+  bodyHasScaffoldPlaceholder,
+  placeholderSections,
+  regionHasScaffoldMarker,
+  stripInlineCodeSpans,
+} from "./placeholder.js";
+export type { PlaceholderSection } from "./placeholder.js";
 export { runUpdate, maybeCommitUpdate, parseCsvList } from "./update.js";
 export type { UpdateOptions, UpdateResult } from "./update.js";
 export type { ClaimFootprintReceipt } from "./update.js";
@@ -358,6 +448,9 @@ export {
 export {
   commentOperation,
   createOperation,
+  frictionClearOperation,
+  frictionOperation,
+  frictionReportOperation,
   handoffOperation,
   importIssuesOperation,
   listOperation,
@@ -375,6 +468,11 @@ export type {
   CreateOperationOptions,
   CreatePayload,
   EnvelopePayload,
+  FrictionClearPayload,
+  FrictionOperationOptions,
+  FrictionPayload,
+  FrictionReportOperationOptions,
+  FrictionReportPayload,
   HandoffPayload,
   ImportIssuesOperationOptions,
   ImportIssuesPayload,

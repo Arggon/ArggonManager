@@ -15,7 +15,13 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runInit, dryRunInit, type ProposalEntry } from "./init.js";
 import { arggonVersion, renderGeneratedDoc } from "./docs.js";
-import { readGeneratedState, updateGeneratedSection } from "@arggondev/lib";
+import {
+  type ConventionConfig,
+  parseConventionConfig,
+  readConventionConfig,
+  readGeneratedState,
+  updateGeneratedSection,
+} from "@arggondev/lib";
 import { runCli } from "./test-spawn.js";
 // Ordering assertions go through assertOrder, never a bare `indexOf`
 // comparison: `-1 < n` makes a renamed clause pass as if it were still
@@ -76,9 +82,16 @@ const TIER1_DOCS = [
   // W5 task-native-tui: the TUI board/status entry is vendored beside it.
   ".opencode/plugins/arggon/tui.tsx",
   // ADR 0014 (task-zcode-plugin-seam): the ZCode plugin seam is tier-1 —
-  // marketplace catalog + the vendored declarative plugin.
+  // marketplace catalog + the vendored declarative plugin. TIER1_DOCS mirrors
+  // the template walk's order (code-unit sort: `README.md` precedes the
+  // lowercase directories).
   ".zcode-marketplace/arggon/.zcode-plugin/plugin.json",
-  ".zcode-marketplace/arggon/agents/arggon-delivery-lead.md",
+  // task-zcode-lead-role-belongs-to-the-main-session: the seam README is
+  // tier-1 — it states that in ZCode the main session IS the delivery lead.
+  ".zcode-marketplace/arggon/README.md",
+  // task-zcode-lead-role-belongs-to-the-main-session: maker/standards-reviewer
+  // only — the delivery lead is the main session's role in ZCode, not a
+  // dispatchable subagent; the seam README carries that statement.
   ".zcode-marketplace/arggon/agents/arggon-maker.md",
   ".zcode-marketplace/arggon/agents/arggon-standards-reviewer.md",
   ".zcode-marketplace/arggon/commands/arggon-adopt.md",
@@ -96,6 +109,10 @@ const TIER1_DOCS = [
   ".zcode-marketplace/arggon/commands/arggon-status.md",
   ".zcode-marketplace/arggon/hooks/gate.mjs",
   ".zcode-marketplace/arggon/hooks/hooks.json",
+  // task-zcode-automations: the opt-in automation contract templates are
+  // tier-1 too (daily spec-drift scan, weekly stale-claim sweep).
+  ".zcode-marketplace/arggon/templates/automations/spec-drift-scan.md",
+  ".zcode-marketplace/arggon/templates/automations/stale-claim-sweep.md",
   // task-zcode-goal-mode: the goal-mode contract template is tier-1 too.
   ".zcode-marketplace/arggon/templates/goal-mode.md",
   ".zcode-marketplace/marketplace.json",
@@ -353,6 +370,361 @@ describe("init", () => {
     gitInit(dir);
     const result = runInit({ dir, force: false });
     expect(result.warning).toBeUndefined();
+  });
+});
+
+// bug-init-force-drops-x-tracker-block: `init --force` used to re-scaffold
+// `.convention.yml` from the fixed scaffold string, silently dropping the
+// whole `x-tracker` block — `allow-steal` (the human-only claim-takeover
+// double gate), `strict-gate-bins`, `strict-worktree-writes`,
+// `reap-acked-orphans`, `product-acceptance` — plus any adopter-set
+// `branch_patterns`. It erred "safe" (a gate that was armed became unarmed)
+// while losing configuration the adopter set on purpose, with nothing
+// reporting the loss. The forced write now starts from the existing file's
+// bytes and rewrites only the `x-generated` provenance section, and the run
+// reports what it kept and what it replaced.
+describe("init --force and the convention's x-* extensions (bug-init-force-drops-x-tracker-block)", () => {
+  const NOW = new Date("2026-09-17T12:00:00Z");
+
+  /**
+   * An adopter-armed tree: two `x-tracker` safety flags armed, a custom
+   * branch pattern, a saved view and a recorded project name — the
+   * configuration a forced re-scaffold used to erase.
+   */
+  function armTree(dir: string): void {
+    mkdirSync(join(dir, "ArggonManager"), { recursive: true });
+    writeFileSync(
+      join(dir, "ArggonManager/.convention.yml"),
+      [
+        "version: 5",
+        "branch_patterns:",
+        '  bug: "hotfix/{id}"',
+        "",
+        "x-tracker:",
+        "  allow-steal: true",
+        "  reap-acked-orphans: true",
+        "",
+        "x-views:",
+        '  mine: "status:todo"',
+        "",
+        "x-generated:",
+        '  projectName: "armed-repo"',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+  }
+
+  it("a forced re-init keeps the armed x-tracker flags, the custom pattern and the view — and says what it kept", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-"));
+    armTree(dir);
+
+    const result = runInit({ dir, force: true, full: true, now: NOW });
+
+    // Both armed flags survive ON DISK ...
+    const after = readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8");
+    expect(after).toContain("allow-steal: true");
+    expect(after).toContain("reap-acked-orphans: true");
+    // ... and in the parsed config, so the safety gates stay ARMED ...
+    const config = parseConventionConfig(after);
+    expect(config.tracker.allowSteal).toBe(true);
+    expect(config.tracker.reapAckedOrphans).toBe(true);
+    // ... together with the adopter's own configuration (custom branch
+    // pattern, saved view) ...
+    expect(config.branchPatterns.bug).toBe("hotfix/{id}");
+    expect(config.views.mine).toBe("status:todo");
+    // ... and the x-generated provenance this run refreshed (project name
+    // carried over, fresh entries for the docs it generated).
+    expect(config.generatedProjectName).toBe("armed-repo");
+    expect(config.generated["AGENTS.md"]).toBeDefined();
+
+    // The run says what it kept and what it replaced: no silent loss.
+    expect(result.convention).toEqual({
+      preserved: ["version", "branch_patterns", "x-tracker", "x-views"],
+      replaced: ["x-generated"],
+      rescaffolded: false,
+    });
+  });
+
+  it("--dry-run previews the same keep/replace report and the scaffold row says it — writing nothing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-dry-"));
+    armTree(dir);
+    const before = readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8");
+
+    const dry = dryRunInit({ dir, force: true, full: true, now: NOW });
+
+    expect(dry.convention).toEqual({
+      preserved: ["version", "branch_patterns", "x-tracker", "x-views"],
+      replaced: ["x-generated"],
+      rescaffolded: false,
+    });
+    const row = dry.plan.find((e) => e.dest === "ArggonManager/.convention.yml");
+    expect(row?.decision).toBe("overwritten");
+    expect(row?.reason).toBe(
+      "force re-scaffold — preserved version, branch_patterns, x-tracker, x-views; " +
+        "x-generated provenance refreshed",
+    );
+    // Pure read: the armed file is byte-identical after the preview.
+    expect(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")).toBe(before);
+  });
+
+  it("enumerates the exception: an unparseable .convention.yml is re-derived from the scaffold and reported, not silently preserved", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-bad-"));
+    mkdirSync(join(dir, "ArggonManager"), { recursive: true });
+    writeFileSync(
+      join(dir, "ArggonManager/.convention.yml"),
+      "not a convention file\na line with no colon at all\n",
+      "utf8",
+    );
+
+    // The preview names the wholesale replacement before anything is written.
+    const dry = dryRunInit({ dir, force: true, now: NOW });
+    expect(dry.convention).toEqual({
+      preserved: [],
+      replaced: ["x-generated"],
+      rescaffolded: true,
+    });
+    expect(dry.plan.find((e) => e.dest === "ArggonManager/.convention.yml")?.reason).toMatch(
+      /unreadable or unparseable; re-derived from the scaffold/,
+    );
+
+    const result = runInit({ dir, force: true, full: true, now: NOW });
+    expect(result.convention).toEqual({
+      preserved: [],
+      replaced: ["x-generated"],
+      rescaffolded: true,
+    });
+    // The file is repaired from the fixed scaffold (current version, default
+    // branch patterns) — the one case where a force genuinely discards.
+    const after = readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8");
+    expect(after).toContain("version: 5");
+    expect(after).toContain('  bug: "fix/{id}"');
+  });
+
+  it("a forced re-init of a scaffolded tree keeps its own sections and refreshes only the provenance", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-vanilla-"));
+    runInit({ dir, force: false, now: NOW });
+    const result = runInit({ dir, force: true, now: NOW });
+    expect(result.convention).toEqual({
+      preserved: ["version", "branch_patterns"],
+      replaced: ["x-generated"],
+      rescaffolded: false,
+    });
+  });
+
+  // The apply path is where the item lives: nothing above drives the CLI
+  // surface, so before this change `arggon init --force` printed nothing about
+  // what it kept and `--force --json` dropped the report entirely — the
+  // in-process report was unreachable for every real caller (`runInit` has no
+  // MCP tool and no library export).
+  it("the CLI apply path reports it: --force --json carries the report and the human run names it", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-cli-"));
+    armTree(dir);
+    gitInit(dir);
+
+    const json = runCli(["init", "--force", "--json", dir], dir);
+    expect(json.status, json.stderr).toBe(0);
+    const body = JSON.parse(json.stdout) as {
+      ok: boolean;
+      convention?: { preserved: string[]; replaced: string[]; rescaffolded: boolean };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.convention).toEqual({
+      preserved: ["version", "branch_patterns", "x-tracker", "x-views"],
+      replaced: ["x-generated"],
+      rescaffolded: false,
+    });
+
+    // Human output names what the forced write kept and replaced.
+    const human = runCli(["init", "--force", dir], dir);
+    expect(human.status, human.stderr).toBe(0);
+    expect(human.stdout).toContain(
+      "arggon init: .convention.yml preserved version, branch_patterns, x-tracker, x-views; " +
+        "replaced x-generated",
+    );
+
+    // And the armed flags are still armed after the CLI's own forced run.
+    const after = readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8");
+    const config = parseConventionConfig(after);
+    expect(config.tracker.allowSteal).toBe(true);
+    expect(config.tracker.reapAckedOrphans).toBe(true);
+  });
+
+  it("a run that force-re-scaffolds nothing carries no convention key (fresh scaffold, idempotent re-init)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-nokey-"));
+    const fresh = runCli(["init", "--json", dir], dir);
+    expect(fresh.status, fresh.stderr).toBe(0);
+    const body = JSON.parse(fresh.stdout) as { ok: boolean; convention?: unknown };
+    expect(body.ok).toBe(true);
+    expect(body.convention).toBeUndefined();
+    expect("convention" in body).toBe(false);
+
+    // Already initialized, no --force: the convention file is not rewritten.
+    const again = runCli(["init", "--json", dir], dir);
+    expect(again.status, again.stderr).toBe(0);
+    const second = JSON.parse(again.stdout) as { ok: boolean; convention?: unknown };
+    expect(second.ok).toBe(true);
+    expect("convention" in second).toBe(false);
+  });
+
+  /**
+   * bug-convention-parser-rejects-valid-yaml-force-rescaffolds: the worst case,
+   * pinned where the follow-up would look for it. Each of these is a
+   * perfectly valid `.convention.yml`; the strict line parser used to refuse
+   * it, `conventionScaffoldBase` classified the refusal as "unreadable or
+   * unparseable", and the whole file was re-derived from the fixed scaffold —
+   * so the adopter's armed flag (their `post-start` hook, their extension
+   * block) was GONE from disk. A NEGATIVE test for the old behaviour: it stays
+   * red until the parser reads the construct, and green after.
+   *
+   * One fixture per case: the first forced run writes the repaired file, so a
+   * second run on the same tree is an ordinary preserve and would say so.
+   */
+  const VALID_YAML_CONVENTIONS: Array<{
+    name: string;
+    raw: string;
+    /** The top-level sections the file carries, as the report must name them. */
+    preserved: string[];
+    /** What the forced re-init must NOT have dropped from the file. */
+    assert: (config: ConventionConfig) => void;
+  }> = [
+    {
+      name: "an inline comment after the boolean",
+      raw: "x-tracker:\n  allow-steal: true # armed\n",
+      preserved: ["x-tracker"],
+      assert: (config) => expect(config.tracker.allowSteal).toBe(true),
+    },
+    {
+      name: "a post-start block scalar",
+      raw: "x-worktree:\n  post-start: |\n    npm ci\n    echo ready\n",
+      preserved: ["x-worktree"],
+      assert: (config) => expect(config.worktree.postStart).toBe("npm ci\necho ready\n"),
+    },
+    {
+      name: "a quoted top-level key",
+      raw: '"x-tracker":\n  allow-steal: true\n',
+      preserved: ["x-tracker"],
+      assert: (config) => expect(config.tracker.allowSteal).toBe(true),
+    },
+  ];
+
+  for (const construct of VALID_YAML_CONVENTIONS) {
+    it(`a forced re-init keeps the adopter's configuration under ${construct.name}`, () => {
+      const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-yaml-"));
+      mkdirSync(join(dir, "ArggonManager"), { recursive: true });
+      writeFileSync(join(dir, "ArggonManager/.convention.yml"), construct.raw, "utf8");
+
+      // The preview and the run must agree: no wholesale replacement is even
+      // PROPOSED for a file a real YAML parse can read.
+      const dry = dryRunInit({ dir, force: true, full: true, now: NOW });
+      expect(dry.convention).toEqual({
+        preserved: construct.preserved,
+        replaced: ["x-generated"],
+        rescaffolded: false,
+      });
+      // Pure read: the adopter's file is byte-identical after the preview.
+      expect(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")).toBe(construct.raw);
+
+      const result = runInit({ dir, force: true, full: true, now: NOW });
+      expect(result.convention).toEqual({
+        preserved: construct.preserved,
+        replaced: ["x-generated"],
+        rescaffolded: false,
+      });
+      construct.assert(
+        parseConventionConfig(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")),
+      );
+    });
+
+    it(`the CLI apply path preserves it too, under ${construct.name}`, () => {
+      const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-yaml-cli-"));
+      mkdirSync(join(dir, "ArggonManager"), { recursive: true });
+      writeFileSync(join(dir, "ArggonManager/.convention.yml"), construct.raw, "utf8");
+      gitInit(dir);
+
+      const json = runCli(["init", "--force", "--json", dir], dir);
+      expect(json.status, json.stderr).toBe(0);
+      const body = JSON.parse(json.stdout) as {
+        ok: boolean;
+        convention?: { preserved: string[]; replaced: string[]; rescaffolded: boolean };
+      };
+      expect(body.ok).toBe(true);
+      expect(body.convention).toEqual({
+        preserved: construct.preserved,
+        replaced: ["x-generated"],
+        rescaffolded: false,
+      });
+      construct.assert(
+        parseConventionConfig(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")),
+      );
+    });
+  }
+
+  it("the CLI apply path names the exception: a file this arggon cannot read is re-derived, on both surfaces", () => {
+    // The wholesale-replace arm is reserved for files NO line parser can read:
+    // no colon anywhere, so there is no key and no value to keep. A valid-YAML
+    // file the adopter wrote on purpose is covered by the construct cases above.
+    const unreadable = (dir: string): void => {
+      mkdirSync(join(dir, "ArggonManager"), { recursive: true });
+      writeFileSync(
+        join(dir, "ArggonManager/.convention.yml"),
+        "not a convention file\na line with no colon at all\n",
+        "utf8",
+      );
+    };
+    const expected = { preserved: [], replaced: ["x-generated"], rescaffolded: true };
+
+    const previewDir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-cli-bad-dry-"));
+    unreadable(previewDir);
+    const dry = runCli(["init", "--force", "--dry-run", "--json", previewDir], previewDir);
+    expect(dry.status, dry.stderr).toBe(0);
+    const preview = JSON.parse(dry.stdout) as {
+      convention?: { preserved: string[]; replaced: string[]; rescaffolded: boolean };
+    };
+    expect(preview.convention).toEqual(expected);
+    // Pure read: the unreadable file is still exactly as the adopter left it.
+    expect(readFileSync(join(previewDir, "ArggonManager/.convention.yml"), "utf8")).toBe(
+      "not a convention file\na line with no colon at all\n",
+    );
+
+    const jsonDir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-cli-bad-json-"));
+    unreadable(jsonDir);
+    const json = runCli(["init", "--force", "--json", jsonDir], jsonDir);
+    expect(json.status, json.stderr).toBe(0);
+    const body = JSON.parse(json.stdout) as {
+      convention?: { preserved: string[]; replaced: string[]; rescaffolded: boolean };
+    };
+    expect(body.convention).toEqual(expected);
+
+    // The human line names the wholesale replacement instead of saying
+    // nothing: the rescaffold is the one arm where configuration IS lost.
+    const humanDir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-cli-bad-human-"));
+    unreadable(humanDir);
+    const human = runCli(["init", "--force", humanDir], humanDir);
+    expect(human.status, human.stderr).toBe(0);
+    expect(human.stdout).toContain(
+      "arggon init: .convention.yml could not be read by this arggon — re-derived from " +
+        "the scaffold; its previous configuration was NOT preserved",
+    );
+  });
+
+  it("does not drop the docs' x-generated provenance either: a modified doc stays skipped under force and keeps its state entry", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-docs-"));
+    runInit({ dir, force: false, full: true, now: NOW });
+    const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
+    writeFileSync(join(dir, "AGENTS.md"), `${agents}\nadopter edit\n`, "utf8");
+
+    const result = runInit({ dir, force: true, full: true, now: NOW });
+
+    // Adopter-modified docs are never overwritten — force does not lift that
+    // rule — and their provenance entry survives the forced convention
+    // rewrite, which is exactly why the rewrite starts from the existing file.
+    expect(result.modified).toContain("AGENTS.md");
+    expect(result.skipped).toContain("AGENTS.md");
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(`${agents}\nadopter edit\n`);
+    const config = readConventionConfig(dir);
+    expect(config.generated["AGENTS.md"]).toBeDefined();
+    expect(config.generated[".editorconfig"]).toBeDefined();
   });
 });
 

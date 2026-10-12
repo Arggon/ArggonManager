@@ -8,6 +8,7 @@ labels: [context-budget, docs]
 created: "2026-10-03"
 updated: "2026-10-03"
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-mcp-budget-contradicted-across-docs.md
   Leaves live only under a story. id is the filename stem: bug-mcp-budget-contradicted-across-docs.
@@ -19,7 +20,7 @@ updated: "2026-10-03"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+`cli/src/measure.ts` owns the live MCP `tools/list` figures and disagrees with the docs that restate them. Code side (`cli/src/measure.ts:48,57`, comment at `:38-46,50-55`): `MCP_TOOLS_BUDGET_BYTES = 16_384`, with the comment recording the 9-tool 9,040 B baseline (2026-09-15) and the ADR 0014 full-surface re-baseline at 15,701 B / 15 tools (2026-09-29); `MCP_TOOLS_BASELINE_BYTES = 15_701`; the `doctor --budget` note at `:352` prints the 2026-09-29 re-baseline. Docs side: `README.md:287` states the advisory `<=12,288 B` budget, and `ArggonManager/docs/json-output.md:229` (`mcp.totalBytes <= 12,288 B` advisory, live baseline 9,040 B at `5d6c504`, 2026-09-15) and `:902` (`MCP_TOOLS_BUDGET_BYTES` at 12,288 B, ~36% headroom over the 9,040 B 2026-09-15 baseline) restate the pre-ADR-0014 numbers. So the docs pin `<=12,288 B / 9,040 B` while the code enforces `16,384 / 15,701` — and per `measure.ts:46` the MCP bound is advisory/report-only, unlike its two CI-gated siblings.
 
 ## Acceptance
 

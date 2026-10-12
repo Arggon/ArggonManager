@@ -1,11 +1,13 @@
 ---
-spec_id: update-channel-015
+spec_id: update-channel-023
 title: Bounded opt-out update channel
 status: proposed
 created: 2026-10-01
 ---
 
-# Spec: Bounded opt-out update channel (update-channel-015)
+# Spec: Bounded opt-out update channel (update-channel-023)
+
+> **Renumber note (2026-10-11):** originally filed as `spec-update-channel-015` in collision with `spec-release-pipeline-015.md` (task-renumber-colliding-doc-numbers); renumbered to the next FREE spec number (023). Renumbered the far-less-referenced of the pair — one inbound reference (`plan-update-channel-020.md`, updated in kind) versus the implemented release-pipeline spec's many citations — the ADR 0024 precedent. Spec content unchanged.
 
 ## Purpose
 

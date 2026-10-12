@@ -538,7 +538,7 @@ id: task-broken
   });
 });
 
-describe("runList dependency predicates (spec-deps-001)", () => {
+describe("runList dependency predicates (spec-deps-022)", () => {
   function depTree(): string {
     const root = mkdtempSync(join(tmpdir(), "arggon-list-deps-"));
     mkdirSync(join(root, "tasks"), { recursive: true });

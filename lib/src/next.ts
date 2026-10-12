@@ -29,7 +29,7 @@ export type NextSuggestion = {
   poolSize: number;
   /**
    * Open (non-terminal) dependency ids of the suggested item — additive
-   * per spec-deps-001 §5. Empty when the item is ready. Dependencies are
+   * per spec-deps-022 §5. Empty when the item is ready. Dependencies are
    * advisory: this never gates an update, it only explains the ranking.
    */
   blockedBy: string[];

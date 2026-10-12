@@ -1,21 +1,8 @@
 {
   "schemaVersion": 1,
   "conventionVersion": 5,
-  "count": 6,
+  "count": 4,
   "findings": [
-    {
-      "file": "ArggonManager/docs/explorations/exploration-ui-improvements-012.md",
-      "kind": "DECISION-PENDING-EXPLORATION",
-      "line": 165,
-      "severity": "warn",
-      "message": "Decision section records no decision after 9 day(s) (threshold 7) — link docs/adr/<NNNN>-<slug>.md, record \"No ADR required — <reason>\", or supersede the exploration"
-    },
-    {
-      "file": "ArggonManager/docs/specs/spec-deps-001.md",
-      "kind": "no-error-path",
-      "severity": "warn",
-      "message": "no error/failure path mentioned anywhere in the spec"
-    },
     {
       "file": "ArggonManager/docs/specs/spec-opencode-seam-010.md",
       "kind": "no-error-path",

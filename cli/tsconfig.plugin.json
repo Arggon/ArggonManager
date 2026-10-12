@@ -17,6 +17,7 @@
   "include": [
     "../opencode/plugins/arggon/index.ts",
     "../opencode/plugins/arggon/board.ts",
-    "../opencode/plugins/arggon/tui.tsx"
+    "../opencode/plugins/arggon/tui.tsx",
+    "../opencode/plugins/arggon/**/*.test.ts"
   ]
 }

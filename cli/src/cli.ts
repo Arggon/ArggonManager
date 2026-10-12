@@ -22,8 +22,15 @@ import {
   formatTrendMarkdown,
   formatTrendTable,
   formatValidateHuman,
+  FrictionError,
+  buildFrictionPublishDoc,
+  frictionClearOperation,
+  frictionOperation,
+  frictionReportOperation,
   handoffOperation,
   importIssuesOperation,
+  type FrictionPublishTier,
+  isFrictionPublishTier,
   jsonEnabled,
   listOperation,
   maybeCommitUpdate,
@@ -31,6 +38,9 @@ import {
   parseCsvList,
   priorityOperation,
   readConventionVersion,
+  readFrictionOptOut,
+  readFrictionReport,
+  renderFrictionReport,
   renderShowText,
   reportOperation,
   runComment,
@@ -47,6 +57,8 @@ import {
   runUpdate,
   runValidate,
   sanitizeHumanError,
+  sanitizeHumanText,
+  sanitizeHumanValue,
   showOperation,
   successEnvelope,
   successJson,
@@ -67,6 +79,7 @@ import { runDoctor, formatDoctorReport, measureBudgetForDoctor } from "./doctor.
 import {
   runInit,
   dryRunInit,
+  type ConventionRewriteReport,
   type InitResult,
   type InitDryRunResult,
   type ProposalEntry,
@@ -192,7 +205,7 @@ program
   .argument("[dir]", "target directory", ".")
   .option(
     "-f, --force",
-    "overwrite existing convention/templates (docs are never overwritten)",
+    "re-scaffold with existing configuration preserved: .convention.yml is re-scaffolded from its own bytes (only the x-generated provenance is refreshed) and templates are recopied — docs are never overwritten",
     false,
   )
   .option(
@@ -310,6 +323,13 @@ program
                 skipped: result.skipped,
                 restored: result.restored,
                 conventionPath: result.conventionPath,
+                // What the forced re-scaffold kept and replaced in
+                // `.convention.yml` (bug-init-force-drops-x-tracker-block) —
+                // the same keep/replace object the real run reports, so a
+                // preview and the run it previews cannot disagree. Absent
+                // unless this run force-re-scaffolds an EXISTING convention
+                // file (a fresh scaffold creates it).
+                ...(result.convention ? { convention: result.convention } : {}),
                 // Reaping family (task-adapter-orphan-reaping), previewed from
                 // the identical plan: what the run would remove and what it
                 // would keep, each refusal naming its reason.
@@ -355,6 +375,14 @@ program
               skipped: result.skipped,
               restored: result.restored,
               conventionPath: result.conventionPath,
+              // What the forced re-scaffold kept and replaced in
+              // `.convention.yml` (bug-init-force-drops-x-tracker-block): the
+              // keep/replace object the run is about to report, carried on the
+              // apply path itself (not only in the preview) so a forced
+              // re-init says what it kept instead of leaving the operator to
+              // infer it. Absent unless this run force-re-scaffolds an EXISTING
+              // convention file.
+              ...(result.convention ? { convention: result.convention } : {}),
               // Reaping family (task-adapter-orphan-reaping), never folded into
               // the create/update/skip counts: a deletion is its own action, and
               // a refusal names its path and reason.
@@ -1527,6 +1555,271 @@ program
           return;
         }
         printHumanError("arggon handoff", message);
+        process.exitCode = 1;
+      }
+    },
+  );
+
+program
+  .command("friction")
+  .description(
+    "Record friction in ArggonManager itself into the local append-only friction log (never the tracker, never the network), or render its deduped report with --report [--tier a|b], or remove the whole log with --clear",
+  )
+  .argument(
+    "[observation]",
+    "one line about what broke (capped 2000 chars; verbatim, never parsed); omitted when --report or --clear is given",
+  )
+  .option(
+    "--command <shape>",
+    "the command that failed, as an argv shape (required for a capture; ids/paths/URLs/tokens/SHAs normalized to <arg>)",
+  )
+  .option(
+    "--error <code>",
+    "the error.code from the failed envelope, e.g. START_FAILED (capped 64; class, not prose)",
+  )
+  .option("--harness <id>", "the agent harness you run in (capped 32; default unknown)")
+  .option(
+    "--evidence <file>",
+    "a file whose CONTENTS (never its path) are captured, capped 4000 chars",
+  )
+  .option(
+    "--report",
+    "render the fingerprint-deduped report (one row per class, count desc) instead of capturing; mutually exclusive with a capture and with --clear",
+    false,
+  )
+  .option(
+    "--tier <a|b>",
+    'report output tier: "a" (default) prints the report only; "b" additionally prints the prefilled issues/new URL a HUMAN opens (never submitted by arggon)',
+  )
+  .option(
+    "--clear",
+    "remove the whole local friction log (idempotent; reports cleared: N; mutually exclusive with a capture and with --report)",
+    false,
+  )
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action(
+    (
+      observation: string | undefined,
+      opts: {
+        command?: string;
+        error?: string;
+        harness?: string;
+        evidence?: string;
+        report?: boolean;
+        tier?: string;
+        clear?: boolean;
+        json?: boolean;
+      },
+    ) => {
+      const json = jsonEnabled(opts);
+
+      // --- the mode conflicts, each one a NAMED error (spec §Observability) ---
+      const hasCapture =
+        observation !== undefined ||
+        opts.command !== undefined ||
+        opts.error !== undefined ||
+        opts.harness !== undefined ||
+        opts.evidence !== undefined;
+      // `--tier` only means something next to `--report`: it selects how the
+      // REPORT is published. Silently ignoring it beside a capture (or beside
+      // `--clear`) is the shape the existing capture/report conflict exists to
+      // prevent, so it is named rather than dropped.
+      const tierGiven = opts.tier !== undefined;
+      let tier: FrictionPublishTier = "a";
+      if (tierGiven) {
+        const raw = opts.tier ?? "";
+        if (!isFrictionPublishTier(raw)) {
+          // An UNKNOWN tier is a different fact from a tier without a report:
+          // a machine reading `reason` must be able to tell "you typed a tier
+          // this spec does not define" from "you forgot --report".
+          const err = new FrictionError(
+            "unknown-tier",
+            `arggon friction --tier must be "a" or "b" (got ${JSON.stringify(raw)}); tier c is not in this spec`,
+          );
+          if (json) {
+            failJson({
+              command: "friction",
+              message: err.message,
+              code: "FRICTION_FAILED",
+              conventionVersion: readConventionVersion(process.cwd()),
+              payload: {
+                reason: err.reason,
+                ...(opts.report ? { report: true } : {}),
+              },
+            });
+            return;
+          }
+          printHumanError("arggon friction", err.message);
+          process.exitCode = 1;
+          return;
+        }
+        tier = raw;
+        if (!opts.report) {
+          const err = new FrictionError(
+            "tier-without-report",
+            'arggon friction --tier requires --report: the tier selects how the REPORT is published, so run "arggon friction --report --tier a|b"',
+          );
+          if (json) {
+            failJson({
+              command: "friction",
+              message: err.message,
+              code: "FRICTION_FAILED",
+              conventionVersion: readConventionVersion(process.cwd()),
+              payload: { reason: err.reason },
+            });
+            return;
+          }
+          printHumanError("arggon friction", err.message);
+          process.exitCode = 1;
+          return;
+        }
+      }
+
+      /** One named conflict, both channels: `--json` envelope + human stderr. */
+      const conflict = (reason: string, message: string): void => {
+        if (json) {
+          failJson({
+            command: "friction",
+            message,
+            code: "FRICTION_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+            payload: {
+              reason,
+              ...(opts.report ? { report: true } : {}),
+              ...(opts.clear ? { clear: true } : {}),
+            },
+          });
+          return;
+        }
+        printHumanError("arggon friction", message);
+        process.exitCode = 1;
+      };
+
+      if (opts.clear && hasCapture) {
+        conflict(
+          "clear-and-capture-mutually-exclusive",
+          'arggon friction --clear and a capture are mutually exclusive: run --clear alone, or a capture ("<observation>" --command <shape>) without --clear',
+        );
+        return;
+      }
+      if (opts.clear && opts.report) {
+        conflict(
+          "report-and-clear-mutually-exclusive",
+          "arggon friction --report and --clear are mutually exclusive: two modes, one run — render the report first, then clear",
+        );
+        return;
+      }
+
+      // --- report mode (plan task T3) + tier B (plan task T4) ---
+      if (opts.report) {
+        if (hasCapture) {
+          conflict(
+            "report-and-capture-mutually-exclusive",
+            'arggon friction --report and a capture are mutually exclusive: run --report alone, or a capture ("<observation>" --command <shape>) without --report',
+          );
+          return;
+        }
+        // The opt-out gates CAPTURE, never discoverability (ADR 0024 §3): the
+        // report still runs, still exits 0, and still states the opt-out plus
+        // its remediation rather than hiding the command.
+        const optedOut = readFrictionOptOut(process.cwd(), process.env).optedOut;
+        if (json) {
+          const outcome = frictionReportOperation({ cwd: process.cwd(), optedOut, tier });
+          emitJson(outcome.envelope);
+          if (!outcome.ok) process.exitCode = 1;
+          return;
+        }
+        try {
+          const report = readFrictionReport({ optedOut });
+          // Rendered VERBATIM on purpose: the narrative is the operator's own
+          // local data, and the spec instructs the report to pass it through
+          // literally — fenced and labelled as untrusted, never reordered,
+          // escaped or truncated. So the display-sanitizer applied to other
+          // human lines (a hostile-REPO guard) is deliberately NOT used here;
+          // the field was redacted at write and the log is not a hostile repo.
+          process.stdout.write(renderFrictionReport(report));
+          if (tier === "b") {
+            const publish = buildFrictionPublishDoc(report);
+            process.stdout.write(
+              "tier b — prefilled URL for a HUMAN to open and submit (arggon never submits it; docs/agents.md §0 stands):\n",
+            );
+            process.stdout.write(`${publish.url}\n`);
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          printHumanError("arggon friction", message);
+          process.exitCode = 1;
+        }
+        return;
+      }
+
+      // --- clear mode (plan task T4): the complete local rollback ---
+      if (opts.clear) {
+        if (json) {
+          const outcome = frictionClearOperation({ cwd: process.cwd() });
+          emitJson(outcome.envelope);
+          if (!outcome.ok) process.exitCode = 1;
+          return;
+        }
+        try {
+          const result = frictionClearOperation({ cwd: process.cwd() });
+          if (!result.ok) {
+            printHumanError("arggon friction", result.envelope.error.message);
+            process.exitCode = 1;
+            return;
+          }
+          console.log(
+            `arggon friction: cleared ${sanitizeHumanValue(String(result.envelope.cleared ?? 0))} — ${sanitizeHumanText(result.envelope.path ?? "")}`,
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          printHumanError("arggon friction", message);
+          process.exitCode = 1;
+        }
+        return;
+      }
+
+      // --- capture mode (plan task T1) + the opt-out gate (plan task T4) ---
+      const options = () => ({
+        cwd: process.cwd(),
+        version: arggonVersion(),
+        // An omitted observation reaches the kernel as "" so it fails with the
+        // named `no-observation` reason rather than an uncaught TypeError.
+        observation: observation ?? "",
+        command: opts.command ?? "",
+        error: opts.error,
+        harness: opts.harness,
+        evidencePath: opts.evidence,
+        optedOut: readFrictionOptOut(process.cwd(), process.env).optedOut,
+      });
+      if (json) {
+        const outcome = frictionOperation(options());
+        emitJson(outcome.envelope);
+        if (!outcome.ok) process.exitCode = 1;
+        return;
+      }
+      try {
+        const result = frictionOperation(options());
+        if (!result.ok) {
+          printHumanError("arggon friction", result.envelope.error.message);
+          process.exitCode = 1;
+          return;
+        }
+        // Opted out: nothing was written. Exit 0 — honoring the operator's
+        // configuration is success — but the line says so out loud, because a
+        // silent success here looks exactly like a recorded observation.
+        if (result.envelope.optedOut) {
+          console.log(
+            "arggon friction: opted out — nothing recorded (x-friction: false in the tracker .convention.yml, or ARGGON_NO_FRICTION set). The command stays discoverable on purpose: set the key back to true, or unset the variable, to re-enable capture.",
+          );
+          return;
+        }
+        console.log(
+          `arggon friction: recorded ${sanitizeHumanValue(result.envelope.record?.fingerprint ?? "")} — ${sanitizeHumanText(result.envelope.path ?? "")}`,
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        printHumanError("arggon friction", message);
         process.exitCode = 1;
       }
     },
@@ -3091,6 +3384,35 @@ function printInitAdapters(adapters: AdapterSelectionReport): void {
   }
 }
 
+/**
+ * Human line for the forced convention re-scaffold
+ * (bug-init-force-drops-x-tracker-block). The `--json` envelope carries the
+ * same keep/replace object; this is the line a human operator reads, and it
+ * exists because a forced re-scaffold used to be silent: the report has to
+ * reach the apply path, not only the preview. In the one arm where
+ * configuration genuinely IS discarded — the existing file could not be read by
+ * this arggon — the line names the wholesale replacement in so many words,
+ * because a rescue nobody is told about is the defect this item exists to kill.
+ */
+function printInitConvention(convention: ConventionRewriteReport): void {
+  if (convention.rescaffolded) {
+    console.log(
+      "arggon init: .convention.yml could not be read by this arggon — re-derived from " +
+        "the scaffold; its previous configuration was NOT preserved",
+    );
+    return;
+  }
+  const kept =
+    convention.preserved.length > 0
+      ? `preserved ${sanitizeHumanError(convention.preserved.join(", "))}`
+      : "preserved no existing sections";
+  const replaced =
+    convention.replaced.length > 0
+      ? `replaced ${sanitizeHumanError(convention.replaced.join(", "))}`
+      : "replaced nothing";
+  console.log(`arggon init: .convention.yml ${kept}; ${replaced}`);
+}
+
 function printInitHuman(result: InitResult): void {
   // bug-init-git-doctor-blindspot: human path warns on stderr; the --json
   // envelope carries the same text as the additive `warning` field instead.
@@ -3157,6 +3479,11 @@ function printInitHuman(result: InitResult): void {
       `  - kept adopter-modified docs (never overwritten): ${sanitizeHumanError(result.skipped.join(", "))}`,
     );
   }
+  // What the forced re-scaffold did to the tracker `.convention.yml`
+  // (bug-init-force-drops-x-tracker-block): present only when a `--force` run
+  // re-scaffolded an EXISTING file, which is the only case with configuration
+  // to keep — and the only case where keeping it used to be silent.
+  if (result.convention) printInitConvention(result.convention);
   printInitReaps(result.reaped, result.reapRefused);
   printInitAdapters(result.adapters);
   console.log("Next:");

@@ -34,6 +34,14 @@
 # one-time npmjs.com setup exists (release.md): repo Arggon/ArggonManager,
 # workflow filename release.yml, no environment, direct publish allowed — for
 # both `arggon-manager` and `@arggondev/lib`.
+#
+# Both publish steps run through `cli/publish-auth-hint.mjs`
+# (bug-release-needs-auth-self-describing): npmjs.com does not validate a
+# trusted-publisher entry on save, so a missing or wrong entry only surfaces at
+# publish time as a bare ENEEDAUTH. The wrapper therefore re-emits npm's own
+# stderr verbatim and, on a genuine authentication failure only, prints the
+# cause, which package failed and the pointer to the one-time setup. It exits
+# with npm's status, so publish behavior is unchanged.
 name: release
 
 on:
@@ -217,7 +225,16 @@ jobs:
             echo "@arggondev/lib@${VERSION} already on the registry - already-published = success, never re-publish"
             exit 0
           fi
-          npm publish --workspace lib
+          # WRAPPED, not bare (bug-release-needs-auth-self-describing): the
+          # npmjs.com trusted-publisher setup is the one thing a human must do
+          # once, and a missing or wrong entry surfaces only HERE, at publish
+          # time, as a bare ENEEDAUTH that names no cause — the failure and its
+          # fix lived in different documents. The wrapper re-emits npm's own
+          # stderr verbatim, adds the self-describing pointer on a genuine
+          # authentication failure only, and exits with npm's status, so the
+          # publish semantics below are unchanged (lib-first, OIDC-only,
+          # already-published = success, same step failure).
+          node cli/publish-auth-hint.mjs --package "@arggondev/lib" --version "$VERSION" -- npm publish --workspace lib
 
       - name: Poll the registry until the kernel is visible (propagation lag; bounded)
         # The runbook gotcha, scripted: registry propagation lags minutes, so
@@ -256,7 +273,12 @@ jobs:
             echo "arggon-manager@${VERSION} already on the registry - already-published = success, never re-publish"
             exit 0
           fi
-          npm publish
+          # Same wrapper as the kernel publish above, per package: the two
+          # failures that cost this repo two release attempts were per-package
+          # (a missing @arggondev/lib entry, a lowercase-org repo string for
+          # argon-manager), so each publish annotates itself with its own
+          # package name and its own `npm trust list` command.
+          node cli/publish-auth-hint.mjs --package "arggon-manager" --version "$VERSION" -- npm publish
 
       - name: Attach both packed tarballs to the release
         # ADR 0018 §4: the non-npm fallback. Both tarballs from the inspect-

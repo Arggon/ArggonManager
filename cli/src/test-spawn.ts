@@ -496,16 +496,34 @@ export function readEnvelope(init: EnvelopeReadInit): ReadEnvelope {
  * (bug-row-table-flake). `cwd` defaults to the vitest process cwd; `options`
  * are passed straight to `spawnSync` (env, input, timeout, …).
  *
+ * THE env-injection convention (task-plugin-test-type-coverage): the child's
+ * environment goes at `options.env`, never in a positional argument — every
+ * runner in this module takes the SAME options object, so the two shapes cannot
+ * drift apart again. A former plugin-suite wrapper took an env MAP positionally
+ * while this function took an options OBJECT, and the same-named third slots
+ * were silently confusable: an options-shaped call on the wrapper ran the child
+ * with one environment variable literally named `env` (PATH lost); an
+ * env-map-shaped call here was indistinguishable from no options at all, so the
+ * child inherited the HOST environment and an isolation assertion passed for
+ * the wrong reason. {@link runCliJson} is the `--json` contract-runner variant
+ * with the same options shape.
+ *
  * Raises {@link SpawnHarnessError} when the spawn produced no CLI result (the
  * child never launched, was killed, or died inside the ESM loader); returns the
  * raw result otherwise, so a non-zero `arggon` exit a test asserts on is
  * untouched (bug-cli-spawn-suites-exit-1-flake).
+ *
+ * Raises {@link RunCliOptionsShapeError} for the one wrong shape the type
+ * system cannot reject (an env-MAP VARIABLE passed as `options`: every env map
+ * is structurally assignable to an all-optional options type) — see
+ * {@link RUN_CLI_OPTION_KEYS}.
  */
 export function runCli(
   args: string[],
   cwd?: string,
   options: RunCliOptions = {},
 ): SpawnSyncReturns<string> {
+  assertRunCliOptionsShape(options);
   const argv = [...cliNodeArgs(), ...args];
   const before = artifactFingerprint(repoRoot);
   const proc = spawnSync(process.execPath, argv, {
@@ -530,6 +548,106 @@ export function runCli(
     outcome: proc,
     artifactDrift: drift,
   });
+}
+
+/**
+ * Every option name `spawnSync` understands (the named keys of
+ * `SpawnSyncOptionsWithStringEncoding` in @types/node: ProcessEnvOptions'
+ * `cwd`/`env`/`uid`/`gid`, CommonOptions' `timeout`/`windowsHide`,
+ * CommonSpawnOptions' `argv0`/`stdio`/`shell`/`windowsVerbatimArguments`,
+ * MessagingOptions' `serialization`/`killSignal`, Abortable's `signal`, and
+ * SpawnSyncOptions' `input`/`maxBuffer`/`encoding`). The guard below reads it;
+ * `test-spawn.test.ts` pins the list so a node-types addition that misses it
+ * turns into a review comment instead of a false-positive throw.
+ */
+export const RUN_CLI_OPTION_KEYS: ReadonlySet<string> = new Set([
+  "cwd",
+  "env",
+  "uid",
+  "gid",
+  "timeout",
+  "windowsHide",
+  "argv0",
+  "stdio",
+  "shell",
+  "windowsVerbatimArguments",
+  "serialization",
+  "killSignal",
+  "signal",
+  "input",
+  "maxBuffer",
+  "encoding",
+]);
+
+/**
+ * An env MAP passed as the whole `options` argument of {@link runCli} /
+ * {@link runCliJson}: the shape the type system cannot reject (every env map is
+ * assignable to an all-optional options type, and a non-fresh value skips the
+ * excess-property check) and the one that used to pass SILENTLY — every option
+ * is ignored by `spawnSync`, so the child inherited the HOST environment and an
+ * isolation test passed for the wrong reason (task-plugin-test-type-coverage).
+ */
+export class RunCliOptionsShapeError extends Error {
+  /** The option keys no `spawnSync` option answers to. */
+  readonly unknownKeys: string[];
+
+  constructor(unknownKeys: string[]) {
+    super(
+      [
+        "[arggon-test-spawn] options carry no known spawnSync option —",
+        `  unknown keys: ${unknownKeys.map((key) => JSON.stringify(key)).join(", ")}`,
+        "  this looks like an env MAP passed as the OPTIONS argument: every entry",
+        "  would be silently ignored and the child would inherit the HOST",
+        "  environment, so an isolation test passes for the wrong reason.",
+        "  The environment goes at `options.env`: runCli(args, cwd, { env: myEnv }).",
+      ].join("\n"),
+    );
+    this.name = "RunCliOptionsShapeError";
+    this.unknownKeys = unknownKeys;
+  }
+}
+
+/**
+ * Reject the env-MAP-as-options shape at the boundary: an `options` object
+ * whose EVERY key is unknown to `spawnSync` cannot be doing anything (each
+ * entry would be silently dropped), so it is reported instead of ignored. An
+ * omitted or empty `options` is untouched, and any single known key (however
+ * odd the mix) still reaches `spawnSync` untouched — the guard narrows the
+ * historically silent case, it does not police mixes (spawnSync has always
+ * ignored unknown keys, and that is out of scope here).
+ */
+export function assertRunCliOptionsShape(options: RunCliOptions): void {
+  const keys = Object.keys(options);
+  if (keys.length === 0) return;
+  const unknown = keys.filter((key) => !RUN_CLI_OPTION_KEYS.has(key));
+  if (unknown.length === keys.length) throw new RunCliOptionsShapeError(unknown);
+}
+
+/**
+ * The `--json` contract-runner variant of {@link runCli}: prepends `--json` to
+ * `args`, defaults `timeout` to 60s, and returns the flat
+ * `{ status, stdout, stderr }` triple the envelope contract tests read.
+ *
+ * The THIRD PARAMETER IS THE SAME OPTIONS SHAPE as {@link runCli} — one
+ * env-injection convention for every runner in this module (`options.env`), so
+ * a wrong shape is a TYPE error, never a runtime surprise. This replaces the
+ * plugin suite's former local `runCli(args, cwd, env)` wrapper, whose
+ * positional env MAP was silently confusable with this module's options OBJECT
+ * (task-plugin-test-type-coverage). Harness failures still surface as
+ * {@link SpawnHarnessError}; a wrong options shape as
+ * {@link RunCliOptionsShapeError}.
+ */
+export function runCliJson(
+  args: string[],
+  cwd: string,
+  options: RunCliOptions = {},
+): { status: number | null; stdout: string; stderr: string } {
+  // The CALLER's options are guarded before the 60s default merges in: the
+  // known `timeout` key must not be able to smuggle an env-MAP-shaped options
+  // object past the boundary.
+  assertRunCliOptionsShape(options);
+  const proc = runCli(["--json", ...args], cwd, { timeout: 60_000, ...options });
+  return { status: proc.status, stdout: proc.stdout ?? "", stderr: proc.stderr ?? "" };
 }
 
 /**

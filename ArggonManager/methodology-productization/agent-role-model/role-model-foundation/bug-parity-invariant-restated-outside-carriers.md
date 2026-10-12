@@ -46,7 +46,7 @@ worker:
 - `ArggonManager/docs/claim.md:99` — _"Agents and humans follow the same rules"_
 
 Frozen records are **not** to be rewritten: `spec-methodology-adapters-017.md:49`,
-`spec-spec-pipeline-002.md:20`, `spec-deps-001.md:19` and the explorations are
+`spec-spec-pipeline-002.md:20`, `spec-deps-022.md:19` and the explorations are
 historical statements of what was true when written. ADR 0020 and claim.md are not —
 they are live text a reader consults today, and both now contradict the carriers.
 

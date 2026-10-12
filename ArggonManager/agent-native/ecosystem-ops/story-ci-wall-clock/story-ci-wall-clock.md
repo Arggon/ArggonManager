@@ -8,6 +8,7 @@ labels: [ci]
 created: "2026-10-05"
 updated: "2026-10-05"
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-ci-wall-clock/story-ci-wall-clock.md (story index; required).
   parent MUST be the epic id. Optional style prefixes (e.g. story-) are not type discriminators.
@@ -17,15 +18,27 @@ updated: "2026-10-05"
 
 ## Context
 
-<!-- Why this story exists. -->
+CI runs at p50 **350 s** (61 runs measured 2026-10-05) and **72 % of the required `cli` job is one command** (`npm run test`, 252 s). The suite is 128 files / 2680 tests and reports `tests 97%, import 1%, transform 1%` — the cost is real work, already well parallelized (~7.8x), not overhead.
+
+The decision is cross-cutting: it fixes the shape of the **one required check** (`cli`, app 15368, `strict: true`) and couples CI topology to `auto-done.yml`'s hand-posted `cli` check, so it is recorded as an ADR rather than a task.
+
+- Exploration: [`exploration-ci-pipeline-wall-clock-022`](../../docs/explorations/exploration-ci-pipeline-wall-clock-022.md) — the measurements, candidates and rejected options.
+- ADR: [`0023-ci-wall-clock`](../../docs/adr/0023-ci-wall-clock.md) — the decision (Context L21-42, three ordered steps L44-66, consequences L68-82, rejected alternatives L84-104).
+
+The rejected options and the deferred `auto-done.yml` inline-suite run are recorded in `## Notes` below; they are not restated here.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] `task-ci-concurrency-cancel` merged — superseded runs are cancelled (step 1).
+- [ ] `task-ci-shard-wall-measure` merged — the real 4-core shard walls are recorded (step 2's precondition).
+- [ ] Duration-aware sharding merged with an **aggregator job named exactly `cli`** that `needs:` the shard jobs, so branch protection's required check keeps reporting (step 2).
+- [ ] The `worktree.test.ts` floor is lowered (step 3) — until then every shard topology floors at that one file's duration.
+- [ ] p50 `cli` job wall clock is re-measured after step 3 and compared against the 350 s baseline recorded here.
 
 ## Notes
 
 ### 2026-10-05 @ses_ef26e3a0dffeCrCyR7114VVZ2H
+
 ## Context
 
 CI runs at p50 **350 s** (61 runs measured 2026-10-05) and **72 % of the required `cli` job is one command** (`npm run test`, 252 s). The suite is 128 files / 2680 tests and reports `tests 97%, import 1%, transform 1%` — the cost is real work, already well parallelized (~7.8x), not overhead.

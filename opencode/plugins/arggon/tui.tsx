@@ -15,11 +15,15 @@
  *   per-item status, the session's active item and the kernel `next`
  *   suggestion, with a navigable selection cursor (`j`/`k`, `PgUp`/`PgDn`,
  *   `g`/`G`), `Enter` toggling a bounded inline detail block (body +
- *   acceptance rows, read through the kernel's `runShow`), `n`/`a` jumping to
- *   the kernel `next` suggestion and the session's active item, `r` reloading
- *   (the selection survives when the item still exists), `f` full-screen and
- *   `esc` closing the detail block first and the panel second. Opened by the
- *   `arggon.board.open` command (slash `/arggon-board`, palette, `ctrl+g`).
+ *   acceptance rows, read through the kernel's `runShow`, plus the parent edge
+ *   and the id-sorted children resolved through the inlined kernel's recorded
+ *   `parent` edges — no parallel hierarchy), `p` jumping to the parent's
+ *   detail and `1`..`9` jumping to the numbered child's detail, `n`/`a`
+ *   jumping to the kernel `next` suggestion and the session's active item,
+ *   `r` reloading (the selection survives when the item still exists), `f`
+ *   full-screen and `esc` closing the detail block first and the panel second.
+ *   Opened by the `arggon.board.open` command (slash `/arggon-board`, palette,
+ *   `ctrl+g`).
  * - `sidebar.content` contribution: one status line (active item, or the ready
  *   count) so the item status is visible without opening the panel.
  * - `app` slot: hosts the global keymap layer (the documented home for plugin
@@ -27,11 +31,21 @@
  *
  * Display only: every read goes through `board.ts` → the kernel; nothing here
  * writes to the tracker.
+ *
+ * Activation model (task-native-panel-hierarchy-links): the panel renders
+ * plain OpenTUI `<text>` rows with no click/link surface, so hierarchy links
+ * are keyboard-activated through the panel keymap layer — the same mechanism
+ * as the existing `n`/`a` jumps, not pointer clicks. The detail block names
+ * the keys inline (`[p]`, `[1]`..`[9]`); this is the agreed activation for
+ * this surface, not display-only.
  */
 import { Show, createSignal } from "solid-js";
 import {
   ARGON_BOARD_PANEL,
+  BOARD_HIERARCHY_CHILD_KEYS,
+  boardChildrenOf,
   boardItemDetail,
+  boardParentId,
   boardSnapshot,
   boardTreeLines,
   emptyBoardSelection,
@@ -143,6 +157,17 @@ export type BoardController = {
   jumpNext(): void;
   /** Jump to the session's active item (toasts when none resolves). */
   jumpActive(): void;
+  /**
+   * Open the selected item's parent detail (toasts `no parent` when the item
+   * has no parent edge, `parent not found` when the edge points nowhere).
+   */
+  jumpParent(): void;
+  /**
+   * Open the selected item's `index`-th child detail (0-based, id-sorted like
+   * the tree; toasts `no child N` when out of range). Digits `1`..`9` map to
+   * indexes 0..8.
+   */
+  jumpChild(index: number): void;
   /** Toggle the inline detail block for the selected item. */
   toggleDetail(): void;
   /** Re-read the tracker, keeping the selection when the item still exists. */
@@ -184,6 +209,53 @@ export function createBoardController(options: BoardControllerOptions): BoardCon
   const jumpNext = (): void => jump(snapshot().nextId, "next suggestion");
   const jumpActive = (): void => jump(snapshot().activeId, "active item");
 
+  const readDetail = (id: string): BoardItemDetail =>
+    options.detailRows === undefined
+      ? boardItemDetail(options.cwd, id, { items: snapshot().items })
+      : boardItemDetail(options.cwd, id, { rows: options.detailRows, items: snapshot().items });
+
+  const openItem = (id: string, label: string): void => {
+    const target = selectBoardItem(snapshot(), id);
+    if (target === null) {
+      options.toast?.(`arggon board: no ${label}`);
+      return;
+    }
+    setSelection(target);
+    setDetail(readDetail(id));
+  };
+
+  const jumpParent = (): void => {
+    const selected = selection().id;
+    if (selected === null) {
+      options.toast?.("arggon board: no parent");
+      return;
+    }
+    const parentId = boardParentId(snapshot().items, selected);
+    if (parentId === null) {
+      options.toast?.("arggon board: no parent");
+      return;
+    }
+    const target = selectBoardItem(snapshot(), parentId);
+    if (target === null) {
+      options.toast?.("arggon board: parent not found");
+      return;
+    }
+    setSelection(target);
+    setDetail(readDetail(parentId));
+  };
+
+  const jumpChild = (index: number): void => {
+    const selected = selection().id;
+    const children =
+      selected === null ? [] : boardChildrenOf(snapshot().items, selected);
+    const child = children[index];
+    if (child === undefined) {
+      options.toast?.(`arggon board: no child ${index + 1}`);
+      return;
+    }
+    openItem(child.id, `child ${index + 1}`);
+  };
+
   const toggleDetail = (): void => {
     const selected = selection().id;
     if (selected === null) return;
@@ -191,11 +263,7 @@ export function createBoardController(options: BoardControllerOptions): BoardCon
       setDetail(null);
       return;
     }
-    setDetail(
-      options.detailRows === undefined
-        ? boardItemDetail(options.cwd, selected)
-        : boardItemDetail(options.cwd, selected, { rows: options.detailRows }),
-    );
+    setDetail(readDetail(selected));
   };
 
   const reload = (): void => {
@@ -225,6 +293,8 @@ export function createBoardController(options: BoardControllerOptions): BoardCon
     jump,
     jumpNext,
     jumpActive,
+    jumpParent,
+    jumpChild,
     toggleDetail,
     reload,
     escape,
@@ -299,10 +369,11 @@ export function registerArgonTui(
   };
 
   /**
-   * Panel body: cursor navigation, `enter` detail, `n`/`a` jumps, `r` reload,
-   * `f` full-screen, `esc` detail-first. The binds are the documented OpenCode
-   * key names (docs/playbooks/opencode.md § TUI); a plain letter bound in a
-   * panel layer is active only while the panel owns input.
+   * Panel body: cursor navigation, `enter` detail, `p`/`1`..`9` hierarchy
+   * jumps, `n`/`a` jumps, `r` reload, `f` full-screen, `esc` detail-first.
+   * The binds are the documented OpenCode key names
+   * (docs/playbooks/opencode.md § TUI); a plain letter bound in a panel layer
+   * is active only while the panel owns input.
    */
   const BoardPanel = (props: { panel: ArgonTuiPanel }) => {
     const width = (): number => (typeof props.panel?.width === "number" ? props.panel.width : 0);
@@ -327,6 +398,12 @@ export function registerArgonTui(
           { id: "arggon.board.last", bind: "shift+g", run: () => board.move("last") },
           { id: "arggon.board.last.end", bind: "end", run: () => board.move("last") },
           { id: "arggon.board.detail", bind: "return", run: () => board.toggleDetail() },
+          { id: "arggon.board.parent", bind: "p", run: () => board.jumpParent() },
+          ...Array.from({ length: BOARD_HIERARCHY_CHILD_KEYS }, (_, index) => ({
+            id: `arggon.board.child.${index + 1}`,
+            bind: `${index + 1}`,
+            run: () => board.jumpChild(index),
+          })),
           { id: "arggon.board.next", bind: "n", run: () => board.jumpNext() },
           { id: "arggon.board.active", bind: "a", run: () => board.jumpActive() },
           {

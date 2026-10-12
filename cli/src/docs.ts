@@ -1590,3 +1590,130 @@ export function applyDocsPlan(root: string, plan: DocsPlan): DocsResult {
 export function generateDocs(opts: GenerateDocsOptions): DocsResult {
   return applyDocsPlan(opts.root, planGenerateDocs(opts));
 }
+
+/**
+ * One broken row of the provenance ledger (bug-stale-x-generated-records-
+ * goal-mode-seam-pair): a committed generated file whose bytes are EXACTLY
+ * what the current generator produces, but whose `x-generated` record is
+ * missing or stale. This is the one provenance defect every other gate is
+ * blind to: the CI drift gate compares the committed copies against the
+ * generator's output and deliberately excludes the state file, so copies stay
+ * byte-synced while init classifies the file adopter-modified and silently
+ * stops propagating template edits to it — the state that left the goal-mode
+ * seam pair (`arggon-goal.md` / `goal-mode.md`) stranded.
+ */
+export type ProvenanceRecordViolation = {
+  /** Destination path (posix, relative to the probed root). */
+  dest: string;
+  /** The template id the generator renders this destination from. */
+  template: string;
+  /**
+   * `missing-record` — generator output on disk with no `x-generated` entry at
+   * all (init reads it as a pre-provenance adopter file); `stale-checksum` —
+   * an entry exists but its checksum no longer matches the committed bytes
+   * (init reads it as an adopter edit). Same consequence either way.
+   */
+  kind: "missing-record" | "stale-checksum";
+  /** One-line explanation naming the bytes and the record that disagree. */
+  reason: string;
+};
+
+/**
+ * Audit the provenance ledger against the committed seam bytes
+ * (bug-stale-x-generated-records-goal-mode-seam-pair). For every destination
+ * the current generator owns (`currentGeneratedTemplatesFrom` — the SAME walk
+ * init plans from), a committed copy that is byte-identical to the current
+ * render MUST carry a matching `x-generated` record: if the bytes are the
+ * generator's, the record describing them is bookkeeping the generator wrote
+ * at some point, and it drifting away is always a defect — never an adopter's
+ * sanctioned state.
+ *
+ * Deliberately NOT violations (each has its own story):
+ *  - bytes that differ from the render — genuine adopter content; init must
+ *    keep skipping it (and the CI dirty diff owns copy-vs-template drift);
+ *  - acknowledged entries — the adopter sanctioned divergence explicitly
+ *    (`arggon adopt --ack`), the one sanctioned way to stop propagation;
+ *  - vendored plugin artifacts (`isBundledPluginDest`) — per-checkout bytes
+ *    the shared checksum cannot describe; init re-vendors them on mismatch
+ *    (bug-stale-vendored-plugin-copy);
+ *  - renders that cannot be produced (template absent, project name
+ *    unrecoverable) — "cannot decide", the doctor `unverified` semantics.
+ *
+ * Pure read: no writes, never throws on unreadable files. The repo's own test
+ * suite runs this against the arggon checkout itself on every CI run, so a
+ * template edit that regenerates copies without the records (or a merge that
+ * drops records) cannot land green.
+ */
+export function auditGeneratedProvenance(opts: {
+  root: string;
+  /** Defaults to the bundle (`bundledTemplatesDir()`), like every caller. */
+  templatesDir?: string;
+  /** Include the tier-2 doc set (defaults to tier-1 only, like init). */
+  full?: boolean;
+  /** Overrides the detected tracker layout (defaults to detection at root). */
+  layout?: TrackerLayout;
+  /** Resolved project name; defaults to init's resolution chain at root. */
+  projectName?: string | null;
+}): ProvenanceRecordViolation[] {
+  const templatesDir = opts.templatesDir ?? bundledTemplatesDir();
+  const layout: TrackerLayout = opts.layout ?? trackerAt(opts.root)?.layout ?? "arggon-manager";
+  const state = readGeneratedState(opts.root);
+  const projectName =
+    opts.projectName !== undefined
+      ? opts.projectName
+      : resolveProjectName(opts.root, { entries: state, recorded: null }).name;
+  const violations: ProvenanceRecordViolation[] = [];
+  for (const { dest, template } of currentGeneratedTemplatesFrom(templatesDir, layout)) {
+    if (!opts.full && TIER2_DESTS.has(canonicalTemplateDest(template.replace(/^docs\//, "")))) {
+      continue;
+    }
+    // Acknowledged baseline: sanctioned divergence, init never regenerates it.
+    if (state[dest]?.acknowledged) continue;
+    // Derived vendored artifact: per-checkout bytes, re-vendored on mismatch.
+    if (isBundledPluginDest(dest)) continue;
+    const destAbs = join(opts.root, ...dest.split("/"));
+    if (!existsSync(destAbs)) continue;
+    let disk: string;
+    try {
+      disk = readFileSync(destAbs, "utf8");
+    } catch {
+      continue; // unreadable: nothing can be decided about its bytes
+    }
+    const render = renderGeneratedDoc({
+      templatesDir,
+      root: opts.root,
+      template,
+      dest,
+      projectName,
+    });
+    // Render refused, or the bytes are adopter content (differ from the
+    // render): no row of the ledger is broken — init skipping those files is
+    // init behaving correctly.
+    if (render === null || !checksumMatches(checksumOf(render), disk)) continue;
+    const entry = state[dest];
+    if (!entry?.checksum) {
+      violations.push({
+        dest,
+        template,
+        kind: "missing-record",
+        reason:
+          "committed copy is byte-identical to the current generator render but has no " +
+          "x-generated record — init classifies it adopter-modified and silently stops " +
+          "propagating template edits to it",
+      });
+    } else if (!checksumMatches(entry.checksum, disk)) {
+      violations.push({
+        dest,
+        template,
+        kind: "stale-checksum",
+        reason:
+          "committed copy is byte-identical to the current generator render but the " +
+          "x-generated checksum (" +
+          entry.checksum +
+          ") does not match the committed bytes — init classifies it adopter-modified " +
+          "and silently stops propagating template edits to it",
+      });
+    }
+  }
+  return violations.sort((a, b) => a.dest.localeCompare(b.dest));
+}

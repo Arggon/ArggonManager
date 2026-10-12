@@ -1,12 +1,13 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-seam-drift-gate-blocks-new-generated-seam-content
 title: "`tasks-validate` drift gate installs the PINNED released arggon and diffs the committed seam, so any PR adding new generated seam content (e.g. the ZCode goal-mode template) fails until a release + ARGGON_VERSION re-pin"
+assignee: arggon-delivery-lead
 parent: tooling-and-environment
 labels: [ci, release]
 created: "2026-10-03"
-updated: "2026-10-03"
+updated: "2026-10-09"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-seam-drift-gate-blocks-new-generated-seam-content.md

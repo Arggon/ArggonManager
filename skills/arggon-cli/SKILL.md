@@ -163,7 +163,7 @@ Non-trivial items are orchestrated per `references/orchestration.md`.
 ## 3. Views and tooling
 
 ```bash
-<!-- arggon:generated-commands start: board,report,doctor,sync,import-issues,instructions,cleanup,priority migrate,migrate -->
+<!-- arggon:generated-commands start: board,report,doctor,sync,import-issues,instructions,cleanup,priority migrate,migrate,friction -->
 arggon board  # Write a static read-only HTML board from the tracker (git files stay the source of truth)
 arggon report  # Aggregate leaf statuses per container, grouped by epic (display only)
 arggon doctor  # Report installation state: convention version, generated-doc provenance, tracker counts (pure read); with --budget, also the ADR 0006 context-budget surfaces incl. the live MCP tool-schema size (report-only)
@@ -173,6 +173,7 @@ arggon instructions  # Print the agent wiring (install, pre-commit, CI) extracte
 arggon cleanup  # List worktrees of done/cancelled items whose branches are merged (--prune removes them)
 arggon priority migrate  # Move legacy pN labels into the priority field on all items (highest label wins, all pN labels removed, non-priority labels kept; idempotent; never auto-commits — review and commit once)
 arggon migrate  # Move a legacy tasks/ tracker (and its product docs) to the ArggonManager/ layout (ADR 0012, convention v5; idempotent, never auto-commits)
+arggon friction [observation]  # Record friction in ArggonManager itself into the local append-only friction log (never the tracker, never the network), or render its deduped report with --report [--tier a|b], or remove the whole log with --clear
 <!-- arggon:generated-commands end -->
 ```
 

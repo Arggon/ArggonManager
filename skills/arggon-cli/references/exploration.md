@@ -11,11 +11,11 @@ Thinking is the deliverable — keep every artifact lean.
 Before any work, classify the task. The ratchet is one-way: complexity
 discovered mid-flight upgrades the classification, nothing downgrades it.
 
-| Classification | Meaning                                        | Route                                                                        |
-| -------------- | ---------------------------------------------- | ---------------------------------------------------------------------------- |
-| **Spike**      | One open question, throwaway answer            | Time-boxed prototype or an `arggon stack explore` record; feeds a bounded task. |
-| **Bounded**    | An existing flow to read and extend            | `references/methodology.md` — spec first for non-trivial features.            |
-| **Greenfield** | No existing flow to read; others will depend on it | This protocol, every phase.                                                  |
+| Classification | Meaning                                            | Route                                                                           |
+| -------------- | -------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Spike**      | One open question, throwaway answer                | Time-boxed prototype or an `arggon stack explore` record; feeds a bounded task. |
+| **Bounded**    | An existing flow to read and extend                | `references/methodology.md` — spec first for non-trivial features.              |
+| **Greenfield** | No existing flow to read; others will depend on it | This protocol, every phase.                                                     |
 
 ## Phase 1 — Stance
 

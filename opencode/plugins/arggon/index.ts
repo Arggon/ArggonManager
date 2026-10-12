@@ -1575,6 +1575,35 @@ export async function resolveToolCwd(
  * expectation the resolution can be held to, which is what turns a silent
  * mis-binding into either a named refusal (writes) or a visible receipt field
  * (reads).
+ *
+ * The third signal closes the hole those two left
+ * (bug-native-guard-silent-without-worktree-declaration): both are
+ * RECONCILING — they hold the resolution against a declaration the caller
+ * made. A worker that never moved its session and never sourced anything
+ * declares nothing, so the guard stayed silent and the 2026-10-05 incident
+ * (7 open PRs invisible to the tracker) still reproduced. The claim itself
+ * is the missing declaration: `start --worktree` — the dispatch surface —
+ * already writes the worktree's `.arggon.env` the moment it claims, so the
+ * expectation exists before the worker's first tracker write. All the guard
+ * was missing was reading it from the CLAIM's checkout instead of only from
+ * the caller's: for an item-scoped call that declares nothing, the sibling
+ * worktrees of the resolved checkout (`git worktree list --porcelain`) are
+ * scanned for one whose `.arggon.env` names the call's item, and that
+ * worktree becomes the expectation.
+ *
+ * The asymmetry is kept, not flattened: a CALLER-declared disagreement still
+ * refuses a write (the caller stated an expectation; clearing it or moving is
+ * a clean recovery). A claim-footprint disagreement is REPORTED on every
+ * item-scoped envelope, read or write, instead of refusing — because the same
+ * in-flight claim is legitimately written from the canonical checkout by its
+ * own lifecycle (the post-merge done flip and the unclaim of a dropped claim
+ * both run `update` from the primary while the worktree still exists, and no
+ * native remedy would land them on the right branch). The report is what the
+ * silence denied: `trackerRoot` names the checkout that answered and
+ * `trackerRootMismatch` names the claiming worktree and where its declaration
+ * was read. A checkout with no claiming worktree anywhere — the ordinary
+ * primary, an adopter without worktrees — still declares nothing and stays
+ * byte-identical to the CLI.
  * -------------------------------------------------------------------------- */
 
 /** The env-contract file `start --worktree` writes at a worktree root. */
@@ -1600,6 +1629,15 @@ const MAX_ENV_WALK_DEPTH = 8
 
 /** A `.arggon.env` larger than this is not the contract's file; ignored. */
 const MAX_ENV_FILE_BYTES = 8_192
+
+/**
+ * Upper bound of worktree roots the claim-footprint scan reads. A call can
+ * never turn into an unbounded crawl of the repo's worktrees: the scan stops
+ * at the first worktree whose `.arggon.env` declares the call's item and
+ * never reads more roots than this (one file read per root, each bounded by
+ * {@link MAX_ENV_FILE_BYTES}).
+ */
+const MAX_CLAIM_WORKTREE_SCAN = 64
 
 /** `source` value for an identity taken from the host process environment. */
 export const PROCESS_ENV_SOURCE = "process.env"
@@ -1717,14 +1755,73 @@ export function processWorktreeIdentity(
 }
 
 /**
+ * Worktree roots of `git worktree list --porcelain` output, in listing order.
+ *
+ * Pure and total: a `worktree <path>` line per registered worktree, everything
+ * else (`HEAD`, `branch`, `detached`, bare, blank lines, a failed listing)
+ * ignored. Non-string input yields no worktrees rather than throwing, so a
+ * missing git binary can never dispatch a rejection through the seam.
+ */
+export function parseWorktreeList(output: unknown): string[] {
+  if (typeof output !== "string") return []
+  const paths: string[] = []
+  for (const line of output.split("\n")) {
+    if (!line.startsWith("worktree ")) continue
+    const path = line.slice("worktree ".length).trim()
+    if (path !== "") paths.push(path)
+  }
+  return paths
+}
+
+/**
+ * The claim footprint of one item: a sibling worktree of `root` whose
+ * `.arggon.env` declares it, discovered through `git worktree list --porcelain`
+ * (bug-native-guard-silent-without-worktree-declaration).
+ *
+ * This is what gives an unsourced session an expectation to be held against:
+ * `start --worktree` writes the declaring `.arggon.env` at claim time, so the
+ * footprint exists before the worker's first tracker write and nothing has to
+ * be sourced. Only the documented contract declares a footprint — a worktree
+ * without `.arggon.env` (`x-worktree.env: false`, a pre-spec-016 worktree, a
+ * plain `git worktree add`) declares nothing and is skipped.
+ *
+ * Best-effort and bounded, like every other read of the contract: a failed
+ * `git` call (not a repository, git absent), an empty listing, or no worktree
+ * declaring `itemId` yields undefined, which degrades resolution to its
+ * pre-existing behavior. The resolved root itself is never a candidate — a
+ * checkout is judged against OTHER checkouts' claims. Reads at most `limit`
+ * worktree roots.
+ */
+export async function itemClaimWorktree(
+  root: string,
+  itemId: string,
+  limit: number = MAX_CLAIM_WORKTREE_SCAN,
+): Promise<WorktreeIdentity | undefined> {
+  if (itemId === "") return undefined
+  const listing = await run("git", ["worktree", "list", "--porcelain"], root, 2_000)
+  if (listing.code !== 0) return undefined
+  const resolvedRoot = resolve(root)
+  for (const path of parseWorktreeList(listing.stdout).slice(0, Math.max(limit, 0))) {
+    const absolute = resolve(path)
+    if (absolute === resolvedRoot) continue
+    // The listing gives the worktree ROOT, which is exactly where the contract
+    // writes the file — no upward walk needed.
+    const identity = readWorktreeEnv(join(absolute, WORKTREE_ENV_FILE))
+    if (identity?.item === itemId && identity.worktreePath !== undefined) return identity
+  }
+  return undefined
+}
+
+/**
  * Where one call actually bound, and what the checkout claims to be.
  *
  * `root` is the checkout the tracker root resolved from (the tracker dir's
  * parent), NOT the tracker dir: a worktree's identity names its checkout root,
  * so the two have to be the same kind of thing to be compared. `declared` is
  * every worktree path this call could be held to — the env file at the resolved
- * directory and the process environment — and is empty when the caller
- * declared nothing, which is the ordinary plain-checkout case.
+ * directory, the process environment, and the claim footprint of the call's
+ * item — and is empty when the caller declared nothing AND no worktree claims
+ * the item, which is the ordinary plain-checkout case.
  */
 export type TrackerBinding = {
   /** The working directory the call resolved to (the session's own). */
@@ -1737,6 +1834,14 @@ export type TrackerBinding = {
   sources: string[]
   /** Identity of the checkout the call resolved into, when it declares one. */
   worktree?: WorktreeIdentity
+  /**
+   * The claim footprint discovered for this call's item: a sibling worktree
+   * whose `.arggon.env` names it, read when the caller declared nothing. Set
+   * by the claim-footprint scan, never by the caller — a binding that carries
+   * one reports its mismatch instead of refusing the write (see the gate in
+   * {@link argonToolDefinitions}).
+   */
+  claim?: WorktreeIdentity
 }
 
 /**
@@ -1787,7 +1892,7 @@ export const TRACKER_ROOT_MISMATCH = "TRACKER_ROOT_MISMATCH"
 
 /**
  * A resolved-vs-expected disagreement: the call bound to {@link resolved} while
- * the caller declared {@link declared} instead.
+ * {@link declared} was expected instead.
  */
 export type TrackerRootMismatch = {
   resolved: string
@@ -1799,11 +1904,14 @@ export type TrackerRootMismatch = {
  * The mismatch for a binding, or undefined when there is none.
  *
  * The rule is deliberately narrow so it cannot wedge a correct session: it
- * fires only when the caller declared at least one worktree AND the checkout it
- * resolved into is none of them. A plain checkout declares nothing, so it is
- * never refused; a session correctly moved into its worktree resolves to the
- * declared path, so it is never refused. Only the third state — declared a
- * worktree, resolved somewhere else — refuses.
+ * fires only when an expectation exists — the caller declared at least one
+ * worktree, or the claim footprint of the call's item named one — AND the
+ * checkout it resolved into is none of them. A plain checkout with no claiming
+ * worktree has no expectation, so it is never refused; a session correctly
+ * moved into its worktree resolves to the declared path, so it is never
+ * refused. Only the third state — an expectation exists and the call resolved
+ * somewhere else — reports, and a caller-declared one refuses the write on top
+ * of the report (see the gate in {@link argonToolDefinitions}).
  *
  * Identity is compared by PATH only, never by `ARGGON_WORKTREE_ID`: a
  * long-lived host can carry a stale id from an earlier worktree session while
@@ -1911,6 +2019,20 @@ type ArgonToolSpec = {
    * a new tool is refusing-by-default until it says it only reads.
    */
   mutates?: boolean
+  /**
+   * True for the specs whose input names an EXISTING item the call reads or
+   * writes (`update`, `show`, `comment`, `handoff`). Only these carry the item
+   * id the claim-footprint scan keys on
+   * (bug-native-guard-silent-without-worktree-declaration): when they declare
+   * nothing, a sibling worktree's `.arggon.env` naming that item becomes the
+   * expectation the resolution is held against. Deliberately NOT on `create`
+   * (its `id` is the stem of an item that does not exist yet, so there is no
+   * footprint to find), on `start`/`branch`/`cleanup` (the worktree lifecycle
+   * manages the claim from the canonical checkout by design — an attach MUST
+   * work from the primary) or on the pool reads (`list`/`next`/`report`/
+   * `validate` name no item).
+   */
+  itemScoped?: boolean
 }
 
 const ID = { type: "string" }
@@ -2109,6 +2231,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
         agent: true,
       }),
     mutates: true,
+    itemScoped: true,
   },
   {
     name: "show",
@@ -2148,6 +2271,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
         body: input.body === true,
         tailComments: typeof input.tail_comments === "number" ? input.tail_comments : undefined,
       }),
+    itemScoped: true,
   },
   {
     name: "next",
@@ -2241,6 +2365,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
         author: asString(input.author) ?? sessionToken(tool?.sessionID),
       }),
     mutates: true,
+    itemScoped: true,
   },
   {
     name: "handoff",
@@ -2294,6 +2419,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
       })
     },
     mutates: true,
+    itemScoped: true,
   },
   {
     name: "priority",
@@ -5062,8 +5188,33 @@ export function argonToolDefinitions(
       // reports it, so the mismatch is observable without a mutation
       // (bug-native-arggon-tools-resolve-tracker-root-to-session-cwd).
       const binding = trackerBinding(kernel, resolved.cwd, options.worktreeEnv ?? process.env)
+      // When the caller declared nothing, the CLAIM declares instead: for an
+      // item-scoped call, a sibling worktree whose `.arggon.env` names the
+      // item is the expectation `start --worktree` established at claim time.
+      // Without this, the unsourced-and-unmoved session — the 2026-10-05
+      // incident — declared nothing and the guard stayed silent
+      // (bug-native-guard-silent-without-worktree-declaration).
+      if (spec.itemScoped === true && binding.declared.length === 0) {
+        const claim = await itemClaimWorktree(binding.root, asString(input?.id) ?? "")
+        if (claim !== undefined) {
+          binding.claim = claim
+          const absolute = resolve(claim.worktreePath ?? "")
+          if (absolute !== "" && !binding.declared.includes(absolute)) {
+            binding.declared.push(absolute)
+            binding.sources.push(claim.source)
+          }
+        }
+      }
       const mismatch = trackerRootMismatch(binding)
-      if (mismatch !== undefined && spec.mutates === true) {
+      // Only a CALLER-declared disagreement refuses a write. A claim-footprint
+      // one reports it: the same in-flight claim is legitimately written from
+      // the canonical checkout by its own lifecycle — the post-merge done flip
+      // (`/arggon-done`) and the unclaim of a dropped claim both run `update`
+      // from the primary while the worktree still exists, and moving the
+      // session would land those writes on an already-merged branch instead of
+      // the canonical copy. The report names the disagreement on the envelope
+      // (reads and writes alike), so the state is no longer silent.
+      if (mismatch !== undefined && spec.mutates === true && binding.claim === undefined) {
         throw new ArgonToolError(
           kernel.failEnvelope({
             command: spec.name,
@@ -5246,17 +5397,20 @@ export {
   ARGON_BOARD_PANEL,
   BOARD_DETAIL_MAX_LINE_CHARS,
   BOARD_DETAIL_MAX_ROWS,
+  BOARD_HIERARCHY_CHILD_KEYS,
   BOARD_SELECTION_MARK,
   BOARD_SELECTION_PAGE,
   BOARD_STATUS_MARKS,
   BOARD_STATUS_ORDER,
   BOARD_TYPE_BADGES,
   activeBoardId,
+  boardChildrenOf,
   boardCountsLine,
   boardDetailLines,
   boardHeaderLine,
   boardItemDetail,
   boardItemLine,
+  boardParentId,
   boardRoot,
   boardSnapshot,
   boardTreeEntries,
@@ -5272,6 +5426,8 @@ export {
 } from "./board.js"
 export type {
   BoardActiveInput,
+  BoardHierarchyItem,
+  BoardHierarchyLink,
   BoardItem,
   BoardItemDetail,
   BoardSelection,

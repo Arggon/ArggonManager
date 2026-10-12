@@ -50,6 +50,89 @@ jobs:
       - run: npm run lint
       - run: npm run test:structure
       - run: npm run lint:structure
+      - name: "Spec pipeline: zero NEW findings vs the ADR 0017 baseline"
+        # task-ci-required-check-missing-spec-analyze-baseline: the repo-root
+        # baseline lane — the shared ADR 0017 zero-NEW gate — ran nowhere a
+        # human sees before merge. `spec analyze` appeared in NO workflow
+        # (`grep -rn "spec analyze" .github/` was empty), there is no
+        # pre-commit hook, and the only required check on main is `cli`, which
+        # did not run it. So the lane exited 1 on main for five days
+        # (2026-10-06 → 2026-10-11) and the only thing that noticed was a
+        # manual reproduction in a work-item comment. It runs here, in the job
+        # that is already required on main, so a NEW finding reddens the check
+        # that gates the merge instead of a log nobody reads.
+        #
+        # Why THIS job and not the `arggon` workflow's `tasks-validate` job:
+        # that job installs the RELEASED bin
+        # (`npm install -g arggon-manager@$ARGGON_VERSION`), so a detector
+        # change in this checkout cannot fail a gate until the release carrying
+        # it ships — exactly the lag that hid this lane (the PR whose detector
+        # change made 5 findings visible merged green; the lane only went red
+        # days later, when someone ran the command by hand). `cli` runs
+        # `npm run arggon` = `tsx cli/src/cli.ts` — THIS checkout's source — so
+        # the gate bites on the very commit that moved the detector or the
+        # corpus, with no release window in between. It also needs nothing the
+        # job above does not already provide: `npm ci` (node_modules) and the
+        # build; it is offline, model-free and ~0.3 s locally.
+        #
+        # BLOCKING on purpose: the job shell is `bash -e`, so the gate's exit
+        # code (>= 1 NEW finding, or a structural SPEC_FAILED) fails this step
+        # and the job. Deliberately no `continue-on-error`, no `|| true` and no
+        # advisory `if:` — that is what makes it a gate.
+        #
+        # Only the repo-root baseline is wired. The release-pipeline story's
+        # `ArggonManager/docs/specs/spec-analyze-baseline-release-pipeline-015.json`
+        # is a snapshot of the same whole-corpus scan and carries the identical
+        # finding set (4 entries, field-for-field), so a second step would
+        # re-run one scan and print the same answer — a duplicate lane whose
+        # only effect is a second place to go stale. One corpus, one baseline,
+        # one lane; the story-scoped file stays owned by that story.
+        #
+        # Placed after `lint:structure` (the other docs-side structural gates)
+        # and before the smoke steps, whose recorded rationale is "cheap and
+        # last: a failing run keeps its fixture for inspection, with nothing
+        # after it".
+        run: npm run arggon -- spec analyze --baseline ArggonManager/spec-analyze-baseline.json
+      - name: "Paired-deletion guard: a D row that takes an implementation AND its test"
+        # bug-no-gate-warns-on-paired-impl-and-test-deletion: the silent shape.
+        # `npm test` / `npm run build` fire when a deletion breaks compilation
+        # or orphans a test; deleting an implementation AND its paired test in
+        # one change leaves nothing to fail and goes green. PR #586 produced
+        # exactly that pair (`D cli/src/adapters.ts` +
+        # `D cli/src/adapter-selection.test.ts`) and the only reason anyone
+        # could tell was manual `git diff --name-status` inspection.
+        #
+        # REPORT-ONLY on purpose, and this is the recorded decision. A paired
+        # deletion is a legitimate, reviewed refactor step as often as it is an
+        # accident — measured over the last 500 commits of this repo it occurs
+        # ZERO times out of 40 `D` rows, so a blocking gate would buy nothing
+        # today and would cost a `continue-on-error`-shaped bypass on the first
+        # intentional module removal. The `cli` shell is `bash -e`, so the step
+        # still fails on the one thing that must fail: a run that COULD NOT
+        # look. `node cli/paired-deletion-guard.mjs` exits 2 on an unresolvable
+        # base or no merge base — never a quiet pass, which is the vacuity
+        # bug-verification-regex-matching-nothing is about. Deliberately no
+        # `|| true` and no `continue-on-error`: the only exit code this step
+        # may produce on a healthy run is 0, and 2 means "the fetch is wrong".
+        # Promoting it to blocking is `--strict` plus its own call.
+        #
+        # THREE-DOT, always. The guard diffs merge-base -> head. A two-dot
+        # comparison against a base that moved ahead of the branch point
+        # reports every file the base gained as `D` on the branch side — a
+        # paired deletion that never happened, i.e. the #586 false positive,
+        # recreated by the gate itself. The default checkout is shallow, so both
+        # sides are fetched by SHA with enough depth for `git merge-base` to
+        # find the real branch point; the guard prints the merge base it used
+        # and warns when that base sits on the shallow boundary.
+        #
+        # PR-only: a `push` run has no base branch name to fetch, and
+        # main-vs-main is empty by construction.
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=250 origin \
+            "+${{ github.event.pull_request.base.sha }}:refs/remotes/pull/base" \
+            "+${{ github.event.pull_request.head.sha }}:refs/remotes/pull/head"
+          node cli/paired-deletion-guard.mjs --base refs/remotes/pull/base --head refs/remotes/pull/head
       - name: Native start cold-start smoke (tools.arggon.start worktree path)
         # task-wire-native-start-cold-smoke-into-ci: the deterministic,
         # MODEL-FREE gate for the native worktree/start path, run in this job

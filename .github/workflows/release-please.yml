@@ -37,6 +37,29 @@ jobs:
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      - name: Surface an aborted release (release-please found no tag for a merged release PR)
+        # bug-release-config-workflow-agreement-ungated: release-please can ABORT
+        # with only a `logger.warn` while the job reports success — that
+        # warned-and-succeeded shape kept the release pipeline dead from
+        # 2026-10-02 to 2026-10-07 behind green runs nobody could read as failure.
+        # This step turns the abort into a red run. Its predicate is
+        # release-please's OWN (src/manifest.ts): a MERGED release PR still
+        # carrying `autorelease: pending` — findMergedReleasePullRequests() →
+        # "There are untagged, merged release PRs outstanding - aborting". The
+        # logic is a tested, injectable-gh script (cli/release-abort-check.mjs),
+        # not inline shell, and it runs on EVERY push with no `if:`. It cannot
+        # go red on a legitimate no-release push: on such a push no release PR is
+        # merged and every already-merged one has had its label flipped to
+        # `autorelease: tagged`, so the query is empty (the green path is proven
+        # in cli/release-abort-check.test.ts). An OPEN release PR is excluded by
+        # `--state merged`; a gh query failure warns and exits 0 rather than cry
+        # wolf on a healthy push. The tag↔config agreement that causes the abort
+        # is pinned by cli/src/release-config-agreement.test.ts.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node cli/release-abort-check.mjs --repo "$GITHUB_REPOSITORY"
+
       # release-please does not update lockfiles (googleapis/release-please#1993,
       # open): the release PR bumps both package versions and rewrites the root's
       # kernel dependency to the exact released version, so an unsynced

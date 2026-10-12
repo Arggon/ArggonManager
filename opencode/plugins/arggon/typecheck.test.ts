@@ -12,6 +12,18 @@
  * gated only by eslint + smoke). `solid-js`/JSX resolve to the repo-only
  * `cli/types/tui-runtime.d.ts` shim — the runtime provides them at load time
  * and the repo deliberately has no `solid-js` dependency.
+ *
+ * Since task-plugin-test-type-coverage the project also includes every
+ * `*.test.ts` file in the plugin directory: those tests were the one surface in
+ * the repo outside
+ * EVERY type gate (vitest transpiles them, nothing checked them), and the
+ * concrete instance was a local `runCli(args, cwd, env)` wrapper taking an env
+ * MAP while the shared `cli/src/test-spawn.ts` runner took an OPTIONS object in
+ * the same-named slot — a wrong call compiled and the child silently ran with
+ * the wrong environment. In the gate, the wrong shapes are compile errors,
+ * pinned by the `@ts-expect-error` negative control at the bottom of
+ * `tools.test.ts` (which fails this gate as `Unused '@ts-expect-error'
+ * directive` if a signature is loosened).
  */
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";

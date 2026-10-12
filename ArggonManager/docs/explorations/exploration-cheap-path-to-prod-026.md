@@ -1,11 +1,13 @@
 ---
-exploration_id: cheap-path-to-prod-001
+exploration_id: cheap-path-to-prod-026
 title: "Cheapest credible path to production for generated projects"
 status: resolved
 created: 2026-09-14
 ---
 
-# Exploration: cheap-path-to-prod (cheap-path-to-prod-001)
+# Exploration: cheap-path-to-prod (cheap-path-to-prod-026)
+
+> **Renumber note (2026-10-11):** originally filed as `exploration-cheap-path-to-prod-001` in collision with `exploration-token-context-efficiency-001.md` (task-renumber-colliding-doc-numbers); renumbered to the next FREE exploration number (026). Renumbered the fewer-referenced of the pair — one inbound doc reference (ADR 0005, updated in kind) versus the other exploration's two — the ADR 0024 precedent. Decision content unchanged (still records ADR 0005).
 
 Operating principle 2 (2026-09-14): **infrastructure is expensive.** Every
 ArggonManager-generated project needs a default answer to "how does this get

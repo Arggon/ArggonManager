@@ -35,7 +35,7 @@ env:
   # reference the drift step's pinned-lag assertion polices — it must never
   # sit behind the seam it has to reproduce. The adopter TEMPLATE keeps its
   # literal pin by design — adopters pin deliberately.
-  ARGGON_VERSION: "0.5.0"
+  ARGGON_VERSION: "0.6.0"
 
 jobs:
   tasks-validate:

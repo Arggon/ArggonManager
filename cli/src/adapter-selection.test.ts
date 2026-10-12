@@ -63,7 +63,13 @@ const BY_AGENT: Record<string, string[]> = (() => {
     if (agent === null) continue;
     (out[agent] ??= []).push(dest);
   }
-  for (const key of Object.keys(out)) out[key]!.sort();
+  for (const key of Object.keys(out)) {
+    // Same comparator as doctor's per-agent file rows (localeCompare), so the
+    // fixture order matches the report order — a case-sensitive `.sort()`
+    // puts an uppercase entry (e.g. the seam README.md) ahead of the
+    // lowercase directories and reads as a membership diff.
+    out[key]!.sort((a, b) => a.localeCompare(b));
+  }
   return out;
 })();
 
@@ -123,7 +129,12 @@ function ackState(dir: string, dest: string): void {
 
 /** Destinations of `agent` that this run actually wrote to disk. */
 function onDisk(root: string, agent: string): string[] {
-  return (BY_AGENT[agent] ?? []).filter((rel) => existsIn(root, rel)).sort();
+  // localeCompare: the comparator BY_AGENT itself is sorted with (matches
+  // doctor's file-row order), not a case-sensitive `.sort()` that would rank
+  // an uppercase entry (the seam README.md) ahead of lowercase directories.
+  return (BY_AGENT[agent] ?? []).filter((rel) => existsIn(root, rel)).sort((a, b) =>
+    a.localeCompare(b),
+  );
 }
 
 /** The `adapters` rows for one agent in an init result. */
@@ -593,7 +604,7 @@ describe("doctor --agents: per-agent report", () => {
       "  agents: claude, opencode, zcode (adapter selection: init --agents / --no-agents; report-only)
         agent claude: 2 file(s) — 2 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)
         agent opencode: 18 file(s) — 18 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)
-        agent zcode: 21 file(s) — 21 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)"
+        agent zcode: 23 file(s) — 23 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)"
     `);
   });
 

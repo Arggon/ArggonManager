@@ -1,7 +1,7 @@
 ---
 spec_id: zcode-native-seam-012
 title: ZCode native seam (MCP full surface + declarative plugin)
-status: proposed
+status: implemented
 created: "2026-09-29"
 ---
 

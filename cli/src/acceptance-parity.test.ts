@@ -247,21 +247,28 @@ function preFixGate(body: string): boolean {
 
 /**
  * The live `## Acceptance` region, derived INDEPENDENTLY of the kernel
- * (bug-done-gate-counts-checkboxes-inside-comment-blocks).
+ * (bug-done-gate-counts-checkboxes-inside-comment-blocks,
+ * bug-done-gate-whole-body-scan-counts-fenced-repro-boxes).
  *
  * Written from the RULE, not from the source, so agreement is evidence:
  *
  *   1. a comment block starts at `### <YYYY-MM-DD> @author` or `### Waiver <…>`
  *      and runs to the NEXT such heading or the end of the body — a nested
  *      `### Acceptance` inside a comment does not end it;
- *   2. THEN the region is everything after the FIRST `## Acceptance` heading up
+ *   2. a fenced code block starts at a run of 3+ backticks or tildes (indented
+ *      at most 3 spaces; a backtick fence's info string may not contain a
+ *      backtick) and runs to its closer — the same character, at least as long,
+ *      nothing but whitespace after it — or to the end of the body;
+ *   3. THEN the region is everything after the FIRST `## Acceptance` heading up
  *      to the next heading of rank 1 or 2; absent => no contract.
  *
  * The ORDER is part of the rule, not an implementation detail: a `## Acceptance`
  * heading that lives inside a comment block is removed by step 1 and is
  * therefore not a contract at all. The structured fuzz below found this by
  * disagreeing with the kernel until the oracle was ordered the same way — which
- * is the reason the fuzz exists.
+ * is the reason the fuzz exists. Step 2 sits BEFORE the heading rules for the
+ * same reason: a fence is content, so a fenced `### <date> @author` cannot open
+ * a comment block and a fenced `## Acceptance` cannot open a section, either.
  *
  * Split on the LineTerminator set, like the kernel's row parser, so a CR / U+2028
  * body needs no separate rule here either.
@@ -269,7 +276,24 @@ function preFixGate(body: string): boolean {
 function liveRegionOracle(body: string): string {
   const live: string[] = [];
   let inComment = false;
+  let fence: { char: string; length: number } | null = null;
   for (const line of body.split(/[\n\r\u2028\u2029]/)) {
+    const run = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence) {
+      const closes =
+        run !== null &&
+        run[1]?.startsWith(fence.char) &&
+        (run[1]?.length ?? 0) >= fence.length &&
+        /^[ \t]*$/.test(run[2] ?? "");
+      if (closes) fence = null;
+      continue;
+    }
+    const opens =
+      run !== null && (run[1]?.startsWith("~") === true || !(run[2] ?? "").includes("`"));
+    if (opens) {
+      fence = { char: run![1]![0]!, length: run![1]!.length };
+      continue;
+    }
     if (/^###[ \t]+(?:\d{4}-\d{2}-\d{2}[ \t]+@|Waiver\b)/.test(line)) inComment = true;
     if (!inComment) live.push(line);
   }
@@ -674,10 +698,17 @@ describe("acceptance parity corpus (bug-three-acceptance-parsers-diverging)", ()
       "-  [ ] two spaces",
       "- [ ]\u00a0nbsp",
       "```",
+      "```markdown",
+      "``` js `inline`",
+      "~~~",
+      "````",
+      "  ```",
+      "```   ",
+      "``` not-a-closer info",
       "> quoted - [ ] not a row",
     ];
     const eols = ["\n", "\r\n", "\r", "\u2028", "\u2029"];
-    const bodies = 40_000;
+    const bodies = 200_000;
     const counts = { noContract: 0, unchecked: 0, allows: 0 };
     for (let i = 0; i < bodies; i += 1) {
       const lines = 1 + Math.floor(rand() * 8);
