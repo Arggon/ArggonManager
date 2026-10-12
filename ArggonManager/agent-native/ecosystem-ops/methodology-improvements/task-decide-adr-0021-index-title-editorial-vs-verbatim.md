@@ -8,6 +8,7 @@ labels: [docs, adr]
 created: "2026-10-06"
 updated: "2026-10-06"
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-decide-adr-0021-index-title-editorial-vs-verbatim.md
   Leaves live only under a story. id is the filename stem: task-decide-adr-0021-index-title-editorial-vs-verbatim.
@@ -19,15 +20,28 @@ updated: "2026-10-06"
 
 ## Context
 
-<!-- Why this task exists. -->
+#620's acceptance box 5 reads, verbatim: "ADR 0020 (amended by merged PR #610) and ADR 0021 (renumbered, PR #605) both survive. … Its editorial row title needs the one-line declaration the failure message prints verbatim, which is the gate working, not a rejection of the renumber."
+
+The item's author anticipated exactly the failure the suite raised for ADR 0021 and named the expected remedy: keep the editorial row, add `- Index title: …` to ADR 0021. The row for 0021 is `Agents as primary workers, humans as product owner: role model, promotion policy, recorded acceptance` while ADR 0021's H1 is the shorter `Agents as primary workers, humans as product owner` — the editorial row tracks the story title (`agent-role-model`), which reads like intent, not accident.
+
+At merge it was resolved the other way: both drifted rows were made to copy their H1 verbatim. For 0022 that is clearly right — its divergence (`External agent tooling:` vs `External agent tooling —` plus a dropped `and`) reads as drift, not editorializing. For 0021 the editorial row may be deliberate.
+
+The merge is green (9/9, 130 files / 2751 tests) and the suite's default rule ("verbatim unless declared") is satisfied either way, so no invariant is broken — but a ticked acceptance box in a merged item now describes a remedy that did not happen.
+
+Routing (2026-10-06, delivery lead, under ADR 0026 §5): this does NOT owe a product-owner brief — an ADR index-row style question, editorial, local, trivially reversible, a lead call recorded as a plain comment. What is genuinely missing is not a decision but the written rule (`task-adr-index-title-rule-unwritten-in-engineering-md` covers that half).
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] Decide for ADR 0021 which remedy is canonical: keep the editorial row plus `- Index title: Agents as primary workers, humans as product owner: role model, promotion policy, recorded acceptance` in `0021-agents-primary-workers-human-product-owner.md`, or keep the verbatim row that merged
+- [ ] If the editorial row is chosen, confirm `docs/engineering.md` §ADR process carries the rule from `task-adr-index-title-rule-unwritten-in-engineering-md` first — an undocumented declaration is exactly the invisible-divergence case that rule prevents
+- [ ] Whatever is decided, correct acceptance box 5 on `task-adr-index-parity-does-not-check-titles` (now `done`) so it records what actually shipped — via a dated comment or a one-line edit with a `Numbering note`-style addendum, not a rewrite of the box's history
+- [ ] `npx vitest run cli/src/adr-index-parity.test.ts` green, with the corpus report re-derived: how many rows are verbatim vs declared after the change
+- [ ] Decide whether ADR 0022's verbatim row also wants the declaration instead — its H1 carries an em dash and comma the row lacked, which reads as accidental, but the same question applies
 
 ## Notes
 
 ### 2026-10-06 @ses_ef169b774ffddLlcycmzGGeU5Q
+
 Filed from the PR #620 merge verification (PR merged as ed773495). **This is a discrepancy I introduced and shipped, recorded so it is not lost.**
 
 ### Context
@@ -51,12 +65,13 @@ The result: the merge is green (9/9, and 130 files / 2751 tests), but a **ticked
 - [ ] Decide whether ADR 0022's verbatim row also wants the declaration instead — its H1 carries an em dash and a comma that the row lacked, which reads as accidental, but the same question applies
 
 ### 2026-10-07 @ses_eee869ac3ffeNvrvsvJxm9t0FG
+
 ### 2026-10-06 @arggon-delivery-lead — routing decision under ADR 0026 §5 (the decision brief)
 
-Recorded from `task-wire-decision-brief-carriers` row 8, which asked the three live cases named in exploration 025 to be **re-briefed or recorded as decided under the new convention**. This is the classification, not the content answer: it records *whether the product owner is asked at all*, which is exactly what ADR 0026 §5's routing rule decides, and it leaves the underlying question open on this item.
+Recorded from `task-wire-decision-brief-carriers` row 8, which asked the three live cases named in exploration 025 to be **re-briefed or recorded as decided under the new convention**. This is the classification, not the content answer: it records _whether the product owner is asked at all_, which is exactly what ADR 0026 §5's routing rule decides, and it leaves the underlying question open on this item.
 
 **Verdict: this does NOT owe a brief.**
 
-An ADR index-row style question — editorial, local, and trivially reversible. Not an authority-map row and not hard to reverse, so per ADR 0026 §5 it is a lead call recorded as a plain comment. What is genuinely missing on this item is not a product-owner decision but a *rule written down* (`task-adr-index-title-rule-unwritten-in-engineering-md` covers that half).
+An ADR index-row style question — editorial, local, and trivially reversible. Not an authority-map row and not hard to reverse, so per ADR 0026 §5 it is a lead call recorded as a plain comment. What is genuinely missing on this item is not a product-owner decision but a _rule written down_ (`task-adr-index-title-rule-unwritten-in-engineering-md` covers that half).
 
 So no `decide:` brief is written for it. Recording the classification matters more than it looks: ADR 0026 §5 exists precisely so that not every open question becomes a brief, and these three were the evidence that questions without a home pile up looking like pending product-owner decisions. Two of them never were one.
