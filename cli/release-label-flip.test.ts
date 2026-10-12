@@ -230,6 +230,21 @@ describe("release-label-flip (bug-autorelease-label-lifecycle-unowned)", () => {
     expect(result.stderr).toContain(MANUAL_RECOVERY);
   });
 
+  it("a malformed verification payload ([null]) warns and still exits 0 — the contract is absolute", () => {
+    // The verification payload is the last thing read before the run proceeds
+    // to the publish; an unguarded dereference here would throw and exit
+    // non-zero, contradicting the exit-0 contract. The flip loop already
+    // guards `pr.number`; the renderer must be equally defensive.
+    const { bin } = makeGh([{ stdout: `${STUCK_664}\n` }, {}, { stdout: "[null]\n" }]);
+    const result = runFlip(bin);
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain("release-label-flip: WARNING");
+    expect(result.stderr).toContain("still 'autorelease: pending' on 1 merged release PR(s)");
+    // Rendered defensively, not dereferenced: no number, no title -> placeholders.
+    expect(result.stderr).toContain("  #? (untitled)");
+    expect(result.stderr).toContain(MANUAL_RECOVERY);
+  });
+
   it("accepts the repository from GITHUB_REPOSITORY when --repo is absent", () => {
     const { bin } = makeGh([{ stdout: "[]\n" }]);
     const result = spawnSync("node", [flipPath], {
@@ -291,11 +306,12 @@ describe("the release.yml flip step (workflow contract)", () => {
   it("grants the documented minimal permission for PR labels: pull-requests: write", () => {
     // GitHub's GITHUB_TOKEN permission table (docs.github.com → Workflow syntax
     // → permissions): `pull-requests: write` "permits an action to add a label
-    // to a pull request". The label endpoints
-    // (POST/DELETE /repos/{owner}/{repo}/issues/{issue_number}/labels) are
-    // listed under Repository permissions for "Pull requests" (write) in
-    // "Permissions required for GitHub Apps". `contents: write` (tag/release)
-    // and `id-token: write` (OIDC) stay as they were.
+    // to a pull request". `gh pr edit` applies labels with the GraphQL
+    // addLabelsToLabelable/removeLabelsFromLabelable mutations (not the REST
+    // /issues/{n}/labels endpoints), and its PR read no longer needs a
+    // repository-projects grant on github.com (cli/cli#8784 → #10714/#13280).
+    // `contents: write` (tag/release) and `id-token: write` (OIDC) stay as they
+    // were.
     expect(workflow).toMatch(/^permissions:\n(?:.*\n)*? {2}pull-requests: write$/m);
     expect(workflow).toContain("contents: write");
     expect(workflow).toContain("id-token: write");

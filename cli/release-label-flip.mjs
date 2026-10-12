@@ -137,7 +137,11 @@ function flip(gh, repo, number) {
 }
 
 function renderPending(prs) {
-  return prs.map((pr) => `  #${pr.number} ${pr.title ?? "(untitled)"}`).join("\n");
+  // Defensive like the flip loop above: a malformed entry (null, a bare
+  // number) must not throw — this script's contract is exit 0 on EVERY path,
+  // and the verification payload is the last thing it reads before the run
+  // continues to the publish.
+  return prs.map((pr) => `  #${pr?.number ?? "?"} ${pr?.title ?? "(untitled)"}`).join("\n");
 }
 
 function main() {

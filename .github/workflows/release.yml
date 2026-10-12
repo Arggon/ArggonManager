@@ -58,16 +58,19 @@ permissions:
   contents: write
   id-token: write
   # The autorelease label flip below (bug-autorelease-label-lifecycle-unowned).
-  # The documented minimal permission for it: GitHub's GITHUB_TOKEN permission
-  # table (docs.github.com → Workflow syntax for GitHub Actions → permissions)
-  # says `pull-requests: write` "permits an action to add a label to a pull
-  # request", and the label endpoints (POST/DELETE
-  # /repos/{owner}/{repo}/issues/{issue_number}/labels) are listed under
-  # Repository permissions for "Pull requests" (write) in "Permissions required
-  # for GitHub Apps". gh's `pr edit --add-label/--remove-label` (the same
-  # command the manual recovery documents) also READS the PR, which `write`
-  # includes. No broader grant: `contents: write` covers the tag/release and
-  # `id-token: write` the OIDC publish, both unchanged.
+  # `pull-requests: write` is the documented minimal grant: GitHub's GITHUB_TOKEN
+  # permission table (docs.github.com → Workflow syntax for GitHub Actions →
+  # permissions) says it "permits an action to add a label to a pull request"
+  # (and write includes the read the command needs). Note what `gh pr edit`
+  # actually does: it applies labels with the GraphQL
+  # `addLabelsToLabelable`/`removeLabelsFromLabelable` mutations, NOT the REST
+  # /issues/{n}/labels endpoints, so cite the permission table, not those
+  # endpoints. The command also READS the PR, whose classic-projects fields
+  # needed a repository-projects grant in older gh (cli/cli#8784); cli/cli#10714
+  # + #13280 fixed that for non-enterprise hosts (this repo is github.com), so
+  # no projects permission is needed here. No broader grant: `contents: write`
+  # covers the tag/release and `id-token: write` the OIDC publish, both
+  # unchanged.
   pull-requests: write
 
 concurrency:
