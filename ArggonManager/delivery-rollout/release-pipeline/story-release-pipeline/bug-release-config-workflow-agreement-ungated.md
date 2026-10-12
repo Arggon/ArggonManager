@@ -12,7 +12,6 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T13:30:32.525Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-config-workflow-agreement-ungated
 ---
-
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-config-workflow-agreement-ungated.md
   Leaves live only under a story. id is the filename stem: bug-release-config-workflow-agreement-ungated.
@@ -168,3 +167,7 @@ surfaces it.
 self-describing auth-failure message belongs to that item.
 `bug-autorelease-label-lifecycle-unowned` — owns the `release.yml` label flip and
 the manual-recovery text appended after my marked comment.
+
+### handoff 2026-10-12 @ses_ecfafb575ffeLCEQKunZ0o9mM2 (session: ses_ecfafb575ffeLCEQKunZ0o9mM2) — next: Merge PR #740 after review; on merge watch release-please.yml's no-release run — cli/release-abort-check.mjs must print OK (AC#5 real-run evidence, surfaced by delivery lead).
+- branch: fix/bug-release-config-workflow-agreement-ungated
+- open questions: Observe the real post-merge release-please.yml run stays green (AC#5); confirm release-please flips autorelease pending→tagged on the healthy path before release.yml tags (labels bug-autorelease-labe…
