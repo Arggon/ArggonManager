@@ -9,6 +9,7 @@ created: "2026-10-03"
 updated: "2026-10-03"
 depends_on: [bug-spec-analyze-does-not-detect-duplicate-doc-numbers]
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-spec-pipeline/task-spec-analyze-naming-and-skill-mirror.md
   Leaves live only under a story. id is the filename stem: task-spec-analyze-naming-and-skill-mirror.
@@ -20,15 +21,25 @@ depends_on: [bug-spec-analyze-does-not-detect-duplicate-doc-numbers]
 
 ## Context
 
-<!-- Why this task exists. -->
+Two advisory follow-ups from the reviewer of PR #603 (`bug-spec-analyze-does-not-detect-duplicate-doc-numbers`), 2026-10-03 — the PR that landed the whole-directory duplicate-number detector. Both gaps were deliberately left out of that PR; neither is a regression in the detector.
+
+1. **Non-conforming filenames are silent.** `docNumberCollisions` (`cli/src/spec.ts:377`) buckets what it can parse and skips the rest (`if (hit === undefined) continue`), so a doc named outside the per-directory conventions is never counted, never reported, and never collided. The conventions live in one table, `DOC_NUMBER_SOURCES` (`cli/src/spec.ts:334-338`): `NNNN-<slug>.md` in `adr/`, `exploration-<slug>-NNN.md`, `spec-<slug>-NNN.md`, `plan-<slug>-NNN.md` (lowercase, at least 3 digits, number last). A name that misses the pattern carries no number (`docNumberFromFileName` returns `undefined`, `cli/src/spec.ts:346-362`). In the live corpus the only unmatched file is `docs/adr/README.md`, which is correct — but a typo'd spec such as `spec-foo-9.md` (2 digits) would silently escape both the collision rule and `spec new`'s numbering, because the scaffolder reads its next number through the same table (`nextDocNumber`, `cli/src/spec.ts:1555-1564`).
+
+2. **The numbering rule is not mirrored into the agent skill.** `skills/arggon-cli/references/methodology.md:60-65` (Pipeline references) documents the spec/plan/exploration pipeline but never says a number must be unique, or that `spec new` picks the next free number. An agent authoring docs from the skill alone can still collide — the exact failure the detector exists to stop. Per `ArggonManager/docs/agents.md` §Changing the methodology itself this is a **Behavioral** change if it lands (agents must re-learn something): the rule text must land in `skills/arggon-cli/references/methodology.md` AND its byte-equal `.agents/skills/` copy in the same PR (parity pinned by `cli/src/skill-copy.test.ts`), with the ADR 0016 adopter-upgrade reference.
+
+Sequencing is part of the contract: this item depends on the detector (`depends_on: [bug-spec-analyze-does-not-detect-duplicate-doc-numbers]` in frontmatter) so the documented text matches the shipped behavior.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] Non-conforming doc filenames are reported (report-only is fine — consistent with the collision rule's own contract), not silently skipped
+- [ ] `spec new` cannot allocate a number already used by a non-conforming file
+- [ ] The uniqueness rule and `spec new`'s next-free-number behavior are documented in `skills/arggon-cli/references/methodology.md` AND its byte-equal `.agents/skills/` copy, with the ADR 0016 impact statement
+- [ ] Depends on the detector landing so the doc text matches the shipped behavior
 
 ## Notes
 
 ### 2026-10-03 @ses_f02ab5836ffeOAxmisboIwWE4x
+
 Two findings from the reviewer of PR #603 (bug-spec-analyze-does-not-detect-duplicate-doc-numbers), 2026-10-03, both advisory:
 
 1. **Non-conforming filenames are silent.** `docNumberCollisions` buckets what it can parse and ignores the rest, so a doc named outside the conventions (`NNNN-<slug>.md`, `exploration-<slug>-NNN.md`, `spec-<slug>-NNN.md`, `plan-<slug>-NNN.md`) is never counted, never reported, and never collided. In the live corpus the only unmatched file is `docs/adr/README.md`, which is correct — but a typo'd spec (`spec-foo-9.md`) would silently escape both the collision rule and `spec new`'s numbering.
@@ -36,6 +47,7 @@ Two findings from the reviewer of PR #603 (bug-spec-analyze-does-not-detect-dupl
 2. **The rule is not mirrored into the agent skill.** `skills/arggon-cli/references/methodology.md` (and its byte-equal copy under `.agents/skills/`) documents the spec/plan/exploration pipeline but never says a number must be unique, or that `spec new` picks the next free number. An agent authoring docs from the skill alone can still collide — the exact failure this bug exists to stop. Per `docs/agents.md` §Changing the methodology this is a **Behavioral** change if it lands (agents must re-learn something), and the skill copies must stay byte-equal in the same PR.
 
 Acceptance:
+
 - [ ] Non-conforming doc filenames are reported (report-only is fine — consistent with the collision rule's own contract), not silently skipped
 - [ ] `spec new` cannot allocate a number already used by a non-conforming file
 - [ ] The uniqueness rule and `spec new`'s next-free-number behavior are documented in `skills/arggon-cli/references/methodology.md` AND its byte-equal `.agents/skills/` copy, with the ADR 0016 impact statement
