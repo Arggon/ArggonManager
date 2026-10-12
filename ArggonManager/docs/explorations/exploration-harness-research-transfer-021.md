@@ -275,6 +275,8 @@ measure one number before believing any of it.**
    reclassifying; if it is low, P1 is closed for us and we did not spend a week proving
    it.**
 
+> 2026-10-11 closure: measured in `task-measure-kernel-refusal-rate` (PR #726) — 0 recorded kernel refusals per 1,224 lifecycle transitions over 2026-08-16→2026-10-11 (auto-done CI spot-check 0/19). Verdict: AutoHarness's thesis has no measurable target in this repo (unmeasurable-and-observably-zero, not high). Remaining pin: `task-sweep-auto-done-refusal-warnings` (bounded sweep of the 497 auto-done logs for the merge-time done-gate rate).
+
 **Trade-offs, stated rather than hidden:**
 
 1. **We decline the strongest empirical result in the batch** (P3: +9.2% on SWE-bench
