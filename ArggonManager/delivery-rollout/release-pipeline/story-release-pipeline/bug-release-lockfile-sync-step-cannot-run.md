@@ -71,7 +71,7 @@ branch` step.
 - [x] Recorded root cause with evidence: which runs were inspected (`#664`-era
       sync-step outcomes vs run 38283343454) and whether this is a runner
       environment change or was latent — no guess
-- [ ] Verified on a real `release-please.yml` run after the fix lands: the sync
+- [x] Verified on a real `release-please.yml` run after the fix lands: the sync
       step completes, pushes the reconciled `package-lock.json` onto the open
       release PR (expect the `@arggondev/lib` spec + workspace version to match
       the PR's `package.json`), and the run is green — expected vs observed
@@ -498,3 +498,14 @@ Gates re-run: `actionlint` exit 0 · `prettier --check` clean (both files) · `n
 
 - branch: fix/bug-release-lockfile-sync-commit-staging
 - open questions: Item branch field vs the follow-up branch fix/bug-release-lockfile-sync-commit-staging (old branch merged, kept for the record); npm-10 libc churn on the real sync; whether to pin the step's npm.
+
+### 2026-10-12 @arggon-delivery-lead — real-run box observed and ticked (run 38294418386, merge 42048bf)
+
+After #747 merged, the merge push re-ran `release-please.yml` with release PR #744 open. Observed (expected → observed):
+
+- the sync step's install completed (`npm install --package-lock-only --ignore-scripts`, exit 0);
+- the commit path staged, committed and **pushed**: `[release-please--branches--main 4f2febb] chore: sync package-lock.json with the release PR versions` → `To https://github.com/Arggon/ArggonManager` `efca688..4f2febb  HEAD -> release-please--branches--main`;
+- the **run concluded `success`** (first green run of this workflow with a release PR open);
+- the PR branch's lockfile now reads `packages[""].dependencies["@arggondev/lib"] = "^0.7.0"` and `packages["lib"].version = "0.7.0"`, matching its `package.json` / `lib/package.json` — the #1993 reconciliation the step exists for, performed for the first time.
+
+Both halves of the defect (install blocked by `prepare`, commit without staging) are closed; the step's fail-loud property is unchanged (unsatisfiable resolution → exit 1, lockfile untouched). Box ticked; item flipped to `done`.
