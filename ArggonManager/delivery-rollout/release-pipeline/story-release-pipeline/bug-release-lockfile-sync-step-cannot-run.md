@@ -12,7 +12,6 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T17:27:25.869Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-lockfile-sync-step-cannot-run
 ---
-
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-lockfile-sync-step-cannot-run.md
   Leaves live only under a story. id is the filename stem: bug-release-lockfile-sync-step-cannot-run.
@@ -385,3 +384,24 @@ The maker's correction to the Context is accurate for #664 (verified: created 20
 Not independently reproduced by me (execution evidence is the verifier's): the sha256 byte-identity with `npm@10.9.9`, the ETARGET negative control, `npm ci` exit codes, and the actionlint/prettier/test:structure/lint:structure gates - all maker-recorded in the item; this does not change the verdict above.
 
 Out of scope, report only: run 38282448930's `Surface an aborted release` failure (sibling bug), the Node-20-deprecation annotations, npm-10 `libc` formatting churn.
+
+### 2026-10-12 @ses_eced77ddeffe7RDZa3wt3P1UKS
+### Correction — first-failure provenance (addresses verdict 2f2ab18a)
+
+My earlier evidence comment above named run **37648763109 (2026-10-07, PR #664)** as the first exposure and counted **9** sync-step failures. Both numbers were artifacts of a `--limit`-truncated `gh run list` and are wrong. Corrected in commit `3d2d64b1` (workflow comment + Notes), with the fix line untouched.
+
+Re-derived by enumerating **all 377 runs** of this workflow through the API (`actions/workflows/release-please.yml/runs`, 2026-10-01 → 10-12; 62 failures) and reading every failure's step from `runs/<id>/jobs`:
+
+| window | release PR | sync-step failures |
+| --- | --- | --- |
+| 2026-10-01T18:36Z → 10-02T05:39Z | #556 (created 2026-10-01T18:39:09Z by run 36908073600, merged 2026-10-02T12:16:48Z) | **39** |
+| 2026-10-07T16:01Z → 10-09T14:45Z | #664 (created 2026-10-07T16:04:23Z, merged 2026-10-09T15:14:36Z) | **8** |
+| 2026-10-12T17:18Z → 17:27Z | #744 (created 2026-10-12T17:21:12Z) | **2** (38283343454, 38284301238) |
+| **total** | | **49** |
+
+- **First exposure: run 36908073600, 2026-10-01T18:36Z** — the workflow's first run, which created PR #556 at 18:39:09Z, ~1.5 h after the step landed. Its log shows `> arggon-manager@0.5.0 prepare` → `npm run build` → `src/atomic.ts(1,29): error TS2591`. So the first live release PR and the first exposure are the same event — on #556, not #664.
+- The **latent-not-environment** conclusion is unchanged and better supported: 11 days of failure across image builds `ubuntu24/20260927.320` (10-01 and 10-07) and `ubuntu24/20261004.327` (10-12), all Node.js 22.23.3 / npm 10.9.9.
+- The PR-less stretch runs from **#556's merge (2026-10-02T12:16:48Z)** to #664's creation (10-07T16:04:23Z); the first no-op after the merge is 37005746756 (12:16:50Z run, green).
+- The other 13 workflow failures in the window are not this defect: release-please-action (10, one on the tag-pinned `@v4`), the abort step (1), two with no failing step recorded.
+
+Gates re-run after the correction: `arggon validate` ok (0 warnings) · `actionlint` exit 0 · `prettier --check` clean on both changed files · `test:structure` 5/5 · `lint:structure` exit 0. Branch re-pushed with the verdict commit `2f2ab18a` riding along. The one acceptance box for the real post-merge run stays unticked, as instructed.
