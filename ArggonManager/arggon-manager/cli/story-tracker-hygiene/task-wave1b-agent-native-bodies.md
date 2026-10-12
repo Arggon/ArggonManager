@@ -33,3 +33,7 @@ Wave-1b of `decided: A`: the blocking guard (`task-validate-refuses-placeholder-
 - [ ] Prettier clean (modulo a disclosed single-line depends_on exception); `arggon validate` green; PR opened
 
 ## Notes
+
+### handoff 2026-10-12 @Arggon — next: Lead reviews the 12 bodies, opens the PR and merges to unblock the guard commit
+- branch: feat/task-wave1b-agent-native-bodies
+- open questions: whether the 2 formatter-made title requotes count as frontmatter touch for the guard; self-decided-файл had zero Notes too (3rd zero-Notes file, not 2)
