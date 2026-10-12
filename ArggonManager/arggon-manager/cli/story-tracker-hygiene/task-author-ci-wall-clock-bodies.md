@@ -12,6 +12,7 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T02:09:51.485Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-author-ci-wall-clock-bodies
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-ci-wall-clock-bodies.md
   Leaves live only under a story. id is the filename stem: task-author-ci-wall-clock-bodies.
@@ -35,6 +36,7 @@ Wave 1 of `decided: A` on `bug-template-only-bodies-ship-green`: the blocking gu
 ## Notes
 
 ### 2026-10-12 @ses_ed22024a4ffe8UUDQDGBJjYTv3
+
 Maker evidence (bodies authored, commit 9ad90acc, pushed to origin/feat/task-author-ci-wall-clock-bodies).
 
 - All 3 files under ArggonManager/agent-native/ecosystem-ops/story-ci-wall-clock/ were still scaffold placeholders in live ## Context / ## Acceptance (verified before touching); all carried real dated 2026-10-05 Notes material, so every live section is transcription, not invention. No file was noteless; ADR 0023 line pins added as grounding (Context L21-42, Decision L44-66 incl. step 1 L48-52 / step 2 L54-59, consequences L68-82, alternatives L84-104, as read at HEAD).
@@ -47,5 +49,6 @@ Maker evidence (bodies authored, commit 9ad90acc, pushed to origin/feat/task-aut
 - Staged explicit paths only (never git add -A); committed 9ad90acc; push exit 0, branch tracks origin/feat/task-author-ci-wall-clock-bodies. No PR opened (delivery lead owns PR/merge/done). Own Acceptance boxes NOT ticked, status left in_progress.
 
 ### handoff 2026-10-12 @ses_ed22024a4ffe8UUDQDGBJjYTv3 (session: ses_ed22024a4ffe8UUDQDGBJjYTv3) — next: Review diff 9ad90acc, open PR from feat/task-author-ci-wall-clock-bodies, verify, merge, flip done
+
 - branch: feat/task-author-ci-wall-clock-bodies
 - open questions: None; all 3 files had Notes so zero direction invented
