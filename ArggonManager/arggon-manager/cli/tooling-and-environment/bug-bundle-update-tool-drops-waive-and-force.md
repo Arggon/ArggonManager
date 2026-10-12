@@ -8,6 +8,7 @@ labels: [parity, native-seam, done-gate]
 created: "2026-10-09"
 updated: "2026-10-09"
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-bundle-update-tool-drops-waive-and-force.md
   Leaves live only under a story. id is the filename stem: bug-bundle-update-tool-drops-waive-and-force.
@@ -19,25 +20,37 @@ updated: "2026-10-09"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+Measured 2026-10-08 by the zcode-autoharness probe-rule experiment (claim `arggon-bundle-kernel-gate-parity`, run `run-mv0hbyj9-487b169e`, ledger `.zcode/harness/ledger.jsonl` in the autoharness repo). Verdict: REFUTED, high confidence — two independent probes (fixed 16-scenario gate matrix; seeded differential fuzzer, 36 cases) each reproduced the divergence on 2/2 runs against `dist/cli.js` v0.5.0 (`9f9b22cd`) and `opencode/plugins/arggon/index.bundle.ts`.
+
+Divergence 1 — done gate, waive path. Item `in_progress` with an unticked (or absent) live `## Acceptance` contract: the CLI accepts `arggon update <id> --status done --waive "<reason>"` (status flips to done), while the bundle's update tool `execute({ id, status: "done", waive: "<reason>" })` refuses with the standard unchecked/no-contract refusal. The bundle's update tool input mapping (id, title, status, assignee, branch, parent, type, unassign, labels, priority, depends_on, add_depends_on, issue, blocked_reason, no_cascade, full) has no `waive` field, so the inlined kernel never sees the waiver. The refusal message even tells the agent to "pass --waive" — which that surface cannot act on.
+
+Divergence 2 — claim/steal gate, force path. Item `in_progress` claimed by alice: the CLI accepts `arggon update <id> --assignee bob --force` (assignee becomes bob), while the bundle's `execute({ id, assignee: "bob", force: true })` refuses with "claim conflict ... or pass --force". No `force` field in the tool mapping either.
+
+Both divergences are the false-refusal direction (bundle refuses what the CLI permits) — noisy, not unsafe, and the same direction as the 2026-10-06 incident. Everything else in the matrix agreed on all runs: ticked/unticked/history-only/placeholder/CRLF/lowercase-heading/no-contract done shapes, reopen of done/cancelled (both refuse agents), the `--steal` flag (both refuse when unarmed and when armed+non-TTY — refusal REASONS differ: the CLI names the steal gate, the bundle surfaces the kernel claim conflict).
+
+Reproduction harness: `zcode-autoharness examples/probes/arggon-bundle/` (`probe-1-gate-matrix.mjs`, `probe-2-gate-fuzz.mjs`); re-running that runner after a fix is the regression tripwire. Probes were read-only against this repo; all mutations happened in `/tmp` fixtures.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] The bundle's update tool carries `waive` through to the inlined kernel: an `in_progress` item with an unticked (or absent) live `## Acceptance` contract flips to `done` via the bundle exactly where the CLI accepts `--waive`
+- [ ] The bundle's update tool carries `force` through to the inlined kernel: a claimed item reassigns via the bundle exactly where the CLI accepts `--force`
+- [ ] Neither refusal path tells the agent to pass a flag the bundle surface cannot act on
+- [ ] The probe harness (`probe-1-gate-matrix.mjs`, `probe-2-gate-fuzz.mjs`) is green against the fixed bundle, with the `--steal` armed/unarmed refusals unchanged
 
 ## Notes
 
 ### 2026-10-09 @Arggon
+
 Measured 2026-10-08 by the zcode-autoharness probe-rule experiment (claim arggon-bundle-kernel-gate-parity, run run-mv0hbyj9-487b169e, ledger .zcode/harness/ledger.jsonl in the autoharness repo). Verdict: REFUTED, high confidence — two independent probes (fixed 16-scenario gate matrix; seeded differential fuzzer, 36 cases) each reproduced the divergence on 2/2 runs against dist/cli.js v0.5.0 (9f9b22cd) and opencode/plugins/arggon/index.bundle.ts.
 
 Divergence 1 — done gate, waive path. Item in_progress with an unticked (or absent) live ## Acceptance contract:
-  CLI:   arggon update <id> --status done --waive "<reason>"  -> ACCEPTED (status flips to done)
-  bundle: update tool execute({ id, status: "done", waive: "<reason>" }) -> REFUSED, the standard unchecked/no-contract refusal
+CLI: arggon update <id> --status done --waive "<reason>" -> ACCEPTED (status flips to done)
+bundle: update tool execute({ id, status: "done", waive: "<reason>" }) -> REFUSED, the standard unchecked/no-contract refusal
 The bundle's update tool input mapping (id, title, status, assignee, branch, parent, type, unassign, labels, priority, depends_on, add_depends_on, issue, blocked_reason, no_cascade, full) has no waive field, so the inlined kernel never sees the waiver. The refusal message even tells the agent to 'pass --waive' — which that surface cannot act on.
 
 Divergence 2 — claim/steal gate, force path. Item in_progress claimed by alice:
-  CLI:   arggon update <id> --assignee bob --force -> ACCEPTED (assignee becomes bob)
-  bundle: update tool execute({ id, assignee: "bob", force: true }) -> REFUSED, 'claim conflict ... or pass --force'
+CLI: arggon update <id> --assignee bob --force -> ACCEPTED (assignee becomes bob)
+bundle: update tool execute({ id, assignee: "bob", force: true }) -> REFUSED, 'claim conflict ... or pass --force'
 No force field in the tool mapping either.
 
 Both divergences are the false-refusal direction (bundle refuses what the CLI permits) — noisy, not unsafe, and the same direction as the 2026-10-06 incident. Everything else in the matrix agreed on all runs: ticked/unticked/history-only/placeholder/CRLF/lowercase-heading/no-contract done shapes, reopen of done/cancelled (both refuse agents), the --steal flag (both refuse when unarmed and when armed+non-TTY — refusal REASONS differ: the CLI names the steal gate, the bundle surfaces the kernel claim conflict).
