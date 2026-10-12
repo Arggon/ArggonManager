@@ -8,7 +8,6 @@ labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-ci-wall-clock-bodies.md
   Leaves live only under a story. id is the filename stem: task-author-ci-wall-clock-bodies.
@@ -30,3 +29,10 @@ Wave 1 of `decided: A` on `bug-template-only-bodies-ship-green`: the blocking gu
 - [ ] Prettier clean; `arggon validate` green; PR opened
 
 ## Notes
+
+### 2026-10-12 @ses_ed2ed434cffdHsqB0EV526IjUT
+verdict: approve (ci-wall-clock story + 2 tasks, docs-only, smoke-exempt)
+- Read the worktree diff (3 files + own item file) — nothing else; scope stays on the item
+- Standards-reviewer: approve, no blocking findings (frontmatter identical; Notes→live transcription verbatim incl. box sets; ADR 0023 pins resolve at HEAD; boxes checkable; own boxes unticked)
+- Verifier: validate ok; prettier red ONLY on the author's own item file (targets clean) → lead fixed with prettier --write (blank lines only, 3 insertions), re-ran probe green + validate green in the worktree
+- Recommendation: merge PR #734 (merge, not squash) on green CI; lead ticks Acceptance after merge and flips done
