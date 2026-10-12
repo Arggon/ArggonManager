@@ -9,6 +9,7 @@ priority: p2
 created: "2026-10-11"
 updated: "2026-10-11"
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-verifier-cannot-read-the-tracker-no-allow-side.md
   Leaves live only under a story. id is the filename stem: bug-verifier-cannot-read-the-tracker-no-allow-side.
@@ -20,15 +21,30 @@ updated: "2026-10-11"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+Found live during Wave A of `methodology-productization`, 2026-10-11. The delivery lead dispatched `arggon-verifier` to run the execution probes a standards-reviewer verdict needed (`verdict: approve` on one lane, `verdict: request-changes` on another). The verifier could not complete the tracker-read part of its brief and reported that Code Mode was restricted. This is the root cause.
+
+**The mechanism, verified by reading the shipped config rather than inferred.** The role's contract and its prompt both name tracker reads: `ArggonManager/docs/agents.md` §Orchestration → "Who proves, who reviews" states the verifier "runs the gates a review verdict needs and returns expected-vs-observed evidence", and its own generated contract (`templates/docs/opencode/agents/arggon-verifier.md`) says "Read-only inspections are in scope" while the brief asked it to read item bodies with `tools.arggon.show({ id, body: true })`. The permissions block in that same file denies, per entry, `edit`, `subagent`, the write-side `arggon_*` tools in BOTH spellings (`arggon_create` and `arggon_arggon_create`, etc.), and four `shell` write-shapes — but THE READS (`arggon_show`, `arggon_list`, `arggon_validate`, `arggon_next`, `arggon_report`) APPEAR NOWHERE: not denied, but not granted either. The permission model has no allow side for this role, so the whole `arggon` namespace is unreachable while the explicitly-granted `shell` works. The deny list blocks writes; the absence of any grant blocks reads; the two are conflated.
+
+**Consequence, and why it is a defect rather than an inconvenience.** The role's read-only guarantee is enforced at the wrong layer — it holds only because the prompt says "never post to the tracker", not because the config forbids it. The verifier structurally cannot do the read half of its job (in this wave it worked around it by reading item state through the shell, an unplanned substitute), and a prompt edit, a compaction, or a different model could break the write guarantee with nothing in the configuration noticing. Compare the standards reviewer, where `edit`/`write`/`patch` are REMOVED FROM ITS CATALOG — the same boundary enforced at the layer that cannot drift. The asymmetry is sharpest in one observation: for the four mutating tools the config took care to deny both spellings, while the read tools got no entry at all — the author reasoned about the write-side surface only.
+
+The reverse failure also exists: the review bar's "docs that travel with the change" is unenforceable for a role that cannot read the item it is reviewing. During Wave A two of five makers left the live `## Acceptance` section as boilerplate and put the real checklist in the dated comment record; the verifier could not independently confirm the checklist state on those items.
+
+**Second finding, same session, recorded here (same "permission/tool surface fails silently" class — possibly a symptom, discriminator unknown).** Two `tools.arggon.comment` calls reported `ok: true`, but one brief body (~4 KB) never reached disk: verified three ways (`grep -rn`, `git log --all -S`, the file's back-to-back headings), the body is absent from every git object — named LOSS, not truncation. Controlled experiment on a scratch item (now `cancelled`) falsified size, fences, default author and nested headings; both failures share only that another `tools.arggon.*` write was in flight in the same session (a branch rebase; a `create` auto-commit landing in the same window), pointing at a concurrent-writer LOST UPDATE on the native path — consistent with the DONE `bug-comment-race-no-lock` / `bug-comment-torn-read` fixes, so either the reasoning is wrong or those fixes have a gap on the native surface. Reproducer: two foreground `tools.arggon.comment` calls to the same item fired concurrently, asserting both bodies survive. The loss is confined to superseded briefs (restated later), so no decision was lost — filed because the class repeats.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] An `effect: allow` entry exists for each read-only arggon tool the verifier role is contracted to use — at minimum `arggon_show`, `arggon_list`, `arggon_validate`, `arggon_next`, `arggon_report`, `arggon_branch` (read-side), and their `arggon_arggon_*` MCP spellings — in BOTH `.opencode/agents/arggon-verifier.md` (this tree's generated seam) and `templates/docs/opencode/agents/arggon-verifier.md` (the template every adopter tree renders), so the fix reaches new adopters and not only this repo
+- [ ] A probe proves the allow is real: a verifier-role session runs `tools.arggon.show({ id: "<any item>", meta: true })` and gets a successful envelope back, reported as command / expected / observed / exit / does-NOT-prove
+- [ ] A negative control proves the deny is also real and unchanged: the same session attempting `tools.arggon.update({ id, status: "done" })` is refused, and `tools.arggon.create(...)` is refused — the read grant does not open a write path
+- [ ] The generated seam bytes and the template are kept byte-consistent, and the provenance/never-overwrite semantics (`x-generated`, `arggon doctor --agents`) still hold on both
+- [ ] `ArggonManager/docs/agents.md` §Orchestration and the role table in `ArggonManager/docs/engineering.md` state the read-only boundary as config-enforced, not prompt-enforced — the wording change does not claim a guarantee the config does not actually deliver
+- [ ] Impact class stated (this is a generated agent seam shipped to adopters, so the class is likely Behavioral — role prompts change — and Behavioral requires the ADR 0016 upgrade-channel reference per `ArggonManager/docs/agents.md` §Changing the methodology itself)
+- [ ] `arggon validate` green, `npm test` green (the seam has permission/parity tests — find them and confirm they pin the new allow list), prettier clean, and `npm run lint:structure` / `test:structure` clean if the permission block is parsed by anything in `tools/ast-grep`
 
 ## Notes
 
 ### 2026-10-11 @ses_ed6d9b22effexLQQ1jvoDJGIMi
+
 ## Context
 
 Found live during Wave A of `methodology-productization`, 2026-10-11. The delivery lead
@@ -73,7 +89,7 @@ follow:
 2. The guarantee that matters is currently prose-protected rather than config-protected.
    A prompt edit, a compaction, or a different model could break it with nothing in the
    configuration noticing. Compare the standards reviewer, where `edit`/`write`/`patch`
-   are *removed from its catalog* — the same role boundary enforced at the layer that
+   are _removed from its catalog_ — the same role boundary enforced at the layer that
    cannot drift.
 
 The asymmetry is sharpest in one observation: for the four mutating tools the config took
@@ -150,7 +166,9 @@ it should be used for the checklist-honesty finding noted in Context above (the 
 makers who left placeholder `## Acceptance` sections), not left as an unused grant.
 
 ### 2026-10-11 @ses_ed6d9b22effexLQQ1jvoDJGIMi
+
 ### 2026-10-11 @arggon-delivery-lead
+
 ## A second finding from the same wave: a comment heading landed with no body
 
 Not the same root cause as this item's bug — recorded here because it was found in the
@@ -211,7 +229,9 @@ to a superseded brief whose content I restated in a later comment, so no decisio
 Filed because the class is what repeats, not this instance.
 
 ### 2026-10-11 @ses_ed6d9b22effexLQQ1jvoDJGIMi
+
 ### 2026-10-11 @arggon-delivery-lead
+
 ## Correction to the finding above - I now have the reproducer, and it is not what I guessed
 
 My first write-up proposed two hypotheses and labelled both as untrusted. Both are now

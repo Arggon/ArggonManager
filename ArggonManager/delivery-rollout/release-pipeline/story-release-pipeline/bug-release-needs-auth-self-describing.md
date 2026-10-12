@@ -24,38 +24,13 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-release-needs-auth-self-d
 
 ## Context
 
-Two release attempts were lost to a failure that named no cause.
-`.github/workflows/release.yml` publishes `@arggondev/lib` first, then the root
-`arggon-manager`, both through npm **OIDC trusted publishing** — the one thing a
-human must do once at npmjs.com (`release.md` § "One-time setup: npm trusted
-publishers"). npmjs.com does **not** validate a trusted-publisher entry when it
-is saved, so a missing or wrong entry only surfaces at publish time — as a bare
+This item has zero dated Notes; the defect is grounded in the named authorities below, not in transcribed testimony.
 
-```
-npm error code ENEEDAUTH
-npm error need auth This command requires you to be logged in to https://registry.npmjs.org/
-```
+**The failure path that exhibits it.** `.github/workflows/release.yml:204-220` (Publish the kernel first) and `:249-259` (Publish the CLI) run bare `npm publish --workspace lib` / `npm publish` behind only an already-published idempotency check. The workflow's own header (`release.yml:31-36`) states the design intent plainly: OIDC trusted publishing ONLY, no `NPM_TOKEN` anywhere, failing closed until the one-time npmjs.com setup exists (repo `Arggon/ArggonManager`, workflow filename `release.yml`, no environment, direct publish allowed — for BOTH packages). When that setup is absent or wrong, npm reports `ENEEDAUTH` — authentication failed, with no pointer to which of the four binding fields is wrong.
 
-which says authentication failed without naming the cause. The two real
-failures were per-package: a **missing entry for `@arggondev/lib`** and a
-**lowercase-org repo string** (`arggon/…` instead of `Arggon/…`) for
-`arggon-manager`. A wrong workflow filename and the post-2026-09-03
-stage-only default are the same class.
+**The runbook names the cause, but nothing on the failure path does.** `release.md:58-61` states the exact trap: "npm does not verify the configuration when you save it, so a wrong value only surfaces at publish time — as `ENEEDAUTH`, which says authentication failed without naming the cause. The org here is `Arggon`, capital A." `release.md:40-53` is the one-time setup (both packages, filename binding, direct-publish selection); `release.md:75-80` gives the fastest diagnostic (`npm trust list <package>`, 2FA-protected read) and records the two failures that already cost this repo two release attempts (a missing entry for `@arggondev/lib`, a lowercase-org repo string for `arggon-manager`); `release.md:139-149` (Exception: publish fails with an authentication error) is the recovery (fix the config, "Re-run failed jobs", guard idempotent re-entry). None of that is reachable from the failed step's own output: the publish steps echo only the already-published short-circuit (`release.yml:217`, `:256`) and otherwise let npm's bare `ENEEDAUTH` stand as the whole diagnosis. The spec agrees this path is runtime-pending: `ArggonManager/docs/specs/spec-release-pipeline-015.md:457-462` (A17) states publishing stays inert until the human completes the trusted-publisher setup, with the publish path itself listed as observed-only-on-first-real-release.
 
-The runbook already documents the cause and the recovery ("One-time setup: npm
-trusted publishers"; "Exception: publish fails with an authentication error"),
-but **nothing on the failure path pointed there** — the failure and its fix
-lived in different documents, so the operator was left grepping the repo for a
-string npm had already printed.
-
-### The fix in one line
-
-The two publish steps run through a tested wrapper
-(`cli/publish-auth-hint.mjs`): it re-emits npm's own stderr verbatim and, on a
-**genuine** authentication failure only, prints the cause, the package that
-failed, `npm trust list <package>`, the exact repo/workflow-filename binding and
-the case-sensitivity warning, plus where the full recovery lives. Publish
-semantics are untouched (the wrapper exits with npm's status).
+So the operator who hits the red publish step — the exact person the exception manual was written for — must already know `release.md` exists and which section to open. A failed publish should name its own remedy: the one-time setup section, the four binding fields, and the `npm trust list` diagnostic.
 
 ## Acceptance
 
@@ -82,3 +57,62 @@ is worse than none. `E401` is the one status that is unambiguously the registry
 refusing the credential, and this workflow carries no token, so a 401 here can
 only be the trusted-publisher path. The `npm ≥ 11.5.1` upgrade step in
 `release.yml` is the mitigation for the #9088 class and already ships.
+
+### 2026-10-12 — body merge note (arggon-maker)
+
+PR #738 (`task-wave1b-mixed-bodies`) landed this item's Context and a five-box
+Acceptance while the fix was in flight. The Context above is kept verbatim from
+that authoring; the Acceptance below carries the seven criteria this fix was
+dispatched against, which subsume those five (the pointer to the one-time setup,
+the binding fields, `npm trust list`, unchanged recovery, gates green). The
+five-box list is superseded by the seven, not dropped.
+
+### 2026-10-12 @ses_ecfafb576ffepx0r0tPtLqBoBC
+
+## Verification evidence (2026-10-12, worktree `fix/bug-release-needs-auth-self-describing`)
+
+Shape: a tested module `cli/publish-auth-hint.mjs` that BOTH publish steps wrap —
+`node cli/publish-auth-hint.mjs --package "<name>" --version "$VERSION" -- npm publish …` —
+on the `cli/release-guard.mjs` / `cli/inspect-tarballs.mjs` precedent (a scripted gate
+release.yml calls). It re-emits npm's own stderr verbatim, prints the self-describing
+pointer only on a genuine authentication failure, and exits with npm's status, so a
+failing publish fails the step exactly as before and a passing publish prints nothing.
+
+Classification rule (auth ⇐ pointer):
+
+- `npm error code <CODE>` / `npm ERR! code <CODE>` with CODE in {ENEEDAUTH, E401}
+  (npm 11's lowercase `error` prefix and npm 10's `ERR!` are both parsed);
+- or, when the log carries no code line, the messages "need auth", "requires you to be
+  logged in", "authorize this machine using `npm adduser`", "401 Unauthorized".
+  NOT auth (no pointer at all): E404 (name typo — npm can mask a trusted-publisher
+  mismatch as a 404, npm/cli#9088, so it is deliberately not translated), E403 (version
+  already published), EPRIVATE, ECONNRESET / ETIMEDOUT / ENOTFOUND / EAI_AGAIN, ELIFECYCLE,
+  ENOENT (pack), an unknown code, a log with no error line, and exit 0.
+
+Commands run (all in the worktree; expected → observed):
+
+1. `npx vitest run cli/publish-auth-hint.test.ts` → "Test Files 1 passed (1) / Tests 39 passed (39)" (expected all pass, negatives included).
+2. `npm run test` → "Test Files 144 passed (144) / Tests 3181 passed (3181)" (baseline in a fresh worktree first failed 1 file, 5 tests: `cli/src/headless-ci.test.ts` asserts `dist/cli.js` exists — an unbuilt worktree, fixed by `npm run build`, not by this change).
+3. `npm run test:structure` → "test result: ok. 5 passed; 0 failed".
+4. `npm run lint:structure` → no diagnostics. Mid-flight it flagged one error: the lib-first ordering assertion now goes through `assertOrder` (test/assert-order.ts) instead of a bare `indexOf` comparison.
+5. `npm run arggon -- validate` → "arggon validate: ok (0 warning(s), convention v5)".
+6. `npx prettier --check` on the three changed files + the item → "All matched files use Prettier code style!". (`prettier --check .` is red on origin/main already — 626 files — so only the changed files are claimed here.)
+7. `actionlint .github/workflows/release.yml` → exit 0, clean.
+8. `npx eslint cli/publish-auth-hint.mjs cli/publish-auth-hint.test.ts` → exit 0.
+
+Offline smoke against fixture npm error logs (expected → observed):
+a. `--package @arggondev/lib --log <ENEEDAUTH log>` → "publish-auth-hint: npm publish for
+@arggondev/lib@0.6.0 failed with an AUTHENTICATION error (npm error code ENEEDAUTH)",
+plus `npm trust list @arggondev/lib`, the repository/workflow-filename binding,
+"`Arggon`, capital A", the stage-only warning and the release.md section names.
+b. same for `arggon-manager` with npm 10's `ERR!` prefix → its own pointer
+(npmjs.com/package/arggon-manager/access).
+c. `--log <404 name-typo log>` → npm's error re-emitted, pointer occurrences: 0 (expected 0).
+d. `--log <ECONNRESET log>` → pointer occurrences: 0 (expected 0).
+e. wrapper mode with a fake failing npm → npm's stderr echoed verbatim, pointer printed,
+child exit status 1 preserved (also pinned for 7 and 0 in the suite).
+
+Publish semantics: step names, `if:` conditions and step order are unchanged — the diff is
+the two wrapped `npm publish` invocations plus comments. lib-first order, "already on the
+registry - already-published = success", the 300 s propagation poll and OIDC-only (no
+`NPM_TOKEN`) are pinned by the workflow-contract test in the suite.
