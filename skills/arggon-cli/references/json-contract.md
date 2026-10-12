@@ -103,7 +103,11 @@ Results are the documented `--json` envelopes serialized as text content; kernel
 failures surface as tool errors with the CLI's message text, and a spawned
 child that dies without an envelope surfaces a tool error with a clipped
 stderr tail — the session keeps running either way. An MCP caller cannot
-reopen `done`/`cancelled` items and cannot steal a claim (there is no `force`
-parameter anywhere on the surface) — the CLI and MCP share one rules module.
+reopen `done`/`cancelled` items and cannot steal a claim — no `force` parameter
+touches a claim (`update --force` stays human-only, with no native/MCP
+parameter). The one `force` on the surface is `arggon_cleanup`'s audited prune
+opt-in: terminal+merged worktrees whose only removal blockers are untracked,
+refused without `prune` (`force requires prune`), and it never discards tracked
+modifications — the CLI and MCP share one rules module.
 Tool schemas mirror the CLI options both ways; the standing invariant is
 `mcp-parity.test.ts` (exceptions documented there, `--json` always excepted).
