@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-author-tooling-env-bodies
 title: Author bodies for the 3 placeholder tasks under tooling-and-environment
+assignee: arggon-delivery-lead
+branch: feat/task-author-tooling-env-bodies
 parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
+claimed_at: "2026-10-12T01:56:24.180Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-author-tooling-env-bodies
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-tooling-env-bodies.md
