@@ -81,3 +81,13 @@ No tracker items filed, no bodies outside the item touched, no scope growth (the
 
 - branch: feat/task-validate-refuses-placeholder-bodies
 - open questions: Wave-1b scoping/ownership per area; whether import/adopt scaffolds get authored post-creation; restore-strictness not needed (tests already strict)
+
+### 2026-10-12 @ses_ed2ed434cffdHsqB0EV526IjUT
+
+verdict: approve (blocking PLACEHOLDER_BODY guard, kernel change, decided A live)
+
+- Read the worktree diff (kernel x4 + new test + acceptance helper + 15 seed repairs + rebuilt bundle + convention.md + own item) — nothing else; scope stays on the item
+- Standards-reviewer: approve, no blocking findings (grammar matches marker-never-prose; shared extraction reused, no second parser; no waive parameter added anywhere; seed repairs intent-preserving and fixture-only; fence/comment exclusions match decided semantics)
+- Verifier, all 7 probes green: npm test 3156/3156 (144 files), CLI refusal/named-code probe exact, quoted-prose pass, done-via-waiver pass, dated-comment pass, check:plugin exit 0, worktree validate ok
+- Sequencing hold released: wave-1b merged, tree validates clean under the new kernel
+- Recommendation: merge PR #739 (merge, not squash) on green CI; lead ticks Acceptance after merge and flips done
