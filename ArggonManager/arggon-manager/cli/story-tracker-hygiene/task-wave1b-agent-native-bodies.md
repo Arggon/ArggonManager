@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-wave1b-agent-native-bodies
 title: "Wave-1b bodies: 12 agent-native placeholder bugs (worktree, MI, spec-pipeline)"
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
-claimed_at: "2026-10-12T03:27:54.878Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-wave1b-agent-native-bodies
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-wave1b-agent-native-bodies.md
   Leaves live only under a story. id is the filename stem: task-wave1b-agent-native-bodies.
@@ -28,10 +26,10 @@ Wave-1b of `decided: A`: the blocking guard (`task-validate-refuses-placeholder-
 
 ## Acceptance
 
-- [ ] Every listed file carries a real `## Context` (no scaffold marker)
-- [ ] Every listed file carries checkable `## Acceptance` boxes
-- [ ] No file outside the listed set touched; frontmatter untouched
-- [ ] Prettier clean (modulo a disclosed single-line depends_on exception); `arggon validate` green; PR opened
+- [x] Every listed file carries a real `## Context` (no scaffold marker)
+- [x] Every listed file carries checkable `## Acceptance` boxes
+- [x] No file outside the listed set touched; frontmatter untouched
+- [x] Prettier clean (modulo a disclosed single-line depends_on exception); `arggon validate` green; PR opened
 
 ## Notes
 
