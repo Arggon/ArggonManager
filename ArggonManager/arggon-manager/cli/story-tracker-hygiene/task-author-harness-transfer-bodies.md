@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-author-harness-transfer-bodies
 title: Author bodies for the 3 placeholder tasks under harness-research-transfer and external-harness-evaluation
+assignee: arggon-delivery-lead
+branch: feat/task-author-harness-transfer-bodies
 parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
+claimed_at: "2026-10-12T02:15:08.193Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-author-harness-transfer-bodies
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-harness-transfer-bodies.md
   Leaves live only under a story. id is the filename stem: task-author-harness-transfer-bodies.
