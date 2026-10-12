@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-wave1b-mixed-bodies
 title: "Wave-1b bodies: 12 placeholder items (tooling-env, role-model, release, adapters)"
+assignee: arggon-delivery-lead
+branch: feat/task-wave1b-mixed-bodies
 parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
+claimed_at: "2026-10-12T03:38:25.324Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-wave1b-mixed-bodies
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-wave1b-mixed-bodies.md
   Leaves live only under a story. id is the filename stem: task-wave1b-mixed-bodies.
