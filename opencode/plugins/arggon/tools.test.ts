@@ -52,7 +52,7 @@ import {
   runUpdate,
 } from "@arggondev/lib";
 import { runInit } from "../../../cli/src/init.js";
-import { satisfyAcceptance, satisfyAllAcceptance } from "../../../test/acceptance.js";
+import { satisfyAcceptance, satisfyAllAcceptance, satisfyPlaceholders } from "../../../test/acceptance.js";
 // Ordering assertions go through assertOrder, never a bare `indexOf`
 // comparison: `-1 < n` makes a renamed clause pass as if it were still
 // ordered (bug-vacuous-substring-ordering-assertions).
@@ -151,6 +151,9 @@ function seedInto(dir: string): void {
   // Committed, because suites below merge branches back into this tree and git
   // refuses a merge that would overwrite a dirty file.
   satisfyAllAcceptance(dir);
+  // Placeholder guard (task-validate-refuses-placeholder-bodies): the scaffold
+  // IS the template placeholder, so arrange real prose over the markers too.
+  satisfyPlaceholders(dir);
   commitIfRepo(dir, "arrange live acceptance");
 }
 
