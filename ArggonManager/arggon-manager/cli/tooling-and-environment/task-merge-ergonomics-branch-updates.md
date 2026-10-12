@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-merge-ergonomics-branch-updates
 title: "Merge ergonomics: require-up-to-date + tracker auto-commit churn makes every merged PR stale for the next one — evaluate merge queue / auto-update-branch / a documented refresh step"
+assignee: arggon-delivery-lead
+branch: feat/task-merge-ergonomics-branch-updates
 parent: tooling-and-environment
 labels: [git, delivery, friction]
 created: "2026-10-12"
 updated: "2026-10-12"
+claimed_at: "2026-10-12T23:39:22.632Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-merge-ergonomics-branch-updates
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-merge-ergonomics-branch-updates.md
