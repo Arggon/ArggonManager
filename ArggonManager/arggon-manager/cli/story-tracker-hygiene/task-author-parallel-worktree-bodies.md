@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-author-parallel-worktree-bodies
 title: Author bodies for the parallel-worktree story and its 4 placeholder tasks
+assignee: arggon-delivery-lead
+branch: feat/task-author-parallel-worktree-bodies
 parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
+claimed_at: "2026-10-12T01:42:28.636Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-author-parallel-worktree-bodies
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-parallel-worktree-bodies.md
   Leaves live only under a story. id is the filename stem: task-author-parallel-worktree-bodies.
