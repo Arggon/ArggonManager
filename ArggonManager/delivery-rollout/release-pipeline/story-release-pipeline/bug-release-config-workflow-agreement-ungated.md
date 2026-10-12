@@ -175,3 +175,36 @@ the manual-recovery text appended after my marked comment.
 ### handoff 2026-10-12 @ses_ecfafb575ffeLCEQKunZ0o9mM2 (session: ses_ecfafb575ffeLCEQKunZ0o9mM2) — next: Merge PR #740 after review; on merge watch release-please.yml's no-release run — cli/release-abort-check.mjs must print OK (AC#5 real-run evidence, surfaced by delivery lead).
 - branch: fix/bug-release-config-workflow-agreement-ungated
 - open questions: Observe the real post-merge release-please.yml run stays green (AC#5); confirm release-please flips autorelease pending→tagged on the healthy path before release.yml tags (labels bug-autorelease-labe…
+
+### 2026-10-12 @ses_ecfafb575ffeLCEQKunZ0o9mM2
+## Evidence — gate + abort backstop (arggon-maker)
+
+PR #740: https://github.com/Arggon/ArggonManager/pull/740 (base main). The one-word config repair (include-component-in-tag: false, b7b5f866) was already on main and was NOT touched; this change adds the two gates that were missing.
+
+### Shipped
+- cli/src/release-config-agreement.test.ts — gate. Pure agreementViolation(config, workflow): release.yml must tag the plain v\${VERSION} (spec invariant 1) AND the config's include-component-in-tag must resolve to false (absent ⇒ schema default true ⇒ the outage). Two-sided (absent-key + workflow-side component drift).
+- cli/release-abort-check.mjs + step in .github/workflows/release-please.yml (runs on every push, after the action) — abort backstop. Predicate IS release-please's own (src/manifest.ts findMergedReleasePullRequests): a MERGED PR still carrying 'autorelease: pending' ⇒ exit 1 (red); none ⇒ exit 0. SHAPE = fail the run on the abort predicate. Cannot red on a legitimate no-release push: that predicate only exists when a merged release PR is stuck; an ordinary push merges none and every already-merged PR is flipped to 'autorelease: tagged', so the path is green (proven). An open release PR is excluded by --state merged; a gh query failure warns + exits 0 (never cries wolf). Comment seam left for bug-autorelease-label-lifecycle-unowned (manual recovery + release.yml label flip).
+- release.md §The tag↔config agreement — the contract for the next author.
+
+### Gates: expected → observed
+- arggon validate → 'arggon validate: ok (0 warning(s), convention v5)'
+- npm run test → 'Test Files 145 passed (145)' / 'Tests 3160 passed (3160)'
+- npm run test:structure → 'test result: ok. 5 passed; 0 failed;'
+- npm run lint:structure → no findings (exit 0); npm run lint → exit 0; actionlint release-please.yml → exit 0; prettier (touched files) → conformant.
+
+### Negative case — the backstop seen RED (injected gh returns a merged stuck pending PR), verbatim exit 1:
+```
+release-abort-check: FAIL — release-please is STUCK and this run would otherwise report success.
+1 MERGED release PR(s) still carry the 'autorelease: pending' label, which is
+release-please's own abort condition (src/manifest.ts: "There are untagged, merged release PRs
+outstanding - aborting"). ... #123 chore: release (release-please--branches--main) ...
+First suspect is the tag↔config agreement cli/src/release-config-agreement.test.ts pins ...
+```
+Green case (injected []) exit 0: 'release-abort-check: OK — ... not aborting.' Config gate flip-to-true / delete-key on the REAL committed config also goes red. Both new suites 18/18.
+
+### AC#5 (real release-please run) — post-merge, delivery lead
+The merge push to main is the real release-please.yml run (no Release-As: trailer ⇒ no-release push ⇒ must stay green). Did NOT fabricate a red run. npx release-please --dry-run not used: not offline-runnable here (not a local dep; dry-run hits the GitHub API), so it adds nothing a unit test lacks — the real run is the evidence.
+
+### For siblings (reported, not filed here)
+- bug-release-needs-auth-self-describing: the gh-auth failure path (warn+exit 0) assumes the runner gh authed by GITHUB_TOKEN; a self-describing auth message belongs there.
+- bug-autorelease-label-lifecycle-unowned: owns the release.yml label flip + the manual-recovery text after the marked comment.
