@@ -169,3 +169,24 @@ exhausted (99 B native headroom, 88 B MCP headroom — the `force` property is b
 on both surfaces by budget), and `docs/opencode2.md`'s catalog-bytes figure was
 already stale before this change (11,821 B documented vs ~12,161 B measured); it
 is corrected here.
+
+### Handoff (maker → delivery lead)
+
+- **Branch:** `fix/bug-cleanup-prune-untracked-artifacts-no-force` (pushed; PR
+  open, unmerged). Commits: `fix(cleanup)` (code + docs + tests + bundle) and
+  `chore(tasks)` (this file).
+- **Next concrete step:** delivery-lead review + merge; the PR body carries the
+  problem, the approach and the test plan. After merge the recorded
+  `worktree_path` of a blocked worktree keeps it visible to `cleanup`, so the
+  next wave can run `cleanup --prune --force` instead of the manual loop.
+- **Open questions for review:**
+  - The flag is named `--force` as the item's steer named it. The human-only
+    force is `update --force` (claim reassignment, refused for agents); cleanup's
+    force never touches a claim, and `cli/src/mcp-server.test.ts` was narrowed to
+    pin the boundary (`steal` on no spawn tool, `force` only on `arggon_cleanup`).
+  - Budget pressure above: the next native/MCP schema addition needs a trim
+    first; `force` is bare on both surfaces because of it.
+  - Runtime confirmation: the fix is exercised on fixtures (untracked artifact
+    file/dir, foreign `node_modules`, tracked modification) on both surfaces; the
+    original incident replay on the four real worktrees is a delivery-lead call
+    once merged (they were already reaped by hand).
