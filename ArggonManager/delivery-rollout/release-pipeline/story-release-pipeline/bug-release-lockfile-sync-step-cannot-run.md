@@ -12,6 +12,7 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T17:27:25.869Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-lockfile-sync-step-cannot-run
 ---
+
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-lockfile-sync-step-cannot-run.md
   Leaves live only under a story. id is the filename stem: bug-release-lockfile-sync-step-cannot-run.
@@ -474,6 +475,7 @@ verdict: approve (lead merge call) — the standards request-changes (evidence f
 - Merging now. The real-run acceptance box stays open and is mine: the merge push re-runs release-please.yml with release PR #744 open, and the fixed sync step must push the reconciled lockfile — that observation completes this item before its `done` flip.
 
 ### 2026-10-12 @ses_eced77ddeffe7RDZa3wt3P1UKS
+
 ### Second defect fixed — the commit path never staged (delivery on a fresh branch)
 
 Real-run finding accepted: run **38292422896** (merge `a27cd83`) showed the `--ignore-scripts` fix **works** (install exit 0, `up to date, audited 216 packages`, lockfile rewritten, diff fell through) and then died at `git commit` with exit 1 — `Changes not staged for commit: modified: package-lock.json` / `no changes added to commit`. The script never staged the file, so **the sync has never pushed a reconciled lockfile in its entire life** (no `git add` since 7230609f; a second latent defect, not a regression).
@@ -486,12 +488,13 @@ Real-run finding accepted: run **38292422896** (merge `a27cd83`) showed the `--i
 - fixed: `git add package-lock.json` → commit `56e5512c` exit 0, `git show --name-only` → `package-lock.json` **only**, committed fields `^0.7.0` / `0.7.0`, `2 insertions / 38 deletions` (2 reconciled lines + 12 npm-10 `libc` removals);
 - second run of the sequence: install exit 0 → `git diff --quiet` exit 0 → the `already in sync` exit; `git status --porcelain` empty (clean no-op).
 
-Environment note for whoever re-runs this: a scratch *worktree* of this repo inherits the dev clone's `pre-commit` hook and fails with `tsx: command not found` before the staging error can appear — the runner has no hooks, so the repro used a standalone clone.
+Environment note for whoever re-runs this: a scratch _worktree_ of this repo inherits the dev clone's `pre-commit` hook and fails with `tsx: command not found` before the staging error can appear — the runner has no hooks, so the repro used a standalone clone.
 
 **Delivery path:** #745 is `MERGED` (cannot reopen) and the merged branch still exists, but per your guidance I created a fresh branch `fix/bug-release-lockfile-sync-commit-staging` from current `origin/main` with just this change → **PR #747** (not merged). Branch record updated on the item: recorded.
 
 Gates re-run: `actionlint` exit 0 · `prettier --check` clean (both files) · `npm run test:structure` 5/5 · `npm run lint:structure` exit 0 · `arggon validate` ok (0 warnings). Acceptance: 5/6 ticked — the real-run box stays **unticked** for your re-observation.
 
 ### handoff 2026-10-12 @ses_eced77ddeffe7RDZa3wt3P1UKS (session: ses_eced77ddeffe7RDZa3wt3P1UKS) — next: After #747 merges: watch the next release-please.yml run with a release PR open — install, git add, commit and push must all complete (lockfile ^0.7.0 / 0.7.0 on the PR branch), run green; then tick …
+
 - branch: fix/bug-release-lockfile-sync-commit-staging
 - open questions: Item branch field vs the follow-up branch fix/bug-release-lockfile-sync-commit-staging (old branch merged, kept for the record); npm-10 libc churn on the real sync; whether to pin the step's npm.
