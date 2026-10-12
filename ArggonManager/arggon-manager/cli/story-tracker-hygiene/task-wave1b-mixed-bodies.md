@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-wave1b-mixed-bodies
 title: "Wave-1b bodies: 12 placeholder items (tooling-env, role-model, release, adapters)"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
-claimed_at: "2026-10-12T03:38:25.324Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-wave1b-mixed-bodies
 ---
 <!--
@@ -27,10 +26,10 @@ Wave-1b of `decided: A`: the blocking guard (`task-validate-refuses-placeholder-
 
 ## Acceptance
 
-- [ ] Every listed file carries a real `## Context` (no scaffold marker)
-- [ ] Every listed file carries checkable `## Acceptance` boxes
-- [ ] No file outside the listed set touched; frontmatter untouched
-- [ ] Prettier clean (modulo a disclosed single-line depends_on exception); `arggon validate` green; PR opened
+- [x] Every listed file carries a real `## Context` (no scaffold marker)
+- [x] Every listed file carries checkable `## Acceptance` boxes
+- [x] No file outside the listed set touched; frontmatter untouched
+- [x] Prettier clean (modulo the disclosed x-tracker code-span-spacing exception, content wins); `arggon validate` green; PR opened
 
 ## Notes
 
