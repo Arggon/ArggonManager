@@ -12,7 +12,6 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T02:21:16.942Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-author-spec-pipeline-body
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-spec-pipeline-body.md
   Leaves live only under a story. id is the filename stem: task-author-spec-pipeline-body.
@@ -34,3 +33,7 @@ Wave 1 of `decided: A` on `bug-template-only-bodies-ship-green`: the blocking gu
 - [ ] Prettier clean; `arggon validate` green; PR opened
 
 ## Notes
+
+### handoff 2026-10-12 @ses_ed215aaf0ffepJU57aC7vB5qAh (session: ses_ed215aaf0ffepJU57aC7vB5qAh) — next: Open PR from feat/task-author-spec-pipeline-body referencing the item id; review then merge
+- branch: feat/task-author-spec-pipeline-body
+- open questions: none
