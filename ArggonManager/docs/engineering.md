@@ -326,6 +326,30 @@ Use a 4-digit monotonic number. Title is kebab-case.
 - **Convention vs engineering:** schema/layout/status → `ArggonManager/docs/convention.md`; process/structure/review/ADR → `ArggonManager/docs/engineering.md` or `ArggonManager/docs/adr/`
 - **Humans and agents share one work loop** — the same PR and claim rules, the same kernel, the same envelopes; what is asymmetric is **authority**, not the loop, and it is named in §Roles and authority. Agent-only shortcuts are out of scope unless an ADR says otherwise
 
+### Merging: a PR refused as out of date
+
+`main` moves continuously (tracker auto-commits, auto-done flips), and branch protection requires a PR to be up to date with `main` before merging — so on a wave the second PR is refused: `BEHIND` ("the head branch is not up to date with the base branch") or _"Base branch was modified. Review and try the merge again."_ (2026-10-12: [#746](https://github.com/Arggon/ArggonManager/pull/746) and [#747](https://github.com/Arggon/ArggonManager/pull/747)). The refusal is the protection working — it is what stops two individually-green PRs from merging into a semantically broken combination — so refresh the branch, never relax the requirement.
+
+- **Default — refresh server-side, no worktree dance.** Ask GitHub to update the PR branch, then merge once the checks finish. Arming auto-merge once (the repo allows it) means the merge lands without a second visit:
+
+  ```bash
+  gh api -X PUT repos/Arggon/ArggonManager/pulls/<n>/update-branch
+  gh pr merge <n> --merge --auto
+  ```
+
+- **Fallback — the API cannot apply the update** (a real conflict, or a 422 when GitHub cannot rebase the branch): merge locally in the item's worktree, resolve the conflicts there, push, then merge normally:
+
+  ```bash
+  git fetch origin && git merge origin/main
+  # resolve, commit, push, then merge
+  ```
+
+  The API path cannot resolve conflicts and must not be retried in a loop; the local merge is the only path where a conflict gets a resolution and a reviewable diff.
+
+- **Bot-owned PR branches are excluded.** A release-please release PR — and an auto-done flip PR — is managed by the bot's own rebase/retry path; never refresh or merge one by hand.
+
+Enabling the **merge queue** on `main` (owner setting) would remove this step entirely — it refreshes queued PRs itself; until then, refresh as above.
+
 ---
 
 ## Definition of done (engineering, Phase 1)

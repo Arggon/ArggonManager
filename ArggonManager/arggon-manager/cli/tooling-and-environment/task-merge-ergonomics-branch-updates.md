@@ -12,6 +12,7 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T23:39:22.632Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-merge-ergonomics-branch-updates
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-merge-ergonomics-branch-updates.md
   Leaves live only under a story. id is the filename stem: task-merge-ergonomics-branch-updates.
@@ -43,16 +44,16 @@ again.` → retry.
 
 ## Acceptance
 
-- [ ] Decide the remedy, with reasoning recorded (dated comment on this item;
+- [x] Decide the remedy, with reasoning recorded (dated comment on this item;
       a demo/report of the chosen path on a real PR): GitHub **merge queue** on
       `main`; `gh pr merge --auto` plus branch auto-update; a small documented
       refresh procedure (or `arggon` helper) the lead runs before merging; or
       relaxing the up-to-date requirement with the risk named
-- [ ] The merge flow the delivery lead follows is written where the lead reads
+- [x] The merge flow the delivery lead follows is written where the lead reads
       it (`docs/agents.md` §Orchestration or `engineering.md` §Naming, commits,
       PRs) so the next lead does not rediscover it — including what to do when
       the merge is refused for staleness
-- [ ] No regression in the repo's merge discipline: merge commits (never
+- [x] No regression in the repo's merge discipline: merge commits (never
       squash) for branches carrying tracker auto-commits; auto-done's flip PRs
       still land (the workflow's own rebase/retry path must not fight the
       chosen remedy)
@@ -62,6 +63,7 @@ again.` → retry.
 ## Notes
 
 ### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+
 ### 2026-10-12 @arggon-delivery-lead — decision recorded (remedy shape)
 
 **Keep the require-up-to-date protection** — it is the only guard against two individually-green PRs merging into a semantically broken combination. The remedy is two-part:
