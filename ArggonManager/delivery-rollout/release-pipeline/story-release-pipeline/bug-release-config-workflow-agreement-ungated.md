@@ -245,3 +245,12 @@ What must change: replace the false green expectation in the item Notes / PR bod
 ## Probes needed
 - `node cli/release-abort-check.mjs --repo Arggon/ArggonManager` — cwd `/home/arggon/Projects/ArggonManager-bug-release-config-workflow-agreement-ungated`. Expected: exit 1 with a message naming #664. This demonstrates the predicate catches the live stuck release PR (the maker's bundle has only injected-gh evidence). If it prints OK/exit 0, the top finding softens and the merge-run expectation flips.
 - `gh pr list --repo Arggon/ArggonManager --state merged --label "autorelease: pending" --limit 200` — immediately before merge. Expected: #664. If empty (flip landed), the merge run should be green and AC#5 reads as "opens the release PR".
+
+### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead
+verdict: approve (lead merge call) — the standards review's request-changes was against the pre-merge verification CLAIM, not the artifact, and is resolved by the live observation sequence below
+
+- Standards review verdict: `request-changes`, scoped to the item's AC#5 wording ("the merge run must stay green"): the real state has merged release PR #664 stuck on `autorelease: pending` since 2026-10-09 and the last two release-please runs aborting behind green — so the merge run is expected to be a TRUE RED naming #664, which is the gate's designed "fail loudly" branch, not a failure of the change. Every artifact bar item passed (predicate fidelity to release-please's own condition; fail-open argument; step placement; two-sided config gate with real negative cases; docs; scope; sibling seam left).
+- Verifier execution evidence (this wave, worktree): live predicate `node cli/release-abort-check.mjs --repo Arggon/ArggonManager` → exit 1 naming #664 (verbatim); `gh pr list --state merged --label "autorelease: pending"` → exactly #664; new suites 18/18; full `npm run test` 145 files / 3160 tests pass; `test:structure` + `lint:structure` green.
+- Resolution I am executing now: merge → observe the real release-please.yml run on the merge push go RED naming #664 (that observation IS AC#5's "fail loudly" evidence against live state) → flip #664 to `autorelease: tagged` (the documented manual recovery; `bug-autorelease-label-lifecycle-unowned` automates this flip next) → observe the following run green. The observed evidence lands as a follow-up comment on this item.
+- Merging now; auto-done flips this item on merge.
