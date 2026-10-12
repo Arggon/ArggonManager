@@ -12,7 +12,6 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T17:27:25.869Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-lockfile-sync-step-cannot-run
 ---
-
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-lockfile-sync-step-cannot-run.md
   Leaves live only under a story. id is the filename stem: bug-release-lockfile-sync-step-cannot-run.
@@ -284,3 +283,7 @@ aborted release`, not in the sync step (the sync step was skipped) — that is
 - Open questions: none blocking. Only the npm-major `libc` churn noted above,
   and the choice of whether the step should pin its npm (deliberately not done
   here — the diff stays the sync step).
+
+### handoff 2026-10-12 @ses_eced77ddeffe7RDZa3wt3P1UKS (session: ses_eced77ddeffe7RDZa3wt3P1UKS) — next: Post-merge: watch the next release-please.yml run with PR #744 open; the sync step must complete and push the reconciled lockfile (^0.7.0 / 0.7.0), the run green, then tick the last acceptance box.
+- branch: fix/bug-release-lockfile-sync-step-cannot-run
+- open questions: Next sync also strips npm-10 libc fields (formatting only); whether to pin the step's npm left open; run 38282448930's abort-step failure is sibling scope, reported not filed.
