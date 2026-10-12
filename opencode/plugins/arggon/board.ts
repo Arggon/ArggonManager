@@ -386,10 +386,73 @@ export const BOARD_DETAIL_MAX_ROWS = 16;
 export const BOARD_DETAIL_MAX_LINE_CHARS = 200;
 
 /**
+ * Digit-activatable children per detail block (keymap `1`..`9` in `tui.tsx`).
+ * The OpenTUI panel renders plain `<text>` rows with no click/link surface, so
+ * hierarchy activation is keyboard-only (the same keymap-layer mechanism as the
+ * existing `n`/`a` jumps, not pointer clicks). Nine covers the digit row; a
+ * longer child list renders the first nine numbered plus an honest overflow
+ * row (`… +M more — walk the tree`), and every child stays reachable through
+ * the tree cursor itself.
+ */
+export const BOARD_HIERARCHY_CHILD_KEYS = 9;
+
+/** Minimal hierarchy shape the pure resolvers read (BoardItem satisfies it). */
+export type BoardHierarchyItem = {
+  id: string;
+  parent: string | null;
+  title: string;
+  status: Status;
+};
+
+/**
+ * Parent edge of one item through the inlined kernel's recorded `parent`
+ * edges (no parallel hierarchy): trimmed, `""` → null, null when the item is
+ * unknown or has no parent. Pure.
+ */
+export function boardParentId(
+  items: readonly BoardHierarchyItem[],
+  id: string,
+): string | null {
+  const wanted = id.trim();
+  if (wanted === "") return null;
+  const item = items.find((entry) => entry.id === wanted);
+  const parent = (item?.parent ?? "").trim();
+  return parent === "" ? null : parent;
+}
+
+/**
+ * Children of one item through the inlined kernel's recorded `parent` edges
+ * (no parallel hierarchy): items whose edge equals the id, id-sorted like the
+ * tree flattening. Pure.
+ */
+export function boardChildrenOf<T extends BoardHierarchyItem>(
+  items: readonly T[],
+  id: string,
+): T[] {
+  const wanted = id.trim();
+  if (wanted === "") return [];
+  return sortById(items.filter((entry) => (entry.parent ?? "").trim() === wanted));
+}
+
+/**
  * Bounded, sanitized item read for the panel's inline detail block. Structured
  * rather than pre-rendered so the block (`boardDetailLines`) and its tests stay
  * pure; the id/title/path and every row are already sanitized here.
+ *
+ * Hierarchy rides the inlined kernel's recorded `parent` edges (no parallel
+ * hierarchy): `parent` is null when the item has no parent edge, `missing`
+ * when the edge points at an unknown id; `children` is the id-sorted child
+ * list (possibly empty). Both are sanitized here like every other row.
  */
+export type BoardHierarchyLink = {
+  id: string;
+  /** Sanitized title (`"(missing)"` never appears here; see `missing`). */
+  title: string | null;
+  status: Status | null;
+  /** True when the edge points at an id with no item in the snapshot. */
+  missing: boolean;
+};
+
 export type BoardItemDetail = {
   id: string;
   /** Sanitized title, null when the read failed. */
@@ -405,6 +468,10 @@ export type BoardItemDetail = {
   acceptanceTotal: number;
   /** True when the row budget dropped content. */
   truncated: boolean;
+  /** Hierarchy links for the detail block (null parent = no parent edge). */
+  parent: BoardHierarchyLink | null;
+  /** Id-sorted children (empty when none). */
+  children: BoardHierarchyLink[];
   /** Sanitized single-line reason when the item could not be read; else null. */
   error: string | null;
 };
@@ -486,12 +553,15 @@ function splitBoardDetailRows(
  * one, and a bounded reader's prose is a different question
  * (bug-three-acceptance-parsers-diverging). Never throws and never writes: a
  * missing id, a corrupt tracker or any read failure degrades to an error detail
- * the panel renders. `rows` overrides the row budget (tests).
+ * the panel renders. `rows` overrides the row budget (tests). `items` supplies
+ * the hierarchy snapshot (the panel controller passes its live snapshot so the
+ * parent/children match the displayed tree with no second read); when absent
+ * the snapshot is read here through `boardSnapshot` (never throws).
  */
 export function boardItemDetail(
   cwd: string,
   id: string,
-  options: { rows?: number } = {},
+  options: { rows?: number; items?: readonly BoardItem[] } = {},
 ): BoardItemDetail {
   const requested = id.trim();
   const failed = (error: string): BoardItemDetail => ({
@@ -503,6 +573,8 @@ export function boardItemDetail(
     acceptanceDone: 0,
     acceptanceTotal: 0,
     truncated: false,
+    parent: null,
+    children: [],
     error: sanitizeHumanError(error),
   });
   if (requested === "") return failed("detail unavailable: no selected item");
@@ -517,6 +589,41 @@ export function boardItemDetail(
     // the panel's width clip (a hostile body cannot flood or forge a row).
     const row = (value: string): string =>
       clipBoardLine(sanitizeHumanTextUncapped(value), BOARD_DETAIL_MAX_LINE_CHARS);
+    // Hierarchy through the kernel's recorded `parent` edges (no second
+    // hierarchy): the live snapshot when the caller has it, else a fresh
+    // total read (an unreadable snapshot degrades to the edge with unknown
+    // titles rather than dropping the whole detail block).
+    const link = (item: BoardItem): BoardHierarchyLink => ({
+      id: sanitizeHumanTextUncapped(item.id),
+      title: sanitizeHumanTextUncapped(item.title),
+      status: item.status,
+      missing: false,
+    });
+    const snapshotItems: readonly BoardItem[] =
+      options.items ?? boardSnapshot(cwd).items;
+    const parentId =
+      snapshotItems.length > 0
+        ? boardParentId(snapshotItems, requested)
+        : (shown.item.parent ?? "").trim() || null;
+    const byId =
+      snapshotItems.length > 0
+        ? new Map(snapshotItems.map((entry) => [entry.id, entry]))
+        : new Map<string, BoardItem>();
+    const parent: BoardHierarchyLink | null =
+      parentId === null
+        ? null
+        : byId.get(parentId) !== undefined
+          ? link(byId.get(parentId)!)
+          : {
+              id: sanitizeHumanTextUncapped(parentId),
+              title: null,
+              status: null,
+              missing: true,
+            };
+    const children: BoardHierarchyLink[] =
+      snapshotItems.length > 0
+        ? boardChildrenOf(snapshotItems, requested).map(link)
+        : [];
     return {
       id: requested,
       title: sanitizeHumanTextUncapped(shown.item.title ?? requested),
@@ -531,6 +638,8 @@ export function boardItemDetail(
       acceptanceDone: criteria.filter((entry) => entry.checked).length,
       acceptanceTotal: criteria.length,
       truncated: acceptance.length + body.length > budget,
+      parent,
+      children,
       error: null,
     };
   } catch (error) {
@@ -549,6 +658,35 @@ export function boardDetailLines(
     return [clip(`  ┌ argon detail · ${detail.id}`), clip(`  └ ${detail.error}`)];
   }
   const lines = [clip(`  ┌ argon detail · ${detail.id} — ${detail.title ?? detail.id}`)];
+  // Hierarchy always renders honestly (never hidden): the parent edge and the
+  // id-sorted children through the kernel's `parent` edges. Outside the
+  // acceptance/body row budget so a long checklist can never hide the walk.
+  // Activation is keyboard (`p` parent, `1`..`9` children — the panel has no
+  // click surface); the bracket hints name the key. Repo-controlled bytes are
+  // escaped here as well as at construction (a hand-built detail must not
+  // forge a row either).
+  const safe = (value: string): string => sanitizeHumanTextUncapped(value);
+  const parentRow =
+    detail.parent === null
+      ? "parent: none"
+      : detail.parent.missing
+        ? `parent: ${safe(detail.parent.id)} (missing) [p]`
+        : `parent: ${safe(detail.parent.id)} — ${safe(detail.parent.title ?? detail.parent.id)}${detail.parent.status !== null ? ` (${detail.parent.status})` : ""} [p]`;
+  lines.push(clip(`  │ ${parentRow}`));
+  if (detail.children.length === 0) {
+    lines.push(clip("  │ children: none"));
+  } else {
+    lines.push(clip(`  │ children (${detail.children.length}):`));
+    const shown = detail.children.slice(0, Math.max(BOARD_HIERARCHY_CHILD_KEYS, 0));
+    shown.forEach((child, index) => {
+      const label = child.missing
+        ? `${safe(child.id)} (missing)`
+        : `${safe(child.id)} — ${safe(child.title ?? child.id)}${child.status !== null ? ` (${child.status})` : ""}`;
+      lines.push(clip(`  │   [${index + 1}] ${label}`));
+    });
+    const hidden = detail.children.length - shown.length;
+    if (hidden > 0) lines.push(clip(`  │   … +${hidden} more — walk the tree`));
+  }
   // Blank body rows keep the prose rhythm without trailing whitespace.
   const row = (value: string): string => (value === "" ? "  │" : `  │ ${value}`);
   for (const entry of detail.acceptance) lines.push(clip(row(entry)));
