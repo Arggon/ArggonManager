@@ -1,13 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-release-needs-auth-self-describing
 title: "A failed release publish reports `npm ENEEDAUTH` with no pointer to the one-time npmjs.com trusted-publisher setup that resolves it — the runbook names the cause, but nothing on the failure path does"
+assignee: arggon-delivery-lead
+branch: fix/bug-release-needs-auth-self-describing
 parent: story-release-pipeline
 labels: [release, docs, failure-mode]
-
 created: "2026-10-09"
-updated: "2026-10-09"
+updated: "2026-10-12"
+claimed_at: "2026-10-12T13:30:29.065Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-release-needs-auth-self-describing
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-needs-auth-self-describing.md
