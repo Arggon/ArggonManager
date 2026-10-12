@@ -153,16 +153,17 @@ payload row + the observed-removal paragraph + the re-measured catalog bytes).
 
 ### Gates (item worktree; expected vs observed)
 
-| Gate                                | Expected                          | Observed                                                                  |
-| ----------------------------------- | --------------------------------- | ------------------------------------------------------------------------- |
-| `npm run build`                     | tsc projects + bundle regen clean | clean; `build:plugin — 48 modules inlined, 556482 bytes`                  |
-| `npm run test`                      | full suite green                  | 149 files / 3,244 tests passed, 0 failed                                  |
-| `npm run test:structure`            | 5 ast-grep rule tests pass        | 5 passed, 0 failed                                                        |
-| `npm run lint:structure`            | no findings                       | no findings (exit 0)                                                      |
-| `npm run arggon -- validate`        | ok, 0 warnings                    | `ok (0 warning(s), convention v5)`                                        |
-| `npx prettier --check` (changed)    | every changed file formatted      | all matched files use Prettier code style                                 |
-| `npm run check:plugin`              | committed bundle byte-identical   | no diff against a fresh `build:plugin`                                    |
-| `npm run arggon -- doctor --budget` | advisory bounds pass              | native catalog 12,189 B ≤ 12,288; live MCP `tools/list` 16,296 B ≤ 16,384 |
+| Gate                                | Expected                            | Observed                                                        |
+| ----------------------------------- | ----------------------------------- | --------------------------------------------------------------- |
+| `npm run build`                     | tsc projects + bundle regen clean   | clean; `build:plugin — 48 modules inlined, 556482 bytes`        |
+| `npm run test`                      | full suite green                    | 149 files / 3,244 tests passed, 0 failed                        |
+| `npm run test:structure`            | 5 ast-grep rule tests pass          | 5 passed, 0 failed                                              |
+| `npm run lint:structure`            | no findings                         | no findings (exit 0)                                            |
+| `npm run arggon -- validate`        | ok, 0 warnings                      | `ok (0 warning(s), convention v5)`                              |
+| `npx prettier --check` (changed)    | every changed file formatted        | all matched files use Prettier code style                       |
+| `npm run check:plugin`              | committed bundle byte-identical     | no diff against a fresh `build:plugin`                          |
+| `npm run context:report`            | native catalog within budget        | `native arggon tools (15, 9 pinned) 12,189 ≤12,288 B adv. pass` |
+| `npm run arggon -- doctor --budget` | live MCP `tools/list` within budget | 16,296 B ≤ 16,384 B (pass)                                      |
 
 Out of scope, reported only: both ADR 0006 advisory budgets are now nearly
 exhausted (99 B native headroom, 88 B MCP headroom — the `force` property is bare
