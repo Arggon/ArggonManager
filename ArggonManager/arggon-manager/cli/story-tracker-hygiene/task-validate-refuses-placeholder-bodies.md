@@ -1,15 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-validate-refuses-placeholder-bodies
 title: "validate refuses placeholder bodies on open items (blocking, decided A)"
+assignee: arggon-delivery-lead
+branch: feat/task-validate-refuses-placeholder-bodies
 parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
+claimed_at: "2026-10-12T02:53:12.924Z"
 depends_on: [task-author-methodology-improvements-bodies, task-author-parallel-worktree-bodies, task-author-tooling-env-bodies, task-author-ci-wall-clock-bodies, task-author-harness-transfer-bodies, task-author-spec-pipeline-body]
+worktree_path: /home/arggon/Projects/ArggonManager-task-validate-refuses-placeholder-bodies
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-validate-refuses-placeholder-bodies.md
   Leaves live only under a story. id is the filename stem: task-validate-refuses-placeholder-bodies.
