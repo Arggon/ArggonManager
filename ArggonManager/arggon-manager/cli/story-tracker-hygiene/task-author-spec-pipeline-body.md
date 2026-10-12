@@ -8,7 +8,6 @@ labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-spec-pipeline-body.md
   Leaves live only under a story. id is the filename stem: task-author-spec-pipeline-body.
@@ -30,3 +29,10 @@ Wave 1 of `decided: A` on `bug-template-only-bodies-ship-green`: the blocking gu
 - [ ] Prettier clean; `arggon validate` green; PR opened
 
 ## Notes
+
+### 2026-10-12 @ses_ed2ed434cffdHsqB0EV526IjUT
+verdict: approve (spec-pipeline task body, docs-only, smoke-exempt)
+- Read the worktree diff (1 task file + own item file) — nothing else; scope stays on the item
+- Standards-reviewer: approve, no blocking findings (frontmatter identical incl. depends_on kept; Notes→live faithful; all spec.ts/methodology.md/agents.md pins resolve at HEAD; 4 checkable boxes matching Notes; no markers; no ticks; own boxes unticked)
+- Verifier: validate ok, prettier clean on both files (maker's own-file style commit held)
+- Recommendation: merge PR #736 (merge, not squash) on green CI; lead ticks Acceptance after merge and flips done
