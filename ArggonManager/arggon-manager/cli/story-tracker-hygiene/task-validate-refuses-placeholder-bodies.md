@@ -7,6 +7,7 @@ parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
+depends_on: [task-author-methodology-improvements-bodies, task-author-parallel-worktree-bodies, task-author-tooling-env-bodies, task-author-ci-wall-clock-bodies, task-author-harness-transfer-bodies, task-author-spec-pipeline-body]
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-validate-refuses-placeholder-bodies.md
