@@ -171,3 +171,7 @@ the manual-recovery text appended after my marked comment.
 ### handoff 2026-10-12 @ses_ecfafb575ffeLCEQKunZ0o9mM2 (session: ses_ecfafb575ffeLCEQKunZ0o9mM2) — next: Merge PR #740 after review; on merge watch release-please.yml's no-release run — cli/release-abort-check.mjs must print OK (AC#5 real-run evidence, surfaced by delivery lead).
 - branch: fix/bug-release-config-workflow-agreement-ungated
 - open questions: Observe the real post-merge release-please.yml run stays green (AC#5); confirm release-please flips autorelease pending→tagged on the healthy path before release.yml tags (labels bug-autorelease-labe…
+
+### handoff 2026-10-12 @ses_ecfafb575ffeLCEQKunZ0o9mM2 (session: ses_ecfafb575ffeLCEQKunZ0o9mM2) — next: Merge PR #740 after review; on merge watch release-please.yml's no-release run — cli/release-abort-check.mjs must print OK (AC#5 real-run evidence, surfaced by delivery lead).
+- branch: fix/bug-release-config-workflow-agreement-ungated
+- open questions: Observe the real post-merge release-please.yml run stays green (AC#5); confirm release-please flips autorelease pending→tagged on the healthy path before release.yml tags (labels bug-autorelease-labe…
