@@ -253,17 +253,24 @@ describe("mcp server", () => {
     expect(properties).not.toHaveProperty("force");
   });
 
-  it("exposes no force/steal surface on the spawn tools either", async () => {
+  it("exposes no human-only force/steal surface on the spawn tools", async () => {
     const result = await client.request("tools/list");
     const tools = result.tools as Array<{ name: string; inputSchema: Record<string, unknown> }>;
-    for (const name of ["arggon_start", "arggon_branch", "arggon_cleanup"]) {
-      const properties = tools.find((tool) => tool.name === name)!.inputSchema.properties as Record<
-        string,
-        unknown
-      >;
-      expect(properties, name).not.toHaveProperty("force");
-      expect(properties, name).not.toHaveProperty("steal");
+    const properties = (name: string): Record<string, unknown> =>
+      tools.find((tool) => tool.name === name)!.inputSchema.properties as Record<string, unknown>;
+    for (const name of ["arggon_start", "arggon_branch"]) {
+      expect(properties(name), name).not.toHaveProperty("force");
+      expect(properties(name), name).not.toHaveProperty("steal");
     }
+    // `arggon_cleanup` is the one surface that carries a `force`, by decision
+    // (bug-cleanup-prune-untracked-artifacts-no-force): it is the audited prune
+    // opt-in — terminal+merged items whose removal blockers are ALL untracked
+    // (never tracked changes, never a live claim) — and NOT the human-only
+    // claim power (`update --force`, refused for agent callers by the shared
+    // rules module) nor `steal`. The kernel keeps that gate; this pin records
+    // which surface the word may appear on.
+    expect(properties("arggon_cleanup")).not.toHaveProperty("steal");
+    expect(properties("arggon_cleanup")).toHaveProperty("force");
   });
 
   it("arggon_priority plans a dry run through the shared kernel operation", async () => {
