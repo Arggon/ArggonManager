@@ -4,7 +4,7 @@ status: in_progress
 id: bug-release-lockfile-sync-step-cannot-run
 title: "release-please.yml's lockfile-sync step fails: `npm install --package-lock-only` runs the root `prepare` -> `npm run build` -> TS2591 on the runner (no node_modules) - the run is red and the #1993 lockfile reconciliation never happens"
 assignee: arggon-delivery-lead
-branch: fix/bug-release-lockfile-sync-step-cannot-run
+branch: fix/bug-release-lockfile-sync-commit-staging
 parent: story-release-pipeline
 labels: [release, ci, failure-mode, gate-fidelity]
 created: "2026-10-12"
@@ -12,7 +12,6 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T17:27:25.869Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-lockfile-sync-step-cannot-run
 ---
-
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-lockfile-sync-step-cannot-run.md
   Leaves live only under a story. id is the filename stem: bug-release-lockfile-sync-step-cannot-run.
