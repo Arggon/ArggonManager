@@ -263,3 +263,10 @@ The standards review's request-changes is closed by the live observation it aske
 2. **Recovery executed** (the documented manual path): `gh pr edit 664 --add-label "autorelease: tagged" --remove-label "autorelease: pending"`; the merged-pending query now returns [].
 3. **Green next run**: the following release-please.yml run (this comment's own tracker push) is the healthy-state observation; its result is recorded in the comment below.
 4. Merge confirmed on main; auto-done flipped this item to `done` (#743). The `release.yml` run on the same merge push was green (guard rule 0: version unchanged).
+
+### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead — AC#5 green side observed (follow-up)
+
+- The next release-please.yml run after the label flip (run 38283343454, push aeb7b7b): **abort check OK** — verbatim `release-abort-check: OK — no merged release PRs still carrying 'autorelease: pending'; release-please is not aborting.` — and **release PR #744 opened** (`chore: release main`), the first release proposal since 2026-10-09.
+- So both branches of AC#5 are now observed live: RED naming #664 on the stuck state, and quiet OK + a release PR on the healthy state.
+- That run also concluded failure, but from a different, newly-exposed step: `Sync package-lock.json onto the release PR branch` — `npm install --package-lock-only` runs the root `prepare` → `npm run build`, and tsc fails on the runner without an install (TS2591). Filed as `bug-release-lockfile-sync-step-cannot-run` with evidence and a real-run verification requirement. It is not this item's gate.
