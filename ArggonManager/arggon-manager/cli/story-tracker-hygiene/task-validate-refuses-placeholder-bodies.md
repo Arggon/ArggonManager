@@ -9,7 +9,6 @@ created: "2026-10-12"
 updated: "2026-10-12"
 depends_on: [task-author-methodology-improvements-bodies, task-author-parallel-worktree-bodies, task-author-tooling-env-bodies, task-author-ci-wall-clock-bodies, task-author-harness-transfer-bodies, task-author-spec-pipeline-body]
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-validate-refuses-placeholder-bodies.md
   Leaves live only under a story. id is the filename stem: task-validate-refuses-placeholder-bodies.
@@ -34,3 +33,6 @@ Hard constraint from the wave-1 survey: the guard must match the SCAFFOLD MARKER
 - [ ] `npm test` green; prettier clean; PR opened
 
 ## Notes
+
+### 2026-10-12 @ses_ed2ed434cffdHsqB0EV526IjUT
+Lead note (wave-1b gate): the guard change stays staged-uncommitted on its branch until `task-wave1b-agent-native-bodies` + `task-wave1b-mixed-bodies` merge — committing earlier turns main red on the pre-commit hook (the guard correctly refuses its own commit while 24 placeholders remain). Those two tasks are the remaining depends_on in effect; frontmatter `depends_on` untouched deliberately (`bug-update-depends-on-multiline-rejected`: the serializer would rewrite it multiline-broken).
