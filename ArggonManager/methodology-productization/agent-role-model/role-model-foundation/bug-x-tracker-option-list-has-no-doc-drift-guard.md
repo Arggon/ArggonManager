@@ -9,6 +9,7 @@ priority: p2
 created: "2026-10-04"
 updated: "2026-10-04"
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-x-tracker-option-list-has-no-doc-drift-guard.md
   Leaves live only under a story. id is the filename stem: bug-x-tracker-option-list-has-no-doc-drift-guard.
@@ -20,21 +21,31 @@ updated: "2026-10-04"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+Found while reviewing PR #637 (`task-role-model-report-only-detector`), raised by the worker and confirmed by the coordinator: the `x-tracker` option list in `ArggonManager/docs/convention.md` §Tracker hygiene is PROSE WITH NO STRUCTURAL GUARD. `cli/src/convention.test.ts` and its siblings assert PARSING BEHAVIOUR; nothing asserts that the documented option list matches the keys `TrackerConfig` actually reads.
+
+The consequence is not hypothetical: `x-tracker.product-acceptance` was implemented and merged with its option UNDOCUMENTED — the flag existed in `lib/src/convention.ts` while `convention.md` still listed only `auto-commit`, `allow-steal`, `strict-gate-bins` and `strict-worktree-writes`. The PR's CI was green throughout, including the seam-drift and docs gates. It was caught by a worker's escalation, not by a test. That is the same class as the ADR-index drift (`adr-index-parity.test.ts`), which exists because the index silently rotted three times.
+
+The standards-reviewer verdict (`verdict: approve`, drift guard + 3 doc clauses) verified by reading: the new `cli/src/convention-option-doc-contract.test.ts` (397 lines, 18 assertions) derives option names from the kernel and the doc and restates nothing — kernel `key === "…"` branches, exported type members, and default-object keys agree on all five sections (`x-tracker` 6, `x-playbooks` 1, `x-import` 1, `x-worktree` 4, `x-github` 1), with type-boolean members equal to the parser's boolean validations; the boolean parse-error sentence is asserted `toEqual` in BOTH directions (the guard found two real gaps — §Worktree bootstrap's `env` and §Issue round-trip's `issue-roundtrip` carried no boolean window while the kernel validates both); the `undocumented-by-design` escape hatch is real, documented, currently unused (0 hits in `lib/src/convention.ts`), and discriminating by construction; and the `x-views` / `x-generated` exclusions are honest (open vocabulary / machine-written state with no adopter-facing enumeration sentence), with the guard forcing any new `### … (x-name)` section to join `SECTIONS` or `UNGUARDED_SECTIONS` with a reason. Three non-blocking notes ride along (a marked-but-doc-mismatched boolean reads as a kernel mismatch; the marker is line-scoped, not branch-scoped; a future duplicate dispatch would drop the first block's keys — all fail-loud, worth one-line comments).
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] A test derives the official `x-tracker` option list from the type/parser (the single source) and asserts `docs/convention.md` §Tracker hygiene names every key — a new option cannot be added without a doc line
+- [ ] The guard covers the PARSE-ERROR SENTENCE too: the keys it enumerates as boolean-only are exactly the boolean keys, so a boolean option cannot ship outside that list
+- [ ] The same treatment for the namespaced extensions documented alongside it (`x-views`, `x-playbooks`, `x-import`, `x-worktree`) if the derivation is cheap; if not, say so in the item rather than half-doing it
+- [ ] A deliberate escape hatch: an inline marker or an explicit allow-list, documented, so a genuinely undocumented-by-design option is possible and visible in review
+- [ ] `npx prettier --check` clean; `arggon validate` + `npm test` green
+- [ ] The test reads the doc and the source, not a copy of either — a guard that restates the list in the test is the same bug one level down
 
 ## Notes
 
 ### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+
 ## Context
 
 Found while reviewing PR #637 (`task-role-model-report-only-detector`), raised by the
 worker and confirmed by me: the `x-tracker` option list in
 `ArggonManager/docs/convention.md` §Tracker hygiene is **prose with no structural guard**.
-`cli/src/convention.test.ts` and its siblings assert *parsing behaviour*; nothing asserts
+`cli/src/convention.test.ts` and its siblings assert _parsing behaviour_; nothing asserts
 that the documented option list matches the keys `TrackerConfig` actually reads.
 
 The consequence is not hypothetical: `x-tracker.product-acceptance` was implemented and
@@ -56,6 +67,7 @@ because the index silently rotted three times.
 - [ ] The test reads the doc and the source, not a copy of either — a guard that restates the list in the test is the same bug one level down
 
 ### 2026-10-11 @ses_ed4c5d320ffeScEzxxks3AMgTV
+
 verdict: approve (drift guard + 3 doc clauses)
 
 ## What I read
@@ -69,13 +81,13 @@ verdict: approve (drift guard + 3 doc clauses)
 
 **(a) Derives from the kernel and the doc, restates nothing.** Expected: option names come from the kernel, never from a list in the test. Observed: `readKernelSections` walks the kernel text for `key [!=]== "…"` branches under each `if (section === "x-…")` dispatch; `typeMembers` reads the exported type declaration; `documentedOptions` slices the doc's own "the official options today are …" sentence; `documentedBooleans` slices the doc's own `or an \`k\` … value that is not \`true\`/\`false\`` window. The only literals are the `SECTIONS` table (section key ↔ kernel type ↔ projection — structure, no option names), `UNGUARDED_SECTIONS` and the marker string. I traced all 18 assertions by hand:
 
-| Section | type members | parser read-keys | default-object keys |
-| --- | --- | --- | --- |
-| `x-tracker` | 6 | 6 (allow-steal, strict-gate-bins, strict-worktree-writes, product-acceptance, reap-acked-orphans, auto-commit) | 6 |
-| `x-playbooks` | 1 | 1 | 1 |
-| `x-import` | 1 | 1 | 1 |
-| `x-worktree` | 4 | 4 | 4 |
-| `x-github` | 1 | 1 | 1 |
+| Section       | type members | parser read-keys                                                                                               | default-object keys |
+| ------------- | ------------ | -------------------------------------------------------------------------------------------------------------- | ------------------- |
+| `x-tracker`   | 6            | 6 (allow-steal, strict-gate-bins, strict-worktree-writes, product-acceptance, reap-acked-orphans, auto-commit) | 6                   |
+| `x-playbooks` | 1            | 1                                                                                                              | 1                   |
+| `x-import`    | 1            | 1                                                                                                              | 1                   |
+| `x-worktree`  | 4            | 4                                                                                                              | 4                   |
+| `x-github`    | 1            | 1                                                                                                              | 1                   |
 
 All three faces agree on every section, and `typeMembers`' boolean members = the parser's `'…' must be a boolean` validations on every section. Rule 1 is real, not decorative.
 
@@ -89,8 +101,8 @@ All three faces agree on every section, and `typeMembers`' boolean members = the
 
 ## Findings (none blocking)
 
-1. `boundAdmissionStamp` — see the reverse-direction note: `expected` is filtered by `exempt` but `documented` is not, so a doc parse-error sentence naming a *marked* boolean option fails with a message that reads as a kernel mismatch. Fail-loud, so acceptable; worth a one-line comment.
-2. The `undocumented-by-design` marker is **line**-scoped (`line.includes(marker)`), not branch-scoped: a marker placed on the `throw` line below the `if (key === "…")` line silently does not apply. It fails the doc rule afterwards, so it is not a silent disarm, but the doc says "carries the marker on its parse branch" without saying the branch's *first* line.
+1. `boundAdmissionStamp` — see the reverse-direction note: `expected` is filtered by `exempt` but `documented` is not, so a doc parse-error sentence naming a _marked_ boolean option fails with a message that reads as a kernel mismatch. Fail-loud, so acceptable; worth a one-line comment.
+2. The `undocumented-by-design` marker is **line**-scoped (`line.includes(marker)`), not branch-scoped: a marker placed on the `throw` line below the `if (key === "…")` line silently does not apply. It fails the doc rule afterwards, so it is not a silent disarm, but the doc says "carries the marker on its parse branch" without saying the branch's _first_ line.
 3. `readKernelSections` keys sections by name and `sections.set` overwrites; a future duplicate dispatch for one section would drop the first block's keys. The "one branch per option" assertion makes that fail rather than pass silently.
 
 ## What remains unverified

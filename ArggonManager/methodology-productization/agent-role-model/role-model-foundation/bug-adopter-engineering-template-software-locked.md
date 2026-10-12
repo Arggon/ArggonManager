@@ -9,6 +9,7 @@ priority: p2
 created: "2026-10-04"
 updated: "2026-10-04"
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-adopter-engineering-template-software-locked.md
   Leaves live only under a story. id is the filename stem: bug-adopter-engineering-template-software-locked.
@@ -20,23 +21,37 @@ updated: "2026-10-04"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+ADR 0021 §6.2 makes domain neutrality part of the methodology: a role is named by WHAT THE PROJECT DECLARES, never by software artifacts. The carriers now honor that, but `templates/docs/docs/engineering.md` — the template `arggon init` renders into every adopting repo's `ArggonManager/docs/engineering.md` — still opens with "code is cheap; good practices and sound software architecture are always important" and keeps "Tests cover the behavior change" in its expectations table. So the first document a non-software adopter reads after `init` teaches them a software-only bar, while the carriers say otherwise. Found reviewing PR #636 (the worker flagged it rather than widening scope — correct, `templates/**` was outside its file set).
+
+Scope widened twice by the coordinator, both from sibling reviews, both belonging here rather than as near-duplicates. From PR #638's review (`bug-parity-invariant-restated-outside-carriers`): `templates/docs/docs/convention.md:3` still says "Humans and agents follow the same rules" VERBATIM, which the two-axis rule (ADR 0021 §1) superseded — the file that becomes every new adopter's `ArggonManager/docs/convention.md` teaches the superseded rule at `init` time. Worse, no test guards it: `cli/src/init-docs.test.ts:166` asserts the file is adopter-owned but never compares its content against the carriers' invariant block, so an adopter template can carry a superseded rule, ship green, and be wrong at every adopter's first read — the same class as `bug-x-tracker-option-list-has-no-doc-drift-guard`. From PR #641's review: `templates/docs/AGENTS.md:17` carries a pre-rename role word (PR #641 renamed the ids the shipped seam generates; the adopter templates were deliberately out of its scope).
+
+The standards-reviewer verdict (`verdict: approve`, review-bar generalization + family drift guard) verified by reading: all five reviewable rows keep their teeth (operating principle, verification, docs/item-id/validate, scalability, security, end-to-end — the last two marginally stronger, with software nouns surviving only inside two explicitly-marked worked examples); the new `cli/src/adopter-template-invariant-drift.test.ts` (272 lines, 3 clauses) is a real drift guard — carriers carry ONE Invariants block and ONE Scope line (precondition), the whole `templates/docs/**` `.md` family is walked (not hand-listed) with byte-identity assertions read from the carriers at run time plus an anti-shrink clause, so a vacuous walk is impossible (invariants byte-identical across all four carriers and both templates, md5 `c404a661a98a`); and the CHANGELOG `## [Unreleased]` hand-edit is this repo's live convention (precedent PR #541 `fcbb3356`, absorbed by the release PR's curation step), not a hazard. Four non-blocking findings ride along: the guard's header overstates what it compares (README bullets are plain list items, not blockquote-prefixed); the docs-only exemption moved inside the software worked example; the `templates/docs/zcode/**` + `templates/docs/opencode/**` seam exclusion leaves the exact guarded class (a pre-rename role word at `templates/docs/zcode/arggon/commands/arggon-goal.md:29`) in the excluded subtree — file it, don't widen here; and the convention extension table was re-padded by prettier (content unchanged).
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] The operating principle and the testing-expectations rows are restated as what the adopting project declares, software case kept as one marked worked example
+- [ ] Software-noun table headers generalized the same way
+- [ ] The REVIEW BAR KEEPS ITS TEETH: a generically stated bar is still blocking, still evidenced, still owned — no bar weakened or dropped while being generalized
+- [ ] `templates/docs/docs/convention.md` carries the two-axis rule (or points at the carrier that does) instead of the verbatim parity sentence
+- [ ] `templates/docs/AGENTS.md:17` uses the shipped role vocabulary (ADR 0021 §6.1) rather than the pre-rename wording
+- [ ] A GUARD EXISTS: a test asserts the adopter templates' invariant statement matches the carriers' invariant block, so the two cannot drift; the guard covers the whole template family (`engineering.md`, `agents.md`, `convention.md`, `AGENTS.md`, `README.md`) rather than the single file that happened to break, and the family cannot silently shrink
+- [ ] `x-generated` provenance respected — re-running `init` does not read as adopter-edited spuriously
+- [ ] ADR 0016 upgrade-channel note: an EXISTING adopter's copy is not refreshed by `init` (never-overwrite), so the corrected template only reaches NEW trees. Say in the release notes that adopters must reconcile their own copies, and decide whether `init --propose` should carry it
+- [ ] Cross-checked against `templates/docs/docs/agents.md` and `convention.md` for the same lock (if clean, say so in the item rather than editing them), and `templates/docs/docs/AGENTS.md:17` work-loop-parity statements left alone where still correct under the two-axis rule
+- [ ] `cli/src/init.test.ts` + the prose-format suite green; `arggon validate` ok; prettier clean
 
 ## Notes
 
 ### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+
 ## Context
 
 ADR 0021 §6.2 makes domain neutrality part of the methodology: a rule is named by
 **what the project declares**, never by software artifacts. The carriers now honor
 that, but `templates/docs/docs/engineering.md` — the template `arggon init` renders
 into every adopting repo's `ArggonManager/docs/engineering.md` — still opens with
-*"code is cheap; good practices and sound software architecture are always
-important"* and keeps *"Tests cover the behavior change"* in its expectations table.
+_"code is cheap; good practices and sound software architecture are always
+important"_ and keeps _"Tests cover the behavior change"_ in its expectations table.
 
 So the first document a non-software adopter reads after `init` teaches them a
 software-only bar, while the carriers say otherwise. Found reviewing PR #636 (the
@@ -53,6 +68,7 @@ file set).
 - [ ] Cross-checked against `templates/docs/docs/agents.md` and `convention.md` for the same lock — if clean, say so in the item rather than editing them
 
 ### 2026-10-04 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+
 ### 2026-10-04 @coordinator — scope widened (finding from PR #638's review)
 
 A worker on `bug-parity-invariant-restated-outside-carriers` found the **same defect in a
@@ -60,13 +76,13 @@ sibling file with a larger blast radius**, and it belongs in this item rather th
 near-duplicate:
 
 - **`templates/docs/docs/convention.md:3`** — the adopter template `arggon init` writes into
-  every new project still says *"Humans and agents follow the same rules"* **verbatim**,
+  every new project still says _"Humans and agents follow the same rules"_ **verbatim**,
   which the two-axis rule (ADR 0021 §1) superseded. This is the file that becomes every
   new adopter's `ArggonManager/docs/convention.md`, so it teaches the superseded rule at
   `init` time — before the adopter has read anything else.
 
 **The part that matters more than the sentence:** no test guards it.
-`cli/src/init-docs.test.ts:166` asserts the file is *adopter-owned* but never compares its
+`cli/src/init-docs.test.ts:166` asserts the file is _adopter-owned_ but never compares its
 content against the carriers' invariant block. So an adopter template can carry a
 superseded rule, ship green, and be wrong at every adopter's first read. That is the same
 class as `bug-x-tracker-option-list-has-no-doc-drift-guard` — a carrier restated in a
@@ -81,6 +97,7 @@ second place with nothing tying the two together.
 - [ ] Cross-checked against `templates/docs/docs/AGENTS.md:17` and `templates/docs/docs/viewer-spike.md` — the work-loop-parity statements there are still correct under the two-axis rule and must be left alone
 
 ### 2026-10-05 @ses_ef83b74e6ffeC6D8RVXoC2u06K
+
 ### 2026-10-04 @coordinator — one more file added (from PR #641's review)
 
 `templates/docs/AGENTS.md:17` carries a **pre-rename role word**, so the adopter template family
@@ -89,11 +106,12 @@ sweep now has a fourth member. Add it to this item's file set and to the guard c
 - [ ] `templates/docs/AGENTS.md:17` uses the shipped role vocabulary (ADR 0021 §6.1) rather than the pre-rename wording
 - [ ] The existing guard row ("the whole template family, not the file that happened to break") now covers `engineering.md`, `agents.md`, `convention.md`, `AGENTS.md`, `README.md`
 
-Note for whoever picks this up: PR #641 renamed the ids the *shipped* seam generates. The
+Note for whoever picks this up: PR #641 renamed the ids the _shipped_ seam generates. The
 **adopter templates** are a separate copy and were deliberately out of that PR's scope — which
 is why this item exists.
 
 ### 2026-10-11 @ses_ed4c5d320ffeScEzxxks3AMgTV
+
 verdict: approve (review-bar generalization + family drift guard)
 
 ## What I read
@@ -109,14 +127,14 @@ verdict: approve (review-bar generalization + family drift guard)
 
 **(a) The review bar kept its teeth.** Expected: generic but still blocking, still evidenced, still owned. Observed — row by row, all five reviewable rows, both non-functional bars and the end-to-end clause survive with the requirement intact:
 
-| Row | Before | After | Teeth |
-| --- | --- | --- | --- |
-| Operating principle | "code is cheap; …always important" | "the artifact is cheap; sound structure and good practice are always important" + declare-your-own + marked worked example | intact (still "always", still blocks "refactor later") |
-| Verification row | "Tests cover the behavior change" | "The verification this project declares for the change exists and covers it — new checks for new behavior, updated checks for changed behavior" | intact (same obligation, generalized noun) |
-| Docs / item id / arggon validate | verbatim | verbatim | intact |
-| Scalability | "payloads stay bounded; complexity is declared … no unbounded reads or renders" | "the artifact's cost stays bounded wherever its inputs grow with the data (a superlinear step must justify its input ceiling); no unbounded reads, renders or rework" | intact, marginally stronger |
-| Security | "subprocess arguments are arrays, never shell-interpolated" | "anything that reaches a shell, a store or a third party is validated or parameterized, never interpolated" | intact and broader |
-| End-to-end | "Smoke gate (blocks merge)… CLI: probe…; UI: real browser…; Docs-only exempt" | "**Blocking end-to-end check (blocks merge)**… run it and record expected-vs-observed evidence in the review verdict. Blocking means the verdict says so, the evidence is attached, and someone owns the call." + marked software examples | intact, and strengthened by adding an explicit owner |
+| Row                              | Before                                                                          | After                                                                                                                                                                                                                                      | Teeth                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| Operating principle              | "code is cheap; …always important"                                              | "the artifact is cheap; sound structure and good practice are always important" + declare-your-own + marked worked example                                                                                                                 | intact (still "always", still blocks "refactor later") |
+| Verification row                 | "Tests cover the behavior change"                                               | "The verification this project declares for the change exists and covers it — new checks for new behavior, updated checks for changed behavior"                                                                                            | intact (same obligation, generalized noun)             |
+| Docs / item id / arggon validate | verbatim                                                                        | verbatim                                                                                                                                                                                                                                   | intact                                                 |
+| Scalability                      | "payloads stay bounded; complexity is declared … no unbounded reads or renders" | "the artifact's cost stays bounded wherever its inputs grow with the data (a superlinear step must justify its input ceiling); no unbounded reads, renders or rework"                                                                      | intact, marginally stronger                            |
+| Security                         | "subprocess arguments are arrays, never shell-interpolated"                     | "anything that reaches a shell, a store or a third party is validated or parameterized, never interpolated"                                                                                                                                | intact and broader                                     |
+| End-to-end                       | "Smoke gate (blocks merge)… CLI: probe…; UI: real browser…; Docs-only exempt"   | "**Blocking end-to-end check (blocks merge)**… run it and record expected-vs-observed evidence in the review verdict. Blocking means the verdict says so, the evidence is attached, and someone owns the call." + marked software examples | intact, and strengthened by adding an explicit owner   |
 
 **(b) Worked examples clearly marked.** Observed: exactly two, both italicized and explicitly scoped — _Worked example (software):_ (the operating principle) and _Worked examples (software):_ (the end-to-end check). The software nouns survive in the examples, not in the bars. The claim is honest.
 
@@ -135,7 +153,7 @@ verdict: approve (review-bar generalization + family drift guard)
 
 ## What remains unverified
 
-Execution. I ran no gate: not npm test (2933 tests), not argong validate, not prettier --check, not the init --propose fixture proof, not the five reverted red runs. I verified by reading that the assertions *can* fail and that the invariants they compare are byte-identical; the red-run evidence and the gate results are the verifier's to reproduce.
+Execution. I ran no gate: not npm test (2933 tests), not argong validate, not prettier --check, not the init --propose fixture proof, not the five reverted red runs. I verified by reading that the assertions _can_ fail and that the invariants they compare are byte-identical; the red-run evidence and the gate results are the verifier's to reproduce.
 
 ## Probes needed
 

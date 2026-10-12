@@ -8,6 +8,7 @@ labels: [docs, tests]
 created: "2026-10-03"
 updated: "2026-10-03"
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-adapter-selection/task-adapter-report-nits-from-review.md
   Leaves live only under a story. id is the filename stem: task-adapter-report-nits-from-review.
@@ -31,11 +32,18 @@ Still informational from round 1, also unfiled: `runAdapterReport` re-reads `.co
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] `README.md:292-294` shows the post-round-2 human line the shipped CLI actually emits (the pinned shape in `adapter-selection.test.ts` is the oracle; the pre-round-2 string is gone)
+- [ ] `json-output.md:236` carries exactly one adopter-edited clause — the superseded "never overwrites it" wording and its dangling `)` are removed, leaving the `--backup` archive-and-regenerate wording
+- [ ] `json-output.md:237` documents all eight `agents.agents[].counts` keys (adding `acknowledged` / `acknowledged-drifted`), matching the code, the sample and the pinned `Object.keys`
+- [ ] The sample caption describes the 9 `adopter-edited` rows honestly: 8 `docs.modified` entries plus the 9th carrying NO provenance state, so the `docs` block cannot see it
+- [ ] `adapter-selection.test.ts:274` asserts the shipped identity `written + replaced + skipped === total` (the always-zero bucket asserted anyway, with the reason commented)
+- [ ] The round-1 informational finding is closed or waived with a reason: `runAdapterReport` reads the state file once so the `docs` and matrix blocks cannot disagree
+- [ ] The review's minimum for the `--agents` sample block is met: no line of the contract names a retired seam path, and the block is either re-measured against the live seam (per-agent `counts.total` consistent with `README.md`) or annotated as a dated snapshot no longer calling itself "re-measurable"
 
 ## Notes
 
 ### 2026-10-11 @ses_ed4c5d320ffeScEzxxks3AMgTV
+
 verdict: request-changes (narrow: the doctor --agents sample block in ArggonManager/docs/json-output.md)
 
 Everything else in this item is right. The three things below are all in the one JSON sample block whose CAPTION this PR rewrites, and one of them is a contradiction this PR creates.
@@ -71,6 +79,7 @@ Everything else in this item is right. The three things below are all in the one
 ## What I need
 
 Minimum, in this PR:
+
 - Replace or annotate `.opencode/agents/arggon-coordinator.md` in the sample so no line of the contract names a retired seam path (one line, unambiguously in scope — it is the same file and the same block as the caption this PR edits).
 - Either re-measure the sample block (init --full on a fixture + arggon adopt --ack to reproduce the acknowledged / adopter-edited states, then paste the real counts) or annotate the block as a dated snapshot whose numbers no longer describe the live seam, and stop calling it "re-measurable".
 
