@@ -33,3 +33,7 @@ Wave 1 of `decided: A` on `bug-template-only-bodies-ship-green`: the blocking gu
 - [ ] Prettier clean; `arggon validate` green; PR opened
 
 ## Notes
+
+### handoff 2026-10-12 @ses_ed2570971ffeDcOy6iRnDSFG5M (session: ses_ed2570971ffeDcOy6iRnDSFG5M) — next: Delivery lead: review 12 bodies, open PR from pushed branch 808e7f6f, send to standards review
+- branch: feat/task-author-methodology-improvements-bodies
+- open questions: Accept prettier-mandated cosmetic normalization of Notes history + 3 YAML titles?; all 12 were placeholders, none pre-authored
