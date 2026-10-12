@@ -9,7 +9,6 @@ parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
-worktree_path: /home/arggon/Projects/ArggonManager-task-wave1b-agent-native-bodies
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-wave1b-agent-native-bodies.md
