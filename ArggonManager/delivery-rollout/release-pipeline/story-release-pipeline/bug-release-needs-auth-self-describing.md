@@ -68,3 +68,17 @@ semantics are untouched (the wrapper exits with npm's status).
 - [x] The change does NOT restructure `release.yml`'s publish semantics: lib-first order, "already published = success", propagation poll, OIDC-only (no `NPM_TOKEN`) all unchanged — and the workflow filename stays `release.yml` (the trusted-publisher binding; renaming is a breaking ops change)
 
 ## Notes
+
+### 2026-10-12 — classification decision (arggon-maker)
+
+The rule is "auth ⇒ pointer, everything else ⇒ silence", grounded in:
+`release.md` § "One-time setup: npm trusted publishers" names `ENEEDAUTH` as the
+only surface of a wrong trusted-publisher entry; npm/cli#9088 records the second
+trusted-publishing failure shape — an old npm on the runner reports the same
+misconfiguration as a **404** ("package not found"), which is also what a name
+typo looks like. A 404 therefore gets **no** pointer: telling the two apart is
+not something a stderr scan can do honestly, and a wrong hint on a real failure
+is worse than none. `E401` is the one status that is unambiguously the registry
+refusing the credential, and this workflow carries no token, so a 401 here can
+only be the trusted-publisher path. The `npm ≥ 11.5.1` upgrade step in
+`release.yml` is the mitigation for the #9088 class and already ships.
