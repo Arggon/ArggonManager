@@ -8,7 +8,6 @@ labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-wave1b-agent-native-bodies.md
   Leaves live only under a story. id is the filename stem: task-wave1b-agent-native-bodies.
@@ -30,3 +29,10 @@ Wave-1b of `decided: A`: the blocking guard (`task-validate-refuses-placeholder-
 - [ ] Prettier clean (modulo a disclosed single-line depends_on exception); `arggon validate` green; PR opened
 
 ## Notes
+
+### 2026-10-12 @ses_ed2ed434cffdHsqB0EV526IjUT
+verdict: approve (12 agent-native bodies, docs-only, smoke-exempt)
+- Read the worktree diff (12 bug files + own item file) — nothing else; scope stays on the item
+- Standards-reviewer: approve, no blocking findings (frontmatter values identical incl. YAML-identical requotes; 3 transcriptions spot-checked; 3 zero-Notes files grounded with all pins resolving at HEAD; normalizations value-equivalent; handoff typo accepted as harmless)
+- Verifier: prettier clean on all 12, validate ok, no scaffold markers, no ticked boxes
+- Recommendation: merge PR #737 (merge, not squash) on green CI; lead ticks Acceptance after merge and flips done
