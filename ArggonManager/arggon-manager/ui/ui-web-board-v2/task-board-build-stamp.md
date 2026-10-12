@@ -8,6 +8,7 @@ labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-build-stamp.md
   Leaves live only under a story. id is the filename stem: task-board-build-stamp.
@@ -19,10 +20,13 @@ updated: "2026-10-12"
 
 ## Context
 
-<!-- Why this task exists. -->
+Found 2026-10-12 from a product-owner report: the drawer on their board shows the PRE-#728 shape (parent as plain text, no children section) while current main provably renders parent-as-link + children (reproduced in Chromium against a fresh `board --serve`: `data-detail-id` anchor + `drawer-children` section present; `/api/item` edges exact). Diagnosis is stale deployment — a checkout/build predating the #728 merge, a cached page/JS bundle, or a static export generated before #728 — but nothing in the board says which commit it was served from, so "stale" vs "broken" took a full repro to separate. The board has a freshness stamp for data; it has no identity for its own build.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] The served board and the static export expose the build commit (hash and/or release version) somewhere the viewer can read without devtools (footer, drawer meta, or equivalent)
+- [ ] The value comes from the build (`write-build-info.mjs` or equivalent), never hand-maintained
+- [ ] Static export stamps at export time; serve mode stamps at server start
+- [ ] `board-parity` pins it; `arggon validate` green; prettier clean; PR opened
 
 ## Notes
