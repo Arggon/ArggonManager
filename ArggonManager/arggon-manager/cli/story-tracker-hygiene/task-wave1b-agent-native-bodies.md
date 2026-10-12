@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-wave1b-agent-native-bodies
 title: "Wave-1b bodies: 12 agent-native placeholder bugs (worktree, MI, spec-pipeline)"
+assignee: arggon-delivery-lead
+branch: feat/task-wave1b-agent-native-bodies
 parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
+claimed_at: "2026-10-12T03:27:54.878Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-wave1b-agent-native-bodies
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-wave1b-agent-native-bodies.md
   Leaves live only under a story. id is the filename stem: task-wave1b-agent-native-bodies.
