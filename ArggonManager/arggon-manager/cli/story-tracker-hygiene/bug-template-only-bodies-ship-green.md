@@ -8,7 +8,6 @@ labels: []
 created: "2026-10-11"
 updated: "2026-10-11"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/bug-template-only-bodies-ship-green.md
   Leaves live only under a story. id is the filename stem: bug-template-only-bodies-ship-green.
@@ -44,3 +43,9 @@ decide: how loudly should the tracker complain about placeholder item bodies (th
 - The recommendation: B first, C as the follow-up — report-only now because a blocking gate over 38 open items (plus unknown adopter trees) holds delivery hostage to a cleanup backlog, and the warning gives us the list to burn down before any gate is armed.
 - The strongest argument against that recommendation: report-only is how this exact rot happened — the convention already says bodies matter and every surface stayed silent; a warning nobody reads is the same silence with better formatting, and option A is the only one that guarantees the next placeholder never ships.
 - The default: B, from 2026-10-25 — the maker implements the report-only surface; if the finding list is still unread after one release cycle, the lead re-briefs with the burn-down numbers attached.
+
+### 2026-10-12 @ses_ed2ed434cffdHsqB0EV526IjUT
+decided: A recorded — implementing as blocking. The 2026-10-25 default (B) is superseded by this answer; the brief above stands unwritten-per-convention (a superseded brief is never rewritten).
+- Owner's reasoning: the delivery lead owns backlog creation and maintenance, so report-only (B) and split (C) — both of which park the rot in the backlog — are not options. The toolchain must refuse.
+- Implementation order this forces: placeholder bodies on currently-open items FIRST (a blocking `validate` over today's ~38 open placeholders would otherwise turn every lane red on landing), the blocking guard SECOND with the tree already clean.
+- Scope kept: done/cancelled items stay excluded (history, not the contract); the guard reads item bodies, not a marker copy; waiver stays human-only per the done-gate shape.
