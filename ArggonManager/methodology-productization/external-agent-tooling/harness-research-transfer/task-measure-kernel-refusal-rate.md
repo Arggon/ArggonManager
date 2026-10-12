@@ -10,7 +10,6 @@ labels: [methodology, telemetry, research]
 priority: p2
 created: "2026-10-05"
 updated: "2026-10-12"
-worktree_path: /home/arggon/Projects/ArggonManager-task-measure-kernel-refusal-rate
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-measure-kernel-refusal-rate.md
