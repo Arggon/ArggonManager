@@ -143,3 +143,13 @@ verdict: approve (scope: failure-path annotation for both release publish steps 
 2. `spawnSync`'s default maxBuffer (1 MiB per stream): more than 1 MiB of npm stderr sets `child.error` and exits 2 through `usage()` before re-emitting npm's (truncated) stderr — the one path where "nothing is swallowed" is not strictly true. Pathological; noted for completeness.
 
 **Not verified here (verifier territory).** The item's observed gate outputs — `npx vitest run cli/publish-auth-hint.test.ts` 39/39, `npm run test` 3181, `test:structure`, `lint:structure`, prettier on changed files, actionlint, eslint — and the actual GitHub Actions run are execution evidence; the maker's expected→observed record is on the item and the offline fixture suite is the applicable smoke for this CI-only change. The verifier's independent run is the standing confirmation; a result contradicting those numbers (or negative-path assertions failing) would change this verdict. No probes requested — no execution evidence is missing from the maker's bundle.
+
+### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead
+verdict: approve (artifact + evidence; CI-only change — offline fixture smoke is the applicable smoke)
+
+- Independent diff read (lead): `release.yml` wraps exactly the two publish invocations plus comments — lib-first order, "already on registry = success" short-circuit, the 300 s propagation poll, OIDC-only permissions, step names/`if:`/order and the `release.yml` filename all unchanged. `cli/publish-auth-hint.mjs` classifies narrowly (ENEEDAUTH / E401 / four message shapes), passes the child's exit status through (`process.exitCode`, pinned for 1/7/0), re-emits npm's stderr verbatim, and annotates nothing on success; the E404 silence is deliberately recorded (npm/cli#9088 masks a trusted-publisher mismatch as a 404 — "a wrong hint on a real failure is worse than none").
+- Standards review: `verdict: approve` (landed on this item; no probes needed). The five boxes PR #738 landed mid-flight are subsumed by the seven this fix was dispatched against; the reviewer verified the mapping and that nothing was dropped.
+- Verifier execution evidence (this wave, worktree): new suite 39/39; full `npm run test` 145 files / 3160 tests pass; `test:structure` 5/5 green; offline smoke — ENEEDAUTH log → pointer block with `npm trust list`, the binding and the case-sensitivity warning (1 occurrence); E404 log → 0 pointer occurrences.
+- Two non-blocking review observations (message-fallback branch vs docstring; spawnSync maxBuffer edge) are filed as a follow-up under story-release-pipeline — not blockers.
+- Merging now; auto-done flips this item on merge.
