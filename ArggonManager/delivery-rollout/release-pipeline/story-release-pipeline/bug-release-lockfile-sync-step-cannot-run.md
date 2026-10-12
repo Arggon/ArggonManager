@@ -472,3 +472,22 @@ verdict: approve (lead merge call) — the standards request-changes (evidence f
 - Verifier replication (this wave): fixed invocation in a scratch copy of `origin/release-please--branches--main` → exit 0, `dep ^0.7.0` / `lib 0.7.0` (matching the branch), **no node_modules**, lockfile diff 2 lines; without the flag locally → lifecycle failure (structural cause corroborated, env caveat stated); diff scope = the step line + comments; actionlint clean.
 - CI green on the fixed head (cli 4m15s, tasks-validate, ui-smoke).
 - Merging now. The real-run acceptance box stays open and is mine: the merge push re-runs release-please.yml with release PR #744 open, and the fixed sync step must push the reconciled lockfile — that observation completes this item before its `done` flip.
+
+### 2026-10-12 @ses_eced77ddeffe7RDZa3wt3P1UKS
+### Second defect fixed — the commit path never staged (delivery on a fresh branch)
+
+Real-run finding accepted: run **38292422896** (merge `a27cd83`) showed the `--ignore-scripts` fix **works** (install exit 0, `up to date, audited 216 packages`, lockfile rewritten, diff fell through) and then died at `git commit` with exit 1 — `Changes not staged for commit: modified: package-lock.json` / `no changes added to commit`. The script never staged the file, so **the sync has never pushed a reconciled lockfile in its entire life** (no `git add` since 7230609f; a second latent defect, not a regression).
+
+**Fix:** `git add package-lock.json` immediately before the commit, explicit path, never `git add -A`, with an in-script comment recording why. It is the step's only commit path — checked: the only `git commit` in `release-please.yml`; no other workflow uses `--package-lock-only`. `set -euo pipefail` and the fail-loud property untouched.
+
+**Offline reproduction, both halves** (hook-less clone of `origin/release-please--branches--main`, HEAD `2cfe2dbe`, no `node_modules`, runner npm 10.9.9):
+
+- as shipped: install exit 0 (`^0.4.0`→`^0.7.0`, `0.4.0`→`0.7.0`) → `git diff --quiet` exit 1 → **`git commit` exit 1** with the run's verbatim message;
+- fixed: `git add package-lock.json` → commit `56e5512c` exit 0, `git show --name-only` → `package-lock.json` **only**, committed fields `^0.7.0` / `0.7.0`, `2 insertions / 38 deletions` (2 reconciled lines + 12 npm-10 `libc` removals);
+- second run of the sequence: install exit 0 → `git diff --quiet` exit 0 → the `already in sync` exit; `git status --porcelain` empty (clean no-op).
+
+Environment note for whoever re-runs this: a scratch *worktree* of this repo inherits the dev clone's `pre-commit` hook and fails with `tsx: command not found` before the staging error can appear — the runner has no hooks, so the repro used a standalone clone.
+
+**Delivery path:** #745 is `MERGED` (cannot reopen) and the merged branch still exists, but per your guidance I created a fresh branch `fix/bug-release-lockfile-sync-commit-staging` from current `origin/main` with just this change → **PR #747** (not merged). Branch record updated on the item: recorded.
+
+Gates re-run: `actionlint` exit 0 · `prettier --check` clean (both files) · `npm run test:structure` 5/5 · `npm run lint:structure` exit 0 · `arggon validate` ok (0 warnings). Acceptance: 5/6 ticked — the real-run box stays **unticked** for your re-observation.
