@@ -12,6 +12,7 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T22:10:29.800Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-cleanup-prune-untracked-artifacts-no-force
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-cleanup-prune-untracked-artifacts-no-force.md
   Leaves live only under a story. id is the filename stem: bug-cleanup-prune-untracked-artifacts-no-force.
@@ -191,26 +192,31 @@ is corrected here.
     once merged (they were already reaped by hand).
 
 ### 2026-10-12 @arggon-standards-reviewer
+
 ### 2026-10-12 @arggon-standards-reviewer (independent, read-only, item worktree)
 
 verdict: request-changes (docs only: three carriers still deny the `force` parameter this PR adds, and the README cleanup flag list omits `--force`; the code, tests, bundle and the three docs the maker updated are clean)
 
 **F1 — blocking (docs): carriers still say "there is no `force` parameter", now false.**
+
 - `ArggonManager/docs/agents.md:480` §MCP server: "an MCP caller cannot ... steal a claim (there is no `force` parameter)".
 - `skills/arggon-cli/references/json-contract.md:106` §MCP surface: "there is no `force` parameter anywhere on the surface".
 - `arggon_cleanup` now ships `force` (`cli/src/mcp-server.ts:531`, spawned as `--force` at :796; native `force: BOOLEAN` at `opencode/plugins/arggon/index.ts:5137`), and the narrowed `cli/src/mcp-server.test.ts` pin asserts it. The intent is right — no parameter touches a claim — but both sentences now read as factually false, in exactly the carriers an agent consults to discover the remedy this item exists to provide. `mcp-doc-contract.test.ts` pins membership/count only, so CI cannot catch it — the defect class its own docstring names ("a carrier restates a fact that changed elsewhere and the restatement is never updated").
 - Fix (prose only): "no `force` parameter touches a claim (`update --force` stays human-only with no native/MCP parameter); the only `force` is `arggon_cleanup`'s audited prune opt-in, refused without `prune`".
 
 **F2 — blocking (docs): README §cleanup flag list omits `--force` and predates the classification.**
+
 - `README.md:373` lists "Flags: `--prune`, `--release <id>`, `--take-over-worktree`, `--no-commit`, `--no-gh`, `--json`" — every other cleanup flag is listed (this is the maintained surface); `--force` is absent. The same paragraph's "dirty worktrees are refused by git, except that a start-created `.arggon.env` ... is reaped first" no longer describes the receipt (blockers are classified up front, skipped with `blockingPaths`, or reaped under the opt-in), and the release arm's "the only thing that forces the removal" now reads unqualified beside prune's `--force`.
 - Fix: add `--force` to the list and one clause for the untracked-blocker classification/opt-in.
 
 **Non-blocking notes**
+
 - N1 `lib/src/cleanup.ts:430`: when the porcelain probe returns `undefined`, the classifier keeps the pre-probe shape (`removable: true`, then a raw `failed` git error that does not name the manual sequence). Reachable only for an already-broken worktree — git's own removal check runs the same status probe — and documented in code; a follow-up could carry the manual sequence in the `failed` message too.
 - N2 `ArggonManager/docs/json-output.md:572`: the `release` row's "the only case in which the removal is forced" is true within the release arm, but `agents.md` got the "(prune's own, narrower opt-in is `--force`)" qualifier and this row did not.
 - N3 nit: in the mixed tracked+untracked case `blockingPaths` is emitted untracked-first (`lib/src/cleanup.ts:442`), which the field note's "as ONE `git status --porcelain` probe reported them" can be read to contradict; the count cap and exact `blockingTotal` hold either way.
 
 **Verified by reading (clean)**
+
 - Decision (b) narrowings hold end to end: `classifyCleanupEntry` order is terminal → branch → integration (ancestry or merged PR) → remote safety → existence/registration → one porcelain probe (`lib/src/cleanup.ts:371-471`); `forced` is set only inside that terminal+merged branch, only when every non-start-owned blocker is `??` and `deps.force === true` (:448-460). Live claims are unreachable by construction; `--force` without `--prune` refuses on all three surfaces — CLI throw (`cli/src/cleanup.ts:308`), native typed `CLEANUP_FAILED` (`opencode/plugins/arggon/index.ts:4633`), MCP (spawns the CLI and gets the `failJson` envelope; `cli/src/cli.ts` catch).
 - Tracked modifications refused with and without force (`lib/src/cleanup.ts:439-447`), proven intact by both suites' tests.
 - `--force` reaches git for exactly the classified entry: CLI `removeWorktree(root, path, { force: entry.forced === true })` (`cli/src/cleanup.ts:424`), native `removeWorktreeObserved(..., { force: entry.forced === true })` (`index.ts:4740`), and `defaultCleanupGit.removeWorktree` maps it to an argv array (`lib/src/cleanup.ts:249`). Start-owned unlink targets match the classifier's `primaryRoots`: CLI loop `mainRoot = worktreeList(root)[0]` + `root` (`cli/src/cleanup.ts:412-413`) vs the kernel default `[registered[0], root]`; native passes `[canonicalRoot(options, root), root]` and unlinks the same two (`index.ts:4727-4731`). Foreign `node_modules` and adopter-shaped `.arggon.env` stay blockers unforced.
@@ -220,11 +226,45 @@ verdict: request-changes (docs only: three carriers still deny the `force` param
 - The three docs the maker updated (`agents.md` §Cleanup, `json-output.md` §cleanup, `opencode2.md` payload row/figure) match the implementation; scope is clean (the `worktree.ts` read-only ownership twins are AC4's shared-declaration requirement and preserve `unlink*` semantics; the opencode2.md figure correction is disclosed).
 
 **Execution evidence (read, not run — this role does not execute gates)**
+
 - PR #751 checks: `cli` SUCCESS (build, `check:plugin`, `npm test`, lint, `test:structure`, `lint:structure`, spec baseline, `smoke:native-start-cold`), `ui-smoke` SUCCESS, `tasks-validate` SUCCESS → the committed-bundle drift gate and the full suite are green on this head.
 - Not verifiable by reading: the advisory `doctor --budget` figures (12,189 B native / 16,296 B MCP) and a standalone fixture smoke record.
 
 ## Probes needed (verifier; advisory — does not change this verdict)
+
 - `npm run arggon -- doctor --budget` (cwd: the item worktree) — expected native ≤ 12,288 B, MCP ≤ 16,384 B; if it fails, the opencode2.md figure and a trim decision change.
 - Optional §Review bar smoke record: on a throwaway fixture repo, `arggon cleanup --prune --json` → skip with `blockingPaths` + reason; then `arggon cleanup --prune --force --json` → `removed worktree … forced: true`. CI's real-git integration tests already cover this shape.
 
 Recommendation: no-merge until F1/F2 are fixed (docs-only, no code change); the code half is approvable as-is.
+
+### 2026-10-12 @arggon-maker — review response (docs-only round)
+
+F1/F2/N2 fixed in `9dae1a8a` — docs only, no code touched:
+
+- **F1** — `ArggonManager/docs/agents.md` §MCP server and
+  `skills/arggon-cli/references/json-contract.md` §MCP surface now state that no
+  `force` parameter touches a claim (`update --force` stays human-only, with no
+  native/MCP parameter) and that the only `force` on the surface is
+  `arggon_cleanup`'s audited prune opt-in (terminal+merged, untracked blockers
+  only, refused without `prune`/`force requires prune`, never tracked
+  modifications).
+- **F2** — `README.md` §cleanup: `--force` added to the maintained flag list,
+  and the paragraph now describes the up-front blocker classification (skip with
+  `blockingPaths`/`blockingTotal` + a reason naming `--force` and the manual
+  sequence; tracked modifications refused with or without it; start-owned
+  artifacts never blockers) instead of the pre-classification "dirty worktrees
+  are refused by git" sentence; the release arm's "only thing that forces the
+  removal" is qualified as the release's own hatch.
+- **N2** — `ArggonManager/docs/json-output.md` release row now carries the
+  "(prune's own, narrower opt-in is `--force`, reported as `candidates[].forced`)"
+  qualifier.
+- **Wording check across the carriers** (agents.md §Cleanup + §MCP server,
+  json-contract.md, README.md, json-output.md): default refusal, `--force`
+  requires `--prune`, terminal+merged+untracked-only, tracked modifications never
+  discarded, and the manual sequence named in the refusal — no contradictions.
+- **Gates for this round**: `npx prettier --check` on the four changed files
+  clean; `npm run arggon -- validate` ok (0 warnings); `cli/src/mcp-doc-contract.test.ts`
+  - `cli/src/skill-generated-commands.test.ts` + `cli/src/prose-format.test.ts`
+    25/25 passed; `npm run skills:sync` refreshed the gitignored vendored copies.
+- N1 (probe-degradation fallback shape) and N3 (emission order) left to the lead,
+  as instructed.
