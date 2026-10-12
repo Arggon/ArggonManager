@@ -8,7 +8,6 @@ labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-tooling-env-bodies.md
   Leaves live only under a story. id is the filename stem: task-author-tooling-env-bodies.
@@ -30,3 +29,7 @@ Wave 1 of `decided: A` on `bug-template-only-bodies-ship-green`: the blocking gu
 - [ ] Prettier clean; `arggon validate` green; PR opened
 
 ## Notes
+
+### handoff 2026-10-12 @ses_ed22c74cfffeW3qD2qeuOZpagW (session: ses_ed22c74cfffeW3qD2qeuOZpagW) — next: Review the 3 authored bodies, merge feat/task-author-tooling-env-bodies, then complete the item
+- branch: feat/task-author-tooling-env-bodies
+- open questions: None; line-drift corrections disclosed in evidence comment
