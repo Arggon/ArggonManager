@@ -8,6 +8,7 @@ labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-wave1b-agent-native-bodies.md
   Leaves live only under a story. id is the filename stem: task-wave1b-agent-native-bodies.
@@ -19,10 +20,13 @@ updated: "2026-10-12"
 
 ## Context
 
-<!-- Why this task exists. -->
+Wave-1b of `decided: A`: the blocking guard (`task-validate-refuses-placeholder-bodies`, built, staged, uncommittable) refuses its own commit while these placeholders remain — their merge gates the guard's commit. Scope is ONLY files under `ArggonManager/agent-native/`: parallel-worktree-runtime-isolation-ports-state-services: bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use, bug-fresh-worktree-refusal-prose-drops-prep-step-truncation, bug-gatebin-budget-reserved-block-can-exceed-clip, bug-mcp-server-binds-session-cwd-tracker-root, bug-prover-agent-has-no-x-generated-entry, bug-self-decided-false-positive-owner-assigned, bug-task-permissions-enforcement-not-observed; methodology-improvements: bug-context-report-baseline-date-mismatch, bug-mcp-budget-contradicted-across-docs, bug-wave-probe-file-check-model-dependent; story-spec-pipeline: bug-parity-suite-cannot-catch-wrong-input-at-call-sites, bug-zero-byte-item-files-committed-by-comment-autocommit. Three of these have ZERO dated Notes and need domain judgment grounded in named authorities, not invention: bug-context-report-baseline-date-mismatch, bug-mcp-budget-contradicted-across-docs, bug-release-needs-auth-self-describing. All others: transcribe Notes/comments. Bugs get Context + checkable boxes; the two tasks likewise.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] Every listed file carries a real `## Context` (no scaffold marker)
+- [ ] Every listed file carries checkable `## Acceptance` boxes
+- [ ] No file outside the listed set touched; frontmatter untouched
+- [ ] Prettier clean (modulo a disclosed single-line depends_on exception); `arggon validate` green; PR opened
 
 ## Notes
