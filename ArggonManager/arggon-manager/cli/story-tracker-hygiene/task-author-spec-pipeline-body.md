@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-author-spec-pipeline-body
 title: Author body for the placeholder task under story-spec-pipeline
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
-claimed_at: "2026-10-12T02:21:16.942Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-author-spec-pipeline-body
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-spec-pipeline-body.md
   Leaves live only under a story. id is the filename stem: task-author-spec-pipeline-body.
@@ -28,10 +26,10 @@ Wave 1 of `decided: A` on `bug-template-only-bodies-ship-green`: the blocking gu
 
 ## Acceptance
 
-- [ ] Every listed file carries a real `## Context` (no scaffold marker)
-- [ ] Every listed task carries checkable `## Acceptance` boxes; the story file(s) carry prose-or-checkable Acceptance
-- [ ] No file outside the listed set touched; frontmatter untouched
-- [ ] Prettier clean; `arggon validate` green; PR opened
+- [x] Every listed file carries a real `## Context` (no scaffold marker)
+- [x] Every listed task carries checkable `## Acceptance` boxes; the story file(s) carry prose-or-checkable Acceptance
+- [x] No file outside the listed set touched; frontmatter untouched
+- [x] Prettier clean; `arggon validate` green; PR opened
 
 ## Notes
 
