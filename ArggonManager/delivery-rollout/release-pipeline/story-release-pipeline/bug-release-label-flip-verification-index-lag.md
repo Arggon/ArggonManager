@@ -12,7 +12,6 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T22:10:25.913Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-label-flip-verification-index-lag
 ---
-
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-label-flip-verification-index-lag.md
   Leaves live only under a story. id is the filename stem: bug-release-label-flip-verification-index-lag.
@@ -130,3 +129,20 @@ the candidate copy under `.opencode/harness/candidates/`. It scores 1.0
 (11/11 edit, 5/5 write) via the harness runner (`harness.grade`);
 `harness.search` was unavailable (synthesis endpoint down), so the predicate
 was hand-written and runner-adjudicated.
+
+### 2026-10-12 @arggon-maker
+Maker evidence — chosen shape and gates.
+
+**Shape.** Authoritative per-PR read after each flip edit (`gh pr view <n> --repo <repo> --json labels`, `viewLabels`/`stillPending`); the discovery `gh pr list` query is unchanged and never re-read for the verdict. It cannot mask a stuck label because the verdict reads the PR object (no index lag to excuse it); a failed/unreadable read is reported as *unverified* and the run never prints the clean-release line on unknown state. Exit 0 on every path, warning text, manual-recovery line and flip argv unchanged.
+
+**Tests.** `cli/release-label-flip.test.ts` 15 → 18. New: (1) command-shaped fake `gh` whose `pr list` lags forever while `pr view` says `tagged` → NO warning; (2) same lag, `pr view` says `pending` → warning + #744 + recovery; (3) a `[null]` per-PR payload (exit 0) → warns, never claims clean. Updated: the flip test pins call 3 as `pr view … --json labels`; the `[null]` discovery test keeps the defensive `#? (untitled)` contract.
+
+**Gates (expected vs observed).**
+- `npx vitest run cli/release-label-flip.test.ts` — expected 18 pass; observed 18 pass.
+- `npm run test` — before `npm run build`: 3227 pass / 5 skip / 1 fail (`cli/src/headless-ci.test.ts` precondition “run `npm run build` first”, unrelated to this diff); after `npm run build`: 148 files, 3232 pass, 0 fail.
+- `npm run test:structure` — 5 pass; `npm run lint:structure` — no findings.
+- `npm run arggon -- validate` — ok (0 warnings, convention v5).
+- `npx prettier --check cli/release-label-flip.mjs cli/release-label-flip.test.ts` — clean.
+- `git diff --name-only` — the script + test (+ this item file); `release.yml`, `release-please.yml`, `cli/release-abort-check.mjs` untouched → backstop contract unchanged.
+
+**Out of scope (reported only, not in the diff).** The workspace AutoHarness gate required a validation harness: left untracked at `.opencode/checks/release-label-flip-search-verification.ts` (pure checker declining a post-flip search re-query), graded 1.0 via `harness.grade` (11/11 edit, 5/5 write).
