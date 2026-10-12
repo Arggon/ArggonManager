@@ -208,6 +208,38 @@ enforces the same rule at CI time on every repo (the drift step's pinned-lag
 assertion), so an adopter whose pin lags their seam gets the bump-the-pin
 remedy instead of an unexplainable diff.
 
+## The tag↔config agreement (gate-enforced)
+
+`release.yml` creates the plain annotated tag `vX.Y.Z` (`git tag -a
+"v${VERSION}"` — the tag names the exact published commit, spec invariant 1).
+`release-please-config.json` must agree with it: it carries
+`"include-component-in-tag": false`, so release-please searches that SAME plain
+tag. When the two disagree, release-please searches a component-prefixed tag
+(`arggon-manager-v0.5.0`), never finds the plain one, concludes its own merged
+release PR is untagged, and aborts before opening the next release PR. That is
+exactly what killed releases from 2026-10-02 to 2026-10-07 — and it stayed
+invisible because the abort is a `logger.warn` inside a run that reported
+`success`, not a failure.
+
+Two gates keep the class out, and both are proven red (a gate never seen red is
+not evidence):
+
+- **`cli/src/release-config-agreement.test.ts`** fails if
+  `include-component-in-tag` resolves to anything but the `false` that matches
+  `release.yml`'s plain `v${VERSION}` — including the key being **absent** (the
+  official schema default is `true`, the exact omission that shipped the
+  outage). A fixture that flips the key to `true` goes red; so does the reverse
+  drift of editing `release.yml`'s tag line back to a component prefix. Fix the
+  config or the tag line — the next drift is a red test, not a silent dead
+  pipeline.
+- **`cli/release-abort-check.mjs`** runs in `release-please.yml` right after the
+  action and fails the run when a MERGED release PR still carries
+  `autorelease: pending` — release-please's own abort predicate
+  (`src/manifest.ts`). It cannot go red on an ordinary push: no release PR is
+  merged, and every already-merged one has had its label flipped to
+  `autorelease: tagged`, so the check is green. An aborted release can no longer
+  masquerade as a green run.
+
 ## One release story: two axes (bug-seam-drift-gate-blocks-new-generated-seam-content)
 
 The "release forgotten" refusals people hit — the drift gate red on a PR that
