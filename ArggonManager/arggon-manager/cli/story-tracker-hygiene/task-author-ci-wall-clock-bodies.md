@@ -33,3 +33,15 @@ Wave 1 of `decided: A` on `bug-template-only-bodies-ship-green`: the blocking gu
 - [ ] Prettier clean; `arggon validate` green; PR opened
 
 ## Notes
+
+### 2026-10-12 @ses_ed22024a4ffe8UUDQDGBJjYTv3
+Maker evidence (bodies authored, commit 9ad90acc, pushed to origin/feat/task-author-ci-wall-clock-bodies).
+
+- All 3 files under ArggonManager/agent-native/ecosystem-ops/story-ci-wall-clock/ were still scaffold placeholders in live ## Context / ## Acceptance (verified before touching); all carried real dated 2026-10-05 Notes material, so every live section is transcription, not invention. No file was noteless; ADR 0023 line pins added as grounding (Context L21-42, Decision L44-66 incl. step 1 L48-52 / step 2 L54-59, consequences L68-82, alternatives L84-104, as read at HEAD).
+- Story: live Context = Notes prose + exploration/ADR links + pointer to standing Notes for rejected options; live Acceptance = the 5 Notes boxes verbatim, all unticked. Tasks: live Context + Acceptance transcribed verbatim from Notes (only addition: ADR Decision line-pin in the opening line), all boxes unticked.
+- Frontmatter untouched on all 3 (diff shows zero frontmatter lines changed; no depends_on/labels touched).
+- Gates: tools.arggon.validate ok:true, 0 errors, 0 warnings; npx prettier --check clean on all 3 touched files (all 3 were prettier-dirty at HEAD).
+- Pre-existing prettier normalizations disclosed (2 blank lines per file, nothing else): blank line after the --- frontmatter close, and blank line after the dated ### 2026-10-05 @ses_... heading. Proof of no out-of-scope change: git diff removed-lines audit shows exactly the 6 scaffold placeholder lines (2 per file) and nothing else — no words/values/checkbox-states changed outside the new live sections.
+- depends_on exception not needed: none of the 3 files carries depends_on.
+- Tooling note: the story edit call returned a spurious oldString-mismatch error yet wrote the content (verified byte-identical via cat -A + git diff); the other two edits returned success. No content impact.
+- Staged explicit paths only (never git add -A); committed 9ad90acc; push exit 0, branch tracks origin/feat/task-author-ci-wall-clock-bodies. No PR opened (delivery lead owns PR/merge/done). Own Acceptance boxes NOT ticked, status left in_progress.
