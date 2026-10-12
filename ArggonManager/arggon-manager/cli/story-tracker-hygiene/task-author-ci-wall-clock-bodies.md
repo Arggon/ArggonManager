@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-author-ci-wall-clock-bodies
 title: Author bodies for the ci-wall-clock story and its 2 placeholder tasks
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
-claimed_at: "2026-10-12T02:09:51.485Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-author-ci-wall-clock-bodies
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-ci-wall-clock-bodies.md
   Leaves live only under a story. id is the filename stem: task-author-ci-wall-clock-bodies.
@@ -28,10 +26,10 @@ Wave 1 of `decided: A` on `bug-template-only-bodies-ship-green`: the blocking gu
 
 ## Acceptance
 
-- [ ] Every listed file carries a real `## Context` (no scaffold marker)
-- [ ] Every listed task carries checkable `## Acceptance` boxes; the story file(s) carry prose-or-checkable Acceptance
-- [ ] No file outside the listed set touched; frontmatter untouched
-- [ ] Prettier clean; `arggon validate` green; PR opened
+- [x] Every listed file carries a real `## Context` (no scaffold marker)
+- [x] Every listed task carries checkable `## Acceptance` boxes; the story file(s) carry prose-or-checkable Acceptance
+- [x] No file outside the listed set touched; frontmatter untouched
+- [x] Prettier clean; `arggon validate` green; PR opened
 
 ## Notes
 
