@@ -9,7 +9,6 @@ parent: story-release-pipeline
 labels: [ci, release, gate-fidelity]
 created: "2026-10-07"
 updated: "2026-10-12"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-release-config-workflow-agreement-ungated
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-config-workflow-agreement-ungated.md

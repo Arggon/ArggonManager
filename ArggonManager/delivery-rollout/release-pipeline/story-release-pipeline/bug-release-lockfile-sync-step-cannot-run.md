@@ -9,7 +9,6 @@ parent: story-release-pipeline
 labels: [release, ci, failure-mode, gate-fidelity]
 created: "2026-10-12"
 updated: "2026-10-12"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-release-lockfile-sync-step-cannot-run
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-lockfile-sync-step-cannot-run.md

@@ -9,7 +9,6 @@ parent: story-release-pipeline
 labels: [release, docs, methodology]
 created: "2026-10-07"
 updated: "2026-10-12"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-autorelease-label-lifecycle-unowned
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-autorelease-label-lifecycle-unowned.md

@@ -9,7 +9,6 @@ parent: story-release-pipeline
 labels: [release, docs, failure-mode]
 created: "2026-10-09"
 updated: "2026-10-12"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-release-needs-auth-self-describing
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-needs-auth-self-describing.md
