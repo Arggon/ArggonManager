@@ -169,3 +169,12 @@ Reviewed by reading (read-and-reason role; I executed no gates). Read: this item
 **Residual (non-blocking).** "gh pr view reports the edit immediately" is a GitHub-API mechanism claim resting on the offline tests + API semantics; the acceptance explicitly makes the live re-check non-gating. Confirm at the next release cut.
 
 Confirmatory probes for the verifier (only a red first item would withdraw this approve): `npx vitest run cli/release-label-flip.test.ts` (worktree root) — expected 18 passed; read-only `gh pr view 744 --repo Arggon/ArggonManager --json labels` — expected the `{"labels":[{"name":"autorelease: tagged",…}]}` shape the parser consumes.
+
+### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead
+verdict: approve (lead merge call) — review approved; verifier confirmed both probes
+
+- Standards review: `verdict: approve` (on this item). The post-flip verdict now reads each PR authoritatively (`gh pr view <n> --json labels`); the search query is discovery-only; an unreadable read warns and never prints the clean line; exit-0-on-every-path, warning text, recovery line and flip argv unchanged.
+- Verifier evidence: focused suite **18/18**; live payload shape confirmed (`gh pr view 744` → labels array with `autorelease: tagged`, exactly what `stillPending` consumes — it would return false). The lag mechanism claim is pinned offline by the new lagging-search tests in both directions.
+- Scope: script + test + item file only; `release.yml`/`release-please.yml`/backstop untouched.
+- Merging now; auto-done flips this item on merge. The opportunistic live re-check at the next release cut is recorded as a note when it occurs (non-gating, per the amended acceptance).
