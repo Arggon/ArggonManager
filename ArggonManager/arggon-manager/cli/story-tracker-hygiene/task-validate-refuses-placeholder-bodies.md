@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-validate-refuses-placeholder-bodies
 title: "validate refuses placeholder bodies on open items (blocking, decided A)"
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
-claimed_at: "2026-10-12T02:53:12.924Z"
 depends_on: [task-author-methodology-improvements-bodies, task-author-parallel-worktree-bodies, task-author-tooling-env-bodies, task-author-ci-wall-clock-bodies, task-author-harness-transfer-bodies, task-author-spec-pipeline-body]
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-validate-refuses-placeholder-bodies.md
   Leaves live only under a story. id is the filename stem: task-validate-refuses-placeholder-bodies.
@@ -30,11 +28,11 @@ Hard constraint from the wave-1 survey: the guard must match the SCAFFOLD MARKER
 
 ## Acceptance
 
-- [ ] `arggon validate` FAILS (non-zero, named error) on an open (`todo`/`in_progress`/`blocked`) item whose live `## Context` or `## Acceptance` still carries the scaffold placeholder marker
-- [ ] Done/cancelled items excluded (history, not the contract) and the message says so
-- [ ] The guard reads the item body (derives from source), not a restated marker copy in the test — with a negative control proving quoted placeholder prose stays green
-- [ ] `ArggonManager/docs/convention.md` documents the refusal alongside the done gate; human-only waiver path stated (agents cannot waive)
-- [ ] `npm test` green; prettier clean; PR opened
+- [x] `arggon validate` FAILS (non-zero, named error) on an open (`todo`/`in_progress`/`blocked`) item whose live `## Context` or `## Acceptance` still carries the scaffold placeholder marker
+- [x] Done/cancelled items excluded (history, not the contract) and the message says so
+- [x] The guard reads the item body (derives from source), not a restated marker copy in the test — with a negative control proving quoted placeholder prose stays green
+- [x] `ArggonManager/docs/convention.md` documents the refusal alongside the done gate; human-only waiver path stated (agents cannot waive)
+- [x] `npm test` green; prettier clean; PR opened
 
 ## Notes
 
