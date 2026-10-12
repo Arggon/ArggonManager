@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-autorelease-label-lifecycle-unowned
 title: "The `autorelease` label lifecycle is load-bearing and owned by nobody: release-please needs `autorelease: pending` → `tagged`, but it only flips the label when ITS tagging path runs, and this repo tags in `release.yml` — a permanent deadlock by construction, documented nowhere"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-release-pipeline
 labels: [release, docs, methodology]
 created: "2026-10-07"
 updated: "2026-10-12"
-claimed_at: "2026-10-12T17:27:29.536Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-autorelease-label-lifecycle-unowned
 ---
 <!--
