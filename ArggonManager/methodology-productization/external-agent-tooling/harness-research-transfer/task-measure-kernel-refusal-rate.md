@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-measure-kernel-refusal-rate
 title: "Measure our illegal-action rate: how often do agents attempt transitions the kernel refuses? (AutoHarness's opening datum)"
 assignee: arggon-delivery-lead
@@ -9,11 +9,9 @@ parent: harness-research-transfer
 labels: [methodology, telemetry, research]
 priority: p2
 created: "2026-10-05"
-updated: "2026-10-11"
-claimed_at: "2026-10-11T22:29:04.116Z"
+updated: "2026-10-12"
 worktree_path: /home/arggon/Projects/ArggonManager-task-measure-kernel-refusal-rate
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-measure-kernel-refusal-rate.md
   Leaves live only under a story. id is the filename stem: task-measure-kernel-refusal-rate.
@@ -65,28 +63,28 @@ afternoon**. The point is to close a standing plausibility either way:
 
 ## Acceptance
 
-- [ ] Counts kernel refusals over a stated window (suggest N = last 8 weeks) from a named
+- [x] Counts kernel refusals over a stated window (suggest N = last 8 weeks) from a named
       source: session logs, the tracker's own recorded refusals (`START_FAILED`, `CANNOT_*`,
       reopen/steal refusals), or PR/CI output — whichever actually exists. **If no source
       records them, that is itself the finding** — say so and stop; do not build telemetry
       inside this item
-- [ ] Reports a **rate with a denominator** (refusals per agent action or per item
+- [x] Reports a **rate with a denominator** (refusals per agent action or per item
       lifecycle transition), not a raw count. A count without a denominator cannot answer
       AutoHarness's question
-- [ ] Breaks the rate down **by rule**, so the top offenders are named. A single aggregate
+- [x] Breaks the rate down **by rule**, so the top offenders are named. A single aggregate
       number is less useful than "these three rules account for 80%"
-- [ ] States the **measurement's own limits** explicitly (what is not captured, and why
+- [x] States the **measurement's own limits** explicitly (what is not captured, and why
       the rate could be understated — e.g. an agent that never attempts the illegal move
       because a doc told it not to would show zero refusals _and_ zero violations, which
       are different findings)
-- [ ] Cross-checks one rule against something other than the log: e.g. compare the
+- [x] Cross-checks one rule against something other than the log: e.g. compare the
       never-reopen refusal against the tracker's actual `done`/`cancelled` history
-- [ ] One-line verdict on the item: does AutoHarness's thesis have a target in this repo,
+- [x] One-line verdict on the item: does AutoHarness's thesis have a target in this repo,
       yes or no — with the number attached
-- [ ] If the answer is "high", file the follow-up as a tracked item (do not scope it
+- [x] If the answer is "high", file the follow-up as a tracked item (do not scope it
       here); if "near-zero", record the closure and link it from exploration-021's
       Recommendation so the next reader does not re-litigate
-- [ ] `arggon validate` green; PR opened. **Advisory** unless a telemetry surface is
+- [x] `arggon validate` green; PR opened. **Advisory** unless a telemetry surface is
       actually added, in which case say which and why
 
 ## Notes — kernel-refusal measurement (2026-10-11 @arggon-maker)
