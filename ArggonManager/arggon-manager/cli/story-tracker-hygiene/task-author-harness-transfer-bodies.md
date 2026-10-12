@@ -51,3 +51,12 @@ Maker evidence (arggon-maker, worktree session):
 
 - branch: feat/task-author-harness-transfer-bodies
 - open questions: none
+
+### 2026-10-12 @ses_ed2ed434cffdHsqB0EV526IjUT
+
+verdict: approve (3 harness-transfer bodies, docs-only, smoke-exempt)
+
+- Read the worktree diff (3 files + own item file) — nothing else; scope stays on the item
+- Standards-reviewer: approve, no blocking findings (machine-checked transcription: 2 files zero delta, stopping-rule one specified delta — the corrected ADR 0017 link, wrong filename confined to untouched Notes; link resolves; 24 new boxes checkable; own boxes unticked)
+- Verifier: validate ok; prettier red ONLY on the author's own item file (targets clean) → lead fixed with prettier --write (blank lines only), re-ran all-4 green + validate green in the worktree
+- Recommendation: merge PR #735 (merge, not squash) on green CI; lead ticks Acceptance after merge and flips done
