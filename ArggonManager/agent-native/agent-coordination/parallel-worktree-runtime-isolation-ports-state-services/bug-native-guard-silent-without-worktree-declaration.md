@@ -153,3 +153,14 @@ One evidence point for a filed follow-up, not a defect in this PR: this diff nor
 Item state: all five boxes in the live `## Acceptance` section are ticked and each is honest against the diff.
 
 Merge call: **approved — merge as a merge commit** (tracker auto-commits ride this branch, so no squash).
+
+### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead — recurrence evidence from a 2-wave orchestrated run (2 makers, 2 reviewers, 1 verifier)
+
+The incident this item guards against reproduces in the *subagent* path, not just the unsourced-shell path:
+
+- A maker subagent dispatched into a claimed worktree starts with its session cwd in the **primary checkout**; every `tools.arggon.comment`/`handoff` it made auto-committed onto the primary's `main` instead of the item branch. The maker noticed, merged `main` into its branch twice to fold the commits in, and left a note — but a second maker's evidence/verdict commits went the same way, and one stray duplicate comment commit had to be manually reset off local main.
+- My own (lead) `session_move` into a worktree followed by a read **in the same execute block** answered the primary's stale state (`todo`), and the comment in that block landed on the primary; the documented ritual (move, then a **separate** read that must answer `in_progress`, then write) was the only reliable sequence.
+- The lesson is not "delete the guard" but: a declared worktree that a write did **not** resolve into must be refused for subagents too, not only for unsourced sessions. The orchestration playbook's rule 1 (move-then-confirm in a separate call) is currently prose a subagent must remember; the guard staying silent when no declaration exists is what made each of these writes silent.
+
+Same day, same class: the reviewer role's verdict commits can only be pushed by the lead (reviewers cannot push) — worth knowing for whoever fixes this.
