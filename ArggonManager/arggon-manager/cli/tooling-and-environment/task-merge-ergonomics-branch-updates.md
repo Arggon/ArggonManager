@@ -8,7 +8,6 @@ labels: [git, delivery, friction]
 created: "2026-10-12"
 updated: "2026-10-12"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-merge-ergonomics-branch-updates.md
   Leaves live only under a story. id is the filename stem: task-merge-ergonomics-branch-updates.
@@ -57,3 +56,13 @@ again.` → retry.
       on a 2-PR wave), so the improvement is observable rather than asserted
 
 ## Notes
+
+### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead — decision recorded (remedy shape)
+
+**Keep the require-up-to-date protection** — it is the only guard against two individually-green PRs merging into a semantically broken combination. The remedy is two-part:
+
+1. **Implemented now (this item):** a documented, one-command refresh the lead runs when a merge is refused. Preferred path without a worktree dance: `gh api -X PUT repos/Arggon/ArggonManager/pulls/<n>/update-branch` (refreshes the PR branch server-side; then re-merge when checks finish). Fallback when a local merge is needed: in the item's worktree `git fetch origin && git merge origin/main && git push`. The doc states what a refusal means (conflict → resolve in the worktree; API 422 → fall back) and when to choose which. Where it lives: `ArggonManager/docs/engineering.md` §Naming, commits, PRs (the lead's reading path). A helper script is optional and at the maker's discretion (test it if added).
+2. **Durable fix, owner's settings (recommended, not blocking):** enable the **merge queue** on `main` — it serializes merges and refreshes queued PRs, which is exactly this friction. No agent can change branch protection, so this is recorded for the product owner to enable when convenient.
+
+Measured evidence stays in this item: on 2026-10-12 the wave hit `#746 BEHIND → manual bump` and `#747 "Base branch was modified" → retry`, each costing a full CI cycle (cli ~5–7 min). The maker should tick box 1 citing this comment.
