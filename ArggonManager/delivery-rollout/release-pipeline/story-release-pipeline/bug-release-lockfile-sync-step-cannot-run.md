@@ -491,3 +491,7 @@ Environment note for whoever re-runs this: a scratch *worktree* of this repo inh
 **Delivery path:** #745 is `MERGED` (cannot reopen) and the merged branch still exists, but per your guidance I created a fresh branch `fix/bug-release-lockfile-sync-commit-staging` from current `origin/main` with just this change → **PR #747** (not merged). Branch record updated on the item: recorded.
 
 Gates re-run: `actionlint` exit 0 · `prettier --check` clean (both files) · `npm run test:structure` 5/5 · `npm run lint:structure` exit 0 · `arggon validate` ok (0 warnings). Acceptance: 5/6 ticked — the real-run box stays **unticked** for your re-observation.
+
+### handoff 2026-10-12 @ses_eced77ddeffe7RDZa3wt3P1UKS (session: ses_eced77ddeffe7RDZa3wt3P1UKS) — next: After #747 merges: watch the next release-please.yml run with a release PR open — install, git add, commit and push must all complete (lockfile ^0.7.0 / 0.7.0 on the PR branch), run green; then tick …
+- branch: fix/bug-release-lockfile-sync-commit-staging
+- open questions: Item branch field vs the follow-up branch fix/bug-release-lockfile-sync-commit-staging (old branch merged, kept for the record); npm-10 libc churn on the real sync; whether to pin the step's npm.
