@@ -12,6 +12,7 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T03:38:25.324Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-wave1b-mixed-bodies
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-wave1b-mixed-bodies.md
   Leaves live only under a story. id is the filename stem: task-wave1b-mixed-bodies.
@@ -35,9 +36,11 @@ Wave-1b of `decided: A`: the blocking guard (`task-validate-refuses-placeholder-
 ## Notes
 
 ### 2026-10-12 @ses_ed1cf0451ffecacHCLC9mjdfZT
+
 Evidence for the standards reviewer (maker: arggon-maker, branch feat/task-wave1b-mixed-bodies).
 
 Commands run (all in the worktree /home/arggon/Projects/ArggonManager-task-wave1b-mixed-bodies):
+
 - `npx prettier --check` on the 12 touched files — expected clean; observed 11 clean, 1 warn (bug-x-tracker-option-list-has-no-doc-drift-guard.md, disclosed exception below).
 - `npx prettier --check` on the own item file — expected pre-existing dirt; observed 1 warn (missing blank line after frontmatter `---`, from the tracker claim write; style fix follows this comment).
 - `arggon validate` via native tool — expected ok; observed ok:true, 0 warnings, convention v5 (also green as the commit hook on 786c7c7c).
@@ -47,6 +50,7 @@ Commands run (all in the worktree /home/arggon/Projects/ArggonManager-task-wave1
 - Commit: 786c7c7c `docs(tracker): wave-1b mixed bodies for 12 placeholder items` (12 files, 223 insertions, 65 deletions). Staged explicit paths only, never `git add -A`.
 
 Non-content normalizations from the editor's format-on-save (pre-existing dirt was a missing blank line after `---` in all 12). Proved word/value/checkbox-identical outside the new live sections via `git diff -U0` plus a minus/plus pairing pass (only 4 unpaired minus lines repo-wide: 2 title requotes + 2 table-separator re-pads, all benign):
+
 - `+` blank line after frontmatter `---` (all 12) and blank lines around headings/lists.
 - 2-space-indented continuation lines dedented to column 0 (bundle Notes CLI/bundle rows, adopter convention quote, verifier catalog line).
 - Emphasis `*` -> `_` (identical rendering) in carried-over Notes prose (ci-seam-pin, adopter, verifier, x-tracker, verification-regex).
@@ -57,6 +61,7 @@ Non-content normalizations from the editor's format-on-save (pre-existing dirt w
 Content-wins exception (validate wins over prettier, same principle as the disclosed depends_on rule): prettier's markdown printer deletes the space after inline code spans ending in an escaped backtick, gluing words in bug-x-tracker Notes (the\`SECTIONS\`table, join\`SECTIONS\`, \`false\`window). I restored the 3 spaces via a byte-precise script after the format-on-save ate them, so that file warns on --check while its words stay intact. Proof: `git show HEAD:file | npx prettier --stdin-filepath` shows prettier itself demanding the glued form. No depends_on exception to disclose (no depends_on field in any of the 12).
 
 Findings for the lead (not filed as items, per instructions):
+
 - ONE file had zero dated Notes: bug-release-needs-auth-self-describing.md. Context + Acceptance grounded in line-pinned authorities: release.md:40-61 (one-time setup + ENEEDAUTH trap), :75-80 (npm trust list diagnostic + the two failures that cost two release attempts), :139-149 (recovery), .github/workflows/release.yml:31-36 (OIDC-only, fails closed), :204-220 + :249-259 (bare publish steps with no error pointer), spec-release-pipeline-015.md:457-462 (A17 runtime-pending).
 - TWO files already had live Context (Acceptance still placeholder, now filled; Context left byte-identical): task-adapter-report-nits-from-review.md (5 nits + round-1 informational; Acceptance adds the verdict's minimum: retired seam paths + re-measure-or-annotate) and task-capability-matrix-followups-from-review.md (5 findings -> 5 boxes).
 - No file had live Acceptance already; no box ticked anywhere (all 12 files' boxes unticked, including transcribed ones).
@@ -64,5 +69,6 @@ Findings for the lead (not filed as items, per instructions):
 - No single-line depends_on exceeds printWidth in any touched file.
 
 ### handoff 2026-10-12 @ses_ed1cf0451ffecacHCLC9mjdfZT (session: ses_ed1cf0451ffecacHCLC9mjdfZT) — next: Lead reviews 12 bodies, opens PR, merges to unblock guard commit
+
 - branch: feat/task-wave1b-mixed-bodies
 - open questions: Accept x-tracker prettier exception; file zcode seam-id sweep noted in nits verdict?
