@@ -12,6 +12,7 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T02:21:16.942Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-author-spec-pipeline-body
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-spec-pipeline-body.md
   Leaves live only under a story. id is the filename stem: task-author-spec-pipeline-body.
