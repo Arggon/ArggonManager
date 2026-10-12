@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-author-ci-wall-clock-bodies
 title: Author bodies for the ci-wall-clock story and its 2 placeholder tasks
+assignee: arggon-delivery-lead
+branch: feat/task-author-ci-wall-clock-bodies
 parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
+claimed_at: "2026-10-12T02:09:51.485Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-author-ci-wall-clock-bodies
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-ci-wall-clock-bodies.md
   Leaves live only under a story. id is the filename stem: task-author-ci-wall-clock-bodies.
