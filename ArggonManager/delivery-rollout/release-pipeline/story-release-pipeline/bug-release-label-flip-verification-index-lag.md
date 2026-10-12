@@ -50,7 +50,11 @@ fires on every successful release trains readers to ignore the real one.
 - [ ] The backstop's fail-closed behaviour is unchanged (unknown state elsewhere
       still reddens per its own contract); only the repair's self-verification
       changes
-- [ ] Re-verified on a real release run (the next cut): the flip completes with
-      no warning when it succeeded — expected vs observed recorded here
+- [ ] Offline proof of the false-positive fix: with a fake `gh` whose search
+      query lags (its list still returns the PR as `autorelease: pending`) but
+      whose authoritative per-PR read reports `tagged`, the run prints NO
+      warning; with a PR genuinely still pending it still warns and names the
+      recovery. (The opportunistic live re-check at the next release cut, when
+      one occurs, is recorded in Notes — it does not gate this item.)
 
 ## Notes
