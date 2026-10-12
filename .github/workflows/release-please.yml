@@ -74,12 +74,12 @@ jobs:
       # `--ignore-scripts` is load-bearing, not tidiness: `npm install
       # --package-lock-only` still runs the root `prepare` (`npm run build`), and
       # that build needs a toolchain (`tsc`, `@types/node`) this workflow never
-      # installs — the step died on it in every run that actually reached this
-      # point, from the first non-no-op run (37648763109, 2026-10-07, PR #664)
-      # through 38283343454 (bug-release-lockfile-sync-step-cannot-run). The flag
-      # suppresses lifecycle scripts only: resolution is byte-identical with and
-      # without it (registry tarballs + the local `lib` workspace link; the tree
-      # has no git dependency whose build the install would have to run).
+      # installs — every run with an open release PR died on it: 49 failures,
+      # from the workflow's first run (36908073600, 2026-10-01, which created PR
+      # #556) through 38283343454 (bug-release-lockfile-sync-step-cannot-run).
+      # The flag suppresses lifecycle scripts only: resolution is byte-identical
+      # with and without it (registry tarballs + the local `lib` workspace link;
+      # the tree has no git dependency whose build the install would need).
       # Keep the step fail-loud — npm rewrites package-lock.json even when a
       # lifecycle script then fails, so swallowing the exit code would commit a
       # lockfile whose install was never proven.

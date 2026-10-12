@@ -12,6 +12,7 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T17:27:25.869Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-lockfile-sync-step-cannot-run
 ---
+
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-lockfile-sync-step-cannot-run.md
   Leaves live only under a story. id is the filename stem: bug-release-lockfile-sync-step-cannot-run.
@@ -85,48 +86,77 @@ branch` step.
 
 ### Root cause: latent since the step landed — not a runner change (box 2)
 
-Every `release-please.yml` run inspected, with the failing step from
-`gh run view <id> --json jobs`:
+**Failure inventory** — every run of this workflow fetched through the API
+(`actions/workflows/release-please.yml/runs`, 2026-10-01 → 10-12: 377 runs, 62
+failures), each failing run's step read from `runs/<id>/jobs`:
 
-| run             | created              | sync-step outcome                                                                                                                                                                                                                                                                                    | run                     |
-| --------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| 37065003701     | 2026-10-02T21:08     | `no open release PR - nothing to sync` (no-op; earliest run inspected in the PR-less window)                                                                                                                                                                                                         | success                 |
-| 37641543969     | 2026-10-07T15:03     | `no open release PR - nothing to sync` (no-op)                                                                                                                                                                                                                                                       | success                 |
-| 37645808234     | 2026-10-07T15:42     | `no open release PR` (no-op)                                                                                                                                                                                                                                                                         | success                 |
-| 37646194763     | 2026-10-07T15:45     | `no open release PR` (no-op)                                                                                                                                                                                                                                                                         | success                 |
-| 37647730584     | 2026-10-07T15:56     | `no open release PR` (no-op)                                                                                                                                                                                                                                                                         | success                 |
-| **37648763109** | **2026-10-07T16:04** | **first run that reaches the install**: the release-please step of this same run creates PR #664 at 16:04:23, so the sync step finds `release-please--branches--main`, checks it out, and dies in `> arggon-manager@0.6.0 prepare` → `npm error workspace @arggondev/lib@0.6.0` → `npm error code 2` | **failure** (sync step) |
-| 37651478610     | 2026-10-07T16:22     | same failure on `arggon-manager@0.6.0`                                                                                                                                                                                                                                                               | failure (sync step)     |
-| 37660850172     | 2026-10-07T17:40     | same failure                                                                                                                                                                                                                                                                                         | failure (sync step)     |
-| 37662722859     | 2026-10-07T17:54     | same failure                                                                                                                                                                                                                                                                                         | failure (sync step)     |
-| 37663812581     | 2026-10-07T18:03     | same failure                                                                                                                                                                                                                                                                                         | failure (sync step)     |
-| 37934103136     | 2026-10-09T13:02     | same failure                                                                                                                                                                                                                                                                                         | failure (sync step)     |
-| 37943907204     | 2026-10-09T14:24     | same failure                                                                                                                                                                                                                                                                                         | failure (sync step)     |
-| 37946621948     | 2026-10-09T14:45     | same failure                                                                                                                                                                                                                                                                                         | failure (sync step)     |
-| 37950252277     | 2026-10-09T15:14     | `chore: release main (#664)` push — #664 already merged, no open PR → no-op                                                                                                                                                                                                                          | success                 |
-| 38283343454     | 2026-10-12T17:18     | same failure on `arggon-manager@0.7.0` (TS2591), opens PR #744                                                                                                                                                                                                                                       | failure (sync step)     |
+| window                           | release PR                                                                          | runs failing in this step                                                                                      | cause                                         |
+| -------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| 2026-10-01T18:36Z → 10-02T05:39Z | #556 (created 2026-10-01T18:39:09Z by run 36908073600, merged 2026-10-02T12:16:48Z) | **39** (26 on 10-01, 13 on 10-02 before the merge)                                                             | TS2591, identical `prepare` → `build` failure |
+| 2026-10-07T16:01Z → 10-09T14:45Z | #664 (created 2026-10-07T16:04:23Z by run 37648763109, merged 2026-10-09T15:14:36Z) | **8** (37648763109, 37651478610, 37660850172, 37662722859, 37663812581, 37934103136, 37943907204, 37946621948) | TS2591                                        |
+| 2026-10-12T17:18Z → 17:27Z       | #744 (created 2026-10-12T17:21:12Z by run 38283343454)                              | **2** (38283343454, 38284301238)                                                                               | TS2591                                        |
+| **total**                        |                                                                                     | **49**                                                                                                         |                                               |
+
+The other 13 workflow failures in the window are not this defect:
+release-please-action failures (10, one on the old tag-pinned `@v4`), the
+`Surface an aborted release` step (1), and two with no failing step recorded.
+The first success after #556's merge is the no-op at 2026-10-02T12:16:50Z
+(37005746756); the PR-less stretch then runs until #664's creation on 10-07.
+
+Runs read individually (log per run; failing-step name from
+`gh run view <id> --json jobs`):
+
+| run             | created              | sync-step outcome                                                                                                                                                                                                                                                                | run                     |
+| --------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| **36908073600** | **2026-10-01T18:36** | **first exposure — the workflow's first run**: the release-please step of this same run creates PR #556 at 18:39:09Z, so the sync step finds `release-please--branches--main`, checks it out, and dies in `> arggon-manager@0.5.0 prepare` → `src/atomic.ts(1,29): error TS2591` | **failure** (sync step) |
+| 37005746756     | 2026-10-02T12:16     | `no open release PR - nothing to sync` (first run after #556's merge)                                                                                                                                                                                                            | success                 |
+| 37065003701     | 2026-10-02T21:08     | `no open release PR - nothing to sync` (no-op, ~9 h after the merge; earliest no-op inspected)                                                                                                                                                                                   | success                 |
+| 37641543969     | 2026-10-07T15:03     | `no open release PR - nothing to sync` (no-op)                                                                                                                                                                                                                                   | success                 |
+| 37645808234     | 2026-10-07T15:42     | `no open release PR` (no-op)                                                                                                                                                                                                                                                     | success                 |
+| 37646194763     | 2026-10-07T15:45     | `no open release PR` (no-op)                                                                                                                                                                                                                                                     | success                 |
+| 37647730584     | 2026-10-07T15:56     | `no open release PR` (no-op)                                                                                                                                                                                                                                                     | success                 |
+| **37648763109** | **2026-10-07T16:04** | **the #664 window's first failure**: this run's release-please step creates PR #664 at 16:04:23, and the sync step dies in `> arggon-manager@0.6.0 prepare` → `npm error workspace @arggondev/lib@0.6.0` → `npm error code 2`                                                    | **failure** (sync step) |
+| 37651478610     | 2026-10-07T16:22     | same failure on `arggon-manager@0.6.0`                                                                                                                                                                                                                                           | failure (sync step)     |
+| 37660850172     | 2026-10-07T17:40     | same failure                                                                                                                                                                                                                                                                     | failure (sync step)     |
+| 37662722859     | 2026-10-07T17:54     | same failure                                                                                                                                                                                                                                                                     | failure (sync step)     |
+| 37663812581     | 2026-10-07T18:03     | same failure                                                                                                                                                                                                                                                                     | failure (sync step)     |
+| 37934103136     | 2026-10-09T13:02     | same failure                                                                                                                                                                                                                                                                     | failure (sync step)     |
+| 37943907204     | 2026-10-09T14:24     | same failure                                                                                                                                                                                                                                                                     | failure (sync step)     |
+| 37946621948     | 2026-10-09T14:45     | same failure                                                                                                                                                                                                                                                                     | failure (sync step)     |
+| 37950252277     | 2026-10-09T15:14     | `chore: release main (#664)` push — #664 already merged, no open PR → no-op                                                                                                                                                                                                      | success                 |
+| 38283343454     | 2026-10-12T17:18     | same failure on `arggon-manager@0.7.0` (TS2591), opens PR #744                                                                                                                                                                                                                   | failure (sync step)     |
+| 38284301238     | 2026-10-12T17:27     | same failure on `arggon-manager@0.7.0` (TS2591)                                                                                                                                                                                                                                  | failure (sync step)     |
 
 Decisive facts:
 
-- The step **never once completed its install path on the runner**: all 9 runs
-  that had an open release PR failed in exactly this step, and every run
-  inspected outside that window took the "no open release PR" early exit
-  (earliest inspected: 37065003701, 2026-10-02T21:08). There is no run in which
-  `npm install --package-lock-only` succeeded.
-- **Latent, not a runner change.** The identical failure already occurred on
-  2026-10-07 (first non-no-op run, 37648763109) — the failure predates
-  38283343454 by 5 days. The two runner images are equivalent where it matters:
-  `ubuntu-24.04` build `20260927.320` (10-07) and build `20261004.327` (10-12)
-  both ship Node.js 22.23.3 / npm 10.9.9, and the step landed 2026-10-01
+- The step **never once completed its install path on the runner**: **49 runs
+  across three release-PR windows** failed in exactly this step (#556 window 39,
+  #664 window 8, #744 window 2), and no run exists in which
+  `npm install --package-lock-only` succeeded. Every success outside those
+  windows is the `no open release PR` early exit.
+- **Latent, not a runner change** — and more strongly supported than the first
+  revision of these Notes claimed: the identical failure already occurred on
+  **2026-10-01, in the workflow's first run (36908073600)**, 11 days before
+  38283343454, and the runner images are equivalent where it matters:
+  `ubuntu-24.04` build `20260927.320` (10-01 and 10-07) and build `20261004.327`
+  (10-12) all ship Node.js 22.23.3 / npm 10.9.9. The step landed 2026-10-01
   (7230609f) with the root `prepare` → `npm run build` script in place since
-  2026-09-19 (b300eb96).
-- The no-op is why it stayed hidden: the step exits before the install whenever
-  `gh pr list --state open --head release-please--branches--main` is empty, and
-  during the pipeline deadlock (10-02 → 10-07) no release PR existed at all, so
-  the step could not fail. Correction to this item's Context: PR #664 was not
-  open 10-02 → 09; it was **created 2026-10-07T16:04:23Z** by run 37648763109
-  (the "re-run release-please after the label fix" push) and merged 10-09. The
-  first live release PR and the first exposure of the defect are the same event.
+  2026-09-19 (b300eb96) — the first release PR appeared ~1.5 h later.
+- The no-op hides it only _between_ windows: the step exits before the install
+  whenever `gh pr list --state open --head release-please--branches--main` is
+  empty, and no release PR was open from #556's merge (2026-10-02T12:16:48Z)
+  until #664's creation (2026-10-07T16:04:23Z) — the pipeline deadlock window.
+  Correction to this item's Context: the release PR open on 10-02 was **#556**,
+  not #664. #556 was created 2026-10-01T18:39:09Z by run 36908073600 and merged
+  10-02; #664 was created 2026-10-07T16:04:23Z by run 37648763109 and merged
+  10-09. The first live release PR and the first exposure of the defect are the
+  same event — on **#556 / run 36908073600**, not #664.
+- Provenance of this correction, for the record: an earlier revision of these
+  Notes named 37648763109 (10-07) as the first exposure and counted 9 failures —
+  an artifact of a `--limit`-truncated `gh run list`. It was caught in review
+  (verdict commit 2f2ab18a) and the inventory above was re-derived by
+  enumerating **all 377 runs** through the API and reading every failure's
+  step.
 - Mechanism: `npm install --package-lock-only` still runs the root `prepare`
   even though it installs nothing, so `npm run build` executes in a checkout
   with no `node_modules`; on the runner a `tsc` is on `PATH` (the image's
@@ -312,6 +342,7 @@ Left unticked as instructed: _Verified on a real release-please.yml run after th
 **Out of scope, reported not filed:** run 38282448930 failed in `Surface an aborted release` (sibling `bug-autorelease-label-lifecycle-unowned` territory); both runs annotate Node.js 20-deprecated actions forced onto Node.js 24.
 
 ### 2026-10-12 @ses_ecebd76f6ffeRyFG8k67Do7tZN
+
 ### verdict: request-changes (first-failure provenance is wrong: 2026-10-01 / run 36908073600 / PR #556, not 2026-10-07 / 37648763109 / #664)
 
 Practice & standards review, read-and-reason only: no gates executed here. Inspected: PR #745 diff (gh pr diff), the workflow on main vs branch, the workflow's run history and step logs (gh run view --log), PR metadata (#556/#664/#744), and the git refs below.
@@ -324,18 +355,18 @@ Practice & standards review, read-and-reason only: no gates executed here. Inspe
 
 **Blocking finding - the item's and the shipped comment's "first failure" is wrong, and the failure inventory is incomplete**
 
-`gh run view 36908073600 --log` shows the *first* non-no-op run - created **2026-10-01T18:36Z**, the same run whose release-please step created release PR **#556 at 18:39:09Z**, ~1.5 h after the step landed - dying with the identical `src/atomic.ts(1,29): error TS2591` under `> arggon-manager@0.5.0 prepare` -> `npm run build`. Scanning every run of this workflow (2026-10-01..10-12) gives sync-step failures of **49, not 9**:
+`gh run view 36908073600 --log` shows the _first_ non-no-op run - created **2026-10-01T18:36Z**, the same run whose release-please step created release PR **#556 at 18:39:09Z**, ~1.5 h after the step landed - dying with the identical `src/atomic.ts(1,29): error TS2591` under `> arggon-manager@0.5.0 prepare` -> `npm run build`. Scanning every run of this workflow (2026-10-01..10-12) gives sync-step failures of **49, not 9**:
 
-| window | release PR | sync-step failures | cause |
-| --- | --- | --- | --- |
-| 10-01T18:36Z -> 10-02T05:39Z | #556 (created 10-01T18:39:09Z, merged 10-02T12:16:48Z) | 39 | TS2591 (same prepare/build failure) |
-| 10-07T16:01Z -> 10-09T14:45Z | #664 | 8 | TS2591 |
-| 10-12T17:18Z -> 17:27Z | #744 | 2 (38283343454, 38284301238) | TS2591 |
+| window                       | release PR                                             | sync-step failures           | cause                               |
+| ---------------------------- | ------------------------------------------------------ | ---------------------------- | ----------------------------------- |
+| 10-01T18:36Z -> 10-02T05:39Z | #556 (created 10-01T18:39:09Z, merged 10-02T12:16:48Z) | 39                           | TS2591 (same prepare/build failure) |
+| 10-07T16:01Z -> 10-09T14:45Z | #664                                                   | 8                            | TS2591                              |
+| 10-12T17:18Z -> 17:27Z       | #744                                                   | 2 (38283343454, 38284301238) | TS2591                              |
 
-Every success outside these windows is the `no open release PR` no-op (first after #556's merge: 37005746756, echoed at 12:19Z). "The step never once completed its install path" is therefore true - but the record pinning *which* runs must be corrected:
+Every success outside these windows is the `no open release PR` no-op (first after #556's merge: 37005746756, echoed at 12:19Z). "The step never once completed its install path" is therefore true - but the record pinning _which_ runs must be corrected:
 
 - Item: "all 9 runs that had an open release PR failed in exactly this step" -> **49 runs across three release-PR windows**.
-- Item: "the first was 37648763109 (2026-10-07T16:04 ...)" -> first is **36908073600, 2026-10-01, PR #556**; #664 is the *second* exposure.
+- Item: "the first was 37648763109 (2026-10-07T16:04 ...)" -> first is **36908073600, 2026-10-01, PR #556**; #664 is the _second_ exposure.
 - Item: "the failure predates 38283343454 by 5 days" -> **11 days**.
 - Item: "The first live release PR and the first exposure of the defect are the same event" -> true of **#556 (10-01)**, not #664.
 - Item: "earliest inspected: 37065003701, 2026-10-02T21:08" -> the PR-less window begins at **2026-10-02T12:16:48Z** (#556's merge).
@@ -343,7 +374,7 @@ Every success outside these windows is the `no open release PR` no-op (first aft
 
 The maker's correction to the Context is accurate for #664 (verified: created 2026-10-07T16:04:23Z, merged 2026-10-09T15:14:36Z) but incomplete - it replaces one wrong "first" with another and never names #556, the release PR that was open on 10-02.
 
-**Not in question:** the conclusion (latent since the step landed, not a runner change) is confirmed and *better* supported than written - the same failure on image builds ubuntu24/20260927.320 and ubuntu24/20261004.327. The flag choice and the fail-loud property are sound; the fix line itself needs no change.
+**Not in question:** the conclusion (latent since the step landed, not a runner change) is confirmed and _better_ supported than written - the same failure on image builds ubuntu24/20260927.320 and ubuntu24/20261004.327. The flag choice and the fail-loud property are sound; the fix line itself needs no change.
 
 **Requested change (tight scope)**
 
