@@ -1,14 +1,15 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-template-only-bodies-ship-green
 title: "Template-only item bodies ship green: open containers carry placeholder Context and Acceptance and no surface names it"
+assignee: arggon-delivery-lead
 parent: story-tracker-hygiene
 labels: []
 created: "2026-10-11"
-updated: "2026-10-11"
+updated: "2026-10-12"
+claimed_at: "2026-10-12T14:52:52.601Z"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/bug-template-only-bodies-ship-green.md
   Leaves live only under a story. id is the filename stem: bug-template-only-bodies-ship-green.
@@ -27,10 +28,10 @@ Scale (same-day grep, open `todo`/`in_progress`/`blocked` items only): 12 open c
 ## Acceptance
 
 - [x] The 12 open `methodology-productization` containers named in `task-author-methodology-productization-bodies` carry real Context and Acceptance (done, PR #727)
-- [ ] The 27 remaining open placeholder items named in the six `task-author-*-bodies` tasks carry real Context and Acceptance (those tasks' merges satisfy this row; this bug tracks the guard, not the prose)
-- [ ] A BLOCKING surface refuses template-only bodies on open items: `arggon validate` fails non-zero with a named error (`task-validate-refuses-placeholder-bodies`; `decided: A`, report-only explicitly rejected)
-- [ ] The guard matches the scaffold marker, never quoted prose; done/cancelled excluded with the message saying so
-- [ ] `arggon validate` + `npm test` green; prettier clean
+- [x] The 27 remaining open placeholder items named in the six `task-author-*-bodies` tasks carry real Context and Acceptance (those tasks' merges satisfy this row; this bug tracks the guard, not the prose)
+- [x] A BLOCKING surface refuses template-only bodies on open items: `arggon validate` fails non-zero with a named error (`task-validate-refuses-placeholder-bodies`; `decided: A`, report-only explicitly rejected)
+- [x] The guard matches the scaffold marker, never quoted prose; done/cancelled excluded with the message saying so
+- [x] `arggon validate` + `npm test` green; prettier clean
 
 ## Notes
 
