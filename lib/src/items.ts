@@ -569,6 +569,16 @@ export function acceptanceComplete(body: string): boolean {
 const ACCEPTANCE_HEADING = /^##[ \t]+acceptance[ \t]*$/i;
 
 /**
+ * The live context heading: a level-2 ATX heading whose whole text is
+ * `Context`, case-insensitively — the same exact-match rule as
+ * {@link ACCEPTANCE_HEADING} (a `## Context notes` heading is prose, not the
+ * section). Every template in the tree writes exactly `## Context`, so the
+ * placeholder guard (`placeholderSections`, `lib/src/placeholder.ts`) and the
+ * done gate read the same address for the contract.
+ */
+const CONTEXT_HEADING = /^##[ \t]+context[ \t]*$/i;
+
+/**
  * A heading of rank 1 or 2 — the live section ends at the next one. Rank 3
  * (`###`) does NOT end it: a dated comment block may carry its own `###`
  * subheadings, and `## Acceptance` sections legitimately hold `###` prose.
@@ -720,6 +730,35 @@ export function liveAcceptanceRegion(body: string): string | null {
   let start = -1;
   for (let i = 0; i < lines.length; i += 1) {
     if (ACCEPTANCE_HEADING.test(lines[i]!)) {
+      start = i + 1;
+      break;
+    }
+  }
+  if (start === -1) return null;
+  const region: string[] = [];
+  for (let i = start; i < lines.length; i += 1) {
+    const line = lines[i]!;
+    if (SECTION_END_HEADING.test(line)) break;
+    region.push(line);
+  }
+  return region.join("\n");
+}
+
+/**
+ * The item's LIVE context section: the body of its `## Context` heading up to
+ * the next rank-1/rank-2 heading, with dated comment blocks and fenced code
+ * blocks removed — the same extraction as {@link liveAcceptanceRegion}, so the
+ * placeholder guard reads the same live bytes the done gate reads for
+ * acceptance. `null` when the item has no such section.
+ *
+ * Pure; O(lines). Takes the canonical body (`acceptanceBody(item)`), like every
+ * other acceptance consumer.
+ */
+export function liveContextRegion(body: string): string | null {
+  const lines = liveAcceptanceLines(body);
+  let start = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (CONTEXT_HEADING.test(lines[i]!)) {
       start = i + 1;
       break;
     }

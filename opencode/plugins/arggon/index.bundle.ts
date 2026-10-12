@@ -69,6 +69,7 @@ __arggonEdges.set("lib/src/index.ts\u0000./lock.js", "lib/src/lock.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./next.js", "lib/src/next.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./operations.js", "lib/src/operations.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./paths.js", "lib/src/paths.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./placeholder.js", "lib/src/placeholder.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./relations.js", "lib/src/relations.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./report.js", "lib/src/report.ts")
@@ -126,6 +127,7 @@ __arggonEdges.set("lib/src/operations.ts\u0000./tracker-commit.js", "lib/src/tra
 __arggonEdges.set("lib/src/operations.ts\u0000./trend.js", "lib/src/trend.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./update.js", "lib/src/update.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./validate.js", "lib/src/validate.ts")
+__arggonEdges.set("lib/src/placeholder.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./atomic.js", "lib/src/atomic.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./dates.js", "lib/src/dates.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./frontmatter.js", "lib/src/frontmatter.ts")
@@ -170,6 +172,7 @@ __arggonEdges.set("lib/src/validate.ts\u0000./convention.js", "lib/src/conventio
 __arggonEdges.set("lib/src/validate.ts\u0000./ids.js", "lib/src/ids.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./paths.js", "lib/src/paths.ts")
+__arggonEdges.set("lib/src/validate.ts\u0000./placeholder.js", "lib/src/placeholder.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./relations.js", "lib/src/relations.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
@@ -3628,12 +3631,13 @@ function runImportIssues(opts) {
 __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.liveAcceptanceUnchecked = exports.liveAcceptanceRows = exports.liveAcceptanceRegion = exports.liveAcceptanceCriteria = exports.itemsById = exports.acceptanceUnchecked = exports.acceptanceRows = exports.acceptanceGate = exports.acceptanceCriteria = exports.acceptanceComplete = exports.acceptanceBody = void 0;
-exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = void 0;
-exports.frictionFenceFor = exports.FRICTION_REPORT_MAX_ROWS = exports.resolveRepoAbsPath = exports.redactFrictionText = exports.readOrCreateMachineSalt = exports.readFrictionLog = exports.readFrictionDropped = exports.normalizeCommandShape = exports.frictionStateDir = exports.frictionStateBase = exports.frictionSaltPath = exports.frictionReporterId = exports.frictionMajorVersion = exports.frictionLogPath = exports.frictionFingerprintMaterial = exports.frictionFingerprint = exports.frictionDroppedPath = exports.clearFrictionLog = exports.buildFrictionRecord = exports.appendFrictionRecord = exports.FrictionError = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SECRET_PLACEHOLDER = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_REDACTION_MAX_SUBSTITUTIONS = exports.FRICTION_REDACTED_FIELD = exports.FRICTION_PATH_PLACEHOLDER = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_MAX_LINES = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_HARNESS_CAP = exports.FRICTION_FORMAT_VERSION = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_DROPPED_FILE_NAME = exports.FRICTION_DEFAULT_HARNESS = exports.FRICTION_COMMAND_SHAPE_CAP = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = void 0;
-exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.isFrictionPublishTier = exports.buildFrictionPublishUrl = exports.buildFrictionPublishTitle = exports.buildFrictionPublishDoc = exports.buildFrictionPublishBody = exports.FRICTION_PUBLISH_URL_BASE = exports.FRICTION_PUBLISH_TITLE_PREFIX = exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = exports.FRICTION_PUBLISH_TIERS = exports.FRICTION_PUBLISH_NARRATIVE_CAP = exports.FRICTION_PUBLISH_MAX_URL_CHARS = exports.FRICTION_PUBLISH_MAX_CLASSES = exports.FRICTION_PUBLISH_LABEL = exports.FRICTION_PUBLISH_FENCE_INFO = exports.resolveFrictionOptOut = exports.readFrictionOptOut = exports.FRICTION_OPT_OUT_ENV = exports.summarizeFrictionLog = exports.renderFrictionReport = exports.readFrictionReport = void 0;
-exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeReleaseRefusal = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.frictionClearOperation = void 0;
+exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.liveContextRegion = exports.liveAcceptanceUnchecked = exports.liveAcceptanceRows = exports.liveAcceptanceRegion = exports.liveAcceptanceCriteria = exports.itemsById = exports.acceptanceUnchecked = exports.acceptanceRows = exports.acceptanceGate = exports.acceptanceCriteria = exports.acceptanceComplete = exports.acceptanceBody = void 0;
+exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = void 0;
+exports.FRICTION_REPORT_MAX_ROWS = exports.resolveRepoAbsPath = exports.redactFrictionText = exports.readOrCreateMachineSalt = exports.readFrictionLog = exports.readFrictionDropped = exports.normalizeCommandShape = exports.frictionStateDir = exports.frictionStateBase = exports.frictionSaltPath = exports.frictionReporterId = exports.frictionMajorVersion = exports.frictionLogPath = exports.frictionFingerprintMaterial = exports.frictionFingerprint = exports.frictionDroppedPath = exports.clearFrictionLog = exports.buildFrictionRecord = exports.appendFrictionRecord = exports.FrictionError = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SECRET_PLACEHOLDER = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_REDACTION_MAX_SUBSTITUTIONS = exports.FRICTION_REDACTED_FIELD = exports.FRICTION_PATH_PLACEHOLDER = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_MAX_LINES = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_HARNESS_CAP = exports.FRICTION_FORMAT_VERSION = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_DROPPED_FILE_NAME = exports.FRICTION_DEFAULT_HARNESS = exports.FRICTION_COMMAND_SHAPE_CAP = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = void 0;
+exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.stripInlineCodeSpans = exports.regionHasScaffoldMarker = exports.placeholderSections = exports.bodyHasScaffoldPlaceholder = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.isFrictionPublishTier = exports.buildFrictionPublishUrl = exports.buildFrictionPublishTitle = exports.buildFrictionPublishDoc = exports.buildFrictionPublishBody = exports.FRICTION_PUBLISH_URL_BASE = exports.FRICTION_PUBLISH_TITLE_PREFIX = exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = exports.FRICTION_PUBLISH_TIERS = exports.FRICTION_PUBLISH_NARRATIVE_CAP = exports.FRICTION_PUBLISH_MAX_URL_CHARS = exports.FRICTION_PUBLISH_MAX_CLASSES = exports.FRICTION_PUBLISH_LABEL = exports.FRICTION_PUBLISH_FENCE_INFO = exports.resolveFrictionOptOut = exports.readFrictionOptOut = exports.FRICTION_OPT_OUT_ENV = exports.summarizeFrictionLog = exports.renderFrictionReport = exports.readFrictionReport = exports.frictionFenceFor = void 0;
+exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeReleaseRefusal = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = void 0;
+exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.frictionClearOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceBody", { enumerable: true, get: function () { return items_js_1.acceptanceBody; } });
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
@@ -3646,6 +3650,7 @@ Object.defineProperty(exports, "liveAcceptanceCriteria", { enumerable: true, get
 Object.defineProperty(exports, "liveAcceptanceRegion", { enumerable: true, get: function () { return items_js_1.liveAcceptanceRegion; } });
 Object.defineProperty(exports, "liveAcceptanceRows", { enumerable: true, get: function () { return items_js_1.liveAcceptanceRows; } });
 Object.defineProperty(exports, "liveAcceptanceUnchecked", { enumerable: true, get: function () { return items_js_1.liveAcceptanceUnchecked; } });
+Object.defineProperty(exports, "liveContextRegion", { enumerable: true, get: function () { return items_js_1.liveContextRegion; } });
 Object.defineProperty(exports, "loadItems", { enumerable: true, get: function () { return items_js_1.loadItems; } });
 Object.defineProperty(exports, "softTryLoadItem", { enumerable: true, get: function () { return items_js_1.softTryLoadItem; } });
 Object.defineProperty(exports, "tryLoadItem", { enumerable: true, get: function () { return items_js_1.tryLoadItem; } });
@@ -3847,6 +3852,11 @@ var list_js_2 = require("./list.js");
 Object.defineProperty(exports, "parseOlderThan", { enumerable: true, get: function () { return list_js_2.parseOlderThan; } });
 var validate_js_1 = require("./validate.js");
 Object.defineProperty(exports, "runValidate", { enumerable: true, get: function () { return validate_js_1.runValidate; } });
+var placeholder_js_1 = require("./placeholder.js");
+Object.defineProperty(exports, "bodyHasScaffoldPlaceholder", { enumerable: true, get: function () { return placeholder_js_1.bodyHasScaffoldPlaceholder; } });
+Object.defineProperty(exports, "placeholderSections", { enumerable: true, get: function () { return placeholder_js_1.placeholderSections; } });
+Object.defineProperty(exports, "regionHasScaffoldMarker", { enumerable: true, get: function () { return placeholder_js_1.regionHasScaffoldMarker; } });
+Object.defineProperty(exports, "stripInlineCodeSpans", { enumerable: true, get: function () { return placeholder_js_1.stripInlineCodeSpans; } });
 var update_js_1 = require("./update.js");
 Object.defineProperty(exports, "runUpdate", { enumerable: true, get: function () { return update_js_1.runUpdate; } });
 Object.defineProperty(exports, "maybeCommitUpdate", { enumerable: true, get: function () { return update_js_1.maybeCommitUpdate; } });
@@ -4042,6 +4052,7 @@ exports.acceptanceCriteria = acceptanceCriteria;
 exports.acceptanceUnchecked = acceptanceUnchecked;
 exports.acceptanceComplete = acceptanceComplete;
 exports.liveAcceptanceRegion = liveAcceptanceRegion;
+exports.liveContextRegion = liveContextRegion;
 exports.liveAcceptanceRows = liveAcceptanceRows;
 exports.liveAcceptanceCriteria = liveAcceptanceCriteria;
 exports.liveAcceptanceUnchecked = liveAcceptanceUnchecked;
@@ -4294,6 +4305,7 @@ function acceptanceComplete(body) {
     return acceptanceUnchecked(body).length === 0;
 }
 const ACCEPTANCE_HEADING = /^##[ \t]+acceptance[ \t]*$/i;
+const CONTEXT_HEADING = /^##[ \t]+context[ \t]*$/i;
 const SECTION_END_HEADING = /^#{1,2}[ \t]/;
 const COMMENT_BLOCK_HEADING = /^###[ \t]+(?:\d{4}-\d{2}-\d{2}[ \t]+@|Waiver\b)/;
 const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
@@ -4341,6 +4353,26 @@ function liveAcceptanceRegion(body) {
     let start = -1;
     for (let i = 0; i < lines.length; i += 1) {
         if (ACCEPTANCE_HEADING.test(lines[i])) {
+            start = i + 1;
+            break;
+        }
+    }
+    if (start === -1)
+        return null;
+    const region = [];
+    for (let i = start; i < lines.length; i += 1) {
+        const line = lines[i];
+        if (SECTION_END_HEADING.test(line))
+            break;
+        region.push(line);
+    }
+    return region.join("\n");
+}
+function liveContextRegion(body) {
+    const lines = liveAcceptanceLines(body);
+    let start = -1;
+    for (let i = 0; i < lines.length; i += 1) {
+        if (CONTEXT_HEADING.test(lines[i])) {
             start = i + 1;
             break;
         }
@@ -5321,6 +5353,55 @@ function newItemPath(opts) {
         return (0, node_path_1.join)(parentContainerDir, `${id}.md`);
     }
     return (0, node_path_1.join)(parentContainerDir, id, `${id}.md`);
+}
+})
+
+__arggonModules.set("lib/src/placeholder.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.stripInlineCodeSpans = stripInlineCodeSpans;
+exports.regionHasScaffoldMarker = regionHasScaffoldMarker;
+exports.placeholderSections = placeholderSections;
+exports.bodyHasScaffoldPlaceholder = bodyHasScaffoldPlaceholder;
+const items_js_1 = require("./items.js");
+function stripInlineCodeSpans(text) {
+    let out = "";
+    let i = 0;
+    while (i < text.length) {
+        if (text[i] !== "`") {
+            out += text[i];
+            i += 1;
+            continue;
+        }
+        let run = 0;
+        while (text[i + run] === "`")
+            run += 1;
+        const closer = "`".repeat(run);
+        const end = text.indexOf(closer, i + run);
+        if (end === -1) {
+            out += text.slice(i);
+            break;
+        }
+        i = end + run;
+    }
+    return out;
+}
+const SCAFFOLD_COMMENT = /<!--[\s\S]*?-->/;
+function regionHasScaffoldMarker(region) {
+    if (region === null)
+        return false;
+    return SCAFFOLD_COMMENT.test(stripInlineCodeSpans(region));
+}
+function placeholderSections(body) {
+    const sections = [];
+    if (regionHasScaffoldMarker((0, items_js_1.liveContextRegion)(body)))
+        sections.push("Context");
+    if (regionHasScaffoldMarker((0, items_js_1.liveAcceptanceRegion)(body)))
+        sections.push("Acceptance");
+    return sections;
+}
+function bodyHasScaffoldPlaceholder(source) {
+    return placeholderSections((0, items_js_1.acceptanceBody)(source)).length > 0;
 }
 })
 
@@ -7190,6 +7271,7 @@ const convention_js_1 = require("./convention.js");
 const ids_js_1 = require("./ids.js");
 const priority_js_1 = require("./priority.js");
 const items_js_1 = require("./items.js");
+const placeholder_js_1 = require("./placeholder.js");
 const paths_js_1 = require("./paths.js");
 const relations_js_1 = require("./relations.js");
 const sanitize_js_1 = require("./sanitize.js");
@@ -7272,6 +7354,18 @@ function checkItemShape(item, errors) {
     }
     if (item.priority !== undefined && item.priority !== null && !(0, priority_js_1.isPriority)(item.priority)) {
         push(errors, rel, `priority must be one of p0, p1, p2, p3 (got ${JSON.stringify(item.priority)})`, "PRIORITY_INVALID");
+    }
+}
+function checkPlaceholderBodies(items, errors) {
+    for (const item of items) {
+        if (item.status !== "todo" && item.status !== "in_progress" && item.status !== "blocked") {
+            continue;
+        }
+        const sections = (0, placeholder_js_1.placeholderSections)(item.body);
+        if (sections.length === 0)
+            continue;
+        const where = sections.map((section) => `'## ${section}'`).join(" and ");
+        push(errors, item.relPath, `open ${item.type} '${item.id}' still carries the scaffold placeholder marker (<!-- … -->) in its live ${where} section — done/cancelled items are excluded (history, not the contract). Write the real prose there (a marker quoted inside code spans or fenced blocks does not count)`, "PLACEHOLDER_BODY");
     }
 }
 function checkDependencies(items, byId, errors) {
@@ -7440,6 +7534,7 @@ function runValidate(opts) {
         }
     }
     checkDependencies(items, byId, errors);
+    checkPlaceholderBodies(items, errors);
     for (const item of items) {
         if (item.type !== "story")
             continue;

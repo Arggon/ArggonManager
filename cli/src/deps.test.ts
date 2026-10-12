@@ -38,15 +38,29 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
 function primedTree(): { dir: string; paths: Record<string, string> } {
   const dir = mkdtempSync(join(tmpdir(), "arggon-deps-"));
   runInit({ dir, force: false });
-  runCreate({ cwd: dir, type: "initiative", title: "Launch MVP" });
-  runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp" });
-  runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login" });
+  // Real prose in every seed body (task-validate-refuses-placeholder-bodies):
+  // the scaffold IS the template placeholder, so a default body would fail
+  // `validate` for the wrong reason in every test below. The ticked criterion
+  // keeps the leaves' shape neutral for the graph rules under test.
+  const container = "## Context\n\nSeed.\n\n## Acceptance\n\nSeed.\n";
+  const leaf = "## Context\n\nSeed.\n\n## Acceptance\n\n- [x] seed\n";
+  runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", body: container });
+  runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", body: container });
+  runCreate({
+    cwd: dir,
+    type: "story",
+    title: "Login",
+    parent: "auth",
+    id: "story-login",
+    body: container,
+  });
   const a = runCreate({
     cwd: dir,
     type: "task",
     title: "First",
     parent: "story-login",
     id: "task-a",
+    body: leaf,
   });
   const b = runCreate({
     cwd: dir,
@@ -54,6 +68,7 @@ function primedTree(): { dir: string; paths: Record<string, string> } {
     title: "Second",
     parent: "story-login",
     id: "task-b",
+    body: leaf,
   });
   const c = runCreate({
     cwd: dir,
@@ -61,6 +76,7 @@ function primedTree(): { dir: string; paths: Record<string, string> } {
     title: "Third",
     parent: "story-login",
     id: "task-c",
+    body: leaf,
   });
   return { dir, paths: { "task-a": a.path, "task-b": b.path, "task-c": c.path } };
 }
@@ -194,6 +210,7 @@ describe("validate dependency rules", () => {
       title: "Fourth",
       parent: "story-login",
       id: "task-d",
+      body: "## Context\n\nSeed.\n\n## Acceptance\n\n- [x] seed\n",
     });
     setFrontmatter(paths["task-a"], { depends_on: ["task-c"] });
     setFrontmatter(paths["task-b"], { depends_on: ["task-c"] });

@@ -52,9 +52,36 @@ function initRepo(prefix: string): string {
   git(["config", "user.email", "test@example.com"], dir);
   git(["config", "user.name", "Test"], dir);
   runInit({ dir, force: false });
-  runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
-  runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "auth", now: NOW });
-  runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "login", now: NOW });
+  // Real seed prose (task-validate-refuses-placeholder-bodies): the scaffold
+  // IS the placeholder, so default bodies would fail `validate` here.
+  const container = "## Context\n\nSeed.\n\n## Acceptance\n\nSeed.\n";
+  const leaf = "## Context\n\nSeed.\n\n## Acceptance\n\n- [x] seed\n";
+  runCreate({
+    cwd: dir,
+    type: "initiative",
+    title: "Launch",
+    id: "launch",
+    now: NOW,
+    body: container,
+  });
+  runCreate({
+    cwd: dir,
+    type: "epic",
+    title: "Auth",
+    parent: "launch",
+    id: "auth",
+    now: NOW,
+    body: container,
+  });
+  runCreate({
+    cwd: dir,
+    type: "story",
+    title: "Login",
+    parent: "auth",
+    id: "login",
+    now: NOW,
+    body: container,
+  });
   runCreate({
     cwd: dir,
     type: "task",
@@ -62,6 +89,7 @@ function initRepo(prefix: string): string {
     parent: "login",
     id: "task-race",
     now: NOW,
+    body: leaf,
   });
   commitAllIfDirty(dir, "init tasks");
   return dir;

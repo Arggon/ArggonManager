@@ -54,6 +54,7 @@ export {
   liveAcceptanceRegion,
   liveAcceptanceRows,
   liveAcceptanceUnchecked,
+  liveContextRegion,
   loadItems,
   softTryLoadItem,
   tryLoadItem,
@@ -318,6 +319,13 @@ export type { ParsedLog } from "./trend.js";
 export { parseOlderThan } from "./list.js";
 export { runValidate } from "./validate.js";
 export type { ValidateOptions, ValidateResult } from "./validate.js";
+export {
+  bodyHasScaffoldPlaceholder,
+  placeholderSections,
+  regionHasScaffoldMarker,
+  stripInlineCodeSpans,
+} from "./placeholder.js";
+export type { PlaceholderSection } from "./placeholder.js";
 export { runUpdate, maybeCommitUpdate, parseCsvList } from "./update.js";
 export type { UpdateOptions, UpdateResult } from "./update.js";
 export type { ClaimFootprintReceipt } from "./update.js";

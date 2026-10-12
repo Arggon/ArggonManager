@@ -23,7 +23,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { MAX_ENVELOPE_DETAIL_CHARS, defaultCleanupGit, runCleanup } from "./cleanup.js";
 import { parseFrontmatter, runCreate, runUpdate, runValidate } from "@arggondev/lib";
 
-import { satisfyAllAcceptance } from "../../test/acceptance.js";
+import { satisfyAllAcceptance, satisfyPlaceholders } from "../../test/acceptance.js";
 
 import { runInit } from "./init.js";
 import { defaultStartGit, runStart } from "./start.js";
@@ -93,6 +93,9 @@ function initRepo(): string {
   // Done gate (task-done-gate-acceptance-waiver, ADR 0015): these suites flip
   // the leaves done for cleanup/worktree rules, so arrange satisfied contracts.
   satisfyAllAcceptance(dir);
+  // Placeholder guard (task-validate-refuses-placeholder-bodies): the scaffold
+  // IS the template placeholder, so arrange real prose over the markers too.
+  satisfyPlaceholders(dir);
   // init now also generates AND auto-commits the governing docs; this is a
   // tolerant no-op when everything is already committed (tracker hygiene).
   commitAllIfDirty(dir, "init tasks");
@@ -2337,7 +2340,10 @@ describe("claim release — unclaim leaves nothing (bug-unclaim-leaves-worktree-
     expect(done.claimFootprint).toBeUndefined();
     // The receipt is absent, not degraded: the release is never named on stdout
     // either (the human path is where an agent would read the remedy).
-    const human = runCli(["update", "task-bravo", "--status", "blocked", "--blocked-reason", "x"], dir);
+    const human = runCli(
+      ["update", "task-bravo", "--status", "blocked", "--blocked-reason", "x"],
+      dir,
+    );
     expect(human.stdout).not.toContain("claim dropped");
     expect(existsSync(wt)).toBe(true);
     // `--prune` is the merge-gated remedy the docs point a done item at: the
@@ -2389,7 +2395,9 @@ describe("claim release — unclaim leaves nothing (bug-unclaim-leaves-worktree-
     expect(refused.release?.entry.releasable).toBe(false);
     expect(refused.release?.entry.reason).toContain("uncommitted or untracked file");
     expect(refused.release?.entry.blockingTotal).toBeGreaterThan(0);
-    expect(refused.release?.entry.blockingPaths).toContain("ArggonManager/launch/auth/login/task-alpha.md");
+    expect(refused.release?.entry.blockingPaths).toContain(
+      "ArggonManager/launch/auth/login/task-alpha.md",
+    );
     expect(refused.failures).toHaveLength(1);
     expect(existsSync(wt)).toBe(true);
     expect(existsSync(stamp)).toBe(true); // the evidence survives a refused release
@@ -2420,9 +2428,9 @@ describe("claim release — unclaim leaves nothing (bug-unclaim-leaves-worktree-
     const dir = initRepo();
     const wt = claimedAndMerged(dir);
 
-    expect(() =>
-      runCleanup({ cwd: dir, releaseTakeOverWorktree: true, noGh: true }),
-    ).toThrow(/--take-over-worktree requires --release/);
+    expect(() => runCleanup({ cwd: dir, releaseTakeOverWorktree: true, noGh: true })).toThrow(
+      /--take-over-worktree requires --release/,
+    );
 
     const human = runCli(["cleanup", "--take-over-worktree"], dir);
     expect(human.status).not.toBe(0);
