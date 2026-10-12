@@ -12,7 +12,6 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T17:27:25.869Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-lockfile-sync-step-cannot-run
 ---
-
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-lockfile-sync-step-cannot-run.md
   Leaves live only under a story. id is the filename stem: bug-release-lockfile-sync-step-cannot-run.
@@ -311,3 +310,47 @@ Branch `fix/bug-release-lockfile-sync-step-cannot-run`, PR #745 (not merged). Fi
 Left unticked as instructed: _Verified on a real release-please.yml run after the fix lands_ (delivery lead, post-merge).
 
 **Out of scope, reported not filed:** run 38282448930 failed in `Surface an aborted release` (sibling `bug-autorelease-label-lifecycle-unowned` territory); both runs annotate Node.js 20-deprecated actions forced onto Node.js 24.
+
+### 2026-10-12 @ses_ecebd76f6ffeRyFG8k67Do7tZN
+### verdict: request-changes (first-failure provenance is wrong: 2026-10-01 / run 36908073600 / PR #556, not 2026-10-07 / 37648763109 / #664)
+
+Practice & standards review, read-and-reason only: no gates executed here. Inspected: PR #745 diff (gh pr diff), the workflow on main vs branch, the workflow's run history and step logs (gh run view --log), PR metadata (#556/#664/#744), and the git refs below.
+
+**Verified by reading**
+
+- Diff is exactly two files: `.github/workflows/release-please.yml` (+13 comment lines; the one line changed to `npm install --package-lock-only --ignore-scripts`) and this item file. No other step semantics changed; no `|| true`, no `continue-on-error`; `set -euo pipefail` and the `git diff --quiet` short-circuit are intact -> the negative case is preserved as claimed.
+- Staleness / reconciliation claims hold: on `origin/release-please--branches--main`, `packages[""].dependencies["@arggondev/lib"]` = `^0.4.0` and `packages["lib"].version` = `0.4.0`, while that branch's `package.json` is `^0.7.0` and `lib/package.json` is 0.7.0 (main: `^0.6.0` / 0.6.0 / lockfile `^0.4.0`/0.4.0). `node_modules/@arggondev/lib` is `{resolved:"lib", link:true}`, so the item's honest-scope note on `npm ci` (green both with stale and reconciled lockfile) is coherent. No `chore: sync package-lock.json ...` commit ever landed on the release branch - the reconciliation indeed never happened.
+- Root `prepare` is `npm run build`; the step landed 2026-10-01 (7230609f); PR #745 CI is green (cli / tasks-validate / ui-smoke, run 38285884615).
+
+**Blocking finding - the item's and the shipped comment's "first failure" is wrong, and the failure inventory is incomplete**
+
+`gh run view 36908073600 --log` shows the *first* non-no-op run - created **2026-10-01T18:36Z**, the same run whose release-please step created release PR **#556 at 18:39:09Z**, ~1.5 h after the step landed - dying with the identical `src/atomic.ts(1,29): error TS2591` under `> arggon-manager@0.5.0 prepare` -> `npm run build`. Scanning every run of this workflow (2026-10-01..10-12) gives sync-step failures of **49, not 9**:
+
+| window | release PR | sync-step failures | cause |
+| --- | --- | --- | --- |
+| 10-01T18:36Z -> 10-02T05:39Z | #556 (created 10-01T18:39:09Z, merged 10-02T12:16:48Z) | 39 | TS2591 (same prepare/build failure) |
+| 10-07T16:01Z -> 10-09T14:45Z | #664 | 8 | TS2591 |
+| 10-12T17:18Z -> 17:27Z | #744 | 2 (38283343454, 38284301238) | TS2591 |
+
+Every success outside these windows is the `no open release PR` no-op (first after #556's merge: 37005746756, echoed at 12:19Z). "The step never once completed its install path" is therefore true - but the record pinning *which* runs must be corrected:
+
+- Item: "all 9 runs that had an open release PR failed in exactly this step" -> **49 runs across three release-PR windows**.
+- Item: "the first was 37648763109 (2026-10-07T16:04 ...)" -> first is **36908073600, 2026-10-01, PR #556**; #664 is the *second* exposure.
+- Item: "the failure predates 38283343454 by 5 days" -> **11 days**.
+- Item: "The first live release PR and the first exposure of the defect are the same event" -> true of **#556 (10-01)**, not #664.
+- Item: "earliest inspected: 37065003701, 2026-10-02T21:08" -> the PR-less window begins at **2026-10-02T12:16:48Z** (#556's merge).
+- Shipped workflow comment: "from the first non-no-op run (37648763109, 2026-10-07, PR #664)" -> wrong first; this line ships permanently.
+
+The maker's correction to the Context is accurate for #664 (verified: created 2026-10-07T16:04:23Z, merged 2026-10-09T15:14:36Z) but incomplete - it replaces one wrong "first" with another and never names #556, the release PR that was open on 10-02.
+
+**Not in question:** the conclusion (latent since the step landed, not a runner change) is confirmed and *better* supported than written - the same failure on image builds ubuntu24/20260927.320 and ubuntu24/20261004.327. The flag choice and the fail-loud property are sound; the fix line itself needs no change.
+
+**Requested change (tight scope)**
+
+1. Workflow comment: first non-no-op run is **36908073600 (2026-10-01, PR #556)**, not 37648763109 (10-07, #664).
+2. Item Notes / Decisive facts: add the #556 window (39 failures) to the inspected-runs table; correct 9 -> 49 and 5 days -> 11 days; name #556 in the correction and date the PR-less window from its merge (10-02T12:16:48Z).
+3. Re-tick acceptance box 2 once the record is corrected; the fix itself is unchanged.
+
+Not independently reproduced by me (execution evidence is the verifier's): the sha256 byte-identity with `npm@10.9.9`, the ETARGET negative control, `npm ci` exit codes, and the actionlint/prettier/test:structure/lint:structure gates - all maker-recorded in the item; this does not change the verdict above.
+
+Out of scope, report only: run 38282448930's `Surface an aborted release` failure (sibling bug), the Node-20-deprecation annotations, npm-10 `libc` formatting churn.
