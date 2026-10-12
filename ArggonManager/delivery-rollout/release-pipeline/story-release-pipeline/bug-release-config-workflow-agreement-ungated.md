@@ -208,3 +208,40 @@ The merge push to main is the real release-please.yml run (no Release-As: traile
 ### For siblings (reported, not filed here)
 - bug-release-needs-auth-self-describing: the gh-auth failure path (warn+exit 0) assumes the runner gh authed by GITHUB_TOKEN; a self-describing auth message belongs there.
 - bug-autorelease-label-lifecycle-unowned: owns the release.yml label flip + the manual-recovery text after the marked comment.
+
+### 2026-10-12 @ses_ecf022155ffeeGNMnHJeNTMYfl
+verdict: request-changes (scope: the shipped live-state claim and merge/verification plan; no code change requested)
+
+**Blocking finding — the evidence bundle's live-state claim is false, and the merge plan built on it will be misread.** The item Notes, the PR body and the handoff all say the merge push "must stay green" because the backstop "finds no stuck PR" / "every already-merged one has had its label flipped". Observed just now (read-only, 2026-10-12):
+
+```
+$ gh pr list --repo Arggon/ArggonManager --state merged --label "autorelease: pending" --limit 200 --json number,title,mergedAt
+[{"number":664,"title":"chore: release main","mergedAt":"2026-10-09T15:14:36Z"}]
+```
+
+and the two latest release-please.yml runs (38266214060, 38266190932) each log `⚠ There are untagged, merged release PRs outstanding - aborting` while concluding `success`. The recurrence is live: #664 merged 2026-10-09 and its label was never flipped. release-please cannot flip it here — config `skip-github-release: true` makes `BaseStrategy.buildRelease` return before any candidate release exists (release-please v17.3.0 `strategies/base.js:354`; v17.3.0 is what the pinned action resolves), so `createReleasesForPullRequest`'s `removeIssueLabels(pending)/addIssueLabels(tagged)` (`manifest.ts:1294–1315`) never runs. `release.yml` has no flip yet either. Verified in the bundled source, not inferred.
+
+Consequence: **on the merge push the backstop will exit 1 naming #664 — the first real run is a true RED, not OK** (unless #664 is flipped first). That red is the change working: it catches a live silent abort that has been green since 10-09. But as shipped the item tells the delivery lead to expect OK and treats "no stuck PR" as fact, so the record would misread the gate at exactly the moment it first fires.
+
+Recommended sequence (real evidence both directions): merge → observe the run fail naming #664 (a real negative case, stronger than the injected fixture) → flip the label (`gh pr edit 664 --add-label "autorelease: tagged" --remove-label "autorelease: pending"` — the same manual recovery used for #556) → the next push prints OK and release-please opens the next release PR (AC#5's other branch). Flipping #664 before merge also works, but then the red exists only in the fixture.
+
+Same claim in `release.md` §The tag↔config agreement: "…every already-merged one has had its label flipped to `autorelease: tagged`, so the check is green" states the post-sibling steady state as current fact. Scope it to the landed flip (`bug-autorelease-label-lifecycle-unowned`) or name the pending window; otherwise it misleads the next author reading it while the state is red.
+
+What must change: replace the false green expectation in the item Notes / PR body / handoff with the observed pair above, and scope the release.md sentence. No code change requested — the artifact is otherwise approvable.
+
+**On the six concerns (all read-only):**
+
+1. **Abort predicate fidelity — matches release-please's own, no false negative found.** `findMergedReleasePullRequests` → `pullRequestIterator(targetBranch, 'MERGED', 200, false)` (manifest.ts:1140–1147): first 200 merged PRs on `main`, updated-desc, filtered by `hasAllLabels(['autorelease: pending'])` (DEFAULT_LABELS, manifest.ts:287–288); `createPullRequests` aborts on any hit (manifest.ts:926–934). The gh query is a faithful superset in the safe direction: a label filter switches `gh pr list` to its search backend (labels force the search path — verified live, the query returned only the merged #664), so it is not confined to a recent 200-PR window, spans all bases (single-branch repo), and does not require a parseable release-PR body. Divergences only widen the red. `--limit 200` is defensible: release-please's own cap is exactly 200, gh's search cap is 1000. Only realistic false-negative is search-index lag, bounded by the red condition being a persistent state — the next run still catches it. No false-positive path found: an open/normal PR cannot leak in (`--state merged`; no workflow other than this branch applies the label).
+2. **Fail-open on gh failure — keep it.** The action step above shares token/API and runs first, so the shared-failure-domain argument holds; and because the predicate is a persistent state, warn+exit-0 can at most delay detection to the next push, never lose it. One tension worth recording: engineering.md's paired-deletion-guard precedent fails on "could not look" — but here fail-closed would manufacture reds on healthy pushes, which is the crying-wolf defect this item kills. Non-blocking improvement: emit `::warning::` so the warning surfaces as an Actions annotation instead of only in the step log.
+3. **Placement/conditions — confirmed, cannot skip when needed.** release-please.yml:40–61, after the action (32) and checkout (38), before the lockfile sync, no `if:`, on every push. The only way it does not run is an earlier step failing — job already red. Green path proven offline (injected empty gh); red path exits 1 at script lines 117–143 (read).
+4. **Config gate — two-sided and genuinely exercised.** `agreementViolation` reddens on config `true`, on the key absent ("absent (schema default: true)"), on workflow tag drift to a component prefix, on no `git tag -a` line, and on the real committed bytes with the key flipped or deleted. `workflowTagRef` reads release.yml:101 `git tag -a "v\${VERSION}"`; committed config line 5 is `include-component-in-tag: false`; six of the nine tests fail if the predicate is vacuous.
+5. **Docs vs predicate/spec — consistent** modulo the scoping fix above; release.md states the same predicate the gate enforces and cites spec invariant 1 (`vX.Y.Z` names the exact published commit).
+6. **Scope — exact.** Diff stat = the 5 claimed files + the two item bodies; `release.yml` untouched; b7b5f866 already on `origin/main` and untouched; the sibling-item edit is the delivery lead's recorded decision only (no half-built flip code); `cli/*.mjs` + `cli/*.test.ts` matches the release-guard / paired-deletion-guard / inspect-tarballs precedent.
+
+**Residual (non-blocking, for the sibling):** post-sibling, on a release-merge push `release.yml` (flip) and `release-please.yml` (check) run concurrently — if the check beats the flip it reds once and clears on the next push. The recorded decision already puts the flip right after the tag↔agreement step, which should normally win; worth stating so the first such red is not read as a defect.
+
+**Verified by me:** everything above by reading the diff/workflow/script/tests/release-please v17.3.0 source+schema, plus read-only live queries (`gh pr list`, `gh pr view 664`, `gh run view --log`). **Not verified:** the maker's gate table (both suites, `npm run test`/`test:structure`/`lint:structure`, actionlint) — verifier to confirm in this worktree.
+
+## Probes needed
+- `node cli/release-abort-check.mjs --repo Arggon/ArggonManager` — cwd `/home/arggon/Projects/ArggonManager-bug-release-config-workflow-agreement-ungated`. Expected: exit 1 with a message naming #664. This demonstrates the predicate catches the live stuck release PR (the maker's bundle has only injected-gh evidence). If it prints OK/exit 0, the top finding softens and the merge-run expectation flips.
+- `gh pr list --repo Arggon/ArggonManager --state merged --label "autorelease: pending" --limit 200` — immediately before merge. Expected: #664. If empty (flip landed), the merge run should be green and AC#5 reads as "opens the release PR".
