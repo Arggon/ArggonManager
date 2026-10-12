@@ -8,7 +8,6 @@ labels: [release, docs, methodology]
 created: "2026-10-07"
 updated: "2026-10-07"
 ---
-
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-autorelease-label-lifecycle-unowned.md
   Leaves live only under a story. id is the filename stem: bug-autorelease-label-lifecycle-unowned.
@@ -95,3 +94,17 @@ tag-form mismatch, this one the label bookkeeping. Both were required. Neither
 had been considered when the release pipeline was designed — the spec's §Rationale
 worked out _who tags_ but never asked _who updates release-please's bookkeeping
 once it stops tagging_.
+
+### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead — decision recorded: option (a), release.yml owns the flip
+
+The item's first acceptance criterion asks who owns the `autorelease: pending` → `tagged` transition. That is a reversible CI-ownership call inside the delivery lead's sequencing authority (not an authority-map row, not a brief), so it is decided and recorded here.
+
+**Decision: (a)** — `release.yml` flips the label on the merged release PR, in the same run that tags, immediately after the tag↔version agreement step.
+
+Reasoning:
+1. The label's meaning is "this release PR was merged but its release is not tagged yet". The fact that resolves that condition — the tag — exists only in `release.yml`'s run. The workflow that creates the fact owns the bookkeeping the fact implies; coupling them in one run also makes the flip atomic by construction (a run that dies before the flip leaves the abort backstop to catch it, which is exactly what item `bug-release-config-workflow-agreement-ungated` lands as its abort-surfacing step).
+2. (b) was rejected: it makes a workflow that owns no tags responsible for tag bookkeeping, and flips on a delay (the next push to main), so the label stays wrong for the whole window between the tag and the next push — the exact window the deadlock lived in.
+3. The `skip-github-release: true` reconciliation the acceptance asks for: the repo opted out of release-please's tagging because GITHUB_TOKEN-created events do not trigger workflows, so release-please never runs its own tagging path and never flips its own label. The parts of release-please's bookkeeping the repo now owns itself are: (i) the tag-vs-config agreement (gate, landed by `bug-release-config-workflow-agreement-ungated`), (ii) the label lifecycle flip (this item), and (iii) the abort-condition surfacing that replaces "read the warning inside a green run".
+
+Detection criterion for this item is therefore satisfied by the release-please.yml backstop from `bug-release-config-workflow-agreement-ungated` (fail the run when merged `autorelease: pending` PRs are outstanding) plus this item's release.md lifecycle section; the maker should extend that backstop's message with the manual recovery (`gh pr edit <n> --add-label "autorelease: tagged" --remove-label "autorelease: pending"`) if the wave-3 item's landed step does not already carry it.

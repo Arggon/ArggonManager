@@ -37,3 +37,6 @@ Hard constraint from the wave-1 survey: the guard must match the SCAFFOLD MARKER
 - [ ] `npm test` green; prettier clean; PR opened
 
 ## Notes
+
+### 2026-10-12 @ses_ed2ed434cffdHsqB0EV526IjUT
+Lead note (wave-1b gate): the guard change stays staged-uncommitted on its branch until `task-wave1b-agent-native-bodies` + `task-wave1b-mixed-bodies` merge — committing earlier turns main red on the pre-commit hook (the guard correctly refuses its own commit while 24 placeholders remain). Those two tasks are the remaining depends_on in effect; frontmatter `depends_on` untouched deliberately (`bug-update-depends-on-multiline-rejected`: the serializer would rewrite it multiline-broken).
