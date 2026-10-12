@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-author-spec-pipeline-body
 title: Author body for the placeholder task under story-spec-pipeline
+assignee: arggon-delivery-lead
+branch: feat/task-author-spec-pipeline-body
 parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
+claimed_at: "2026-10-12T02:21:16.942Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-author-spec-pipeline-body
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-spec-pipeline-body.md
   Leaves live only under a story. id is the filename stem: task-author-spec-pipeline-body.
