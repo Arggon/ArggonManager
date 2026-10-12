@@ -92,3 +92,7 @@ Measured evidence stays in this item: on 2026-10-12 the wave hit `#746 BEHIND �
 - `npm run arggon -- validate` — expected ok:true; observed `arggon validate: ok (0 warning(s), convention v5)`, exit 0.
 - `npx prettier --check` on `ArggonManager/docs/engineering.md` and the item file — expected clean; observed "All matched files use Prettier code style!", exit 0.
 - Doc-contract backstop (not required for docs-only, run to protect `main`): `npx vitest run cli/src/adr-status-doc-contract.test.ts cli/src/capability-matrix.test.ts cli/src/mcp-doc-contract.test.ts` — expected pass; observed 3 files / 46 tests passed.
+
+### handoff 2026-10-12 @ses_ecd832dcaffeNprCV9oommyP6g (session: ses_ecd832dcaffeNprCV9oommyP6g) — next: Delivery lead: review + merge the PR; on BEHIND use engineering.md §Naming, commits, PRs refresh flow; observe the box-4 after-cost during this wave.
+- branch: feat/task-merge-ergonomics-branch-updates
+- open questions: Merge queue needs a merge_group trigger in ci.yml + a push:main ordering check (ADR 0018 C3, auto-done) — follow-up not filed here; box 4 after-observation pending.
