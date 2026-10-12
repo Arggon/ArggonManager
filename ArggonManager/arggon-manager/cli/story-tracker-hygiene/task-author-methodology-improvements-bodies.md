@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-author-methodology-improvements-bodies
 title: Author bodies for the 12 placeholder tasks under methodology-improvements
+assignee: arggon-delivery-lead
+branch: feat/task-author-methodology-improvements-bodies
 parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-12"
+claimed_at: "2026-10-12T01:09:55.998Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-author-methodology-improvements-bodies
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-methodology-improvements-bodies.md
   Leaves live only under a story. id is the filename stem: task-author-methodology-improvements-bodies.
