@@ -50,3 +50,12 @@ Maker evidence (arggon-maker, worktree session):
 - Gates: `npm run arggon -- validate` ok (0 warnings, convention v5) before commit (also ran as pre-commit hook); `npx prettier --check` clean on both touched files (target + own item file). Baseline pre-check was dirty on both (pre-existing dirt, same class as PRs #731-735).
 - Non-content normalizations disclosed (editor applied on save): (1) blank line after frontmatter closing --- in both files; (2) blank line after dated Notes heading + before Notes Acceptance list in target. No words/values/checkbox-states changed outside new live sections.
 - Proof: git diff shows only scaffold-comment removals, added live content, and the blank lines above; grep of frontmatter value keys over the diff is empty (frontmatter untouched); grep [x] over target is empty — all 4 live boxes unticked; staged explicit paths only (2 files, no -A); commit 613a9c4c; `git push -u origin feat/task-author-spec-pipeline-body` -> new remote branch created, upstream tracking set (no failure). Touched nothing outside the target + own item file. Did NOT tick own Acceptance boxes, did NOT flip done, filed no tracker items.
+
+### 2026-10-12 @ses_ed2ed434cffdHsqB0EV526IjUT
+
+verdict: approve (spec-pipeline task body, docs-only, smoke-exempt)
+
+- Read the worktree diff (1 task file + own item file) — nothing else; scope stays on the item
+- Standards-reviewer: approve, no blocking findings (frontmatter identical incl. depends_on kept; Notes→live faithful; all spec.ts/methodology.md/agents.md pins resolve at HEAD; 4 checkable boxes matching Notes; no markers; no ticks; own boxes unticked)
+- Verifier: validate ok, prettier clean on both files (maker's own-file style commit held)
+- Recommendation: merge PR #736 (merge, not squash) on green CI; lead ticks Acceptance after merge and flips done
