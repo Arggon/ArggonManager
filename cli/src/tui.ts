@@ -13,7 +13,9 @@
  * `renderTuiScreen` (the loop's dispatcher), `handleKey` (keypress reducer for
  * both modes), `clampTuiState` (board selection bounds), `followTuiScroll` +
  * `clampTuiDetailScroll` (the two scroll windows), `wrapTuiLine`,
- * `tuiAcceptanceRows`, `tuiDependencySummary`, `tuiBodyRows` +
+ * `tuiAcceptanceRows`, `tuiDependencySummary`, `tuiParentOf` + `tuiChildrenOf`
+ * (the detail-pane hierarchy jumps over the kernel `parent` edges,
+ * task-tui-hierarchy-jump), `tuiBodyRows` +
  * `tuiDetailBodyRows` (frame geometry), `loadTuiItems` (shared data path,
  * detail bodies included), `createTuiKeyDecoder` (the stateful stdin
  * splitter, bug-tui-split-escape-sequences), `formatTuiClock` (the footer
@@ -135,6 +137,14 @@ export type TuiDetailState = {
    * value or a resize still renders a valid window.
    */
   scroll: number;
+  /**
+   * Transient in-pane notice (task-tui-hierarchy-jump): the honest-empty
+   * report for a hierarchy jump with no target (no parent / no such child).
+   * Raw text — the pane footer renders it through `sanitizeHumanTextUncapped`
+   * like every other repo-controlled value. Absent (undefined/null) = no
+   * notice; cleared on the next successful jump or scroll.
+   */
+  notice?: string | null;
 };
 
 /**
@@ -727,6 +737,15 @@ export type TuiKeyContext = {
   suggestedAssignee?: string | null;
   views?: readonly TuiViewOption[];
   filterVerdict?: TuiFilterVerdict;
+  /**
+   * Full loaded snapshot for detail-pane hierarchy jumps
+   * (task-tui-hierarchy-jump): the loop passes the same `loadItems` snapshot
+   * the frame renders, so parent/children resolve through the kernel's
+   * recorded `parent` edges and the pane can never disagree with the board
+   * about the tree. Absent (pure-reducer tests) = an empty tree: every jump
+   * reports its honest-empty notice.
+   */
+  detailItems?: WorkItem[];
 };
 
 /**
@@ -740,7 +759,10 @@ export type TuiKeyContext = {
  * column. The `/` prompt applies its draft through the loop's verdict: an
  * invalid expression stays at the prompt with the kernel's error inline.
  * Detail pane: Esc and Enter return to the board with every board field
- * untouched, ↑/↓ and PgUp/PgDn/Home/End scroll the pane, q quits. The action
+ * untouched, ↑/↓ and PgUp/PgDn/Home/End scroll the pane, `p` jumps to the
+ * parent's detail and `1`-`9`/`c` open a child's detail
+ * (task-tui-hierarchy-jump; honest-empty notices when there is no target),
+ * q quits. The action
  * flow is modal: the reducer only advances its stages, the loop performs the
  * single runUpdate at the `apply` stage. Never mutates the input state.
  */
@@ -754,7 +776,8 @@ export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {})
     if (key === ESC || key === "?") return { ...state, help: false };
     return state;
   }
-  if (state.detail !== null) return handleDetailKey(state, key, ctx.detailLines ?? 0);
+  if (state.detail !== null)
+    return handleDetailKey(state, key, ctx.detailLines ?? 0, ctx.detailItems ?? []);
   // The action flow is modal (task-tui-actions-parity): no board key reaches
   // the board while it is open.
   if (state.action !== null) {
@@ -877,21 +900,68 @@ export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {})
 }
 
 /**
- * Detail-pane reducer (task-tui-detail-pane). Read-only: no key can write, and
- * no key touches the board fields, so returning to the board restores the
- * selection, the filter and the scroll window exactly. Esc and Enter both
- * close the pane; q/Ctrl-C quit the app; `/` and every other board key are
- * ignored inside the pane (it has no filter and no selection).
+ * The open item's parent through the kernel's recorded `parent` edge
+ * (task-tui-hierarchy-jump): the item whose id is the open item's `parent`
+ * field, looked up in the same `loadItems` snapshot the frame renders. Null
+ * when the open id vanished from the tree, when it has no parent, or when the
+ * recorded parent id is no longer in the tree. Pure; read-only.
  */
-function handleDetailKey(state: TuiState, key: string, lines: number): TuiState {
+export function tuiParentOf(items: WorkItem[], id: string): WorkItem | null {
+  const open = items.find((entry) => entry.id === id) ?? null;
+  if (open === null || open.parent === null || open.parent === undefined) return null;
+  return items.find((entry) => entry.id === open.parent) ?? null;
+}
+
+/**
+ * The open item's children through the kernel's recorded `parent` edges
+ * (task-tui-hierarchy-jump): every item whose `parent` is the open id, from
+ * the same `loadItems` snapshot the frame renders — no second hierarchy.
+ * Canonical id order (the board's sort), so `[n]` numbers are stable. Pure;
+ * read-only; copies.
+ */
+export function tuiChildrenOf(items: WorkItem[], id: string): WorkItem[] {
+  return sortById(items.filter((entry) => entry.parent === id));
+}
+
+/**
+ * Detail-pane reducer (task-tui-detail-pane, task-tui-hierarchy-jump).
+ * Read-only: no key can write, and no key touches the board fields, so
+ * returning to the board restores the selection, the filter and the scroll
+ * window exactly. Esc and Enter both close the pane; q/Ctrl-C quit the app;
+ * `/` and every other board key are ignored inside the pane (it has no filter
+ * and no selection). Hierarchy: `p` opens the parent's detail, `1`-`9` open
+ * the nth child in canonical id order and `c` opens the first child — all
+ * resolved through the kernel's recorded `parent` edges in `items` (the
+ * loop's live snapshot); a jump with no target keeps the pane on the same
+ * item and sets the transient in-pane notice instead of misfiring.
+ */
+function handleDetailKey(
+  state: TuiState,
+  key: string,
+  lines: number,
+  items: WorkItem[] = [],
+): TuiState {
   const detail = state.detail;
   if (detail === null) return state;
   const rows = tuiDetailBodyRows(state.height);
   const scrollTo = (value: number): TuiState => ({
     ...state,
-    detail: { ...detail, scroll: clampTuiDetailScroll(value, lines, rows) },
+    detail: { ...detail, scroll: clampTuiDetailScroll(value, lines, rows), notice: null },
   });
   const page = Math.max(1, rows);
+  // A hierarchy jump lands at the top of the target's detail with the notice
+  // cleared; the board fields behind the pane are untouched.
+  const jumpTo = (id: string): TuiState => ({
+    ...state,
+    detail: { id, scroll: 0, notice: null },
+  });
+  // An honest-empty report: the pane stays on the same item, the scroll is
+  // kept, and the footer carries the notice until the next jump or scroll.
+  const refuse = (notice: string): TuiState => ({
+    ...state,
+    detail: { ...detail, notice },
+  });
+  const openItem = items.find((entry) => entry.id === detail.id) ?? null;
 
   switch (key) {
     case ESC:
@@ -900,6 +970,49 @@ function handleDetailKey(state: TuiState, key: string, lines: number): TuiState 
       return { ...state, detail: null };
     case "q":
       return { ...state, quit: true };
+    case "p": {
+      // Jump to the parent's detail (task-tui-hierarchy-jump).
+      if (openItem === null) return refuse(`no parent: ${detail.id} is not in the tree anymore`);
+      if (openItem.parent === null || openItem.parent === undefined) {
+        return refuse(`no parent: ${detail.id} has no parent`);
+      }
+      const parent = items.find((entry) => entry.id === openItem.parent) ?? null;
+      if (parent === null) return refuse(`no parent: parent ${openItem.parent} is not in the tree`);
+      return jumpTo(parent.id);
+    }
+    case "c": {
+      // Open the first child (task-tui-hierarchy-jump): the convenience key
+      // beside the `1`-`9` per-child numbers.
+      if (openItem === null) {
+        return refuse(`no children: ${detail.id} is not in the tree anymore`);
+      }
+      const children = tuiChildrenOf(items, detail.id);
+      if (children.length === 0) return refuse(`no children: ${detail.id} has no children`);
+      return jumpTo(children[0]!.id);
+    }
+    case "1":
+    case "2":
+    case "3":
+    case "4":
+    case "5":
+    case "6":
+    case "7":
+    case "8":
+    case "9": {
+      // Open the nth child in canonical id order (task-tui-hierarchy-jump).
+      if (openItem === null) {
+        return refuse(`no children: ${detail.id} is not in the tree anymore`);
+      }
+      const children = tuiChildrenOf(items, detail.id);
+      const index = Number(key) - 1;
+      if (children.length === 0) return refuse(`no children: ${detail.id} has no children`);
+      const target = children[index];
+      if (target === undefined) {
+        const total = children.length === 1 ? "1 child" : `${children.length} children`;
+        return refuse(`no child ${key}: ${detail.id} has ${total}`);
+      }
+      return jumpTo(target.id);
+    }
     case ARROW_UP:
     case "k":
       // Vim motions scroll the pane too (task-tui-help-vim-keys).
@@ -1641,6 +1754,28 @@ export function buildTuiDetailLines(input: TuiDetailInput): string[] {
     );
   }
 
+  // Hierarchy (task-tui-hierarchy-jump): the children through the kernel's
+  // recorded `parent` edges in the same snapshot — every item whose `parent`
+  // is this item's id, canonical id order so the `[n]` numbers are stable.
+  // The numbers are the open keys: `1`-`9` open that child, `c` the first;
+  // `p` jumps to the parent (footer + help document it). An item with no
+  // children reports that honestly instead of hiding the section. Every
+  // repo-controlled value goes through the sanitize path like all other lines.
+  const children = tuiChildrenOf(input.items, item.id);
+  if (children.length === 0) {
+    push("", "children: (none)", "");
+  } else {
+    push("", `children (${children.length}):`, "");
+    children.forEach((child, index) => {
+      const marker = index < 9 ? `[${index + 1}] ` : "· ";
+      push(
+        "  ",
+        `${marker}${safe(child.id)} (${child.status}) — ${safe(child.title ?? child.id)}`,
+        "    ",
+      );
+    });
+  }
+
   // Acceptance excerpt: the cascade-counted rows plus the count, so the item's
   // contract is readable before the body is scrolled.
   const acceptance = tuiAcceptanceRows(input.body);
@@ -1730,9 +1865,18 @@ export function renderTuiDetail(
   );
   const header = color ? `\x1b[1m${headerText}\x1b[0m` : headerText;
   // Position first, help last — a narrow terminal clips the help, never the
-  // position (same precedence as the board footer).
+  // position (same precedence as the board footer). The hierarchy key (`p`
+  // parent) rides right after the position so it stays visible at 80 columns;
+  // the per-child numbers document themselves in the children section (`[n]`)
+  // and the help overlay names every binding. A hierarchy refusal (no parent /
+  // no such child) reports as an inline notice after the position instead of
+  // misfiring — sanitized like every other repo-controlled value.
+  const notice =
+    detail.notice === null || detail.notice === undefined || detail.notice === ""
+      ? ""
+      : ` · ${sanitizeHumanTextUncapped(detail.notice)}`;
   const footer = clipLine(
-    `row ${content.length === 0 ? 0 : scroll + 1}/${content.length} · ↑/↓ line · PgUp/PgDn page · home/end · esc back · q quit`,
+    `row ${content.length === 0 ? 0 : scroll + 1}/${content.length}${notice} · p parent · ↑/↓ line · PgUp/PgDn page · home/end · esc back · q quit`,
     width,
   );
 
@@ -1765,6 +1909,11 @@ export const TUI_HELP: readonly TuiHelpGroup[] = [
       ["PgUp/PgDn", "move the selection one body page up/down"],
       ["g/G · home/end", "jump to the first/last card of the column"],
       ["enter", "open the read-only detail pane (esc/enter back)"],
+      ["p", "in the detail pane: open the parent's detail (reports when none)"],
+      [
+        "1-9 · c",
+        "in the detail pane: open a child's detail — number opens that child, c the first (reports when none)",
+      ],
     ],
   },
   {
@@ -1915,7 +2064,10 @@ export type TuiLoopOptions = {
  * Enter opens the read-only detail pane; Esc/Enter return to the board; `r`
  * forces a refresh; `/` filters through the kernel filter language plus free
  * text on id/title (an invalid expression is refused inline, never applied)
- * and `v` cycles the tracker's saved views (task-tui-filter-language). Key bytes
+ * and `v` cycles the tracker's saved views (task-tui-filter-language). Inside
+ * the pane `p` jumps to the parent's detail and `1`-`9`/`c` open a child's
+ * detail through the kernel `parent` edges of the same snapshot, with
+ * honest-empty notices when there is no target (task-tui-hierarchy-jump). Key bytes
  * go through the stateful decoder
  * (bug-tui-split-escape-sequences): a CSI sequence split across stdin chunks
  * reassembles instead of leaking a phantom Esc, and a genuinely lone Esc is
@@ -2024,6 +2176,10 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
           suggestedAssignee: resolveMe(),
           views,
           filterVerdict,
+          // The live snapshot for the pane's hierarchy jumps
+          // (task-tui-hierarchy-jump): re-derived per key like every other
+          // context field, so a jump resolves the tree the frame renders.
+          detailItems: items,
         });
         if (current.quit) return false;
         // A finished flow (task-tui-actions-parity): exactly ONE kernel

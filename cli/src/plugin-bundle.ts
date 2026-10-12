@@ -48,16 +48,20 @@ export const KERNEL_PACKAGE = "@arggondev/lib";
 /**
  * Named exports the vendored bundle forwards (W5 `task-native-tui`; extended by
  * W6 `task-native-panel-interaction` with the panel's selection/detail
- * surface). The emitted wrapper re-exports ONLY this board surface —
- * everything else the entry module exports stays internal to the bundle
- * (review P3: the forwarding used to leak all ~46 server-plugin internals). The
- * list is exactly what `tui.tsx` imports from `./index.ts`; the parity test
- * pins both directions (every name exists in the entry, and the bundle
- * forwards nothing else).
+ * surface, and by `task-native-panel-hierarchy-links` with the hierarchy
+ * resolvers the panel's parent/children jumps read). The emitted wrapper
+ * re-exports ONLY this board surface — everything else the entry module
+ * exports stays internal to the bundle (review P3: the forwarding used to leak
+ * all ~46 server-plugin internals). The list is exactly what `tui.tsx` imports
+ * from `./index.ts`; the parity test pins both directions (every name exists
+ * in the entry, and the bundle forwards nothing else).
  */
 export const BUNDLE_EXPORTS = [
   "ARGON_BOARD_PANEL",
+  "BOARD_HIERARCHY_CHILD_KEYS",
+  "boardChildrenOf",
   "boardItemDetail",
+  "boardParentId",
   "boardSnapshot",
   "boardTreeLines",
   "emptyBoardSelection",
