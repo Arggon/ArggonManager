@@ -12,6 +12,7 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T17:27:25.869Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-lockfile-sync-step-cannot-run
 ---
+
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-lockfile-sync-step-cannot-run.md
   Leaves live only under a story. id is the filename stem: bug-release-lockfile-sync-step-cannot-run.
@@ -285,10 +286,12 @@ aborted release`, not in the sync step (the sync step was skipped) — that is
   here — the diff stays the sync step).
 
 ### handoff 2026-10-12 @ses_eced77ddeffe7RDZa3wt3P1UKS (session: ses_eced77ddeffe7RDZa3wt3P1UKS) — next: Post-merge: watch the next release-please.yml run with PR #744 open; the sync step must complete and push the reconciled lockfile (^0.7.0 / 0.7.0), the run green, then tick the last acceptance box.
+
 - branch: fix/bug-release-lockfile-sync-step-cannot-run
 - open questions: Next sync also strips npm-10 libc fields (formatting only); whether to pin the step's npm left open; run 38282448930's abort-step failure is sibling scope, reported not filed.
 
 ### 2026-10-12 @ses_eced77ddeffe7RDZa3wt3P1UKS
+
 ### Maker evidence
 
 Branch `fix/bug-release-lockfile-sync-step-cannot-run`, PR #745 (not merged). Fix: the sync step now runs `npm install --package-lock-only --ignore-scripts` with a comment carrying the why. Full evidence, including the inspected-runs table, lives in **Notes** on this branch.
@@ -305,6 +308,6 @@ Branch `fix/bug-release-lockfile-sync-step-cannot-run`, PR #745 (not merged). Fi
 
 **Gates (expected vs observed):** `arggon validate` ok, 0 warnings · `actionlint v1.7.12` exit 0, no findings (`npx actionlint` does not resolve — actionlint ships as a Go binary on PATH) · `prettier --check` clean on both changed files · `test:structure` 5 passed / 0 failed · `lint:structure` exit 0.
 
-Left unticked as instructed: *Verified on a real release-please.yml run after the fix lands* (delivery lead, post-merge).
+Left unticked as instructed: _Verified on a real release-please.yml run after the fix lands_ (delivery lead, post-merge).
 
 **Out of scope, reported not filed:** run 38282448930 failed in `Surface an aborted release` (sibling `bug-autorelease-label-lifecycle-unowned` territory); both runs annotate Node.js 20-deprecated actions forced onto Node.js 24.
