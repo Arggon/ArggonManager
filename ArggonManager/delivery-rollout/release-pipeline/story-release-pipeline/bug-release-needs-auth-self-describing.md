@@ -5,11 +5,9 @@ id: bug-release-needs-auth-self-describing
 title: "A failed release publish reports `npm ENEEDAUTH` with no pointer to the one-time npmjs.com trusted-publisher setup that resolves it — the runbook names the cause, but nothing on the failure path does"
 parent: story-release-pipeline
 labels: [release, docs, failure-mode]
-
 created: "2026-10-09"
 updated: "2026-10-09"
 ---
-
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-needs-auth-self-describing.md
   Leaves live only under a story. id is the filename stem: bug-release-needs-auth-self-describing.
@@ -38,3 +36,50 @@ So the operator who hits the red publish step — the exact person the exception
 - [ ] `npm test` green (if the pointer is a tested step-body string, the assertion pins it rather than restating it); `arggon validate` green; prettier clean
 
 ## Notes
+
+### 2026-10-12 @ses_ecfafb576ffepx0r0tPtLqBoBC
+## Verification evidence (2026-10-12, worktree `fix/bug-release-needs-auth-self-describing`)
+
+Shape: a tested module `cli/publish-auth-hint.mjs` that BOTH publish steps wrap —
+`node cli/publish-auth-hint.mjs --package "<name>" --version "$VERSION" -- npm publish …` —
+on the `cli/release-guard.mjs` / `cli/inspect-tarballs.mjs` precedent (a scripted gate
+release.yml calls). It re-emits npm's own stderr verbatim, prints the self-describing
+pointer only on a genuine authentication failure, and exits with npm's status, so a
+failing publish fails the step exactly as before and a passing publish prints nothing.
+
+Classification rule (auth ⇐ pointer):
+- `npm error code <CODE>` / `npm ERR! code <CODE>` with CODE in {ENEEDAUTH, E401}
+  (npm 11's lowercase `error` prefix and npm 10's `ERR!` are both parsed);
+- or, when the log carries no code line, the messages "need auth", "requires you to be
+  logged in", "authorize this machine using `npm adduser`", "401 Unauthorized".
+NOT auth (no pointer at all): E404 (name typo — npm can mask a trusted-publisher
+mismatch as a 404, npm/cli#9088, so it is deliberately not translated), E403 (version
+already published), EPRIVATE, ECONNRESET / ETIMEDOUT / ENOTFOUND / EAI_AGAIN, ELIFECYCLE,
+ENOENT (pack), an unknown code, a log with no error line, and exit 0.
+
+Commands run (all in the worktree; expected → observed):
+1. `npx vitest run cli/publish-auth-hint.test.ts` → "Test Files 1 passed (1) / Tests 39 passed (39)" (expected all pass, negatives included).
+2. `npm run test` → "Test Files 144 passed (144) / Tests 3181 passed (3181)" (baseline in a fresh worktree first failed 1 file, 5 tests: `cli/src/headless-ci.test.ts` asserts `dist/cli.js` exists — an unbuilt worktree, fixed by `npm run build`, not by this change).
+3. `npm run test:structure` → "test result: ok. 5 passed; 0 failed".
+4. `npm run lint:structure` → no diagnostics. Mid-flight it flagged one error: the lib-first ordering assertion now goes through `assertOrder` (test/assert-order.ts) instead of a bare `indexOf` comparison.
+5. `npm run arggon -- validate` → "arggon validate: ok (0 warning(s), convention v5)".
+6. `npx prettier --check` on the three changed files + the item → "All matched files use Prettier code style!". (`prettier --check .` is red on origin/main already — 626 files — so only the changed files are claimed here.)
+7. `actionlint .github/workflows/release.yml` → exit 0, clean.
+8. `npx eslint cli/publish-auth-hint.mjs cli/publish-auth-hint.test.ts` → exit 0.
+
+Offline smoke against fixture npm error logs (expected → observed):
+a. `--package @arggondev/lib --log <ENEEDAUTH log>` → "publish-auth-hint: npm publish for
+   @arggondev/lib@0.6.0 failed with an AUTHENTICATION error (npm error code ENEEDAUTH)",
+   plus `npm trust list @arggondev/lib`, the repository/workflow-filename binding,
+   "`Arggon`, capital A", the stage-only warning and the release.md section names.
+b. same for `arggon-manager` with npm 10's `ERR!` prefix → its own pointer
+   (npmjs.com/package/arggon-manager/access).
+c. `--log <404 name-typo log>` → npm's error re-emitted, pointer occurrences: 0 (expected 0).
+d. `--log <ECONNRESET log>` → pointer occurrences: 0 (expected 0).
+e. wrapper mode with a fake failing npm → npm's stderr echoed verbatim, pointer printed,
+   child exit status 1 preserved (also pinned for 7 and 0 in the suite).
+
+Publish semantics: step names, `if:` conditions and step order are unchanged — the diff is
+the two wrapped `npm publish` invocations plus comments. lib-first order, "already on the
+registry - already-published = success", the 300 s propagation poll and OIDC-only (no
+`NPM_TOKEN`) are pinned by the workflow-contract test in the suite.
