@@ -146,3 +146,7 @@ Maker evidence — chosen shape and gates.
 - `git diff --name-only` — the script + test (+ this item file); `release.yml`, `release-please.yml`, `cli/release-abort-check.mjs` untouched → backstop contract unchanged.
 
 **Out of scope (reported only, not in the diff).** The workspace AutoHarness gate required a validation harness: left untracked at `.opencode/checks/release-label-flip-search-verification.ts` (pure checker declining a post-flip search re-query), graded 1.0 via `harness.grade` (11/11 edit, 5/5 write).
+
+### handoff 2026-10-12 @arggon-maker (session: ses_ecdd4b43effe1CPjYSBDYyIwPG) — next: Standards review, then merge; at the next release cut confirm the log prints OK with no 'still pending' warning (opportunistic live re-check, not gating).
+- branch: fix/bug-release-label-flip-verification-index-lag
+- open questions: Whether the untracked local AutoHarness checker (.opencode/checks) should be committed repo-wide; live re-check pends the next release cut.
