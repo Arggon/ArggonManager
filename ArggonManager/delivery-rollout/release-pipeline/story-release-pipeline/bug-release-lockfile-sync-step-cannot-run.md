@@ -12,6 +12,7 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T17:27:25.869Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-lockfile-sync-step-cannot-run
 ---
+
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-lockfile-sync-step-cannot-run.md
   Leaves live only under a story. id is the filename stem: bug-release-lockfile-sync-step-cannot-run.
@@ -250,6 +251,11 @@ keep the fail-loud path honest:
   so a hypothetical `|| true` here would silently commit a partially reconciled
   lockfile — which is exactly why the step must stay fail-loud.)
 
+**Correction (2026-10-12, after the real run):** this reasoning covers the
+_install_ failure path only. The commit tail had its own defect — it never staged
+the file — so nothing was ever committed either. See "Second defect found by the
+real run" below.
+
 ### `npm ci` on the release PR branch (box 5)
 
 Scratch worktree at `origin/release-please--branches--main` (HEAD `9ffe998f`),
@@ -283,6 +289,56 @@ made.
 Note: `npx actionlint` does not resolve in this environment (actionlint ships as
 a Go binary, version-pinned at v1.7.12 on `PATH`, which is how the repo's other
 items ran it); the real binary was run and is clean.
+
+### Second defect found by the real run (2026-10-12): the commit path never staged
+
+Run **38292422896** (merge commit `a27cd83`, 2026-10-12T18:39:47Z, release PR #744
+open) — the first real `release-please.yml` run after the install fix merged:
+
+- `npm install --package-lock-only --ignore-scripts` **completed successfully**
+  (`up to date, audited 216 packages`, exit 0) and rewrote `package-lock.json` —
+  the `prepare`/TS2591 failure is gone, the flag works on the runner.
+- `git diff --quiet -- package-lock.json` correctly reported a diff and fell
+  through.
+- The step then died at **`git commit` with exit 1**, because the script never
+  staged the file. Verbatim: `Changes not staged for commit:` … `modified:
+package-lock.json` / `no changes added to commit (use "git add" …)` /
+  `##[error]Process completed with exit code 1`.
+
+So the commit tail was broken independently of the install: **the sync has never
+pushed a reconciled lockfile in the step's entire life** (the same script had no
+`git add` when it landed in 7230609f; the first fix took the step past its first
+failure and straight into its second — a second latent defect, not a regression).
+
+Fix on this branch (`fix/bug-release-lockfile-sync-commit-staging`):
+`git add package-lock.json` immediately before the commit — explicit path, never
+`git add -A`, with an in-script comment recording why. It is the step's only
+commit path (checked: the only `git commit` in `release-please.yml`); no sibling
+instance exists in the script, and no other workflow uses `--package-lock-only`.
+`set -euo pipefail` and the fail-loud property are untouched.
+
+Offline reproduction of both halves in a hook-less clone of
+`origin/release-please--branches--main` (HEAD `2cfe2dbe`, no `node_modules`,
+runner npm 10.9.9):
+
+| step                                               | as shipped                                                                                                                             | fixed                                                                                                                                                                                             |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm install --package-lock-only --ignore-scripts` | exit 0, `^0.4.0`→`^0.7.0`, `0.4.0`→`0.7.0`                                                                                             | same                                                                                                                                                                                              |
+| `git diff --quiet -- package-lock.json`            | exit 1 (falls through, as intended)                                                                                                    | same                                                                                                                                                                                              |
+| `git commit -m …`                                  | **exit 1** — `Changes not staged for commit: modified: package-lock.json` / `no changes added to commit` (the run's failure, verbatim) | `git add package-lock.json` → commit `56e5512c`, exit 0                                                                                                                                           |
+| commit contents                                    | —                                                                                                                                      | `git show --name-only` → `package-lock.json` **only**; `git show HEAD:package-lock.json` → `^0.7.0` / `0.7.0`; `2 insertions / 38 deletions` (the 2 reconciled lines + 12 npm-10 `libc` removals) |
+| second run of the sequence                         | —                                                                                                                                      | install exit 0, `git diff --quiet` exit 0 → takes the `already in sync` exit; `git status --porcelain` empty (clean no-op)                                                                        |
+
+One local-environment note: a scratch _worktree_ of this repo inherits the dev
+clone's `pre-commit` hook, which fails with `tsx: command not found` and masks the
+staging error; the runner has no hooks (`actions/checkout` installs none), so the
+reproduction used a standalone clone.
+
+Why the first round missed it, honestly: the offline evidence exercised the
+install, the flag's byte-identity, the diff check and the negative control — but
+never the commit tail, and no acceptance criterion covered it. The real run is
+what surfaced it. The real-run acceptance box stays **unticked**; the delivery
+lead re-observes after this lands.
 
 ### Observations outside this item's scope (report only, no files changed)
 
@@ -408,7 +464,9 @@ Re-derived by enumerating **all 377 runs** of this workflow through the API (`ac
 Gates re-run after the correction: `arggon validate` ok (0 warnings) · `actionlint` exit 0 · `prettier --check` clean on both changed files · `test:structure` 5/5 · `lint:structure` exit 0. Branch re-pushed with the verdict commit `2f2ab18a` riding along. The one acceptance box for the real post-merge run stays unticked, as instructed.
 
 ### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+
 ### 2026-10-12 @arggon-delivery-lead
+
 verdict: approve (lead merge call) — the standards request-changes (evidence fidelity) is resolved by the maker's correction, and the verifier replicated the core claim
 
 - Review finding accepted and corrected: first exposure is run **36908073600 (2026-10-01)**, the run that created release PR **#556** — not the #664 window; **49 failures across three release-PR windows** (#556 39, #664 8, #744 2). The corrected workflow comment + item Notes carry the full inventory and keep the "latent, not a runner change" conclusion (now supported on both image builds). This supersedes the request-changes.

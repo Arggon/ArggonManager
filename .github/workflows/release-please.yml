@@ -111,5 +111,11 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Stage BY PATH: the install only writes the working tree, so a bare
+          # `git commit` fails with "Changes not staged for commit" — run
+          # 38292422896 died exactly there (bug-release-lockfile-sync-step-
+          # cannot-run). Explicit path, never `git add -A`, so the commit can
+          # only ever carry package-lock.json.
+          git add package-lock.json
           git commit -m "chore: sync package-lock.json with the release PR versions"
           git push origin "HEAD:refs/heads/$branch"
