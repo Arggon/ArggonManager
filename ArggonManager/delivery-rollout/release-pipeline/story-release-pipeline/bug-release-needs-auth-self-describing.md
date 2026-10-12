@@ -83,3 +83,7 @@ Publish semantics: step names, `if:` conditions and step order are unchanged —
 the two wrapped `npm publish` invocations plus comments. lib-first order, "already on the
 registry - already-published = success", the 300 s propagation poll and OIDC-only (no
 `NPM_TOKEN`) are pinned by the workflow-contract test in the suite.
+
+### handoff 2026-10-12 @ses_ecfafb576ffepx0r0tPtLqBoBC (session: ses_ecfafb576ffepx0r0tPtLqBoBC) — next: Delivery lead: review the PR (shape = cli/publish-auth-hint.mjs wrapper on both publish steps) and merge; auto-done flips the item on merge.
+- branch: fix/bug-release-needs-auth-self-describing
+- open questions: Should the npm/cli#9088 class (a trusted-publisher mismatch reported as 404) get a hedged pointer later, or stay silent by design? Nothing in release.yml/release-please* was touched.
