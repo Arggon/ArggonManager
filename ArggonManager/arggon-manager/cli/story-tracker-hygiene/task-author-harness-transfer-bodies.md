@@ -12,6 +12,7 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T02:15:08.193Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-author-harness-transfer-bodies
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-harness-transfer-bodies.md
   Leaves live only under a story. id is the filename stem: task-author-harness-transfer-bodies.
