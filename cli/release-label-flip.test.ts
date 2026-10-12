@@ -14,8 +14,10 @@
  *   - no-op: nothing merged carries the label -> exit 0, one query, no edit —
  *     the rule-0/rule-2 path that runs on every ordinary push;
  *   - flip: a merged pending PR is moved to `autorelease: tagged` with EXACTLY
- *     the command the manual recovery documents, then verified against the
- *     abort predicate;
+ *     the command the manual recovery documents, then verified against the PR
+ *     object itself (`gh pr view <n> --json labels`) — never against the
+ *     search-index query, whose lag warned on the healthy v0.7.0 flip of #744
+ *     (bug-release-label-flip-verification-index-lag, run 38296293861);
  *   - warn-and-continue: a failed query, a failed edit, or a label that
  *     survives the flip exits 0 with the manual recovery in the message. This
  *     step sits before the publish: it must never be able to strand a tagged
@@ -104,9 +106,58 @@ function runFlip(bin: string, extraArgs: string[] = [], extraEnv: Record<string,
   });
 }
 
+/** What `gh pr view <n> --json labels` prints for the given label names. */
+function labelsJson(names: string[]): string {
+  return `${JSON.stringify({ labels: names.map((name) => ({ name })) })}\n`;
+}
+
+/**
+ * A fake `gh` that answers by COMMAND SHAPE, not by call order — the shape the
+ * search-index bug needs pinned. `pr list` keeps answering from a search index
+ * that never catches up (the lag is what warned on the healthy #744 flip, run
+ * 38296293861), while the authoritative per-PR read (`pr view <n> --json
+ * labels`) reports the label state the test sets. An invocation it does not
+ * recognise fails loudly, and every argv is recorded like `makeGh` records it.
+ */
+function makeIndexLagGh(options: { search: string; labels: Record<number, string[]> }): {
+  bin: string;
+  dir: string;
+} {
+  const dir = mkdtempSync(join(tmpdir(), "arggon-release-label-flip-"));
+  tmpDirs.push(dir);
+  writeFileSync(join(dir, "search"), options.search);
+  for (const [number, names] of Object.entries(options.labels)) {
+    writeFileSync(join(dir, `labels.${number}`), labelsJson(names));
+  }
+  const script = [
+    "#!/bin/sh",
+    'dir="$(dirname "$0")"',
+    'n=$(( $(cat "$dir/count" 2>/dev/null || echo 0) + 1 ))',
+    `printf '%s' "$n" > "$dir/count"`,
+    `printf '%s\\n' "$@" > "$dir/argv.$n"`,
+    'case "$1 $2" in',
+    '  "pr list") cat "$dir/search" ;;',
+    '  "pr view") f="$dir/labels.$3"; if [ -f "$f" ]; then cat "$f"; else echo "fake gh: no labels fixture for PR #$3" >&2; exit 1; fi ;;',
+    '  "pr edit") : ;;',
+    '  *) echo "fake gh: unexpected invocation: $*" >&2; exit 1 ;;',
+    "esac",
+    "",
+  ].join("\n");
+  const bin = join(dir, "gh");
+  writeFileSync(bin, script);
+  chmodSync(bin, 0o755);
+  return { bin, dir };
+}
+
 const STUCK_664 = JSON.stringify([
   { number: 664, title: "chore: release main", headRefName: "release-please--branches--main" },
 ]);
+
+const STUCK_744 = JSON.stringify([
+  { number: 744, title: "chore: release main", headRefName: "release-please--branches--main" },
+]);
+
+const VIEW_664 = ["pr", "view", "664", "--repo", "Arggon/ArggonManager", "--json", "labels"];
 
 describe("release-label-flip (bug-autorelease-label-lifecycle-unowned)", () => {
   it("queries release-please's abort predicate: merged PRs still pending the autorelease label", () => {
@@ -138,8 +189,12 @@ describe("release-label-flip (bug-autorelease-label-lifecycle-unowned)", () => {
     expect(invocations(dir).map((argv) => argv[1])).toEqual(["list"]);
   });
 
-  it("flip path: moves the merged pending PR to `autorelease: tagged` and verifies", () => {
-    const { bin, dir } = makeGh([{ stdout: `${STUCK_664}\n` }, {}, { stdout: "[]\n" }]);
+  it("flip path: moves the merged pending PR to `autorelease: tagged` and reads the PR back to verify", () => {
+    const { bin, dir } = makeGh([
+      { stdout: `${STUCK_664}\n` },
+      {},
+      { stdout: labelsJson([TAGGED]) },
+    ]);
     const result = runFlip(bin);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("#664");
@@ -159,8 +214,9 @@ describe("release-label-flip (bug-autorelease-label-lifecycle-unowned)", () => {
       "--remove-label",
       PENDING,
     ]);
-    // Call 3 re-runs the abort predicate as the verification.
-    expect(calls[2]).toEqual(expect.arrayContaining(["pr", "list", "--label", PENDING]));
+    // Call 3 reads the PR OBJECT back (`pr view`), not the search query whose
+    // index lags the edit (bug-release-label-flip-verification-index-lag).
+    expect(calls[2]).toEqual(VIEW_664);
   });
 
   it("flips every stuck PR, not just the first", () => {
@@ -168,7 +224,13 @@ describe("release-label-flip (bug-autorelease-label-lifecycle-unowned)", () => {
       { number: 556, title: "chore: release 0.6.0", headRefName: "release-please--branches--main" },
       { number: 664, title: "chore: release main", headRefName: "release-please--branches--main" },
     ]);
-    const { bin } = makeGh([{ stdout: `${two}\n` }, {}, {}, { stdout: "[]\n" }]);
+    const { bin } = makeGh([
+      { stdout: `${two}\n` },
+      {},
+      { stdout: labelsJson([TAGGED]) },
+      {},
+      { stdout: labelsJson([TAGGED]) },
+    ]);
     const result = runFlip(bin);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("#556");
@@ -178,16 +240,19 @@ describe("release-label-flip (bug-autorelease-label-lifecycle-unowned)", () => {
 
   it("a failed flip warns with the manual recovery, exits 0, and never strands the release", () => {
     // The step sits BEFORE the publish: exit 0 is the whole contract here.
+    // The label is read back even after a failed edit (a partial edit can still
+    // leave it pending), and the failure is reported either way.
     const { bin } = makeGh([
       { stdout: `${STUCK_664}\n` },
       { status: 1, stderr: "HTTP 403: Resource not accessible by integration\n" },
-      { stdout: `${STUCK_664}\n` },
+      { stdout: labelsJson([PENDING]) },
     ]);
     const result = runFlip(bin);
     expect(result.status).toBe(0);
     expect(result.stderr).toContain("release-label-flip: WARNING");
     expect(result.stderr).toContain("could not flip #664");
     expect(result.stderr).toContain("Resource not accessible by integration");
+    expect(result.stderr).toContain("still 'autorelease: pending' on 1 merged release PR(s)");
     expect(result.stderr).toContain(MANUAL_RECOVERY);
   });
 
@@ -195,14 +260,48 @@ describe("release-label-flip (bug-autorelease-label-lifecycle-unowned)", () => {
     const { bin } = makeGh([
       { stdout: `${STUCK_664}\n` },
       {},
-      // The edit claimed success but the predicate still sees it — the
-      // verification, not the edit's exit code, decides the verdict.
-      { stdout: `${STUCK_664}\n` },
+      // The edit claimed success but the PR still carries the label — the
+      // authoritative per-PR read, not the edit's exit code, decides the verdict.
+      { stdout: labelsJson([PENDING]) },
     ]);
     const result = runFlip(bin);
     expect(result.status).toBe(0);
     expect(result.stderr).toContain("still 'autorelease: pending' on 1 merged release PR(s)");
     expect(result.stderr).toContain("#664");
+    expect(result.stderr).toContain(MANUAL_RECOVERY);
+  });
+
+  it("a healthy flip whose search index still lags reports no warning at all", () => {
+    // The live shape (v0.7.0, run 38296293861): the edit succeeds, and the
+    // search query — however often it is asked — still lists #744 as pending,
+    // while the PR object itself is already `tagged`. No crying wolf.
+    const { bin, dir } = makeIndexLagGh({
+      search: `${STUCK_744}\n`,
+      labels: { 744: [TAGGED] },
+    });
+    const result = runFlip(bin);
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toContain("WARNING");
+    expect(result.stdout).toContain("release-please is not aborting");
+    const calls = invocations(dir);
+    // The flip really happened, and the verdict came from the PR object.
+    expect(calls[1]).toEqual(expect.arrayContaining(["pr", "edit", "744"]));
+    expect(calls.some((argv) => argv[0] === "pr" && argv[1] === "view" && argv[2] === "744")).toBe(
+      true,
+    );
+  });
+
+  it("under that same lagging search, a label the PR really still carries still warns and names the recovery", () => {
+    // The mirror of the test above: the index lag must not mask a genuinely
+    // stuck label either — the per-PR read is `pending`, so the warning stands.
+    const { bin } = makeIndexLagGh({
+      search: `${STUCK_744}\n`,
+      labels: { 744: [PENDING] },
+    });
+    const result = runFlip(bin);
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain("still 'autorelease: pending' on 1 merged release PR(s)");
+    expect(result.stderr).toContain("#744");
     expect(result.stderr).toContain(MANUAL_RECOVERY);
   });
 
@@ -222,27 +321,46 @@ describe("release-label-flip (bug-autorelease-label-lifecycle-unowned)", () => {
     expect(result.stderr).toContain("could not parse");
   });
 
-  it("an unverifiable flip (re-query fails) warns instead of claiming success", () => {
+  it("an unverifiable flip (the per-PR read fails) warns instead of claiming success", () => {
     const { bin } = makeGh([{ stdout: `${STUCK_664}\n` }, {}, { status: 1, stderr: "HTTP 500\n" }]);
     const result = runFlip(bin);
     expect(result.status).toBe(0);
-    expect(result.stderr).toContain("could not re-query to verify");
+    expect(result.stderr).toContain("could not re-query to verify #664");
+    expect(result.stderr).toContain("could not verify 1 merged release PR(s)");
     expect(result.stderr).toContain(MANUAL_RECOVERY);
+    expect(result.stdout).not.toContain("release-please is not aborting");
   });
 
-  it("a malformed verification payload ([null]) warns and still exits 0 — the contract is absolute", () => {
-    // The verification payload is the last thing read before the run proceeds
-    // to the publish; an unguarded dereference here would throw and exit
-    // non-zero, contradicting the exit-0 contract. The flip loop already
-    // guards `pr.number`; the renderer must be equally defensive.
+  it("an unreadable per-PR payload ([null]) warns instead of claiming a clean release", () => {
+    // `pr view` may exit 0 with a payload the script cannot read. Treating that
+    // as "cleared" would be the false green this script must never print; the
+    // unreadable read is counted as unverified and reported.
     const { bin } = makeGh([{ stdout: `${STUCK_664}\n` }, {}, { stdout: "[null]\n" }]);
     const result = runFlip(bin);
     expect(result.status).toBe(0);
+    expect(result.stderr).toContain("could not re-query to verify #664");
+    expect(result.stderr).toContain("could not verify 1 merged release PR(s)");
+    expect(result.stderr).toContain(MANUAL_RECOVERY);
+    expect(result.stdout).not.toContain("release-please is not aborting");
+  });
+
+  it("a malformed discovery payload ([null]) warns and still exits 0 — the contract is absolute", () => {
+    // A payload entry read before any edit; an unguarded dereference would throw
+    // and exit non-zero, contradicting the exit-0 contract, and an entry the
+    // script cannot read keeps the summary from claiming the release is clean
+    // (fail closed for the warning, never the run). The flip loop already guards
+    // `pr.number`; the renderer must be equally defensive.
+    const { bin, dir } = makeGh([{ stdout: "[null]\n" }]);
+    const result = runFlip(bin);
+    expect(result.status).toBe(0);
     expect(result.stderr).toContain("release-label-flip: WARNING");
+    expect(result.stderr).toContain("skipping a malformed entry");
     expect(result.stderr).toContain("still 'autorelease: pending' on 1 merged release PR(s)");
     // Rendered defensively, not dereferenced: no number, no title -> placeholders.
     expect(result.stderr).toContain("  #? (untitled)");
     expect(result.stderr).toContain(MANUAL_RECOVERY);
+    // Nothing was flipped on a payload the script cannot read.
+    expect(invocations(dir).map((argv) => argv[1])).toEqual(["list"]);
   });
 
   it("accepts the repository from GITHUB_REPOSITORY when --repo is absent", () => {
