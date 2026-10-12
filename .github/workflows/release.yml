@@ -1,5 +1,11 @@
 # The release workflow — owns tag + GitHub Release + build + pack + inspect +
 # OIDC publish + tarball assets (ADR 0018 §1–2, §4; spec-release-pipeline-015).
+# It also owns release-please's `autorelease` label flip: `skip-github-release:
+# true` opts out of release-please's tagging path, and that path was the only
+# thing that moved a merged release PR off `autorelease: pending` — without the
+# flip release-please aborts ("There are untagged, merged release PRs
+# outstanding") forever behind green runs. See release.md §The `autorelease`
+# label lifecycle.
 #
 # FILENAME IS FIXED (`release.yml`): the npmjs.com trusted-publisher
 # configuration for BOTH packages binds to the workflow filename — renaming
@@ -51,6 +57,21 @@ on:
 permissions:
   contents: write
   id-token: write
+  # The autorelease label flip below (bug-autorelease-label-lifecycle-unowned).
+  # `pull-requests: write` is the documented minimal grant: GitHub's GITHUB_TOKEN
+  # permission table (docs.github.com → Workflow syntax for GitHub Actions →
+  # permissions) says it "permits an action to add a label to a pull request"
+  # (and write includes the read the command needs). Note what `gh pr edit`
+  # actually does: it applies labels with the GraphQL
+  # `addLabelsToLabelable`/`removeLabelsFromLabelable` mutations, NOT the REST
+  # /issues/{n}/labels endpoints, so cite the permission table, not those
+  # endpoints. The command also READS the PR, whose classic-projects fields
+  # needed a repository-projects grant in older gh (cli/cli#8784); cli/cli#10714
+  # + #13280 fixed that for non-enterprise hosts (this repo is github.com), so
+  # no projects permission is needed here. No broader grant: `contents: write`
+  # covers the tag/release and `id-token: write` the OIDC publish, both
+  # unchanged.
+  pull-requests: write
 
 concurrency:
   # Serialize release runs; never cancel a publishing run mid-flight — a
@@ -131,6 +152,35 @@ jobs:
             exit 1
           fi
           echo "agreement ok: tag v${VERSION} -> $RELEASE_SHA, root == lib == $root_v"
+
+      - name: Flip the merged release PR's label (release-please bookkeeping this run owns)
+        # bug-autorelease-label-lifecycle-unowned. release-please moves its
+        # release PR `autorelease: pending` -> `autorelease: tagged` ONLY inside
+        # its own tagging path, which this repo opts out of
+        # (`skip-github-release: true`): a GITHUB_TOKEN-created tag triggers no
+        # workflow, so release.yml owns the tag — and with it the label flip.
+        # Without the flip a merged release PR stays `pending` forever,
+        # release-please reads it as merged-but-untagged and aborts behind green:
+        # releases were dead 2026-10-02 → 2026-10-07 on #556, and again on #664
+        # (2026-10-09 → 2026-10-12, cleared by hand). The workflow that creates
+        # the fact (the tag) owns the bookkeeping the fact implies, in the SAME
+        # run; a run that dies before this step leaves the label pending and
+        # cli/release-abort-check.mjs reddens the next push naming it.
+        # Placed here — immediately after the agreement assert, before the
+        # release object and before anything ships — so the window between the
+        # tag and the flip is as short as the run allows. The label tracks the
+        # TAG, not the publish, which is why it must not sit after the publish.
+        # Idempotent: a rule-2 re-run finds nothing pending once flipped.
+        # Best-effort by design: cli/release-label-flip.mjs warns and exits 0 on
+        # every failure path, because a non-zero exit here would strand a
+        # tagged release before the publish; a stuck label is detected by the
+        # release-please backstop instead (release.md documents the lifecycle
+        # and the manual recovery, which is the exact command this runs).
+        if: steps.guard.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node cli/release-label-flip.mjs --repo "$GITHUB_REPOSITORY"
 
       - name: GitHub Release v(V) with the merged CHANGELOG section as notes
         # release-please.yml is PR-only (skip-github-release), so this run owns
