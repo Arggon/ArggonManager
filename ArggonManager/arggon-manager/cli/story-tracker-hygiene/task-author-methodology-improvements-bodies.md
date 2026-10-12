@@ -12,6 +12,7 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T01:09:55.998Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-author-methodology-improvements-bodies
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-author-methodology-improvements-bodies.md
   Leaves live only under a story. id is the filename stem: task-author-methodology-improvements-bodies.
@@ -35,8 +36,19 @@ Wave 1 of `decided: A` on `bug-template-only-bodies-ship-green`: the blocking gu
 ## Notes
 
 ### handoff 2026-10-12 @ses_ed2570971ffeDcOy6iRnDSFG5M (session: ses_ed2570971ffeDcOy6iRnDSFG5M) — next: Delivery lead: review 12 bodies, open PR from pushed branch 808e7f6f, send to standards review
+
 - branch: feat/task-author-methodology-improvements-bodies
 - open questions: Accept prettier-mandated cosmetic normalization of Notes history + 3 YAML titles?; all 12 were placeholders, none pre-authored
 
 ### 2026-10-12 @ses_ed2570971ffeDcOy6iRnDSFG5M
+
 Maker evidence (standards reviewer): 12/12 files under ArggonManager/agent-native/ecosystem-ops/methodology-improvements/ verified scaffold placeholders first, then given real Context + unticked checkable Acceptance; 10 transcribed from Notes verbatim, 2 noteless items grounded in authorities (mcp-doc-contract CORPUS_FILES/DIRS 5+5 in cli/src/mcp-doc-contract.test.ts; MAX_NATIVE_PREPARATION_NAMES=32 in opencode/plugins/arggon/index.ts:195 with Bound column at docs/opencode2.md:131,146-147). Gates observed: npx prettier --check clean on all 12 (expected); tools.arggon.validate ok, 0 warnings (expected); pre-commit hook validate ok (observed). No scaffold markers remain; no boxes ticked; no depends_on/labels/status values changed. Known cosmetic side-effect: repo prettier --write also normalized pre-existing style debt (blank lines, 3 YAML title quote styles, *-to-_ emphasis and table padding in Notes) — render- and YAML-equivalent only. Work commit 808e7f6f; push of feat/task-author-methodology-improvements-bodies succeeded with upstream tracking set.
+
+### 2026-10-12 @ses_ed2ed434cffdHsqB0EV526IjUT
+
+verdict: approve (12 MI task bodies, docs-only, smoke-exempt)
+
+- Read the worktree diff (12 task files + own item file) — nothing else; scope stays on the item
+- Standards-reviewer: approve, no blocking findings (frontmatter values untouched — 3 title quote flips render-equivalent; prettier-rewrite shapes disclosed and verified; transcription spot-checked against Notes; 2 noteless items grounded in authorities; 59 new boxes all checkable, all unticked)
+- Verifier: prettier clean on all 12, validate ok (0 warnings)
+- Recommendation: merge PR #731 (merge, not squash) on green CI; lead ticks Acceptance after merge and flips done
