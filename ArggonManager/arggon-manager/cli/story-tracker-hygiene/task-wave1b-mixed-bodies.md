@@ -12,7 +12,6 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T03:38:25.324Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-wave1b-mixed-bodies
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-wave1b-mixed-bodies.md
   Leaves live only under a story. id is the filename stem: task-wave1b-mixed-bodies.
