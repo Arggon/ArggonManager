@@ -8,6 +8,7 @@ labels: []
 created: "2026-10-11"
 updated: "2026-10-11"
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/bug-template-only-bodies-ship-green.md
   Leaves live only under a story. id is the filename stem: bug-template-only-bodies-ship-green.
@@ -25,10 +26,10 @@ Scale (same-day grep, open `todo`/`in_progress`/`blocked` items only): 12 open c
 
 ## Acceptance
 
-- [ ] The 12 open `methodology-productization` containers named in `task-author-methodology-productization-bodies` carry real Context and Acceptance (that task's merge satisfies this row; this bug tracks the guard, not the prose)
-- [ ] A named surface reports template-only bodies on open items (validate warning, `spec analyze`-style finding, or `doctor` check — the brief below decides which), so a new placeholder cannot ship green silently
-- [ ] The surface reads the item body, not a copy of a marker list — a guard that restates the placeholder strings in the test is the same bug one level down
-- [ ] Done/cancelled items are excluded (history, not the contract) and the surface says so in its message
+- [x] The 12 open `methodology-productization` containers named in `task-author-methodology-productization-bodies` carry real Context and Acceptance (done, PR #727)
+- [ ] The 27 remaining open placeholder items named in the six `task-author-*-bodies` tasks carry real Context and Acceptance (those tasks' merges satisfy this row; this bug tracks the guard, not the prose)
+- [ ] A BLOCKING surface refuses template-only bodies on open items: `arggon validate` fails non-zero with a named error (`task-validate-refuses-placeholder-bodies`; `decided: A`, report-only explicitly rejected)
+- [ ] The guard matches the scaffold marker, never quoted prose; done/cancelled excluded with the message saying so
 - [ ] `arggon validate` + `npm test` green; prettier clean
 
 ## Notes
@@ -45,7 +46,9 @@ decide: how loudly should the tracker complain about placeholder item bodies (th
 - The default: B, from 2026-10-25 — the maker implements the report-only surface; if the finding list is still unread after one release cycle, the lead re-briefs with the burn-down numbers attached.
 
 ### 2026-10-12 @ses_ed2ed434cffdHsqB0EV526IjUT
+
 decided: A recorded — implementing as blocking. The 2026-10-25 default (B) is superseded by this answer; the brief above stands unwritten-per-convention (a superseded brief is never rewritten).
+
 - Owner's reasoning: the delivery lead owns backlog creation and maintenance, so report-only (B) and split (C) — both of which park the rot in the backlog — are not options. The toolchain must refuse.
 - Implementation order this forces: placeholder bodies on currently-open items FIRST (a blocking `validate` over today's ~38 open placeholders would otherwise turn every lane red on landing), the blocking guard SECOND with the tree already clean.
 - Scope kept: done/cancelled items stay excluded (history, not the contract); the guard reads item bodies, not a marker copy; waiver stays human-only per the done-gate shape.
