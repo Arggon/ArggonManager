@@ -65,7 +65,7 @@ Record them in the exploration doc's edge-case table (dimension / hunted case
   not already resolved: every row carries a terminal resolution and a fresh
   read of the dimensions finds nothing new. A pass that adds nothing ends the
   hunt; passes beyond it are not evidence of coverage.
-- The two stops are different tests, and conflating them fails in both
+- The two stops are different checks, and conflating them fails in both
   directions. A round ends when the **questions** are exhausted: nothing
   askable stays open. The hunt ends when the **design** is closed: a full pass
   stops changing it. Stop a round early and the spec ships over a live unknown,
