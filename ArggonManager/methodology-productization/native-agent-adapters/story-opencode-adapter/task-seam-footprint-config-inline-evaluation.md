@@ -12,6 +12,7 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T23:39:26.165Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-seam-footprint-config-inline-evaluation
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/task-seam-footprint-config-inline-evaluation.md
   Leaves live only under a story. id is the filename stem: task-seam-footprint-config-inline-evaluation.
@@ -234,12 +235,16 @@ clean-tree rule only blocks untracked files under the tracker dir, so these
 never blocked `start`; the pruning refusal is the real cost.
 
 Precision (review): the ignore removes these from **git** accounting, not from
-seam discovery — `.opencode/opencode.json` is one of
-`OPENCODE_CONFIG_CANDIDATES`, so `findOpenCodeConfig` still sees it and, on a
-tree without a tracked config, `init` would present-skip the generated
-`opencode.jsonc` (the same code path option (b) collides with). This repo is
-unaffected (its root `opencode.jsonc` is tracked); "out of seam accounting"
-means git, not config discovery.
+seam discovery — different layers. `.opencode/opencode.json` is one of
+`OPENCODE_CONFIG_CANDIDATES`; `findOpenCodeConfig` skips the signed
+`opencode.jsonc` and returns the machine-local file **even while our root
+config exists**, so `init` present-skips the generated root config (the same
+code path option (b) collides with). Observed from the primary checkout
+(`init --dry-run --json`, read-only): `{ "dest": "opencode.jsonc", "decision":
+"present-skip", "reason": "adopter OpenCode config present at
+.opencode/opencode.json — config seam not generated (add \"mcp.servers.arggon\"
+manually if wanted)" }`. Box 4's "out of seam accounting" means git accounting;
+discovery is a separate layer.
 
 **Template decision: no change to `templates/docs/gitignore`** (recorded, per
 mandate). Reasons: (1) `.opencode/opencode.json` is a legitimate adopter
@@ -332,6 +337,7 @@ Scope: item text only. The `.gitignore` hygiene change is verified as-is and nee
 — standards review, session ses_ecd6b7d30ffexsOrPyRjyceCMS (read-only; no project files touched)
 
 ### 2026-10-13 @arggon-standards-reviewer
+
 verdict: request-changes (one sentence in the precision note states the config present-skip backwards; every other correction holds)
 
 Scope: item text. The `.gitignore` hygiene change is untouched by the fix and still verified as-is.
