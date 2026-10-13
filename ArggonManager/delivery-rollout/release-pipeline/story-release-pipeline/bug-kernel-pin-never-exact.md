@@ -48,3 +48,8 @@ Current PR #764 repeats it (`^0.8.0`), so the live release would ship the caret 
 - [ ] if the owner prefers a range pin instead of exact, that is a recorded decision change (ADR 0018 amendment / superseding ADR), never a silent drift
 
 ## Notes
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+### One-time un-pin applied to the live release — 2026-10-13 (delivery lead)
+While clearing #764 (see bug-release-proposal-non-lockstep-undetected), the lead applied the spec's one-time hand-unpin in the release PR before merge: root dependency `^0.8.0` → `0.8.0` (5fd10db4, lockfile re-synced; CI re-run green). #764 will ship the exact pin — the first release since v0.4.x to do so. From the next release onward the GenericJson updater preserves the absence of a range operator, so exactness is sticky.
+Remaining on this item: the machine-owned normalization + guard, the `release.md` documentation, and correcting the spec A3 / task-release-workflow "documented in release.md" claims.
