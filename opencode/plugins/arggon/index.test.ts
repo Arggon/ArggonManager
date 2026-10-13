@@ -681,7 +681,7 @@ describe("plugin-context: session directory wiring (bug-native-tools-commit-to-p
 // `prompt` hook may write admission metadata and nothing else, the `compaction`
 // hook may re-inject the item block and never record the compaction itself.
 // The runtime load (a real hook firing on a real host) is the model-free
-// `npm run smoke:opencode-prompt-stamp` evidence.
+// `npm run smoke:opencode:prompt-stamp` evidence.
 // ---------------------------------------------------------------------------
 
 /** A worktree identity as `arggon start --worktree` declares it in `.arggon.env`. */

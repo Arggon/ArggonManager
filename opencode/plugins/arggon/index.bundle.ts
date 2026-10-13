@@ -10567,10 +10567,12 @@ async function onCompaction(ctx, event) {
         const system = event.system;
         const block = buildItemBlock(item, { currentDirectory: directory });
         system.push(compactionRetentionPart(block.text));
-        const id = asString(item.id) ?? "?";
-        if (retainedSessions.get(sessionID) === id)
-            return;
-        setBounded(retainedSessions, sessionID, id);
+        const id = asString(item.id);
+        if (id !== undefined) {
+            if (retainedSessions.get(sessionID) === id)
+                return;
+            setBounded(retainedSessions, sessionID, id);
+        }
         console.error(`[arggon] compaction: retained item ${id} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`);
     }
     catch (error) {

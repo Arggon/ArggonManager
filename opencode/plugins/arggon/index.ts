@@ -1571,9 +1571,14 @@ export async function onCompaction(ctx: PluginContext, event: CompactionEvent): 
     const system = event.system as unknown[]
     const block = buildItemBlock(item, { currentDirectory: directory })
     system.push(compactionRetentionPart(block.text))
-    const id = asString(item.id) ?? "?"
-    if (retainedSessions.get(sessionID) === id) return
-    setBounded(retainedSessions, sessionID, id)
+    // Tighter read, same as onContext: never fabricate an id to key the
+    // de-dup on. The block is already retained; a missing id (which the
+    // documented show envelope never produces) only skips the log de-dup.
+    const id = asString(item.id)
+    if (id !== undefined) {
+      if (retainedSessions.get(sessionID) === id) return
+      setBounded(retainedSessions, sessionID, id)
+    }
     console.error(
       `[arggon] compaction: retained item ${id} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`,
     )
