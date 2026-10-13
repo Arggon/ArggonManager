@@ -9,7 +9,6 @@ parent: harness-research-transfer
 labels: []
 created: "2026-10-11"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-sweep-auto-done-refusal-warnings
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-sweep-auto-done-refusal-warnings.md
