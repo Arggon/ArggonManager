@@ -9,7 +9,6 @@ parent: story-opencode-adapter
 labels: [opencode-seam, methodology, evaluation]
 created: "2026-10-12"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-seam-footprint-config-inline-evaluation
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/task-seam-footprint-config-inline-evaluation.md
