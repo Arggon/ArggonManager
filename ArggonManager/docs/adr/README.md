@@ -38,4 +38,4 @@ numbering, the status and the row order.
 | [0024](./0024-adopter-friction-channel.md)                         | Adopter friction channel                                                                                       | Accepted                               |
 | [0025](./0025-done-gate-live-acceptance-section.md)                | Done gate scope: the live `## Acceptance` section, and no contract means no flip                               | Accepted                               |
 | [0026](./0026-owner-decision-brief.md)                             | The bounded plain-language decision brief: how a delivery lead brings a decision to the product owner          | Accepted                               |
-| [0027](./0027-cross-run-lessons-promote-into-existing-carriers.md) | Cross-run lessons: promote into the carriers that already own the topic                                        | Proposed                               |
+| [0027](./0027-cross-run-lessons-promote-into-existing-carriers.md) | Cross-run lessons: promote into the carriers that already own the topic                                        | Accepted                               |

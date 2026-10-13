@@ -1,6 +1,6 @@
 # 0027 Cross-run lessons: promote into the carriers that already own the topic
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-13
 - Deciders: product owner (Gonzalo), delivery lead (Arggon) — proposed by the maker for `task-spike-cross-run-lesson-store`
 - Input: [exploration-cross-run-lesson-store-027](../explorations/exploration-cross-run-lesson-store-027.md) (2026-10-13)
