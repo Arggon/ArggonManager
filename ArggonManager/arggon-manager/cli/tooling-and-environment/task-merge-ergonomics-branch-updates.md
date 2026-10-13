@@ -147,3 +147,22 @@ Requested changes: impact class in PR description + item comment; the F2 fix; th
 **Minor** — the PR body is corrected: `prettier --check` is claimed clean for `engineering.md` only; the item file is disclosed as failing in the kernel's comment/handoff shape (18/18 siblings), and no workflow runs prettier.
 
 Box 4 untouched (unchecked; the lead's after-observation still pending).
+
+### 2026-10-13 @ses_ecd55780cffe4KYPAcVe6cQS3I
+verdict: approve (supersedes the `request-changes` carried at cc90d896)
+
+Re-review of the corrections at head `9abb950f` (doc fix `d0694414` + item comment `9abb950f`). Read: `git diff origin/main...HEAD` / `gh pr diff 753 --name-only` (exactly 2 files), the item body + all comments, the PR body, `engineering.md` §Naming, commits, PRs (new section lines 329–353), `agents.md` §Changing the methodology itself, the skill references, live repo settings + branch protection, GitHub docs (auto-merge, merge-queue gated-feature reusable, keeping a PR in sync), CI status on head. Did not run the project's gates (verifier territory).
+
+**1. Impact class — resolved.** PR body and item comment both state "Methodology impact class: behavioral", each with the ADR 0016 reference; the item comment adds the skill-sync result (`npm run skills:sync`, no tracked diff — `.agents/skills/` is gitignored at `.gitignore:14`; `skill-copy.test.ts` green). That is what §Changing the methodology itself requires in both places. No skill statement is made false: the PR touches no file under `skills/arggon-cli/**`, the flow's `--merge` command matches pitfalls.md's merge-never-squash rule, and bot-owned branches keep their own squash self-merge (agents.md §Auto-done).
+
+**2. `--auto` re-strand — resolved and sound.** The "merge lands without a second visit" promise is gone. Line 340 now states auto-merge does not refresh a branch that falls behind after arming, and gives the repeatable recovery (`update-branch` again; the armed merge completes once the checks pass). Consistent with GitHub's docs: auto-merge merges "after all required reviews and status checks pass", is disabled only by a non-write-permission push or a base-branch switch, and the merge-queue doc contrasts the queue as removing the need to update the branch — i.e. plain auto-merge does not.
+
+**3. Merge-queue availability — resolved and honestly bounded.** Live API: `owner.type: User` (public repo). GitHub's gated-feature text: "Pull request merge queues are available in any public repository owned by an organization, or in private repositories owned by organizations using GitHub Enterprise Cloud." The doc's closing sentence (line 353) and the item correction comment state the org-transfer precondition and mark the `merge_group` follow-up moot until then. The earlier wrong bullet remains only as append-only comment history and is explicitly retracted in the following comment; current-state statements (doc, PR body, item correction) are consistent.
+
+**4. Minor — resolved.** The PR body now claims `prettier --check` clean for `engineering.md` only and discloses the item file's kernel-shape exception.
+
+**Scope/state:** exactly two files (`gh pr diff --name-only`); head CI green (`cli` 5m13s, `tasks-validate`, `ui-smoke` all pass), `mergeStateStatus: CLEAN`, `mergeable: MERGEABLE`. The `cli` check runs `npm run test` (`vitest run`), which covers `cli/src/skill-copy.test.ts`, so the parity claim is CI-backed.
+
+**Unverified by me (execution tier):** I did not execute `skills:sync` or the vitest runs myself — maker-reported outputs plus green CI are the evidence. Nothing hinges on it: no skill source file changed, so the generated copies need no tracked change.
+
+**Merge recommendation: approve.** Box 4 (before/after cost) stays unchecked by design — it is the lead's after-observation, so keep the item `in_progress` until it is ticked; it does not block this merge. Non-blocking note: the empty `### 2026-10-13 @practice-standards-reviewer` heading above the prior verdict is a kernel-append artifact of that comment's own body, not stray content from the maker.
