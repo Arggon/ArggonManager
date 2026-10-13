@@ -25,10 +25,11 @@ procedure to execute by hand — the manual bump/pack/publish runbook is gone.
    the release. Merge the release PR **by itself**: the guard classifies the
    pushed HEAD commit, so a bump buried under later commits in the same push
    silently strands the release.
-4. **`release.yml`** (the merge push) runs the ordered guard, then: annotated
-   tag `vX.Y.Z` → flips the merged release PR's `autorelease: pending` label to
-   `autorelease: tagged` (release-please's own bookkeeping — see §The
-   `autorelease` label lifecycle) → GitHub Release (notes = the merged
+4. **`release.yml`** (the merge push) runs the ordered guard and the pre-tag
+   gates (the merged CHANGELOG section for V; root-lib lockstep), then:
+   annotated tag `vX.Y.Z` → flips the merged release PR's `autorelease:
+pending` label to `autorelease: tagged` (release-please's own bookkeeping —
+   see §The `autorelease` label lifecycle) → GitHub Release (notes = the merged
    CHANGELOG section) → build → pack → extract-and-inspect → publish
    `@arggondev/lib` first, then `arggon-manager` (OIDC trusted publishing) →
    both tarballs attached to the release. Every published artifact self-reports
@@ -137,6 +138,64 @@ extraction is a tested module (`cli/release-notes.mjs`) that matches the header
 by prefix, and it now runs as a `--check` gate **before** the tag step, so this
 class cannot strand a tag again. Local publishing needs registry credentials in
 `~/.npmrc`; the workflow's own path is OIDC trusted publishing.
+
+## Exception: the release PR is non-lockstep (root != lib)
+
+release-please bumps **only the components whose paths the wave touched**, while
+`release-please-config.json`'s extra-files rule rewrites the root's kernel pin
+to the root's new version assuming lockstep. A wave whose commits touch no
+`lib/` path therefore yields a non-lockstep proposal — root ahead, lib unmoved —
+which is a broken release: the root would pin a kernel version that was never
+bumped. Every release is lockstep (ADR 0018 §1/§2; spec-release-pipeline-015
+invariant 1), so it must never merge.
+
+**Detection.** Both surfaces landed 2026-10-13
+(`bug-release-proposal-non-lockstep-undetected`), after #764 (root 0.8.0, lib
+0.7.1) sat undetected behind the release PR's approval-gated CI:
+
+- `release-please.yml` runs `cli/release-lockstep-check.mjs` on every push. It
+  reads both `package.json` versions at the open release PR's head ref and
+  **reddens the maintenance run** when they differ, naming both versions and the
+  remedy below. A lockstep proposal and a push with no open release PR stay
+  silent; a gh query that cannot run warns and exits 0 (never a false red).
+- `release.yml` asserts root == lib **before** creating the tag, so a
+  non-lockstep release commit cannot strand a tag. (The assert used to run after
+  the tag: it stopped the publish but left `vX.Y.Z` behind, the label flip never
+  ran, and release-please wedged on the merged release PR — the 2026-10-02 →
+  2026-10-07 outage class.)
+
+**Remedy — force both packages with a `Release-As` trailer.** release-please
+applies an **empty** commit to every component path (`CommitSplit
+includeEmpty: true`), so an empty commit whose message carries the trailer sets
+BOTH packages to `X.Y.Z` and updates the open release PR to a lockstep proposal:
+
+```bash
+git commit --allow-empty -m "chore(release): X.Y.Z" -m "Release-As: X.Y.Z"
+git push origin main
+```
+
+`X.Y.Z` is the version you intend to release — normally the higher of the two
+proposals, and the red check message prints the concrete command. The
+`linked-versions` plugin is **not** an alternative here: under this repo's tag
+contract (`include-component-in-tag: false`) `getComponent()` returns the empty
+component, so the plugin finds no components to link (verified against
+release-please 17.11.2). Step 1 of "What the automation owns" is the same
+trailer used deliberately; this exception is about _repairing_ a proposal that
+went out non-lockstep.
+
+**If a tag is stranded anyway (legacy runs).** A run from before the pre-tag gate
+can leave `vX.Y.Z` naming a non-lockstep commit with nothing published. Recovery:
+
+1. **Never move or delete the tag** (invariants above) — and never publish from
+   it or hand-create its GitHub Release: the commit's two versions disagree and
+   its root kernel pin names a kernel that does not exist.
+2. If the merged release PR still carries `autorelease: pending`, the next
+   `release-please.yml` run reddens naming it; clear it with the label-flip
+   command (§The `autorelease` label lifecycle).
+3. Fix lockstep **forward**: push the empty `Release-As` commit for the NEXT
+   version (patch for fixes, minor for features), merge that lockstep release
+   PR, and let `release.yml` publish it. npm simply skips the stranded number;
+   nothing points adopters at it.
 
 ## Exception: publish fails with an authentication error
 

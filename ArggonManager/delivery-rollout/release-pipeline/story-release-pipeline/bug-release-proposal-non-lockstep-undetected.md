@@ -12,6 +12,7 @@ updated: "2026-10-13"
 claimed_at: "2026-10-13T14:34:44.598Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-proposal-non-lockstep-undetected
 ---
+
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-proposal-non-lockstep-undetected.md
   Leaves live only under a story. id is the filename stem: bug-release-proposal-non-lockstep-undetected.
@@ -39,23 +40,28 @@ Found 2026-10-13 investigating the red `cli` run on release PR #764 (run 3834432
 
 ## Acceptance
 
-- [ ] `release-please.yml` surfaces a non-lockstep OPEN release PR as a red maintenance run (not only as the PR's approval-gated CI), naming both versions and the remedy (empty `Release-As: X.Y.Z` commit to main); logic in a tested, injectable-gh script per the `cli/release-abort-check.mjs` pattern
-- [ ] its test proves the green path (lockstep → exit 0, silent) and the red path (root != lib → non-zero, message carries both versions + remedy), injectable rather than live
-- [ ] `release.yml` asserts root-lib lockstep BEFORE creating/pushing the tag, so a broken release commit cannot strand a tag; the tag↔commit agreement assert stays after the tag as today
-- [ ] `ArggonManager/docs/runbooks/release.md` documents the non-lockstep case, the Release-As remedy, and the stranded-tag recovery if one ever lands
+- [x] `release-please.yml` surfaces a non-lockstep OPEN release PR as a red maintenance run (not only as the PR's approval-gated CI), naming both versions and the remedy (empty `Release-As: X.Y.Z` commit to main); logic in a tested, injectable-gh script per the `cli/release-abort-check.mjs` pattern
+- [x] its test proves the green path (lockstep → exit 0, silent) and the red path (root != lib → non-zero, message carries both versions + remedy), injectable rather than live
+- [x] `release.yml` asserts root-lib lockstep BEFORE creating/pushing the tag, so a broken release commit cannot strand a tag; the tag↔commit agreement assert stays after the tag as today
+- [x] `ArggonManager/docs/runbooks/release.md` documents the non-lockstep case, the Release-As remedy, and the stranded-tag recovery if one ever lands
 - [x] the live #764 state is recorded here once cleared (owner pushes the Release-As commit → #764 updates lockstep → CI re-approved and green)
 
 ## Notes
 
 ### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
 ### Resolution record — 2026-10-13 (delivery lead)
+
 The product owner instructed the delivery lead to fix the failing release. Actions taken on that instruction (runbook step 1; merge remains the owner's click — releases are human by design):
+
 - Lead pushed the empty `Release-As: 0.8.0` trigger to main (7d972ed5). Version 0.8.0 = the minor the convention derives (new adopter-facing features).
 - release-please updated #764 to lockstep: root 0.8.0 == lib 0.8.0 (09f10bab + lockfile sync c58d8302).
 - Release PR head 5fd10db4 is fully green: cli pass, tasks-validate pass, ui-smoke pass. Mergeable when checked.
-The durable-guard acceptance rows on this item (maintenance-run surfacing, pre-tag lockstep assert, runbook) remain open — they are prevention, not needed to clear this release.
+  The durable-guard acceptance rows on this item (maintenance-run surfacing, pre-tag lockstep assert, runbook) remain open — they are prevention, not needed to clear this release.
 
 ### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
 ### Released — 2026-10-13 (delivery lead, post-merge verification)
+
 #764 merged (79a6ee6c, squash `chore: release main (#764)`). release.yml run 38404213674 — every step green: tag v0.8.0 → label flip (`autorelease: tagged`) → GitHub Release with both tarballs → lib published first → registry poll → CLI published → assets attached.
 Verified independently: npm `arggon-manager@0.8.0` live (`latest`), `@arggondev/lib@0.8.0` live, and the exact kernel pin shipped (`"@arggondev/lib": "0.8.0"` — the first exact release since v0.4.x, see bug-kernel-pin-never-exact). The live-PR acceptance row is met; the prevention rows (maintenance-run surfacing + pre-tag lockstep assert + runbook) remain open.

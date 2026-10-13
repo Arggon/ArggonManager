@@ -32,3 +32,46 @@
 - **minor** — new commands, new templates or template changes, methodology
   changes, or any new adopter-facing feature.
 - **patch** — bug fixes with no adopter-facing surface change.
+
+## Non-lockstep release proposals (both packages always release together)
+
+release-please bumps only the components whose paths a wave touched, so a wave
+with no `lib/` change can auto-propose a root-only bump — observed 2026-10-13 on
+release PR #764: root `0.8.0`, lib `0.7.1`, with the root's kernel pin rewritten
+to `^0.8.0` assuming lockstep. That proposal is broken: every release is lockstep
+(root version == lib version; ADR 0018 §1/§2, spec-release-pipeline-015
+invariant 1) and it must never merge.
+
+**Detection.** `release-please.yml`'s `cli/release-lockstep-check.mjs` step
+reddens the maintenance run on an open non-lockstep PR, naming both versions;
+`release.yml` asserts root == lib **before** creating the tag, so a broken
+release commit cannot strand a tag. A lockstep proposal and a push with no open
+release PR stay silent.
+
+**Remedy — force both packages with an empty `Release-As` commit.** An empty
+commit is applied to every component path (`CommitSplit includeEmpty: true`), so
+the trailer sets BOTH packages and release-please updates the PR to a lockstep
+proposal:
+
+```bash
+git commit --allow-empty -m "chore(release): X.Y.Z" -m "Release-As: X.Y.Z"
+git push origin main
+```
+
+`X.Y.Z` is the version you intend to release (normally the higher of the two
+proposals; the red check message prints the concrete command).
+
+**If a tag is stranded anyway** (a run from before the pre-tag gate): never move
+or delete the tag and never publish from it — its versions disagree. Clear the
+merged PR's stuck `autorelease: pending` label if the abort check names it:
+
+```bash
+gh pr edit <n> --add-label "autorelease: tagged" --remove-label "autorelease: pending"
+```
+
+then fix lockstep forward: force the NEXT version with the empty `Release-As`
+commit above, merge that lockstep release PR, and let `release.yml` publish it.
+npm skips the stranded number, and nothing points adopters at it.
+
+Full operator detail: [`release.md`](../../../release.md) (repo root),
+§Exception: the release PR is non-lockstep.

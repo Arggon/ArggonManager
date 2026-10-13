@@ -402,10 +402,13 @@ describe("the release.yml flip step (workflow contract)", () => {
     // that creates the tag flips the label, in the same run, so the window
     // between the tag and the flip is as short as the run allows. A run that
     // dies before the flip is caught by the release-please backstop.
+    // The agreement step's root==lib half moved BEFORE the tag
+    // (bug-release-proposal-non-lockstep-undetected); this ordering — tag, then
+    // agreement, then flip — is unchanged.
     assertOrder(
       workflow,
       `- name: Create the annotated tag v(V) at the pushed commit`,
-      `- name: Assert tag-version agreement and root-lib lockstep before anything ships`,
+      `- name: Assert tag-version agreement`,
       `node cli/release-label-flip.mjs --repo "$GITHUB_REPOSITORY"`,
       `- name: GitHub Release v(V) with the merged CHANGELOG section as notes`,
       `node cli/publish-auth-hint.mjs --package "@arggondev/lib"`,

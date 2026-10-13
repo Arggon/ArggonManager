@@ -118,6 +118,31 @@ jobs:
           VERSION: ${{ steps.guard.outputs.version }}
         run: npx tsx cli/src/release-notes.ts --check --version "$VERSION"
 
+      - name: Assert root-lib lockstep BEFORE tagging
+        # Invariant 1 (ADR 0018 §1/§2; spec-release-pipeline-015): every
+        # release is lockstep — root version == lib version at the released
+        # commit. bug-release-proposal-non-lockstep-undetected: this assert used
+        # to live in the step below, AFTER the tag, so a non-lockstep release
+        # commit (release-please auto-proposed one on 2026-10-13: root 0.8.0,
+        # lib 0.7.1) created tag v(V) and only then failed — stranding the tag,
+        # never running the label flip, and wedging release-please on the
+        # merged release PR: the 2026-10-02 → 2026-10-07 outage class. It now
+        # runs beside the notes gate, BEFORE the tag step, so a broken pair can
+        # never strand a tag. The earlier surface is the maintenance run
+        # (cli/release-lockstep-check.mjs in release-please.yml); this gate is
+        # the last line before a tag exists.
+        if: steps.guard.outputs.release == 'true'
+        run: |
+          set -euo pipefail
+          root_v="$(node -p "require('./package.json').version")"
+          lib_v="$(node -p "require('./lib/package.json').version")"
+          if [ "$root_v" != "$lib_v" ]; then
+            echo "lockstep broken: root $root_v != lib $lib_v — refusing to release" >&2
+            echo "force both packages to one version with an empty 'Release-As: X.Y.Z' trailer commit on main (release.md §Exception: the release PR is non-lockstep)" >&2
+            exit 1
+          fi
+          echo "lockstep ok: root == lib == $root_v"
+
       - name: Create the annotated tag v(V) at the pushed commit
         if: steps.guard.outputs.release == 'true' && steps.guard.outputs.tag_exists == 'false'
         env:
@@ -130,10 +155,13 @@ jobs:
           git tag -a "v${VERSION}" -m "arggon-manager v${VERSION} (+ @arggondev/lib in lockstep)" "$RELEASE_SHA"
           git push origin "refs/tags/v${VERSION}"
 
-      - name: Assert tag-version agreement and root-lib lockstep before anything ships
-        # Invariant 1: the tag names the exact commit being published and the
-        # kernel version equals the CLI version. Mismatch fails without
-        # publishing (AC A9). After the tag step, `git ls-remote` is the truth.
+      - name: Assert tag-version agreement
+        # Invariant 1, the TAG half: the tag names the exact commit being
+        # published (AC A9). bug-release-proposal-non-lockstep-undetected: the
+        # root==lib half moved to "Assert root-lib lockstep BEFORE tagging"
+        # above, so a non-lockstep release commit can no longer strand a tag;
+        # this step stays after the tag step because `git ls-remote` is the
+        # truth only once the tag exists.
         if: steps.guard.outputs.release == 'true'
         env:
           RELEASE_SHA: ${{ github.sha }}
@@ -145,13 +173,7 @@ jobs:
             echo "tag v${VERSION} does not name the published commit (tag: ${tag_sha:-absent}, pushed: $RELEASE_SHA)" >&2
             exit 1
           fi
-          root_v="$(node -p "require('./package.json').version")"
-          lib_v="$(node -p "require('./lib/package.json').version")"
-          if [ "$root_v" != "$lib_v" ]; then
-            echo "lockstep broken: root $root_v != lib $lib_v — refusing to publish" >&2
-            exit 1
-          fi
-          echo "agreement ok: tag v${VERSION} -> $RELEASE_SHA, root == lib == $root_v"
+          echo "agreement ok: tag v${VERSION} -> $RELEASE_SHA"
 
       - name: Flip the merged release PR's label (release-please bookkeeping this run owns)
         # bug-autorelease-label-lifecycle-unowned. release-please moves its
