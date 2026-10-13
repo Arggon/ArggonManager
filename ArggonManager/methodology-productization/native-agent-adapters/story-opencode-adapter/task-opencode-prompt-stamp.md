@@ -211,3 +211,13 @@ Execution. I ran no server, no test suite and no gate. Everything above is from 
 1. cd /home/arggon/Projects/ArggonManager-task-opencode-prompt-stamp && npm run check:plugin — demonstrates the committed bundle is byte-identical to a fresh regeneration from the source. This is the single load-bearing claim of this PR; if it exits non-zero the shipped bundle is not what the source says.
 2. Same cwd: npm run build && npx tsx smoke/opencode-prompt-stamp-smoke.ts — demonstrates the 13 checks, and specifically checks 3 (no Duplicate plugin ID), 4/5 (stamp on the persisted payload, prompt text byte-identical, delivery steer), 7/8 (one item block in the compaction request, the summary still landing, the block surviving into the next agent-loop request), 9 (4 s idle window with zero provider requests) and 10 (no stamp on a plain primary checkout).
 3. Same cwd: npx vitest run opencode/plugins/arggon/index.test.ts — demonstrates the +424 lines of rewrite-contract assertions, in particular that metadata merges without dropping caller keys, that a re-admission re-stamps rather than accumulates, and that the 768 B bound is enforced by clip-then-drop.
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 87604141 (PR #760); auto-done flip #767. Verifier probes on the merged head (e24221ec):
+- `npm run check:plugin` — exit 0; bundle sha256 unchanged across regeneration (2d76432d…)
+- `npm run build` + `npx tsx smoke/opencode-prompt-stamp-smoke.ts` — 13/13 checks on a real `opencode serve`, no Duplicate plugin ID, 4 s idle window with zero provider requests
+- `npx vitest run opencode/plugins/arggon/index.test.ts` — 70/70 passed
+Impact class Behavioral recorded on the item (adopter-upgrade channel noted; no skill copy affected).
+Follow-ups filed: task-plugin-smoke-home-isolation (hermetic HOME for the other plugin smokes, npm script, id-read consistency).
