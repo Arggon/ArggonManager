@@ -60,3 +60,7 @@ ADR 0027 (Accepted with PR #761) decided: no cross-run lesson store; lessons are
 3. **`references/pitfalls.md` still states a read contract in its header** — the write obligation now lives in agents.md §Promoting lessons and the prompt (ADR 0027 point 1 assigns it there). No skill edit, so the byte-equal copies are preserved.
 
 Not flipped to `done` — completion is the delivery lead's call after merge.
+
+### handoff 2026-10-13 @ses_ec8e84466ffeY3Gpdkc55cQeEv (session: ses_ec8e84466ffeY3Gpdkc55cQeEv) — next: Review PR #795 (Behavioral) against the acceptance checklist, then merge; delete the claim's worktree after merge (tools.arggon.cleanup).
+- branch: feat/task-lesson-promotion-implementation
+- open questions: ZCode maker prompt has no trigger (scoped out; follow-up?); pre-existing doctor hint: skill frontmatter version 0.5.0 vs package 0.9.0; references/pitfalls.md header still read-only-contract
