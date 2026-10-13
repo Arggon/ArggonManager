@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-plugin-smoke-home-isolation
 title: "Plugin smokes need hermetic HOME: a machine-global plugin can shadow fixture bundles"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-opencode-adapter
 labels: [opencode-seam, tests, review-followup]
 created: "2026-10-13"
 updated: "2026-10-13"
-claimed_at: "2026-10-13T16:39:49.749Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-plugin-smoke-home-isolation
 ---
 <!--
