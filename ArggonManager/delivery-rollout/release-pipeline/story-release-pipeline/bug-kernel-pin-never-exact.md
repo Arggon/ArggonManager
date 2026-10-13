@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-kernel-pin-never-exact
 title: Exact kernel pin was never established — every released arggon-manager ships a `^@arggondev/lib` range and nothing detects it (ADR 0018 §2 / spec A3 unmet since v0.4.x)
+assignee: arggon-delivery-lead
+branch: fix/bug-kernel-pin-never-exact
 parent: story-release-pipeline
 labels: [release, adopters]
 created: "2026-10-13"
 updated: "2026-10-13"
+claimed_at: "2026-10-13T16:39:53.194Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-kernel-pin-never-exact
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-kernel-pin-never-exact.md
