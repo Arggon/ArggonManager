@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-matrix-reaches-adopters
-title: '`adapters/capability-matrix.json` never reaches an adopter: it is not in the package `files` (blocked by the tagged-version guard) so `doctor` reports "not found" in every adopter tree'
+title: "`adapters/capability-matrix.json` never reaches an adopter: it is not in the package `files` (blocked by the tagged-version guard) so `doctor` reports \"not found\" in every adopter tree"
+assignee: arggon-delivery-lead
+branch: feat/task-matrix-reaches-adopters
 parent: story-capability-matrix
 labels: [adopters, packaging]
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-13"
+claimed_at: "2026-10-13T03:19:04.611Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-matrix-reaches-adopters
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-capability-matrix/task-matrix-reaches-adopters.md
   Leaves live only under a story. id is the filename stem: task-matrix-reaches-adopters.
