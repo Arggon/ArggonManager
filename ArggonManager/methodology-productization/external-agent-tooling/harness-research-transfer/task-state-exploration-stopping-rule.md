@@ -212,3 +212,7 @@ Independently re-ran every gate on head `30e9b977` (before this session's tick c
 - PR CI: `tasks-validate` pass, `ui-smoke` pass; the `cli` run for the previous head was success (a fresh one runs for the new head)
 
 **Ticked the live `## Acceptance` section only** (commit `cba3688a`, 8/8, each supported by the checks above); the dated history copy under Notes is untouched. `agents.md` §5 / auto-done requires the live checklist ticked before merge — the bot never edits checklists — so this is the honest state, not a pre-judgement of review. Status stays `in_progress`; impact class **Advisory**; no merge, no done flip (delivery lead's call).
+
+### handoff 2026-10-13 @ses_eca8380bcffeJ9iFxVFsZRDkkQ (session: ses_eca8380bcffeJ9iFxVFsZRDkkQ) — next: Review + merge PR #771 (docs-only, Advisory; live checklist ticked 8/8, head cba3688a). Auto-done flips after merge; do not merge/done from the maker side.
+- branch: feat/task-state-exploration-stopping-rule
+- open questions: Stale dispatch premise (PR #771 already open from the prior maker — confirm no duplicate intent); cli check re-running for head cba3688a
