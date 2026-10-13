@@ -134,6 +134,19 @@ describe("init docs: tier-1 content", () => {
     expect(contributing).toContain("work item id");
   });
 
+  it("CONTRIBUTING.md and the PR template state the check as what the project declares", () => {
+    const contributing = readFileSync(join(dir, "CONTRIBUTING.md"), "utf8");
+    const pr = readFileSync(join(dir, ".github/PULL_REQUEST_TEMPLATE.md"), "utf8");
+    // bug-adopter-engineering-template-software-locked follow-up
+    // (task-adopter-template-family-followups): the check is named by what the
+    // project declares and the software case is a marked worked example, so a
+    // non-software adopter reads its own verification — not "tests pass".
+    for (const text of [contributing, pr]) {
+      expect(text).toContain("The verification this project declares");
+      expect(text).not.toContain("Tests pass locally");
+    }
+  });
+
   it("docs/tracking.md replaces GitHub issue templates", () => {
     const tracking = readFileSync(join(dir, "ArggonManager/docs/tracking.md"), "utf8");
     expect(tracking).toContain("ArggonManager/");
@@ -173,6 +186,19 @@ describe("init docs: tier-2 content (--full)", () => {
     expect(engineering).toContain("## Definition of done");
     // Adopter-owned: the generated docs must not leak this repo's own doc text.
     expect(engineering).not.toContain("auto-done workflow");
+  });
+
+  it("docs/engineering.md keeps the docs-only exemption outside the software worked example", () => {
+    const engineering = readFileSync(join(dir, "ArggonManager/docs/engineering.md"), "utf8");
+    // bug-adopter-engineering-template-software-locked follow-up
+    // (task-adopter-template-family-followups): the exemption is a general
+    // clause for every project, not a sentence inside the software example.
+    expect(engineering).toContain("Docs-only changes are exempt from the end-to-end check");
+    const workedExample = engineering
+      .split("\n")
+      .find((line) => line.includes("Worked examples (software)"));
+    expect(workedExample).toBeDefined();
+    expect(workedExample).not.toContain("Docs-only");
   });
 
   it("CHANGELOG.md follows Keep a Changelog", () => {
