@@ -103,3 +103,9 @@ Expected → observed (3 consecutive runs, same result, ~60 s each):
 ### handoff 2026-10-13 @ses_eca8380c0ffersLXopMkATS3NS (session: ses_eca8380c0ffersLXopMkATS3NS) — next: Review PR #773 (feat/task-opencode-event-panel): verify the two allow-listed events + onCleanup disposal in tui.tsx, run `npm run smoke:opencode:panel-refresh` (maintainer, model-free) and the standa…
 - branch: feat/task-opencode-event-panel
 - open questions: smoke:tui/opencode* still not hermetic-HOME (task-plugin-smoke-home-isolation); prompt-stamp smoke's byte-equality relies on its own copyFileSync because init prepends a provenance marker to both ven…
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as cc2ccc4e (PR #773); auto-done flip landed. T4 second half: the open board panel follows the host's event stream (`context.data.on`, probed on 2.0.26) on `session.shell.ended` / `session.step.ended`, failure-isolated, one disposer wired through `onCleanup`; no timer, no polling. Model-free hermetic smoke — 3 consecutive identical runs: stale panel → event → repaint with zero keys sent, and a disk-only change never drawn (no polling fallback). `check:plugin` green (tui.tsx is vendored verbatim — bundle byte-identical), full suite 3327, lint/structure/validate/prettier green; CI green.
+Recorded follow-ups: smoke HOME isolation (already tracked as task-plugin-smoke-home-isolation); CI wiring for the new smoke needs an opencode install step (deliberately not taken); the prompt-stamp smoke's vendored-marker nuance stays a note.
