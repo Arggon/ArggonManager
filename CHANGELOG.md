@@ -6,6 +6,81 @@ All notable changes to ArggonManager are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0](https://github.com/Arggon/ArggonManager/compare/v0.9.0...v0.10.0) (2026-10-13)
+
+
+### Added
+
+* **smoke:** hermetic HOME for the plugin smokes; onCompaction id read (task-plugin-smoke-home-isolation) ([0ecb600](https://github.com/Arggon/ArggonManager/commit/0ecb60076bf62d9bb5cdd702a112c41dfe20b55f))
+* **smoke:** serve the plugin smokes under a hermetic HOME ([56e2317](https://github.com/Arggon/ArggonManager/commit/56e2317f69afa96905f14a17670f59b74508ff9d))
+
+
+### Fixed
+
+* **docs:** shipped doc samples name the shipped seam ids + live-doc guard (bug-retired-agent-ids-in-doc-samples) ([78ae2b3](https://github.com/Arggon/ArggonManager/commit/78ae2b305dc0472abdca2395787b2ab410eddc35))
+* **docs:** shipped doc samples name the shipped seam ids + live-doc guard (bug-retired-agent-ids-in-doc-samples) ([b08f1b0](https://github.com/Arggon/ArggonManager/commit/b08f1b0579cfd812e7aa24ed513854c864095353))
+* **plugin:** read onCompaction's item id like onContext ([1b4bdc7](https://github.com/Arggon/ArggonManager/commit/1b4bdc7f947eebc5c207d62ce81e88571a9d9879))
+* **release:** guard the exact kernel pin (bug-kernel-pin-never-exact) ([838bb46](https://github.com/Arggon/ArggonManager/commit/838bb46fb910a2fe4e256a814396c35a41cbbf82))
+* **release:** guard the exact kernel pin on the release PR and on main ([8264452](https://github.com/Arggon/ArggonManager/commit/8264452c3a74757661feb0e728a3931ad3dda051))
+* **roles:** shipped role vocabulary in the goal contract and the capability matrix (task-retired-role-words-product-text) ([6b820cc](https://github.com/Arggon/ArggonManager/commit/6b820ccb7cc8d8957e55322a356d8fa3694ebd91))
+* **roles:** shipped role vocabulary in the goal contract and the capability matrix (task-retired-role-words-product-text) ([6bbf2fd](https://github.com/Arggon/ArggonManager/commit/6bbf2fdccfb76b86c99c69ec3b2d7b952258ae8b))
+* **seam:** emit one provenance marker per agent, warn the V1 schema (task-seam-nits-v1-schema-and-marker) ([9ef55be](https://github.com/Arggon/ArggonManager/commit/9ef55be936e03057b873fb534344d49c83d01493))
+* **seam:** single provenance marker + V1-schema warning (task-seam-nits-v1-schema-and-marker) ([c311eb0](https://github.com/Arggon/ArggonManager/commit/c311eb074ce363e348476915aef96f45801df66e))
+
+
+### Changed
+
+* **auto:** mark items done (PR [#787](https://github.com/Arggon/ArggonManager/issues/787) merged) ([#791](https://github.com/Arggon/ArggonManager/issues/791)) ([f0f2843](https://github.com/Arggon/ArggonManager/commit/f0f284316340353f1c3e7c13b13e3b2eee7afb64))
+* **auto:** mark items done (PR [#788](https://github.com/Arggon/ArggonManager/issues/788) merged) ([#792](https://github.com/Arggon/ArggonManager/issues/792)) ([c91f70b](https://github.com/Arggon/ArggonManager/commit/c91f70b866f1ee707f3adc7013fc1e0799fadac8))
+* **auto:** mark items done (PR [#790](https://github.com/Arggon/ArggonManager/issues/790) merged) ([#793](https://github.com/Arggon/ArggonManager/issues/793)) ([b343070](https://github.com/Arggon/ArggonManager/commit/b34307062ad2d1db54ab288fb378e358c404a21a))
+* **labs:** CI-log mining method + done-gate refusal classification (task-done-gate-refusal-rate-substrate) ([c6475d0](https://github.com/Arggon/ArggonManager/commit/c6475d0cb8b526eaba00fb97541d24e608fd5d94))
+* **labs:** CI-log mining method + done-gate refusal classification (task-done-gate-refusal-rate-substrate) ([6b7a66f](https://github.com/Arggon/ArggonManager/commit/6b7a66f6c67486561e8652922527d0efcfe41045))
+* **methodology:** promote lessons into their carriers (task-lesson-promotion-implementation) ([268d908](https://github.com/Arggon/ArggonManager/commit/268d9088919d15ca0c22789ec5213ef7857767aa))
+* **methodology:** promote lessons into their carriers (task-lesson-promotion-implementation) ([2447188](https://github.com/Arggon/ArggonManager/commit/24471883b4cde4afb535436d9fb59b9c9ad6c923))
+* **release:** 0.10.0 ([12178ba](https://github.com/Arggon/ArggonManager/commit/12178bad0a26c23d4385a6e21f3c9a36248dc646))
+* **release:** state the expected red window on a non-lockstep release PR ([1efe5dd](https://github.com/Arggon/ArggonManager/commit/1efe5dd7755872f7b6848465ee2aedf8b796f776))
+* **release:** state the expected red window on a non-lockstep release PR (task-nonlockstep-red-state-expectations) ([cf42c32](https://github.com/Arggon/ArggonManager/commit/cf42c329b6fba4ac8221bcf4cf049e2b7f7c1437))
+* **tasks:** claimed bug-kernel-pin-never-exact ([e95b704](https://github.com/Arggon/ArggonManager/commit/e95b704eb9a9c29ca1600c05ec13b3be211c46ea))
+* **tasks:** claimed bug-retired-agent-ids-in-doc-samples ([48f7ddd](https://github.com/Arggon/ArggonManager/commit/48f7ddd007bc725d97e5a6daeafb9527c1bc364e))
+* **tasks:** claimed task-done-gate-refusal-rate-substrate ([7d98098](https://github.com/Arggon/ArggonManager/commit/7d98098a761619232f3adca4468de266986bf724))
+* **tasks:** claimed task-lesson-promotion-implementation ([cf3ef58](https://github.com/Arggon/ArggonManager/commit/cf3ef5872cee9df8b3bf38160bfdb19d96e3fa43))
+* **tasks:** claimed task-nonlockstep-red-state-expectations ([2452fd6](https://github.com/Arggon/ArggonManager/commit/2452fd6a6eaee3831a1f8f1b325cf706c9bd7e1b))
+* **tasks:** claimed task-plugin-smoke-home-isolation ([038a1cb](https://github.com/Arggon/ArggonManager/commit/038a1cbf00fe4985c431478d08e9059843c61e1f))
+* **tasks:** claimed task-retired-role-words-product-text ([a4c2da4](https://github.com/Arggon/ArggonManager/commit/a4c2da4cf0c3932a9dc3b2ffe918011a411eb57d))
+* **tasks:** claimed task-seam-nits-v1-schema-and-marker ([fd61aa0](https://github.com/Arggon/ArggonManager/commit/fd61aa07250fcd9ebf82d25647fe6163f8f1189c))
+* **tasks:** commented bug-kernel-pin-never-exact ([ab6becf](https://github.com/Arggon/ArggonManager/commit/ab6becf36a384d25fd1612d09e68e4c484fdce0b))
+* **tasks:** commented bug-kernel-pin-never-exact ([c0da3e2](https://github.com/Arggon/ArggonManager/commit/c0da3e2a29c57dc15b030faa32f7b185f4a6ff14))
+* **tasks:** commented bug-kernel-pin-never-exact ([0a308b2](https://github.com/Arggon/ArggonManager/commit/0a308b2357ebe40fd932dae4d4f900ecb338612a))
+* **tasks:** commented bug-release-proposal-non-lockstep-undetected ([c1b2380](https://github.com/Arggon/ArggonManager/commit/c1b23802ba183f8ebfab79ceab8d8afaec9b93ee))
+* **tasks:** commented bug-retired-agent-ids-in-doc-samples ([b94a9ba](https://github.com/Arggon/ArggonManager/commit/b94a9ba2241f33bb791f943475bea5e5b11b993d))
+* **tasks:** commented bug-retired-agent-ids-in-doc-samples ([378eb66](https://github.com/Arggon/ArggonManager/commit/378eb663e997028c955c38b602a0a94e01483419))
+* **tasks:** commented task-done-gate-refusal-rate-substrate ([48bbbc2](https://github.com/Arggon/ArggonManager/commit/48bbbc20073865d869e293b6990abb4d071c1303))
+* **tasks:** commented task-done-gate-refusal-rate-substrate ([675c000](https://github.com/Arggon/ArggonManager/commit/675c000caa9a0f2e70aa2d05502cf1b7f168c4b7))
+* **tasks:** commented task-lesson-promotion-implementation ([0322f46](https://github.com/Arggon/ArggonManager/commit/0322f46757b4779ff3c8f3a283dbb2f3420f225e))
+* **tasks:** commented task-lesson-promotion-implementation ([ae1d67e](https://github.com/Arggon/ArggonManager/commit/ae1d67ec7fb8a73d58aa4e71597d0f6f045af35b))
+* **tasks:** commented task-nonlockstep-red-state-expectations ([c211e17](https://github.com/Arggon/ArggonManager/commit/c211e175895c1cc87e63696bdd69a7106b3fcc19))
+* **tasks:** commented task-nonlockstep-red-state-expectations ([0222104](https://github.com/Arggon/ArggonManager/commit/022210474e0130b359c6173a973d7d2799b952fb))
+* **tasks:** commented task-plugin-smoke-home-isolation ([7990949](https://github.com/Arggon/ArggonManager/commit/799094981c7d52ec27034b1d4abc57cd748d97c3))
+* **tasks:** commented task-plugin-smoke-home-isolation ([557f93d](https://github.com/Arggon/ArggonManager/commit/557f93dd52b40dac45e1733f9dee67b0cad30b23))
+* **tasks:** commented task-plugin-smoke-home-isolation ([ce3f14b](https://github.com/Arggon/ArggonManager/commit/ce3f14b76b1a1fbeb951b20bbaf4c0a58f449f83))
+* **tasks:** commented task-plugin-smoke-home-isolation ([ab10b84](https://github.com/Arggon/ArggonManager/commit/ab10b842f7a4dddaa091a65485d30f66bb3a7a2d))
+* **tasks:** commented task-plugin-smoke-home-isolation ([bc2290e](https://github.com/Arggon/ArggonManager/commit/bc2290e44335c59bd5965e471fbc0f13ad98f7d9))
+* **tasks:** commented task-release-workflow ([238da50](https://github.com/Arggon/ArggonManager/commit/238da500697e8e4d0fe8fc3a56a1cf7d9fe01f3a))
+* **tasks:** commented task-retired-role-words-product-text ([5e1642d](https://github.com/Arggon/ArggonManager/commit/5e1642df94bdeb43e960fcd831fa577be44e4911))
+* **tasks:** commented task-retired-role-words-product-text ([996bbc2](https://github.com/Arggon/ArggonManager/commit/996bbc224cd1d4453da3f698027f49e82f1847e1))
+* **tasks:** commented task-retired-role-words-product-text ([a26c67e](https://github.com/Arggon/ArggonManager/commit/a26c67ea1355b0d25f37b13332f521cf153bea20))
+* **tasks:** commented task-retired-role-words-product-text ([f289258](https://github.com/Arggon/ArggonManager/commit/f28925819fa3528a302020560357e8829e098008))
+* **tasks:** commented task-seam-nits-v1-schema-and-marker ([a2b451b](https://github.com/Arggon/ArggonManager/commit/a2b451b9465adffe0461d3516792603918a7bc85))
+* **tasks:** commented task-seam-nits-v1-schema-and-marker ([b5aec8b](https://github.com/Arggon/ArggonManager/commit/b5aec8b6b45268c3c81f05e549a90b676196a8b2))
+* **tasks:** commented task-seam-nits-v1-schema-and-marker ([c6024e1](https://github.com/Arggon/ArggonManager/commit/c6024e1f79f799a1eef2448df2c0a0a53c45eafa))
+* **tasks:** done bug-kernel-pin-never-exact ([c2a1f9d](https://github.com/Arggon/ArggonManager/commit/c2a1f9d6822e5bdff680fefc606b9b526d3ff4d0))
+* **tasks:** file bug-full-smoke-scenarios-precede-newer-gates (context + acceptance) ([fbc0e5d](https://github.com/Arggon/ArggonManager/commit/fbc0e5d438b7edc206a4b33dd7d18f90a3e3e715))
+* **tasks:** file task-nonlockstep-red-state-expectations (guard's expected red window) ([a8801d8](https://github.com/Arggon/ArggonManager/commit/a8801d8a33641477c3b6d62db8c3d393d6f92602))
+* **tasks:** file task-zcode-maker-lesson-trigger (ADR 0027 parity gap) ([d321efb](https://github.com/Arggon/ArggonManager/commit/d321efb03758d899c01d7088210cfcd02a060f81))
+* **tasks:** pruned bug-kernel-pin-never-exact, task-plugin-smoke-home-isolation, task-retired-role-words-product-text, task-seam-nits-v1-schema-and-marker ([c43b907](https://github.com/Arggon/ArggonManager/commit/c43b907f27c46859efe1a03246fce4c4ad7c2a9a))
+* **tasks:** tick acceptance on bug-kernel-pin-never-exact (lead verification: exact pin + guard + docs shipped) ([7797b86](https://github.com/Arggon/ArggonManager/commit/7797b865dd79560b893630e9b50d02906310ae29))
+* **tasks:** tick task-plugin-smoke-home-isolation acceptance (hermetic smokes verified) ([eabf0fe](https://github.com/Arggon/ArggonManager/commit/eabf0fe7e6ffa3753d39566c790d7372b0f6b0b8))
+
 ## [0.9.0](https://github.com/Arggon/ArggonManager/compare/v0.8.0...v0.9.0) (2026-10-13)
 
 
