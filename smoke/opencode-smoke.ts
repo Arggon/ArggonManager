@@ -94,6 +94,15 @@
  * `npm run smoke:opencode`; set `ARGON_SMOKE_KEEP=1` to keep fixtures even on
  * success, `OPENCODE_SMOKE_TIMEOUT_MS` to change the per-command timeout.
  *
+ * Hermetic serving: every `opencode` child runs under a disposable HOME with
+ * all four XDG dirs under it (`smoke/opencode-hermetic.ts`), because the
+ * machine-global `~/.config/opencode/plugins/arggon` would otherwise compete
+ * with each fixture's vendored bundle for the same plugin id, and the run could
+ * exercise the wrong plugin. The provider credentials the model-driven run
+ * needs are exported from the host and imported into the hermetic store before
+ * the first scenario — a V2 run resolves them (and the models-dev catalog) from
+ * the data home, never from the config home the isolation blanks.
+ *
  * Model-driven and timing sensitive: run it ALONE. A concurrent test suite or
  * another headless harness can stall a provider call past the per-command
  * timeout and leave a scenario half-done (the deterministic gates — `npm test`,
@@ -116,6 +125,14 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  createHermeticHome,
+  hostConfigHome,
+  pluginEvidenceFaults,
+  seedHermeticCredentials,
+  type HermeticHome,
+  vendoredSourceMatches,
+} from "./opencode-hermetic.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(repoRoot, "cli/src/cli.ts");
@@ -161,6 +178,14 @@ type TranscriptEvent = { type?: string; part?: TranscriptPart };
 const failures: string[] = [];
 const fixtures: Fixture[] = [];
 
+/**
+ * The hermetic HOME every fixture child serves under (created in `main`). The
+ * machine-global `~/.config/opencode/plugins/arggon` would otherwise compete
+ * with a fixture's vendored bundle for the same plugin id — `undefined` only in
+ * unit tests, which never spawn a child (see smoke/opencode-hermetic.ts).
+ */
+let hermetic: HermeticHome | undefined;
+
 function check(name: string, ok: boolean, detail?: string): void {
   const suffix =
     ok || detail === undefined ? "" : `\n      ${detail.split("\n").slice(0, 6).join("\n      ")}`;
@@ -201,9 +226,11 @@ class Fixture {
     // when present, and an inherited value would silently point the session at
     // the caller's repo instead of the fixture. ARGON_ITEM is cleared by
     // default so the harness is deterministic even under a leaked env; the
-    // env-override scenario passes it explicitly.
+    // env-override scenario passes it explicitly. The hermetic HOME/XDG set
+    // keeps every machine-global plugin, config and MCP server out of the run.
     return {
       ...process.env,
+      ...(hermetic?.env ?? {}),
       ARGON_ITEM: undefined,
       PWD: this.dir,
       PATH: `${this.binDir}:${process.env.PATH ?? ""}`,
@@ -379,6 +406,13 @@ class Fixture {
     return join(this.dir, ...rel.split("/"));
   }
 
+  /** The fixture's own plugin directory, as the host's `loading plugin` line names it. */
+  pluginDir(): string {
+    // PLUGIN_DEST is the vendored FILE (`…/arggon/index.ts`); the host names
+    // the plugin's directory in its loading line.
+    return join(realpathSync(this.dir), ...dirname(PLUGIN_DEST).split("/"));
+  }
+
   /** Deterministic item worktree path (`../<repo>-<id>`, the start convention). */
   worktreePath(id: string): string {
     return join(dirname(this.dir), `${basename(this.dir)}-${id}`);
@@ -537,8 +571,16 @@ function runTail(result: RunResult): string {
   return lines.slice(-12).join("\n");
 }
 
-function pluginLoaded(result: RunResult): boolean {
-  return /msg="loading plugin" id=.*plugins\/arggon/.test(result.stderr);
+/**
+ * Faults in a run's plugin evidence (empty = the host named this fixture's own
+ * plugin as loaded and no machine-global plugin directory was discovered).
+ * Returning the reason instead of a boolean keeps a failing check readable.
+ */
+function pluginLoaded(result: RunResult, fixture: Fixture): string[] {
+  return pluginEvidenceFaults(result.stderr, {
+    pluginDirs: [fixture.pluginDir()],
+    hostConfigHome: hostConfigHome(),
+  });
 }
 
 function mcpConnected(result: RunResult): boolean {
@@ -635,6 +677,14 @@ function scenarioFreshInit(): void {
       "vendored plugin is the single-file bundle with the kernel inlined",
       f.read(PLUGIN_DEST).includes('__arggonModules.set("lib/src/index.ts"'),
     );
+    // The bytes are the committed bundle's, the marker line aside (the shape
+    // the T4 smokes also pin): a machine-global copy must not be what runs.
+    const committed = readFileSync(PLUGIN_SOURCE, "utf8");
+    check(
+      "the vendored plugin is this checkout's committed bundle byte for byte",
+      vendoredSourceMatches(f.read(PLUGIN_DEST), committed),
+      `vendored bytes: ${f.read(PLUGIN_DEST).length}; committed bytes: ${committed.length}`,
+    );
   }
   const config = f.read("opencode.jsonc");
   check(
@@ -652,7 +702,8 @@ function scenarioFreshInit(): void {
     session.stderr.includes(`directory=${f.dir}`),
     runTail(session),
   );
-  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  const pluginFaults = pluginLoaded(session, f);
+  check("plugin loads in the runtime", pluginFaults.length === 0, pluginFaults.join("; "));
   check(
     "native tools register from the inlined kernel (12)",
     session.stderr.includes(
@@ -677,7 +728,8 @@ function scenarioAdopterConfig(): void {
   check("no opencode.jsonc written over the adopter config", !existsSync(f.path("opencode.jsonc")));
   const session = f.opencode(TOOL_PROMPT);
   f.saveTranscript("adopter-config", session);
-  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  const pluginFaults = pluginLoaded(session, f);
+  check("plugin loads in the runtime", pluginFaults.length === 0, pluginFaults.join("; "));
   check(
     "plugin registers the fifteen native tools with no config entry",
     session.stderr.includes(
@@ -716,7 +768,8 @@ function scenarioNeverClobber(): void {
   const session = f.opencode("Reply with exactly: CLOBBER_CHECK");
   f.saveTranscript("never-clobber", session);
   check("session still succeeds", session.status === 0, runTail(session));
-  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  const pluginFaults = pluginLoaded(session, f);
+  check("plugin loads in the runtime", pluginFaults.length === 0, pluginFaults.join("; "));
   check("adopter command ran (server was not replaced)", existsSync(sentinel));
   check("adopter config bytes untouched", f.read("opencode.json") === config);
   check(
@@ -901,7 +954,8 @@ function scenarioNativeTools(): void {
   const session = f.opencode(prompt);
   f.saveTranscript("native-tools", session);
   check("session succeeds", session.status === 0, runTail(session));
-  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  const pluginFaults = pluginLoaded(session, f);
+  check("plugin loads in the runtime", pluginFaults.length === 0, pluginFaults.join("; "));
   check(
     "plugin logs the 12-tool registration with the namespace description",
     session.stderr.includes(
@@ -1124,7 +1178,8 @@ function scenarioContextSilent(): void {
     session.status === 0 && textContains(session.stdout, "SILENT_OK"),
     runTail(session),
   );
-  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  const pluginFaults = pluginLoaded(session, f);
+  check("plugin loads in the runtime", pluginFaults.length === 0, pluginFaults.join("; "));
   check(
     "no item context injected",
     contextInjections(session.stderr).length === 0,
@@ -1145,7 +1200,8 @@ function scenarioContextOutside(): void {
     session.status === 0 && textContains(session.stdout, "OUTSIDE_OK"),
     runTail(session),
   );
-  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  const pluginFaults = pluginLoaded(session, f);
+  check("plugin loads in the runtime", pluginFaults.length === 0, pluginFaults.join("; "));
   check(
     "no item context injected",
     contextInjections(session.stderr).length === 0,
@@ -1328,7 +1384,12 @@ function scenarioCommands(only?: string): void {
     f.saveTranscript(`command-${name}`, session);
     const label = `/${name}`;
     check(`${label}: session completes`, sessionCompleted(session, name), runTail(session));
-    check(`${label}: plugin loads in the runtime`, pluginLoaded(session), runTail(session));
+    const commandPluginFaults = pluginLoaded(session, f);
+    check(
+      `${label}: plugin loads in the runtime`,
+      commandPluginFaults.length === 0,
+      commandPluginFaults.join("; "),
+    );
     const dir = methodologyDir(name);
     if (dir !== undefined) {
       const abs = f.path(dir);
@@ -1469,7 +1530,8 @@ function scenarioWorktreeLifecycle(): void {
   );
   f.saveTranscript("worktree-lifecycle-start", startSession);
   check("start session succeeds", startSession.status === 0, runTail(startSession));
-  check("plugin loads in the runtime", pluginLoaded(startSession), runTail(startSession));
+  const pluginFaults = pluginLoaded(startSession, f);
+  check("plugin loads in the runtime", pluginFaults.length === 0, pluginFaults.join("; "));
   const started = executeJson(startSession.stdout, "tools.arggon.start");
   check("model executed the native start tool", started !== undefined, runTail(startSession));
   if (started === undefined) return;
@@ -1628,7 +1690,8 @@ function scenarioInvariants(): void {
   );
   f.saveTranscript("invariants", session);
   check("session succeeds as the worker agent", session.status === 0, runTail(session));
-  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  const pluginFaults = pluginLoaded(session, f);
+  check("plugin loads in the runtime", pluginFaults.length === 0, pluginFaults.join("; "));
   const result = executeJson(session.stdout, "tools.arggon.update");
   check("model executed the invariants script", result !== undefined, runTail(session));
   if (result === undefined) return;
@@ -1805,7 +1868,8 @@ function scenarioPermissions(): void {
     );
   });
   check("session succeeds as the reviewer agent", session.status === 0, runTail(session));
-  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  const pluginFaults = pluginLoaded(session, f);
+  check("plugin loads in the runtime", pluginFaults.length === 0, pluginFaults.join("; "));
   const result = executeJson(session.stdout, "tools.arggon.show");
   check("model executed the reviewer script", result !== undefined, runTail(session));
   if (result !== undefined) {
@@ -1914,7 +1978,8 @@ function scenarioVerifierPermissions(): void {
     return probe !== undefined && probe.catalog !== undefined && show.command === "show";
   });
   check("session succeeds as the verifier agent", session.status === 0, runTail(session));
-  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  const pluginFaults = pluginLoaded(session, f);
+  check("plugin loads in the runtime", pluginFaults.length === 0, pluginFaults.join("; "));
   const result = executeJson(session.stdout, "tools.arggon.show");
   check("model executed the verifier script", result !== undefined, runTail(session));
   if (result !== undefined) {
@@ -1971,40 +2036,67 @@ function main(): void {
     return;
   }
   console.log(`model: ${MODEL}`);
-  // Dev aid: OPENCODE_SMOKE_ONLY=commands re-runs just the per-command group
-  // (the full harness runs every scenario by default).
-  if (process.env.OPENCODE_SMOKE_ONLY === "commands") {
-    scenarioCommands();
-  } else if (process.env.OPENCODE_SMOKE_ONLY?.startsWith("command:")) {
-    // Dev aid: re-run one command scenario, e.g. OPENCODE_SMOKE_ONLY=command:adr.
-    scenarioCommands(process.env.OPENCODE_SMOKE_ONLY.slice("command:".length));
-  } else if (process.env.OPENCODE_SMOKE_ONLY === "verifier-permissions") {
-    // Dev aid: re-run just the verifier read-grant/deny probe
-    // (bug-verifier-cannot-read-the-tracker-no-allow-side).
-    scenarioVerifierPermissions();
-  } else if (process.env.OPENCODE_SMOKE_ONLY === "w4") {
-    scenarioWorktreeLifecycle();
-    scenarioInvariants();
-    scenarioPermissions();
-    scenarioVerifierPermissions();
-  } else {
-    scenarioFreshInit();
-    scenarioAdopterConfig();
-    scenarioNeverClobber();
-    scenarioFailureIsolation();
-    scenarioPluginAbsent();
-    scenarioNativeTools();
-    scenarioCommands();
-    scenarioContextBranch();
-    scenarioContextStorage();
-    scenarioContextEnv();
-    scenarioContextSilent();
-    scenarioContextOutside();
-    scenarioHygiene();
-    scenarioWorktreeLifecycle();
-    scenarioInvariants();
-    scenarioPermissions();
-    scenarioVerifierPermissions();
+  // Hermetic serving: HOME + every XDG dir under a disposable root, so no
+  // machine-global plugin/config/MCP server can compete with the fixture
+  // bundles (see smoke/opencode-hermetic.ts). A model-driven run resolves its
+  // provider from the V2 data store, so seed the credentials the run needs;
+  // without them every session would fail provider resolution halfway through.
+  const hermeticRoot = realpathSync(mkdtempSync(join(tmpdir(), "arggon-smoke-hermetic-")));
+  hermetic = createHermeticHome(hermeticRoot);
+  const providerID = MODEL.split("/")[0];
+  const seed = seedHermeticCredentials("opencode", hermetic, {
+    providers: providerID === "" ? undefined : [providerID],
+  });
+  if (!seed.ok) {
+    console.error(`smoke:opencode FAILED — could not seed the hermetic HOME: ${seed.error}`);
+    rmSync(hermeticRoot, { recursive: true, force: true });
+    hermetic = undefined;
+    process.exit(1);
+  }
+  console.log(
+    `hermetic home: ${hermeticRoot} (${seed.credentials} credential(s) seeded for ${providerID || "all providers"})`,
+  );
+  try {
+    // Dev aid: OPENCODE_SMOKE_ONLY=commands re-runs just the per-command group
+    // (the full harness runs every scenario by default).
+    if (process.env.OPENCODE_SMOKE_ONLY === "commands") {
+      scenarioCommands();
+    } else if (process.env.OPENCODE_SMOKE_ONLY?.startsWith("command:")) {
+      // Dev aid: re-run one command scenario, e.g. OPENCODE_SMOKE_ONLY=command:adr.
+      scenarioCommands(process.env.OPENCODE_SMOKE_ONLY.slice("command:".length));
+    } else if (process.env.OPENCODE_SMOKE_ONLY === "verifier-permissions") {
+      // Dev aid: re-run just the verifier read-grant/deny probe
+      // (bug-verifier-cannot-read-the-tracker-no-allow-side).
+      scenarioVerifierPermissions();
+    } else if (process.env.OPENCODE_SMOKE_ONLY === "w4") {
+      scenarioWorktreeLifecycle();
+      scenarioInvariants();
+      scenarioPermissions();
+      scenarioVerifierPermissions();
+    } else {
+      scenarioFreshInit();
+      scenarioAdopterConfig();
+      scenarioNeverClobber();
+      scenarioFailureIsolation();
+      scenarioPluginAbsent();
+      scenarioNativeTools();
+      scenarioCommands();
+      scenarioContextBranch();
+      scenarioContextStorage();
+      scenarioContextEnv();
+      scenarioContextSilent();
+      scenarioContextOutside();
+      scenarioHygiene();
+      scenarioWorktreeLifecycle();
+      scenarioInvariants();
+      scenarioPermissions();
+      scenarioVerifierPermissions();
+    }
+  } finally {
+    // The hermetic home (and its seeded credentials) never outlives the run,
+    // kept fixtures or not: inspection needs the fixture, not its HOME.
+    rmSync(hermeticRoot, { recursive: true, force: true });
+    hermetic = undefined;
   }
 
   if (failures.length > 0) {
