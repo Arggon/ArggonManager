@@ -76,3 +76,7 @@ Remaining on this item: the machine-owned normalization + guard, the `release.md
 **Documentation nuance for the record (differs from the item note's phrasing).** Checked against the tree at PR #555's merge (9abfca91): the one-time un-pin WAS documented in the repo-root operator manual `release.md` (§Exception, added in the same PR, 2f28e32f), so "documented in release.md" was true for that file; the canonical runbook `ArggonManager/docs/runbooks/release.md` never carried it (grep zero hits at that commit). What failed was execution + enforcement, not the writing — the spec correction and the task-release-workflow comment now state exactly that.
 
 **Acceptance.** All four rows are satisfied by this PR + the recorded evidence: exact pin on main and in the release PR (0.8.0/0.9.0 shipped exact); guard on both surfaces with fix-naming failures; release.md/runbook/spec/task record corrected; live releases verified. Status left `in_progress` — completion is the delivery lead's call after merge.
+
+### handoff 2026-10-13 @ses_ec9dcc298ffeLS5eOrNXTRs44z (session: ses_ec9dcc298ffeLS5eOrNXTRs44z) — next: Standards review + merge PR #789; then flip bug-kernel-pin-never-exact done (all four acceptance rows satisfied). No release trigger needed — guard is passive.
+- branch: fix/bug-kernel-pin-never-exact
+- open questions: Pre-existing spec prettier drift left unswept (5/24 specs drift; precedent says leave) — file a sweep item?; local provenance failure unchanged (bug-skill-source-edit-leaves-ledger-stale); doc-claim …
