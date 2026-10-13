@@ -111,3 +111,27 @@ that; this re-derives the idea on our substrate so the comparison is honest.
 - [ ] Recommendation with trade-offs; if greenfield, a spec + `spec analyze` clean before any implementation task (ADR 0017)
 - [ ] ADR only if the answer changes a carrier, gate or command
 - [ ] `arggon validate` + `spec validate` green; `spec analyze` reports no NEW finding naming this item
+
+### 2026-10-13 @arggon-maker
+### Spike complete — decision: no lesson store; promote into the carriers that already own the topic
+
+PR #761 (docs-only, Advisory) — https://github.com/Arggon/ArggonManager/pull/761
+
+**Classification first: bounded**, ratchet recorded one-way — a new command, a generated lessons surface, a new gate or a package upgrades this to greenfield (ADR 0017) and stops. No spec is owed for the follow-up (ADR 0017's hard gate is greenfield-only); **an ADR was owed**, because the answer changes a carrier (a rule in `docs/agents.md` + a trigger in the generated maker prompt), so ADR 0027 is written Proposed.
+
+**The gap, stated before any design** (acceptance row 2): retention is not the deficit — of the tracker's 746 item docs (6,959,940 B), 423 carry a dated comment record and those records are **3,647,836 B = 52.4 % of the tracker** (largest 131,535 B in one item). Lessons are written per item, unbounded, unindexed. ADR 0024's own context records 10 items as repeat reports of one class; `bug-mcp-budget-contradicted-across-docs` names its lesson "same lesson as the baseline-date mismatch" inside a per-item acceptance line while both stay open and the class recurs a third time (`task-schema-budgets-near-exhaustion`). The two behaviours that would change are named and one of them (dead-end re-attempts) is explicitly **not** measured — no number is claimed for it.
+
+**Three shapes + the declined fourth** (acceptance row 3): (a) item-body section — rejected (read only by whoever resumes that item, dies with it, checkbox rows reach the container cascade's whole-body reader); (b) per-area note, mandatory read — rejected (no trigger, no enforcement point: the claim path reads the item only); (c) curated carrier promoted by a human — **adopted in its existing form**, because `references/pitfalls.md` (9,476 B on demand, 0 B fixed) and `docs/playbooks/<tech>.md` already do it; the missing part is the write path. The `autoctx` automatic-capture shape is declined unchanged from ADR 0022.
+
+**Where it lives / budget** (row 4): one line per lesson, ≤160 chars, mandatory citation; mechanics → `references/pitfalls.md`, technology → playbooks, a refuted approach → an item's `## Context`, a decision → an ADR. Measurement reuses existing surfaces — `context:report --strict`: generated AGENTS.md **2,031 B ≤ 2,048 (17 B free)**, native catalog 12,189 ≤ 12,288 (99 B), MCP 16,296 ≤ 16,384 (88 B), item block 252 ≤ 1,024; `arggon doctor --budget` for the ADR 0006 surfaces. Trigger goes in the generated maker prompt (ADR 0024 §2), never the generated AGENTS.md. One new ceiling proposed: pitfalls.md ≤ 12,288 B.
+
+**Staleness** (row 5): technology inherits `playbook status` (90 d); mechanism lessons carry **no clock** and the reason is recorded — they expire on an event (the mechanism changes), not a date; the mandatory citation is the invalidation pointer, and the residual risk is stated, not hidden.
+**Contradiction** (row 6): supersede in place with a dated note, never a juxtaposed second bullet; ADR 0016's propose/absorb evaluated — inherited for shipped carriers (a skill/template edit reaches adopters by proposal), declined in-tree because git already is propose/absorb.
+
+**Falsifiable question decided now** (row 7): this spike shows value, which is **not** evidence about `autoctx` — manual promotion and automatic capture/replay are different capabilities. The trigger to re-open: the same class filed a **third time** after the rule ships, arriving with a candidate that captures lessons **inside our loop** (ADR 0022 revisit clause (b)); a second loop does not re-open it.
+
+**Deliverables:** `ArggonManager/docs/explorations/exploration-cross-run-lesson-store-027.md` (scaffolded via `arggon stack explore`, next free 027); `ArggonManager/docs/adr/0027-cross-run-lessons-promote-into-existing-carriers.md` (Proposed) + index row; live `## Acceptance` section ticked 10/10.
+
+**Gates** (worktree `/home/arggon/Projects/ArggonManager-task-spike-cross-run-lesson-store`, commit ecf4bc25): `arggon validate` ok 0 warnings (also the pre-commit hook); `spec validate` ok 38 docs 0 warnings; `spec analyze` **4 findings, identical to the pre-change baseline, none naming this work**; `adr-index-parity` + `adr-status-doc-contract` **18/18**; prettier --check clean on every authored file. `npm test` is not required for a docs-only change — say so explicitly — the two ADR contract tests were run as the targeted defence. **Pre-existing drift:** the item file carries one blank-line drift and **574 tracker .md files fail the same prettier check on main** (no `format:check` gate exists) — left alone and reported, not fixed in this diff.
+
+**Observed vs expected:** expected the spike to end in a carrier build; observed that the carriers already exist and only the write path is missing, which moves the deliverable from a store to a rule — hence the ADR.
