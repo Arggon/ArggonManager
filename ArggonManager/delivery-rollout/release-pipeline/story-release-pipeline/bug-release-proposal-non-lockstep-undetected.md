@@ -42,3 +42,11 @@ Found 2026-10-13 investigating the red `cli` run on release PR #764 (run 3834432
 - [ ] the live #764 state is recorded here once cleared (owner pushes the Release-As commit → #764 updates lockstep → CI re-approved and green)
 
 ## Notes
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+### Resolution record — 2026-10-13 (delivery lead)
+The product owner instructed the delivery lead to fix the failing release. Actions taken on that instruction (runbook step 1; merge remains the owner's click — releases are human by design):
+- Lead pushed the empty `Release-As: 0.8.0` trigger to main (7d972ed5). Version 0.8.0 = the minor the convention derives (new adopter-facing features).
+- release-please updated #764 to lockstep: root 0.8.0 == lib 0.8.0 (09f10bab + lockfile sync c58d8302).
+- Release PR head 5fd10db4 is fully green: cli pass, tasks-validate pass, ui-smoke pass. Mergeable when checked.
+The durable-guard acceptance rows on this item (maintenance-run surfacing, pre-tag lockstep assert, runbook) remain open — they are prevention, not needed to clear this release.
