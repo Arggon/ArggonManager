@@ -88,3 +88,10 @@ All four open acceptance rows implemented on `fix/bug-release-proposal-non-locks
 ### handoff 2026-10-13 @ses_eca4ef973ffeRAmpvyBGPnMWrE (session: ses_eca4ef973ffeRAmpvyBGPnMWrE) — next: Delivery lead: get #770 repaired (product owner pushes empty `Release-As: 0.9.0` commit), review and merge PR #782, verify the merge, then flip the item done.
 - branch: fix/bug-release-proposal-non-lockstep-undetected
 - open questions: #770 is live non-lockstep (0.9.0/0.8.0): fix before merge or accept the designed red; pre-existing provenance-audit local failure (stale .convention.yml checksum) is unfiled.
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as e3432290 (PR #782); auto-done flip landed. `cli/release-lockstep-check.mjs` (+13 tests) surfaces a non-lockstep open release PR as a red maintenance run, naming both versions and the Release-As remedy; the lockstep assert moved pre-tag in `release.yml` (tag↔commit agreement stays post-tag); the runbook documents the case, remedy and stranded-tag recovery. Green path quiet; "cannot check" warns and exits 0 with the pre-tag gate as backstop — the repo's established shapes.
+Live proof: the check's first real run caught release PR **#770** (root 0.9.0 / lib 0.8.0) — awaiting the product owner's Release-As trigger; the pre-tag assert would refuse its tag.
+Note: the local `npm test` provenance-audit failure is pre-existing and unrelated (stale derived skill-copy ledger — recorded on bug-skill-source-edit-leaves-ledger-stale); the maker proved CI-equivalence and the suite green in that state.
