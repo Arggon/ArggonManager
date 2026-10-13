@@ -46,7 +46,24 @@
  *      `arggon show <id> --meta --json`, cached for a few seconds. Per-call
  *      injection means the block is present again after compaction. Hard bound:
  *      ITEM_BLOCK_MAX_BYTES (1 KiB).
- *   5. Session ergonomics + hygiene (ADR 0010 W3): rename the session to a
+ *   5. Prompt-admission stamp (plan-methodology-adapters-017 T4, spec S4):
+ *      `ctx.session.hook("prompt")` writes a bounded branch/item stamp into the
+ *      admitted prompt's own `metadata` — the worktree env contract
+ *      (`ARGGON_*` / `ARGON_ITEM`, spec-worktree-env-contract-016) first, then
+ *      the process environment, then the resolution chain in (3). It resolves
+ *      the directory from the SESSION's own location (`session_move` updates
+ *      it), because only the session's checkout carries the `.arggon.env` — see
+ *      {@link hookDirectory}. It rewrites metadata ONLY: the prompt text,
+ *      files, delivery, session and message ids are left byte-identical, and no
+ *      permission or state surface is touched. The stamp is persisted with the
+ *      user message, so an admitted prompt carries the item it was opened
+ *      under — including after the session is moved or compacted.
+ *   6. Compaction retention (T4/S4): `ctx.session.hook("compaction")` re-injects
+ *      the item block into the checkpoint-summary request's system instructions,
+ *      so a summary is produced WITH the item block in scope instead of losing it
+ *      with the transcript it replaces. It never sets `result`: the model still
+ *      writes the summary.
+ *   7. Session ergonomics + hygiene (ADR 0010 W3): rename the session to a
  *      claimed item id (`ctx.session.rename`, or `ctx.session.update` on 2.0.7
  *      where rename is absent); after a shell `git commit`, run
  *      `arggon validate --json` and log a warning when it fails. The warning
@@ -160,6 +177,35 @@ type ContextEvent = {
   system?: unknown
 }
 
+/**
+ * V2 `prompt` hook event (Build a plugin → Hooks → Prompt admission): an owned,
+ * mutable admission draft. `prompt` carries `text`/`files`/`agents`/`skills`,
+ * `metadata` is application-defined admission metadata, `delivery` is `"steer"`
+ * unless a hook changes it. Structural — the vendored file imports no plugin
+ * types.
+ */
+type PromptEvent = {
+  sessionID?: unknown
+  messageID?: unknown
+  prompt?: unknown
+  metadata?: unknown
+  delivery?: unknown
+}
+
+/**
+ * V2 `compaction` model-request hook event: the checkpoint-summary request.
+ * `system` is the assembled system-instruction array (the same shape the
+ * `context` hook sees), `messages` the transcript being summarized, and
+ * `result` — set by a hook that wants to record the compaction itself and skip
+ * the model call — is absent until a hook writes it.
+ */
+type CompactionEvent = {
+  sessionID?: unknown
+  system?: unknown
+  messages?: unknown
+  result?: unknown
+}
+
 type ToolEvent = {
   tool?: unknown
   sessionID?: unknown
@@ -187,6 +233,20 @@ export const CACHE_MAX_ENTRIES = 256
 
 /** Branch prefixes correlated to an item id (arggon branch <id> defaults). */
 export const BRANCH_PREFIXES = ["feat/", "fix/"] as const
+
+/**
+ * Key one admission stamp rides under inside a prompt's `metadata`
+ * (`payload.metadata.arggon` once the host has admitted the prompt).
+ */
+export const ADMISSION_STAMP_KEY = "arggon"
+
+/**
+ * Hard byte bound of the whole admission stamp (ADR 0006: everything the seam
+ * adds to a model request pays for itself on every call). Enforced by
+ * {@link buildAdmissionStamp}: over-long values are clipped and the least
+ * load-bearing fields are dropped before the bound is exceeded.
+ */
+export const ADMISSION_STAMP_MAX_BYTES = 768
 
 const ITEM_MARKER = "<arggon-item>"
 const STORAGE_PREFIX = "arggon/session/"
@@ -912,6 +972,137 @@ export function boundText(
   return { text: bounded, bytes: byteLength(bounded), truncated: true }
 }
 
+// ---------------------------------------------------------------------------
+// Prompt-admission stamp (plan-methodology-adapters-017 T4, spec S4)
+// ---------------------------------------------------------------------------
+
+/** What one admitted prompt is stamped with, and where the values came from. */
+export type AdmissionStamp = {
+  /** The claimed item id (`ARGON_ITEM` / the correlated item). */
+  item?: string
+  /** The item's working branch (`ARGGON_WORKTREE_BRANCH` / the correlated one). */
+  branch?: string
+  /** The absolute worktree the session declared (`ARGGON_WORKTREE_PATH`). */
+  worktreePath?: string
+  /** `<repo>-<item-id>` (`ARGGON_WORKTREE_ID`). */
+  worktreeId?: string
+  /** Where the stamp came from: a `.arggon.env` path, `process.env`, `storage` or `branch`. */
+  source: string
+}
+
+/**
+ * Stamp fields in the order they are dropped when the byte bound forces it:
+ * the identity (item/branch) and its source are the load-bearing part, the
+ * worktree coordinates are the nice-to-have.
+ */
+const STAMP_DROP_ORDER: ReadonlyArray<keyof AdmissionStamp> = [
+  "worktreeId",
+  "worktreePath",
+  "branch",
+  "item",
+]
+
+const STAMP_IDENTITY_FIELDS: ReadonlyArray<readonly [keyof AdmissionStamp, keyof WorktreeIdentity]> = [
+  ["item", "item"],
+  ["branch", "branch"],
+  ["worktreePath", "worktreePath"],
+  ["worktreeId", "worktreeId"],
+]
+
+/**
+ * A stamp from a worktree identity — the env contract's declared values, with
+ * the file path (or {@link PROCESS_ENV_SOURCE}) as the source.
+ *
+ * Returns undefined when the identity declares neither an item nor a branch:
+ * "nothing declared" is the ordinary plain-checkout case and must stay silent
+ * rather than produce an empty stamp. The byte bound is enforced by clipping
+ * every value and then dropping {@link STAMP_DROP_ORDER} fields, so an
+ * implausibly long path can never grow a prompt.
+ */
+export function buildAdmissionStamp(identity: WorktreeIdentity | undefined): AdmissionStamp | undefined {
+  if (identity === undefined) return undefined
+  const stamp: AdmissionStamp = { source: clip(identity.source, MAX_VALUE_CHARS) }
+  for (const [field, key] of STAMP_IDENTITY_FIELDS) {
+    const value = asString(identity[key])
+    if (value === undefined) continue
+    stamp[field] = clip(value, MAX_VALUE_CHARS)
+  }
+  return boundAdmissionStamp(stamp)
+}
+
+/**
+ * The same stamp from the resolution chain in `resolveItemId` — the correlation
+ * fallback for a plain checkout on `feat/<id>`, where no env contract exists.
+ */
+export function admissionStampFromResolution(
+  resolved: ResolvedItem | undefined,
+): AdmissionStamp | undefined {
+  if (resolved === undefined) return undefined
+  return boundAdmissionStamp({ item: clip(resolved.id, MAX_VALUE_CHARS), source: resolved.source })
+}
+
+/** Drop fields, least load-bearing first, until the stamp fits its byte bound. */
+function boundAdmissionStamp(stamp: AdmissionStamp): AdmissionStamp | undefined {
+  if (stamp.item === undefined && stamp.branch === undefined) return undefined
+  for (const field of STAMP_DROP_ORDER) {
+    if (byteLength(JSON.stringify(stamp)) <= ADMISSION_STAMP_MAX_BYTES) break
+    delete stamp[field]
+  }
+  if (stamp.item === undefined && stamp.branch === undefined) return undefined
+  return byteLength(JSON.stringify(stamp)) <= ADMISSION_STAMP_MAX_BYTES ? stamp : undefined
+}
+
+/**
+ * Write the stamp onto an admission draft and return what was written.
+ *
+ * This is the whole rewrite contract of the `prompt` hook, and it is
+ * deliberately narrow:
+ * - ONLY `metadata` is written, and only under {@link ADMISSION_STAMP_KEY};
+ *   every other metadata key the caller set is preserved (the stamp merges, it
+ *   never replaces), and a re-admission of the same session overwrites the key
+ *   rather than accumulating.
+ * - `prompt.text`, `prompt.files`, `prompt.agents`, `prompt.skills` and
+ *   `delivery` are never touched: an admitted prompt stays byte-identical to
+ *   what the user submitted, and the delivery mode stays the host's.
+ * - `sessionID`/`messageID` are readonly by contract and never assigned.
+ */
+export function applyAdmissionStamp(
+  event: PromptEvent,
+  stamp: AdmissionStamp | undefined,
+): AdmissionStamp | undefined {
+  if (stamp === undefined) return undefined
+  const existing =
+    event.metadata !== null && typeof event.metadata === "object"
+      ? (event.metadata as Record<string, unknown>)
+      : undefined
+  event.metadata = { ...existing, [ADMISSION_STAMP_KEY]: stamp }
+  return stamp
+}
+
+/**
+ * Whether a `compaction` event still needs the item block: true when the system
+ * instructions are the array the hook can push into, no part already carries the
+ * marker (so a second compaction of the same session does not stack a duplicate)
+ * and no other plugin has already recorded the compaction (`result` set means
+ * the model is skipped, so there is nothing left to retain for).
+ */
+export function needsCompactionRetention(system: unknown, result?: unknown): boolean {
+  if (result !== undefined) return false
+  if (!Array.isArray(system)) return false
+  return !system.some(
+    (part) =>
+      part !== null &&
+      typeof part === "object" &&
+      typeof (part as { text?: unknown }).text === "string" &&
+      (part as { text: string }).text.includes(ITEM_MARKER),
+  )
+}
+
+/** The one system part a compaction retains: the item block, verbatim. */
+export function compactionRetentionPart(block: string): { type: "text"; text: string } {
+  return { type: "text", text: block }
+}
+
 /** Validate JSON failure → bounded warning detail (undefined when ok / unparsable). */
 export function parseValidateFailure(stdout: unknown): string | undefined {
   if (typeof stdout !== "string" || stdout.trim() === "") return undefined
@@ -995,6 +1186,40 @@ export function sessionDirectoryResolver(
   }
 }
 
+/**
+ * The directory a session-scoped hook acts on.
+ *
+ * The session's OWN location first — `Session.Info.location.directory`, the
+ * value `session_move` updates and the one {@link sessionDirectoryResolver}
+ * already reads per native-tool call — and the plugin instance's location
+ * directory only as a fallback for a host that exposes no session surface.
+ *
+ * This is the difference between the two: the worktree env contract's
+ * `.arggon.env` exists at the session's directory, never at the canonical
+ * checkout the plugin instance was loaded from (a worktree session and its
+ * project share one plugin registration, observed on 2.0.26). A hook that read
+ * `ctx.location.directory` would therefore never see a worktree session's
+ * declaration, and the stamp would silently come from the wrong checkout.
+ *
+ * A session lookup that throws (host storage unavailable) degrades to the
+ * plugin location: the hook still runs, it just holds the call to the
+ * coarser expectation.
+ */
+async function hookDirectory(ctx: PluginContext, sessionID: string | undefined): Promise<string | undefined> {
+  if (sessionID !== undefined) {
+    const resolve = sessionDirectoryResolver(ctx)
+    if (resolve !== undefined) {
+      try {
+        const directory = await resolve(sessionID)
+        if (directory !== undefined) return directory
+      } catch {
+        // Optional surface: fall through to the plugin instance's location.
+      }
+    }
+  }
+  return locationDirectory(ctx)
+}
+
 /** No-op outside ArggonManager trees: no tracker root, nothing to do. */
 function hasTasksTree(directory: string): boolean {
   try {
@@ -1046,6 +1271,14 @@ type CacheEntry = { at: number; item?: Record<string, unknown> }
 const itemCache = new Map<string, CacheEntry>()
 const branchCache = new Map<string, { at: number; branch?: string }>()
 const renamedSessions = new Map<string, string>()
+/**
+ * One admission-stamp log line per session per identity (`<session>:<item>:<source>`),
+ * so a long session that admits many prompts does not grow the log — the stamp
+ * itself rides on every prompt, the log line only reports the first.
+ */
+const stampedSessions = new Map<string, string>()
+/** One compaction-retention log line per session per item, same reason. */
+const retainedSessions = new Map<string, string>()
 
 /** Project-scoped cache key for one item view. */
 export function itemCacheKey(directory: string, id: string): string {
@@ -1222,19 +1455,34 @@ export async function onToolAfter(ctx: PluginContext, event: ToolEvent): Promise
   }
 }
 
+/**
+ * The item every injection path shares: resolve the session's item, load its
+ * bounded view through the CLI, and forget a stale storage correlation.
+ * Returns undefined when nothing resolves or the item is gone.
+ */
+async function resolveInjectedItem(
+  ctx: PluginContext,
+  sessionID: string,
+  directory: string,
+): Promise<Record<string, unknown> | undefined> {
+  const resolved = await resolveItemId(ctx, sessionID, directory)
+  if (resolved === undefined) return undefined
+  const item = await loadItem(ctx, directory, resolved.id)
+  if (item === undefined) {
+    // Stale storage entry (item moved/renamed): forget it, branch may resolve next call.
+    if (resolved.source === "storage") await storageRemove(ctx, sessionKey(sessionID))
+    return undefined
+  }
+  return item
+}
+
 async function onContext(ctx: PluginContext, event: ContextEvent): Promise<void> {
   try {
     const sessionID = asString(event.sessionID)
     const directory = locationDirectory(ctx)
     if (sessionID === undefined || directory === undefined || !hasTasksTree(directory)) return
-    const resolved = await resolveItemId(ctx, sessionID, directory)
-    if (resolved === undefined) return
-    const item = await loadItem(ctx, directory, resolved.id)
-    if (item === undefined) {
-      // Stale storage entry (item moved/renamed): forget it, branch may resolve next call.
-      if (resolved.source === "storage") await storageRemove(ctx, sessionKey(sessionID))
-      return
-    }
+    const item = await resolveInjectedItem(ctx, sessionID, directory)
+    if (item === undefined) return
     await maybeRename(ctx, sessionID, item)
     const system = event.system
     if (!Array.isArray(system)) return
@@ -1251,10 +1499,86 @@ async function onContext(ctx: PluginContext, event: ContextEvent): Promise<void>
     // `block=` carries the exact injected text so the smoke can measure its
     // bytes independently instead of trusting the reported count (F8).
     console.error(
-      `[arggon] context: injected item ${asString(item.id) ?? resolved.id} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`,
+      `[arggon] context: injected item ${asString(item.id)} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`,
     )
   } catch (error) {
     logOnce("context", "context injection failed", error)
+  }
+}
+
+/**
+ * T4 prompt-admission stamp: stamp the admitted prompt with the item/branch it
+ * was opened under.
+ *
+ * Resolution order is the worktree env contract first (the values `arggon start
+ * --worktree` writes at the worktree root, spec-worktree-env-contract-016 — the
+ * only source that names the worktree itself), then the host process's own
+ * declaration, then the correlation chain `resolveItemId` already uses
+ * (env → observed calls → branch). First source that declares an item or a
+ * branch wins and is named in the stamp, so a reader can always tell which
+ * expectation the stamp was held to.
+ *
+ * Read-only apart from the stamp: no CLI call, no storage write, no timer. A
+ * failure logs once and the prompt is admitted exactly as submitted.
+ *
+ * Exported so the guard order and the rewrite contract are testable with a fake
+ * context, like {@link onToolAfter}.
+ */
+export async function onPromptAdmission(ctx: PluginContext, event: PromptEvent): Promise<void> {
+  try {
+    const sessionID = asString(event.sessionID)
+    const directory = await hookDirectory(ctx, sessionID)
+    if (directory === undefined || !hasTasksTree(directory)) return
+    const stamp =
+      buildAdmissionStamp(findWorktreeEnv(directory)) ??
+      buildAdmissionStamp(processWorktreeIdentity()) ??
+      admissionStampFromResolution(
+        sessionID === undefined ? undefined : await resolveItemId(ctx, sessionID, directory),
+      )
+    const applied = applyAdmissionStamp(event, stamp)
+    if (applied === undefined) return
+    const id = applied.item ?? applied.branch ?? "?"
+    const key = `${sessionID ?? "?"}:${id}:${applied.source}`
+    if (stampedSessions.get(sessionID ?? "?") === key) return
+    setBounded(stampedSessions, sessionID ?? "?", key)
+    console.error(`[arggon] prompt: stamped admission ${id} from ${applied.source}`)
+  } catch (error) {
+    logOnce("prompt", "prompt admission stamping failed", error)
+  }
+}
+
+/**
+ * T4 compaction retention: keep the item block in scope for the checkpoint
+ * summary. A compaction request summarizes the transcript it replaces, so
+ * without this the block the context hook injects per call is the only copy
+ * left — and the summary is produced without it.
+ *
+ * The hook writes ONE system part and never `result`: the model still writes
+ * the summary. Idempotent per request (the marker check), bounded by the same
+ * ITEM_BLOCK_MAX_BYTES the context hook uses, and a no-op outside a tracker
+ * tree or when no item resolves. Exported for the same reason as
+ * {@link onToolAfter}: the guard order is testable with a fake context.
+ */
+export async function onCompaction(ctx: PluginContext, event: CompactionEvent): Promise<void> {
+  try {
+    const sessionID = asString(event.sessionID)
+    if (sessionID === undefined) return
+    const directory = await hookDirectory(ctx, sessionID)
+    if (directory === undefined || !hasTasksTree(directory)) return
+    if (!needsCompactionRetention(event.system, event.result)) return
+    const item = await resolveInjectedItem(ctx, sessionID, directory)
+    if (item === undefined) return
+    const system = event.system as unknown[]
+    const block = buildItemBlock(item, { currentDirectory: directory })
+    system.push(compactionRetentionPart(block.text))
+    const id = asString(item.id) ?? "?"
+    if (retainedSessions.get(sessionID) === id) return
+    setBounded(retainedSessions, sessionID, id)
+    console.error(
+      `[arggon] compaction: retained item ${id} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`,
+    )
+  } catch (error) {
+    logOnce("compaction", "compaction retention failed", error)
   }
 }
 
@@ -5389,6 +5713,23 @@ const definition: PluginDefinition = {
       }
     } catch (error) {
       logOnce("context-hook", "session context hook unavailable", error)
+    }
+    // T4 (plan-methodology-adapters-017): the prompt-admission stamp and the
+    // compaction retention. Registered beside the context hook — same
+    // feature detection, same failure isolation, same disposal. A host without
+    // either hook (older 2.0.x) keeps every other path unchanged.
+    for (const [name, handler, key] of [
+      ["prompt", onPromptAdmission, "prompt-hook"],
+      ["compaction", onCompaction, "compaction-hook"],
+    ] as const) {
+      try {
+        const hook = ctx?.session?.hook
+        if (typeof hook !== "function") break
+        const registration = await hook(name, (event) => handler(ctx, event as never))
+        disposers.push(() => dispose(registration))
+      } catch (error) {
+        logOnce(key, `session ${name} hook unavailable`, error)
+      }
     }
     try {
       const hook = ctx?.tool?.hook

@@ -9590,7 +9590,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardParentId = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.boardChildrenOf = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_HIERARCHY_CHILD_KEYS = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.TRACKER_ROOT_MISMATCH = exports.PROCESS_ENV_SOURCE = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
+exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardParentId = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.boardChildrenOf = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_HIERARCHY_CHILD_KEYS = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.TRACKER_ROOT_MISMATCH = exports.PROCESS_ENV_SOURCE = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.ADMISSION_STAMP_MAX_BYTES = exports.ADMISSION_STAMP_KEY = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
 exports.isArggonItemId = isArggonItemId;
 exports.parseArggonItemFromCommand = parseArggonItemFromCommand;
 exports.parseArggonItemFromCode = parseArggonItemFromCode;
@@ -9599,11 +9599,18 @@ exports.itemIdFromBranch = itemIdFromBranch;
 exports.looksLikeCommitCommand = looksLikeCommitCommand;
 exports.buildItemBlock = buildItemBlock;
 exports.boundText = boundText;
+exports.buildAdmissionStamp = buildAdmissionStamp;
+exports.admissionStampFromResolution = admissionStampFromResolution;
+exports.applyAdmissionStamp = applyAdmissionStamp;
+exports.needsCompactionRetention = needsCompactionRetention;
+exports.compactionRetentionPart = compactionRetentionPart;
 exports.parseValidateFailure = parseValidateFailure;
 exports.sessionDirectoryResolver = sessionDirectoryResolver;
 exports.itemCacheKey = itemCacheKey;
 exports.setBounded = setBounded;
 exports.onToolAfter = onToolAfter;
+exports.onPromptAdmission = onPromptAdmission;
+exports.onCompaction = onCompaction;
 exports.csvList = csvList;
 exports.sessionToken = sessionToken;
 exports.resolveToolCwd = resolveToolCwd;
@@ -9633,6 +9640,8 @@ exports.ITEM_BLOCK_MAX_BYTES = 1024;
 exports.CACHE_TTL_MS = 5_000;
 exports.CACHE_MAX_ENTRIES = 256;
 exports.BRANCH_PREFIXES = ["feat/", "fix/"];
+exports.ADMISSION_STAMP_KEY = "arggon";
+exports.ADMISSION_STAMP_MAX_BYTES = 768;
 const ITEM_MARKER = "<arggon-item>";
 const STORAGE_PREFIX = "arggon/session/";
 const MAX_CLI_OUTPUT = 256 * 1024;
@@ -10145,6 +10154,69 @@ function boundText(text, max = exports.ITEM_BLOCK_MAX_BYTES) {
     const bounded = `${cut}${marker}`;
     return { text: bounded, bytes: byteLength(bounded), truncated: true };
 }
+const STAMP_DROP_ORDER = [
+    "worktreeId",
+    "worktreePath",
+    "branch",
+    "item",
+];
+const STAMP_IDENTITY_FIELDS = [
+    ["item", "item"],
+    ["branch", "branch"],
+    ["worktreePath", "worktreePath"],
+    ["worktreeId", "worktreeId"],
+];
+function buildAdmissionStamp(identity) {
+    if (identity === undefined)
+        return undefined;
+    const stamp = { source: clip(identity.source, MAX_VALUE_CHARS) };
+    for (const [field, key] of STAMP_IDENTITY_FIELDS) {
+        const value = asString(identity[key]);
+        if (value === undefined)
+            continue;
+        stamp[field] = clip(value, MAX_VALUE_CHARS);
+    }
+    return boundAdmissionStamp(stamp);
+}
+function admissionStampFromResolution(resolved) {
+    if (resolved === undefined)
+        return undefined;
+    return boundAdmissionStamp({ item: clip(resolved.id, MAX_VALUE_CHARS), source: resolved.source });
+}
+function boundAdmissionStamp(stamp) {
+    if (stamp.item === undefined && stamp.branch === undefined)
+        return undefined;
+    for (const field of STAMP_DROP_ORDER) {
+        if (byteLength(JSON.stringify(stamp)) <= exports.ADMISSION_STAMP_MAX_BYTES)
+            break;
+        delete stamp[field];
+    }
+    if (stamp.item === undefined && stamp.branch === undefined)
+        return undefined;
+    return byteLength(JSON.stringify(stamp)) <= exports.ADMISSION_STAMP_MAX_BYTES ? stamp : undefined;
+}
+function applyAdmissionStamp(event, stamp) {
+    if (stamp === undefined)
+        return undefined;
+    const existing = event.metadata !== null && typeof event.metadata === "object"
+        ? event.metadata
+        : undefined;
+    event.metadata = { ...existing, [exports.ADMISSION_STAMP_KEY]: stamp };
+    return stamp;
+}
+function needsCompactionRetention(system, result) {
+    if (result !== undefined)
+        return false;
+    if (!Array.isArray(system))
+        return false;
+    return !system.some((part) => part !== null &&
+        typeof part === "object" &&
+        typeof part.text === "string" &&
+        part.text.includes(ITEM_MARKER));
+}
+function compactionRetentionPart(block) {
+    return { type: "text", text: block };
+}
 function parseValidateFailure(stdout) {
     if (typeof stdout !== "string" || stdout.trim() === "")
         return undefined;
@@ -10201,6 +10273,21 @@ function sessionDirectoryResolver(ctx) {
         return asString(session?.location?.directory) ?? asString(session?.directory);
     };
 }
+async function hookDirectory(ctx, sessionID) {
+    if (sessionID !== undefined) {
+        const resolve = sessionDirectoryResolver(ctx);
+        if (resolve !== undefined) {
+            try {
+                const directory = await resolve(sessionID);
+                if (directory !== undefined)
+                    return directory;
+            }
+            catch {
+            }
+        }
+    }
+    return locationDirectory(ctx);
+}
 function hasTasksTree(directory) {
     try {
         return (0, node_fs_1.existsSync)((0, node_path_1.join)(directory, "ArggonManager")) || (0, node_fs_1.existsSync)((0, node_path_1.join)(directory, "tasks"));
@@ -10245,6 +10332,8 @@ async function storageRemove(ctx, key) {
 const itemCache = new Map();
 const branchCache = new Map();
 const renamedSessions = new Map();
+const stampedSessions = new Map();
+const retainedSessions = new Map();
 function itemCacheKey(directory, id) {
     return `${directory}\u0000${id}`;
 }
@@ -10400,21 +10489,27 @@ async function onToolAfter(ctx, event) {
         logOnce("tool-observe", "tool observation failed", error);
     }
 }
+async function resolveInjectedItem(ctx, sessionID, directory) {
+    const resolved = await resolveItemId(ctx, sessionID, directory);
+    if (resolved === undefined)
+        return undefined;
+    const item = await loadItem(ctx, directory, resolved.id);
+    if (item === undefined) {
+        if (resolved.source === "storage")
+            await storageRemove(ctx, sessionKey(sessionID));
+        return undefined;
+    }
+    return item;
+}
 async function onContext(ctx, event) {
     try {
         const sessionID = asString(event.sessionID);
         const directory = locationDirectory(ctx);
         if (sessionID === undefined || directory === undefined || !hasTasksTree(directory))
             return;
-        const resolved = await resolveItemId(ctx, sessionID, directory);
-        if (resolved === undefined)
+        const item = await resolveInjectedItem(ctx, sessionID, directory);
+        if (item === undefined)
             return;
-        const item = await loadItem(ctx, directory, resolved.id);
-        if (item === undefined) {
-            if (resolved.source === "storage")
-                await storageRemove(ctx, sessionKey(sessionID));
-            return;
-        }
         await maybeRename(ctx, sessionID, item);
         const system = event.system;
         if (!Array.isArray(system))
@@ -10427,10 +10522,59 @@ async function onContext(ctx, event) {
             return;
         const block = buildItemBlock(item, { currentDirectory: directory });
         system.push({ type: "text", text: block.text });
-        console.error(`[arggon] context: injected item ${asString(item.id) ?? resolved.id} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`);
+        console.error(`[arggon] context: injected item ${asString(item.id)} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`);
     }
     catch (error) {
         logOnce("context", "context injection failed", error);
+    }
+}
+async function onPromptAdmission(ctx, event) {
+    try {
+        const sessionID = asString(event.sessionID);
+        const directory = await hookDirectory(ctx, sessionID);
+        if (directory === undefined || !hasTasksTree(directory))
+            return;
+        const stamp = buildAdmissionStamp(findWorktreeEnv(directory)) ??
+            buildAdmissionStamp(processWorktreeIdentity()) ??
+            admissionStampFromResolution(sessionID === undefined ? undefined : await resolveItemId(ctx, sessionID, directory));
+        const applied = applyAdmissionStamp(event, stamp);
+        if (applied === undefined)
+            return;
+        const id = applied.item ?? applied.branch ?? "?";
+        const key = `${sessionID ?? "?"}:${id}:${applied.source}`;
+        if (stampedSessions.get(sessionID ?? "?") === key)
+            return;
+        setBounded(stampedSessions, sessionID ?? "?", key);
+        console.error(`[arggon] prompt: stamped admission ${id} from ${applied.source}`);
+    }
+    catch (error) {
+        logOnce("prompt", "prompt admission stamping failed", error);
+    }
+}
+async function onCompaction(ctx, event) {
+    try {
+        const sessionID = asString(event.sessionID);
+        if (sessionID === undefined)
+            return;
+        const directory = await hookDirectory(ctx, sessionID);
+        if (directory === undefined || !hasTasksTree(directory))
+            return;
+        if (!needsCompactionRetention(event.system, event.result))
+            return;
+        const item = await resolveInjectedItem(ctx, sessionID, directory);
+        if (item === undefined)
+            return;
+        const system = event.system;
+        const block = buildItemBlock(item, { currentDirectory: directory });
+        system.push(compactionRetentionPart(block.text));
+        const id = asString(item.id) ?? "?";
+        if (retainedSessions.get(sessionID) === id)
+            return;
+        setBounded(retainedSessions, sessionID, id);
+        console.error(`[arggon] compaction: retained item ${id} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`);
+    }
+    catch (error) {
+        logOnce("compaction", "compaction retention failed", error);
     }
 }
 exports.ARGON_TOOL_NAMESPACE = "arggon";
@@ -12683,6 +12827,21 @@ const definition = {
         }
         catch (error) {
             logOnce("context-hook", "session context hook unavailable", error);
+        }
+        for (const [name, handler, key] of [
+            ["prompt", onPromptAdmission, "prompt-hook"],
+            ["compaction", onCompaction, "compaction-hook"],
+        ]) {
+            try {
+                const hook = ctx?.session?.hook;
+                if (typeof hook !== "function")
+                    break;
+                const registration = await hook(name, (event) => handler(ctx, event));
+                disposers.push(() => dispose(registration));
+            }
+            catch (error) {
+                logOnce(key, `session ${name} hook unavailable`, error);
+            }
         }
         try {
             const hook = ctx?.tool?.hook;

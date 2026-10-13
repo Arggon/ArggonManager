@@ -484,9 +484,21 @@ claiming the item, NOTHING sourced — and pins that the WRITE reports `trackerR
   runtime resolve `solid-js`, so the adopter tree still needs no `node_modules`.
 * **Session ↔ item correlation** — `ARGON_ITEM` env → observed `arggon` calls
   (shell invocations and Code Mode `tools.arggon.<name>(…)` calls) →
-  `feat/<id>` / `fix/<id>` branch.
+  `feat/<id>` / `fix/<id>` branch. For the prompt-admission stamp the
+  **worktree env contract** (`.arggon.env`, spec-worktree-env-contract-016) is
+  consulted first, because it is the only source that names the session's own
+  worktree; the chain above is its fallback on a plain checkout.
 * **Bounded context** — injects an `arggon show --json`-shaped item block
   (≤ 1024 B) per model call, so it is present after compaction by construction.
+* **Prompt-admission stamp (T4)** — the `prompt` hook writes a bounded
+  branch/item stamp into the admitted prompt's own `metadata`
+  (`payload.metadata.arggon`), so a persisted user message carries the item it
+  was opened under. Metadata only: the prompt text, files, agents, skills and
+  `delivery` are left byte-identical, and nothing permission-related is touched.
+* **Compaction retention (T4)** — the `compaction` hook re-injects the item
+  block into the checkpoint-summary request's system instructions exactly once,
+  so the summary is produced WITH the item in scope. It never sets `result`: the
+  model still writes the summary.
 * **Session ergonomics** — renames the session to the claimed item; surfaces
   the recorded `worktree_path` for `session_move`.
 * **Hygiene signal** — logs a non-blocking warning when `arggon validate`
@@ -559,6 +571,7 @@ npm test                      # 1438+ tests
 npm run smoke:opencode        # headless scenarios on a real OpenCode runtime: dependency-less bundle, one session per native command, the W4 worktree lifecycle + invariants + permissions
 npm run smoke:opencode:wave   # scripted coordinator/worker/reviewer wave (2 fixtures)
 npm run smoke:native-start-cold  # deterministic + model-free: the native tools.arggon.start cold worktree (dependency-requiring pre-commit gate, bounded readiness/claim-commit receipt, claim commit with only the item file, re-run attach, untouched installs)
+npx tsx smoke/opencode-prompt-stamp-smoke.ts   # deterministic + model-free (T4): the prompt-admission stamp, the compaction retention, the no-polling timeline and the off-contract silence on a real `opencode serve` + scripted provider
 npm run smoke:tui             # TUI evidence on a real runtime: init seam, plugin discovery, PTY run, /arggon-board opens and renders the tree
 npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, item block, keep.tokens
 ```
@@ -567,11 +580,16 @@ npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, ite
 sensitive**: run them on their own, without a concurrent test suite or another
 headless harness (a loaded machine can stall a provider call past the per-command
 timeout and leave a scenario half-done). The deterministic gates (`npm test`,
-lint/build/`check:plugin`, `validate`) are safe to run in parallel; `smoke:tui`
-and `smoke:native-start-cold` are model-free and cheap — the latter needs
-`npm run build` first, because it drives the native tool against **this
-checkout's** plugin source and kernel build, not a vendored or primary-copy
-build.
+lint/build/`check:plugin`, `validate`) are safe to run in parallel; `smoke:tui`,
+`smoke:native-start-cold` and `smoke/opencode-prompt-stamp-smoke.ts` are
+model-free and cheap — the latter two need `npm run build` first, because they
+drive the native tools and the vendored bundle against **this checkout's**
+plugin source and kernel build, not a vendored or primary-copy build. The T4
+smoke additionally serves with a hermetic `HOME`: the plugin supervisor resolves
+plugin ids globally and keeps the first registration, so a machine-global
+`~/.config/opencode/plugins/arggon/index.ts` would shadow the fixture's vendored
+copy (`Duplicate plugin ID: arggon`) and the run would silently exercise the
+wrong plugin — the harness asserts the fixture's bytes are the ones under test.
 
 ## Side-by-side installs
 
