@@ -1006,6 +1006,51 @@ describe("opencode seam: marker stamping", () => {
     expect(out.startsWith(`---\n${marker}\n`)).toBe(true);
   });
 
+  it("shipped OpenCode templates carry no marker — the emitter owns provenance (task-seam-nits-v1-schema-and-marker)", () => {
+    // The seam of PR #754 carried the maker/verifier marker twice: both
+    // templates had copied generator output back into themselves, and
+    // `stampGeneratedContent` stamped a second marker on top. A template is a
+    // source, never a provenance carrier — this is the guard at the root,
+    // where the emitted bytes alone cannot tell author from stamp.
+    for (const sub of ["agents", "commands"]) {
+      const dir = join(repoRoot, "templates/docs/opencode", sub);
+      for (const file of readdirSync(dir)
+        .filter((f) => f.endsWith(".md"))
+        .sort()) {
+        const markers = readFileSync(join(dir, file), "utf8")
+          .split("\n")
+          .filter((line) => line.includes("arggon:generated"));
+        expect(
+          markers,
+          `templates/docs/opencode/${sub}/${file}: the emitter owns the marker, not the template`,
+        ).toEqual([]);
+      }
+    }
+  });
+
+  it("emits exactly one frontmatter marker per OpenCode agent and command (task-seam-nits-v1-schema-and-marker)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const markerLines = (path: string): string[] =>
+      readFileSync(path, "utf8")
+        .split("\n")
+        .filter((line) => line.includes("arggon:generated"));
+    for (const sub of ["agents", "commands"]) {
+      for (const file of readdirSync(join(dir, ".opencode", sub))
+        .filter((f) => f.endsWith(".md"))
+        .sort()) {
+        const rel = `.opencode/${sub}/${file}`;
+        // The marker names the template root-relative source (`docs/` stripped
+        // by the generator), so `.opencode/…` → `opencode/…`.
+        const expected = [generatedYamlMarker(rel.replace(/^\./, ""))];
+        expect(markerLines(join(dir, ...rel.split("/"))), `${rel} (fresh init)`).toEqual(expected);
+        expect(markerLines(join(repoRoot, ...rel.split("/"))), `${rel} (committed seam)`).toEqual(
+          expected,
+        );
+      }
+    }
+  });
+
   it("stamps a TypeScript destination with a // provenance marker (W2 plugin)", () => {
     const out = stampGeneratedContent(SEAM_PLUGIN, SEAM_PLUGIN_SOURCE, "export default {}\n");
     expect(out).toBe(`// arggon:generated template="${SEAM_PLUGIN_SOURCE}"\nexport default {}\n`);

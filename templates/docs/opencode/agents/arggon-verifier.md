@@ -1,5 +1,4 @@
 ---
-# arggon:generated template="opencode/agents/arggon-verifier.md"
 description: ArggonManager verifier — runs the gates a review verdict needs and returns expected-vs-observed evidence; never changes the tree
 mode: subagent
 permissions:
