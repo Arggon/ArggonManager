@@ -66,3 +66,9 @@ again locally. This item is about the mechanism, not that one record.
 - [ ] `arggon validate` green; no mass churn of unrelated ledger entries
 
 ## Notes
+
+### 2026-10-13 @arggon-delivery-lead — the repair tripped the drift gate, and the right fix was the overdue re-pin
+
+Re-recording the checksum alone was not the whole repair: setting the entry's `arggonVersion` to `0.7.0` (the version whose sync actually wrote the copy) made the `tasks-validate` drift gate demand the **post-release re-pin** — `ARGGON_VERSION (0.6.0) lags the committed arggon seam (0.7.0)`, exactly as `release.md` §"The re-pin" prescribes after a release. The re-pin was overdue for 0.7.0 and was completed the same hour: both pins (`templates/docs/github/workflows/arggon.yml`, `.github/workflows/arggon.yml`) bumped to `0.7.0` and the seam regenerated with the 0.7.0 build (`5520c227`); `ci-seam-pin.test.ts` + `provenance-audit.test.ts` green (16/16).
+
+Lesson for this item's fix: **whoever updates the ledger must respect the pin** — a version stamp newer than `ARGGON_VERSION` is a re-pin request, not a bookkeeping edit. Either the fix's mechanism keeps the stamp at the pin, or it (correctly) routes the re-pin flow. Record this in the acceptance's decision.
