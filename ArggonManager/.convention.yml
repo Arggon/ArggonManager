@@ -213,7 +213,7 @@ x-generated:
     generatedAt: "2026-10-13T02:56:53.578Z"
   .zcode-marketplace/arggon/commands/arggon-goal.md:
     template: "docs/zcode/arggon/commands/arggon-goal.md"
-    checksum: "sha256:01c1b91cd6d9cb6213fb6ea5db23f835ac5865ee4a95eccf87294e019a30edbb"
+    checksum: "sha256:0f0366467aa64ac57ce19f0a942d8a95913e5370c2b34e83db1b23ade5feaea0"
     arggonVersion: "0.7.0"
     generatedAt: "2026-10-13T02:56:53.578Z"
   .zcode-marketplace/arggon/commands/arggon-handoff.md:
