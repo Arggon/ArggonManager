@@ -36,9 +36,12 @@
  *      directions are safe to assert on it.
  *
  * The escape hatch: an option that ships deliberately undocumented carries
- * `undocumented-by-design` on its parse branch in `lib/src/convention.ts`; only
- * marked keys are exempt from rules 2 and 3, and `convention.md` §Tracker
- * hygiene documents the marker, so the choice stays visible in the branch diff.
+ * `undocumented-by-design` on the LINE of its `key === "…"` (or `key !== "…"`)
+ * comparison in `lib/src/convention.ts` — the walk reads the marker off that one
+ * line, so a marker on the branch's `throw`/assignment line below it does not
+ * apply. Only marked keys are exempt from rules 2 and 3, and `convention.md`
+ * §Tracker hygiene documents the marker, so the choice stays visible in the
+ * branch diff.
  *
  * Deliberate narrowing, stated so it cannot be mistaken for coverage: rule 2's
  * reverse direction (a doc line naming an option the parser does not read) is
@@ -110,18 +113,22 @@ const UNGUARDED_SECTIONS: Readonly<Record<string, string>> = {
 };
 
 /**
- * `if (section === "x-tracker") {` — the parser's section dispatch. Any indent:
- * the kernel both dispatches each section at the top of the branch chain and
- * handles its options in a per-section block further down; the walk below takes
- * the last dispatch's block, which is the handler, so a reorder that empties one
- * fails the suite rather than silently reading nothing.
+ * `if (section === "x-tracker") {` — the parser's section dispatch. Any indent.
+ * Every dispatch block is assigned to its section's ONE bucket: a future split
+ * of one section's handler over two `if (section === "…")` blocks merges with
+ * the first block instead of dropping its keys (the duplicate-dispatch hazard),
+ * so no option can fall out of the parsed set unseen.
  */
 const SECTION_DISPATCH = /^\s*if \(section === "(x-[a-z-]+)"\) \{$/;
 /** `key === "auto-commit"` / `key !== "max-age-days"` — a branch that reads an option. */
 const KEY_BRANCH = /key [!=]== "([a-z0-9-]+)"/g;
 /** `'allow-steal' must be a boolean` — the boolean validation's own error text. */
 const BOOLEAN_ERROR = /'([a-z0-9-]+)' must be a boolean/;
-/** The escape hatch, documented in convention.md §Tracker hygiene. */
+/**
+ * The escape hatch, documented in convention.md §Tracker hygiene. LINE-scoped:
+ * `exempt` is read off the line carrying the option's `key === "…"` comparison
+ * (the branch's comparison line), never off the whole branch block.
+ */
 const UNDOCUMENTED_BY_DESIGN = "undocumented-by-design";
 
 /** One section's parse branches: which options the parser reads, and how. */
@@ -134,8 +141,9 @@ interface ParsedSection {
 
 /**
  * Walk the kernel line by line, associating each parse branch with the section
- * dispatch it sits under. Pure over `source`, so the premise test can run it
- * over synthetic branches and prove the exemption logic really works.
+ * dispatch it sits under. Pure over `source`, so the premise tests can run it
+ * over synthetic branches and prove the exemption and duplicate-dispatch logic
+ * really work.
  */
 function readKernelSections(source: string = kernelSource): Map<string, ParsedSection> {
   const sections = new Map<string, ParsedSection>();
@@ -143,8 +151,20 @@ function readKernelSections(source: string = kernelSource): Map<string, ParsedSe
   for (const line of source.split("\n")) {
     const dispatch = line.match(SECTION_DISPATCH);
     if (dispatch) {
-      current = { keys: [], booleans: new Set<string>() };
-      sections.set(dispatch[1]!, current);
+      const name = dispatch[1]!;
+      const existing = sections.get(name);
+      if (existing !== undefined) {
+        // A second dispatch for one section is a second HANDLER, not a
+        // replacement: keep its bucket so the blocks' keys MERGE. Assigning a
+        // fresh bucket here dropped the first block's keys (the
+        // duplicate-dispatch hazard), and passed silently whenever the second
+        // block re-listed the same keys. An option listed in both blocks is
+        // still caught by the one-branch-per-option assertion below.
+        current = existing;
+      } else {
+        current = { keys: [], booleans: new Set<string>() };
+        sections.set(name, current);
+      }
       continue;
     }
     if (current === null) continue;
@@ -317,8 +337,9 @@ describe("convention.md documents every option the namespaced-extension parsers 
         (option) =>
           `\`${key}.${option.name}\` is read by the parser but not named in convention.md's ` +
           `\`${key}\` enumeration (the PR #637 shape) — add it to the "official options" ` +
-          `sentence, or mark its parse branch \`${UNDOCUMENTED_BY_DESIGN}\` for a ` +
-          `deliberately undocumented option`,
+          `sentence, or put \`${UNDOCUMENTED_BY_DESIGN}\` on the same line as its ` +
+          `\`key === "…"\` comparison in lib/src/convention.ts for a deliberately ` +
+          `undocumented option`,
       );
     expect(problems).toEqual([]);
     // Reverse direction, hyphenated names only (see the header note: the
@@ -344,20 +365,48 @@ describe("convention.md documents every option the namespaced-extension parsers 
       );
       const expected = [...parsed.booleans].filter((name) => !exempt.has(name)).sort();
       const documented = documentedBooleans(sections.get(key)!).sort();
+      // Classify each mismatched name by SIDE, so the message cannot be read as
+      // the other direction: `expected` is filtered by exemption and
+      // `documented` is not, so a sentence naming a marked boolean is a doc
+      // line the marker excludes — not a kernel mismatch, and not a doc line
+      // that restored a missing kernel option.
+      const missing = expected.filter((name) => !documented.includes(name));
+      const extra = documented.filter((name) => !expected.includes(name));
+      const details = [
+        ...missing.map(
+          (name) =>
+            `\`${name}\` is validated as a boolean by the kernel but missing from the sentence`,
+        ),
+        ...extra.map((name) =>
+          parsed.booleans.has(name)
+            ? `\`${name}\` is validated as a boolean by the kernel but exempt — its ` +
+              `\`key === "…"\` line carries \`${UNDOCUMENTED_BY_DESIGN}\`, so the sentence ` +
+              `must not name it`
+            : `\`${name}\` is named by the sentence but the kernel ` +
+              `${
+                parsed.keys.some((option) => option.name === name)
+                  ? "reads it and does not validate it as a boolean"
+                  : "reads no such option"
+              }`,
+        ),
+      ];
       expect(
         documented,
         `convention.md: \`${key}\`'s parse-error sentence names ` +
           `${documented.length === 0 ? "no boolean option" : documented.join(", ")}, the kernel ` +
           `validates ${expected.length === 0 ? "none" : expected.join(", ")} as boolean — the ` +
-          `sentence must enumerate exactly the boolean options`,
+          `sentence must enumerate exactly the boolean options` +
+          (details.length === 0 ? "" : `: ${details.join("; ")}`),
       ).toEqual(expected);
     },
   );
 
-  it("exempts exactly the parse branches that carry the marker (premise)", () => {
+  it("exempts exactly the lines carrying the marker (premise)", () => {
     // Every option is documented today, so the exemption path would otherwise
-    // be unexercised. The same option, marked and unmarked, over synthetic
-    // branches: this is the evidence the escape hatch discriminates.
+    // be unexercised. Synthetic branches prove the escape hatch discriminates
+    // on the marker's LINE: the same marker is read when it sits on the
+    // `key === "…"` comparison line and ignored when it sits elsewhere in the
+    // same block (the throw line below).
     const parsed = readKernelSections(
       [
         'if (section === "x-tracker") {',
@@ -371,6 +420,9 @@ describe("convention.md documents every option the namespaced-extension parsers 
         "  }",
         '  if (key !== "typed-option") continue;',
         `    throw new Error(\`\${sourcePath}: 'typed-option' must be a boolean (got \${JSON.stringify(value)})\`);`,
+        '  if (key === "misplaced-marker") {',
+        `    throw new Error(\`\${sourcePath}: 'misplaced-marker' must be a boolean\`); // ${UNDOCUMENTED_BY_DESIGN} on the wrong line`,
+        "  }",
         "}",
       ].join("\n"),
     ).get("x-tracker");
@@ -379,9 +431,56 @@ describe("convention.md documents every option the namespaced-extension parsers 
         { name: "documented-option", exempt: false },
         { name: "legacy-alias", exempt: true },
         { name: "typed-option", exempt: false },
+        { name: "misplaced-marker", exempt: false },
       ],
-      booleans: new Set(["typed-option"]),
+      booleans: new Set(["typed-option", "misplaced-marker"]),
     });
+  });
+
+  it("merges a section's dispatch blocks instead of dropping one (premise)", () => {
+    // readKernelSections keys sections by name. A future split of one section's
+    // handler over two `if (section === "…")` blocks must read BOTH blocks'
+    // keys: a fresh bucket per dispatch silently dropped the first block's keys
+    // whenever the second re-listed the same set (the duplicate-dispatch
+    // hazard). A split over distinct keys merges; an option re-listed in both
+    // blocks surfaces as a duplicate for rule 1's one-branch-per-option
+    // assertion, so neither shape can pass unseen.
+    const split = readKernelSections(
+      [
+        'if (section === "x-tracker") {',
+        '  if (key === "first-option") {',
+        "    continue;",
+        "  }",
+        "}",
+        'if (section === "x-tracker") {',
+        '  if (key === "second-option") {',
+        "    continue;",
+        "  }",
+        "}",
+      ].join("\n"),
+    ).get("x-tracker");
+    expect(split).toEqual({
+      keys: [
+        { name: "first-option", exempt: false },
+        { name: "second-option", exempt: false },
+      ],
+      booleans: new Set(),
+    });
+    const relisted = readKernelSections(
+      [
+        'if (section === "x-tracker") {',
+        '  if (key === "same-option") {',
+        "    continue;",
+        "  }",
+        "}",
+        'if (section === "x-tracker") {',
+        '  if (key === "same-option") {',
+        "    continue;",
+        "  }",
+        "}",
+      ].join("\n"),
+    ).get("x-tracker");
+    expect(relisted!.keys.map((option) => option.name)).toEqual(["same-option", "same-option"]);
   });
 
   it("documents the escape hatch where an undocumented-by-design option would hide", () => {
