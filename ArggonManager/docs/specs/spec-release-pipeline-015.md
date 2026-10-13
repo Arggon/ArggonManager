@@ -113,6 +113,26 @@ become `"^0.4.2"` — exactly the silent-skew surface ADR 0018 §2 rejects.
 > hand-unpin inside the first release PR's review (legitimate there — the
 > guard is satisfied by the release bump); machine-owned exact→exact from
 > release 2. Documented in `release.md`.
+> Update (2026-10-13, bug-kernel-pin-never-exact): the one-time hand-unpin
+> **never executed**. v0.4.1 through v0.7.1 all shipped the caret — the step was
+> written down (this amendment; the operator manual at the repo root,
+> `release.md` §Exception, added in the same PR, `2f28e32f`), but nothing ran it
+> and nothing detected the drift, so A3's `[x]` was in effect unmet for five
+> releases. Documentation is not enforcement; the file-level gaps were that the
+> canonical runbook (`ArggonManager/docs/runbooks/release.md`) never carried the
+> hand-unpin or the pin format (zero hits at PR #555), and no test or workflow
+> checked the pin anywhere. The un-pin finally landed inside the 0.8.0 release PR
+> (`5fd10db4`) and exactness then held on its own: v0.9.0 rewrote
+> `"@arggondev/lib": "0.8.0"` → `"0.9.0"` with no operator (#770), confirming the
+> mechanism is sticky once established. A3 is now continuously enforced instead
+> of verified once: `cli/release-lockstep-check.mjs` reddens an open release PR
+> whose pin is non-exact, stale or missing, and a test in the same file pins
+> `main` to the bare released version. The rejected alternative was revisited on
+> this evidence and the rejection **stands**: no caret-stripping/normalization
+> step ships — release-please owns the rewrite, exactness is sticky once `main`
+> is exact, and a second writer on its PR branch would silently repair a
+> release-please regression instead of surfacing it. The runbook now carries the
+> invariant.
 
 The `extra-files` GenericJSON updater remains the choice: from the first
 hand-unpinned release onward it writes the bare version (exact→exact) and
@@ -395,7 +415,9 @@ Workflow inputs: none. The released version is read from the tree at
       release still produces it (C2 verified — no conventional-commit
       dependency)
 - [x] A3 the root `dependencies["@arggondev/lib"]` value in the release PR
-      is exact (no `^`/`~`/range operator) (C1 verified)
+      is exact (no `^`/`~`/range operator) (C1 verified — corrected
+      2026-10-13: the hand-unpin never executed; exactness established at
+      v0.8.0 and guard-enforced since; see the C1 update)
 - [x] A4 the PR's `package.json` diff is limited to `version` +
       `dependencies["@arggondev/lib"]` (no re-serialization churn), and the
       bracket-quoted jsonpath resolves the `@`-containing key
@@ -459,7 +481,7 @@ Workflow inputs: none. The released version is read from the tree at
 
 ### Verification (2026-10-01, PR #555)
 
-A1–A17 verified against the implementation: A1/A2 via release-please CLI dry-run (17.11.2, `--release-as 0.4.2` against the pushed branch — both packages, lockstep, proposal spans exactly the five spec files); A3 per the C1 amendment above (one-time hand-unpin inside the first release PR's review, machine-owned exact→exact thereafter); A5 via offline fixture tests of the ordered predicate (`cli/release-guard.mjs`); A7–A11 and A13–A15 by direct inspection of the workflows/scripts/docs in the PR diff; A16 actionlint clean with all gates green in the PR; A17 stated in the PR body. **Runtime-pending (first real release observes):** A2's end-to-end proposal against live main, A12's "Approve workflows" click, and the publish path itself (fails closed until the npmjs.com trusted-publisher setup).
+A1–A17 verified against the implementation: A1/A2 via release-please CLI dry-run (17.11.2, `--release-as 0.4.2` against the pushed branch — both packages, lockstep, proposal spans exactly the five spec files); A3 per the C1 amendment above, **corrected 2026-10-13 (`bug-kernel-pin-never-exact`)**: the one-time hand-unpin never executed through v0.7.1 (every release shipped the caret), the first exact release was v0.8.0 (`5fd10db4`, un-pin applied in its release PR) and exactness is guard-enforced since; A5 via offline fixture tests of the ordered predicate (`cli/release-guard.mjs`); A7–A11 and A13–A15 by direct inspection of the workflows/scripts/docs in the PR diff; A16 actionlint clean with all gates green in the PR; A17 stated in the PR body. **Runtime-pending (first real release observes):** A2's end-to-end proposal against live main, A12's "Approve workflows" click, and the publish path itself (fails closed until the npmjs.com trusted-publisher setup).
 
 ## Non-goals
 

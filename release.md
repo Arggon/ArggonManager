@@ -14,17 +14,18 @@ procedure to execute by hand — the manual bump/pack/publish runbook is gone.
    Decide the number first: bug fixes → patch, new surface → minor.
 2. **`release-please.yml`** opens/updates the release PR: bumps both
    `package.json` versions in lockstep, rewrites the root's kernel dependency
-   to the exact released version (no caret — exact-to-exact once the first
-   release PR has un-pinned the caret, see the exception below), drafts the
-   `CHANGELOG.md` section, and syncs `package-lock.json` onto the
-   PR branch. The PR touches exactly five files: both `package.json` files,
-   `package-lock.json`, `CHANGELOG.md`, `.release-please-manifest.json`.
+   to the exact released version (no caret — exactness is sticky and guarded;
+   see §The kernel pin stays exact), drafts the `CHANGELOG.md` section, and
+   syncs `package-lock.json` onto the PR branch. The PR touches exactly five
+   files: both `package.json` files, `package-lock.json`, `CHANGELOG.md`,
+   `.release-please-manifest.json`.
 3. **Review + merge** — hand-edit the drafted `## [X.Y.Z] - YYYY-MM-DD`
    section to house style (`### Added` / `### Changed` / `### Fixed`, kernel-
-   facing changes called out), verify the five-file diff, merge. Merging is
-   the release. Merge the release PR **by itself**: the guard classifies the
-   pushed HEAD commit, so a bump buried under later commits in the same push
-   silently strands the release.
+   facing changes called out), verify the five-file diff and that
+   `dependencies["@arggondev/lib"]` is the bare `X.Y.Z` (the guard reddens
+   otherwise), merge. Merging is the release. Merge the release PR **by
+   itself**: the guard classifies the pushed HEAD commit, so a bump buried
+   under later commits in the same push silently strands the release.
 4. **`release.yml`** (the merge push) runs the ordered guard and the pre-tag
    gates (the merged CHANGELOG section for V; root-lib lockstep), then:
    annotated tag `vX.Y.Z` → flips the merged release PR's `autorelease:
@@ -241,18 +242,54 @@ replaces it.
 (npm 10 and 12 exit 254 with `ENOENT`) — create it first (`release.yml` and
 `ArggonManager/docs/ci.md` both script the `mkdir`).
 
-## Exception: the first release PR un-pins the kernel (one-time)
+## The kernel pin stays exact (guard-enforced)
 
-release-please's extra-files JSON updater rewrites the version inside the
-existing dependency string (`generic-json.ts` does a version-regex substring
-replace), so the range prefix is preserved: today's `^0.4.0` becomes
-`^0.4.2` in the first release PR, not `0.4.2`. The exact pin needs a one-time
-bootstrap performed in that PR's review: edit the root dependency to the
-exact `X.Y.Z` being released (the version guard is satisfied there — the
-release PR bumps the version to an untagged number). From the second release
-on the rewrite is exact-to-exact and fully machine-owned. A dependency-only
-un-pin outside a release PR is blocked by design: the CI version guard treats
-`dependencies` as publish-relevant and demands a version bump.
+The root's `dependencies["@arggondev/lib"]` ships the **bare** released version —
+no `^`/`~`/range operator (ADR 0018 §2; spec-release-pipeline-015 invariant 4 /
+A3), so what an adopter installs is exactly what CI tested. release-please's
+extra-files JSON updater rewrites the version **inside** the existing string
+(`generic-json.ts` does a version-regex substring replace), so it preserves
+whatever operator is there: an exact pin stays exact, a caret stays a caret.
+Exactness was established in the 0.8.0 release PR (#764, `5fd10db4`), and v0.9.0
+kept it automatically (#770 rewrote `"@arggondev/lib": "0.8.0"` to `"0.9.0"` with
+no operator), so the rewrite is machine-owned and sticky.
+
+**What did not work (the record).** The original plan (spec C1 amendment,
+2026-10-01) was a one-time hand-unpin inside the _first_ release PR's review,
+"machine-owned exact→exact from release 2". That manual step never executed:
+v0.4.1 through v0.7.1 all shipped the caret and nothing detected it. The
+one-time exception was written down here and in the spec, but documentation is
+not enforcement — the SPEC's `A3 verified` was effectively unmet for five
+releases. The 0.8.0 release PR was the first to un-pin.
+
+**The guard** (`bug-kernel-pin-never-exact`). Two surfaces keep A3 true:
+
+- `release-please.yml` runs `cli/release-lockstep-check.mjs` on every push. At
+  the open release PR's head ref it checks the versions (lockstep) **and** the
+  kernel pin: a range operator, a stale exact version, or a missing dependency
+  reddens the maintenance run, naming the value and the fix. A clean proposal
+  and a push with no open PR stay silent; a gh query that cannot run warns and
+  exits 0.
+- `cli/release-lockstep-check.test.ts` pins main's own pin to the same contract
+  on every CI run, so a range pin fails a PR before it ever reaches a release
+  PR.
+
+**No normalization step writes the pin** (decided 2026-10-13). release-please
+owns that rewrite and exactness is sticky once main is exact; a caret-stripping
+step would be a second writer on release-please's own PR branch — the
+alternative the spec rejected (C1) — and would silently repair a release-please
+regression instead of surfacing it. The detection gap is what A3 lacked, and the
+guard closes it; the spec's rejected-alternative note was revisited and stands,
+now on evidence.
+
+**When the guard reddens.** In the release PR: edit `package.json`'s
+`dependencies["@arggondev/lib"]` to the bare `X.Y.Z` being released, then re-run
+`release-please.yml` ("Re-run all jobs" on the red run — or any later push to
+`main`) so the lockfile-sync step recomputes `package-lock.json` on the fixed
+branch; `npm ci` compares the lockfile against the changed pin. Merge only after
+that run is green. A dependency-only un-pin on `main` is blocked by design (the
+CI version guard treats `dependencies` as publish-relevant and demands a version
+bump), which is why the fix lives in the release PR.
 
 ## The re-pin (guard-enforced)
 

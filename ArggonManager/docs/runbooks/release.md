@@ -21,6 +21,14 @@
 - **Owner-only irreversible decisions** — npm publishes and GitHub Releases are
   owner-run or owner-configured (npmjs.com trusted publishers); everything else
   in the flow is automation.
+- **The root kernel pin stays exact** — `dependencies["@arggondev/lib"]` carries
+  the bare released version, no range operator (ADR 0018 §2;
+  spec-release-pipeline-015 invariant 4 / A3). Exactness is sticky through
+  release-please's extra-files rewrite and guarded on two surfaces:
+  `cli/release-lockstep-check.mjs` reddens the maintenance run on an open release
+  PR whose pin is not exact, and a test in the same file fails CI on a range pin
+  on `main`. The fix lives in the release PR — see root `release.md`
+  §The kernel pin stays exact (guard-enforced).
 - **Merge the release PR by itself** — the guard classifies the pushed HEAD
   commit; a version bump buried under later commits in the same push silently
   strands the release (the bump never lands at HEAD).
