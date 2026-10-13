@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-opencode-event-panel
 title: OpenCode board panel event-driven refresh (plan T4)
+assignee: arggon-delivery-lead
+branch: feat/task-opencode-event-panel
 parent: story-opencode-adapter
 labels: []
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-13"
+claimed_at: "2026-10-13T13:29:13.322Z"
 depends_on: [task-adapter-selection-flags, task-capability-matrix]
+worktree_path: /home/arggon/Projects/ArggonManager-task-opencode-event-panel
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/task-opencode-event-panel.md
