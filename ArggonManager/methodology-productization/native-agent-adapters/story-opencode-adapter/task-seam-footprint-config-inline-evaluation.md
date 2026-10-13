@@ -12,7 +12,6 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T23:39:26.165Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-seam-footprint-config-inline-evaluation
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/task-seam-footprint-config-inline-evaluation.md
   Leaves live only under a story. id is the filename stem: task-seam-footprint-config-inline-evaluation.
@@ -256,3 +255,13 @@ adopters to ignore its state, that belongs in its own install docs.
   plugin id, so the project copy loads as failed (`Duplicate plugin ID: arggon`)
   in the primary. The project seam still works where no global copy exists; the
   owner may want to uninstall the global one.
+
+### 2026-10-13 @ses_ecd832dc8ffeqhaGFiLKLTG8Eh
+Evidence (maker run, 2026-10-12; branch feat/task-seam-footprint-config-inline-evaluation, PR #754):
+
+- Inventory re-measured: 15 tracked seam files = 19,812 B agents + 12,093 B commands = 31,905 B content (72K in 4K blocks); root opencode.jsonc 3,088 B tracked/adopter-edited; plugin copies gitignored derived (expected 549,029 B = marker + 548,958 B bundle; primary copy 481,162 B is stale, doctor plugin.current=false; tui.tsx primary copy 15,742 B vs 18,524 B source).
+- Primary git status was exactly `?? .opencode/harness/` + `?? .opencode/opencode.json` (machine-local harness config 115 B + state 3,623 B).
+- Loading probed, not read: convention dir `.opencode/plugins/arggon/index.ts` discovered (opencode api plugin.list, primary; fails only with Duplicate plugin ID because a global ~/.config/opencode/plugins/arggon install exists); config entry probe on opencode v2.0.26 via `opencode run --standalone --print-logs` logs `msg="loading plugin" id=/tmp/opencode/seam-d/plug entrypoint=file:///tmp/opencode/seam-d/plug/index.ts` and setup marker appears; same with `plugin` singular.
+- Idiom: published config.json (fetched, 39,039 B) names `plugin` (singular) + inline agent/command; V2 docs/runtime use `plugins` (plural); both keys load and `opencode debug config` normalizes singular to plural. Owner's `plugins` is correct for V2; the published schema is stale V1. Owner's file untouched.
+- Gates: `npm run arggon -- validate` → ok (0 warnings, convention v5); `npx prettier --check <item.md>` → pass (.gitignore has no prettier parser; verified with `git check-ignore -v`); `npm run test:structure` → 5 passed; `npm run lint:structure` → clean; ignore probe: simulated `.opencode/harness/friction.jsonl` + `.opencode/opencode.json` leave git status clean; `git worktree remove` refuses untracked harness state and succeeds once ignored.
+- Out of scope, reported: agents carry the x-generated marker twice (templates have one); primary plugin copies stale; global arggon plugin duplicates the project id.
