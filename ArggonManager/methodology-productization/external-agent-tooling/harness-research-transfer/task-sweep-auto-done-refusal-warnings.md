@@ -92,3 +92,9 @@ Gates: `npm run arggon -- validate` → ok (0 warnings, convention v5); `npx pre
 ### handoff 2026-10-13 @ses_eca4ef96effeP7GhkMP8PrO6xn (session: ses_eca4ef96effeP7GhkMP8PrO6xn) — next: Lead: verify PR #779 (docs correction) + evidence comment, file the substrate follow-up, decide correcting done item task-measure-kernel-refusal-rate, tick Acceptance
 - branch: feat/task-sweep-auto-done-refusal-warnings
 - open questions: Parent's 0/220 is refuted (16.0%/18.1%) so AutoHarness is not closed; follow-up item unfiled (maker boundary); is 16-18% high enough to reclassify P1 per exploration-021 item 4?
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 97a8ffcb (PR #779); flipped manually — the maker left the rows unticked, and the lead ticked them after filing the substrate follow-up the item's own row 3 required (task-done-gate-refusal-rate-substrate).
+The sweep refuted its parent: the done-gate merge-time refusal rate is **16.0% (42/262)** in the parent's window and **18.1% (52/288)** full-window — the parent's 0 was a pattern artifact (literal `::warning::` vs the executed `##[warning]` render); raw logs and check-run annotations agree exactly (239 step-level warnings each). exploration-021's closure note corrected to "not closed"; refutation recorded on the done parent item.
