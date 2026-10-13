@@ -171,3 +171,7 @@ of this change: (1) `tools.arggon.show` resolves the **main checkout** and still
 `todo` / unclaimed although the claim is committed on this branch (2cfcaafb); (2) a project
 auto-harness gate declined a read-only `arggon` tool call and demanded checkers under
 `.opencode/checks/` — enforcement machinery is out of this item's scope, so I did not add it.
+
+### handoff 2026-10-13 @arggon-maker — next: Review PR #771 (docs-only, impact Advisory) against the item's acceptance criteria; tick the live checklist and flip done after merge — full evidence in the comment above.
+- branch: feat/task-state-exploration-stopping-rule
+- open questions: checklist left unticked for the lead; tools.arggon.show reads main checkout (todo/unclaimed) despite the committed claim; auto-harness gate declined a read-only arggon call (out of scope)
