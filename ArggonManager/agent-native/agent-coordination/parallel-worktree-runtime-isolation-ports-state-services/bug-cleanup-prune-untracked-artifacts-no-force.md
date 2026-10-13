@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-cleanup-prune-untracked-artifacts-no-force
 title: "cleanup --prune classifies a done+merged worktree removable and then fails on untracked generated artifacts, with no force path — every wave ends in manual git worktree remove --force"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [worktree, hygiene, friction]
 created: "2026-10-12"
 updated: "2026-10-12"
-claimed_at: "2026-10-12T22:10:29.800Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-cleanup-prune-untracked-artifacts-no-force
 ---
 <!--
