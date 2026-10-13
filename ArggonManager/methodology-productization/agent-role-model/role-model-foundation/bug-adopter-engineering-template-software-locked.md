@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-adopter-engineering-template-software-locked
 title: templates/docs/docs/engineering.md (the adopter-facing review-bar template) is software-locked — ADR 0021 §6.2 domain neutrality does not reach the file every new adopter reads first
 assignee: arggon-delivery-lead
@@ -9,8 +9,7 @@ parent: role-model-foundation
 labels: [docs, templates, methodology]
 priority: p2
 created: "2026-10-04"
-updated: "2026-10-11"
-claimed_at: "2026-10-11T09:57:40.781Z"
+updated: "2026-10-13"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-adopter-engineering-template-software-locked
 ---
 <!--
