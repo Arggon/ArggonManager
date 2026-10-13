@@ -83,7 +83,7 @@ One JSONL line, append-only. `v` is the format version.
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `v`                                      | `1`. Readers **must** skip a record whose `v` they do not know rather than fail the whole file.                                                                                                                  |
 | `ts`                                     | ISO-8601 UTC from the kernel clock, never a parsed locale string.                                                                                                                                                |
-| `fingerprint`                            | `sha256(commandShape ‖ "\x1f" ‖ errorCode ‖ "\x1f" ‖ harness ‖ "\x1f" ‖ majorVersion)`, hex, truncated to 16 chars. **Never derived from `narrative`.**                                                          |
+| `fingerprint`                            | `sha256` over the **length-prefixed** encoding of the four stable fields (amended 2026-10-11 — see §Fingerprint discipline), hex, truncated to 16 chars. **Never derived from `narrative`.**                     |
 | `reporterId`                             | `sha256(machineSalt ‖ repoAbsPath)`, truncated to 12 hex chars. `machineSalt` is 32 random bytes generated once in the state dir and never leaves it. Identifies _same machine, same repo_ — never _which_ repo. |
 | `commandShape`                           | Required. argv normalized: subcommand and flags kept, values that look like paths, ids, URLs, tokens or SHAs replaced with a placeholder. Capped 200 chars.                                                      |
 | `errorCode`                              | Optional; the `error.code` from the envelope the agent already has (e.g. `START_FAILED`, `VALIDATE_FAILED`), else free-form, capped 64. Never prose.                                                             |
@@ -100,6 +100,66 @@ narrative, following Sentry's grouping rule that a frequently-changing value
 groups". Two observations with the same `commandShape` + `errorCode` +
 `harness` + major version are the same friction class even if the prose differs;
 two observations with different error codes are not, however similar the prose.
+
+#### The formula is length-prefixed (amended 2026-10-11)
+
+The first version of this spec mandated a separator-joined pre-image:
+
+```text
+fingerprint = sha256(commandShape ‖ "\x1f" ‖ errorCode ‖ "\x1f" ‖ harness ‖ "\x1f" ‖ majorVersion)
+```
+
+Amended by `task-friction-fingerprint-separator-not-length-prefixed` to a
+**length-prefixed** pre-image. A separator delimits by VALUE, so it stops the
+ordinary collision — a field containing a space or a dash cannot shift a field
+boundary — but it is ambiguous by construction: `(a, U+001F‖b, c, d)` and
+`(a‖U+001F, b, c, d)` produce byte-identical material, so a `--command` whose
+own text carries U+001F could forge another tuple's digest and merge two
+friction classes. The impact was bounded and honest — the log is never published
+raw (redaction runs at write, and a human opens every tier-B URL), so the gain
+was mis-grouped records rather than a leak — but this is the one field the whole
+dedupe design leans on, and a normative spec is the wrong place to be quietly
+ambiguous about it.
+
+Each component is now encoded as `<len>:<value>` and the four encodings are
+concatenated with no separator. `len` is the component's length in UTF-16 code
+units — the unit the caps truncate in, so the prefix describes the value that is
+actually hashed rather than an estimate of it. An absent `errorCode` still hashes
+as the empty string, which encodes as `0:`.
+
+```text
+fingerprint = sha256( len(commandShape) + ":" + commandShape
+                    + len(errorCode)   + ":" + errorCode
+                    + len(harness)     + ":" + harness
+                    + len(majorVersion) + ":" + majorVersion )
+```
+
+The encoding is injective over tuples: the parse of an encoded string is
+deterministic — read the digits, consume exactly that many characters — so no
+second tuple can produce the same pre-image, and only a hash collision can still
+merge two classes. That is the honest residual boundary of a digest truncated to
+16 hex chars.
+
+**Why length-prefix, not the alternatives.** Domain separation (a label
+prefix, or an explicitly structured encoding with component boundaries) names
+the same guarantee a length prefix buys, so it is one mechanism rather than two;
+and there is exactly one derivation over this material, so a domain tag would
+guard against a collision that does not exist. Keeping the verbatim formula was
+rejected: the boundary was recorded in a test instead of fixed, and accepted
+ambiguity is a decision a spec should make out loud rather than inherit.
+
+**Backward compatibility — `v` stays `1`, deliberately.** A record's `v` answers
+"can this reader parse this line", not "does this line carry the fingerprint
+formula I compute now". Bumping to `2` would make an upgraded `arggon` **skip**
+every `v: 1` line the adopter already recorded — the reader's documented
+behaviour for an unknown `v` — which destroys a local history that is cache-like
+and cheap to re-earn, to fix a grouping ambiguity the bump does not fix either:
+two logs written either side of the change would still split the class. Staying
+at `v: 1` degrades honestly instead. The reader never recomputes a fingerprint;
+it groups by the one each line carries, so a log spanning the change shows one
+class as two rows (a count split, never a wrong merge), and rotation ages the
+old-formula lines out within the 5000-line bound. The `v` discipline in §The
+record and the persistence criterion below are unchanged by this amendment.
 
 ### Dedupe and ordering
 

@@ -4,6 +4,7 @@ import { CONVENTION_VERSION, readConventionConfig, readConventionVersion } from 
 import { assertValidId, BRANCH_PATTERN } from "./ids.js";
 import { isPriority } from "./priority.js";
 import { softTryLoadItem, walkTasksTree, type WorkItem } from "./items.js";
+import { placeholderSections } from "./placeholder.js";
 import { findTrackerLocation, newItemPath, type TrackerLayout } from "./paths.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
 import { sanitizeHumanError } from "./sanitize.js";
@@ -154,6 +155,37 @@ function checkItemShape(item: SoftItem, errors: Issue[]): void {
       rel,
       `priority must be one of p0, p1, p2, p3 (got ${JSON.stringify(item.priority)})`,
       "PRIORITY_INVALID",
+    );
+  }
+}
+
+/**
+ * Scaffold-placeholder pass (task-validate-refuses-placeholder-bodies;
+ * `decided: A` on bug-template-only-bodies-ship-green): a template-only body
+ * on an OPEN item fails `validate`, it does not warn. Report-only and split
+ * were explicitly rejected — the delivery lead owns the backlog, so parking
+ * rot there is not an option.
+ *
+ * The guard reads the item BODY through {@link placeholderSections} (the
+ * `<!-- … -->` marker grammar in the live `## Context` / `## Acceptance`
+ * sections, quoted prose excluded — never a restated marker copy), and only
+ * for OPEN statuses (`todo`/`in_progress`/`blocked`). Done/cancelled items are
+ * history, not the contract, and the message says so. One error per item (the
+ * sections named inside) so the report stays bounded as the corpus grows.
+ */
+function checkPlaceholderBodies(items: SoftItem[], errors: Issue[]): void {
+  for (const item of items) {
+    if (item.status !== "todo" && item.status !== "in_progress" && item.status !== "blocked") {
+      continue;
+    }
+    const sections = placeholderSections(item.body);
+    if (sections.length === 0) continue;
+    const where = sections.map((section) => `'## ${section}'`).join(" and ");
+    push(
+      errors,
+      item.relPath,
+      `open ${item.type} '${item.id}' still carries the scaffold placeholder marker (<!-- … -->) in its live ${where} section — done/cancelled items are excluded (history, not the contract). Write the real prose there (a marker quoted inside code spans or fenced blocks does not count)`,
+      "PLACEHOLDER_BODY",
     );
   }
 }
@@ -418,6 +450,8 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
   }
 
   checkDependencies(items, byId, errors);
+
+  checkPlaceholderBodies(items, errors);
 
   for (const item of items) {
     if (item.type !== "story") continue;

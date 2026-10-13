@@ -47,8 +47,10 @@ import {
   tuiDependencySummary,
   tuiDetailBodyRows,
   tuiDetailLinesFor,
+  tuiChildrenOf,
   tuiLegalMoves,
   tuiLensFilter,
+  tuiParentOf,
   tuiViewItems,
   tuiViewOptions,
   visibleTuiItems,
@@ -1565,7 +1567,7 @@ describe("detail pane: renderTuiDetail golden", () => {
     expect(got[0]).toBe("arggon detail · task-detail · esc back".padEnd(80));
     const content = tuiDetailLinesFor(DETAIL_ITEMS, DETAIL_SOURCES, detail, 80);
     expect(got.slice(1, 11)).toEqual(content.slice(0, 10).map((line) => line.padEnd(80)));
-    expect(got[11]).toContain(`row 1/${content.length} · ↑/↓ line`);
+    expect(got[11]).toContain(`row 1/${content.length} · p parent · ↑/↓ line`);
     expect(got[11]).toContain("esc back · q quit");
   });
 
@@ -1718,6 +1720,258 @@ describe("detail pane: handleKey", () => {
   });
 });
 
+// ---------- detail-pane hierarchy jumps (task-tui-hierarchy-jump) ----------
+
+/** Parent story + two children + one grandchild (only direct children count). */
+const HIER_ITEMS = [
+  item({ id: "story-p", type: "story", status: "in_progress", title: "Parent story" }),
+  item({ id: "task-a", type: "task", status: "todo", title: "First child", parent: "story-p" }),
+  item({ id: "task-b", type: "task", status: "done", title: "Second child", parent: "story-p" }),
+  item({ id: "task-a1", type: "task", status: "todo", title: "Grandchild", parent: "task-a" }),
+  item({ id: "task-orphan", type: "task", status: "todo", title: "No parent" }),
+];
+
+const HIER_SOURCES = new Map<string, TuiDetailSource>([
+  ["story-p", { id: "story-p", body: "# parent\n" }],
+  ["task-a", { id: "task-a", body: "# child a\n" }],
+  ["task-b", { id: "task-b", body: "# child b\n" }],
+]);
+
+function hierPane(id: string, overrides: Partial<TuiState> = {}): TuiState {
+  return {
+    ...initialTuiState(120, 20),
+    column: 0,
+    card: 0,
+    scroll: 0,
+    filter: "",
+    detail: { id, scroll: 0 },
+    ...overrides,
+  };
+}
+
+describe("detail pane hierarchy: tuiParentOf + tuiChildrenOf (task-tui-hierarchy-jump)", () => {
+  it("resolves the parent through the kernel parent edge", () => {
+    expect(tuiParentOf(HIER_ITEMS, "task-a")?.id).toBe("story-p");
+    expect(tuiParentOf(HIER_ITEMS, "task-a1")?.id).toBe("task-a");
+    expect(tuiParentOf(HIER_ITEMS, "story-p")).toBeNull(); // no parent
+    expect(tuiParentOf(HIER_ITEMS, "task-orphan")).toBeNull(); // no parent
+    expect(tuiParentOf(HIER_ITEMS, "task-gone")).toBeNull(); // vanished id
+  });
+
+  it("reports null when the recorded parent id is not in the snapshot", () => {
+    const items = [item({ id: "task-x", type: "task", status: "todo", parent: "story-gone" })];
+    expect(tuiParentOf(items, "task-x")).toBeNull();
+  });
+
+  it("lists direct children only, in canonical id order", () => {
+    expect(tuiChildrenOf(HIER_ITEMS, "story-p").map((i) => i.id)).toEqual(["task-a", "task-b"]);
+    expect(tuiChildrenOf(HIER_ITEMS, "task-a").map((i) => i.id)).toEqual(["task-a1"]);
+    expect(tuiChildrenOf(HIER_ITEMS, "task-b")).toEqual([]);
+    expect(tuiChildrenOf(HIER_ITEMS, "task-orphan")).toEqual([]);
+    expect(tuiChildrenOf(HIER_ITEMS, "task-gone")).toEqual([]);
+  });
+});
+
+describe("detail pane hierarchy: children section (task-tui-hierarchy-jump)", () => {
+  it("lists each child with its number, id, status and title", () => {
+    const got = buildTuiDetailLines({
+      item: HIER_ITEMS[0]!,
+      id: "story-p",
+      items: HIER_ITEMS,
+      body: "# parent\n",
+      width: 120,
+    });
+    expect(got).toContain("children (2):");
+    expect(got).toContain("  [1] task-a (todo) — First child");
+    expect(got).toContain("  [2] task-b (done) — Second child");
+    for (const line of got) expect(line.length).toBeLessThanOrEqual(120);
+  });
+
+  it("reports an honest empty section instead of hiding it", () => {
+    const got = buildTuiDetailLines({
+      item: HIER_ITEMS[4]!,
+      id: "task-orphan",
+      items: HIER_ITEMS,
+      body: "# orphan\n",
+      width: 120,
+    });
+    expect(got).toContain("children: (none)");
+  });
+
+  it("sanitizes hostile child ids and titles through the human-text path", () => {
+    const hostile = "\u001b[2J";
+    const items = [
+      item({ id: "story-p", type: "story", status: "todo", title: "Parent" }),
+      item({
+        id: `task-a${hostile}b`,
+        type: "task",
+        status: "todo",
+        title: `title${hostile}`,
+        parent: "story-p",
+      }),
+    ];
+    const got = buildTuiDetailLines({
+      item: items[0]!,
+      id: "story-p",
+      items,
+      body: "# parent\n",
+      width: 120,
+    });
+    expect(got.join("\n")).not.toContain("");
+    expect(got.join("\n")).toContain("\\u001b[2J");
+  });
+});
+
+describe("detail pane hierarchy: handleKey jumps (task-tui-hierarchy-jump)", () => {
+  it("p jumps to the parent's detail at scroll 0, board untouched", () => {
+    const state = hierPane("task-a", { column: 2, card: 3, scroll: 4, filter: "a" });
+    const next = handleKey(state, "p", { detailLines: 50, detailItems: HIER_ITEMS });
+    expect(next.detail).toMatchObject({ id: "story-p", scroll: 0 });
+    expect(next.detail?.notice ?? null).toBeNull();
+    expect(next.column).toBe(2);
+    expect(next.card).toBe(3);
+    expect(next.scroll).toBe(4);
+    expect(next.filter).toBe("a");
+    expect(next.action).toBeNull();
+    expect(next.quit).toBe(false);
+  });
+
+  it("p with no parent reports in-pane instead of misfiring", () => {
+    const state = hierPane("task-orphan");
+    const next = handleKey(state, "p", { detailLines: 50, detailItems: HIER_ITEMS });
+    expect(next.detail?.id).toBe("task-orphan"); // stayed
+    expect(next.detail?.notice).toContain("no parent");
+    expect(next.detail?.notice).toContain("task-orphan");
+    expect(next.quit).toBe(false);
+    expect(next.action).toBeNull();
+  });
+
+  it("p with a missing parent id reports instead of jumping nowhere", () => {
+    const items = [item({ id: "task-x", type: "task", status: "todo", parent: "story-gone" })];
+    const next = handleKey(hierPane("task-x"), "p", { detailLines: 10, detailItems: items });
+    expect(next.detail?.id).toBe("task-x");
+    expect(next.detail?.notice).toContain("story-gone");
+  });
+
+  it("p on a vanished item reports instead of crashing", () => {
+    const next = handleKey(hierPane("task-gone"), "p", {
+      detailLines: 10,
+      detailItems: HIER_ITEMS,
+    });
+    expect(next.detail?.id).toBe("task-gone");
+    expect(next.detail?.notice).toContain("not in the tree");
+  });
+
+  it("1/2 open the nth child in id order; c opens the first", () => {
+    const first = handleKey(hierPane("story-p"), "1", { detailLines: 50, detailItems: HIER_ITEMS });
+    expect(first.detail).toMatchObject({ id: "task-a", scroll: 0 });
+    const second = handleKey(hierPane("story-p"), "2", {
+      detailLines: 50,
+      detailItems: HIER_ITEMS,
+    });
+    expect(second.detail).toMatchObject({ id: "task-b", scroll: 0 });
+    const c = handleKey(hierPane("story-p"), "c", { detailLines: 50, detailItems: HIER_ITEMS });
+    expect(c.detail).toMatchObject({ id: "task-a", scroll: 0 });
+    // Grandchild resolves one level down too.
+    const grand = handleKey(hierPane("task-a"), "1", { detailLines: 50, detailItems: HIER_ITEMS });
+    expect(grand.detail).toMatchObject({ id: "task-a1", scroll: 0 });
+  });
+
+  it("a child number with no target reports the honest count", () => {
+    const state = hierPane("task-orphan");
+    const none = handleKey(state, "1", { detailLines: 50, detailItems: HIER_ITEMS });
+    expect(none.detail?.id).toBe("task-orphan");
+    expect(none.detail?.notice).toContain("no children");
+    const over = handleKey(hierPane("story-p"), "9", { detailLines: 50, detailItems: HIER_ITEMS });
+    expect(over.detail?.id).toBe("story-p");
+    expect(over.detail?.notice).toContain("no child 9");
+    expect(over.detail?.notice).toContain("2 children");
+    const cNone = handleKey(state, "c", { detailLines: 50, detailItems: HIER_ITEMS });
+    expect(cNone.detail?.id).toBe("task-orphan");
+    expect(cNone.detail?.notice).toContain("no children");
+  });
+
+  it("a jump clears the previous notice; a scroll clears it too", () => {
+    const refused = handleKey(hierPane("task-orphan"), "p", {
+      detailLines: 50,
+      detailItems: HIER_ITEMS,
+    });
+    expect(refused.detail?.notice).toContain("no parent");
+    // Scrolling dismisses the transient notice.
+    const scrolled = handleKey(refused, "\x1b[B", { detailLines: 50, detailItems: HIER_ITEMS });
+    expect(scrolled.detail?.notice ?? null).toBeNull();
+    // A successful jump clears it as well.
+    const refusedChild = handleKey(hierPane("task-orphan"), "1", {
+      detailLines: 50,
+      detailItems: HIER_ITEMS,
+    });
+    const jumped = handleKey(
+      { ...refusedChild, detail: { id: "task-a", scroll: 5, notice: "stale" } },
+      "p",
+      { detailLines: 50, detailItems: HIER_ITEMS },
+    );
+    expect(jumped.detail).toMatchObject({ id: "story-p", scroll: 0 });
+  });
+
+  it("hierarchy keys never write: no action flow, no quit, input untouched", () => {
+    const state = hierPane("task-a");
+    const frozen = structuredClone(state);
+    for (const key of ["p", "c", "1", "9"]) {
+      const next = handleKey(state, key, { detailLines: 50, detailItems: HIER_ITEMS });
+      expect(next.action).toBeNull();
+      expect(next.quit).toBe(false);
+    }
+    expect(state).toEqual(frozen);
+  });
+
+  it("without a snapshot every jump reports (pure-reducer path)", () => {
+    const noCtx = handleKey(hierPane("task-a"), "p", { detailLines: 50 });
+    expect(noCtx.detail?.id).toBe("task-a");
+    expect(noCtx.detail?.notice).toContain("not in the tree");
+  });
+});
+
+describe("detail pane hierarchy: footer + help (task-tui-hierarchy-jump)", () => {
+  it("the pane footer names the parent key after the position", () => {
+    const frame = renderTuiDetail(
+      HIER_ITEMS,
+      { id: "task-a", scroll: 0 },
+      HIER_SOURCES,
+      { width: 120, height: 10 },
+      { color: false },
+    );
+    const got = frame.replace(/^\x1b\[H\x1b\[2J/, "").split("\n");
+    expect(got[got.length - 1]).toContain("p parent");
+    assertOrder(got[got.length - 1]!, "row 1/", "p parent");
+  });
+
+  it("a refusal renders as a sanitized inline notice in the footer", () => {
+    const hostile = "\u001b[2J";
+    const frame = renderTuiDetail(
+      HIER_ITEMS,
+      { id: "task-a", scroll: 0, notice: `no parent: task-a${hostile} has no parent` },
+      HIER_SOURCES,
+      { width: 120, height: 10 },
+      { color: false },
+    );
+    // The frame's own leading clear-home is trusted output; everything after
+    // it (including the notice) must carry no raw control bytes.
+    const body = frame.replace(/^\x1b\[H\x1b\[2J/, "");
+    expect(body).not.toContain("");
+    expect(body).not.toContain("");
+    expect(frame).toContain("no parent");
+    expect(frame).toContain("\\u001b[2J");
+  });
+
+  it("the help overlay documents every hierarchy binding", () => {
+    const frame = renderTuiHelp({ ...initialTuiState(120, 30), help: true }, { color: false });
+    expect(frame).toContain("p");
+    expect(frame).toContain("open the parent's detail");
+    expect(frame).toContain("1-9");
+    expect(frame).toContain("open a child's detail");
+  });
+});
+
 describe("detail pane: runTuiBoard loop", () => {
   it("opens with Enter, scrolls with PgDn and Esc returns to the same selection", async () => {
     const root = newTree();
@@ -1806,6 +2060,51 @@ describe("detail pane: runTuiBoard loop", () => {
     term.input.write("q");
     await done;
     expect(term.outputText()).toContain("item task-rate-limit is not in the tree anymore");
+  });
+
+  it("jumps to the parent and back to a child through the live snapshot, read-only", async () => {
+    const root = newTree();
+    const before = readFileSync(
+      join(root, "tasks/launch/epic-a/story-login/task-rate-limit.md"),
+      "utf8",
+    );
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    term.output.rows = 24;
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+    const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 25));
+    term.input.write("\x1b[B"); // todo card 0 (epic-a) -> card 1
+    await tick();
+    term.input.write("\x1b[B"); // card 2: task-rate-limit
+    await tick();
+    term.input.write("\r"); // pane open on task-rate-limit
+    await tick();
+    term.input.write("p"); // parent: story-login
+    await tick();
+    term.input.write("2"); // second child in id order: task-rate-limit again
+    await tick();
+    term.input.write("\x1b"); // Esc: back to the board
+    await wait(150); // past the esc flush window
+    term.input.write("q");
+    await done;
+
+    const text = term.outputText();
+    // The parent jump resolves the kernel edge (task-rate-limit -> story-login)
+    // against the live tree, listing the story's two children numbered.
+    expect(text).toContain("arggon detail · story-login");
+    expect(text).toContain("children (2):");
+    expect(text).toContain("[1] bug-login-500");
+    expect(text).toContain("[2] task-rate-limit");
+    // The numbered jump lands back on the seeded task's detail.
+    const frames = text.split("\x1b[H\x1b[2J");
+    const childFrame = frames.find((frame) => frame.includes("[2] task-rate-limit")) ?? "";
+    expect(childFrame).toContain("arggon detail · story-login");
+    const backOnTask = frames.slice(frames.indexOf(childFrame)).join("\n");
+    expect(backOnTask).toContain("arggon detail · task-rate-limit");
+    // Read-only: the visited item files are byte-identical.
+    expect(
+      readFileSync(join(root, "tasks/launch/epic-a/story-login/task-rate-limit.md"), "utf8"),
+    ).toBe(before);
   });
 });
 
@@ -1899,6 +2198,8 @@ describe("help overlay (task-tui-help-vim-keys)", () => {
       "r",
       "c",
       "m",
+      "p",
+      "1-9",
       "q · Ctrl-C",
       "?",
     ]) {

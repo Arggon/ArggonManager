@@ -25,7 +25,8 @@
  * committed bytes (assert-before-write) and `npm run check:plugin` enforces the
  * gate in CI. The buffer above `MAX_BUNDLE_BYTES` guards accidental dependency
  * creep (an unmapped bare import would only fail at load time in a
- * dependency-less tree).
+ * dependency-less tree); it is a noise gate sized above the planned growth,
+ * not a second architecture constraint — the reasoning lives on the bound.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -47,16 +48,20 @@ export const KERNEL_PACKAGE = "@arggondev/lib";
 /**
  * Named exports the vendored bundle forwards (W5 `task-native-tui`; extended by
  * W6 `task-native-panel-interaction` with the panel's selection/detail
- * surface). The emitted wrapper re-exports ONLY this board surface —
- * everything else the entry module exports stays internal to the bundle
- * (review P3: the forwarding used to leak all ~46 server-plugin internals). The
- * list is exactly what `tui.tsx` imports from `./index.ts`; the parity test
- * pins both directions (every name exists in the entry, and the bundle
- * forwards nothing else).
+ * surface, and by `task-native-panel-hierarchy-links` with the hierarchy
+ * resolvers the panel's parent/children jumps read). The emitted wrapper
+ * re-exports ONLY this board surface — everything else the entry module
+ * exports stays internal to the bundle (review P3: the forwarding used to leak
+ * all ~46 server-plugin internals). The list is exactly what `tui.tsx` imports
+ * from `./index.ts`; the parity test pins both directions (every name exists
+ * in the entry, and the bundle forwards nothing else).
  */
 export const BUNDLE_EXPORTS = [
   "ARGON_BOARD_PANEL",
+  "BOARD_HIERARCHY_CHILD_KEYS",
+  "boardChildrenOf",
   "boardItemDetail",
+  "boardParentId",
   "boardSnapshot",
   "boardTreeLines",
   "emptyBoardSelection",
@@ -67,8 +72,30 @@ export const BUNDLE_EXPORTS = [
   "sidebarStatusLine",
 ] as const;
 
-/** Generous upper bound: the inlined kernel plus the plugin source. */
-export const MAX_BUNDLE_BYTES = 512 * 1024;
+/**
+ * Upper bound on the emitted artifact's bytes. A NOISE GATE, not an
+ * architecture constraint: it protects exactly what the single-file design
+ * cannot catch any other way — accidental dependency creep (an unmapped bare
+ * import builds fine and only fails at load time, inside a dependency-less
+ * adopter tree) and an accidental runaway bundle merging silently.
+ *
+ * Sized 2026-10-11 against the measured friction chain
+ * (task-plugin-bundle-near-byte-ceiling): the former 512 KiB had 599 bytes of
+ * headroom on the friction module's own chain — 523,689 bytes at the T2 report
+ * (PR #712), 524,472 at the done-gate fence (PR #713, CI red with
+ * `plugin bundle: 524472 bytes > 524288 bound`), with T4 opt-out keys and the
+ * T5 MCP surface + json-output + doctor still to land. 640 KiB carries
+ * ~131 KiB (25%) past 524,472 — about seven times the friction module's own
+ * 19.5 KiB share of today's 513,592-byte bundle — so planned additive growth
+ * cannot fail CI on a ceiling error, while a genuinely bloat-struck graph
+ * still does. Splitting was rejected: the adopter shape is ONE vendored file
+ * (ADR 0011 §5/§6) and nothing in the graph is droppable — everything
+ * reachable from the entry is the plugin's own tool surface.
+ *
+ * Raise it the same way when it bites again: record the measured size and the
+ * growth still planned, and keep the bound at least ~25% above both.
+ */
+export const MAX_BUNDLE_BYTES = 640 * 1024;
 
 /** First line of the generated artifact (the init marker is prepended later). */
 export const BUNDLE_BANNER =

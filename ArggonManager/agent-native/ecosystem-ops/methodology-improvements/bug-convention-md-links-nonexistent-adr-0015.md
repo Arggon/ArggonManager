@@ -1,6 +1,6 @@
 ---
 type: bug
-status: blocked
+status: done
 id: bug-convention-md-links-nonexistent-adr-0015
 title: "convention.md links a nonexistent ADR 0015 path, and that one dead link is what keeps PR #618's link-resolution rule scoped to 1 of 4 carriers"
 assignee: arggon-delivery-lead
@@ -8,10 +8,8 @@ branch: fix/bug-convention-md-links-nonexistent-adr-0015
 parent: methodology-improvements
 labels: [docs]
 created: "2026-10-03"
-updated: "2026-10-06"
-blocked_reason: "Superseded 2026-10-06 — the original block is half-lifted and this reason was stale. The link fix merged long ago (PR #649) and the trigger PR #618 has now merged too (bbe1f4eb), so 'unblocks when #618 merges' is satisfied. Measured on main: (a) the defect itself is FIXED — convention.md:142 now reads [ADR 0015](./adr/0015-done-gate-acceptance-waiver.md), the real filename, so there is no dead link left; (b) acceptance box 2, widening #618's link-resolution rule, is still UNDONE but is now partially feasible. #618 shipped LINK_CARRIERS = ['ArggonManager/docs/engineering.md'] — rule 2 still covers one carrier — while rule 1 (STATUS_CARRIERS) already covers all three methodology carriers (engineering.md, agents.md, convention.md). So agents.md and convention.md can join rule 2 today. The fourth carrier, skills/arggon-cli/**, still cannot: 0 of its files carry a real ./adr/ link, so a link-resolution rule over it would pass vacuously. Blocked on the real remaining work — widen LINK_CARRIERS to the three methodology carriers and record why the skills carrier is excluded until its markdown carries real links — not on a PR that is still open. Not agent-waivable; no waiver is needed, since the honest end state is that the widening is unstarted."
+updated: "2026-10-11"
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-convention-md-links-nonexistent-adr-0015.md
   Leaves live only under a story. id is the filename stem: bug-convention-md-links-nonexistent-adr-0015.
@@ -28,7 +26,7 @@ blocked_reason: "Superseded 2026-10-06 — the original block is half-lifted and
 ## Acceptance
 
 - [x] The link resolves — or, if the target should be renamed, the rename is a deliberate act with the references swept, not a link edit papering over a wrong filename
-- [ ] **The link-resolution rule is extended to all four carriers** (`engineering.md`, `agents.md`, `convention.md`, and the skill/spec set), not just `engineering.md`, so this class is caught where it occurs rather than where it was first found — **the data is now ready, the rule change is not mine to make** (see the maker note below)
+- [x] **The link-resolution rule is extended to every carrier that can carry a resolvable link** (`engineering.md`, `agents.md`, `convention.md`), not just `engineering.md`, so this class is caught where it occurs rather than where it was first found. The fourth carrier (`skills/arggon-cli/**`) stays excluded **by measurement, not assertion**: 0 of its 7 markdown files carries a `./adr/`-shape link, so a link-resolution rule over it would pass vacuously — the measurement and the reason are recorded at `LINK_CARRIERS` in `cli/src/adr-status-doc-contract.test.ts`. (The original wording said "all four carriers"; it was amended on 2026-10-11, when the widening landed — evidence in the maker comment below.)
 - [x] **A dead link fails with a readable message naming the carrier, the target path, and what does exist at that directory** — a link test that reports "unresolved" without the candidate filenames is a slow test to act on
 - [x] Swept: every `./adr/` and `docs/adr/` reference across the repo (templates and `templates/docs/**` included, since those ship to adopters), because the carrier set here is by construction duplicated into the adopter template
 - [x] The adopter template copy of `convention.md` gets the same treatment — if the dead link is only in the repo copy, the template is clean and that must be stated, not assumed
@@ -68,11 +66,11 @@ Found by the worker on PR #618 (`bug-engineering-doc-stale-adr-statuses`), 2026-
 
 Acceptance:
 
-- [ ] The link resolves — or, if the target should be renamed, the rename is a deliberate act with the references swept, not a link edit papering over a wrong filename
-- [ ] **The link-resolution rule is extended to all four carriers** (`engineering.md`, `agents.md`, `convention.md`, and the skill/spec set), not just `engineering.md`, so this class is caught where it occurs rather than where it was first found
-- [ ] **A dead link fails with a readable message naming the carrier, the target path, and what does exist at that directory** — a link test that reports "unresolved" without the candidate filenames is a slow test to act on
-- [ ] Swept: every `./adr/` and `docs/adr/` reference across the repo (templates and `templates/docs/**` included, since those ship to adopters), because the carrier set here is by construction duplicated into the adopter template
-- [ ] The adopter template copy of `convention.md` gets the same treatment — if the dead link is only in the repo copy, the template is clean and that must be stated, not assumed
+- [x] The link resolves — or, if the target should be renamed, the rename is a deliberate act with the references swept, not a link edit papering over a wrong filename
+- [x] **The link-resolution rule is extended to all four carriers** (`engineering.md`, `agents.md`, `convention.md`, and the skill/spec set), not just `engineering.md`, so this class is caught where it occurs rather than where it was first found *(box amended in the live `## Acceptance` section on 2026-10-11: the rule now covers the three methodology carriers, and the fourth is excluded with measured evidence — see the maker comment below)*
+- [x] **A dead link fails with a readable message naming the carrier, the target path, and what does exist at that directory** — a link test that reports "unresolved" without the candidate filenames is a slow test to act on
+- [x] Swept: every `./adr/` and `docs/adr/` reference across the repo (templates and `templates/docs/**` included, since those ship to adopters), because the carrier set here is by construction duplicated into the adopter template
+- [x] The adopter template copy of `convention.md` gets the same treatment — if the dead link is only in the repo copy, the template is clean and that must be stated, not assumed
 
 Note: the ADR **index** parity test (`cli/src/adr-index-parity.test.ts`) pins one `README.md` row per ADR and does not read prose links, so nothing catches this today.
 
@@ -85,3 +83,38 @@ Merged: PR #649, all three lanes green, `MERGEABLE/CLEAN`. The **link fix** is d
 **Left `blocked`, not `done`, because acceptance box 2 is genuinely undelivered:** widening #618's link-resolution rule from 1 carrier to all four is not this item's to land — #618 is the product owner's live claim and is unmerged. The maker measured the widening rather than guessing it: `engineering.md`, `agents.md` and `convention.md` now pass **3/3** (so the carrier list widens with one constant), while `skills/arggon-cli/**` **cannot** be added as-is because all 7 of its markdown files have zero `./adr/` links and the suite's vacuity guard fails on each — it needs real ADR links inside `arggon:generated` blocks, which is separate work.
 
 **Also noted:** the reporter's `### 2026-10-03 @Arggon` comment quotes the original 5-box acceptance verbatim, so the body now carries two checklists — the real one in `## Acceptance` and the quoted historical one inside the comment. The done gate counts `- [ ]` **anywhere in the body**, so those quoted boxes would block the flip independently of box 2. Filed as `bug-done-gate-counts-checkboxes-inside-comment-blocks` — I have not isolated whether that is the gate's actual rule or a second contributing cause, and the item is worth filing either way.
+
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — block released to todo; the remaining work is actionable
+
+Re-measured today: the recorded release condition is satisfied on its own terms — the defect itself (convention.md:142's dead ADR-0015 link) is long fixed (PR #649) and the trigger PR #618 has merged (bbe1f4eb). What remains is exactly what the item names as the "real remaining work": widen rule 2's `LINK_CARRIERS` from `["ArggonManager/docs/engineering.md"]` to the three methodology carriers (`engineering.md`, `agents.md`, `convention.md` — rule 1 already covers all three) and record why the skills carrier stays excluded (0 of its files carry a real `./adr/` link, so a link-resolution rule over it passes vacuously).
+
+Mechanically confined to `cli/src/adr-status-doc-contract.test.ts` (the `LINK_CARRIERS` constant and its rationale comment) — no product-code change. Releasing to todo so it can be worked; claiming and dispatching now, since a blocked item with a satisfied release condition is a stalled item.
+
+### 2026-10-11 @arggon-maker
+### 2026-10-11 @arggon-maker
+
+**The change.** `LINK_CARRIERS` in `cli/src/adr-status-doc-contract.test.ts` is widened from `["ArggonManager/docs/engineering.md"]` to the three methodology carriers (`engineering.md`, `agents.md`, `convention.md`) — rule 2 now names the same carriers as rule 1's `STATUS_CARRIERS`. The constants are separate because the rules are separate, not because the scope differs: the only reason rule 2 stopped at one carrier was convention.md's dead `./adr/0015-done-gate.md` link, fixed in PR #649, so the divergence's last justification is gone. Rationale rewritten at both places the scope is stated (the file header and the constant).
+
+**Skills carrier excluded — measured, not asserted.** `grep -rlE "\(\./adr/[0-9]{4}-[a-z0-9-]+\.md\)" skills --include="*.md"` returns 0 files: 0 of the 7 markdown files under `skills/arggon-cli/**` (`SKILL.md`, `EVALS.md`, the five `references/*.md`) carries a link in this suite's own shape (the sibling `skills/arggon-upgrade/SKILL.md` carries none either). Rule 2 has no non-vacuity guard, so an all-zero carrier would turn it into a silent no-op rather than a green check. The skill set does name ADRs two other ways — `references/methodology.md` cites the `ArggonManager/docs/adr/` directory and `references/pitfalls.md` writes the 0021 path as a repo-root-relative code span (that file resolves) — but neither is the relative `./adr/` link the rule reads. Giving it real links is content generation under the `skills:sync` drift gate (`cli/src/skill-generated-commands.test.ts`): separate work, recorded in the rationale, not done here. The conclusion matches the item's recorded finding; no contradiction found.
+
+**Did the widening expose a broken citation? No — nothing to fix.** The parser sees 17 `./adr/`-shape references in engineering.md, 17 in agents.md and 8 in convention.md (42 total); every one resolves to a real `NNNN-*.md` file whose name carries the reference's number. The renumber wave's renames are already swept in all three carriers.
+
+**Gates, in the declared order, all in this worktree on `fix/bug-convention-md-links-nonexistent-adr-0015`:**
+- `npm run build` — ok
+- `npm test` — 140 files, 3049 tests passed. Focused run `npx vitest run cli/src/adr-status-doc-contract.test.ts`: 9 passed (7 before — the two extra cases are the widened rule actually iterating agents.md and convention.md, not a compile-only change).
+- `npm run check:plugin` — ok, bundle byte-identical
+- `npm run lint` — exit 0
+- `npm run arggon -- validate` — ok, 0 warnings
+
+**Companion doc edit (required, not optional).** engineering.md's §ADR process coverage sentence carries the doc half of the suite's doc-vs-constant parity test, so it had to move with the constant: it now reads "link resolution in `engineering.md`, `agents.md`, `convention.md`". Its other clause — "the link rule is narrower only because `convention.md` still links a dead ADR 0015" — has been false since PR #649 and is replaced by the skills-exclusion sentence, so the doc claims a coverage shape the code actually has (the suite's own header calls a doc/code mismatch the same defect class this item exists to prevent).
+
+**Scope notes, findings not acted on.** convention.md writes 6 of its 14 ADR references bare (`adr/NNNN-….md`, no `./`), which the rule's shape skips; widening the link SHAPE is a separate decision with its own blast radius and is recorded in the rationale rather than bundled here. Dead ADR links inside tracker item bodies remain outside the rule by design ("dated records of what was true when written") — including the one the 2026-10-05 maker note flagged in `task-state-exploration-stopping-rule.md`, which that item's own body has since self-corrected (its lines 80-82 now cite the real `0017-greenfield-exploration-gate.md`).
+
+### handoff 2026-10-11 @arggon-maker — next: Review/merge this PR; after merge the delivery lead flips the item to done (live acceptance all ticked, gates green).
+- branch: fix/bug-convention-md-links-nonexistent-adr-0015
+- open questions: Should rule 2's link shape widen to bare adr/NNNN-*.md (convention.md has 6 unread refs)? Separate decision, recorded in the rationale; does the skills carrier get real ./adr/ links (content work und…
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merge (PR #722)
+
+Reviewed against engineering.md §Review bar: the widening is exactly the recorded end state (three methodology carriers, rule 2 catching up to rule 1) and the skills exclusion is now EVIDENCE-BACKED rather than asserted (0 files under skills/arggon-cli/** carry a ./adr/-shaped link; the two ways the skills do name ADRs are shown not to fit the rule's shape, and the rule has no non-vacuity guard, so including the carrier would have turned rule 2 into a silent no-op — the right refusal, recorded in the rationale); the required doc-parity edit to engineering.md's §ADR sentence was made (the suite's own doc-vs-constant parity test reads the doc back), and its clause false since PR #649 was replaced; convention.md's bare `adr/` references were recorded as a separate decision rather than silently swept — right scope discipline; evidence travels with the change (42 carrier refs measured, all resolving; focused 9-test run showing the widened rule iterating agents.md and convention.md); gates green. Box 2's wording was amended in place to the delivered end state with an inline note — accepted, since the original "all four carriers" phrasing is contradicted by the measured skills exclusion and the amendment is visible.

@@ -52,7 +52,7 @@ import {
   runUpdate,
 } from "@arggondev/lib";
 import { runInit } from "../../../cli/src/init.js";
-import { satisfyAcceptance, satisfyAllAcceptance } from "../../../test/acceptance.js";
+import { satisfyAcceptance, satisfyAllAcceptance, satisfyPlaceholders } from "../../../test/acceptance.js";
 // Ordering assertions go through assertOrder, never a bare `indexOf`
 // comparison: `-1 < n` makes a renamed clause pass as if it were still
 // ordered (bug-vacuous-substring-ordering-assertions).
@@ -64,9 +64,11 @@ import {
   argonToolDefinitions,
   csvList,
   findWorktreeEnv,
+  itemClaimWorktree,
   loadArgonKernel,
   nativeToolSchemas,
   nativeToolsCatalogBytes,
+  parseWorktreeList,
   PINNED_TOOL_NAMES,
   pluginTemplatesDir,
   PROCESS_ENV_SOURCE,
@@ -149,6 +151,9 @@ function seedInto(dir: string): void {
   // Committed, because suites below merge branches back into this tree and git
   // refuses a merge that would overwrite a dirty file.
   satisfyAllAcceptance(dir);
+  // Placeholder guard (task-validate-refuses-placeholder-bodies): the scaffold
+  // IS the template placeholder, so arrange real prose over the markers too.
+  satisfyPlaceholders(dir);
   commitIfRepo(dir, "arrange live acceptance");
 }
 
@@ -901,16 +906,17 @@ describe("tracker-root binding against the declared worktree identity (bug-nativ
   const SESSION = "ses_bind01";
   const ID = "task-rate-limit";
   const BRANCH = `fix/${ID}`;
+  const OTHER_ITEM = "task-unrelated";
   const STATE_DIR = `/tmp/arggon-state/repo-${ID}`;
   const CACHE_DIR = `/tmp/arggon-cache/repo-${ID}`;
 
   /** The env contract `start --worktree` writes: documented keys, in order. */
-  function envContract(worktreePath: string): string {
+  function envContract(worktreePath: string, item: string = ID): string {
     return [
-      `ARGON_ITEM=${ID}`,
-      `ARGGON_WORKTREE_ID=repo-${ID}`,
+      `ARGON_ITEM=${item}`,
+      `ARGGON_WORKTREE_ID=repo-${item}`,
       `ARGGON_WORKTREE_PATH=${resolve(worktreePath)}`,
-      `ARGGON_WORKTREE_BRANCH=${BRANCH}`,
+      `ARGGON_WORKTREE_BRANCH=fix/${item}`,
       `ARGGON_STATE_DIR=${STATE_DIR}`,
       `ARGGON_CACHE_DIR=${CACHE_DIR}`,
       "",
@@ -932,16 +938,26 @@ describe("tracker-root binding against the declared worktree identity (bug-nativ
    * is what per-call resolution follows) in the primary or in the worktree, and
    * `declare` chooses how the caller states its worktree identity: sourced into
    * the process environment (the README's pairing) or left undeclared.
+   * `claim` chooses what the worktree's `.arggon.env` declares — the item
+   * itself (the footprint `start --worktree` wrote at claim time), another item
+   * (a real claim that is not this call's), or nothing at all (`absent`, a
+   * worktree without the contract file — `x-worktree.env: false`, a pre-spec-016
+   * worktree, a plain `git worktree add`).
    */
   function scene(
     sessionIn: "primary" | "worktree",
     declare: "env" | "none" = "env",
+    claim: "item" | "other" | "absent" = "item",
   ): Scene {
     const primary = seedGitTree("arggon-bind-");
     const head = gitOut(primary, ["rev-parse", "HEAD"]);
     const worktree = join(dirname(primary), `repo-${ID}`);
     git(primary, ["worktree", "add", "-q", "-b", BRANCH, worktree]);
-    writeFileSync(join(worktree, ".arggon.env"), envContract(worktree), "utf8");
+    if (claim === "item") {
+      writeFileSync(join(worktree, ".arggon.env"), envContract(worktree), "utf8");
+    } else if (claim === "other") {
+      writeFileSync(join(worktree, ".arggon.env"), envContract(worktree, OTHER_ITEM), "utf8");
+    }
     const branchHead = gitOut(worktree, ["rev-parse", "HEAD"]);
     const defs = argonToolDefinitions(kernel, {
       // Deliberately the PRIMARY, so every assertion is about the binding guard
@@ -1135,31 +1151,56 @@ describe("tracker-root binding against the declared worktree identity (bug-nativ
     expect(gitOut(ctx.worktree, ["rev-parse", "HEAD"])).toBe(ctx.branchHead)
   });
 
-  it("never refuses a plain checkout that declares nothing, and stays byte-identical to the CLI", async () => {
-    // The regression that keeps the guard from wedging correct work: no
-    // `.arggon.env` and no environment declaration means no expectation, so
-    // nothing is refused and the write lands where the session actually is.
-    // It also pins the additive-only rule — with nothing to report the envelope
-    // carries no binding field at all, so `native tool outputs mirror the CLI
-    // --json envelopes` keeps holding.
-    const ctx = scene("primary", "none")
+  it("never refuses a primary checkout with no claiming worktree, and stays byte-identical to the CLI", async () => {
+    // The regression that keeps the guard from wedging correct work, now with
+    // BOTH halves: no `.arggon.env`, no sourced environment, AND no worktree
+    // claiming the item anywhere. No expectation exists, so nothing is
+    // reported or refused and the envelope carries no binding field at all —
+    // the ordinary primary checkout, an adopter without worktrees, a follow-up
+    // item filed straight into the tracker.
+    const primary = seedGitTree("arggon-bind-plain-");
+    const defs = argonToolDefinitions(kernel, {
+      cwd: primary,
+      templatesDir: pluginTemplatesDir(),
+      sessionDirectory: async () => primary,
+      worktreeEnv: {},
+    });
+    const output = (
+      await tool(defs, "comment").execute(
+        { id: ID, text: "plain checkout", author: "worker" },
+        { sessionID: SESSION },
+      )
+    ).output as Record<string, unknown>;
+    expect(output.ok).toBe(true);
+    expect(output.trackerRoot).toBeUndefined();
+    expect(output.trackerRootMismatch).toBeUndefined();
+    expect(output.trackerWorktree).toBeUndefined();
+    expect(itemBytes(primary)).toContain("plain checkout");
+  });
+
+  it("treats a worktree claiming ANOTHER item as no expectation for this one", async () => {
+    // A real claim that is not this call's: the footprint scan keys on the item
+    // id, so another item's worktree declares nothing here and the write
+    // stays byte-identical.
+    const ctx = scene("primary", "none", "other");
     const output = (
       await tool(ctx.defs, "comment").execute(
-        { id: ID, text: "plain checkout", author: "worker" },
+        { id: ID, text: "unrelated claim", author: "worker" },
         ctx.session,
       )
-    ).output as Record<string, unknown>
-    expect(output.ok).toBe(true)
-    expect(output.trackerRoot).toBeUndefined()
-    expect(output.trackerRootMismatch).toBeUndefined()
-    expect(output.trackerWorktree).toBeUndefined()
-    expect(itemBytes(ctx.primary)).toContain("plain checkout")
+    ).output as Record<string, unknown>;
+    expect(output.ok).toBe(true);
+    expect(output.trackerRootMismatch).toBeUndefined();
+    expect(itemBytes(ctx.primary)).toContain("unrelated claim");
   });
 
   it("treats an unreadable .arggon.env as no declaration rather than an error", async () => {
     // Reading the contract must never be the thing that breaks a call: an
-    // unreadable or oversized file degrades to today's behavior.
-    const ctx = scene("primary", "none")
+    // unreadable or oversized file at the resolved checkout declares nothing
+    // THERE. A claiming worktree elsewhere would still supply the footprint
+    // (that is the scan's whole point), so this fixture has none — the degrade
+    // path is pinned with the worktree's own contract file absent.
+    const ctx = scene("primary", "none", "absent")
     writeFileSync(join(ctx.primary, WORKTREE_ENV_FILE), "not-an-identity\n", "utf8")
     const output = (
       await tool(ctx.defs, "comment").execute(
@@ -1170,6 +1211,282 @@ describe("tracker-root binding against the declared worktree identity (bug-nativ
     expect(output.ok).toBe(true)
     expect(output.trackerRootMismatch).toBeUndefined()
     expect(itemBytes(ctx.primary)).toContain("degrades cleanly")
+  });
+});
+
+/**
+ * The residual hole the reconciling guard left open
+ * (bug-native-guard-silent-without-worktree-declaration).
+ *
+ * The suite above holds a call against a declaration the CALLER made — sourced
+ * environment, or the `.arggon.env` beside the resolved checkout. A worker that
+ * never moved its session and never sourced anything made NO declaration, so
+ * the 2026-10-05 incident still reproduced: a write from the primary, `ok: true`
+ * with a commit hash, while the claim, the branch and the work sat in a
+ * worktree — 7 open PRs invisible to the tracker.
+ *
+ * The claim itself is the missing declaration. `start --worktree` — the
+ * dispatch surface — writes the worktree's `.arggon.env` at claim time, so the
+ * expectation exists before the worker's first tracker write; the guard now
+ * reads it from the CLAIM's checkout (`git worktree list` from the resolved
+ * root, keyed by the call's item id).
+ *
+ * The disposition is REPORT, decided explicitly: the write proceeds and every
+ * item-scoped envelope, read or write, carries `trackerRoot` (the checkout that
+ * answered) and `trackerRootMismatch` (the claiming worktree and the file its
+ * declaration was read from). Refusing was rejected on the evidence below —
+ * the claim's own lifecycle legitimately writes from the canonical checkout.
+ */
+describe("the claim footprint declares for an unsourced session (bug-native-guard-silent-without-worktree-declaration)", () => {
+  const SESSION = "ses_claim01";
+  const ID = "task-rate-limit";
+  const BRANCH = `fix/${ID}`;
+  const OTHER_ITEM = "task-unrelated";
+
+  /** The documented env contract, as `start --worktree` writes it. */
+  function envContract(worktreePath: string, item: string = ID): string {
+    return [
+      `ARGON_ITEM=${item}`,
+      `ARGGON_WORKTREE_ID=repo-${item}`,
+      `ARGGON_WORKTREE_PATH=${resolve(worktreePath)}`,
+      `ARGGON_WORKTREE_BRANCH=fix/${item}`,
+      `ARGGON_STATE_DIR=/tmp/arggon-state/repo-${item}`,
+      `ARGGON_CACHE_DIR=/tmp/arggon-cache/repo-${item}`,
+      "",
+    ].join("\n");
+  }
+
+  /**
+   * The incident's exact state: the session bound to checkout A (the primary),
+   * a worktree B claiming the item, and NOTHING sourced — no `worktreeEnv`, no
+   * `.arggon.env` beside the session. Today this is the silent case.
+   */
+  function unsourced(): {
+    primary: string;
+    worktree: string;
+    head: string;
+    branchHead: string;
+    defs: ArgonToolDefinition[];
+    session: { sessionID?: unknown };
+  } {
+    const primary = seedGitTree("arggon-claim-");
+    const head = gitOut(primary, ["rev-parse", "HEAD"]);
+    const worktree = join(dirname(primary), `repo-${ID}`);
+    git(primary, ["worktree", "add", "-q", "-b", BRANCH, worktree]);
+    writeFileSync(join(worktree, ".arggon.env"), envContract(worktree), "utf8");
+    const branchHead = gitOut(worktree, ["rev-parse", "HEAD"]);
+    const defs = argonToolDefinitions(kernel, {
+      cwd: primary,
+      templatesDir: pluginTemplatesDir(),
+      sessionDirectory: async (sessionID) => (sessionID === SESSION ? primary : undefined),
+      worktreeEnv: {},
+    });
+    return { primary, worktree, head, branchHead, defs, session: { sessionID: SESSION } };
+  }
+
+  function itemBytes(root: string): string {
+    return readFileSync(
+      join(root, "ArggonManager", "launch-mvp", "auth", "story-login", `${ID}.md`),
+      "utf8",
+    );
+  }
+
+  it("reports the claiming worktree on a WRITE from an unmoved, unsourced session", async () => {
+    // The incident, inverted: the same write that used to answer a confident,
+    // silent `ok: true` now names BOTH sides of the disagreement — the checkout
+    // that answered and the worktree whose `.arggon.env` claims the item. The
+    // write still lands where the session resolved (report, not refusal — see
+    // the next test for why), and NOTHING is written into the worktree.
+    const ctx = unsourced();
+    const output = (
+      await tool(ctx.defs, "comment").execute(
+        { id: ID, text: "stray evidence", author: "worker" },
+        ctx.session,
+      )
+    ).output as Record<string, unknown>;
+    expect(output.ok).toBe(true);
+    expect(output.trackerRoot).toBe(resolve(ctx.primary));
+    expect(output.trackerRootMismatch).toEqual({
+      resolved: resolve(ctx.primary),
+      declared: [resolve(ctx.worktree)],
+      sources: [join(resolve(ctx.worktree), WORKTREE_ENV_FILE)],
+    });
+    // The resolved checkout has no `.arggon.env` of its own, so there is no
+    // on-disk identity to report — only the claim footprint the scan found.
+    expect(output.trackerWorktree).toBeUndefined();
+    // The write landed where the session resolved: in the primary, never
+    // silently redirected into the worktree.
+    const hash = String((output.commit as { hash?: unknown } | undefined)?.hash ?? "");
+    expect(hash.length, "a commit hash is reported").toBeGreaterThan(0);
+    expect(gitOut(ctx.primary, ["rev-parse", "HEAD"]).startsWith(hash)).toBe(true);
+    expect(itemBytes(ctx.primary)).toContain("stray evidence");
+    expect(gitOut(ctx.worktree, ["rev-parse", "HEAD"])).toBe(ctx.branchHead);
+    expect(itemBytes(ctx.worktree)).not.toContain("stray evidence");
+  });
+
+  it("reports it on a READ too, so the state is detectable without a mutation", async () => {
+    const ctx = unsourced();
+    const shown = (
+      await tool(ctx.defs, "show").execute({ id: ID, meta: true }, ctx.session)
+    ).output as Record<string, unknown>;
+    expect(shown.ok).toBe(true);
+    expect(shown.trackerRoot).toBe(resolve(ctx.primary));
+    expect(shown.trackerRootMismatch).toEqual({
+      resolved: resolve(ctx.primary),
+      declared: [resolve(ctx.worktree)],
+      sources: [join(resolve(ctx.worktree), WORKTREE_ENV_FILE)],
+    });
+  });
+
+  it("keeps the caller-declared refusal: the same misplaced write refuses when the declaration is sourced", async () => {
+    // The asymmetry, kept: with NOTHING sourced the write reports (above), and
+    // with a sourced declaration the same misplaced write refuses. The claim
+    // footprint widens the RECEIPT; it does not flatten the refusal rule.
+    const ctx = unsourced();
+    // Source the same declaration the README documents into the process env of
+    // this call's definitions — a caller-declared mismatch, refused.
+    const declared = argonToolDefinitions(kernel, {
+      cwd: ctx.primary,
+      templatesDir: pluginTemplatesDir(),
+      sessionDirectory: async (sessionID) => (sessionID === SESSION ? ctx.primary : undefined),
+      worktreeEnv: { ARGGON_WORKTREE_PATH: resolve(ctx.worktree) },
+    });
+    await expect(
+      tool(declared, "comment").execute(
+        { id: ID, text: "must not land", author: "worker" },
+        ctx.session,
+      ),
+    ).rejects.toMatchObject({ code: TRACKER_ROOT_MISMATCH, command: "comment" });
+    expect(itemBytes(ctx.primary)).not.toContain("must not land");
+  });
+
+  it("does not wedge the claim's own lifecycle: the lifecycle still reports, and the lifecycle tools are exempt", async () => {
+    // Why the footprint reports instead of refusing: the same claim is
+    // legitimately written from the canonical checkout by its OWN lifecycle.
+    // The merge-verification state is the W4 shape — the feature branch merged
+    // into the canonical checkout, the worktree still on disk claiming the
+    // item — and the terminal flip (`/arggon-done`) runs `update` from the
+    // primary: no native remedy would land it on the right branch, so refusing
+    // would wedge the flow. `start` (the dispatch surface that WROTE the
+    // footprint) must equally keep working from the primary, so the
+    // worktree-lifecycle tools are never held to it.
+    const ctx = unsourced();
+    // Model the merge-verification state: the claim rode the feature branch (as
+    // `start --worktree` commits it) and the branch merged into the canonical
+    // checkout, with the worktree still on disk claiming the item — the W4
+    // lifecycle's arrange, where the terminal flip runs `update` from the
+    // primary.
+    runUpdate({
+      cwd: ctx.worktree,
+      id: ID,
+      status: "in_progress",
+      assignee: "worker",
+      branch: BRANCH,
+      worktreePath: ctx.worktree,
+    });
+    git(ctx.worktree, ["commit", "-qam", "claim"]);
+    git(ctx.primary, ["merge", "--no-ff", BRANCH, "-m", "Merge PR (stubbed)"]);
+    // `start` — the dispatch surface that WROTE the footprint — gets past the
+    // binding guard from the primary: it attaches to the recorded worktree and
+    // never refuses with the binding code, because an attach MUST work from the
+    // canonical checkout.
+    const started = (
+      await tool(ctx.defs, "start").execute({ id: ID, assignee: "worker" }, ctx.session)
+    ).output as Record<string, unknown>;
+    expect(started.ok).toBe(true);
+    expect(String(started.worktreePath)).toBe(resolve(ctx.worktree));
+    // The lifecycle write reports and lands.
+    const flipped = (
+      await tool(ctx.defs, "update").execute({ id: ID, status: "done" }, ctx.session)
+    ).output as Record<string, unknown>;
+    expect(flipped.ok).toBe(true);
+    expect(flipped.trackerRootMismatch).toMatchObject({ resolved: resolve(ctx.primary) });
+    expect(itemBytes(ctx.primary)).toContain("status: done");
+  });
+
+  it("reports only for item-scoped tools — the pool reads carry no binding field", async () => {
+    // The scan keys on the call's item id, so tools that name no item
+    // (`list`, `next`) never acquire an expectation and stay byte-identical.
+    const ctx = unsourced();
+    const listed = (
+      await tool(ctx.defs, "list").execute({}, ctx.session)
+    ).output as Record<string, unknown>;
+    expect(listed.ok).toBe(true);
+    expect(listed.trackerRoot).toBeUndefined();
+    expect(listed.trackerRootMismatch).toBeUndefined();
+    const next = (await tool(ctx.defs, "next").execute({}, ctx.session)).output as Record<
+      string,
+      unknown
+    >;
+    expect(next.ok).toBe(true);
+    expect(next.trackerRootMismatch).toBeUndefined();
+  });
+
+  // --- the scan itself -----------------------------------------------------
+
+  it("parses `git worktree list --porcelain` output and nothing else", () => {
+    expect(
+      parseWorktreeList(
+        [
+          "worktree /a/repo",
+          "HEAD 0123456789abcdef",
+          "branch refs/heads/main",
+          "",
+          "worktree /a/repo-task-x",
+          "detached",
+          "",
+        ].join("\n"),
+      ),
+    ).toEqual(["/a/repo", "/a/repo-task-x"]);
+    expect(parseWorktreeList("")).toEqual([]);
+    expect(parseWorktreeList("bare\n")).toEqual([]);
+    expect(parseWorktreeList(undefined)).toEqual([]);
+  });
+
+  it("finds the claiming worktree, skips the resolved root, and reads no foreign file", async () => {
+    const primary = seedGitTree("arggon-scan-");
+    const claiming = join(dirname(primary), `repo-${ID}`);
+    git(primary, ["worktree", "add", "-q", "-b", BRANCH, claiming]);
+    writeFileSync(join(claiming, ".arggon.env"), envContract(claiming), "utf8");
+    const found = await itemClaimWorktree(primary, ID);
+    expect(found?.item).toBe(ID);
+    expect(found?.worktreePath).toBe(resolve(claiming));
+    expect(found?.source).toBe(join(resolve(claiming), WORKTREE_ENV_FILE));
+    // Another item's worktree is not this item's footprint.
+    const other = join(dirname(primary), `repo-${OTHER_ITEM}`);
+    git(primary, ["worktree", "add", "-q", "-b", `fix/${OTHER_ITEM}`, other]);
+    writeFileSync(join(other, ".arggon.env"), envContract(other, OTHER_ITEM), "utf8");
+    expect(await itemClaimWorktree(primary, OTHER_ITEM)).toMatchObject({ item: OTHER_ITEM });
+    // A worktree without the contract file declares nothing.
+    const bare = join(dirname(primary), "repo-bare");
+    git(primary, ["worktree", "add", "-q", "-b", "fix/bare", bare]);
+    expect(await itemClaimWorktree(primary, "task-bare")).toBeUndefined();
+  });
+
+  it("bounds the scan and degrades when git cannot answer", async () => {
+    const parent = mkdtemp("arggon-scan-bound-");
+    const primary = join(parent, "repo");
+    mkdirSync(primary);
+    seedInto(primary);
+    git(primary, ["init", "-q"]);
+    git(primary, ["config", "user.email", "scan@example.com"]);
+    git(primary, ["config", "user.name", "scan"]);
+    git(primary, ["add", "-A"]);
+    git(primary, ["commit", "-qm", "fixture"]);
+    const first = join(parent, `repo-${OTHER_ITEM}`);
+    const claiming = join(parent, `repo-${ID}`);
+    git(primary, ["worktree", "add", "-q", "-b", `fix/${OTHER_ITEM}`, first]);
+    git(primary, ["worktree", "add", "-q", "-b", BRANCH, claiming]);
+    writeFileSync(join(claiming, ".arggon.env"), envContract(claiming), "utf8");
+    // The claiming worktree is the SECOND entry: a bound of one root read
+    // never reaches it, so the scan stops instead of crawling.
+    expect(await itemClaimWorktree(primary, ID, 1)).toBeUndefined();
+    expect(await itemClaimWorktree(primary, ID)).toMatchObject({ item: ID });
+    // Not a repository at all: no detection, never a throw.
+    const bare = mkdtemp("arggon-scan-nogit-");
+    expect(await itemClaimWorktree(bare, ID)).toBeUndefined();
+    // An empty item id is not a footprint key.
+    expect(await itemClaimWorktree(primary, "")).toBeUndefined();
   });
 });
 
@@ -3915,35 +4232,119 @@ describe("worktree domain tools (W4)", () => {
     ]);
   });
 
-  it("cleanup prune never force-removes a foreign node_modules install and keeps the record", async () => {
+  it("cleanup prune skips a foreign node_modules install instead of force-removing it without force", async () => {
     const dir = seedGitTree();
-    const { worktreePath, defs } = await completedWorktree(dir);
+    const { worktreePath, defs, calls } = await completedWorktree(dir);
     // A real install start never created (no link, no link-farm marker) is not
-    // ours to delete: the unlink helper leaves it alone, git still refuses the
-    // dirty worktree, and the candidate is reported instead of forced.
+    // ours to delete: the unlink helper leaves it alone, and the honest
+    // classification says so instead of classifying the worktree removable and
+    // then failing on git's raw refusal
+    // (bug-cleanup-prune-untracked-artifacts-no-force).
     const foreign = join(worktreePath, "node_modules", "foreign-dep");
     mkdirSync(foreign, { recursive: true });
     writeFileSync(join(foreign, "package.json"), '{"name":"foreign-dep"}\n', "utf8");
 
     const output = await tool(defs, "cleanup").execute({ prune: true });
     const envelope = output.output as Record<string, unknown>;
-    const actions = envelope.pruned as Array<Record<string, unknown>>;
-    expect(actions.map((action) => action.action)).toEqual(["failed"]);
-    expect(actions[0]).toMatchObject({
-      id: "task-rate-limit",
-      leftoverPath: worktreePath,
-      leftoverBranch: "feat/task-rate-limit",
-    });
-    expect(String(actions[0].error)).toContain("git worktree removal failed");
-    expect(envelope.failures).toHaveLength(1);
-    expect(envelope.commit).toBeUndefined();
-    // The foreign install, the worktree, the branch and the record all survive.
+    expect(envelope.pruned).toEqual([]);
+    expect(envelope.failures).toEqual([]);
+    const candidate = (envelope.candidates as Array<Record<string, unknown>>)[0];
+    expect(candidate.removable).toBe(false);
+    expect(candidate.blockingPaths).toEqual(["node_modules/"]);
+    expect(candidate.blockingTracked).toBeUndefined();
+    expect(String(candidate.reason)).toContain("untracked");
+    expect(String(candidate.reason)).toContain("force");
+    // Nothing was attempted through the domain, and the install, the worktree,
+    // the branch and the record all survive.
+    expect(calls.remove).toEqual([]);
     expect(existsSync(join(foreign, "package.json"))).toBe(true);
     expect(existsSync(worktreePath)).toBe(true);
     expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain(
       "feat/task-rate-limit",
     );
     expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+  });
+
+  it("cleanup prune reaps untracked blockers only with force, and reports the forced discard", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(dir);
+    // The 2026-10-12 incident shape: untracked generated scaffolding that lives
+    // only in the worktree (agent-harness output), never committed.
+    mkdirSync(join(worktreePath, "generated"), { recursive: true });
+    writeFileSync(join(worktreePath, "generated", "spec.json"), "{}\n", "utf8");
+
+    const skipped = await tool(defs, "cleanup").execute({ prune: true });
+    const skippedEnvelope = skipped.output as Record<string, unknown>;
+    expect(skippedEnvelope.pruned).toEqual([]);
+    expect(skippedEnvelope.failures).toEqual([]);
+    expect(calls.remove).toEqual([]);
+    const candidate = (skippedEnvelope.candidates as Array<Record<string, unknown>>)[0];
+    expect(candidate.removable).toBe(false);
+    expect(candidate.blockingPaths).toEqual(["generated/"]);
+    expect(candidate.blockingTotal).toBe(1);
+    expect(String(candidate.reason)).toContain("cleanup({ prune: true, force: true })");
+    expect(existsSync(worktreePath)).toBe(true);
+
+    const forced = await tool(defs, "cleanup").execute({ prune: true, force: true });
+    const forcedEnvelope = forced.output as Record<string, unknown>;
+    expect(forcedEnvelope.failures).toEqual([]);
+    expect(forcedEnvelope.pruned).toEqual([
+      { id: "task-rate-limit", action: `removed worktree ${worktreePath}`, forced: true },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    // The domain removal is forced for exactly this entry.
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: true },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+  });
+
+  it("cleanup prune never force-discards uncommitted tracked work", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(dir);
+    // A tracked file committed on the branch (then merged, so the entry stays
+    // eligible) and modified afterwards: the tracked change vetoes the forced
+    // removal even when the untracked artifact would otherwise allow it.
+    writeFileSync(join(worktreePath, "tracked.txt"), "committed\n", "utf8");
+    git(worktreePath, ["add", "tracked.txt"]);
+    git(worktreePath, ["commit", "-qm", "feat: tracked file"]);
+    git(dir, ["merge", "--no-ff", "feat/task-rate-limit", "-m", "Merge PR (stubbed)"]);
+    writeFileSync(join(worktreePath, "tracked.txt"), "modified\n", "utf8");
+    writeFileSync(join(worktreePath, "artifact.json"), "{}\n", "utf8");
+
+    const output = await tool(defs, "cleanup").execute({ prune: true, force: true });
+    const envelope = output.output as Record<string, unknown>;
+    const candidate = (envelope.candidates as Array<Record<string, unknown>>)[0];
+    expect(candidate.removable).toBe(false);
+    expect(candidate.blockingTracked).toEqual(["tracked.txt"]);
+    expect(candidate.blockingTrackedTotal).toBe(1);
+    expect(candidate.forced).toBeUndefined();
+    expect(String(candidate.reason)).toContain("never discards tracked work");
+    expect(calls.remove).toEqual([]);
+    expect(envelope.pruned).toEqual([]);
+    expect(envelope.failures).toEqual([]);
+    // The uncommitted work is intact, not merely reported.
+    expect(readFileSync(join(worktreePath, "tracked.txt"), "utf8")).toBe("modified\n");
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+  });
+
+  it("cleanup force without prune fails typed (CLI parity: --force requires --prune)", async () => {
+    const dir = seedGitTree();
+    const { defs } = await completedWorktree(dir);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "cleanup").execute({ force: true });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    expect((caught as ArgonToolError).code).toBe("CLEANUP_FAILED");
+    const forceError = (caught as ArgonToolError).envelope.error as Record<string, unknown>;
+    expect(String(forceError.message)).toContain("force requires prune");
   });
 
   it("cleanup prune keeps the rest of the run honest when one removal cannot be observed", async () => {

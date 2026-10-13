@@ -1,5 +1,13 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { findTasksDir, itemsById, loadItems, liveAcceptanceCriteria } from "@arggondev/lib";
+import {
+  findTasksDir,
+  itemsById,
+  liveAcceptanceRegion,
+  liveContextRegion,
+  loadItems,
+  liveAcceptanceCriteria,
+  placeholderSections,
+} from "@arggondev/lib";
 
 /**
  * Shared test arrange helper for the done gate (task-done-gate-acceptance-waiver,
@@ -63,5 +71,65 @@ export function satisfyAllAcceptance(cwd: string): void {
   const tasksDir = findTasksDir(cwd);
   for (const item of loadItems(tasksDir)) {
     writeFileSync(item.filePath, tickedFile(readFileSync(item.filePath, "utf8")), "utf8");
+  }
+}
+
+/**
+ * Fixture prose substituted for a scaffold marker left in a live section.
+ * Deliberately NOT a checkbox: whether the arranged item carries criteria is
+ * the caller's business (see `satisfyAcceptance`); this step only removes the
+ * marker so `validate` reads real prose.
+ */
+const FIXTURE_PROSE = "Fixture prose (arranged by test/acceptance.ts).";
+
+/** A full-line scaffold comment inside a live region (spans already excluded). */
+const MARKER_LINE = /^[ \t]*<!--[\s\S]*?-->[ \t]*$/gm;
+
+/** The raw-body heading opening one live section (mirrors the kernel's exact match). */
+function sectionHeading(section: "Context" | "Acceptance"): RegExp {
+  return section === "Context" ? /^##[ \t]+context[ \t]*$/im : /^##[ \t]+acceptance[ \t]*$/im;
+}
+
+/**
+ * Replace the first occurrence of `marker` at or after the section heading —
+ * the live one, since live sections precede the Notes record in file order.
+ * Fixture-only approximation (like the rest of this helper): exotic bodies
+ * (fenced headings before the live one, marker duplicates inside dated
+ * comments) arrange by hand instead.
+ */
+function clearAfter(raw: string, heading: RegExp, marker: string): string {
+  const found = heading.exec(raw);
+  if (!found) return raw;
+  const at = raw.indexOf(marker, found.index);
+  if (at === -1) return raw;
+  return `${raw.slice(0, at)}${FIXTURE_PROSE}${raw.slice(at + marker.length)}`;
+}
+
+/**
+ * Arrange real prose over the scaffold markers of EVERY item in the tree, so a
+ * suite that seeds fixtures through `runCreate` (whose scaffold IS the
+ * template placeholder) can assert `validate` green for OTHER rules
+ * (task-validate-refuses-placeholder-bodies).
+ *
+ * Detection is the kernel's own (`placeholderSections` — the `<!-- … -->`
+ * grammar in the live sections, quoted prose excluded), never a restated
+ * marker copy here; only the replacement prose is fixture-owned. Runs AFTER
+ * `satisfyAcceptance`/`satisfyAllAcceptance` when a suite needs both (the
+ * marker stays put while criteria are arranged, then is replaced).
+ */
+export function satisfyPlaceholders(cwd: string): void {
+  const tasksDir = findTasksDir(cwd);
+  for (const item of loadItems(tasksDir)) {
+    let out = readFileSync(item.filePath, "utf8");
+    const raw = out;
+    for (const section of placeholderSections(item.body)) {
+      const region =
+        section === "Context" ? liveContextRegion(item.body) : liveAcceptanceRegion(item.body);
+      if (region === null) continue;
+      for (const match of region.matchAll(MARKER_LINE)) {
+        out = clearAfter(out, sectionHeading(section), match[0]);
+      }
+    }
+    if (out !== raw) writeFileSync(item.filePath, out, "utf8");
   }
 }

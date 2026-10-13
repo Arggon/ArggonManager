@@ -45,11 +45,19 @@ import {
   FrictionError,
   appendFrictionRecord,
   buildFrictionRecord,
+  clearFrictionLog,
+  frictionDroppedPath,
   frictionLogPath,
   type FrictionInput,
   type FrictionOptions,
   type FrictionRecord,
 } from "./friction.js";
+import {
+  buildFrictionPublishDoc,
+  type FrictionPublishDoc,
+  type FrictionPublishTier,
+} from "./friction-publish.js";
+import { readFrictionReport, type FrictionReport } from "./friction-report.js";
 import { runShow, type ShowComment, type ShowOptions } from "./show.js";
 import { runSync } from "./sync-command.js";
 import type { SyncFilled, SyncResult } from "./sync-types.js";
@@ -587,15 +595,30 @@ export function importIssuesOperation(
  * record must name the arggon that captured it, and the kernel ships no
  * manifest.
  */
-export type FrictionOperationOptions = FrictionOptions & FrictionInput;
+export type FrictionOperationOptions = FrictionOptions &
+  FrictionInput & {
+    /**
+     * Whether the operator opted out of capture (resolved by the caller from
+     * `x-friction` / `ARGGON_NO_FRICTION`). When true NO record is written and
+     * the envelope reports `optedOut: true` with no `record` — the command still
+     * exits 0, because honoring the opt-out is success, not failure.
+     */
+    optedOut?: boolean;
+  };
 
 export type FrictionPayload = {
   /** Absolute log path the record was appended to. */
   path?: string;
   /** Lines rotation dropped on this write (0 unless the bound was crossed). */
   dropped?: number;
-  /** The record exactly as persisted. */
+  /** The record exactly as persisted. Absent when opted out. */
   record?: FrictionRecord;
+  /**
+   * True when capture is opted out and nothing was written (ADR 0024 §3). The
+   * record is absent, `path` is absent, and the exit code stays 0 — an
+   * operator who turned the channel off did not make an error.
+   */
+  optedOut?: boolean;
   /** Failure only: the reason a machine acts on (spec §Observability). */
   reason?: string;
 };
@@ -603,13 +626,27 @@ export type FrictionPayload = {
 export function frictionOperation(opts: FrictionOperationOptions): CommandOutcome<FrictionPayload> {
   const cwd = opts.cwd;
   try {
+    if (opts.optedOut) {
+      // Nothing is written — not even the state dir. The envelope still carries
+      // the log path so the operator can see WHERE a record would have gone,
+      // and `optedOut: true` so a machine does not read a missing `record` as a
+      // failure.
+      return succeed(
+        "friction",
+        {
+          optedOut: true,
+          path: frictionLogPath(opts.env ?? process.env, opts.home ?? homedir()),
+        },
+        readConventionVersion(cwd),
+      );
+    }
     const record = buildFrictionRecord(opts, opts);
     const env = opts.env ?? process.env;
     const home = opts.home ?? homedir();
     const appended = appendFrictionRecord(record, frictionLogPath(env, home));
     return succeed(
       "friction",
-      { path: appended.path, dropped: appended.dropped, record },
+      { optedOut: false, path: appended.path, dropped: appended.dropped, record },
       readConventionVersion(cwd),
     );
   } catch (err) {
@@ -635,6 +672,134 @@ export function frictionOperation(opts: FrictionOperationOptions): CommandOutcom
       };
     }
     return fail("friction", cwd, "FRICTION_FAILED", err);
+  }
+}
+
+/**
+ * `arggon friction --report` — the fingerprint-dedupe report (plan task T3).
+ *
+ * Like capture, deliberately NOT a tracker operation: it reads the local log
+ * and its drop counter, loads no items and commits nothing (the log is not the
+ * tracker). The envelope carries the whole `FrictionReport` flattened onto the
+ * house base — the same rows the human renderer prints, plus the honesty
+ * signals (`dropped`, `skippedVersions`, `malformed`, `optedOut`) so a machine
+ * sees exactly what a human does. Rows are NOT capped here: the 50-row cap and
+ * the "… and N more classes" line are a human-channel concern
+ * ({@link renderFrictionReport}); `--json` is the complete contract.
+ *
+ * An empty or missing log is success with `count: 0` and `classes: 0`, matching
+ * `list`'s zero-match contract — empty is not an error. An opted-out tree
+ * renders that same empty report with `optedOut: true`, because the opt-out
+ * gates capture, never discoverability (ADR 0024 §3).
+ *
+ * `tier` is additive and OFF by default: only `"b"` produces a `publish` block
+ * (the prefilled URL a HUMAN opens), so a tier-`a` envelope is byte-identical
+ * to what it was before the tier existed. Tier `c` is out of spec.
+ */
+export type FrictionReportOperationOptions = {
+  cwd: string;
+  /** Environment for the state-base resolution; defaults to `process.env`. */
+  env?: NodeJS.ProcessEnv;
+  /** Home override; defaults to `os.homedir()`. */
+  home?: string;
+  /** Whether capture is opted out (the caller resolves the two keys). */
+  optedOut?: boolean;
+  /** Report output tier; defaults to `"a"` (the report only). */
+  tier?: FrictionPublishTier;
+};
+
+export type FrictionReportPayload = FrictionReport & {
+  /** Discriminant that marks this envelope as a report, not a capture. */
+  report: true;
+  /** Absolute log path the report was derived from (the operator's own state). */
+  path: string;
+  /**
+   * Tier B's prefilled document, present ONLY for `--tier b`: the URL a human
+   * opens plus the title and body it carries. Nothing here is ever submitted by
+   * arggon (ADR 0024 §4) — the whole module that builds it is pure string
+   * construction with no `gh`, no token and no network.
+   */
+  publish?: FrictionPublishDoc;
+};
+
+export function frictionReportOperation(
+  opts: FrictionReportOperationOptions,
+): CommandOutcome<FrictionReportPayload> {
+  try {
+    const report = readFrictionReport({
+      env: opts.env,
+      home: opts.home,
+      optedOut: opts.optedOut,
+    });
+    const payload: FrictionReportPayload = {
+      report: true,
+      path: frictionLogPath(opts.env ?? process.env, opts.home ?? homedir()),
+      ...report,
+      ...(opts.tier === "b" ? { publish: buildFrictionPublishDoc(report) } : {}),
+    };
+    return succeed("friction", payload, readConventionVersion(opts.cwd));
+  } catch (err) {
+    if (err instanceof FrictionError) {
+      return {
+        ok: false,
+        envelope: failEnvelope({
+          command: "friction",
+          message: err.message,
+          code: "FRICTION_FAILED",
+          conventionVersion: readConventionVersion(opts.cwd),
+          payload: {
+            report: true,
+            reason: err.reason,
+            ...(err.path !== undefined ? { path: err.path } : {}),
+          },
+        }) as KernelFailureEnvelope<FrictionReportPayload>,
+        exitCode: 1,
+        error: err,
+      };
+    }
+    return fail("friction", opts.cwd, "FRICTION_FAILED", err);
+  }
+}
+
+/**
+ * `arggon friction --clear` — the complete local rollback (plan task T4, spec
+ * §Persistence / migration / rollback).
+ *
+ * Like capture and report, deliberately NOT a tracker operation: it removes one
+ * file outside the repo (plus the cumulative drop counter beside it), loads no
+ * items and commits nothing. Idempotent: a missing or empty log reports
+ * `cleared: 0` and exits 0, because "already clear" is what was asked for.
+ *
+ * The opt-out does NOT gate this. The opt-out gates CAPTURE (ADR 0024 §3);
+ * deleting local state the operator explicitly asked to delete is not capture,
+ * and an opt-out that made the rollback unreachable would strand the very
+ * history the operator is trying to get rid of.
+ */
+export type FrictionClearPayload = {
+  /** Discriminant that marks this envelope as a clear, not a capture. */
+  clear: true;
+  /** Absolute log path that was cleared (the file is gone afterwards). */
+  path: string;
+  /** Records removed; `0` when there was nothing to remove. */
+  cleared: number;
+  /** Failure only: the reason a machine acts on (spec §Observability). */
+  reason?: string;
+};
+
+export function frictionClearOperation(opts: {
+  cwd: string;
+  /** Environment for the state-base resolution; defaults to `process.env`. */
+  env?: NodeJS.ProcessEnv;
+  /** Home override; defaults to `os.homedir()`. */
+  home?: string;
+}): CommandOutcome<FrictionClearPayload> {
+  try {
+    const env = opts.env ?? process.env;
+    const home = opts.home ?? homedir();
+    const cleared = clearFrictionLog(frictionLogPath(env, home), frictionDroppedPath(env, home));
+    return succeed("friction", { clear: true, ...cleared }, readConventionVersion(opts.cwd));
+  } catch (err) {
+    return fail("friction", opts.cwd, "FRICTION_FAILED", err);
   }
 }
 
