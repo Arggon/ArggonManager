@@ -8,6 +8,7 @@ import {
   readFileSync,
   readSync,
   fstatSync,
+  rmSync,
   writeFileSync,
   writeSync,
 } from "node:fs";
@@ -39,9 +40,12 @@ import { worktreeStateBase } from "./worktree.js";
  * request, no `gh`, no auth, no token, no session — the only outbound anything
  * is a tier-B URL a HUMAN opens, which is stage 2 work (plan T4).
  *
- * Redaction (plan T2) runs at WRITE time on top of this module: T1 owns the
- * caps, the normalization and the append discipline; T2's pass composes with
- * the (already capped) field values.
+ * Redaction (plan T2) lives IN this module, on the write path: every field a
+ * caller can put arbitrary bytes into is redacted BEFORE it is capped and
+ * before the line is persisted, so no unredacted byte exists on disk for a
+ * renderer — or a later `--report` bug — to leak. T1 owns the caps, the
+ * normalization and the append discipline; the redaction pass composes with
+ * them: normalize → redact → cap → append.
  */
 
 /** The format version every record carries; readers skip an unknown `v`. */
@@ -55,6 +59,21 @@ export const FRICTION_LOG_FILE_NAME = "friction.jsonl";
 
 /** The per-machine salt file name under `<stateBase>/arggon/`. */
 export const FRICTION_SALT_FILE_NAME = "machine-salt";
+
+/**
+ * The rotation-drop counter file name under `<stateBase>/arggon/`
+ * (task-friction-dedupe-and-report, plan T3). Rotation physically REMOVES the
+ * oldest lines, so the surviving log cannot tell a later reader how much
+ * history was lost; this sidecar makes that drop observable so `--report` can
+ * render `dropped: N` (spec §Limits: "the drop is reported by the next
+ * --report"). The cap and the drop themselves stay owned by the capture task
+ * (T1); this file is only the cumulative counter the report reads — the writer
+ * increments it at the rotation site, `--report` (and a future `--clear`)
+ * reads/resets it. A sidecar, not a line in the JSONL: `readFrictionLog` counts
+ * a non-record line as `malformed`, and the log-is-not-the-tracker discipline
+ * keeps it a plain data file beside the log.
+ */
+export const FRICTION_DROPPED_FILE_NAME = "friction.dropped";
 
 /** Placeholder every normalized commandShape value collapses to. */
 const SHAPE_PLACEHOLDER = "<arg>";
@@ -238,6 +257,218 @@ function capField(value: string, cap: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// Redaction (at write, never at render) — spec §Redaction (at write, not at
+// render). The pass runs here, before the caps and before the append, so the
+// record that reaches the log — and therefore everything a renderer can ever
+// print — is already redacted: there is no "capture now, scrub later" path and
+// no renderer that applies redaction.
+// ---------------------------------------------------------------------------
+
+/**
+ * The canonical placeholder every cross-OS path form collapses to (spec rule
+ * 1): `C:\Users\a\b`, `c:/Users/a/b`, `\\?\C:\Users\a\b`, `/c/Users/a/b` and
+ * `/private/var/folders/x` all become this one token.
+ */
+export const FRICTION_PATH_PLACEHOLDER = "<path>";
+
+/** The placeholder every secret-shaped span collapses to (spec rule 2). */
+export const FRICTION_SECRET_PLACEHOLDER = "<redacted>";
+
+/**
+ * A field whose SECRET-shaped material exceeds 50% of the field, or that
+ * needed more substitutions than the bound allows, is replaced by THIS string
+ * (spec rule 4): a field that is mostly secret is not safe to publish in any
+ * part. Path normalization does not count toward the rate — a `<path>`
+ * placeholder is already safe to publish.
+ */
+export const FRICTION_REDACTED_FIELD = "[redacted: >50% of field]";
+
+/** At most this many substitutions per field (spec rule 4). */
+export const FRICTION_REDACTION_MAX_SUBSTITUTIONS = 20;
+
+// --- Rule 1: cross-OS path normalization -----------------------------------
+
+/**
+ * Every absolute path root across Windows, MSYS and POSIX, in ONE alternation
+ * so the scan is leftmost-longest, which is what makes a CHILD path replace
+ * before its parent: at a given start position the longest fitting root wins,
+ * so `/home/u/repo/sub/secret.txt` is replaced whole and `/home/u/repo` later
+ * on cannot consume the shared prefix and orphan the child's tail.
+ *
+ * The three guards at the head exist for the OTHER rules:
+ *
+ *  - `(?![A-Za-z][A-Za-z0-9+.-]+:)` — a multi-letter scheme (`https:`) is not
+ *    a one-letter drive root, so a URL survives whole for rule 3;
+ *  - `(?<![\w./\\-])` — a root inside a word, after a dot or after another
+ *    separator (`and/or`, `example.com//x`) is not a path start; this is also
+ *    what keeps every non-initial slash of a URL out of this rule;
+ *  - `(?<![A-Za-z]:)` — a slash immediately after a scheme's colon belongs to
+ *    the URL, not to this rule.
+ *
+ * Alternatives in order: extended-length Windows roots (`\\?\C:\…`), UNC roots
+ * (`\\server\share\dir`), drive roots in both slash flavors (`C:\…`, `c:/…`),
+ * POSIX absolute roots and MSYS mounts (`/home/u/…`, `/c/Users/…`) and
+ * home-relative roots (`~/repo`). The POSIX lookahead keeps a bare `/` and a
+ * protocol-relative `//host` from matching.
+ */
+const PATH_PATTERN =
+  /(?![A-Za-z][A-Za-z0-9+.-]+:)(?<![\w./\\-])(?<![A-Za-z]:)(?:\\\\\?\\[A-Za-z]:[/\\](?:[\w.+@%~=-]+[/\\])*[\w.+@%~=-]*|\\\\[\w.$@%?-]+(?:\\[\w.+@%~=-]+)+|[A-Za-z]:[/\\](?:[\w.+@%~=-]+[/\\])*[\w.+@%~=-]*|\/(?=[\w.+@%~=-])(?:[\w.+@%~=-]+\/)*[\w.+@%~=-]*|~(?:\/[\w.+@%~=-]+)+)/g;
+
+// --- Rule 2: secret shapes -------------------------------------------------
+
+/**
+ * The PEM shapes, on their OWN pass ahead of the token/assignment shapes: the
+ * assignment rule's value class would otherwise match `key: -----BEGIN` at an
+ * EARLIER position than the block's header, and the leftmost match would
+ * consume the header, leaving the key body orphaned (and unredacted) behind
+ * it. Longest, most specific secret first — the same "children before
+ * parents" discipline as the path rule.
+ *
+ * Ordered full-block-first so a complete `-----BEGIN …-----` …
+ * `-----END …-----` is replaced whole; a TRUNCATED paste (no END — cut off)
+ * falls to header + base64 body lines, and a bare header alone still goes,
+ * because the header by itself would leave the key material behind.
+ */
+const PEM_PATTERN =
+  /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----|-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----(?:[ \t]*\r?\n[A-Za-z0-9+/]{20,}={0,2})+|-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/g;
+
+/**
+ * The spec's token and assignment shapes. The assignment rule matches the
+ * spec's `key|token|secret|password|passwd|credential` names as substrings of
+ * a longer identifier (`apiKey`, `auth_token`, `client_secret`), in `=`, JSON
+ * and YAML spellings, with the spec's 8+ char value threshold. The
+ * `github_pat_` continuation of the GitHub family is a conservative extension
+ * of the spec's `gh[pousr]_` shape — the current fine-grained PAT prefix —
+ * recorded on the item.
+ */
+const SECRET_PATTERN =
+  /\b(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{20,}|\bsk-[A-Za-z0-9_-]{8,}|\bnpm_[A-Za-z0-9_-]{8,}|\bAKIA[A-Za-z0-9]{8,}|\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*|[A-Za-z0-9_.-]*(?:key|token|secret|password|passwd|credential)[A-Za-z0-9_.-]*["']?[ \t]*[:=][ \t]*(?:[^\s"'`]{8,}|["'][^"'\n]{8,}["'])/gi;
+
+// --- Rule 3: URLs ----------------------------------------------------------
+
+/** A scheme URL: `https://…`, `file:/…` (the slashes are part of the match). */
+const URL_PATTERN = /\b[a-zA-Z][a-zA-Z0-9+.-]*:\/+[^\s]+/g;
+
+/**
+ * Rewrite one URL per spec rule 3: host preserved, query and fragment dropped.
+ * Two deliberate extensions, both conservative and both recorded on the item:
+ *
+ *  - `user:pass@` userinfo is dropped — a credential is not the host;
+ *  - a `file:` URL is a path in disguise, so the whole thing collapses to the
+ *    canonical path placeholder.
+ */
+function redactUrl(match: string): string {
+  const colon = match.indexOf(":");
+  const scheme = match.slice(0, colon + 1);
+  if (scheme.toLowerCase() === "file:") return FRICTION_PATH_PLACEHOLDER;
+  let rest = match.slice(colon + 1).replace(/^\/+/, "");
+  // Query and fragment go first: a query is where tokens ride.
+  const cut = rest.search(/[?#]/);
+  if (cut >= 0) rest = rest.slice(0, cut);
+  // Then userinfo: everything up to the last `@` in the authority is not host.
+  const slash = rest.indexOf("/");
+  const authority = slash < 0 ? rest : rest.slice(0, slash);
+  const at = authority.lastIndexOf("@");
+  const host = at >= 0 ? authority.slice(at + 1) : authority;
+  return `${scheme}//${host}${slash < 0 ? "" : rest.slice(slash)}`;
+}
+
+/** Mutable accounting for one field's pass. */
+type RedactionStats = { substitutions: number; redacted: number };
+
+/** One rule: what it matches, what replaces a match, and what counts against the rate. */
+type RedactionRule = {
+  pattern: RegExp;
+  replace: (match: string) => string;
+  /**
+   * Whether this rule's redacted material counts toward the field's 50% rate.
+   * Path normalization is EXEMPT: a `<path>` placeholder is already safe to
+   * publish, so the wholesale rule — which exists because "a field that is
+   * mostly SECRET is not safe to publish in any part" — measures secret
+   * material (secret shapes and dropped URL parts), never path spans.
+   */
+  countsTowardRate?: boolean;
+  /**
+   * How much of a match counts as redacted material. The default is the whole
+   * matched span; the URL rule counts only what it actually drops, because the
+   * preserved host is not redacted content.
+   */
+  redacted?: (match: string, replacement: string) => number;
+};
+
+const REDACTION_RULES: readonly RedactionRule[] = [
+  { pattern: PATH_PATTERN, replace: () => FRICTION_PATH_PLACEHOLDER, countsTowardRate: false },
+  // PEM before the token/assignment shapes: see the note on PEM_PATTERN — the
+  // assignment rule's leftmost match can otherwise orphan a block's body.
+  { pattern: PEM_PATTERN, replace: () => FRICTION_SECRET_PLACEHOLDER },
+  { pattern: SECRET_PATTERN, replace: () => FRICTION_SECRET_PLACEHOLDER },
+  {
+    pattern: URL_PATTERN,
+    replace: redactUrl,
+    redacted: (match, replacement) => match.length - replacement.length,
+  },
+];
+
+/**
+ * Redact one field value: the spec's four rules, in the spec's order, with the
+ * spec's bound. Idempotent — every placeholder this returns is inert under the
+ * rules — so the append-time guard in {@link appendFrictionRecord} re-runs the
+ * pass on an already-redacted record as a no-op.
+ *
+ * The bound is applied where the spec applies it: a field that needs more than
+ * {@link FRICTION_REDACTION_MAX_SUBSTITUTIONS} substitutions (any rule), or
+ * whose SECRET material exceeds half of the field, is replaced WHOLESALE —
+ * skipping the 21st substitution would leak it.
+ */
+export function redactFrictionText(value: string): string {
+  if (value === "") return value;
+  const stats: RedactionStats = { substitutions: 0, redacted: 0 };
+  let text = value;
+  for (const rule of REDACTION_RULES) {
+    const measure = rule.redacted ?? ((match: string) => match.length);
+    const countsTowardRate = rule.countsTowardRate ?? true;
+    text = text.replace(rule.pattern, (match) => {
+      const replacement = rule.replace(match);
+      if (replacement === match) return match; // already clean: not a substitution
+      stats.substitutions += 1;
+      if (countsTowardRate) stats.redacted += measure(match, replacement);
+      return replacement;
+    });
+  }
+  if (
+    stats.substitutions > FRICTION_REDACTION_MAX_SUBSTITUTIONS ||
+    stats.redacted * 2 > value.length
+  ) {
+    return FRICTION_REDACTED_FIELD;
+  }
+  return text;
+}
+
+/**
+ * Re-apply the pass to a whole record. The write path redacts inside
+ * {@link buildFrictionRecord} (before the caps, so a secret that straddles a
+ * cap boundary is redacted whole rather than cut into a fragment no rule can
+ * recognize); this second, idempotent application is what makes the log-level
+ * invariant structural rather than procedural — an append is where bytes land
+ * on disk, so a record that did NOT come from the builder (a test, a future
+ * caller) cannot smuggle an unredacted field into the log.
+ *
+ * Only the caller-supplied free-text surfaces are covered; `v`, `ts`,
+ * `fingerprint`, `reporterId`, `arggonVersion`, `os`, `arch`, `node` and
+ * `majorVersion` are kernel-owned or derived, never arbitrary caller bytes.
+ */
+function redactFrictionRecord(record: FrictionRecord): FrictionRecord {
+  return {
+    ...record,
+    commandShape: redactFrictionText(record.commandShape),
+    ...(record.errorCode !== undefined ? { errorCode: redactFrictionText(record.errorCode) } : {}),
+    harness: redactFrictionText(record.harness),
+    narrative: redactFrictionText(record.narrative),
+    ...(record.evidence !== undefined ? { evidence: redactFrictionText(record.evidence) } : {}),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Fingerprint / reporterId
 // ---------------------------------------------------------------------------
 
@@ -247,15 +478,47 @@ function sha256Hex(value: string): string {
 }
 
 /**
- * `sha256(commandShape ‖ "\x1f" ‖ errorCode ‖ "\x1f" ‖ harness ‖ "\x1f" ‖
- * majorVersion)` hex, truncated to 16 chars. NEVER derived from `narrative`:
- * an LLM-authored sentence is exactly the frequently-changing value that
- * produces bad groups (Sentry's `{{ error.value }}` rule) — two observations
- * with the same stable fields are the same class even if the prose differs,
- * and two with different error codes are not, however similar the prose.
+ * The fingerprint's pre-image: every component **length-prefixed**, then
+ * concatenated with no separator.
  *
- * `‖` is the unit separator U+001F, so a field value containing one cannot
- * forge a different tuple's digest.
+ * WHY a length prefix and not a separator — the decision recorded for
+ * task-friction-fingerprint-separator-not-length-prefixed (spec
+ * §Fingerprint discipline). The first implementation joined the four stable
+ * fields with U+001F, which stops the ORDINARY collision (a field containing a
+ * space or a dash cannot shift a boundary) but is ambiguous by construction,
+ * because a separator delimits by VALUE: `(a, US‖b, c, d)` and `(a‖US, b, c, d)`
+ * encode to byte-identical material, so a `--command` carrying U+001F could
+ * forge another tuple's digest. A length prefix delimits by COUNT instead, and
+ * the parse of an encoded string is therefore deterministic — read the digits,
+ * consume exactly that many characters — so no second tuple can encode to the
+ * same material. Injective over tuples: only a hash collision can still merge
+ * two classes, which is the honest boundary of a truncated digest.
+ *
+ * The length is UTF-16 code units: the unit `String.prototype.length` counts,
+ * and the unit `capField` truncates in, so the prefix describes the value that
+ * is actually hashed rather than an estimate of it. An empty component encodes
+ * as `0:` and stays unambiguous next to the digits that follow it.
+ *
+ * Exported so the injective-encoding property can be asserted on the pre-image
+ * itself — exactly, with no 16-hex truncation in the way.
+ */
+export function frictionFingerprintMaterial(components: readonly string[]): string {
+  return components.map((component) => `${component.length}:${component}`).join("");
+}
+
+/**
+ * `sha256` over the length-prefixed stable fields (see
+ * {@link frictionFingerprintMaterial}) hex, truncated to 16 chars. NEVER derived
+ * from `narrative`: an LLM-authored sentence is exactly the frequently-changing
+ * value that produces bad groups (Sentry's `{{ error.value }}` rule) — two
+ * observations with the same stable fields are the same class even if the prose
+ * differs, and two with different error codes are not, however similar the
+ * prose.
+ *
+ * The pre-image is injective over tuples, so a field value — including one
+ * that carries the old U+001F separator — cannot forge a different tuple's
+ * digest. `arggonVersion` feeds in as its major version only, so `0.6.0` and
+ * `0.6.1` are one class and `0.x` and `1.x` are two.
  */
 export function frictionFingerprint(args: {
   commandShape: string;
@@ -264,19 +527,24 @@ export function frictionFingerprint(args: {
   harness: string;
   majorVersion: string;
 }): string {
-  const material = [
-    args.commandShape,
-    args.errorCode ?? ABSENT,
-    args.harness,
-    args.majorVersion,
-  ].join("\u001f");
-  return sha256Hex(material).slice(0, FRICTION_FINGERPRINT_CHARS);
+  return sha256Hex(
+    frictionFingerprintMaterial([
+      args.commandShape,
+      args.errorCode ?? ABSENT,
+      args.harness,
+      args.majorVersion,
+    ]),
+  ).slice(0, FRICTION_FINGERPRINT_CHARS);
 }
 
 /**
  * `sha256(machineSalt ‖ repoAbsPath)` hex, truncated to 12 chars. Identifies
  * "same machine, same repo" and never WHICH repo. The salt is 32 random bytes
  * generated once in the state dir and never leaves it.
+ *
+ * Unlike the fingerprint, this concatenation needs no length prefix: the salt is
+ * fixed-width — exactly 64 hex chars, enforced by `SALT_HEX` — so where the salt
+ * ends and the path begins is never in doubt.
  */
 export function frictionReporterId(machineSalt: string, repoAbsPath: string): string {
   return sha256Hex(machineSalt + repoAbsPath).slice(0, FRICTION_REPORTER_ID_CHARS);
@@ -321,6 +589,51 @@ export function frictionSaltPath(env: NodeJS.ProcessEnv, home: string): string {
   return join(frictionStateDir(env, home), FRICTION_SALT_FILE_NAME);
 }
 
+/**
+ * `<stateBase>/arggon/friction.dropped` — the cumulative rotation-drop counter
+ * `--report` renders. Derivable from the log path too (it lives in the same
+ * dir); the env/home form matches the other readers.
+ */
+export function frictionDroppedPath(env: NodeJS.ProcessEnv, home: string): string {
+  return join(frictionStateDir(env, home), FRICTION_DROPPED_FILE_NAME);
+}
+
+/**
+ * The cumulative lines rotation has dropped so far, or `0` when there is no
+ * counter yet (a log that never rotated, or a fresh `--clear`d one). Tolerant:
+ * a missing, blank or non-integer file reads as `0` — a counter the report
+ * cannot parse must not fail the read, exactly like the log reader tolerates a
+ * bad line.
+ */
+export function readFrictionDropped(droppedPath: string): number {
+  let raw: string;
+  try {
+    raw = readFileSync(droppedPath, "utf8").trim();
+  } catch {
+    return 0; // no counter: nothing has been dropped (or the file is unreadable)
+  }
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+
+/**
+ * Add `add` to the cumulative rotation-drop counter beside `dir` (the log's
+ * directory). Best-effort and idempotent-by-read: it reads the current value,
+ * adds, and rewrites one small file. A rotate already wrote the log atomically,
+ * so this write is metadata — it must not turn a successful capture into a
+ * `log-unwritable` failure, and it swallows its own error for exactly that
+ * reason. The next `persistFrictionDropped` re-reads whatever is on disk, so a
+ * swallow degrades to an under-counted `dropped`, never a corrupt counter.
+ */
+function persistFrictionDropped(dir: string, add: number): void {
+  try {
+    const path = join(dir, FRICTION_DROPPED_FILE_NAME);
+    writeFileSync(path, `${readFrictionDropped(path) + add}\n`, "utf8");
+  } catch {
+    // Metadata only: the log is already safely rotated. Leave the counter as-is.
+  }
+}
+
 /** A salt is exactly `FRICTION_SALT_BYTES` bytes of hex; anything else is not ours. */
 const SALT_HEX = /^[0-9a-f]{64}$/;
 
@@ -345,7 +658,15 @@ export class FrictionError extends Error {
 
 /** Every non-happy path names its reason (spec §Observability). */
 export type FrictionFailureReason =
-  "no-observation" | "no-command-shape" | "log-unwritable" | "evidence-unreadable";
+  | "no-observation"
+  | "no-command-shape"
+  | "log-unwritable"
+  | "evidence-unreadable"
+  | "report-and-capture-mutually-exclusive"
+  | "clear-and-capture-mutually-exclusive"
+  | "report-and-clear-mutually-exclusive"
+  | "unknown-tier"
+  | "tier-without-report";
 
 /** `mkdir -p` one directory, naming it on failure. */
 function mkdirP(dir: string): void {
@@ -513,10 +834,15 @@ function readEvidenceContents(path: string): string {
 }
 
 /**
- * Build the record for one capture: caps applied, shape normalized, fingerprint
- * and reporterId derived from the stable fields only. Pure apart from the two
- * reads it names (`--evidence`, and the salt through {@link readOrCreateMachineSalt})
- * — no write happens here, so a caller can inspect a record before persisting.
+ * Build the record for one capture: shape normalized, redacted, capped, and
+ * fingerprint / reporterId derived from the stable fields only. Redaction runs
+ * HERE, before the caps (a secret straddling a cap boundary must be redacted
+ * whole, not cut into a fragment no rule can recognize) and before anything is
+ * persisted — so the record this returns, and the line
+ * {@link appendFrictionRecord} writes, is already redacted. Pure apart from
+ * the two reads it names (`--evidence`, and the salt through
+ * {@link readOrCreateMachineSalt}) — no write happens here, so a caller can
+ * inspect a record before persisting.
  */
 export function buildFrictionRecord(input: FrictionInput, opts: FrictionOptions): FrictionRecord {
   const observation = input.observation.replace(LONE_SURROGATE, "").trim();
@@ -553,17 +879,22 @@ export function buildFrictionRecord(input: FrictionInput, opts: FrictionOptions)
   const version = opts.version.trim() === "" ? "unknown" : opts.version;
   const majorVersion = frictionMajorVersion(version);
   // An absent, empty or whitespace-only error code is ABSENT — it hashes as the
-  // empty string and never rides in the record. Anything else is capped.
+  // empty string and never rides in the record. Anything else is redacted and
+  // then capped (redaction FIRST, so a secret that straddles the cap boundary
+  // is redacted whole rather than cut into a fragment no rule can recognize).
   const errorTrimmed = input.error?.trim();
   const errorCode =
     errorTrimmed === undefined || errorTrimmed === ""
       ? undefined
-      : capField(errorTrimmed, FRICTION_ERROR_CODE_CAP);
-  const harness = capField(input.harness?.trim() || FRICTION_DEFAULT_HARNESS, FRICTION_HARNESS_CAP);
-  const commandShapeCapped = capField(commandShape, FRICTION_COMMAND_SHAPE_CAP);
-  const narrative = capField(observation, FRICTION_NARRATIVE_CAP);
+      : capField(redactFrictionText(errorTrimmed), FRICTION_ERROR_CODE_CAP);
+  const harness = capField(
+    redactFrictionText(input.harness?.trim() || FRICTION_DEFAULT_HARNESS),
+    FRICTION_HARNESS_CAP,
+  );
+  const commandShapeCapped = capField(redactFrictionText(commandShape), FRICTION_COMMAND_SHAPE_CAP);
+  const narrative = capField(redactFrictionText(observation), FRICTION_NARRATIVE_CAP);
   const evidence = input.evidencePath
-    ? capField(readEvidenceContents(input.evidencePath), FRICTION_EVIDENCE_CAP)
+    ? capField(redactFrictionText(readEvidenceContents(input.evidencePath)), FRICTION_EVIDENCE_CAP)
     : undefined;
   const ts = (opts.now ?? new Date()).toISOString();
   return {
@@ -605,6 +936,10 @@ export type FrictionAppendResult = {
 
 /**
  * Append one record to the log, creating the state dir `mkdir -p` on the way.
+ * The record is passed through the (idempotent) redaction guard first: an
+ * append is where bytes land on disk, so the log-level invariant — what lands
+ * in `<stateBase>/arggon/friction.jsonl` is already redacted — holds for every
+ * caller, not only for records that came from {@link buildFrictionRecord}.
  *
  * The append itself is ONE `write()` of a complete, newline-terminated record
  * on an `O_APPEND` descriptor, which is what makes two concurrent writers in
@@ -633,7 +968,7 @@ export function appendFrictionRecord(
       dir,
     );
   }
-  const line = `${JSON.stringify(record)}${NEWLINE}`;
+  const line = `${JSON.stringify(redactFrictionRecord(record))}${NEWLINE}`;
   const existing = readLogLines(logPath);
   // A crashed writer can leave a partial trailing line with no terminator. The
   // next append must NOT glue its own record onto that fragment: one `write()`
@@ -664,6 +999,13 @@ export function appendFrictionRecord(
         logPath,
       );
     }
+    // Persist the cumulative drop so a LATER `--report` — a separate process
+    // that cannot see what rotation removed — can render `dropped: N`. This is
+    // additive to the cap (which stays T1's): it records the count, it does not
+    // decide it. Best-effort: the rotation above already succeeded, so a
+    // failing counter write must not fail the capture (T3 reviewer note N6b);
+    // the log stays correct either way and only the reported count is stale.
+    persistFrictionDropped(dir, existing.length - kept.length);
     return { path: logPath, lines: kept.length + 1, dropped: existing.length - kept.length };
   }
   if (fd === undefined) {
@@ -731,9 +1073,49 @@ function logEndsPartial(logPath: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// The reader: skip an unknown `v` rather than failing the file
+// `--clear`: the complete local rollback (spec §Persistence / migration /
+// rollback). Deleting the log is the whole rollback — the log is cache-like and
+// holds nothing the user authored as work, so there is no migration and nothing
+// to recover afterwards.
 // ---------------------------------------------------------------------------
 
+/** What one clear reports back: how many records left, and the path they left. */
+export type FrictionClearResult = {
+  /** Absolute log path that was cleared (the file is gone afterwards). */
+  path: string;
+  /** Records removed. `0` — never an error — when there was nothing to remove. */
+  cleared: number;
+};
+
+/**
+ * Remove the whole log (and the cumulative drop counter beside it), reporting
+ * how many records it held.
+ *
+ * Idempotent by construction: a missing or empty log clears `0` and exits 0,
+ * because "already cleared" is the state the operator asked for, not a failure
+ * (spec §Failure / retry: "`--clear` is idempotent on an already-empty log and
+ * on a missing file, reporting `cleared: 0` rather than an error"). The count
+ * comes from the same tolerant reader `--report` uses, so a log holding only
+ * malformed lines reports those lines as cleared rather than pretending the file
+ * was empty.
+ *
+ * The machine SALT survives on purpose: it identifies "same machine, same repo"
+ * for `reporterId` across the log's lifetime, and removing it would silently
+ * re-identify the machine rather than clear its history.
+ */
+export function clearFrictionLog(logPath: string, droppedPath: string): FrictionClearResult {
+  const cleared = readLogLines(logPath).length;
+  // `force` makes a missing file a no-op; the directory is never created here —
+  // `--clear` must not leave a state dir behind on a machine that never
+  // captured anything.
+  rmSync(logPath, { force: true });
+  rmSync(droppedPath, { force: true });
+  return { path: logPath, cleared };
+}
+
+// ---------------------------------------------------------------------------
+// The reader: skip an unknown `v` rather than failing the file
+// ---------------------------------------------------------------------------
 /** What a tolerant read reports (spec §Persistence / migration / rollback). */
 export type FrictionLogRead = {
   /** Every record this reader understands, in file order. */

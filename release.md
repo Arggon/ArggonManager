@@ -26,11 +26,13 @@ procedure to execute by hand — the manual bump/pack/publish runbook is gone.
    pushed HEAD commit, so a bump buried under later commits in the same push
    silently strands the release.
 4. **`release.yml`** (the merge push) runs the ordered guard, then: annotated
-   tag `vX.Y.Z` → GitHub Release (notes = the merged CHANGELOG section) →
-   build → pack → extract-and-inspect → publish `@arggondev/lib` first, then
-   `arggon-manager` (OIDC trusted publishing) → both tarballs attached to the
-   release. Every published artifact self-reports the release commit
-   (`write-build-info`).
+   tag `vX.Y.Z` → flips the merged release PR's `autorelease: pending` label to
+   `autorelease: tagged` (release-please's own bookkeeping — see §The
+   `autorelease` label lifecycle) → GitHub Release (notes = the merged
+   CHANGELOG section) → build → pack → extract-and-inspect → publish
+   `@arggondev/lib` first, then `arggon-manager` (OIDC trusted publishing) →
+   both tarballs attached to the release. Every published artifact self-reports
+   the release commit (`write-build-info`).
 
 The first workflow run on a release-please-created PR needs one click — see
 "Approve workflows" below. Publishing itself stays **inert** until the
@@ -207,6 +209,100 @@ seam — **a stale pin is a red test, not a silent outage.** `tasks-validate`
 enforces the same rule at CI time on every repo (the drift step's pinned-lag
 assertion), so an adopter whose pin lags their seam gets the bump-the-pin
 remedy instead of an unexplainable diff.
+
+## The tag↔config agreement (gate-enforced)
+
+`release.yml` creates the plain annotated tag `vX.Y.Z` (`git tag -a
+"v${VERSION}"` — the tag names the exact published commit, spec invariant 1).
+`release-please-config.json` must agree with it: it carries
+`"include-component-in-tag": false`, so release-please searches that SAME plain
+tag. When the two disagree, release-please searches a component-prefixed tag
+(`arggon-manager-v0.5.0`), never finds the plain one, concludes its own merged
+release PR is untagged, and aborts before opening the next release PR. That is
+exactly what killed releases from 2026-10-02 to 2026-10-07 — and it stayed
+invisible because the abort is a `logger.warn` inside a run that reported
+`success`, not a failure.
+
+Two gates keep the class out, and both are proven red (a gate never seen red is
+not evidence):
+
+- **`cli/src/release-config-agreement.test.ts`** fails if
+  `include-component-in-tag` resolves to anything but the `false` that matches
+  `release.yml`'s plain `v${VERSION}` — including the key being **absent** (the
+  official schema default is `true`, the exact omission that shipped the
+  outage). A fixture that flips the key to `true` goes red; so does the reverse
+  drift of editing `release.yml`'s tag line back to a component prefix. Fix the
+  config or the tag line — the next drift is a red test, not a silent dead
+  pipeline.
+- **`cli/release-abort-check.mjs`** runs in `release-please.yml` right after the
+  action and fails the run when a MERGED release PR still carries
+  `autorelease: pending` — release-please's own abort predicate
+  (`src/manifest.ts`). It cannot go red on an ordinary push: no release PR is
+  merged, and every already-merged one has had its label flipped to
+  `autorelease: tagged` by `release.yml`'s tagging run (§The `autorelease`
+  label lifecycle below). When it does redden, it names the stuck PR(s) and the
+  one-command recovery. An aborted release can no longer masquerade as a green
+  run.
+
+## The `autorelease` label lifecycle (owned by `release.yml`)
+
+release-please decides whether it may open the next release PR by reading a
+**label**, so the transition between the two states is load-bearing:
+
+- **`autorelease: pending`** — "this release PR is merged and its release is not
+  tagged yet". Applied by release-please when it opens the release PR.
+- **`autorelease: tagged`** — "this release is complete". Normally applied by
+  release-please's own tagging path; in this repo, by `release.yml`.
+
+While any **merged** release PR still carries `autorelease: pending`,
+release-please reads it as a merged-but-untagged release and **aborts before
+opening the next release PR** (`findMergedReleasePullRequests` → "There are
+untagged, merged release PRs outstanding - aborting"). That abort is a
+`logger.warn` inside a run that reports `success` — which is why this file
+exists to document it.
+
+Because `skip-github-release: true` opts this repo out of release-please's
+tagging path (a `GITHUB_TOKEN`-created tag triggers no workflow, so `release.yml`
+owns the tag), release-please never flips its own label: **`release.yml` owns the
+flip**. `cli/release-label-flip.mjs` runs in the same run that creates the tag,
+immediately after the tag↔version agreement assert, and moves every merged
+`autorelease: pending` PR to `autorelease: tagged`. It is idempotent (nothing
+pending → no-op: every ordinary push's rule-0 run and every rule-2 re-run) and
+best-effort (any failure warns and exits 0 — a non-zero exit there would strand a
+tagged release before the publish, and the backstop below is the detector).
+
+The label tracks the **tag**, not the publish: the flip happens before the
+release object, build and publish steps, and stays flipped if a later step
+fails. That matches release-please's own tagging path (it flips when it tags),
+and a failed publish is recovered by re-running the workflow, never by the label.
+
+**The `skip-github-release: true` reconciliation.** Opting out of
+release-please's tagging makes three pieces of its bookkeeping the repo's own,
+each with a named owner: the tag↔config agreement
+(`cli/src/release-config-agreement.test.ts`), the label lifecycle (this section,
+`cli/release-label-flip.mjs`), and the abort surfacing that replaced "read the
+warning inside a green run" (`cli/release-abort-check.mjs`).
+
+### When a merged release PR is stuck on `autorelease: pending`
+
+The next `release-please.yml` run goes **red** — that is the detection now, and
+it no longer costs days of green runs. The backstop's message names the stuck
+PR(s) and carries the recovery, one command per PR:
+
+```bash
+gh pr edit <n> --add-label "autorelease: tagged" --remove-label "autorelease: pending"
+```
+
+That is the exact command `cli/release-label-flip.mjs` runs, so the automation
+and this instruction cannot drift. Observed end to end on 2026-10-12: #664
+(`chore: release main`, merged 2026-10-09) sat on `autorelease: pending`; run
+38282448930 went red naming it; the command above cleared it; run 38283343454
+printed `release-abort-check: OK` and opened release PR #744.
+
+The residual window is the gap between the tag step and the flip: a run that dies
+there, or a flip that cannot reach GitHub, leaves the label pending — and the
+backstop reddens on the next push to `main` naming it. That cannot regress to the
+old five-day blindness.
 
 ## One release story: two axes (bug-seam-drift-gate-blocks-new-generated-seam-content)
 

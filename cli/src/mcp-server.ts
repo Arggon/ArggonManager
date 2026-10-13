@@ -525,6 +525,10 @@ const TOOLS: ToolDefinition[] = [
             "remove removable worktrees (git worktree remove), delete their merged branches, and clear the worktree_path records",
           default: false,
         },
+        // Bare by budget (ADR 0006/0014), like `release`/`take_over_worktree`:
+        // the force contract is named in the tool description and documented in
+        // ArggonManager/docs/agents.md §Cleanup.
+        force: { type: "boolean", default: false },
         // Lean by design (ADR 0006/0014 schema budget): the release contract is
         // named in the tool description and documented in
         // ArggonManager/docs/agents.md §Worktrees — the properties stay bare.
@@ -789,6 +793,7 @@ export function runMcpServer(opts: McpServerOptions): void {
       return toolResult(
         spawnedOutcome(opts, "cleanup", [
           ...(args.prune === true ? ["--prune"] : []),
+          ...(args.force === true ? ["--force"] : []),
           ...(typeof args.release === "string" ? ["--release", args.release] : []),
           ...(args.take_over_worktree === true ? ["--take-over-worktree"] : []),
           ...(args.no_commit === true ? ["--no-commit"] : []),

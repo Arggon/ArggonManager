@@ -22,9 +22,15 @@ import {
   formatTrendMarkdown,
   formatTrendTable,
   formatValidateHuman,
+  FrictionError,
+  buildFrictionPublishDoc,
+  frictionClearOperation,
   frictionOperation,
+  frictionReportOperation,
   handoffOperation,
   importIssuesOperation,
+  type FrictionPublishTier,
+  isFrictionPublishTier,
   jsonEnabled,
   listOperation,
   maybeCommitUpdate,
@@ -32,6 +38,9 @@ import {
   parseCsvList,
   priorityOperation,
   readConventionVersion,
+  readFrictionOptOut,
+  readFrictionReport,
+  renderFrictionReport,
   renderShowText,
   reportOperation,
   runComment,
@@ -1554,15 +1563,15 @@ program
 program
   .command("friction")
   .description(
-    "Record friction in ArggonManager itself into the local append-only friction log (never the tracker, never the network)",
+    "Record friction in ArggonManager itself into the local append-only friction log (never the tracker, never the network), or render its deduped report with --report [--tier a|b], or remove the whole log with --clear",
   )
   .argument(
-    "<observation>",
-    "one line about what broke (capped 2000 chars; verbatim, never parsed)",
+    "[observation]",
+    "one line about what broke (capped 2000 chars; verbatim, never parsed); omitted when --report or --clear is given",
   )
   .option(
     "--command <shape>",
-    "the command that failed, as an argv shape (required; ids/paths/URLs/tokens/SHAs normalized to <arg>)",
+    "the command that failed, as an argv shape (required for a capture; ids/paths/URLs/tokens/SHAs normalized to <arg>)",
   )
   .option(
     "--error <code>",
@@ -1573,27 +1582,215 @@ program
     "--evidence <file>",
     "a file whose CONTENTS (never its path) are captured, capped 4000 chars",
   )
+  .option(
+    "--report",
+    "render the fingerprint-deduped report (one row per class, count desc) instead of capturing; mutually exclusive with a capture and with --clear",
+    false,
+  )
+  .option(
+    "--tier <a|b>",
+    'report output tier: "a" (default) prints the report only; "b" additionally prints the prefilled issues/new URL a HUMAN opens (never submitted by arggon)',
+  )
+  .option(
+    "--clear",
+    "remove the whole local friction log (idempotent; reports cleared: N; mutually exclusive with a capture and with --report)",
+    false,
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
-      observation: string,
+      observation: string | undefined,
       opts: {
         command?: string;
         error?: string;
         harness?: string;
         evidence?: string;
+        report?: boolean;
+        tier?: string;
+        clear?: boolean;
         json?: boolean;
       },
     ) => {
       const json = jsonEnabled(opts);
+
+      // --- the mode conflicts, each one a NAMED error (spec §Observability) ---
+      const hasCapture =
+        observation !== undefined ||
+        opts.command !== undefined ||
+        opts.error !== undefined ||
+        opts.harness !== undefined ||
+        opts.evidence !== undefined;
+      // `--tier` only means something next to `--report`: it selects how the
+      // REPORT is published. Silently ignoring it beside a capture (or beside
+      // `--clear`) is the shape the existing capture/report conflict exists to
+      // prevent, so it is named rather than dropped.
+      const tierGiven = opts.tier !== undefined;
+      let tier: FrictionPublishTier = "a";
+      if (tierGiven) {
+        const raw = opts.tier ?? "";
+        if (!isFrictionPublishTier(raw)) {
+          // An UNKNOWN tier is a different fact from a tier without a report:
+          // a machine reading `reason` must be able to tell "you typed a tier
+          // this spec does not define" from "you forgot --report".
+          const err = new FrictionError(
+            "unknown-tier",
+            `arggon friction --tier must be "a" or "b" (got ${JSON.stringify(raw)}); tier c is not in this spec`,
+          );
+          if (json) {
+            failJson({
+              command: "friction",
+              message: err.message,
+              code: "FRICTION_FAILED",
+              conventionVersion: readConventionVersion(process.cwd()),
+              payload: {
+                reason: err.reason,
+                ...(opts.report ? { report: true } : {}),
+              },
+            });
+            return;
+          }
+          printHumanError("arggon friction", err.message);
+          process.exitCode = 1;
+          return;
+        }
+        tier = raw;
+        if (!opts.report) {
+          const err = new FrictionError(
+            "tier-without-report",
+            'arggon friction --tier requires --report: the tier selects how the REPORT is published, so run "arggon friction --report --tier a|b"',
+          );
+          if (json) {
+            failJson({
+              command: "friction",
+              message: err.message,
+              code: "FRICTION_FAILED",
+              conventionVersion: readConventionVersion(process.cwd()),
+              payload: { reason: err.reason },
+            });
+            return;
+          }
+          printHumanError("arggon friction", err.message);
+          process.exitCode = 1;
+          return;
+        }
+      }
+
+      /** One named conflict, both channels: `--json` envelope + human stderr. */
+      const conflict = (reason: string, message: string): void => {
+        if (json) {
+          failJson({
+            command: "friction",
+            message,
+            code: "FRICTION_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+            payload: {
+              reason,
+              ...(opts.report ? { report: true } : {}),
+              ...(opts.clear ? { clear: true } : {}),
+            },
+          });
+          return;
+        }
+        printHumanError("arggon friction", message);
+        process.exitCode = 1;
+      };
+
+      if (opts.clear && hasCapture) {
+        conflict(
+          "clear-and-capture-mutually-exclusive",
+          'arggon friction --clear and a capture are mutually exclusive: run --clear alone, or a capture ("<observation>" --command <shape>) without --clear',
+        );
+        return;
+      }
+      if (opts.clear && opts.report) {
+        conflict(
+          "report-and-clear-mutually-exclusive",
+          "arggon friction --report and --clear are mutually exclusive: two modes, one run — render the report first, then clear",
+        );
+        return;
+      }
+
+      // --- report mode (plan task T3) + tier B (plan task T4) ---
+      if (opts.report) {
+        if (hasCapture) {
+          conflict(
+            "report-and-capture-mutually-exclusive",
+            'arggon friction --report and a capture are mutually exclusive: run --report alone, or a capture ("<observation>" --command <shape>) without --report',
+          );
+          return;
+        }
+        // The opt-out gates CAPTURE, never discoverability (ADR 0024 §3): the
+        // report still runs, still exits 0, and still states the opt-out plus
+        // its remediation rather than hiding the command.
+        const optedOut = readFrictionOptOut(process.cwd(), process.env).optedOut;
+        if (json) {
+          const outcome = frictionReportOperation({ cwd: process.cwd(), optedOut, tier });
+          emitJson(outcome.envelope);
+          if (!outcome.ok) process.exitCode = 1;
+          return;
+        }
+        try {
+          const report = readFrictionReport({ optedOut });
+          // Rendered VERBATIM on purpose: the narrative is the operator's own
+          // local data, and the spec instructs the report to pass it through
+          // literally — fenced and labelled as untrusted, never reordered,
+          // escaped or truncated. So the display-sanitizer applied to other
+          // human lines (a hostile-REPO guard) is deliberately NOT used here;
+          // the field was redacted at write and the log is not a hostile repo.
+          process.stdout.write(renderFrictionReport(report));
+          if (tier === "b") {
+            const publish = buildFrictionPublishDoc(report);
+            process.stdout.write(
+              "tier b — prefilled URL for a HUMAN to open and submit (arggon never submits it; docs/agents.md §0 stands):\n",
+            );
+            process.stdout.write(`${publish.url}\n`);
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          printHumanError("arggon friction", message);
+          process.exitCode = 1;
+        }
+        return;
+      }
+
+      // --- clear mode (plan task T4): the complete local rollback ---
+      if (opts.clear) {
+        if (json) {
+          const outcome = frictionClearOperation({ cwd: process.cwd() });
+          emitJson(outcome.envelope);
+          if (!outcome.ok) process.exitCode = 1;
+          return;
+        }
+        try {
+          const result = frictionClearOperation({ cwd: process.cwd() });
+          if (!result.ok) {
+            printHumanError("arggon friction", result.envelope.error.message);
+            process.exitCode = 1;
+            return;
+          }
+          console.log(
+            `arggon friction: cleared ${sanitizeHumanValue(String(result.envelope.cleared ?? 0))} — ${sanitizeHumanText(result.envelope.path ?? "")}`,
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          printHumanError("arggon friction", message);
+          process.exitCode = 1;
+        }
+        return;
+      }
+
+      // --- capture mode (plan task T1) + the opt-out gate (plan task T4) ---
       const options = () => ({
         cwd: process.cwd(),
         version: arggonVersion(),
-        observation,
+        // An omitted observation reaches the kernel as "" so it fails with the
+        // named `no-observation` reason rather than an uncaught TypeError.
+        observation: observation ?? "",
         command: opts.command ?? "",
         error: opts.error,
         harness: opts.harness,
         evidencePath: opts.evidence,
+        optedOut: readFrictionOptOut(process.cwd(), process.env).optedOut,
       });
       if (json) {
         const outcome = frictionOperation(options());
@@ -1606,6 +1803,15 @@ program
         if (!result.ok) {
           printHumanError("arggon friction", result.envelope.error.message);
           process.exitCode = 1;
+          return;
+        }
+        // Opted out: nothing was written. Exit 0 — honoring the operator's
+        // configuration is success — but the line says so out loud, because a
+        // silent success here looks exactly like a recorded observation.
+        if (result.envelope.optedOut) {
+          console.log(
+            "arggon friction: opted out — nothing recorded (x-friction: false in the tracker .convention.yml, or ARGGON_NO_FRICTION set). The command stays discoverable on purpose: set the key back to true, or unset the variable, to re-enable capture.",
+          );
           return;
         }
         console.log(
@@ -2685,6 +2891,11 @@ program
     false,
   )
   .option(
+    "--force",
+    "with --prune: also remove terminal+merged worktrees whose untracked files block 'git worktree remove' (nothing is discarded without this flag; tracked changes are never force-discarded)",
+    false,
+  )
+  .option(
     "--no-commit",
     "keep the tracker dirty: skip the tracker auto-commit of the cleared worktree_path records (default: on with --prune; x-tracker.auto-commit: false opts out tree-wide)",
   )
@@ -2706,6 +2917,7 @@ program
   .action(
     (opts: {
       prune?: boolean;
+      force?: boolean;
       commit?: boolean;
       gh?: boolean;
       release?: string;
@@ -2722,6 +2934,7 @@ program
           // the flag is passed); reading `noGh` made the flag a silent no-op
           // (bug-cleanup-no-gh-ignored).
           noGh: opts.gh === false,
+          ...(opts.force === true ? { pruneForce: true } : {}),
           ...(opts.release !== undefined ? { release: opts.release } : {}),
           ...(opts.takeOverWorktree === true ? { releaseTakeOverWorktree: true } : {}),
         });

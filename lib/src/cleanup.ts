@@ -7,8 +7,12 @@ import { isClaimed } from "./status.js";
 import {
   defaultWorktreeStatus,
   detectWorktreeForeignWrites,
+  isStartOwnedNodeModulesInstall,
+  isStartOwnedWorktreeEnv,
   MAX_CLAIM_WRITE_NAMES,
   readWorktreeClaimStamp,
+  WORKTREE_ENV_FILE,
+  WORKTREE_NODE_MODULES_ENTRY,
   type GitDirRunner,
   type WorktreeClaimStamp,
   type WorktreeForeignWriteReport,
@@ -27,11 +31,15 @@ import {
  * `ctx.worktree.remove` and supplies the domain inventory through
  * {@link CleanupGit.worktreeList}.
  *
- * The classifier is pure over the injected {@link CleanupGit} predicates plus
- * one filesystem check (`existsSync`): a recorded path that is gone clears the
- * record, a path that exists but is not a worktree of this repo is never
- * touched, and a branch that is not provably integrated (ancestry, or a
- * merged PR through the optional gh fallback) is skipped with a reason.
+ * The classifier is pure over the injected {@link CleanupGit} predicates, one
+ * filesystem check (`existsSync`) and one porcelain probe of an existing
+ * worktree (`git status --porcelain`, optional/injectable): a recorded path
+ * that is gone clears the record, a path that exists but is not a worktree of
+ * this repo is never touched, a branch that is not provably integrated
+ * (ancestry, or a merged PR through the optional gh fallback) is skipped with a
+ * reason, and removal-blocking content is classified by kind — untracked
+ * blockers need the caller's force opt-in, tracked modifications are refused
+ * with or without it (bug-cleanup-prune-untracked-artifacts-no-force).
  */
 
 /** Statuses whose worktrees are eligible for pruning (terminal items only). */
@@ -56,6 +64,37 @@ export type CleanupEntry = {
    * "squash-merged PR #12".
    */
   via?: string;
+  /**
+   * Additive (bug-cleanup-prune-untracked-artifacts-no-force): the content
+   * that blocks `git worktree remove`, as ONE porcelain probe of the worktree
+   * reported it — capped at `MAX_CLAIM_WRITE_NAMES` with the exact
+   * `blockingTotal` beside it; ignored files are never listed (they die with
+   * the worktree). Present whenever the probe observed blockers — on a `forced`
+   * entry these are the untracked paths the removal will discard. The
+   * start-owned entries every prune run reaps itself (start's install
+   * link/farm, a start-shaped `.arggon.env`) are not blockers and never appear.
+   */
+  blockingPaths?: string[];
+  /** Exact count of `blockingPaths` before the cap. */
+  blockingTotal?: number;
+  /**
+   * Additive: the TRACKED paths among `blockingPaths` (staged, unstaged or
+   * conflicted), capped with the exact `blockingTrackedTotal`. The force
+   * opt-in never discards them, so their presence keeps the entry
+   * non-removable with or without `--force`. Present only when there are any —
+   * absent therefore means "every blocker is untracked".
+   */
+  blockingTracked?: string[];
+  /** Exact count of tracked blockers before the cap. */
+  blockingTrackedTotal?: number;
+  /**
+   * Additive: true when this entry's removal will pass `--force` — the
+   * terminal+merged entry whose only blockers are untracked AND whose caller
+   * armed the force opt-in. `action` says so, so a forced discard is never a
+   * bare removal. Never set for tracked modifications, and never set without
+   * the flag.
+   */
+  forced?: boolean;
 };
 
 /** Git operations for cleanup, injectable for tests. */
@@ -74,8 +113,10 @@ export type CleanupGit = {
   remoteBranchExists(cwd: string, branch: string): boolean;
   /**
    * `git worktree remove <path>` (refuses dirty worktrees). `opts.force` adds
-   * `--force`: only the release path passes it, and only when the caller armed
-   * the take-over hatch — prune never forces.
+   * `--force`: the release path passes it only when the caller armed the
+   * take-over hatch, and the prune path only for an entry whose classification
+   * set `forced` (terminal+merged, untracked-only blockers, force opt-in
+   * armed) — never for tracked modifications.
    */
   removeWorktree(cwd: string, path: string, opts?: { force?: boolean }): void;
   /** Safe `git branch -d <branch>` (only succeeds for merged branches). */
@@ -105,6 +146,31 @@ export type ClassifyCleanupDeps = {
   noGh?: boolean;
   /** gh executor for the squash-merge fallback; defaults to the real gh CLI. */
   gh?: GhExecutor;
+  /**
+   * The force opt-in (CLI `cleanup --prune --force`; native
+   * `cleanup({ prune: true, force: true })`; bug-cleanup-prune-untracked-artifacts-no-force).
+   * Default OFF, and then every removal-blocking file keeps the conservative
+   * skip: unknown untracked content is never discarded implicitly. Armed, a
+   * terminal+merged worktree whose blockers are ALL untracked becomes
+   * removable with `forced: true` (its removal must then pass `--force`);
+   * tracked modifications keep their refusal either way.
+   */
+  force?: boolean;
+  /**
+   * Porcelain probe (tests); defaults to a real `git status --porcelain`. A
+   * probe that does not answer degrades to "no blocker evidence" — the entry
+   * keeps the plain removal classification and `git worktree remove` decides
+   * at removal time, exactly as before this probe existed.
+   */
+  status?: WorktreeStatusRunner;
+  /**
+   * The checkouts whose start-created install entry this run may unlink before
+   * the removal (ownership scoping, `unlinkNodeModulesLink`). Defaults to the
+   * canonical (first) worktree plus `root` — exactly what the CLI prune loop
+   * unlinks against; the native surface passes the domain's canonical root
+   * plus `root`, mirroring its own unlink calls.
+   */
+  primaryRoots?: string[];
 };
 
 function git(args: string[], cwd: string): string {
@@ -280,8 +346,10 @@ export function findMergedPr(
  * Classify one item with a `worktree_path` record against the base ref. The
  * order is the contract: terminal status → recorded branch → integration
  * (ancestry, or a merged PR unless `noGh`) → remote-tip safety → filesystem
- * state. Every skip carries a `reason`; every removable entry carries the
- * `action` the surface performs.
+ * state (existence, registration) → ONE porcelain probe of its removal
+ * blockers (untracked vs tracked, start-owned artifacts discounted). Every skip
+ * carries a `reason`; every removable entry carries the `action` the surface
+ * performs, and `forced: true` when that removal must pass `--force`.
  */
 export function classifyCleanupEntry(
   item: WorkItem,
@@ -347,16 +415,57 @@ export function classifyCleanupEntry(
   }
   if (!existsSync(path)) {
     entry.action = "clear stale worktree_path record (path missing on disk)";
-  } else if (
-    !gitRunner
-      .worktreeList(root)
-      .map((p) => resolve(p))
-      .includes(path)
-  ) {
-    entry.reason = "path exists but is not a git worktree of this repo (remove it manually)";
-    return entry;
   } else {
-    entry.action = "remove worktree and delete the merged branch";
+    const registered = gitRunner.worktreeList(root).map((p) => resolve(p));
+    if (!registered.includes(path)) {
+      entry.reason = "path exists but is not a git worktree of this repo (remove it manually)";
+      return entry;
+    }
+    // ONE porcelain probe decides whether the removal can actually happen
+    // (bug-cleanup-prune-untracked-artifacts-no-force). Before this gate the
+    // classifier reported `removable: true` for a worktree git always refuses,
+    // so an operator read "removable" and then hit a raw git error. A probe
+    // that does not answer degrades to the pre-probe classification — the
+    // removal attempt then reports its own failure, exactly as before.
+    const porcelain = (deps.status ?? defaultWorktreeStatus)(path);
+    if (porcelain !== undefined) {
+      const primaryRoots = (
+        deps.primaryRoots ?? [registered[0] ?? resolve(root), resolve(root)]
+      ).map((primary) => resolve(primary));
+      const blockers = parseRemovalBlockers(porcelain);
+      const untracked = blockers.untracked.filter(
+        (rel) => !isSelfReapedArtifact(path, rel, primaryRoots),
+      );
+      if (blockers.tracked.length > 0) {
+        // Uncommitted TRACKED work: refused with or without the force opt-in.
+        entry.reason = worktreeTrackedRefusal(item, path, blockers.tracked);
+        entry.blockingPaths = [...untracked, ...blockers.tracked].slice(0, MAX_CLAIM_WRITE_NAMES);
+        entry.blockingTotal = untracked.length + blockers.tracked.length;
+        entry.blockingTracked = blockers.tracked.slice(0, MAX_CLAIM_WRITE_NAMES);
+        entry.blockingTrackedTotal = blockers.tracked.length;
+        return entry;
+      }
+      if (untracked.length > 0) {
+        entry.blockingPaths = untracked.slice(0, MAX_CLAIM_WRITE_NAMES);
+        entry.blockingTotal = untracked.length;
+        if (deps.force !== true) {
+          // Conservative default: unknown untracked content blocks removal and
+          // is never discarded implicitly — the skip names the flag AND the
+          // manual sequence.
+          entry.reason = worktreeUntrackedRefusal(item, path, untracked);
+          return entry;
+        }
+        // Armed force + untracked-only blockers: the removal is authorized to
+        // discard exactly this content (never tracked changes), and says so.
+        entry.forced = true;
+      }
+    }
+    // The action names exactly what the surface does, and a forced discard
+    // says so (never a bare removal).
+    entry.action =
+      entry.forced === true
+        ? "remove worktree (forced past its untracked content), delete its branch and clear the worktree_path record"
+        : "remove worktree and delete the merged branch";
   }
   entry.removable = true;
   return entry;
@@ -486,17 +595,120 @@ export function worktreeReleaseRefusal(
  * post-rename path.
  */
 export function parseRemovalBlockingPaths(porcelain: string): string[] {
-  const paths: string[] = [];
+  return parsePorcelainPaths(porcelain).map((entry) => entry.path);
+}
+
+/** One parsed porcelain line: the post-rename path plus its untracked flag. */
+function parsePorcelainPaths(porcelain: string): Array<{ path: string; untracked: boolean }> {
+  const entries: Array<{ path: string; untracked: boolean }> = [];
   for (const line of porcelain.split("\n")) {
     if (line.trim().length === 0) continue;
-    if (line.slice(0, 2) === "!!") continue; // ignored files die with the worktree
+    const code = line.slice(0, 2);
+    if (code === "!!") continue; // ignored files die with the worktree
     let path = line.slice(3).trim();
     const arrow = path.indexOf(" -> ");
     if (arrow !== -1) path = path.slice(arrow + 4);
     path = path.replace(/^"|"$/g, "");
-    if (path.length > 0) paths.push(path);
+    if (path.length > 0) entries.push({ path, untracked: code === "??" });
   }
-  return paths;
+  return entries;
+}
+
+/**
+ * The removal blockers of {@link parseRemovalBlockingPaths}, split by what the
+ * force opt-in may discard (bug-cleanup-prune-untracked-artifacts-no-force):
+ * untracked entries (`??`) versus tracked modifications (every other
+ * non-ignored status). Ignored files are in neither — they die with the
+ * worktree.
+ */
+export type RemovalBlockers = {
+  /** Untracked paths (`??`): the only content the force opt-in may discard. */
+  untracked: string[];
+  /** Tracked paths with staged/unstaged/conflicted changes: never force-removed. */
+  tracked: string[];
+};
+
+export function parseRemovalBlockers(porcelain: string): RemovalBlockers {
+  const untracked: string[] = [];
+  const tracked: string[] = [];
+  for (const entry of parsePorcelainPaths(porcelain)) {
+    (entry.untracked ? untracked : tracked).push(entry.path);
+  }
+  return { untracked, tracked };
+}
+
+/**
+ * Bound ONE untrusted path inside a skip reason: porcelain paths come from the
+ * worktree being classified (a file name can reach NAME_MAX), and a reason
+ * rides the `--json` envelope/skip line, so `MAX_CLAIM_WRITE_NAMES` names at
+ * this per-path bound keep the whole sentence readable and bounded.
+ */
+function boundedPathName(path: string): string {
+  return path.length > 120 ? `${path.slice(0, 119)}…` : path;
+}
+
+/**
+ * The refusal for a terminal+merged worktree whose removal is blocked by
+ * UNTRACKED content while the force opt-in is NOT armed
+ * (bug-cleanup-prune-untracked-artifacts-no-force). The conservative default is
+ * unchanged — nothing is touched, and unknown untracked files are never
+ * discarded implicitly — but the skip now names the actual blockers and BOTH
+ * remedies: the flag that would discard exactly this content (never tracked
+ * changes) and the manual sequence.
+ */
+export function worktreeUntrackedRefusal(item: WorkItem, path: string, paths: string[]): string {
+  const named = paths.slice(0, MAX_CLAIM_WRITE_NAMES).map(boundedPathName);
+  const extra = paths.length - named.length;
+  const branchStep = item.branch ? `, then git branch -D ${item.branch}` : "";
+  return (
+    `skipping the worktree of '${item.id}': ${paths.length} untracked file` +
+    `${paths.length === 1 ? "" : "s"} block 'git worktree remove' (${named.join(", ")}` +
+    `${extra > 0 ? `, and ${extra} more` : ""}). Nothing was removed. Discard them with the force ` +
+    "opt-in — arggon cleanup --prune --force (native cleanup({ prune: true, force: true })), which " +
+    "never discards tracked changes — or reap the worktree by hand: git worktree remove --force " +
+    `${path}${branchStep}, then arggon cleanup --prune to clear the record.`
+  );
+}
+
+/**
+ * The refusal for a terminal+merged worktree whose removal is blocked by
+ * TRACKED modifications — uncommitted work the force opt-in never discards, so
+ * it is a refusal WITH and WITHOUT the flag; the remedy is to commit or
+ * discard that work first (or reap by hand, the documented last resort).
+ */
+export function worktreeTrackedRefusal(item: WorkItem, path: string, paths: string[]): string {
+  const named = paths.slice(0, MAX_CLAIM_WRITE_NAMES).map(boundedPathName);
+  const extra = paths.length - named.length;
+  const branchStep = item.branch ? `, then git branch -D ${item.branch}` : "";
+  return (
+    `skipping the worktree of '${item.id}': ${paths.length} tracked file` +
+    `${paths.length === 1 ? " has" : "s have"} uncommitted changes (${named.join(", ")}` +
+    `${extra > 0 ? `, and ${extra} more` : ""}), which block 'git worktree remove'; the force ` +
+    "opt-in never discards tracked work. Commit or discard that work first, then re-run prune — or " +
+    `reap the worktree by hand: git worktree remove --force ${path}${branchStep}, then ` +
+    "arggon cleanup --prune to clear the record."
+  );
+}
+
+/**
+ * True when `relPath` is one of the two start-owned root entries this run
+ * removes BEFORE `git worktree remove` AND it actually carries the start shape
+ * (the very ownership predicates `unlinkNodeModulesLink` / `unlinkWorktreeEnv`
+ * use). A foreign install or an adopter-customized env file is NOT this — it
+ * stays a blocker. Paths come from porcelain, so a collapsed untracked
+ * directory keeps its trailing slash.
+ */
+function isSelfReapedArtifact(
+  worktreePath: string,
+  relPath: string,
+  primaryRoots: string[],
+): boolean {
+  const rel = relPath.replace(/\/+$/, "");
+  if (rel === WORKTREE_ENV_FILE) return isStartOwnedWorktreeEnv(worktreePath);
+  if (rel === WORKTREE_NODE_MODULES_ENTRY) {
+    return primaryRoots.some((primary) => isStartOwnedNodeModulesInstall(primary, worktreePath));
+  }
+  return false;
 }
 
 /**

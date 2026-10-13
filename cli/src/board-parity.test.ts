@@ -18,8 +18,23 @@ import { mkdirSync, mkdtempSync as _mkdtempSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { applyBoardFilter, evaluateDrop, renderBoardHtml, type BoardLensItem } from "./board.js";
-import { applyViewLens, parseFilter, runList, runUpdate, visibleItems } from "@arggondev/lib";
+import {
+  applyBoardFilter,
+  buildBoardDetail,
+  buildBoardDetailMap,
+  evaluateDrop,
+  renderBoardHtml,
+  type BoardLensItem,
+} from "./board.js";
+import {
+  applyViewLens,
+  findTasksDir,
+  loadItems,
+  parseFilter,
+  runList,
+  runUpdate,
+  visibleItems,
+} from "@arggondev/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -579,5 +594,68 @@ describe("parity: embedded board lens vs kernel filter", () => {
       expect(() => runList({ cwd: root, filter: expr })).toThrow();
       expect(applyBoardFilter([], expr, null).ok).toBe(false);
     }
+  });
+});
+
+describe("parity: serve detail vs static detail map (task-web-board-hierarchy-links)", () => {
+  function writeHierarchyTree(): string {
+    const root = mkdtempSync(join(tmpdir(), "arggon-hierarchy-parity-"));
+    mkdirSync(join(root, "tasks/top/mid"), { recursive: true });
+    writeFileSync(join(root, "tasks/.convention.yml"), "version: 1\n", "utf8");
+    const write = (
+      rel: string,
+      type: string,
+      id: string,
+      status: string,
+      parent?: string,
+    ): void => {
+      writeFileSync(
+        join(root, rel),
+        `---\ntype: ${type}\nstatus: ${status}\nid: ${id}\ntitle: ${id}\n${parent ? `parent: ${parent}\n` : ""}labels: []\ncreated: "2026-09-11"\nupdated: "2026-09-11"\n---\n\n# ${id}\n`,
+        "utf8",
+      );
+    };
+    write("tasks/top/top.md", "initiative", "top", "todo");
+    write("tasks/top/mid/mid.md", "epic", "mid", "in_progress", "top");
+    write("tasks/top/mid/leaf-a.md", "task", "leaf-a", "todo", "mid");
+    write("tasks/top/mid/leaf-b.md", "task", "leaf-b", "done", "mid");
+    write("tasks/top/mid/orphan.md", "task", "orphan", "todo", "ghost");
+    return root;
+  }
+
+  it("serves and embeds identical parent/children edges for every item", () => {
+    const root = writeHierarchyTree();
+    const items = loadItems(findTasksDir(root));
+    const map = buildBoardDetailMap({ root, items });
+    expect(Object.keys(map).sort()).toEqual(["leaf-a", "leaf-b", "mid", "orphan", "top"]);
+    for (const item of items) {
+      const served = buildBoardDetail({ cwd: root, id: item.id });
+      expect(served.detail.parent, `${item.id} parent`).toEqual(map[item.id].detail.parent);
+      expect(served.detail.children, `${item.id} children`).toEqual(map[item.id].detail.children);
+    }
+  });
+
+  it("resolves edges through the kernel parent frontmatter only (no parallel hierarchy)", () => {
+    const root = writeHierarchyTree();
+    const items = loadItems(findTasksDir(root));
+    const map = buildBoardDetailMap({ root, items });
+    const byId = new Map(items.map((entry) => [entry.id, entry]));
+    for (const item of items) {
+      const expectedParent = item.parent
+        ? { id: item.parent, status: byId.get(item.parent)?.status ?? null }
+        : null;
+      expect(map[item.id].detail.parent, `${item.id} parent`).toEqual(expectedParent);
+      const expectedChildren = items
+        .filter((entry) => entry.parent === item.id)
+        .map((entry) => ({ id: entry.id, status: entry.status }))
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      expect(map[item.id].detail.children, `${item.id} children`).toEqual(expectedChildren);
+    }
+    expect(map["mid"].detail.children).toEqual([
+      { id: "leaf-a", status: "todo" },
+      { id: "leaf-b", status: "done" },
+    ]);
+    expect(map["orphan"].detail.parent).toEqual({ id: "ghost", status: null });
+    expect(map["top"].detail.parent).toBeNull();
   });
 });
