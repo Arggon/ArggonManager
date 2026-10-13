@@ -58,17 +58,21 @@ objects. So both halves of the question have real options:
 
 ## Acceptance
 
-- [ ] Decide, with reasoning recorded on this item: keep the file seam (and say
-      what the file count/size actually is — 72K of md + one generated bundle),
-      inline agents/commands into `opencode.json(c)`, load the plugin via a
-      config `plugin` entry in this repo only, or a mix
-- [ ] If inlining: the `x-generated`/ack/refresh model and `doctor --agents` get
-      an explicit replacement story (or a recorded scope reduction), the seam
-      tests and capability matrix are updated in the same change, and adopters'
-      trees see the same shape
-- [ ] If config-referencing the plugin in this repo: `doctor`'s vendored-plugin
-      staleness detection, `npm test`'s rewrite step, and the `.gitignore`
-      entries are reconciled in the same change
+- [x] Decide, with reasoning recorded on this item: **keep the file seam** — the
+      decision is recorded in the delivery lead's verdict comment (2026-10-12):
+      keep (a); the config-inline option is recorded and NOT taken now; revisit
+      only if the owner wants to trade the provenance/ack/doctor machinery for
+      file count. Measured cost of the kept seam: 15 tracked files / 31,905 B of
+      content + a 3,088 B config; the 549 KB plugin copies are generated and
+      gitignored (zero git accounting)
+- [x] N/A — the decision kept the file seam, so inlining is not taken; if the
+      owner reverses it, the replacement story for the `x-generated`/ack/refresh
+      model and `doctor --agents` is the precondition (recorded in the verdict
+      comment as the strongest counter-argument)
+- [x] N/A — the decision kept the file seam, so no config reference is added;
+      the reconciliation list (doctor staleness detection, `npm test`'s rewrite
+      step, `.gitignore` entries) stays recorded in the verdict comment for
+      whoever takes that path
 - [x] Regardless of decision: the two clearly-local artifacts
       (`.opencode/opencode.json`, `.opencode/harness/`) are kept out of
       ArggonManager's seam accounting — either gitignored (they already trip
@@ -370,6 +374,7 @@ Text: "…so `findOpenCodeConfig` still sees it and, on a tree without a tracked
 — standards review, session ses_ecd55780affe6zwYGBWpe2FVGm (read-only; no project files touched)
 
 ### 2026-10-13 @arggon-standards-reviewer
+
 ### 2026-10-13 @arggon-standards-reviewer
 
 verdict: approve (head e899cba4; supersedes the two request-changes above)
@@ -389,3 +394,17 @@ Scope: item text + `.gitignore`. The fix commit e899cba4 is a fast-forward on th
 **Open, non-blocking (delivery-lead action):** the `docs/agents.md:655` drift follow-up (V1 schema named as field-level source of truth) is still unfiled under story-opencode-adapter.
 
 — standards review, session ses_ecd356ddcffe7X9XjrHphKI9Id (read-only; no project files touched)
+
+### 2026-10-13 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead — decision recorded: keep the file seam (a); hygiene shipped; config-inline recorded, not taken
+
+**Decision (acceptance box 1): keep the file seam.** Reasoning:
+1. The measured cost is small where it matters: 15 tracked files / **31,905 B** of content + a 3,088 B config; the ~549 KB plugin copies are generated, gitignored, and regenerate from the committed bundle — zero git accounting.
+2. The seam's file model is what carries per-file `x-generated` provenance, `init`'s refresh/ack/adopter-edit semantics, `doctor --agents` per-file statuses, orphan reaping, and markdown-diff readability — machinery this repo built deliberately (spec adapter-selection / the orphan-reap rules). Inlining agents/commands into config would retire that subsystem while delivering nothing for adopters whose own config already present-skips the generated seam.
+3. The owner's actual question is answered by the inventory: what reads as clutter is (i) the generated plugin copies (the loading mechanism, gitignored) and (ii) **machine-local artifacts that are not ArggonManager's** — now ignored by the root `.gitignore` (hygiene box shipped: `.opencode/opencode.json`, `.opencode/harness/`; `git check-ignore` hits both; no template change, with the adopter-path reasoning recorded).
+4. **Strongest argument against this decision (recorded, per the brief):** inlining is the only option that *retires* the provenance/ack/doctor machinery — less code to maintain, fewer files for every adopter; keeping (a) means that machinery stays forever. If the owner prefers that trade, it is a deliberate follow-up: boxes 2/3 record the preconditions (replacement story for the x-generated/ack/refresh model; doctor + tests + capability-matrix updates; the config-reference reconciliation list for option (c)).
+5. **Idiom correction (box 5):** the owner's `"plugins"` (plural) in `.opencode/opencode.json` is the **correct V2 spelling** — the published `config.json` schema is V1 and stale (vendor: "never use it to infer V2 field names or shapes"); both spellings load on v2.0.26 and `debug config` normalizes singular→plural. No change needed to the owner's file.
+
+- Review: two rounds of request-changes (V1-names in option (b); a precision sentence reading opposite to the pinned behavior) resolved; superseding `verdict: approve`. Verifier merge-record: init-opencode suite 47/47; validate ok; structure 5/5; lint clean; check-ignore hits — the only prettier contradiction is the kernel's comment-append shape on the reviewer's own verdict commit (at the reviewed head it passes; tracked as `task-tracker-append-shape-not-prettier-clean`).
+- Follow-ups filed from this review: `task-seam-nits-v1-schema-and-marker` (agents.md:655 V1 claim + the double marker).
+- Merging now; auto-done flips this item on merge (boxes 1–5 now closed: 2/3 marked N/A per this decision).
