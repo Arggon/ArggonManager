@@ -8,8 +8,7 @@ branch: fix/bug-cleanup-prune-untracked-artifacts-no-force
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [worktree, hygiene, friction]
 created: "2026-10-12"
-updated: "2026-10-12"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-cleanup-prune-untracked-artifacts-no-force
+updated: "2026-10-13"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-cleanup-prune-untracked-artifacts-no-force.md

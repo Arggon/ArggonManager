@@ -9,7 +9,6 @@ parent: tooling-and-environment
 labels: [git, delivery, friction]
 created: "2026-10-12"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-merge-ergonomics-branch-updates
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-merge-ergonomics-branch-updates.md

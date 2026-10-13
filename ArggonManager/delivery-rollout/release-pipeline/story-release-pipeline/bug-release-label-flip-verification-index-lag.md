@@ -9,7 +9,6 @@ parent: story-release-pipeline
 labels: [release, ci, failure-mode]
 created: "2026-10-12"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-release-label-flip-verification-index-lag
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-label-flip-verification-index-lag.md
