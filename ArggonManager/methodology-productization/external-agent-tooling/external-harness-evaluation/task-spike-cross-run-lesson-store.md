@@ -138,3 +138,9 @@ PR #761 (docs-only, Advisory) — https://github.com/Arggon/ArggonManager/pull/7
 ### handoff 2026-10-13 @arggon-maker (session: ses_eccb87006ffeFqi5BMJYtIfeJa) — next: Delivery lead: review PR #761 (docs-only). Decision is recorded (ADR 0027 Proposed); item stays in_progress. No merge from the maker session.
 - branch: feat/task-spike-cross-run-lesson-store
 - open questions: File the bounded implementation item (rule in docs/agents.md + trigger in templates/docs/opencode/agents/arggon-maker.md)?; ADR 0027 number collides if a concurrent ADR takes 0027 before merge -> mer…
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve (docs-only)
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as f01c1edd (PR #761); auto-done flip #769. Deliverable: `exploration-cross-run-lesson-store-027` + `ADR 0027` (status flipped Proposed → Accepted on landing, commit 4d5b3c4c; ADR index row updated; adr-index-parity + adr-status-doc-contract 18/18). Classification: bounded, with the greenfield upgrade ratchet recorded. Decision: no lesson store — lessons are promoted, bounded (≤160 chars) and cited into the carriers that already own the topic; the gap answer is promotion/retrieval, not retention (52.4% of tracker bytes are per-item comment records).
+Follow-ups filed: task-lesson-promotion-implementation (the bounded implementation: agents.md rule + maker-prompt trigger, Behavioral); task-reconcile-repo-prettier-drift (574 tracker files fail repo-wide prettier at main — reported, not fixed here).
