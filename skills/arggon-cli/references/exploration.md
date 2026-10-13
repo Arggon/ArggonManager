@@ -38,7 +38,9 @@ outcome/users → scope/decomposition → constraints → data → interfaces �
 failure/edge → ops/security → rollout
 
 - A round ends when the frontier is empty: every branch visited, nothing
-  silently assumed. Log each round in the exploration doc.
+  silently assumed. Checkable form: no question remains that is askable now
+  (prerequisites settled) and still unsettled — if you can name one, the round
+  has a next move. Log each round in the exploration doc.
 - "I don't know" routes to a spike item, never a guess.
 - Rounds ballooning? The scope is too large — decompose first, then grill
   each piece.
@@ -58,6 +60,19 @@ criterion**, an **explicit non-goal**, or a **spike item** — nothing stays
 "unknown". This is the mechanism that solves edge cases before they arrive.
 Record them in the exploration doc's edge-case table (dimension / hunted case
 / resolution — pre-seeded in the project-exploration template).
+
+- The hunt ends when a whole pass over the dimensions raises no case that is
+  not already resolved: every row carries a terminal resolution and a fresh
+  read of the dimensions finds nothing new. A pass that adds nothing ends the
+  hunt; passes beyond it are not evidence of coverage.
+- The two stops are different tests, and conflating them fails in both
+  directions. A round ends when the **questions** are exhausted: nothing
+  askable stays open. The hunt ends when the **design** is closed: a full pass
+  stops changing it. Stop a round early and the spec ships over a live unknown,
+  which resurfaces later as rework; run the hunt past an empty pass and it
+  never converges, spending the budget the protocol's cost rests on. A closed
+  hunt is readiness to write the design down, not permission to implement — the
+  hard gate in Phase 5 is unchanged.
 
 ## Phase 5 — Approaches, artifacts, gate
 
