@@ -204,3 +204,10 @@ Gates (all in this worktree): `npm run build` green; `npx vitest run cli/src/ada
 
 - branch: feat/task-adapter-report-nits-from-review
 - open questions: json-output.md:857 retired agent ids -> verdict says own item; caption cites commit fee7979b (date+hash) - keep or date-only? fixture cannot carry acknowledged+adopter-edited together.
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 29b083f6 (PR #762); auto-done flip #766. The narrow request-changes (the `doctor --agents` sample block in json-output.md) was closed by re-measurement, the reviewer's preferred route: sample + caption re-measured against the live seam (zcode 19/16 → 23/23; opencode present 12/6 → 17/1), README and json-output agree, no retired path remains in the block.
+Branch gates (maker-run; CI re-verified green): full suite 3247 passed; lint/structure/validate/prettier green; programmatic assert of the doc's fenced block vs a live `doctor --json --agents` passes.
+Accepted caveat: a throwaway fixture cannot carry acknowledged + adopter-edited mixed states (measured), so the sample cites this tree at fee7979b as a dated live snapshot — recorded in the block. Follow-up filed: bug-retired-agent-ids-in-doc-samples.
