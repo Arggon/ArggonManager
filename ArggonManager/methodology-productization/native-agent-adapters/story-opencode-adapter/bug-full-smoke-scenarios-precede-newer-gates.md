@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-full-smoke-scenarios-precede-newer-gates
 title: "5 full-smoke checks fail on main: scenarios predate the placeholder-body and done-gate rules"
+assignee: arggon-delivery-lead
+branch: fix/bug-full-smoke-scenarios-precede-newer-gates
 parent: story-opencode-adapter
 labels: [opencode-seam, tests]
 created: "2026-10-13"
 updated: "2026-10-13"
+claimed_at: "2026-10-13T22:07:11.280Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-full-smoke-scenarios-precede-newer-gates
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/bug-full-smoke-scenarios-precede-newer-gates.md
