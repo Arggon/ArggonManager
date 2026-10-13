@@ -82,6 +82,18 @@ export type LocalWorkspacePackage = {
 /** Marker file inside a start-created link farm (ownership, see unlink below). */
 const LINK_FARM_MARKER = ".arggon-link-farm";
 
+/**
+ * The two worktree-root entries `start --worktree` creates and every prune run
+ * reaps BEFORE `git worktree remove`: the env contract file (spec
+ * worktree-env-contract-016) and the install entry start links or points at
+ * (bug-start-worktree-node-modules). Exported so the cleanup classifier can
+ * tell a removal blocker the run itself clears from one it does not
+ * (bug-cleanup-prune-untracked-artifacts-no-force) — one declaration, never a
+ * second hard-coded list.
+ */
+export const WORKTREE_ENV_FILE = ".arggon.env";
+export const WORKTREE_NODE_MODULES_ENTRY = "node_modules";
+
 /** True when `child` is `parent` itself or lives under it (physical paths). */
 function isInside(parent: string, child: string): boolean {
   return child === parent || child.startsWith(`${parent}${sep}`);
@@ -405,16 +417,56 @@ export function linkNodeModulesDetailed(
  * directory, absent install) is not ours and must never be touched.
  */
 function ownedLinkFarm(primaryRoot: string, worktreePath: string): string | null {
-  const link = join(worktreePath, "node_modules");
+  const link = join(worktreePath, WORKTREE_NODE_MODULES_ENTRY);
   try {
     if (lstatSync(link).isSymbolicLink()) return null;
     const marker = readFileSync(join(link, LINK_FARM_MARKER), "utf8").trim();
     if (marker.length === 0) return null;
-    if (resolve(marker) !== resolve(join(primaryRoot, "node_modules"))) return null;
+    if (resolve(marker) !== resolve(join(primaryRoot, WORKTREE_NODE_MODULES_ENTRY))) return null;
     return link;
   } catch {
     return null;
   }
+}
+
+/**
+ * Which start-created install shape the worktree carries, if any: a symlink
+ * whose target resolves to `primaryRoot`'s install (`"link"`), or a link farm
+ * this start created (real directory + matching marker, `"farm"`). `null` for
+ * anything else — an npm-reified install, a foreign directory, a link pointing
+ * elsewhere (the ownership rule both {@link unlinkNodeModulesLink} and the
+ * cleanup classifier share).
+ */
+function nodeModulesInstallKind(primaryRoot: string, worktreePath: string): "link" | "farm" | null {
+  const target = resolve(join(primaryRoot, WORKTREE_NODE_MODULES_ENTRY));
+  const link = join(worktreePath, WORKTREE_NODE_MODULES_ENTRY);
+  let isLink: boolean;
+  try {
+    isLink = lstatSync(link).isSymbolicLink();
+  } catch {
+    return null;
+  }
+  if (isLink) {
+    try {
+      // readlink returns the RAW target: a relative target is relative to the
+      // link's own directory, never to process.cwd() (review R1). Resolving
+      // against cwd would miss a relative link whenever the command runs from
+      // anywhere but the primary checkout.
+      return resolve(dirname(link), readlinkSync(link)) === target ? "link" : null;
+    } catch {
+      return null;
+    }
+  }
+  return ownedLinkFarm(primaryRoot, worktreePath) === null ? null : "farm";
+}
+
+/**
+ * Read-only twin of {@link unlinkNodeModulesLink}: true when the worktree's
+ * install entry is a start-created link/farm THIS run would remove before
+ * `git worktree remove`. Never touches anything, never throws.
+ */
+export function isStartOwnedNodeModulesInstall(primaryRoot: string, worktreePath: string): boolean {
+  return nodeModulesInstallKind(primaryRoot, worktreePath) !== null;
 }
 
 /**
@@ -428,46 +480,28 @@ function ownedLinkFarm(primaryRoot: string, worktreePath: string): string | null
  * Best-effort: never throws.
  */
 export function unlinkNodeModulesLink(primaryRoot: string, worktreePath: string): boolean {
-  const target = resolve(join(primaryRoot, "node_modules"));
-  const link = join(worktreePath, "node_modules");
-  let isLink: boolean;
+  const kind = nodeModulesInstallKind(primaryRoot, worktreePath);
+  if (kind === null) return false;
+  const link = join(worktreePath, WORKTREE_NODE_MODULES_ENTRY);
   try {
-    isLink = lstatSync(link).isSymbolicLink();
-  } catch {
-    return false;
-  }
-  if (isLink) {
-    try {
-      // readlink returns the RAW target: a relative target is relative to the
-      // link's own directory, never to process.cwd() (review R1). Resolving
-      // against cwd would miss a relative link whenever the command runs from
-      // anywhere but the primary checkout.
-      if (resolve(dirname(link), readlinkSync(link)) !== target) return false;
-    } catch {
-      return false;
-    }
-    try {
+    if (kind === "link") {
       unlinkSync(link);
       return true;
-    } catch {
-      try {
-        // Windows junctions are directory links; unlink can refuse them.
-        rmdirSync(link);
-        return true;
-      } catch {
-        return false;
-      }
     }
-  }
-  if (ownedLinkFarm(primaryRoot, worktreePath) === null) return false;
-  try {
     // The farm holds only symlinks plus the scoped directories we created, so
     // a recursive remove unlinks the entries without ever following them into
     // the primary install.
     rmSync(link, { recursive: true, force: true });
     return true;
   } catch {
-    return false;
+    if (kind !== "link") return false;
+    try {
+      // Windows junctions are directory links; unlink can refuse them.
+      rmdirSync(link);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -1189,7 +1223,7 @@ export function prepareWorktreeEnv(
     };
   }
   const checkIgnore = request.checkIgnore ?? defaultCheckIgnore;
-  const ignored = checkIgnore(worktreePath, ".arggon.env");
+  const ignored = checkIgnore(worktreePath, WORKTREE_ENV_FILE);
   const gitignored = ignored === undefined ? undefined : ignored;
   // .env seeding: copy-if-absent, never read for interpretation, never
   // overwritten (COPYFILE_EXCL makes the guarantee race-safe). A failure is
@@ -1209,7 +1243,7 @@ export function prepareWorktreeEnv(
   }
   const attachWarning = (): string =>
     [...warnings, "already exists — left byte-identical (never overwritten)"].join("; ");
-  const envPath = join(worktreePath, ".arggon.env");
+  const envPath = join(worktreePath, WORKTREE_ENV_FILE);
   if (existsSync(envPath)) {
     return {
       written: false,
@@ -1367,6 +1401,41 @@ export type WorktreeDependencyPreparation = {
 };
 
 /**
+ * The env file's path when it has the start-created CONTRACT SHAPE, else null:
+ * not a symlink, every line one of the six documented `KEY=value` pairs, a
+ * trailing newline. The ownership rule {@link unlinkWorktreeEnv} and the
+ * cleanup classifier share.
+ */
+function startOwnedEnvPath(worktreePath: string): string | null {
+  const envPath = join(worktreePath, WORKTREE_ENV_FILE);
+  let raw: string;
+  try {
+    if (lstatSync(envPath).isSymbolicLink()) return null; // never remove a link
+    raw = readFileSync(envPath, "utf8");
+  } catch {
+    return null;
+  }
+  const lines = raw.split("\n");
+  if (lines.pop() !== "") return null; // the contract file ends with a newline
+  if (lines.length === 0) return null;
+  const keys = new Set<string>(WORKTREE_ENV_KEYS);
+  for (const line of lines) {
+    const eq = line.indexOf("=");
+    if (eq <= 0 || !keys.has(line.slice(0, eq))) return null;
+  }
+  return envPath;
+}
+
+/**
+ * Read-only twin of {@link unlinkWorktreeEnv}: true when the worktree carries a
+ * start-created, contract-shaped `.arggon.env` THIS run would remove before
+ * `git worktree remove`. Never touches anything, never throws.
+ */
+export function isStartOwnedWorktreeEnv(worktreePath: string): boolean {
+  return startOwnedEnvPath(worktreePath) !== null;
+}
+
+/**
  * Remove the start-created env contract file from a worktree, if present
  * (spec worktree-env-contract-016): an untracked `.arggon.env` blocks
  * `git worktree remove` exactly like the start-created install link did
@@ -1378,22 +1447,8 @@ export type WorktreeDependencyPreparation = {
  * file was removed. Best-effort: never throws.
  */
 export function unlinkWorktreeEnv(worktreePath: string): boolean {
-  const envPath = join(worktreePath, ".arggon.env");
-  let raw: string;
-  try {
-    if (lstatSync(envPath).isSymbolicLink()) return false; // never remove a link
-    raw = readFileSync(envPath, "utf8");
-  } catch {
-    return false;
-  }
-  const lines = raw.split("\n");
-  if (lines.pop() !== "") return false; // the contract file ends with a newline
-  if (lines.length === 0) return false;
-  const keys = new Set<string>(WORKTREE_ENV_KEYS);
-  for (const line of lines) {
-    const eq = line.indexOf("=");
-    if (eq <= 0 || !keys.has(line.slice(0, eq))) return false;
-  }
+  const envPath = startOwnedEnvPath(worktreePath);
+  if (envPath === null) return false;
   try {
     rmSync(envPath);
     return true;

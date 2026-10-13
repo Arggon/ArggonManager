@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-friction-capture-command
 title: arggon friction capture and the local friction log
 assignee: arggon-delivery-lead
@@ -10,8 +10,6 @@ labels: [method]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-11"
-claimed_at: "2026-10-11T07:13:58.073Z"
-worktree_path: /home/arggon/Projects/ArggonManager-task-friction-capture-command
 ---
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-capture-command.md
@@ -162,3 +160,10 @@ No MCP tool and no `tools.arggon.friction` in this PR: `arggon_friction` + `tool
 
 ### 2026-10-11 @Arggon
 PR: https://github.com/Arggon/ArggonManager/pull/695 (base main, head feat/task-friction-capture-command). CI dispatched on push. Status stays in_progress — the delivery lead reviews, verifies the merge and flips to done.
+
+### 2026-10-11 @arggon-delivery-lead
+### 2026-10-11 @arggon-delivery-lead — review verdict: APPROVED, merged (PR #695)
+
+Reviewed against engineering.md §Review bar. Architecture/boundaries: the capture surface is a kernel module (`lib/src/friction.ts`) behind the house envelope assembler in `operations.ts`, explicitly NOT a tracker operation (no item load, no frontmatter, no tracker commit) — the log-is-not-the-tracker invariant is structurally honored, and the state base reuses `worktreeStateBase` rather than inventing a second per-OS mapping. Conventions: `--json` follows the house contract; the generated regions (SKILL.md, convention.yml checksum) were refreshed by the documented sync, not hand-edited. Evidence travels with the change: 61 new tests (46 kernel + 15 CLI) incl. two real processes in two worktrees for the O_APPEND concurrency box, network-denied run for the no-network box, RTL/CJK/astral round-trips, 5000-line rotation; the maker also caught and fixed a real crash-recovery bug (a partial trailing line used to glue the next record — the append now terminates the fragment first). Docs travel with code (SKILL.md command region). Scope stayed on the item: MCP surface, json-output.md and doctor deliberately deferred to T5 with a stated reason. Blocking gates: 2919 tests, build, check:plugin, lint, validate, plus CI cli/tasks-validate/ui-smoke all green.
+
+Two findings routed: the non-length-prefixed fingerprint separator (spec decision owed) → task-friction-fingerprint-separator-not-length-prefixed; the two additive failure reasons (`no-command-shape`, `evidence-unreadable`) accepted as within the spec's evident intent.

@@ -8,6 +8,7 @@ labels: [docs, adr, tests]
 created: "2026-10-06"
 updated: "2026-10-06"
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr-index-parity-status-classes-line-ref-stale.md
   Leaves live only under a story. id is the filename stem: task-adr-index-parity-status-classes-line-ref-stale.
@@ -19,15 +20,21 @@ updated: "2026-10-06"
 
 ## Context
 
-<!-- Why this task exists. -->
+PR #618 (`fix/bug-engineering-doc-stale-adr-statuses`) added a test asserting the ADR index parity suite enforces ADR-status class agreement, citing `cli/src/adr-index-parity.test.ts:125-131` as the home of `STATUS_CLASSES`. PR #620 (`feat/task-adr-index-parity-does-not-check-titles`) rewrote that same file and moved `STATUS_CLASSES` to `:191`. The assertion is still true; only the line citation is dead.
+
+This is a cross-PR reference into a file two concurrent branches rewrote at once. It is small and non-blocking, and exactly the kind that survives review and misleads a later reader because it looks precise.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] The reference in #618's test names `STATUS_CLASSES` by identifier, not by line range — or, if a line range is kept, it matches the post-#620 file
+- [ ] `npx vitest run cli/src/adr-index-parity.test.ts` plus the #618 test is green on a tree containing both #618 and #620
+- [ ] The fix lands in the file that owns the reference (#618's test), not in #620 — #620 did not introduce the error
+- [ ] The diff confirms `STATUS_CLASSES` is still exported and present after #620, so this stays a citation fix and not a dangling-symbol repair
 
 ## Notes
 
 ### 2026-10-06 @ses_ef169b774ffddLlcycmzGGeU5Q
+
 Filed from the PR #620 review (verdict: approve, landed as ed773495). The reviewer's F2.
 
 ### Context

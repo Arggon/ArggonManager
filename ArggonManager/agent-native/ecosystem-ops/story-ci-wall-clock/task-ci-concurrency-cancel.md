@@ -8,6 +8,7 @@ labels: [ci]
 created: "2026-10-05"
 updated: "2026-10-05"
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-ci-wall-clock/task-ci-concurrency-cancel.md
   Leaves live only under a story. id is the filename stem: task-ci-concurrency-cancel.
@@ -19,15 +20,26 @@ updated: "2026-10-05"
 
 ## Context
 
-<!-- Why this task exists. -->
+ADR 0023 step 1 ([`0023-ci-wall-clock`](../../docs/adr/0023-ci-wall-clock.md) Decision L48-52) — the cheapest win, independent of everything else.
+
+No workflow in this repo declares a `concurrency:` block. Over the last 60 CI runs, three branches ran CI 4x, 4x, 2x. Every push while a run is in flight queues **another full ~350s run**, and without `cancel-in-progress` the superseded run still consumes a runner to completion and still posts a check on a stale SHA.
+
+Keyed on **PR number**, not `github.ref`: the documented `ci-${{ github.ref }}` pattern would let two open PRs cancel each other, which is a real hazard on a repo with several concurrent feature branches.
+
+Refs: `ArggonManager/docs/explorations/exploration-ci-pipeline-wall-clock-022.md`, ADR 0023.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] A `concurrency:` stanza is added to the PR-triggered workflow(s) with `group: ci-${{ github.event.pull_request.number || github.ref }}` and `cancel-in-progress: true`.
+- [ ] The group key does **not** combine `queue: max` with `cancel-in-progress` (that is a workflow validation error and would fail the workflow).
+- [ ] Verified by pushing two commits in quick succession to one PR: the older run is cancelled, the newer one completes, and the PR shows exactly one live check.
+- [ ] Verified that two **different** open PRs running simultaneously do **not** cancel each other.
+- [ ] `auto-done.yml` is unaffected (it triggers on `pull_request: closed`, a different event) and the flip flow still lands — assert, do not assume.
 
 ## Notes
 
 ### 2026-10-05 @ses_ef26e3a0dffeCrCyR7114VVZ2H
+
 ## Context
 
 ADR 0023 step 1 — the cheapest win, independent of everything else.

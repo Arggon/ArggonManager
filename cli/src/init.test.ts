@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { runInit, dryRunInit, type ProposalEntry } from "./init.js";
 import { arggonVersion, renderGeneratedDoc } from "./docs.js";
 import {
+  type ConventionConfig,
   parseConventionConfig,
   readConventionConfig,
   readGeneratedState,
@@ -566,17 +567,108 @@ describe("init --force and the convention's x-* extensions (bug-init-force-drops
     expect("convention" in second).toBe(false);
   });
 
+  /**
+   * bug-convention-parser-rejects-valid-yaml-force-rescaffolds: the worst case,
+   * pinned where the follow-up would look for it. Each of these is a
+   * perfectly valid `.convention.yml`; the strict line parser used to refuse
+   * it, `conventionScaffoldBase` classified the refusal as "unreadable or
+   * unparseable", and the whole file was re-derived from the fixed scaffold —
+   * so the adopter's armed flag (their `post-start` hook, their extension
+   * block) was GONE from disk. A NEGATIVE test for the old behaviour: it stays
+   * red until the parser reads the construct, and green after.
+   *
+   * One fixture per case: the first forced run writes the repaired file, so a
+   * second run on the same tree is an ordinary preserve and would say so.
+   */
+  const VALID_YAML_CONVENTIONS: Array<{
+    name: string;
+    raw: string;
+    /** The top-level sections the file carries, as the report must name them. */
+    preserved: string[];
+    /** What the forced re-init must NOT have dropped from the file. */
+    assert: (config: ConventionConfig) => void;
+  }> = [
+    {
+      name: "an inline comment after the boolean",
+      raw: "x-tracker:\n  allow-steal: true # armed\n",
+      preserved: ["x-tracker"],
+      assert: (config) => expect(config.tracker.allowSteal).toBe(true),
+    },
+    {
+      name: "a post-start block scalar",
+      raw: "x-worktree:\n  post-start: |\n    npm ci\n    echo ready\n",
+      preserved: ["x-worktree"],
+      assert: (config) => expect(config.worktree.postStart).toBe("npm ci\necho ready\n"),
+    },
+    {
+      name: "a quoted top-level key",
+      raw: '"x-tracker":\n  allow-steal: true\n',
+      preserved: ["x-tracker"],
+      assert: (config) => expect(config.tracker.allowSteal).toBe(true),
+    },
+  ];
+
+  for (const construct of VALID_YAML_CONVENTIONS) {
+    it(`a forced re-init keeps the adopter's configuration under ${construct.name}`, () => {
+      const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-yaml-"));
+      mkdirSync(join(dir, "ArggonManager"), { recursive: true });
+      writeFileSync(join(dir, "ArggonManager/.convention.yml"), construct.raw, "utf8");
+
+      // The preview and the run must agree: no wholesale replacement is even
+      // PROPOSED for a file a real YAML parse can read.
+      const dry = dryRunInit({ dir, force: true, full: true, now: NOW });
+      expect(dry.convention).toEqual({
+        preserved: construct.preserved,
+        replaced: ["x-generated"],
+        rescaffolded: false,
+      });
+      // Pure read: the adopter's file is byte-identical after the preview.
+      expect(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")).toBe(construct.raw);
+
+      const result = runInit({ dir, force: true, full: true, now: NOW });
+      expect(result.convention).toEqual({
+        preserved: construct.preserved,
+        replaced: ["x-generated"],
+        rescaffolded: false,
+      });
+      construct.assert(
+        parseConventionConfig(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")),
+      );
+    });
+
+    it(`the CLI apply path preserves it too, under ${construct.name}`, () => {
+      const dir = mkdtempSync(join(tmpdir(), "arggon-init-force-yaml-cli-"));
+      mkdirSync(join(dir, "ArggonManager"), { recursive: true });
+      writeFileSync(join(dir, "ArggonManager/.convention.yml"), construct.raw, "utf8");
+      gitInit(dir);
+
+      const json = runCli(["init", "--force", "--json", dir], dir);
+      expect(json.status, json.stderr).toBe(0);
+      const body = JSON.parse(json.stdout) as {
+        ok: boolean;
+        convention?: { preserved: string[]; replaced: string[]; rescaffolded: boolean };
+      };
+      expect(body.ok).toBe(true);
+      expect(body.convention).toEqual({
+        preserved: construct.preserved,
+        replaced: ["x-generated"],
+        rescaffolded: false,
+      });
+      construct.assert(
+        parseConventionConfig(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")),
+      );
+    });
+  }
+
   it("the CLI apply path names the exception: a file this arggon cannot read is re-derived, on both surfaces", () => {
-    // F2 characterization, pinned where the follow-up will find it: valid YAML
-    // (an inline comment is legal there) that this arggon's strict line
-    // parser rejects, so the whole file is re-derived from the scaffold.
-    // One fixture per run: the first forced run repairs the file, so a second
-    // run on the same tree is an ordinary preserve and would say so.
+    // The wholesale-replace arm is reserved for files NO line parser can read:
+    // no colon anywhere, so there is no key and no value to keep. A valid-YAML
+    // file the adopter wrote on purpose is covered by the construct cases above.
     const unreadable = (dir: string): void => {
       mkdirSync(join(dir, "ArggonManager"), { recursive: true });
       writeFileSync(
         join(dir, "ArggonManager/.convention.yml"),
-        "x-tracker:\n  allow-steal: true # armed\n",
+        "not a convention file\na line with no colon at all\n",
         "utf8",
       );
     };
@@ -592,7 +684,7 @@ describe("init --force and the convention's x-* extensions (bug-init-force-drops
     expect(preview.convention).toEqual(expected);
     // Pure read: the unreadable file is still exactly as the adopter left it.
     expect(readFileSync(join(previewDir, "ArggonManager/.convention.yml"), "utf8")).toBe(
-      "x-tracker:\n  allow-steal: true # armed\n",
+      "not a convention file\na line with no colon at all\n",
     );
 
     const jsonDir = mkdtempSync(join(tmpdir(), "arggon-init-force-x-cli-bad-json-"));

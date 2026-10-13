@@ -142,6 +142,12 @@ failing adapter degrades to that.
   commands (`/arggon-*`), MCP wiring for `arggon mcp`. Marketplace manifest
   mirroring the ZCode shape. Same bar: parity with the kernel, generated
   with provenance, smoke-tested headless.
+- **Superseded detail (2026-10-11):** the ids above are pre-rename and the
+  `adapters/claude/` path is not the shipped bundle location. The shipped
+  vocabulary is `arggon-maker` / `arggon-standards-reviewer` (ADR 0021 §6.1/§6.2a′)
+  and a bundle lives at `templates/docs/claude/**` → `.claude-marketplace/**`, the
+  mirror of the ZCode seam; `adapters/` holds the capability matrix. The contract is
+  [spec-claude-code-adapter-024](spec-claude-code-adapter-024.md).
 
 ## Acceptance
 

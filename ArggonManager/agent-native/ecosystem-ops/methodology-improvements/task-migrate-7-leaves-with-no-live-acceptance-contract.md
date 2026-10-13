@@ -8,6 +8,7 @@ labels: [tracker-schema, done-gate]
 created: "2026-10-06"
 updated: "2026-10-06"
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-migrate-7-leaves-with-no-live-acceptance-contract.md
   Leaves live only under a story. id is the filename stem: task-migrate-7-leaves-with-no-live-acceptance-contract.
@@ -19,26 +20,36 @@ updated: "2026-10-06"
 
 ## Context
 
-<!-- Why this task exists. -->
+PR #656's second rule refuses a claimable leaf whose live `## Acceptance` section publishes no criterion. The reviewer measured the blast radius, and it is much smaller than that change's own comment claimed: refused → refused (40 relabelled `no-live-contract`, 29 `unchecked-live-criteria`) is 69; allowed → refused (genuinely newly stranded) is 7; refused → allowed (unblocked) is 3.
+
+The 40 whose criteria sit in dated comments were already refused before the change — 223 criterion rows, all unticked, refused for the right reason already, only the label moved. The genuinely stranded set is 7 open leaves with zero criterion rows anywhere: items that never published a contract at all.
+
+This item owns those 7. One of them is PR #656's own item, whose live `## Acceptance` is still the template placeholder — the maker correctly left it rather than ticking its own homework.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] Enumerate the 7 by re-running the reviewer's measurement — do not take any list here as authoritative; the set moves as items land
+- [ ] For each, author a real live `## Acceptance` contract: the criteria the item actually carries, transcribed with their evidence — where obligations live only in dated comments, the live section states them as current state and the dated blocks stay verbatim
+- [ ] Each transcribed contract is honest: a criterion is ticked only where evidence supports it — any genuinely open criterion stays un-flippable and is recorded, not tidied away
+- [ ] Each item's dated `## Notes` blocks are left exactly as written — transcription into the live body, not an edit of history
+- [ ] No waivers used — the gate is satisfied because the contract exists and is met, not bypassed
+- [ ] After migration, re-run `spec analyze --baseline` / `validate` and report how many leaves remain refused, so the number is not asserted from this note
 
 ## Notes
 
 ### 2026-10-06 @ses_ef169b774ffddLlcycmzGGeU5Q
+
 Filed from the review of PR #656. The migration half of the `no-live-contract` rule's cost.
 
 ### Context
 
 PR #656's second rule refuses a claimable leaf whose live `## Acceptance` section publishes no criterion. The reviewer measured the blast radius precisely, and it is **much smaller than the change's own comment claimed** — the correction matters, so it is recorded here:
 
-| pre-fix → post-fix | count |
-| --- | --- |
-| refused → refused (40 relabelled `no-live-contract`, 29 `unchecked-live-criteria`) | 69 |
-| **allowed → refused (genuinely newly stranded)** | **7** |
-| refused → allowed (unblocked) | 3 |
+| pre-fix → post-fix                                                                 | count |
+| ---------------------------------------------------------------------------------- | ----- |
+| refused → refused (40 relabelled `no-live-contract`, 29 `unchecked-live-criteria`) | 69    |
+| **allowed → refused (genuinely newly stranded)**                                   | **7** |
+| refused → allowed (unblocked)                                                      | 3     |
 
 The 40 items whose criteria sit in dated comments were **already refused before the change** — they carry 223 criterion rows, all unticked, so they were refused for the right reason already and only the label moved. The genuinely stranded set is **7 open leaves with zero criterion rows anywhere**: items that never published a contract at all.
 

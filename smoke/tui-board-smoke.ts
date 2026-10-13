@@ -14,6 +14,10 @@
  * seeded blocked card (`L` … `L`) and `s` cycles the card order (priority,
  * then next: the p1 card leads the todo column) → `/` filter down to the
  * seeded task → Enter opens its read-only detail pane (acceptance rows + body) →
+ * `c` on the childless seeded task reports `no children` in the pane footer
+ * (task-tui-hierarchy-jump: honest-empty instead of misfiring) → `p` jumps to
+ * the parent story's detail → `1` opens the parent's first child again (the
+ * seeded task: the children section lists each child with its number) →
  * PgDn scrolls the pane, DELIVERED AS TWO PTY WRITES so the escape sequence
  * is split across stdin chunks (bug-tui-split-escape-sequences: the decoder
  * must reassemble it instead of leaking a phantom Esc that closes the pane
@@ -428,6 +432,29 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
       {
         label: "detail pane (acceptance rows + body)",
         until: (capture) => missingDetailMarkers(lastFrame(capture), SEEDED_ITEM_ID).length === 0,
+        send: "c", // first child — the seeded task has none: honest-empty notice
+      },
+      {
+        label: "pane reports no children instead of misfiring",
+        until: (capture) =>
+          lastFrame(capture).includes(`arggon detail · ${SEEDED_ITEM_ID}`) &&
+          lastFrame(capture).includes("children: (none)") &&
+          lastFrame(capture).includes("has no children"),
+        send: "p", // jump to the parent's detail (task-tui-hierarchy-jump)
+      },
+      {
+        label: "parent jump opens the story detail with its numbered children",
+        until: (capture) =>
+          lastFrame(capture).includes("arggon detail · entries") &&
+          lastFrame(capture).includes("children (4)") &&
+          lastFrame(capture).includes(`[1] ${SEEDED_ITEM_ID}`),
+        send: "1", // open the parent's first child again
+      },
+      {
+        label: "child jump returns to the seeded task detail",
+        until: (capture) =>
+          lastFrame(capture).includes(`arggon detail · ${SEEDED_ITEM_ID}`) &&
+          missingDetailMarkers(lastFrame(capture), SEEDED_ITEM_ID).length === 0,
         // PgDn split across pty writes: intro + parameter byte only, no final
         // byte. The decoder must hold it, not consume the ESC as Esc (which
         // would close the pane — and a second Esc would clear the filter).
@@ -742,6 +769,31 @@ async function main(): Promise<void> {
         !viewStep.frame.includes("S entries") && // the story card is filtered out
         !viewStep.frame.includes("I tui-smoke"), // the initiative card too
       viewStep?.frame,
+    ) && passed;
+  const emptyStep = steps.find((step) => step.label.startsWith("pane reports no children"));
+  passed =
+    check(
+      "the pane reports no children in-pane instead of misfiring",
+      emptyStep?.ok === true &&
+        emptyStep.frame.includes("children: (none)") &&
+        emptyStep.frame.includes("has no children"),
+      emptyStep?.frame,
+    ) && passed;
+  const parentStep = steps.find((step) => step.label.startsWith("parent jump"));
+  passed =
+    check(
+      "p jumps from the item detail to the parent story detail with numbered children",
+      parentStep?.ok === true &&
+        parentStep.frame.includes("arggon detail \u00b7 entries") &&
+        parentStep.frame.includes("children (4)"),
+      parentStep?.frame,
+    ) && passed;
+  const childStep = steps.find((step) => step.label.startsWith("child jump"));
+  passed =
+    check(
+      "1 opens the parent's first child detail again",
+      childStep?.ok === true && childStep.frame.includes("arggon detail \u00b7 " + SEEDED_ITEM_ID),
+      childStep?.frame,
     ) && passed;
   const refusalStep = steps.find((step) => step.label.startsWith("invalid expression refused"));
   passed =

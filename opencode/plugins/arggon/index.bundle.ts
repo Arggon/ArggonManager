@@ -30,6 +30,8 @@ __arggonEdges.set("lib/src/create.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/create.ts\u0000./relations.js", "lib/src/relations.ts")
 __arggonEdges.set("lib/src/create.ts\u0000./status.js", "lib/src/status.ts")
 __arggonEdges.set("lib/src/create.ts\u0000./tracker-commit.js", "lib/src/tracker-commit.ts")
+__arggonEdges.set("lib/src/friction-optout.ts\u0000./convention.js", "lib/src/convention.ts")
+__arggonEdges.set("lib/src/friction-report.ts\u0000./friction.js", "lib/src/friction.ts")
 __arggonEdges.set("lib/src/friction.ts\u0000./worktree.js", "lib/src/worktree.ts")
 __arggonEdges.set("lib/src/get-open-prs.ts\u0000./detect-repo.js", "lib/src/detect-repo.ts")
 __arggonEdges.set("lib/src/handoff.ts\u0000./comment.js", "lib/src/comment.ts")
@@ -51,6 +53,9 @@ __arggonEdges.set("lib/src/index.ts\u0000./convention.js", "lib/src/convention.t
 __arggonEdges.set("lib/src/index.ts\u0000./create.js", "lib/src/create.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./dates.js", "lib/src/dates.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./filter.js", "lib/src/filter.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./friction-optout.js", "lib/src/friction-optout.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./friction-publish.js", "lib/src/friction-publish.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./friction-report.js", "lib/src/friction-report.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./friction.js", "lib/src/friction.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./frontmatter.js", "lib/src/frontmatter.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./get-open-prs.js", "lib/src/get-open-prs.ts")
@@ -64,6 +69,7 @@ __arggonEdges.set("lib/src/index.ts\u0000./lock.js", "lib/src/lock.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./next.js", "lib/src/next.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./operations.js", "lib/src/operations.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./paths.js", "lib/src/paths.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./placeholder.js", "lib/src/placeholder.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./relations.js", "lib/src/relations.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./report.js", "lib/src/report.ts")
@@ -104,6 +110,8 @@ __arggonEdges.set("lib/src/operations.ts\u0000./comment.js", "lib/src/comment.ts
 __arggonEdges.set("lib/src/operations.ts\u0000./contract.js", "lib/src/contract.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./convention.js", "lib/src/convention.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./create.js", "lib/src/create.ts")
+__arggonEdges.set("lib/src/operations.ts\u0000./friction-publish.js", "lib/src/friction-publish.ts")
+__arggonEdges.set("lib/src/operations.ts\u0000./friction-report.js", "lib/src/friction-report.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./friction.js", "lib/src/friction.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./handoff.js", "lib/src/handoff.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./import-issues.js", "lib/src/import-issues.ts")
@@ -119,6 +127,7 @@ __arggonEdges.set("lib/src/operations.ts\u0000./tracker-commit.js", "lib/src/tra
 __arggonEdges.set("lib/src/operations.ts\u0000./trend.js", "lib/src/trend.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./update.js", "lib/src/update.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./validate.js", "lib/src/validate.ts")
+__arggonEdges.set("lib/src/placeholder.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./atomic.js", "lib/src/atomic.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./dates.js", "lib/src/dates.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./frontmatter.js", "lib/src/frontmatter.ts")
@@ -163,6 +172,7 @@ __arggonEdges.set("lib/src/validate.ts\u0000./convention.js", "lib/src/conventio
 __arggonEdges.set("lib/src/validate.ts\u0000./ids.js", "lib/src/ids.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./paths.js", "lib/src/paths.ts")
+__arggonEdges.set("lib/src/validate.ts\u0000./placeholder.js", "lib/src/placeholder.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./relations.js", "lib/src/relations.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
@@ -429,6 +439,9 @@ exports.findMergedPr = findMergedPr;
 exports.classifyCleanupEntry = classifyCleanupEntry;
 exports.worktreeReleaseRefusal = worktreeReleaseRefusal;
 exports.parseRemovalBlockingPaths = parseRemovalBlockingPaths;
+exports.parseRemovalBlockers = parseRemovalBlockers;
+exports.worktreeUntrackedRefusal = worktreeUntrackedRefusal;
+exports.worktreeTrackedRefusal = worktreeTrackedRefusal;
 exports.worktreeDirtyRefusal = worktreeDirtyRefusal;
 exports.classifyReleaseEntry = classifyReleaseEntry;
 const node_child_process_1 = require("node:child_process");
@@ -635,15 +648,39 @@ function classifyCleanupEntry(item, root, base, gitRunner, deps = {}) {
     if (!(0, node_fs_1.existsSync)(path)) {
         entry.action = "clear stale worktree_path record (path missing on disk)";
     }
-    else if (!gitRunner
-        .worktreeList(root)
-        .map((p) => (0, node_path_1.resolve)(p))
-        .includes(path)) {
-        entry.reason = "path exists but is not a git worktree of this repo (remove it manually)";
-        return entry;
-    }
     else {
-        entry.action = "remove worktree and delete the merged branch";
+        const registered = gitRunner.worktreeList(root).map((p) => (0, node_path_1.resolve)(p));
+        if (!registered.includes(path)) {
+            entry.reason = "path exists but is not a git worktree of this repo (remove it manually)";
+            return entry;
+        }
+        const porcelain = (deps.status ?? worktree_js_1.defaultWorktreeStatus)(path);
+        if (porcelain !== undefined) {
+            const primaryRoots = (deps.primaryRoots ?? [registered[0] ?? (0, node_path_1.resolve)(root), (0, node_path_1.resolve)(root)]).map((primary) => (0, node_path_1.resolve)(primary));
+            const blockers = parseRemovalBlockers(porcelain);
+            const untracked = blockers.untracked.filter((rel) => !isSelfReapedArtifact(path, rel, primaryRoots));
+            if (blockers.tracked.length > 0) {
+                entry.reason = worktreeTrackedRefusal(item, path, blockers.tracked);
+                entry.blockingPaths = [...untracked, ...blockers.tracked].slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
+                entry.blockingTotal = untracked.length + blockers.tracked.length;
+                entry.blockingTracked = blockers.tracked.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
+                entry.blockingTrackedTotal = blockers.tracked.length;
+                return entry;
+            }
+            if (untracked.length > 0) {
+                entry.blockingPaths = untracked.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
+                entry.blockingTotal = untracked.length;
+                if (deps.force !== true) {
+                    entry.reason = worktreeUntrackedRefusal(item, path, untracked);
+                    return entry;
+                }
+                entry.forced = true;
+            }
+        }
+        entry.action =
+            entry.forced === true
+                ? "remove worktree (forced past its untracked content), delete its branch and clear the worktree_path record"
+                : "remove worktree and delete the merged branch";
     }
     entry.removable = true;
     return entry;
@@ -662,11 +699,15 @@ function worktreeReleaseRefusal(item, path, report) {
         `Files modified after that claim: ${named}${extra > 0 ? ` (and ${extra} more)` : ""}.`);
 }
 function parseRemovalBlockingPaths(porcelain) {
-    const paths = [];
+    return parsePorcelainPaths(porcelain).map((entry) => entry.path);
+}
+function parsePorcelainPaths(porcelain) {
+    const entries = [];
     for (const line of porcelain.split("\n")) {
         if (line.trim().length === 0)
             continue;
-        if (line.slice(0, 2) === "!!")
+        const code = line.slice(0, 2);
+        if (code === "!!")
             continue;
         let path = line.slice(3).trim();
         const arrow = path.indexOf(" -> ");
@@ -674,9 +715,51 @@ function parseRemovalBlockingPaths(porcelain) {
             path = path.slice(arrow + 4);
         path = path.replace(/^"|"$/g, "");
         if (path.length > 0)
-            paths.push(path);
+            entries.push({ path, untracked: code === "??" });
     }
-    return paths;
+    return entries;
+}
+function parseRemovalBlockers(porcelain) {
+    const untracked = [];
+    const tracked = [];
+    for (const entry of parsePorcelainPaths(porcelain)) {
+        (entry.untracked ? untracked : tracked).push(entry.path);
+    }
+    return { untracked, tracked };
+}
+function boundedPathName(path) {
+    return path.length > 120 ? `${path.slice(0, 119)}…` : path;
+}
+function worktreeUntrackedRefusal(item, path, paths) {
+    const named = paths.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES).map(boundedPathName);
+    const extra = paths.length - named.length;
+    const branchStep = item.branch ? `, then git branch -D ${item.branch}` : "";
+    return (`skipping the worktree of '${item.id}': ${paths.length} untracked file` +
+        `${paths.length === 1 ? "" : "s"} block 'git worktree remove' (${named.join(", ")}` +
+        `${extra > 0 ? `, and ${extra} more` : ""}). Nothing was removed. Discard them with the force ` +
+        "opt-in — arggon cleanup --prune --force (native cleanup({ prune: true, force: true })), which " +
+        "never discards tracked changes — or reap the worktree by hand: git worktree remove --force " +
+        `${path}${branchStep}, then arggon cleanup --prune to clear the record.`);
+}
+function worktreeTrackedRefusal(item, path, paths) {
+    const named = paths.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES).map(boundedPathName);
+    const extra = paths.length - named.length;
+    const branchStep = item.branch ? `, then git branch -D ${item.branch}` : "";
+    return (`skipping the worktree of '${item.id}': ${paths.length} tracked file` +
+        `${paths.length === 1 ? " has" : "s have"} uncommitted changes (${named.join(", ")}` +
+        `${extra > 0 ? `, and ${extra} more` : ""}), which block 'git worktree remove'; the force ` +
+        "opt-in never discards tracked work. Commit or discard that work first, then re-run prune — or " +
+        `reap the worktree by hand: git worktree remove --force ${path}${branchStep}, then ` +
+        "arggon cleanup --prune to clear the record.");
+}
+function isSelfReapedArtifact(worktreePath, relPath, primaryRoots) {
+    const rel = relPath.replace(/\/+$/, "");
+    if (rel === worktree_js_1.WORKTREE_ENV_FILE)
+        return (0, worktree_js_1.isStartOwnedWorktreeEnv)(worktreePath);
+    if (rel === worktree_js_1.WORKTREE_NODE_MODULES_ENTRY) {
+        return primaryRoots.some((primary) => (0, worktree_js_1.isStartOwnedNodeModulesInstall)(primary, worktreePath));
+    }
+    return false;
 }
 function worktreeDirtyRefusal(item, paths) {
     const named = paths.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
@@ -928,6 +1011,7 @@ exports.readConventionVersion = readConventionVersion;
 exports.parseConventionConfig = parseConventionConfig;
 exports.readConventionConfig = readConventionConfig;
 exports.readGeneratedState = readGeneratedState;
+exports.readFrictionConfig = readFrictionConfig;
 exports.readGeneratedProjectName = readGeneratedProjectName;
 exports.parseGeneratedProjectName = parseGeneratedProjectName;
 exports.serializeGeneratedSection = serializeGeneratedSection;
@@ -944,7 +1028,7 @@ function readConventionVersion(dir) {
         return exports.CONVENTION_VERSION_DEFAULT;
     try {
         const raw = (0, node_fs_1.readFileSync)(path, "utf8");
-        const match = raw.match(/^version\s*:\s*(\d+)/m);
+        const match = raw.match(/^["']?version["']?\s*:\s*(\d+)/m);
         if (!match)
             return exports.CONVENTION_VERSION_DEFAULT;
         const parsed = Number.parseInt(match[1] ?? "", 10);
@@ -1030,6 +1114,132 @@ function stripQuotes(value) {
     }
     return value;
 }
+function stripInlineComment(raw) {
+    if (raw.startsWith("#"))
+        return "";
+    let quote = null;
+    for (let i = 0; i < raw.length; i += 1) {
+        const ch = raw[i];
+        if (quote === '"') {
+            if (ch === "\\")
+                i += 1;
+            else if (ch === '"')
+                quote = null;
+            continue;
+        }
+        if (quote === "'") {
+            if (ch === "'") {
+                if (raw[i + 1] === "'")
+                    i += 1;
+                else
+                    quote = null;
+            }
+            continue;
+        }
+        if (ch === '"' || ch === "'") {
+            quote = ch;
+            continue;
+        }
+        if (ch === "#" && (raw[i - 1] === " " || raw[i - 1] === "\t")) {
+            return raw.slice(0, i).trimEnd();
+        }
+    }
+    return raw;
+}
+function blockScalarHeader(raw) {
+    const match = /^([|>])([0-9+-]*)$/.exec(raw);
+    if (!match)
+        return null;
+    let indent = null;
+    let chomp = null;
+    for (const ch of match[2]) {
+        if (ch === "-" || ch === "+")
+            chomp = ch;
+        else {
+            const digit = Number.parseInt(ch, 10);
+            if (Number.isNaN(digit))
+                return null;
+            indent = indent === null ? digit : indent * 10 + digit;
+        }
+    }
+    return { style: match[1], indent, chomp };
+}
+function collectBlockScalar(lines, from, parentIndent) {
+    const body = [];
+    let index = from;
+    for (; index < lines.length; index += 1) {
+        const line = lines[index];
+        if (line.trim() === "") {
+            body.push(line);
+            continue;
+        }
+        if (line.length - line.trimStart().length <= parentIndent)
+            break;
+        body.push(line);
+    }
+    return { body, next: index };
+}
+function foldBlockScalar(core) {
+    let out = "";
+    let previousWasFolded = false;
+    for (const line of core) {
+        if (line === "") {
+            out += "\n";
+            previousWasFolded = false;
+            continue;
+        }
+        if (/^[ \t]/.test(line)) {
+            out += `${line}\n`;
+            previousWasFolded = false;
+            continue;
+        }
+        if (previousWasFolded)
+            out += " ";
+        out += line;
+        previousWasFolded = true;
+    }
+    return out.endsWith("\n") ? out.slice(0, -1) : out;
+}
+function decodeBlockScalar(body, header) {
+    let blockIndent = header.indent;
+    if (blockIndent === null) {
+        for (const line of body) {
+            if (line.trim() === "")
+                continue;
+            blockIndent = line.length - line.trimStart().length;
+            break;
+        }
+    }
+    if (blockIndent === null)
+        return "";
+    const content = body.map((line) => (line.length >= blockIndent ? line.slice(blockIndent) : ""));
+    let last = content.length;
+    while (last > 0 && content[last - 1].trim() === "")
+        last -= 1;
+    const core = content.slice(0, last);
+    const trailingBlanks = content.length - last;
+    if (core.length === 0)
+        return header.chomp === "+" ? "\n".repeat(trailingBlanks) : "";
+    const joined = header.style === "|" ? core.join("\n") : foldBlockScalar(core);
+    if (header.chomp === "-")
+        return joined;
+    if (header.chomp === "+")
+        return `${joined}\n${"\n".repeat(trailingBlanks)}`;
+    return `${joined}\n`;
+}
+function requireEmptyMapping(sourcePath, key, rawValue) {
+    if (rawValue === "")
+        return;
+    throw new Error(`${sourcePath}: '${key}' must be a mapping, one option per line ` +
+        `(got ${JSON.stringify(rawValue)}; this parser reads BLOCK style only — ` +
+        `flow style { }, anchors (&id), aliases (*id) and tags (!!tag) are not supported)`);
+}
+function parseBooleanOption(sourcePath, key, rawValue) {
+    if (rawValue !== "true" && rawValue !== "false") {
+        throw new Error(`${sourcePath}: '${key}' must be a boolean (got ${JSON.stringify(rawValue)})`);
+    }
+    return rawValue === "true";
+}
 function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}/.convention.yml`) {
     const branchPatterns = { ...exports.DEFAULT_BRANCH_PATTERNS };
     const views = {};
@@ -1053,86 +1263,90 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
         services: null,
     };
     const github = { issueRoundtrip: false };
+    const friction = { capture: null };
     let version = exports.CONVENTION_VERSION_DEFAULT;
     let section = null;
     let generatedDest = null;
     let importOption = null;
-    for (const line of raw.split(/\r?\n/)) {
+    const lines = raw.split(/\r?\n/);
+    if (lines.length > 1 && lines[lines.length - 1] === "")
+        lines.pop();
+    for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index];
         if (!line.trim() || line.trimStart().startsWith("#"))
             continue;
         const indent = line.length - line.trimStart().length;
         const idx = line.indexOf(":");
         if (idx === -1) {
-            throw new Error(`${sourcePath}: invalid line ${JSON.stringify(line)}`);
+            throw new Error(`${sourcePath}: invalid line ${JSON.stringify(line)} (expected 'key: value')`);
         }
-        const key = line.slice(0, idx).trim();
-        const value = line.slice(idx + 1).trim();
+        const key = stripQuotes(line.slice(0, idx).trim());
+        let rawValue = stripInlineComment(line.slice(idx + 1).trim());
+        let value = stripQuotes(rawValue);
+        const header = blockScalarHeader(rawValue);
+        if (header !== null) {
+            const block = collectBlockScalar(lines, index + 1, indent);
+            index = block.next - 1;
+            rawValue = decodeBlockScalar(block.body, header);
+            value = rawValue;
+        }
         if (indent === 0) {
             section = null;
             generatedDest = null;
             importOption = null;
             if (key === "version") {
-                const parsed = Number.parseInt(value, 10);
+                const parsed = Number.parseInt(rawValue, 10);
                 if (Number.isFinite(parsed))
                     version = parsed;
             }
             else if (key === "branch_patterns") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'branch_patterns' must be a mapping, one type per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "branch_patterns";
             }
             else if (key === "x-views") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'x-views' must be a mapping, one view per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-views";
             }
             else if (key === "x-playbooks") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'x-playbooks' must be a mapping, one option per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-playbooks";
             }
             else if (key === "x-tracker") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'x-tracker' must be a mapping, one option per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-tracker";
             }
             else if (key === "x-import") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'x-import' must be a mapping, one option per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-import";
             }
             else if (key === "x-worktree") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'x-worktree' must be a mapping, one option per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-worktree";
             }
             else if (key === "x-github") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'x-github' must be a mapping, one option per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-github";
             }
             else if (key === "x-generated") {
-                if (value !== "") {
-                    throw new Error(`${sourcePath}: 'x-generated' must be a mapping, one destination per line`);
-                }
+                requireEmptyMapping(sourcePath, key, rawValue);
                 section = "x-generated";
+            }
+            else if (key === "x-friction") {
+                if (rawValue === "") {
+                    section = "x-friction";
+                    continue;
+                }
+                friction.capture = parseBooleanOption(sourcePath, key, rawValue);
             }
             continue;
         }
         if (section === "x-generated") {
             if (indent <= 2) {
                 if (key === "projectName") {
-                    generatedProjectName = stripQuotes(value) || null;
+                    generatedProjectName = value || null;
                     continue;
                 }
-                const dest = stripQuotes(key);
+                const dest = key;
                 generatedDest = dest !== "" ? dest : null;
                 if (generatedDest !== null && !(generatedDest in generated)) {
                     generated[generatedDest] = {
@@ -1148,68 +1362,68 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
                 continue;
             const entry = generated[generatedDest];
             if (key === "template")
-                entry.template = stripQuotes(value);
+                entry.template = value;
             else if (key === "checksum")
-                entry.checksum = stripQuotes(value);
+                entry.checksum = value;
             else if (key === "arggonVersion")
-                entry.arggonVersion = stripQuotes(value);
+                entry.arggonVersion = value;
             else if (key === "generatedAt")
-                entry.generatedAt = stripQuotes(value);
+                entry.generatedAt = value;
             else if (key === "acknowledged")
-                entry.acknowledged = value === "true";
+                entry.acknowledged = rawValue === "true";
             continue;
         }
         if (section === "x-playbooks") {
             if (key !== "max-age-days")
                 continue;
-            if (!/^\d+$/.test(value) || Number.parseInt(value, 10) <= 0) {
-                throw new Error(`${sourcePath}: 'max-age-days' must be a positive integer (got ${JSON.stringify(value)})`);
+            if (!/^\d+$/.test(rawValue) || Number.parseInt(rawValue, 10) <= 0) {
+                throw new Error(`${sourcePath}: 'max-age-days' must be a positive integer (got ${JSON.stringify(rawValue)})`);
             }
-            playbooks.maxAgeDays = Number.parseInt(value, 10);
+            playbooks.maxAgeDays = Number.parseInt(rawValue, 10);
             continue;
         }
         if (section === "x-tracker") {
             if (key === "allow-steal") {
-                if (value !== "true" && value !== "false") {
-                    throw new Error(`${sourcePath}: 'allow-steal' must be a boolean (got ${JSON.stringify(value)})`);
+                if (rawValue !== "true" && rawValue !== "false") {
+                    throw new Error(`${sourcePath}: 'allow-steal' must be a boolean (got ${JSON.stringify(rawValue)})`);
                 }
-                tracker.allowSteal = value === "true";
+                tracker.allowSteal = rawValue === "true";
                 continue;
             }
             if (key === "strict-gate-bins") {
-                if (value !== "true" && value !== "false") {
-                    throw new Error(`${sourcePath}: 'strict-gate-bins' must be a boolean (got ${JSON.stringify(value)})`);
+                if (rawValue !== "true" && rawValue !== "false") {
+                    throw new Error(`${sourcePath}: 'strict-gate-bins' must be a boolean (got ${JSON.stringify(rawValue)})`);
                 }
-                tracker.strictGateBins = value === "true";
+                tracker.strictGateBins = rawValue === "true";
                 continue;
             }
             if (key === "strict-worktree-writes") {
-                if (value !== "true" && value !== "false") {
-                    throw new Error(`${sourcePath}: 'strict-worktree-writes' must be a boolean (got ${JSON.stringify(value)})`);
+                if (rawValue !== "true" && rawValue !== "false") {
+                    throw new Error(`${sourcePath}: 'strict-worktree-writes' must be a boolean (got ${JSON.stringify(rawValue)})`);
                 }
-                tracker.strictWorktreeWrites = value === "true";
+                tracker.strictWorktreeWrites = rawValue === "true";
                 continue;
             }
             if (key === "product-acceptance") {
-                if (value !== "true" && value !== "false") {
-                    throw new Error(`${sourcePath}: 'product-acceptance' must be a boolean (got ${JSON.stringify(value)})`);
+                if (rawValue !== "true" && rawValue !== "false") {
+                    throw new Error(`${sourcePath}: 'product-acceptance' must be a boolean (got ${JSON.stringify(rawValue)})`);
                 }
-                tracker.productAcceptance = value === "true";
+                tracker.productAcceptance = rawValue === "true";
                 continue;
             }
             if (key === "reap-acked-orphans") {
-                if (value !== "true" && value !== "false") {
-                    throw new Error(`${sourcePath}: 'reap-acked-orphans' must be a boolean (got ${JSON.stringify(value)})`);
+                if (rawValue !== "true" && rawValue !== "false") {
+                    throw new Error(`${sourcePath}: 'reap-acked-orphans' must be a boolean (got ${JSON.stringify(rawValue)})`);
                 }
-                tracker.reapAckedOrphans = value === "true";
+                tracker.reapAckedOrphans = rawValue === "true";
                 continue;
             }
             if (key !== "auto-commit")
                 continue;
-            if (value !== "true" && value !== "false") {
-                throw new Error(`${sourcePath}: 'auto-commit' must be a boolean (got ${JSON.stringify(value)})`);
+            if (rawValue !== "true" && rawValue !== "false") {
+                throw new Error(`${sourcePath}: 'auto-commit' must be a boolean (got ${JSON.stringify(rawValue)})`);
             }
-            tracker.autoCommit = value === "true";
+            tracker.autoCommit = rawValue === "true";
             continue;
         }
         if (section === "x-import") {
@@ -1217,7 +1431,7 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
                 importOption = key === "label-types" ? "label-types" : null;
                 if (importOption !== null) {
                     importHasLabelTypes = true;
-                    if (value !== "") {
+                    if (rawValue !== "") {
                         throw new Error(`${sourcePath}: 'label-types' must be a mapping, one label per line`);
                     }
                 }
@@ -1225,17 +1439,17 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
             }
             if (importOption !== "label-types")
                 continue;
-            const label = stripQuotes(key);
+            const label = key;
             if (!label) {
                 throw new Error(`${sourcePath}: invalid x-import entry ${JSON.stringify(line)}`);
             }
             if (label in importLabelTypes) {
                 throw new Error(`${sourcePath}: duplicate label '${label}' in x-import.label-types`);
             }
-            const mapped = stripQuotes(value);
+            const mapped = value;
             if (!(0, ids_js_1.isItemType)(mapped)) {
                 throw new Error(`${sourcePath}: 'label-types' values must be work-item types ` +
-                    `(initiative | epic | story | task | bug), got ${JSON.stringify(value)} for label '${label}'`);
+                    `(initiative | epic | story | task | bug), got ${JSON.stringify(rawValue)} for label '${label}'`);
             }
             importLabelTypes[label] = mapped;
             importHasLabelTypes = true;
@@ -1243,42 +1457,42 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
         }
         if (section === "x-worktree") {
             if (key === "post-start-shell") {
-                const shell = stripQuotes(value);
+                const shell = value;
                 if (shell !== "inherit" && shell !== "login") {
-                    throw new Error(`${sourcePath}: 'post-start-shell' must be "inherit" or "login" (got ${JSON.stringify(value)})`);
+                    throw new Error(`${sourcePath}: 'post-start-shell' must be "inherit" or "login" (got ${JSON.stringify(rawValue)})`);
                 }
                 worktree.postStartShell = shell;
                 continue;
             }
             if (key === "env") {
-                if (value !== "true" && value !== "false") {
-                    throw new Error(`${sourcePath}: 'env' must be a boolean (got ${JSON.stringify(value)})`);
+                if (rawValue !== "true" && rawValue !== "false") {
+                    throw new Error(`${sourcePath}: 'env' must be a boolean (got ${JSON.stringify(rawValue)})`);
                 }
-                worktree.env = value === "true";
+                worktree.env = rawValue === "true";
                 continue;
             }
             if (key === "services") {
-                if (value === "true") {
+                if (rawValue === "true") {
                     worktree.services = "true";
                     continue;
                 }
-                if (value === "false") {
+                if (rawValue === "false") {
                     worktree.services = null;
                     continue;
                 }
-                const base = stripQuotes(value);
+                const base = value;
                 if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(base)) {
                     throw new Error(`${sourcePath}: 'services' must be true, false, or a Compose project base name ` +
-                        `([A-Za-z0-9][A-Za-z0-9_-]*, got ${JSON.stringify(value)})`);
+                        `([A-Za-z0-9][A-Za-z0-9_-]*, got ${JSON.stringify(rawValue)})`);
                 }
                 worktree.services = base;
                 continue;
             }
             if (key !== "post-start")
                 continue;
-            const command = stripQuotes(value);
+            const command = value;
             if (!command) {
-                throw new Error(`${sourcePath}: 'post-start' must be a non-empty string (got ${JSON.stringify(value)})`);
+                throw new Error(`${sourcePath}: 'post-start' must be a non-empty string (got ${JSON.stringify(rawValue)})`);
             }
             worktree.postStart = command;
             continue;
@@ -1286,10 +1500,17 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
         if (section === "x-github") {
             if (key !== "issue-roundtrip")
                 continue;
-            if (value !== "true" && value !== "false") {
-                throw new Error(`${sourcePath}: 'issue-roundtrip' must be a boolean (got ${JSON.stringify(value)})`);
+            if (rawValue !== "true" && rawValue !== "false") {
+                throw new Error(`${sourcePath}: 'issue-roundtrip' must be a boolean (got ${JSON.stringify(rawValue)})`);
             }
-            github.issueRoundtrip = value === "true";
+            github.issueRoundtrip = rawValue === "true";
+            continue;
+        }
+        if (section === "x-friction") {
+            if (key === "capture") {
+                friction.capture = parseBooleanOption(sourcePath, "capture", rawValue);
+                continue;
+            }
             continue;
         }
         if (section === "x-views") {
@@ -1299,7 +1520,7 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
             if (key in views) {
                 throw new Error(`${sourcePath}: duplicate view '${key}' in x-views`);
             }
-            const expr = stripQuotes(value);
+            const expr = value;
             if (!expr) {
                 throw new Error(`${sourcePath}: empty expression for view '${key}'`);
             }
@@ -1311,7 +1532,7 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
         if (!(0, ids_js_1.isItemType)(key)) {
             throw new Error(`${sourcePath}: unknown type '${key}' in branch_patterns (expected: initiative | epic | story | task | bug)`);
         }
-        const pattern = stripQuotes(value);
+        const pattern = value;
         if (!pattern) {
             throw new Error(`${sourcePath}: empty pattern for type '${key}'`);
         }
@@ -1329,6 +1550,7 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
         import: { labelTypes: importHasLabelTypes ? importLabelTypes : null },
         worktree,
         github,
+        friction,
         generated,
         generatedProjectName,
     };
@@ -1352,6 +1574,7 @@ function readConventionConfig(dir) {
             import: { labelTypes: null },
             worktree: { postStart: null, postStartShell: null, env: null, services: null },
             github: { issueRoundtrip: false },
+            friction: { capture: null },
             generated: {},
             generatedProjectName: null,
         };
@@ -1367,6 +1590,17 @@ function readGeneratedState(dir) {
     }
     catch {
         return {};
+    }
+}
+function readFrictionConfig(dir) {
+    const path = (0, paths_js_1.conventionPathForRoot)(dir);
+    if (!(0, node_fs_1.existsSync)(path))
+        return { capture: null };
+    try {
+        return parseConventionConfig((0, node_fs_1.readFileSync)(path, "utf8"), path).friction;
+    }
+    catch {
+        return { capture: null };
     }
 }
 function readGeneratedProjectName(dir) {
@@ -1863,11 +2097,348 @@ function matchesPredicate(item, pred, blockedByIndex, ancestorIndex) {
 }
 })
 
+__arggonModules.set("lib/src/friction-optout.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FRICTION_OPT_OUT_ENV = void 0;
+exports.resolveFrictionOptOut = resolveFrictionOptOut;
+exports.readFrictionOptOut = readFrictionOptOut;
+const convention_js_1 = require("./convention.js");
+exports.FRICTION_OPT_OUT_ENV = "ARGGON_NO_FRICTION";
+function resolveFrictionOptOut(config, env) {
+    const fromEnv = env[exports.FRICTION_OPT_OUT_ENV];
+    if (fromEnv !== undefined && fromEnv !== "") {
+        return { optedOut: true, source: "env" };
+    }
+    const capture = config?.capture ?? null;
+    if (capture === false) {
+        return { optedOut: true, source: "config" };
+    }
+    return { optedOut: false, source: null };
+}
+function readFrictionOptOut(dir, env) {
+    return resolveFrictionOptOut((0, convention_js_1.readFrictionConfig)(dir), env);
+}
+})
+
+__arggonModules.set("lib/src/friction-publish.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FRICTION_PUBLISH_TIERS = exports.FRICTION_PUBLISH_MAX_URL_CHARS = exports.FRICTION_PUBLISH_NARRATIVE_CAP = exports.FRICTION_PUBLISH_MAX_CLASSES = exports.FRICTION_PUBLISH_FENCE_INFO = exports.FRICTION_PUBLISH_LABEL = exports.FRICTION_PUBLISH_URL_BASE = exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = exports.FRICTION_PUBLISH_TITLE_PREFIX = void 0;
+exports.isFrictionPublishTier = isFrictionPublishTier;
+exports.buildFrictionPublishTitle = buildFrictionPublishTitle;
+exports.buildFrictionPublishBody = buildFrictionPublishBody;
+exports.buildFrictionPublishUrl = buildFrictionPublishUrl;
+exports.buildFrictionPublishDoc = buildFrictionPublishDoc;
+exports.FRICTION_PUBLISH_TITLE_PREFIX = "[adopter-friction] ";
+exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = 120;
+exports.FRICTION_PUBLISH_URL_BASE = "https://github.com/Arggon/ArggonManager/issues/new";
+exports.FRICTION_PUBLISH_LABEL = "adopter-friction";
+exports.FRICTION_PUBLISH_FENCE_INFO = "arggon-fingerprint";
+exports.FRICTION_PUBLISH_MAX_CLASSES = 10;
+exports.FRICTION_PUBLISH_NARRATIVE_CAP = 400;
+exports.FRICTION_PUBLISH_MAX_URL_CHARS = 6000;
+const MARKER = "…";
+exports.FRICTION_PUBLISH_TIERS = ["a", "b"];
+function isFrictionPublishTier(value) {
+    return exports.FRICTION_PUBLISH_TIERS.includes(value);
+}
+function capText(text, cap) {
+    if (text.length <= cap)
+        return text;
+    return text.slice(0, cap - MARKER.length) + MARKER;
+}
+function fenceFor(text) {
+    const runs = text.match(/`+/g);
+    const longest = runs === null ? 0 : Math.max(...runs.map((run) => run.length));
+    return "`".repeat(Math.max(3, longest + 1));
+}
+function plural(n, one, many) {
+    return n === 1 ? one : many;
+}
+function buildFrictionPublishTitle(report) {
+    const top = report.rows[0];
+    let summary;
+    if (report.optedOut) {
+        summary = "opted out — nothing captured (x-friction: false / ARGGON_NO_FRICTION=1)";
+    }
+    else if (top === undefined) {
+        summary = "no friction recorded (0 records)";
+    }
+    else {
+        const command = top.commandShape === "" ? "(no command shape)" : top.commandShape;
+        const error = top.errorCode !== undefined && top.errorCode !== "" ? ` — ${top.errorCode}` : "";
+        summary = `${command}${error} (×${top.count} of ${report.classes} ${plural(report.classes, "class", "classes")})`;
+    }
+    return exports.FRICTION_PUBLISH_TITLE_PREFIX + capText(summary, exports.FRICTION_PUBLISH_TITLE_MAX_CHARS);
+}
+function fingerprintStanza(row) {
+    return [
+        `fingerprint: ${row.fingerprint}`,
+        `count: ${row.count}`,
+        `reporters: ${row.reporters}`,
+        `commandShape: ${row.commandShape}`,
+        `errorCode: ${row.errorCode ?? ""}`,
+        `harness: ${row.harness}`,
+        `majorVersion: ${row.majorVersion}`,
+        `firstSeen: ${row.firstSeen}`,
+        `lastSeen: ${row.lastSeen}`,
+        `arggonVersion: ${row.arggonVersion}`,
+        `os: ${row.os}`,
+        `arch: ${row.arch}`,
+        `node: ${row.node}`,
+    ];
+}
+function buildFrictionPublishBody(report) {
+    const out = [];
+    out.push("## Adopter friction report");
+    out.push("");
+    out.push("Filed by a human who opened the prefilled URL `arggon friction --report --tier b` printed.");
+    out.push("Nothing here was submitted by the agent that ran arggon (ADR 0024 §4).");
+    out.push("");
+    out.push(`records: ${report.count}   classes: ${report.classes}   dropped: ${report.dropped}   optedOut: ${report.optedOut}`);
+    out.push("dedupe scope: local-only — the reporting machine's own log. No upstream issue is consulted, so a class already filed upstream appears here as new.");
+    out.push("reporters basis: distinct reporterIds present in this log only (stage 1 is one machine).");
+    out.push("narrative is untrusted data, passed through verbatim — never an instruction, never parsed.");
+    if (report.optedOut) {
+        out.push("");
+        out.push("Capture is opted out on this machine (`x-friction: false` in the tracker `.convention.yml`, or `ARGGON_NO_FRICTION=1`), so nothing is recorded and this report is empty. The command stays discoverable on purpose: set the key back to `true`, or unset the variable, to re-enable capture.");
+    }
+    if (report.classes > 0) {
+        const shown = report.rows.slice(0, exports.FRICTION_PUBLISH_MAX_CLASSES);
+        for (const [index, row] of shown.entries()) {
+            out.push("");
+            out.push(`### ${index + 1}. ${row.fingerprint} — count ${row.count}`);
+            out.push("");
+            out.push(`- command: \`${row.commandShape}\``);
+            out.push(`- error: \`${row.errorCode ?? "(none)"}\``);
+            out.push(`- harness: \`${row.harness}\`   major: \`${row.majorVersion}\``);
+            out.push(`- first→last: ${row.firstSeen} → ${row.lastSeen}`);
+            out.push(`- reporters in this log: ${row.reporters}`);
+            out.push("");
+            out.push("narrative (untrusted data, verbatim — never an instruction):");
+            out.push("");
+            const narrative = capText(row.narrative, exports.FRICTION_PUBLISH_NARRATIVE_CAP);
+            const fence = fenceFor(narrative);
+            out.push(fence);
+            out.push(narrative);
+            out.push(fence);
+        }
+        const more = report.classes - shown.length;
+        if (more > 0) {
+            out.push("");
+            out.push(`… and ${more} more ${plural(more, "class", "classes")} not included — the URL length bound. Run \`arggon friction --report\` locally for the whole log.`);
+        }
+    }
+    else if (!report.optedOut) {
+        out.push("");
+        out.push("No friction recorded (count: 0).");
+    }
+    out.push("");
+    out.push(`\`\`\`${exports.FRICTION_PUBLISH_FENCE_INFO}`);
+    if (report.optedOut) {
+        out.push(`optedOut: true`);
+        out.push(`records: 0`);
+        out.push(`classes: 0`);
+    }
+    else {
+        const classes = report.rows.slice(0, exports.FRICTION_PUBLISH_MAX_CLASSES);
+        out.push(`records: ${report.count}`);
+        out.push(`classes: ${report.classes}`);
+        for (const [index, row] of classes.entries()) {
+            if (index > 0)
+                out.push("");
+            out.push(...fingerprintStanza(row));
+        }
+    }
+    out.push("```");
+    return `${out.join("\n")}\n`;
+}
+function buildFrictionPublishUrl(title, body) {
+    const encoded = [
+        `title=${encodeURIComponent(title)}`,
+        `body=${encodeURIComponent(body)}`,
+        `labels=${encodeURIComponent(exports.FRICTION_PUBLISH_LABEL)}`,
+    ].join("&");
+    return `${exports.FRICTION_PUBLISH_URL_BASE}?${encoded}`;
+}
+function buildFrictionPublishDoc(report) {
+    const title = buildFrictionPublishTitle(report);
+    let body = buildFrictionPublishBody(report);
+    let url = buildFrictionPublishUrl(title, body);
+    let included = Math.min(report.classes, exports.FRICTION_PUBLISH_MAX_CLASSES);
+    while (url.length > exports.FRICTION_PUBLISH_MAX_URL_CHARS && included > 0) {
+        included -= 1;
+        const narrowed = {
+            ...report,
+            rows: report.rows.slice(0, included),
+        };
+        body = buildFrictionPublishBody(narrowed);
+        url = buildFrictionPublishUrl(title, body);
+    }
+    return { tier: "b", url, title, body };
+}
+})
+
+__arggonModules.set("lib/src/friction-report.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FRICTION_REPORT_MAX_ROWS = void 0;
+exports.summarizeFrictionLog = summarizeFrictionLog;
+exports.readFrictionReport = readFrictionReport;
+exports.frictionFenceFor = frictionFenceFor;
+exports.renderFrictionReport = renderFrictionReport;
+const node_os_1 = require("node:os");
+const friction_js_1 = require("./friction.js");
+exports.FRICTION_REPORT_MAX_ROWS = 50;
+function summarizeFrictionLog(read, dropped, optedOut = false) {
+    if (optedOut) {
+        return {
+            rows: [],
+            count: 0,
+            classes: 0,
+            dropped: 0,
+            skippedVersions: [],
+            malformed: 0,
+            optedOut: true,
+            truncated: false,
+            dedupeScope: "local-only",
+        };
+    }
+    const byFingerprint = new Map();
+    for (const record of read.records) {
+        let acc = byFingerprint.get(record.fingerprint);
+        if (acc === undefined) {
+            acc = {
+                fingerprint: record.fingerprint,
+                count: 0,
+                reporterIds: new Set(),
+                first: record,
+                last: record,
+            };
+            byFingerprint.set(record.fingerprint, acc);
+        }
+        acc.count += 1;
+        acc.reporterIds.add(record.reporterId);
+        if (record.ts < acc.first.ts)
+            acc.first = record;
+        if (record.ts >= acc.last.ts)
+            acc.last = record;
+    }
+    const rows = [...byFingerprint.values()].map((acc) => {
+        const newest = acc.last;
+        const reporterIds = [...acc.reporterIds].sort();
+        return {
+            fingerprint: acc.fingerprint,
+            count: acc.count,
+            reporters: reporterIds.length,
+            reporterIds,
+            firstSeen: acc.first.ts,
+            lastSeen: newest.ts,
+            narrative: newest.narrative,
+            commandShape: newest.commandShape,
+            ...(newest.errorCode !== undefined ? { errorCode: newest.errorCode } : {}),
+            harness: newest.harness,
+            majorVersion: newest.majorVersion,
+            arggonVersion: newest.arggonVersion,
+            os: newest.os,
+            arch: newest.arch,
+            node: newest.node,
+        };
+    });
+    rows.sort((a, b) => b.count - a.count || compareFingerprint(a.fingerprint, b.fingerprint));
+    return {
+        rows,
+        count: read.records.length,
+        classes: rows.length,
+        dropped,
+        skippedVersions: read.skippedVersions,
+        malformed: read.malformed,
+        optedOut,
+        truncated: rows.length > exports.FRICTION_REPORT_MAX_ROWS,
+        dedupeScope: "local-only",
+    };
+}
+function compareFingerprint(a, b) {
+    return a < b ? -1 : a > b ? 1 : 0;
+}
+const EMPTY_READ = { records: [], skippedVersions: [], malformed: 0 };
+function readFrictionReport(opts) {
+    if (opts.optedOut === true) {
+        return summarizeFrictionLog(EMPTY_READ, 0, true);
+    }
+    const env = opts.env ?? process.env;
+    const home = opts.home ?? (0, node_os_1.homedir)();
+    const read = (0, friction_js_1.readFrictionLog)((0, friction_js_1.frictionLogPath)(env, home));
+    const dropped = (0, friction_js_1.readFrictionDropped)((0, friction_js_1.frictionDroppedPath)(env, home));
+    return summarizeFrictionLog(read, dropped, opts.optedOut ?? false);
+}
+function frictionFenceFor(text) {
+    const runs = text.match(/`+/g);
+    const longest = runs === null ? 0 : Math.max(...runs.map((run) => run.length));
+    return "`".repeat(Math.max(3, longest + 1));
+}
+function renderFrictionReport(report) {
+    const out = [];
+    out.push("arggon friction report");
+    out.push("dedupe scope: local-only — this log alone. No upstream issue is consulted, so a class already filed upstream still appears here as new; you may file it twice.");
+    out.push("");
+    const skipped = report.skippedVersions.length > 0 ? report.skippedVersions.join(", ") : "none";
+    out.push(`records: ${report.count}   classes: ${report.classes}   dropped: ${report.dropped}   skippedVersions: ${skipped}   malformed: ${report.malformed}`);
+    out.push("reporters basis: distinct reporterIds present in THIS log only (stage 1 is one machine, so normally 1; not other machines, not upstream).");
+    if (report.optedOut) {
+        out.push("optedOut: true — capture is disabled on this machine (`x-friction: false` in the tracker `.convention.yml`, or `ARGGON_NO_FRICTION` set). Nothing is recorded and this report is empty. The command stays discoverable ON PURPOSE (ADR 0024 §3): set the key back to `true`, or unset the variable, to re-enable capture. The trigger text is still in your generated agent files.");
+    }
+    else {
+        out.push("optedOut: false");
+    }
+    if (report.dropped > 0) {
+        out.push(`dropped: ${report.dropped} — rotation dropped the oldest record(s) past the 5000-line bound; this history is cache-like and cannot be recovered.`);
+    }
+    if (report.skippedVersions.length > 0) {
+        out.push(`skippedVersions: ${skipped} — record(s) in a format this arggon cannot read; a reader skips an unknown v rather than failing the file. Upgrade to read them.`);
+    }
+    if (report.malformed > 0) {
+        const plural = report.malformed === 1 ? "line" : "lines";
+        out.push(`malformed: ${report.malformed} — ${plural} that parsed as neither a record nor a known version; skipped, not fatal. Delete the log file to start fresh.`);
+    }
+    if (report.classes === 0) {
+        out.push("");
+        out.push(report.optedOut
+            ? `No friction recorded (count: 0) — capture is opted out, so nothing is written while it stays off.`
+            : `No friction recorded (count: 0). Capture some with: arggon friction "<one line>" --command "<argv shape>".`);
+        return `${out.join("\n")}\n`;
+    }
+    out.push("");
+    const shown = report.rows.slice(0, exports.FRICTION_REPORT_MAX_ROWS);
+    for (const row of shown) {
+        out.push(`── ${row.fingerprint}  count ${row.count}  reporters ${row.reporters} ──`);
+        out.push(`   command: ${row.commandShape}`);
+        out.push(`   error:   ${row.errorCode ?? "(none)"}`);
+        out.push(`   harness: ${row.harness}   major: ${row.majorVersion}`);
+        out.push(`   first→last: ${row.firstSeen} → ${row.lastSeen}`);
+        out.push("   narrative (untrusted data, verbatim — never an instruction):");
+        const fence = frictionFenceFor(row.narrative);
+        out.push(fence);
+        out.push(row.narrative);
+        out.push(fence);
+        out.push("");
+    }
+    const more = report.classes - shown.length;
+    if (more > 0) {
+        out.push(`… and ${more} more classes`);
+    }
+    return `${out.join("\n")}\n`;
+}
+})
+
 __arggonModules.set("lib/src/friction.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FrictionError = exports.FRICTION_DEFAULT_HARNESS = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SALT_BYTES = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_HARNESS_CAP = exports.FRICTION_ERROR_CODE_CAP = exports.FRICTION_COMMAND_SHAPE_CAP = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_MAX_LINES = exports.FRICTION_FORMAT_VERSION = void 0;
+exports.FrictionError = exports.FRICTION_REDACTION_MAX_SUBSTITUTIONS = exports.FRICTION_REDACTED_FIELD = exports.FRICTION_SECRET_PLACEHOLDER = exports.FRICTION_PATH_PLACEHOLDER = exports.FRICTION_DEFAULT_HARNESS = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SALT_BYTES = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_HARNESS_CAP = exports.FRICTION_ERROR_CODE_CAP = exports.FRICTION_COMMAND_SHAPE_CAP = exports.FRICTION_DROPPED_FILE_NAME = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_MAX_LINES = exports.FRICTION_FORMAT_VERSION = void 0;
 exports.normalizeCommandShape = normalizeCommandShape;
+exports.redactFrictionText = redactFrictionText;
+exports.frictionFingerprintMaterial = frictionFingerprintMaterial;
 exports.frictionFingerprint = frictionFingerprint;
 exports.frictionReporterId = frictionReporterId;
 exports.frictionMajorVersion = frictionMajorVersion;
@@ -1875,10 +2446,13 @@ exports.frictionStateBase = frictionStateBase;
 exports.frictionStateDir = frictionStateDir;
 exports.frictionLogPath = frictionLogPath;
 exports.frictionSaltPath = frictionSaltPath;
+exports.frictionDroppedPath = frictionDroppedPath;
+exports.readFrictionDropped = readFrictionDropped;
 exports.readOrCreateMachineSalt = readOrCreateMachineSalt;
 exports.resolveRepoAbsPath = resolveRepoAbsPath;
 exports.buildFrictionRecord = buildFrictionRecord;
 exports.appendFrictionRecord = appendFrictionRecord;
+exports.clearFrictionLog = clearFrictionLog;
 exports.readFrictionLog = readFrictionLog;
 const node_crypto_1 = require("node:crypto");
 const node_child_process_1 = require("node:child_process");
@@ -1890,6 +2464,7 @@ exports.FRICTION_FORMAT_VERSION = 1;
 exports.FRICTION_MAX_LINES = 5000;
 exports.FRICTION_LOG_FILE_NAME = "friction.jsonl";
 exports.FRICTION_SALT_FILE_NAME = "machine-salt";
+exports.FRICTION_DROPPED_FILE_NAME = "friction.dropped";
 const SHAPE_PLACEHOLDER = "<arg>";
 const NEWLINE = "\n";
 const MARKER = "…";
@@ -1966,17 +2541,86 @@ function capField(value, cap) {
         end -= 1;
     return clean.slice(0, end) + MARKER;
 }
+exports.FRICTION_PATH_PLACEHOLDER = "<path>";
+exports.FRICTION_SECRET_PLACEHOLDER = "<redacted>";
+exports.FRICTION_REDACTED_FIELD = "[redacted: >50% of field]";
+exports.FRICTION_REDACTION_MAX_SUBSTITUTIONS = 20;
+const PATH_PATTERN = /(?![A-Za-z][A-Za-z0-9+.-]+:)(?<![\w./\\-])(?<![A-Za-z]:)(?:\\\\\?\\[A-Za-z]:[/\\](?:[\w.+@%~=-]+[/\\])*[\w.+@%~=-]*|\\\\[\w.$@%?-]+(?:\\[\w.+@%~=-]+)+|[A-Za-z]:[/\\](?:[\w.+@%~=-]+[/\\])*[\w.+@%~=-]*|\/(?=[\w.+@%~=-])(?:[\w.+@%~=-]+\/)*[\w.+@%~=-]*|~(?:\/[\w.+@%~=-]+)+)/g;
+const PEM_PATTERN = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----|-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----(?:[ \t]*\r?\n[A-Za-z0-9+/]{20,}={0,2})+|-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/g;
+const SECRET_PATTERN = /\b(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{20,}|\bsk-[A-Za-z0-9_-]{8,}|\bnpm_[A-Za-z0-9_-]{8,}|\bAKIA[A-Za-z0-9]{8,}|\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*|[A-Za-z0-9_.-]*(?:key|token|secret|password|passwd|credential)[A-Za-z0-9_.-]*["']?[ \t]*[:=][ \t]*(?:[^\s"'`]{8,}|["'][^"'\n]{8,}["'])/gi;
+const URL_PATTERN = /\b[a-zA-Z][a-zA-Z0-9+.-]*:\/+[^\s]+/g;
+function redactUrl(match) {
+    const colon = match.indexOf(":");
+    const scheme = match.slice(0, colon + 1);
+    if (scheme.toLowerCase() === "file:")
+        return exports.FRICTION_PATH_PLACEHOLDER;
+    let rest = match.slice(colon + 1).replace(/^\/+/, "");
+    const cut = rest.search(/[?#]/);
+    if (cut >= 0)
+        rest = rest.slice(0, cut);
+    const slash = rest.indexOf("/");
+    const authority = slash < 0 ? rest : rest.slice(0, slash);
+    const at = authority.lastIndexOf("@");
+    const host = at >= 0 ? authority.slice(at + 1) : authority;
+    return `${scheme}//${host}${slash < 0 ? "" : rest.slice(slash)}`;
+}
+const REDACTION_RULES = [
+    { pattern: PATH_PATTERN, replace: () => exports.FRICTION_PATH_PLACEHOLDER, countsTowardRate: false },
+    { pattern: PEM_PATTERN, replace: () => exports.FRICTION_SECRET_PLACEHOLDER },
+    { pattern: SECRET_PATTERN, replace: () => exports.FRICTION_SECRET_PLACEHOLDER },
+    {
+        pattern: URL_PATTERN,
+        replace: redactUrl,
+        redacted: (match, replacement) => match.length - replacement.length,
+    },
+];
+function redactFrictionText(value) {
+    if (value === "")
+        return value;
+    const stats = { substitutions: 0, redacted: 0 };
+    let text = value;
+    for (const rule of REDACTION_RULES) {
+        const measure = rule.redacted ?? ((match) => match.length);
+        const countsTowardRate = rule.countsTowardRate ?? true;
+        text = text.replace(rule.pattern, (match) => {
+            const replacement = rule.replace(match);
+            if (replacement === match)
+                return match;
+            stats.substitutions += 1;
+            if (countsTowardRate)
+                stats.redacted += measure(match, replacement);
+            return replacement;
+        });
+    }
+    if (stats.substitutions > exports.FRICTION_REDACTION_MAX_SUBSTITUTIONS ||
+        stats.redacted * 2 > value.length) {
+        return exports.FRICTION_REDACTED_FIELD;
+    }
+    return text;
+}
+function redactFrictionRecord(record) {
+    return {
+        ...record,
+        commandShape: redactFrictionText(record.commandShape),
+        ...(record.errorCode !== undefined ? { errorCode: redactFrictionText(record.errorCode) } : {}),
+        harness: redactFrictionText(record.harness),
+        narrative: redactFrictionText(record.narrative),
+        ...(record.evidence !== undefined ? { evidence: redactFrictionText(record.evidence) } : {}),
+    };
+}
 function sha256Hex(value) {
     return (0, node_crypto_1.createHash)("sha256").update(value, "utf8").digest("hex");
 }
+function frictionFingerprintMaterial(components) {
+    return components.map((component) => `${component.length}:${component}`).join("");
+}
 function frictionFingerprint(args) {
-    const material = [
+    return sha256Hex(frictionFingerprintMaterial([
         args.commandShape,
         args.errorCode ?? ABSENT,
         args.harness,
         args.majorVersion,
-    ].join("\u001f");
-    return sha256Hex(material).slice(0, exports.FRICTION_FINGERPRINT_CHARS);
+    ])).slice(0, exports.FRICTION_FINGERPRINT_CHARS);
 }
 function frictionReporterId(machineSalt, repoAbsPath) {
     return sha256Hex(machineSalt + repoAbsPath).slice(0, exports.FRICTION_REPORTER_ID_CHARS);
@@ -1997,6 +2641,28 @@ function frictionLogPath(env, home) {
 }
 function frictionSaltPath(env, home) {
     return (0, node_path_1.join)(frictionStateDir(env, home), exports.FRICTION_SALT_FILE_NAME);
+}
+function frictionDroppedPath(env, home) {
+    return (0, node_path_1.join)(frictionStateDir(env, home), exports.FRICTION_DROPPED_FILE_NAME);
+}
+function readFrictionDropped(droppedPath) {
+    let raw;
+    try {
+        raw = (0, node_fs_1.readFileSync)(droppedPath, "utf8").trim();
+    }
+    catch {
+        return 0;
+    }
+    const n = Number(raw);
+    return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+function persistFrictionDropped(dir, add) {
+    try {
+        const path = (0, node_path_1.join)(dir, exports.FRICTION_DROPPED_FILE_NAME);
+        (0, node_fs_1.writeFileSync)(path, `${readFrictionDropped(path) + add}\n`, "utf8");
+    }
+    catch {
+    }
 }
 const SALT_HEX = /^[0-9a-f]{64}$/;
 function errorMessage(error) {
@@ -2116,12 +2782,12 @@ function buildFrictionRecord(input, opts) {
     const errorTrimmed = input.error?.trim();
     const errorCode = errorTrimmed === undefined || errorTrimmed === ""
         ? undefined
-        : capField(errorTrimmed, exports.FRICTION_ERROR_CODE_CAP);
-    const harness = capField(input.harness?.trim() || exports.FRICTION_DEFAULT_HARNESS, exports.FRICTION_HARNESS_CAP);
-    const commandShapeCapped = capField(commandShape, exports.FRICTION_COMMAND_SHAPE_CAP);
-    const narrative = capField(observation, exports.FRICTION_NARRATIVE_CAP);
+        : capField(redactFrictionText(errorTrimmed), exports.FRICTION_ERROR_CODE_CAP);
+    const harness = capField(redactFrictionText(input.harness?.trim() || exports.FRICTION_DEFAULT_HARNESS), exports.FRICTION_HARNESS_CAP);
+    const commandShapeCapped = capField(redactFrictionText(commandShape), exports.FRICTION_COMMAND_SHAPE_CAP);
+    const narrative = capField(redactFrictionText(observation), exports.FRICTION_NARRATIVE_CAP);
     const evidence = input.evidencePath
-        ? capField(readEvidenceContents(input.evidencePath), exports.FRICTION_EVIDENCE_CAP)
+        ? capField(redactFrictionText(readEvidenceContents(input.evidencePath)), exports.FRICTION_EVIDENCE_CAP)
         : undefined;
     const ts = (opts.now ?? new Date()).toISOString();
     return {
@@ -2154,7 +2820,7 @@ function appendFrictionRecord(record, logPath) {
     catch (error) {
         throw new FrictionError("log-unwritable", `could not create the friction log directory ${dir}: ${errorMessage(error)}`, dir);
     }
-    const line = `${JSON.stringify(record)}${NEWLINE}`;
+    const line = `${JSON.stringify(redactFrictionRecord(record))}${NEWLINE}`;
     const existing = readLogLines(logPath);
     const terminate = logEndsPartial(logPath);
     let fd;
@@ -2174,6 +2840,7 @@ function appendFrictionRecord(record, logPath) {
         catch (error) {
             throw new FrictionError("log-unwritable", `could not rotate the friction log at ${logPath}: ${errorMessage(error)}`, logPath);
         }
+        persistFrictionDropped(dir, existing.length - kept.length);
         return { path: logPath, lines: kept.length + 1, dropped: existing.length - kept.length };
     }
     if (fd === undefined) {
@@ -2224,6 +2891,12 @@ function logEndsPartial(logPath) {
         return false;
     }
     return raw !== "" && !raw.endsWith(NEWLINE);
+}
+function clearFrictionLog(logPath, droppedPath) {
+    const cleared = readLogLines(logPath).length;
+    (0, node_fs_1.rmSync)(logPath, { force: true });
+    (0, node_fs_1.rmSync)(droppedPath, { force: true });
+    return { path: logPath, cleared };
 }
 function readFrictionLog(logPath) {
     const out = { records: [], skippedVersions: [], malformed: 0 };
@@ -3031,12 +3704,13 @@ function runImportIssues(opts) {
 __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.liveAcceptanceUnchecked = exports.liveAcceptanceRows = exports.liveAcceptanceRegion = exports.liveAcceptanceCriteria = exports.itemsById = exports.acceptanceUnchecked = exports.acceptanceRows = exports.acceptanceGate = exports.acceptanceCriteria = exports.acceptanceComplete = exports.acceptanceBody = void 0;
-exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = void 0;
-exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.resolveRepoAbsPath = exports.readOrCreateMachineSalt = exports.readFrictionLog = exports.normalizeCommandShape = exports.frictionStateDir = exports.frictionStateBase = exports.frictionSaltPath = exports.frictionReporterId = exports.frictionMajorVersion = exports.frictionLogPath = exports.frictionFingerprint = exports.buildFrictionRecord = exports.appendFrictionRecord = exports.FrictionError = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_MAX_LINES = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_HARNESS_CAP = exports.FRICTION_FORMAT_VERSION = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_DEFAULT_HARNESS = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = void 0;
-exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeReleaseRefusal = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = void 0;
-exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = void 0;
+exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.liveContextRegion = exports.liveAcceptanceUnchecked = exports.liveAcceptanceRows = exports.liveAcceptanceRegion = exports.liveAcceptanceCriteria = exports.itemsById = exports.acceptanceUnchecked = exports.acceptanceRows = exports.acceptanceGate = exports.acceptanceCriteria = exports.acceptanceComplete = exports.acceptanceBody = void 0;
+exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = void 0;
+exports.FRICTION_REPORT_MAX_ROWS = exports.resolveRepoAbsPath = exports.redactFrictionText = exports.readOrCreateMachineSalt = exports.readFrictionLog = exports.readFrictionDropped = exports.normalizeCommandShape = exports.frictionStateDir = exports.frictionStateBase = exports.frictionSaltPath = exports.frictionReporterId = exports.frictionMajorVersion = exports.frictionLogPath = exports.frictionFingerprintMaterial = exports.frictionFingerprint = exports.frictionDroppedPath = exports.clearFrictionLog = exports.buildFrictionRecord = exports.appendFrictionRecord = exports.FrictionError = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SECRET_PLACEHOLDER = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_REDACTION_MAX_SUBSTITUTIONS = exports.FRICTION_REDACTED_FIELD = exports.FRICTION_PATH_PLACEHOLDER = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_MAX_LINES = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_HARNESS_CAP = exports.FRICTION_FORMAT_VERSION = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_DROPPED_FILE_NAME = exports.FRICTION_DEFAULT_HARNESS = exports.FRICTION_COMMAND_SHAPE_CAP = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = void 0;
+exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.stripInlineCodeSpans = exports.regionHasScaffoldMarker = exports.placeholderSections = exports.bodyHasScaffoldPlaceholder = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.isFrictionPublishTier = exports.buildFrictionPublishUrl = exports.buildFrictionPublishTitle = exports.buildFrictionPublishDoc = exports.buildFrictionPublishBody = exports.FRICTION_PUBLISH_URL_BASE = exports.FRICTION_PUBLISH_TITLE_PREFIX = exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = exports.FRICTION_PUBLISH_TIERS = exports.FRICTION_PUBLISH_NARRATIVE_CAP = exports.FRICTION_PUBLISH_MAX_URL_CHARS = exports.FRICTION_PUBLISH_MAX_CLASSES = exports.FRICTION_PUBLISH_LABEL = exports.FRICTION_PUBLISH_FENCE_INFO = exports.resolveFrictionOptOut = exports.readFrictionOptOut = exports.FRICTION_OPT_OUT_ENV = exports.summarizeFrictionLog = exports.renderFrictionReport = exports.readFrictionReport = exports.frictionFenceFor = void 0;
+exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.isStartOwnedWorktreeEnv = exports.isStartOwnedNodeModulesInstall = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeUntrackedRefusal = exports.worktreeTrackedRefusal = exports.worktreeReleaseRefusal = exports.parseRemovalBlockingPaths = exports.parseRemovalBlockers = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = void 0;
+exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.frictionClearOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_NODE_MODULES_ENTRY = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceBody", { enumerable: true, get: function () { return items_js_1.acceptanceBody; } });
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
@@ -3049,6 +3723,7 @@ Object.defineProperty(exports, "liveAcceptanceCriteria", { enumerable: true, get
 Object.defineProperty(exports, "liveAcceptanceRegion", { enumerable: true, get: function () { return items_js_1.liveAcceptanceRegion; } });
 Object.defineProperty(exports, "liveAcceptanceRows", { enumerable: true, get: function () { return items_js_1.liveAcceptanceRows; } });
 Object.defineProperty(exports, "liveAcceptanceUnchecked", { enumerable: true, get: function () { return items_js_1.liveAcceptanceUnchecked; } });
+Object.defineProperty(exports, "liveContextRegion", { enumerable: true, get: function () { return items_js_1.liveContextRegion; } });
 Object.defineProperty(exports, "loadItems", { enumerable: true, get: function () { return items_js_1.loadItems; } });
 Object.defineProperty(exports, "softTryLoadItem", { enumerable: true, get: function () { return items_js_1.softTryLoadItem; } });
 Object.defineProperty(exports, "tryLoadItem", { enumerable: true, get: function () { return items_js_1.tryLoadItem; } });
@@ -3165,7 +3840,9 @@ Object.defineProperty(exports, "compactWorkItem", { enumerable: true, get: funct
 Object.defineProperty(exports, "failEnvelope", { enumerable: true, get: function () { return json_js_1.failEnvelope; } });
 Object.defineProperty(exports, "successEnvelope", { enumerable: true, get: function () { return json_js_1.successEnvelope; } });
 var friction_js_1 = require("./friction.js");
+Object.defineProperty(exports, "FRICTION_COMMAND_SHAPE_CAP", { enumerable: true, get: function () { return friction_js_1.FRICTION_COMMAND_SHAPE_CAP; } });
 Object.defineProperty(exports, "FRICTION_DEFAULT_HARNESS", { enumerable: true, get: function () { return friction_js_1.FRICTION_DEFAULT_HARNESS; } });
+Object.defineProperty(exports, "FRICTION_DROPPED_FILE_NAME", { enumerable: true, get: function () { return friction_js_1.FRICTION_DROPPED_FILE_NAME; } });
 Object.defineProperty(exports, "FRICTION_ENV_FACT_CAP", { enumerable: true, get: function () { return friction_js_1.FRICTION_ENV_FACT_CAP; } });
 Object.defineProperty(exports, "FRICTION_EVIDENCE_CAP", { enumerable: true, get: function () { return friction_js_1.FRICTION_EVIDENCE_CAP; } });
 Object.defineProperty(exports, "FRICTION_FINGERPRINT_CHARS", { enumerable: true, get: function () { return friction_js_1.FRICTION_FINGERPRINT_CHARS; } });
@@ -3174,13 +3851,20 @@ Object.defineProperty(exports, "FRICTION_HARNESS_CAP", { enumerable: true, get: 
 Object.defineProperty(exports, "FRICTION_LOG_FILE_NAME", { enumerable: true, get: function () { return friction_js_1.FRICTION_LOG_FILE_NAME; } });
 Object.defineProperty(exports, "FRICTION_MAX_LINES", { enumerable: true, get: function () { return friction_js_1.FRICTION_MAX_LINES; } });
 Object.defineProperty(exports, "FRICTION_NARRATIVE_CAP", { enumerable: true, get: function () { return friction_js_1.FRICTION_NARRATIVE_CAP; } });
+Object.defineProperty(exports, "FRICTION_PATH_PLACEHOLDER", { enumerable: true, get: function () { return friction_js_1.FRICTION_PATH_PLACEHOLDER; } });
+Object.defineProperty(exports, "FRICTION_REDACTED_FIELD", { enumerable: true, get: function () { return friction_js_1.FRICTION_REDACTED_FIELD; } });
+Object.defineProperty(exports, "FRICTION_REDACTION_MAX_SUBSTITUTIONS", { enumerable: true, get: function () { return friction_js_1.FRICTION_REDACTION_MAX_SUBSTITUTIONS; } });
 Object.defineProperty(exports, "FRICTION_REPORTER_ID_CHARS", { enumerable: true, get: function () { return friction_js_1.FRICTION_REPORTER_ID_CHARS; } });
 Object.defineProperty(exports, "FRICTION_SALT_FILE_NAME", { enumerable: true, get: function () { return friction_js_1.FRICTION_SALT_FILE_NAME; } });
+Object.defineProperty(exports, "FRICTION_SECRET_PLACEHOLDER", { enumerable: true, get: function () { return friction_js_1.FRICTION_SECRET_PLACEHOLDER; } });
 Object.defineProperty(exports, "FRICTION_STATE_SUBDIR", { enumerable: true, get: function () { return friction_js_1.FRICTION_STATE_SUBDIR; } });
 Object.defineProperty(exports, "FrictionError", { enumerable: true, get: function () { return friction_js_1.FrictionError; } });
 Object.defineProperty(exports, "appendFrictionRecord", { enumerable: true, get: function () { return friction_js_1.appendFrictionRecord; } });
 Object.defineProperty(exports, "buildFrictionRecord", { enumerable: true, get: function () { return friction_js_1.buildFrictionRecord; } });
+Object.defineProperty(exports, "clearFrictionLog", { enumerable: true, get: function () { return friction_js_1.clearFrictionLog; } });
+Object.defineProperty(exports, "frictionDroppedPath", { enumerable: true, get: function () { return friction_js_1.frictionDroppedPath; } });
 Object.defineProperty(exports, "frictionFingerprint", { enumerable: true, get: function () { return friction_js_1.frictionFingerprint; } });
+Object.defineProperty(exports, "frictionFingerprintMaterial", { enumerable: true, get: function () { return friction_js_1.frictionFingerprintMaterial; } });
 Object.defineProperty(exports, "frictionLogPath", { enumerable: true, get: function () { return friction_js_1.frictionLogPath; } });
 Object.defineProperty(exports, "frictionMajorVersion", { enumerable: true, get: function () { return friction_js_1.frictionMajorVersion; } });
 Object.defineProperty(exports, "frictionReporterId", { enumerable: true, get: function () { return friction_js_1.frictionReporterId; } });
@@ -3188,9 +3872,36 @@ Object.defineProperty(exports, "frictionSaltPath", { enumerable: true, get: func
 Object.defineProperty(exports, "frictionStateBase", { enumerable: true, get: function () { return friction_js_1.frictionStateBase; } });
 Object.defineProperty(exports, "frictionStateDir", { enumerable: true, get: function () { return friction_js_1.frictionStateDir; } });
 Object.defineProperty(exports, "normalizeCommandShape", { enumerable: true, get: function () { return friction_js_1.normalizeCommandShape; } });
+Object.defineProperty(exports, "readFrictionDropped", { enumerable: true, get: function () { return friction_js_1.readFrictionDropped; } });
 Object.defineProperty(exports, "readFrictionLog", { enumerable: true, get: function () { return friction_js_1.readFrictionLog; } });
 Object.defineProperty(exports, "readOrCreateMachineSalt", { enumerable: true, get: function () { return friction_js_1.readOrCreateMachineSalt; } });
+Object.defineProperty(exports, "redactFrictionText", { enumerable: true, get: function () { return friction_js_1.redactFrictionText; } });
 Object.defineProperty(exports, "resolveRepoAbsPath", { enumerable: true, get: function () { return friction_js_1.resolveRepoAbsPath; } });
+var friction_report_js_1 = require("./friction-report.js");
+Object.defineProperty(exports, "FRICTION_REPORT_MAX_ROWS", { enumerable: true, get: function () { return friction_report_js_1.FRICTION_REPORT_MAX_ROWS; } });
+Object.defineProperty(exports, "frictionFenceFor", { enumerable: true, get: function () { return friction_report_js_1.frictionFenceFor; } });
+Object.defineProperty(exports, "readFrictionReport", { enumerable: true, get: function () { return friction_report_js_1.readFrictionReport; } });
+Object.defineProperty(exports, "renderFrictionReport", { enumerable: true, get: function () { return friction_report_js_1.renderFrictionReport; } });
+Object.defineProperty(exports, "summarizeFrictionLog", { enumerable: true, get: function () { return friction_report_js_1.summarizeFrictionLog; } });
+var friction_optout_js_1 = require("./friction-optout.js");
+Object.defineProperty(exports, "FRICTION_OPT_OUT_ENV", { enumerable: true, get: function () { return friction_optout_js_1.FRICTION_OPT_OUT_ENV; } });
+Object.defineProperty(exports, "readFrictionOptOut", { enumerable: true, get: function () { return friction_optout_js_1.readFrictionOptOut; } });
+Object.defineProperty(exports, "resolveFrictionOptOut", { enumerable: true, get: function () { return friction_optout_js_1.resolveFrictionOptOut; } });
+var friction_publish_js_1 = require("./friction-publish.js");
+Object.defineProperty(exports, "FRICTION_PUBLISH_FENCE_INFO", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_FENCE_INFO; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_LABEL", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_LABEL; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_MAX_CLASSES", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_MAX_CLASSES; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_MAX_URL_CHARS", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_MAX_URL_CHARS; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_NARRATIVE_CAP", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_NARRATIVE_CAP; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_TIERS", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_TIERS; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_TITLE_MAX_CHARS", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_TITLE_MAX_CHARS; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_TITLE_PREFIX", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_TITLE_PREFIX; } });
+Object.defineProperty(exports, "FRICTION_PUBLISH_URL_BASE", { enumerable: true, get: function () { return friction_publish_js_1.FRICTION_PUBLISH_URL_BASE; } });
+Object.defineProperty(exports, "buildFrictionPublishBody", { enumerable: true, get: function () { return friction_publish_js_1.buildFrictionPublishBody; } });
+Object.defineProperty(exports, "buildFrictionPublishDoc", { enumerable: true, get: function () { return friction_publish_js_1.buildFrictionPublishDoc; } });
+Object.defineProperty(exports, "buildFrictionPublishTitle", { enumerable: true, get: function () { return friction_publish_js_1.buildFrictionPublishTitle; } });
+Object.defineProperty(exports, "buildFrictionPublishUrl", { enumerable: true, get: function () { return friction_publish_js_1.buildFrictionPublishUrl; } });
+Object.defineProperty(exports, "isFrictionPublishTier", { enumerable: true, get: function () { return friction_publish_js_1.isFrictionPublishTier; } });
 var tracker_commit_js_1 = require("./tracker-commit.js");
 Object.defineProperty(exports, "commitPayload", { enumerable: true, get: function () { return tracker_commit_js_1.commitPayload; } });
 var create_js_1 = require("./create.js");
@@ -3214,6 +3925,11 @@ var list_js_2 = require("./list.js");
 Object.defineProperty(exports, "parseOlderThan", { enumerable: true, get: function () { return list_js_2.parseOlderThan; } });
 var validate_js_1 = require("./validate.js");
 Object.defineProperty(exports, "runValidate", { enumerable: true, get: function () { return validate_js_1.runValidate; } });
+var placeholder_js_1 = require("./placeholder.js");
+Object.defineProperty(exports, "bodyHasScaffoldPlaceholder", { enumerable: true, get: function () { return placeholder_js_1.bodyHasScaffoldPlaceholder; } });
+Object.defineProperty(exports, "placeholderSections", { enumerable: true, get: function () { return placeholder_js_1.placeholderSections; } });
+Object.defineProperty(exports, "regionHasScaffoldMarker", { enumerable: true, get: function () { return placeholder_js_1.regionHasScaffoldMarker; } });
+Object.defineProperty(exports, "stripInlineCodeSpans", { enumerable: true, get: function () { return placeholder_js_1.stripInlineCodeSpans; } });
 var update_js_1 = require("./update.js");
 Object.defineProperty(exports, "runUpdate", { enumerable: true, get: function () { return update_js_1.runUpdate; } });
 Object.defineProperty(exports, "maybeCommitUpdate", { enumerable: true, get: function () { return update_js_1.maybeCommitUpdate; } });
@@ -3246,13 +3962,19 @@ Object.defineProperty(exports, "classifyCleanupEntry", { enumerable: true, get: 
 Object.defineProperty(exports, "classifyReleaseEntry", { enumerable: true, get: function () { return cleanup_js_1.classifyReleaseEntry; } });
 Object.defineProperty(exports, "defaultCleanupGit", { enumerable: true, get: function () { return cleanup_js_1.defaultCleanupGit; } });
 Object.defineProperty(exports, "findMergedPr", { enumerable: true, get: function () { return cleanup_js_1.findMergedPr; } });
+Object.defineProperty(exports, "parseRemovalBlockers", { enumerable: true, get: function () { return cleanup_js_1.parseRemovalBlockers; } });
+Object.defineProperty(exports, "parseRemovalBlockingPaths", { enumerable: true, get: function () { return cleanup_js_1.parseRemovalBlockingPaths; } });
 Object.defineProperty(exports, "worktreeReleaseRefusal", { enumerable: true, get: function () { return cleanup_js_1.worktreeReleaseRefusal; } });
+Object.defineProperty(exports, "worktreeTrackedRefusal", { enumerable: true, get: function () { return cleanup_js_1.worktreeTrackedRefusal; } });
+Object.defineProperty(exports, "worktreeUntrackedRefusal", { enumerable: true, get: function () { return cleanup_js_1.worktreeUntrackedRefusal; } });
 var worktree_js_1 = require("./worktree.js");
 Object.defineProperty(exports, "buildLocalWorkspaces", { enumerable: true, get: function () { return worktree_js_1.buildLocalWorkspaces; } });
 Object.defineProperty(exports, "detectWorktreeForeignWrites", { enumerable: true, get: function () { return worktree_js_1.detectWorktreeForeignWrites; } });
 Object.defineProperty(exports, "freshWorktreeInstallRefusal", { enumerable: true, get: function () { return worktree_js_1.freshWorktreeInstallRefusal; } });
 Object.defineProperty(exports, "inspectDeclaredDependencies", { enumerable: true, get: function () { return worktree_js_1.inspectDeclaredDependencies; } });
 Object.defineProperty(exports, "inspectGateBinResolution", { enumerable: true, get: function () { return worktree_js_1.inspectGateBinResolution; } });
+Object.defineProperty(exports, "isStartOwnedNodeModulesInstall", { enumerable: true, get: function () { return worktree_js_1.isStartOwnedNodeModulesInstall; } });
+Object.defineProperty(exports, "isStartOwnedWorktreeEnv", { enumerable: true, get: function () { return worktree_js_1.isStartOwnedWorktreeEnv; } });
 Object.defineProperty(exports, "linkNodeModules", { enumerable: true, get: function () { return worktree_js_1.linkNodeModules; } });
 Object.defineProperty(exports, "linkNodeModulesDetailed", { enumerable: true, get: function () { return worktree_js_1.linkNodeModulesDetailed; } });
 Object.defineProperty(exports, "linkedWorkspacePackages", { enumerable: true, get: function () { return worktree_js_1.linkedWorkspacePackages; } });
@@ -3280,7 +4002,9 @@ Object.defineProperty(exports, "MAX_CLAIM_TAKEOVERS", { enumerable: true, get: f
 Object.defineProperty(exports, "MAX_MISSING_DEPENDENCIES", { enumerable: true, get: function () { return worktree_js_1.MAX_MISSING_DEPENDENCIES; } });
 Object.defineProperty(exports, "MAX_GATE_BINS", { enumerable: true, get: function () { return worktree_js_1.MAX_GATE_BINS; } });
 Object.defineProperty(exports, "MAX_PREP_STEPS", { enumerable: true, get: function () { return worktree_js_1.MAX_PREP_STEPS; } });
+Object.defineProperty(exports, "WORKTREE_ENV_FILE", { enumerable: true, get: function () { return worktree_js_1.WORKTREE_ENV_FILE; } });
 Object.defineProperty(exports, "WORKTREE_ENV_KEYS", { enumerable: true, get: function () { return worktree_js_1.WORKTREE_ENV_KEYS; } });
+Object.defineProperty(exports, "WORKTREE_NODE_MODULES_ENTRY", { enumerable: true, get: function () { return worktree_js_1.WORKTREE_NODE_MODULES_ENTRY; } });
 var import_issues_js_1 = require("./import-issues.js");
 Object.defineProperty(exports, "runImportIssues", { enumerable: true, get: function () { return import_issues_js_1.runImportIssues; } });
 var import_issues_js_2 = require("./import-issues.js");
@@ -3292,7 +4016,9 @@ Object.defineProperty(exports, "resolveImportType", { enumerable: true, get: fun
 var operations_js_1 = require("./operations.js");
 Object.defineProperty(exports, "commentOperation", { enumerable: true, get: function () { return operations_js_1.commentOperation; } });
 Object.defineProperty(exports, "createOperation", { enumerable: true, get: function () { return operations_js_1.createOperation; } });
+Object.defineProperty(exports, "frictionClearOperation", { enumerable: true, get: function () { return operations_js_1.frictionClearOperation; } });
 Object.defineProperty(exports, "frictionOperation", { enumerable: true, get: function () { return operations_js_1.frictionOperation; } });
+Object.defineProperty(exports, "frictionReportOperation", { enumerable: true, get: function () { return operations_js_1.frictionReportOperation; } });
 Object.defineProperty(exports, "handoffOperation", { enumerable: true, get: function () { return operations_js_1.handoffOperation; } });
 Object.defineProperty(exports, "importIssuesOperation", { enumerable: true, get: function () { return operations_js_1.importIssuesOperation; } });
 Object.defineProperty(exports, "listOperation", { enumerable: true, get: function () { return operations_js_1.listOperation; } });
@@ -3407,6 +4133,7 @@ exports.acceptanceCriteria = acceptanceCriteria;
 exports.acceptanceUnchecked = acceptanceUnchecked;
 exports.acceptanceComplete = acceptanceComplete;
 exports.liveAcceptanceRegion = liveAcceptanceRegion;
+exports.liveContextRegion = liveContextRegion;
 exports.liveAcceptanceRows = liveAcceptanceRows;
 exports.liveAcceptanceCriteria = liveAcceptanceCriteria;
 exports.liveAcceptanceUnchecked = liveAcceptanceUnchecked;
@@ -3659,24 +4386,74 @@ function acceptanceComplete(body) {
     return acceptanceUnchecked(body).length === 0;
 }
 const ACCEPTANCE_HEADING = /^##[ \t]+acceptance[ \t]*$/i;
+const CONTEXT_HEADING = /^##[ \t]+context[ \t]*$/i;
 const SECTION_END_HEADING = /^#{1,2}[ \t]/;
 const COMMENT_BLOCK_HEADING = /^###[ \t]+(?:\d{4}-\d{2}-\d{2}[ \t]+@|Waiver\b)/;
-function withoutCommentBlocks(body) {
+const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+function opensFence(line) {
+    const match = FENCE_LINE.exec(line);
+    if (!match)
+        return false;
+    if (match[1][0] !== "`")
+        return true;
+    return !match[2].includes("`");
+}
+function closesFence(line, fence) {
+    const match = FENCE_LINE.exec(line);
+    if (!match)
+        return false;
+    const run = match[1];
+    if (run[0] !== fence.char || run.length < fence.length)
+        return false;
+    return /^[ \t]*$/.test(match[2]);
+}
+function liveAcceptanceLines(body) {
     const out = [];
+    let fence = null;
     let inComment = false;
     for (const line of body.split(ACCEPTANCE_LINE_BREAK)) {
+        if (fence) {
+            if (closesFence(line, fence))
+                fence = null;
+            continue;
+        }
+        if (opensFence(line)) {
+            const run = FENCE_LINE.exec(line)[1];
+            fence = { char: run[0], length: run.length };
+            continue;
+        }
         if (COMMENT_BLOCK_HEADING.test(line))
             inComment = true;
         if (!inComment)
             out.push(line);
     }
-    return out.join("\n");
+    return out;
 }
 function liveAcceptanceRegion(body) {
-    const lines = withoutCommentBlocks(body).split(ACCEPTANCE_LINE_BREAK);
+    const lines = liveAcceptanceLines(body);
     let start = -1;
     for (let i = 0; i < lines.length; i += 1) {
         if (ACCEPTANCE_HEADING.test(lines[i])) {
+            start = i + 1;
+            break;
+        }
+    }
+    if (start === -1)
+        return null;
+    const region = [];
+    for (let i = start; i < lines.length; i += 1) {
+        const line = lines[i];
+        if (SECTION_END_HEADING.test(line))
+            break;
+        region.push(line);
+    }
+    return region.join("\n");
+}
+function liveContextRegion(body) {
+    const lines = liveAcceptanceLines(body);
+    let start = -1;
+    for (let i = 0; i < lines.length; i += 1) {
+        if (CONTEXT_HEADING.test(lines[i])) {
             start = i + 1;
             break;
         }
@@ -4202,6 +4979,8 @@ exports.priorityOperation = priorityOperation;
 exports.syncOperation = syncOperation;
 exports.importIssuesOperation = importIssuesOperation;
 exports.frictionOperation = frictionOperation;
+exports.frictionReportOperation = frictionReportOperation;
+exports.frictionClearOperation = frictionClearOperation;
 const node_path_1 = require("node:path");
 const node_os_1 = require("node:os");
 const acceptance_js_1 = require("./acceptance.js");
@@ -4219,6 +4998,8 @@ const next_js_1 = require("./next.js");
 const priority_js_1 = require("./priority.js");
 const report_js_1 = require("./report.js");
 const friction_js_1 = require("./friction.js");
+const friction_publish_js_1 = require("./friction-publish.js");
+const friction_report_js_1 = require("./friction-report.js");
 const show_js_1 = require("./show.js");
 const sync_command_js_1 = require("./sync-command.js");
 const tracker_commit_js_1 = require("./tracker-commit.js");
@@ -4479,11 +5260,17 @@ function importIssuesOperation(opts) {
 function frictionOperation(opts) {
     const cwd = opts.cwd;
     try {
+        if (opts.optedOut) {
+            return succeed("friction", {
+                optedOut: true,
+                path: (0, friction_js_1.frictionLogPath)(opts.env ?? process.env, opts.home ?? (0, node_os_1.homedir)()),
+            }, (0, convention_js_1.readConventionVersion)(cwd));
+        }
         const record = (0, friction_js_1.buildFrictionRecord)(opts, opts);
         const env = opts.env ?? process.env;
         const home = opts.home ?? (0, node_os_1.homedir)();
         const appended = (0, friction_js_1.appendFrictionRecord)(record, (0, friction_js_1.frictionLogPath)(env, home));
-        return succeed("friction", { path: appended.path, dropped: appended.dropped, record }, (0, convention_js_1.readConventionVersion)(cwd));
+        return succeed("friction", { optedOut: false, path: appended.path, dropped: appended.dropped, record }, (0, convention_js_1.readConventionVersion)(cwd));
     }
     catch (err) {
         if (err instanceof friction_js_1.FrictionError) {
@@ -4504,6 +5291,54 @@ function frictionOperation(opts) {
             };
         }
         return fail("friction", cwd, "FRICTION_FAILED", err);
+    }
+}
+function frictionReportOperation(opts) {
+    try {
+        const report = (0, friction_report_js_1.readFrictionReport)({
+            env: opts.env,
+            home: opts.home,
+            optedOut: opts.optedOut,
+        });
+        const payload = {
+            report: true,
+            path: (0, friction_js_1.frictionLogPath)(opts.env ?? process.env, opts.home ?? (0, node_os_1.homedir)()),
+            ...report,
+            ...(opts.tier === "b" ? { publish: (0, friction_publish_js_1.buildFrictionPublishDoc)(report) } : {}),
+        };
+        return succeed("friction", payload, (0, convention_js_1.readConventionVersion)(opts.cwd));
+    }
+    catch (err) {
+        if (err instanceof friction_js_1.FrictionError) {
+            return {
+                ok: false,
+                envelope: (0, json_js_1.failEnvelope)({
+                    command: "friction",
+                    message: err.message,
+                    code: "FRICTION_FAILED",
+                    conventionVersion: (0, convention_js_1.readConventionVersion)(opts.cwd),
+                    payload: {
+                        report: true,
+                        reason: err.reason,
+                        ...(err.path !== undefined ? { path: err.path } : {}),
+                    },
+                }),
+                exitCode: 1,
+                error: err,
+            };
+        }
+        return fail("friction", opts.cwd, "FRICTION_FAILED", err);
+    }
+}
+function frictionClearOperation(opts) {
+    try {
+        const env = opts.env ?? process.env;
+        const home = opts.home ?? (0, node_os_1.homedir)();
+        const cleared = (0, friction_js_1.clearFrictionLog)((0, friction_js_1.frictionLogPath)(env, home), (0, friction_js_1.frictionDroppedPath)(env, home));
+        return succeed("friction", { clear: true, ...cleared }, (0, convention_js_1.readConventionVersion)(opts.cwd));
+    }
+    catch (err) {
+        return fail("friction", opts.cwd, "FRICTION_FAILED", err);
     }
 }
 function relativePath(root, path) {
@@ -4599,6 +5434,55 @@ function newItemPath(opts) {
         return (0, node_path_1.join)(parentContainerDir, `${id}.md`);
     }
     return (0, node_path_1.join)(parentContainerDir, id, `${id}.md`);
+}
+})
+
+__arggonModules.set("lib/src/placeholder.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.stripInlineCodeSpans = stripInlineCodeSpans;
+exports.regionHasScaffoldMarker = regionHasScaffoldMarker;
+exports.placeholderSections = placeholderSections;
+exports.bodyHasScaffoldPlaceholder = bodyHasScaffoldPlaceholder;
+const items_js_1 = require("./items.js");
+function stripInlineCodeSpans(text) {
+    let out = "";
+    let i = 0;
+    while (i < text.length) {
+        if (text[i] !== "`") {
+            out += text[i];
+            i += 1;
+            continue;
+        }
+        let run = 0;
+        while (text[i + run] === "`")
+            run += 1;
+        const closer = "`".repeat(run);
+        const end = text.indexOf(closer, i + run);
+        if (end === -1) {
+            out += text.slice(i);
+            break;
+        }
+        i = end + run;
+    }
+    return out;
+}
+const SCAFFOLD_COMMENT = /<!--[\s\S]*?-->/;
+function regionHasScaffoldMarker(region) {
+    if (region === null)
+        return false;
+    return SCAFFOLD_COMMENT.test(stripInlineCodeSpans(region));
+}
+function placeholderSections(body) {
+    const sections = [];
+    if (regionHasScaffoldMarker((0, items_js_1.liveContextRegion)(body)))
+        sections.push("Context");
+    if (regionHasScaffoldMarker((0, items_js_1.liveAcceptanceRegion)(body)))
+        sections.push("Acceptance");
+    return sections;
+}
+function bodyHasScaffoldPlaceholder(source) {
+    return placeholderSections((0, items_js_1.acceptanceBody)(source)).length > 0;
 }
 })
 
@@ -6468,6 +7352,7 @@ const convention_js_1 = require("./convention.js");
 const ids_js_1 = require("./ids.js");
 const priority_js_1 = require("./priority.js");
 const items_js_1 = require("./items.js");
+const placeholder_js_1 = require("./placeholder.js");
 const paths_js_1 = require("./paths.js");
 const relations_js_1 = require("./relations.js");
 const sanitize_js_1 = require("./sanitize.js");
@@ -6550,6 +7435,18 @@ function checkItemShape(item, errors) {
     }
     if (item.priority !== undefined && item.priority !== null && !(0, priority_js_1.isPriority)(item.priority)) {
         push(errors, rel, `priority must be one of p0, p1, p2, p3 (got ${JSON.stringify(item.priority)})`, "PRIORITY_INVALID");
+    }
+}
+function checkPlaceholderBodies(items, errors) {
+    for (const item of items) {
+        if (item.status !== "todo" && item.status !== "in_progress" && item.status !== "blocked") {
+            continue;
+        }
+        const sections = (0, placeholder_js_1.placeholderSections)(item.body);
+        if (sections.length === 0)
+            continue;
+        const where = sections.map((section) => `'## ${section}'`).join(" and ");
+        push(errors, item.relPath, `open ${item.type} '${item.id}' still carries the scaffold placeholder marker (<!-- … -->) in its live ${where} section — done/cancelled items are excluded (history, not the contract). Write the real prose there (a marker quoted inside code spans or fenced blocks does not count)`, "PLACEHOLDER_BODY");
     }
 }
 function checkDependencies(items, byId, errors) {
@@ -6718,6 +7615,7 @@ function runValidate(opts) {
         }
     }
     checkDependencies(items, byId, errors);
+    checkPlaceholderBodies(items, errors);
     for (const item of items) {
         if (item.type !== "story")
             continue;
@@ -7087,13 +7985,14 @@ function applyViewFilter(items, expr, opts = {}) {
 __arggonModules.set("lib/src/worktree.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MAX_CLAIM_WRITE_NAMES = exports.MAX_CLAIM_TAKEOVERS = exports.MAX_PREP_STEPS = exports.WORKTREE_ENV_KEYS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = void 0;
+exports.MAX_CLAIM_WRITE_NAMES = exports.MAX_CLAIM_TAKEOVERS = exports.MAX_PREP_STEPS = exports.WORKTREE_ENV_KEYS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.WORKTREE_NODE_MODULES_ENTRY = exports.WORKTREE_ENV_FILE = void 0;
 exports.packageEntryPaths = packageEntryPaths;
 exports.packageEntryExists = packageEntryExists;
 exports.packageBuildScript = packageBuildScript;
 exports.localWorkspacePackages = localWorkspacePackages;
 exports.linkNodeModules = linkNodeModules;
 exports.linkNodeModulesDetailed = linkNodeModulesDetailed;
+exports.isStartOwnedNodeModulesInstall = isStartOwnedNodeModulesInstall;
 exports.unlinkNodeModulesLink = unlinkNodeModulesLink;
 exports.pointWorkspaceAtLocal = pointWorkspaceAtLocal;
 exports.buildLocalWorkspaces = buildLocalWorkspaces;
@@ -7105,6 +8004,7 @@ exports.inspectDeclaredDependencies = inspectDeclaredDependencies;
 exports.worktreeStateBase = worktreeStateBase;
 exports.worktreeCacheBase = worktreeCacheBase;
 exports.prepareWorktreeEnv = prepareWorktreeEnv;
+exports.isStartOwnedWorktreeEnv = isStartOwnedWorktreeEnv;
 exports.unlinkWorktreeEnv = unlinkWorktreeEnv;
 exports.defaultWorktreeStatus = defaultWorktreeStatus;
 exports.readWorktreeClaimStamp = readWorktreeClaimStamp;
@@ -7122,6 +8022,8 @@ const node_fs_1 = require("node:fs");
 const node_os_1 = require("node:os");
 const node_path_1 = require("node:path");
 const LINK_FARM_MARKER = ".arggon-link-farm";
+exports.WORKTREE_ENV_FILE = ".arggon.env";
+exports.WORKTREE_NODE_MODULES_ENTRY = "node_modules";
 function isInside(parent, child) {
     return child === parent || child.startsWith(`${parent}${node_path_1.sep}`);
 }
@@ -7330,14 +8232,14 @@ function linkNodeModulesDetailed(primaryRoot, worktreePath) {
     }
 }
 function ownedLinkFarm(primaryRoot, worktreePath) {
-    const link = (0, node_path_1.join)(worktreePath, "node_modules");
+    const link = (0, node_path_1.join)(worktreePath, exports.WORKTREE_NODE_MODULES_ENTRY);
     try {
         if ((0, node_fs_1.lstatSync)(link).isSymbolicLink())
             return null;
         const marker = (0, node_fs_1.readFileSync)((0, node_path_1.join)(link, LINK_FARM_MARKER), "utf8").trim();
         if (marker.length === 0)
             return null;
-        if ((0, node_path_1.resolve)(marker) !== (0, node_path_1.resolve)((0, node_path_1.join)(primaryRoot, "node_modules")))
+        if ((0, node_path_1.resolve)(marker) !== (0, node_path_1.resolve)((0, node_path_1.join)(primaryRoot, exports.WORKTREE_NODE_MODULES_ENTRY)))
             return null;
         return link;
     }
@@ -7345,46 +8247,52 @@ function ownedLinkFarm(primaryRoot, worktreePath) {
         return null;
     }
 }
-function unlinkNodeModulesLink(primaryRoot, worktreePath) {
-    const target = (0, node_path_1.resolve)((0, node_path_1.join)(primaryRoot, "node_modules"));
-    const link = (0, node_path_1.join)(worktreePath, "node_modules");
+function nodeModulesInstallKind(primaryRoot, worktreePath) {
+    const target = (0, node_path_1.resolve)((0, node_path_1.join)(primaryRoot, exports.WORKTREE_NODE_MODULES_ENTRY));
+    const link = (0, node_path_1.join)(worktreePath, exports.WORKTREE_NODE_MODULES_ENTRY);
     let isLink;
     try {
         isLink = (0, node_fs_1.lstatSync)(link).isSymbolicLink();
     }
     catch {
-        return false;
+        return null;
     }
     if (isLink) {
         try {
-            if ((0, node_path_1.resolve)((0, node_path_1.dirname)(link), (0, node_fs_1.readlinkSync)(link)) !== target)
-                return false;
+            return (0, node_path_1.resolve)((0, node_path_1.dirname)(link), (0, node_fs_1.readlinkSync)(link)) === target ? "link" : null;
         }
         catch {
-            return false;
+            return null;
         }
-        try {
+    }
+    return ownedLinkFarm(primaryRoot, worktreePath) === null ? null : "farm";
+}
+function isStartOwnedNodeModulesInstall(primaryRoot, worktreePath) {
+    return nodeModulesInstallKind(primaryRoot, worktreePath) !== null;
+}
+function unlinkNodeModulesLink(primaryRoot, worktreePath) {
+    const kind = nodeModulesInstallKind(primaryRoot, worktreePath);
+    if (kind === null)
+        return false;
+    const link = (0, node_path_1.join)(worktreePath, exports.WORKTREE_NODE_MODULES_ENTRY);
+    try {
+        if (kind === "link") {
             (0, node_fs_1.unlinkSync)(link);
             return true;
         }
-        catch {
-            try {
-                (0, node_fs_1.rmdirSync)(link);
-                return true;
-            }
-            catch {
-                return false;
-            }
-        }
-    }
-    if (ownedLinkFarm(primaryRoot, worktreePath) === null)
-        return false;
-    try {
         (0, node_fs_1.rmSync)(link, { recursive: true, force: true });
         return true;
     }
     catch {
-        return false;
+        if (kind !== "link")
+            return false;
+        try {
+            (0, node_fs_1.rmdirSync)(link);
+            return true;
+        }
+        catch {
+            return false;
+        }
     }
 }
 function pointWorkspaceAtLocal(primaryRoot, worktreePath, name) {
@@ -7740,7 +8648,7 @@ function prepareWorktreeEnv(primaryRoot, worktreePath, request) {
         };
     }
     const checkIgnore = request.checkIgnore ?? defaultCheckIgnore;
-    const ignored = checkIgnore(worktreePath, ".arggon.env");
+    const ignored = checkIgnore(worktreePath, exports.WORKTREE_ENV_FILE);
     const gitignored = ignored === undefined ? undefined : ignored;
     let seededDotenv;
     const dotenvSource = (0, node_path_1.join)(primaryRoot, ".env");
@@ -7755,7 +8663,7 @@ function prepareWorktreeEnv(primaryRoot, worktreePath, request) {
         }
     }
     const attachWarning = () => [...warnings, "already exists — left byte-identical (never overwritten)"].join("; ");
-    const envPath = (0, node_path_1.join)(worktreePath, ".arggon.env");
+    const envPath = (0, node_path_1.join)(worktreePath, exports.WORKTREE_ENV_FILE);
     if ((0, node_fs_1.existsSync)(envPath)) {
         return {
             written: false,
@@ -7810,28 +8718,37 @@ function prepareWorktreeEnv(primaryRoot, worktreePath, request) {
     };
 }
 exports.MAX_PREP_STEPS = 16;
-function unlinkWorktreeEnv(worktreePath) {
-    const envPath = (0, node_path_1.join)(worktreePath, ".arggon.env");
+function startOwnedEnvPath(worktreePath) {
+    const envPath = (0, node_path_1.join)(worktreePath, exports.WORKTREE_ENV_FILE);
     let raw;
     try {
         if ((0, node_fs_1.lstatSync)(envPath).isSymbolicLink())
-            return false;
+            return null;
         raw = (0, node_fs_1.readFileSync)(envPath, "utf8");
     }
     catch {
-        return false;
+        return null;
     }
     const lines = raw.split("\n");
     if (lines.pop() !== "")
-        return false;
+        return null;
     if (lines.length === 0)
-        return false;
+        return null;
     const keys = new Set(exports.WORKTREE_ENV_KEYS);
     for (const line of lines) {
         const eq = line.indexOf("=");
         if (eq <= 0 || !keys.has(line.slice(0, eq)))
-            return false;
+            return null;
     }
+    return envPath;
+}
+function isStartOwnedWorktreeEnv(worktreePath) {
+    return startOwnedEnvPath(worktreePath) !== null;
+}
+function unlinkWorktreeEnv(worktreePath) {
+    const envPath = startOwnedEnvPath(worktreePath);
+    if (envPath === null)
+        return false;
     try {
         (0, node_fs_1.rmSync)(envPath);
         return true;
@@ -8222,7 +9139,7 @@ function linkedWorkspacePackages(primaryRoot, worktreePath) {
 __arggonModules.set("opencode/plugins/arggon/board.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_SELECTION_MARK = exports.BOARD_SELECTION_PAGE = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_TYPE_BADGES = exports.ARGON_BOARD_PANEL = void 0;
+exports.BOARD_HIERARCHY_CHILD_KEYS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_SELECTION_MARK = exports.BOARD_SELECTION_PAGE = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_TYPE_BADGES = exports.ARGON_BOARD_PANEL = void 0;
 exports.boardRoot = boardRoot;
 exports.emptyBoardSnapshot = emptyBoardSnapshot;
 exports.activeBoardId = activeBoardId;
@@ -8237,6 +9154,8 @@ exports.clipBoardLine = clipBoardLine;
 exports.boardHeaderLine = boardHeaderLine;
 exports.boardCountsLine = boardCountsLine;
 exports.boardItemLine = boardItemLine;
+exports.boardParentId = boardParentId;
+exports.boardChildrenOf = boardChildrenOf;
 exports.boardItemDetail = boardItemDetail;
 exports.boardDetailLines = boardDetailLines;
 exports.boardTreeLines = boardTreeLines;
@@ -8433,6 +9352,21 @@ function boardItemLine(entry, options = {}) {
 }
 exports.BOARD_DETAIL_MAX_ROWS = 16;
 exports.BOARD_DETAIL_MAX_LINE_CHARS = 200;
+exports.BOARD_HIERARCHY_CHILD_KEYS = 9;
+function boardParentId(items, id) {
+    const wanted = id.trim();
+    if (wanted === "")
+        return null;
+    const item = items.find((entry) => entry.id === wanted);
+    const parent = (item?.parent ?? "").trim();
+    return parent === "" ? null : parent;
+}
+function boardChildrenOf(items, id) {
+    const wanted = id.trim();
+    if (wanted === "")
+        return [];
+    return (0, lib_1.sortById)(items.filter((entry) => (entry.parent ?? "").trim() === wanted));
+}
 function acceptanceRenderRows(item) {
     return (0, lib_1.acceptanceRows)((0, lib_1.acceptanceBody)(item)).map((row) => {
         const mark = row.checked ? "x" : " ";
@@ -8474,6 +9408,8 @@ function boardItemDetail(cwd, id, options = {}) {
         acceptanceDone: 0,
         acceptanceTotal: 0,
         truncated: false,
+        parent: null,
+        children: [],
         error: (0, lib_1.sanitizeHumanError)(error),
     });
     if (requested === "")
@@ -8486,6 +9422,32 @@ function boardItemDetail(cwd, id, options = {}) {
         const shownAcceptance = acceptance.slice(0, budget);
         const shownBody = body.slice(0, Math.max(budget - shownAcceptance.length, 0));
         const row = (value) => clipBoardLine((0, lib_1.sanitizeHumanTextUncapped)(value), exports.BOARD_DETAIL_MAX_LINE_CHARS);
+        const link = (item) => ({
+            id: (0, lib_1.sanitizeHumanTextUncapped)(item.id),
+            title: (0, lib_1.sanitizeHumanTextUncapped)(item.title),
+            status: item.status,
+            missing: false,
+        });
+        const snapshotItems = options.items ?? boardSnapshot(cwd).items;
+        const parentId = snapshotItems.length > 0
+            ? boardParentId(snapshotItems, requested)
+            : (shown.item.parent ?? "").trim() || null;
+        const byId = snapshotItems.length > 0
+            ? new Map(snapshotItems.map((entry) => [entry.id, entry]))
+            : new Map();
+        const parent = parentId === null
+            ? null
+            : byId.get(parentId) !== undefined
+                ? link(byId.get(parentId))
+                : {
+                    id: (0, lib_1.sanitizeHumanTextUncapped)(parentId),
+                    title: null,
+                    status: null,
+                    missing: true,
+                };
+        const children = snapshotItems.length > 0
+            ? boardChildrenOf(snapshotItems, requested).map(link)
+            : [];
         return {
             id: requested,
             title: (0, lib_1.sanitizeHumanTextUncapped)(shown.item.title ?? requested),
@@ -8495,6 +9457,8 @@ function boardItemDetail(cwd, id, options = {}) {
             acceptanceDone: criteria.filter((entry) => entry.checked).length,
             acceptanceTotal: criteria.length,
             truncated: acceptance.length + body.length > budget,
+            parent,
+            children,
             error: null,
         };
     }
@@ -8509,6 +9473,29 @@ function boardDetailLines(detail, options = {}) {
         return [clip(`  ┌ argon detail · ${detail.id}`), clip(`  └ ${detail.error}`)];
     }
     const lines = [clip(`  ┌ argon detail · ${detail.id} — ${detail.title ?? detail.id}`)];
+    const safe = (value) => (0, lib_1.sanitizeHumanTextUncapped)(value);
+    const parentRow = detail.parent === null
+        ? "parent: none"
+        : detail.parent.missing
+            ? `parent: ${safe(detail.parent.id)} (missing) [p]`
+            : `parent: ${safe(detail.parent.id)} — ${safe(detail.parent.title ?? detail.parent.id)}${detail.parent.status !== null ? ` (${detail.parent.status})` : ""} [p]`;
+    lines.push(clip(`  │ ${parentRow}`));
+    if (detail.children.length === 0) {
+        lines.push(clip("  │ children: none"));
+    }
+    else {
+        lines.push(clip(`  │ children (${detail.children.length}):`));
+        const shown = detail.children.slice(0, Math.max(exports.BOARD_HIERARCHY_CHILD_KEYS, 0));
+        shown.forEach((child, index) => {
+            const label = child.missing
+                ? `${safe(child.id)} (missing)`
+                : `${safe(child.id)} — ${safe(child.title ?? child.id)}${child.status !== null ? ` (${child.status})` : ""}`;
+            lines.push(clip(`  │   [${index + 1}] ${label}`));
+        });
+        const hidden = detail.children.length - shown.length;
+        if (hidden > 0)
+            lines.push(clip(`  │   … +${hidden} more — walk the tree`));
+    }
     const row = (value) => (value === "" ? "  │" : `  │ ${value}`);
     for (const entry of detail.acceptance)
         lines.push(clip(row(entry)));
@@ -8603,7 +9590,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.TRACKER_ROOT_MISMATCH = exports.PROCESS_ENV_SOURCE = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
+exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardParentId = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.boardChildrenOf = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_HIERARCHY_CHILD_KEYS = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.TRACKER_ROOT_MISMATCH = exports.PROCESS_ENV_SOURCE = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
 exports.isArggonItemId = isArggonItemId;
 exports.parseArggonItemFromCommand = parseArggonItemFromCommand;
 exports.parseArggonItemFromCode = parseArggonItemFromCode;
@@ -8623,6 +9610,8 @@ exports.resolveToolCwd = resolveToolCwd;
 exports.readWorktreeEnv = readWorktreeEnv;
 exports.findWorktreeEnv = findWorktreeEnv;
 exports.processWorktreeIdentity = processWorktreeIdentity;
+exports.parseWorktreeList = parseWorktreeList;
+exports.itemClaimWorktree = itemClaimWorktree;
 exports.trackerBinding = trackerBinding;
 exports.trackerRootMismatch = trackerRootMismatch;
 exports.trackerRootMismatchMessage = trackerRootMismatchMessage;
@@ -9562,6 +10551,7 @@ exports.WORKTREE_ENV_KEYS = {
 };
 const MAX_ENV_WALK_DEPTH = 8;
 const MAX_ENV_FILE_BYTES = 8_192;
+const MAX_CLAIM_WORKTREE_SCAN = 64;
 exports.PROCESS_ENV_SOURCE = "process.env";
 const IDENTITY_FIELDS = [
     ["worktreePath", exports.WORKTREE_ENV_KEYS.worktreePath],
@@ -9628,6 +10618,36 @@ function processWorktreeIdentity(env = process.env) {
             fields.set(key, value);
     }
     return parseWorktreeEnv(fields, exports.PROCESS_ENV_SOURCE);
+}
+function parseWorktreeList(output) {
+    if (typeof output !== "string")
+        return [];
+    const paths = [];
+    for (const line of output.split("\n")) {
+        if (!line.startsWith("worktree "))
+            continue;
+        const path = line.slice("worktree ".length).trim();
+        if (path !== "")
+            paths.push(path);
+    }
+    return paths;
+}
+async function itemClaimWorktree(root, itemId, limit = MAX_CLAIM_WORKTREE_SCAN) {
+    if (itemId === "")
+        return undefined;
+    const listing = await run("git", ["worktree", "list", "--porcelain"], root, 2_000);
+    if (listing.code !== 0)
+        return undefined;
+    const resolvedRoot = (0, node_path_1.resolve)(root);
+    for (const path of parseWorktreeList(listing.stdout).slice(0, Math.max(limit, 0))) {
+        const absolute = (0, node_path_1.resolve)(path);
+        if (absolute === resolvedRoot)
+            continue;
+        const identity = readWorktreeEnv((0, node_path_1.join)(absolute, exports.WORKTREE_ENV_FILE));
+        if (identity?.item === itemId && identity.worktreePath !== undefined)
+            return identity;
+    }
+    return undefined;
 }
 function trackerBinding(kernel, cwd, env = process.env) {
     const root = resolvedTrackerRoot(kernel, cwd);
@@ -9882,6 +10902,7 @@ const TOOL_SPECS = [
             agent: true,
         }),
         mutates: true,
+        itemScoped: true,
     },
     {
         name: "show",
@@ -9919,6 +10940,7 @@ const TOOL_SPECS = [
             body: input.body === true,
             tailComments: typeof input.tail_comments === "number" ? input.tail_comments : undefined,
         }),
+        itemScoped: true,
     },
     {
         name: "next",
@@ -10005,6 +11027,7 @@ const TOOL_SPECS = [
             author: asString(input.author) ?? sessionToken(tool?.sessionID),
         }),
         mutates: true,
+        itemScoped: true,
     },
     {
         name: "handoff",
@@ -10057,6 +11080,7 @@ const TOOL_SPECS = [
             });
         },
         mutates: true,
+        itemScoped: true,
     },
     {
         name: "priority",
@@ -11182,13 +12206,20 @@ async function nativeCleanup(kernel, input, options, tool) {
     if (releaseId === undefined && input.take_over_worktree === true) {
         return worktreeFail(kernel, "cleanup", "CLEANUP_FAILED", "take_over_worktree requires release (it authorizes a release of a worktree whose stamped owner is presumed dead)", version);
     }
+    if (input.force === true && input.prune !== true) {
+        return worktreeFail(kernel, "cleanup", "CLEANUP_FAILED", "force requires prune (it discards the untracked content of terminal+merged worktrees)", version);
+    }
     const inventory = await domainWorktrees(options);
     const runner = {
         ...git,
         worktreeList: (cwd) => inventory.length > 0 ? inventory : git.worktreeList(cwd),
     };
     const entries = releaseId === undefined
-        ? tracked.map((item) => kernel.classifyCleanupEntry(item, root, base, runner, { noGh: input.no_gh === true }))
+        ? tracked.map((item) => kernel.classifyCleanupEntry(item, root, base, runner, {
+            noGh: input.no_gh === true,
+            force: input.force === true,
+            primaryRoots: [canonicalRoot(options, root), root],
+        }))
         : [];
     const pruned = [];
     const failures = [];
@@ -11234,7 +12265,7 @@ async function nativeCleanup(kernel, input, options, tool) {
                     }
                     kernel.unlinkWorktreeEnv(entry.path);
                     const removal = await removeWorktreeObserved(options, entry.path, root, {
-                        force: false,
+                        force: entry.forced === true,
                     });
                     if (!removal.removed) {
                         const message = boundedNativeText(removal.errors.join("; "), MAX_NATIVE_DETAIL_CHARS);
@@ -11252,6 +12283,7 @@ async function nativeCleanup(kernel, input, options, tool) {
                     pruned.push({
                         id: entry.id,
                         action: `removed worktree ${entry.path}`,
+                        ...(entry.forced === true ? { forced: true } : {}),
                         ...(entry.via !== undefined ? { via: entry.via } : {}),
                     });
                 }
@@ -11496,6 +12528,7 @@ const WORKTREE_TOOL_SPECS = [
             type: "object",
             properties: {
                 prune: BOOLEAN,
+                force: BOOLEAN,
                 release: ID,
                 take_over_worktree: BOOLEAN,
                 no_gh: {
@@ -11538,8 +12571,19 @@ function argonToolDefinitions(kernel, options) {
             if ("error" in resolved)
                 throw resolved.error;
             const binding = trackerBinding(kernel, resolved.cwd, options.worktreeEnv ?? process.env);
+            if (spec.itemScoped === true && binding.declared.length === 0) {
+                const claim = await itemClaimWorktree(binding.root, asString(input?.id) ?? "");
+                if (claim !== undefined) {
+                    binding.claim = claim;
+                    const absolute = (0, node_path_1.resolve)(claim.worktreePath ?? "");
+                    if (absolute !== "" && !binding.declared.includes(absolute)) {
+                        binding.declared.push(absolute);
+                        binding.sources.push(claim.source);
+                    }
+                }
+            }
             const mismatch = trackerRootMismatch(binding);
-            if (mismatch !== undefined && spec.mutates === true) {
+            if (mismatch !== undefined && spec.mutates === true && binding.claim === undefined) {
                 throw new ArgonToolError(kernel.failEnvelope({
                     command: spec.name,
                     code: exports.TRACKER_ROOT_MISMATCH,
@@ -11672,17 +12716,20 @@ var board_js_1 = require("./board.js");
 Object.defineProperty(exports, "ARGON_BOARD_PANEL", { enumerable: true, get: function () { return board_js_1.ARGON_BOARD_PANEL; } });
 Object.defineProperty(exports, "BOARD_DETAIL_MAX_LINE_CHARS", { enumerable: true, get: function () { return board_js_1.BOARD_DETAIL_MAX_LINE_CHARS; } });
 Object.defineProperty(exports, "BOARD_DETAIL_MAX_ROWS", { enumerable: true, get: function () { return board_js_1.BOARD_DETAIL_MAX_ROWS; } });
+Object.defineProperty(exports, "BOARD_HIERARCHY_CHILD_KEYS", { enumerable: true, get: function () { return board_js_1.BOARD_HIERARCHY_CHILD_KEYS; } });
 Object.defineProperty(exports, "BOARD_SELECTION_MARK", { enumerable: true, get: function () { return board_js_1.BOARD_SELECTION_MARK; } });
 Object.defineProperty(exports, "BOARD_SELECTION_PAGE", { enumerable: true, get: function () { return board_js_1.BOARD_SELECTION_PAGE; } });
 Object.defineProperty(exports, "BOARD_STATUS_MARKS", { enumerable: true, get: function () { return board_js_1.BOARD_STATUS_MARKS; } });
 Object.defineProperty(exports, "BOARD_STATUS_ORDER", { enumerable: true, get: function () { return board_js_1.BOARD_STATUS_ORDER; } });
 Object.defineProperty(exports, "BOARD_TYPE_BADGES", { enumerable: true, get: function () { return board_js_1.BOARD_TYPE_BADGES; } });
 Object.defineProperty(exports, "activeBoardId", { enumerable: true, get: function () { return board_js_1.activeBoardId; } });
+Object.defineProperty(exports, "boardChildrenOf", { enumerable: true, get: function () { return board_js_1.boardChildrenOf; } });
 Object.defineProperty(exports, "boardCountsLine", { enumerable: true, get: function () { return board_js_1.boardCountsLine; } });
 Object.defineProperty(exports, "boardDetailLines", { enumerable: true, get: function () { return board_js_1.boardDetailLines; } });
 Object.defineProperty(exports, "boardHeaderLine", { enumerable: true, get: function () { return board_js_1.boardHeaderLine; } });
 Object.defineProperty(exports, "boardItemDetail", { enumerable: true, get: function () { return board_js_1.boardItemDetail; } });
 Object.defineProperty(exports, "boardItemLine", { enumerable: true, get: function () { return board_js_1.boardItemLine; } });
+Object.defineProperty(exports, "boardParentId", { enumerable: true, get: function () { return board_js_1.boardParentId; } });
 Object.defineProperty(exports, "boardRoot", { enumerable: true, get: function () { return board_js_1.boardRoot; } });
 Object.defineProperty(exports, "boardSnapshot", { enumerable: true, get: function () { return board_js_1.boardSnapshot; } });
 Object.defineProperty(exports, "boardTreeEntries", { enumerable: true, get: function () { return board_js_1.boardTreeEntries; } });
@@ -11701,7 +12748,10 @@ exports.default = definition;
 const __arggonEntry = __arggonRequire("opencode/plugins/arggon/index.ts", undefined)
 export default __arggonEntry.default
 export const ARGON_BOARD_PANEL = __arggonEntry.ARGON_BOARD_PANEL
+export const BOARD_HIERARCHY_CHILD_KEYS = __arggonEntry.BOARD_HIERARCHY_CHILD_KEYS
+export const boardChildrenOf = __arggonEntry.boardChildrenOf
 export const boardItemDetail = __arggonEntry.boardItemDetail
+export const boardParentId = __arggonEntry.boardParentId
 export const boardSnapshot = __arggonEntry.boardSnapshot
 export const boardTreeLines = __arggonEntry.boardTreeLines
 export const emptyBoardSelection = __arggonEntry.emptyBoardSelection

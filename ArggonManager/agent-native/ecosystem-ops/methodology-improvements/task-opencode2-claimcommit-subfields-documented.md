@@ -2,13 +2,14 @@
 type: task
 status: todo
 id: task-opencode2-claimcommit-subfields-documented
-title: "`docs/opencode2.md` names only part of the top-level `claimCommit` receipt (committed, hash, message, skipped, ignored[]) — and `NativeClaimCommitReceipt.status` carries a dead \"already-committed\" union member"
+title: '`docs/opencode2.md` names only part of the top-level `claimCommit` receipt (committed, hash, message, skipped, ignored[]) — and `NativeClaimCommitReceipt.status` carries a dead "already-committed" union member'
 parent: methodology-improvements
 labels: [docs, json-contract]
 created: "2026-10-03"
 updated: "2026-10-03"
 depends_on: [task-opencode2-payload-contract-preparation-fields]
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-opencode2-claimcommit-subfields-documented.md
   Leaves live only under a story. id is the filename stem: task-opencode2-claimcommit-subfields-documented.
@@ -20,15 +21,21 @@ depends_on: [task-opencode2-payload-contract-preparation-fields]
 
 ## Context
 
-<!-- Why this task exists. -->
+PR #609 (`task-opencode2-payload-contract-preparation-fields`) documented the `preparation` receipt field by field and added a doc-contract test that runs the real native seam and reads the doc's table against actual payloads. Two siblings surfaced in that work and were reported rather than fixed so the change stayed tight: `claimCommit` is still only partly named in the `start` row — `committed`, `hash`, `message`, `skipped`, `ignored[]` are the real sub-fields and the row does not enumerate them (the same incompleteness class just closed for `preparation`, one level over); and `NativeClaimCommitReceipt.status` still lists a dead `"already-committed"` union member no code path emits — the doc's enumeration is correct, the type carries a value nothing produces.
+
+Both belong here rather than reopening #609. The doc-contract test that now exists makes this cheap: extend its coverage to `claimCommit`'s sub-fields and let it fail on a dead union member, so type and doc cannot drift apart again.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] `claimCommit` sub-fields enumerated in the doc (`committed`, `hash`, `message`, `skipped`, `ignored[]`) with types and bounds, verified against the kernel
+- [ ] The dead `"already-committed"` union member removed from `NativeClaimCommitReceipt.status`, or implemented if it was ever meant to exist — decide and record which
+- [ ] The doc-contract test from PR #609 extended to cover `claimCommit`, including a check that no documented union member is unreachable and no emitted member is undocumented
+- [ ] Lands after PR #609, so the test is extended rather than duplicated (see `depends_on`)
 
 ## Notes
 
 ### 2026-10-03 @ses_f02ab5836ffeOAxmisboIwWE4x
+
 Found by the worker on PR #609 (task-opencode2-payload-contract-preparation-fields), 2026-10-03, and reported rather than fixed so the sibling change would stay tight.
 
 That item documented the `preparation` receipt field by field and added a doc-contract test that runs the real native seam and reads the doc's table against the actual payloads. It also found:
@@ -39,6 +46,7 @@ That item documented the `preparation` receipt field by field and added a doc-co
 Both belong here rather than reopening #609. The doc-contract test that now exists makes this cheap: extend its coverage to `claimCommit`'s sub-fields and let it fail on a dead union member, so the type and the doc cannot drift apart again.
 
 Acceptance:
+
 - [ ] `claimCommit` sub-fields enumerated in the doc (committed, hash, message, skipped, ignored[]) with types and bounds, verified against the kernel
 - [ ] The dead `"already-committed"` union member removed from `NativeClaimCommitReceipt.status`, or implemented if it was ever meant to exist — decide and record which
 - [ ] The doc-contract test from PR #609 extended to cover `claimCommit`, including a check that no documented union member is unreachable and no emitted member is undocumented

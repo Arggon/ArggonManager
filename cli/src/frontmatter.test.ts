@@ -39,11 +39,28 @@ function rawBackslashes(line: string): number {
   return (line.match(/\\/g) ?? []).length;
 }
 
+/**
+ * Real seed prose for a task leaf (task-validate-refuses-placeholder-bodies):
+ * the scaffold IS the placeholder, so default bodies would fail `validate`
+ * here. Module scope: shared by primedTask and the test bodies below.
+ */
+const leaf = "## Context\n\nSeed.\n\n## Acceptance\n\n- [x] seed\n";
+
 /** Minimal story-seeded tree so a task can be created (mirrors comment.test.ts). */
 function primedTask(): { dir: string } {
   const dir = mkdtempSync(join(tmpdir(), "arggon-frontmatter-"));
   runInit({ dir, force: false, commit: false });
-  runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW, commit: false });
+  // Real seed prose (task-validate-refuses-placeholder-bodies): the scaffold
+  // IS the placeholder, so default bodies would fail `validate` here.
+  const container = "## Context\n\nSeed.\n\n## Acceptance\n\nSeed.\n";
+  runCreate({
+    cwd: dir,
+    type: "initiative",
+    title: "Launch MVP",
+    now: NOW,
+    commit: false,
+    body: container,
+  });
   runCreate({
     cwd: dir,
     type: "epic",
@@ -51,6 +68,7 @@ function primedTask(): { dir: string } {
     parent: "launch-mvp",
     now: NOW,
     commit: false,
+    body: container,
   });
   runCreate({
     cwd: dir,
@@ -60,6 +78,7 @@ function primedTask(): { dir: string } {
     id: "story-login",
     now: NOW,
     commit: false,
+    body: container,
   });
   return { dir };
 }
@@ -131,6 +150,9 @@ title: "nits: \\\\\\\\( here"
       id: "escape-nits",
       now: NOW,
       commit: false,
+      // Real prose (task-validate-refuses-placeholder-bodies): the tree is
+      // validated below, and the scaffold IS the placeholder.
+      body: leaf,
     });
     const id = created.id;
     const path = created.path;
@@ -184,6 +206,9 @@ title: "nits: \\\\\\\\( here"
       id: "control-escape",
       now: NOW,
       commit: false,
+      // Real prose (task-validate-refuses-placeholder-bodies): the tree is
+      // validated below, and the scaffold IS the placeholder.
+      body: leaf,
     });
     const path = created.path;
     writeFileSync(
@@ -306,6 +331,9 @@ created: "2026-09-11"
       id: "ambiguous-nits",
       now: NOW,
       commit: false,
+      // Real prose (task-validate-refuses-placeholder-bodies): the tree is
+      // validated below, and the scaffold IS the placeholder.
+      body: leaf,
     });
     const path = created.path;
 
