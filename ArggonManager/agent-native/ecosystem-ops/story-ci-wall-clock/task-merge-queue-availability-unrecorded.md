@@ -8,7 +8,6 @@ labels: [ci, docs, adr]
 created: "2026-10-13"
 updated: "2026-10-13"
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/story-ci-wall-clock/task-merge-queue-availability-unrecorded.md
   Leaves live only under a story. id is the filename stem: task-merge-queue-availability-unrecorded.
@@ -43,3 +42,12 @@ correction where those documents are read.
 - [ ] `arggon spec validate` / `validate` green; docs-only
 
 ## Notes
+
+### 2026-10-13 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-13 @arggon-delivery-lead — owner decision recorded: **no org transfer**
+
+The product owner declined the merge-queue path ("No org", 2026-10-13). Consequences, to be reflected when this item records the constraint where the ADRs are read:
+
+- The GitHub merge queue stays **unavailable by choice**, not pending: this repo remains user-owned, and the documented one-command refresh flow (`engineering.md` §Merging: a PR refused as out of date) is the **permanent** remedy, not an interim one.
+- The `merge_group` CI prep stays moot (do not file it); nothing further is owed on queue enablement.
+- The item's remaining job is unchanged: record the availability constraint (org-only) + this decision in the ADR 0023 / exploration-022 context so the queue is not re-proposed as a pending setting.
