@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adapter-report-nits-from-review
 title: "`doctor --agents` non-blocking review nits: README sample shows a pre-round-2 human line; json-output.md has a half-merged adopter-edited clause; counts row omits acknowledged buckets; matrix assertion omits `replaced`"
 assignee: arggon-delivery-lead
@@ -8,11 +8,9 @@ branch: feat/task-adapter-report-nits-from-review
 parent: story-adapter-selection
 labels: [docs, tests]
 created: "2026-10-03"
-updated: "2026-10-11"
-claimed_at: "2026-10-11T09:57:59.738Z"
+updated: "2026-10-13"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adapter-report-nits-from-review
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-adapter-selection/task-adapter-report-nits-from-review.md
   Leaves live only under a story. id is the filename stem: task-adapter-report-nits-from-review.
