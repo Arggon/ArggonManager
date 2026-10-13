@@ -36,13 +36,13 @@ The reverse failure also exists: the review bar's "docs that travel with the cha
 
 ## Acceptance
 
-- [ ] An `effect: allow` entry exists for each read-only arggon tool the verifier role is contracted to use — at minimum `arggon_show`, `arggon_list`, `arggon_validate`, `arggon_next`, `arggon_report`, `arggon_branch` (read-side), and their `arggon_arggon_*` MCP spellings — in BOTH `.opencode/agents/arggon-verifier.md` (this tree's generated seam) and `templates/docs/opencode/agents/arggon-verifier.md` (the template every adopter tree renders), so the fix reaches new adopters and not only this repo
-- [ ] A probe proves the allow is real: a verifier-role session runs `tools.arggon.show({ id: "<any item>", meta: true })` and gets a successful envelope back, reported as command / expected / observed / exit / does-NOT-prove
-- [ ] A negative control proves the deny is also real and unchanged: the same session attempting `tools.arggon.update({ id, status: "done" })` is refused, and `tools.arggon.create(...)` is refused — the read grant does not open a write path
-- [ ] The generated seam bytes and the template are kept byte-consistent, and the provenance/never-overwrite semantics (`x-generated`, `arggon doctor --agents`) still hold on both
-- [ ] `ArggonManager/docs/agents.md` §Orchestration and the role table in `ArggonManager/docs/engineering.md` state the read-only boundary as config-enforced, not prompt-enforced — the wording change does not claim a guarantee the config does not actually deliver
-- [ ] Impact class stated (this is a generated agent seam shipped to adopters, so the class is likely Behavioral — role prompts change — and Behavioral requires the ADR 0016 upgrade-channel reference per `ArggonManager/docs/agents.md` §Changing the methodology itself)
-- [ ] `arggon validate` green, `npm test` green (the seam has permission/parity tests — find them and confirm they pin the new allow list), prettier clean, and `npm run lint:structure` / `test:structure` clean if the permission block is parsed by anything in `tools/ast-grep`
+- [x] An `effect: allow` entry exists for each read-only arggon tool the verifier role is contracted to use — at minimum `arggon_show`, `arggon_list`, `arggon_validate`, `arggon_next`, `arggon_report`, `arggon_branch` (read-side), and their `arggon_arggon_*` MCP spellings — in BOTH `.opencode/agents/arggon-verifier.md` (this tree's generated seam) and `templates/docs/opencode/agents/arggon-verifier.md` (the template every adopter tree renders), so the fix reaches new adopters and not only this repo
+- [x] A probe proves the allow is real: a verifier-role session runs `tools.arggon.show({ id: "<any item>", meta: true })` and gets a successful envelope back, reported as command / expected / observed / exit / does-NOT-prove
+- [x] A negative control proves the deny is also real and unchanged: the same session attempting `tools.arggon.update({ id, status: "done" })` is refused, and `tools.arggon.create(...)` is refused — the read grant does not open a write path
+- [x] The generated seam bytes and the template are kept byte-consistent, and the provenance/never-overwrite semantics (`x-generated`, `arggon doctor --agents`) still hold on both
+- [x] `ArggonManager/docs/agents.md` §Orchestration and the role table in `ArggonManager/docs/engineering.md` state the read-only boundary as config-enforced, not prompt-enforced — the wording change does not claim a guarantee the config does not actually deliver
+- [x] Impact class stated (this is a generated agent seam shipped to adopters, so the class is likely Behavioral — role prompts change — and Behavioral requires the ADR 0016 upgrade-channel reference per `ArggonManager/docs/agents.md` §Changing the methodology itself)
+- [x] `arggon validate` green, `npm test` green (the seam has permission/parity tests — find them and confirm they pin the new allow list), prettier clean, and `npm run lint:structure` / `test:structure` clean if the permission block is parsed by anything in `tools/ast-grep`
 
 ## Notes
 
@@ -291,3 +291,105 @@ writes can lose one, and the methodology's "comments are the agent handoff chann
 carries the whole reviewer -> verifier -> owner decision chain on top of it. The two comments I
 lost were superseded and recoverable by restatement, which is the only reason this did not
 cost a decision.
+
+### 2026-10-13 @ses_eca8380c1ffeQSEWbCVjqOL52V
+## Evidence (maker) — fix landed as PR #774
+
+Branch `fix/bug-verifier-cannot-read-the-tracker-no-allow-side`, commit
+`d58d8503` (10 files). Scope stayed on this item; the Second finding
+(concurrent-comment lost update) was NOT touched — it has its own item.
+
+### What changed
+
+- `templates/docs/opencode/agents/arggon-verifier.md` + `.opencode/agents/arggon-verifier.md`:
+  `effect: allow` for `show`/`list`/`next`/`report`/`validate` in BOTH spellings
+  (`arggon_<tool>` and `arggon_arggon_<tool>`), and `arggon_comment` /
+  `arggon_arggon_comment` added to the deny side. `arggon_branch` **stays denied**:
+  the acceptance names it "(read-side)", but the tool records the branch (a tracker
+  write), and under the documented last-match-wins ordering an allow placed in the
+  same block would OVERRIDE its deny and open a write path — which the same
+  acceptance's negative control forbids. Reading the branch needs no tool: `show`
+  returns the `branch` field.
+- `ArggonManager/.convention.yml`: `x-generated[.opencode/agents/arggon-verifier.md]`
+  checksum refreshed — without it `cli/src/provenance-audit.test.ts` fails and init
+  would treat the seam as adopter-modified and stop propagating template edits.
+- Guards: `cli/src/init-opencode.test.ts` pins the verifier's allow set, its deny set
+  (`comment` included) and the seam↔template byte parity via `stampGeneratedContent`;
+  `smoke/opencode-smoke.ts` gains a model-driven verifier probe + negative control
+  (dev aid `OPENCODE_SMOKE_ONLY=verifier-permissions`).
+- Carriers: `agents.md` §Orchestration, `engineering.md` §Roles and authority
+  (boundary 2 + authority-map row), the OpenCode playbook's permission-probe
+  section, `opencode2.md`'s Permissions bullet. The longer table row makes
+  prettier re-flow the authority table's padding (padding-only diff).
+
+### Probe 1 — the read is granted (real `arggon-verifier` session, opencode 2.0.26)
+
+- command: `cd /tmp/opencode/verifier-probe/repo && opencode run --standalone --model opencode-go/deepseek-v4-flash --format json --agent arggon-verifier --auto "<script: show/list/validate + update/create/comment + search({namespace:'arggon'})>"`
+- expected: `tools.arggon.show({ id: "task-probe-item", meta: true })` returns a
+  successful envelope; `update`/`create`/`comment` refused.
+- observed (after): ``show`` ok:true with the full frontmatter envelope; ``list`` /
+  ``validate`` ok:true; `updateError` "Unknown tool 'arggon.update'.", `createError`
+  "Unknown tool 'arggon.create'.", `commentError` "Unknown tool 'arggon.comment'.";
+  catalog = exactly `list, next, report, show, validate` (remaining 0); the item file
+  on disk unchanged (no comment body, status still todo).
+- exit: 0 (both execute calls completed).
+- does NOT prove: that the ALLOW entries are what make the read work on this runtime.
+
+### Probe 2 — the correction: the item's mechanism does not reproduce
+
+- command: same session, WITHOUT the fix (fixture restored to the shipped template, recorded as `baseline-verifier.jsonl`).
+- expected per the item: the read is unreachable ("the whole arggon namespace is unreachable").
+- observed: `show` returned the SAME `ok:true` envelope, and the catalog was the
+  same five reads **plus `comment`**. The runtime's documented base policy
+  (`{action:"*", resource:"*", effect:"allow"}`) resolves an unmatched resource to
+  allow, so the missing allow entries were not what blocked reads; the deny entries
+  are what remove write tools from the catalog.
+- exit: 0.
+- does NOT prove: what the 2026-10-11 live verifier actually hit. It rules out this
+  permission block on 2.0.26; the historical cause is still unexplained (open
+  question for the delivery lead, not silently closed).
+- Consequence for the fix, kept honest: the allow entries PIN the read set so it is a
+  stated contract (agent rules are appended last and win) instead of a runtime
+  default, and the docs say config-enforced for the write side / as a stated read set
+  — they do not claim reads were broken.
+
+### Probe 3 — negative control (the deny is unchanged and complete)
+
+- observed: `update({status:"done"})` and `create(...)` refused in BOTH runs;
+  `comment` refused only after the change (that deny is the catalog-visible
+  behavioural change); `edit`/`subagent`/`git commit|push|merge|rebase` denies untouched.
+- does NOT prove: that `ask`-style prompts never appear for other resources; the
+  probe covers the tracker namespace, not every runtime action.
+
+### Gates (all in the worktree, green)
+
+- `npm run build` (tsc x3 + `build:plugin`, bundle byte-stable) — exit 0
+- `npm test` — 152 files / 3315 tests passed
+- `npm run lint` — clean; `npm run test:structure` — 5/5 (ast-grep)
+- `npm run arggon -- validate` — ok, 0 warnings
+- `npx prettier --check` on every touched file — clean
+- `OPENCODE_SMOKE_ONLY=verifier-permissions npm run smoke:opencode` — 11/11 checks
+  (model-driven, run ALONE per §Orchestration)
+
+### Pre-existing failures observed, NOT introduced here (report, not a diff)
+
+The `w4` smoke group reports 4 failures: `second item done`, its two downstream
+invariants checks, and `the reviewer's shell gate denies git push`. Reproduced on
+the UNMODIFIED base commit (`72a79a0d`) in a scratch worktree: the same
+`second item done` and `git push` failures (3 of 4; the reopen pair was skipped
+because the model did not run the script there). Cause of the invariant trio: the
+fixture's `update --status done` on a placeholder-body item is refused while the
+lifecycle scenario ticks its boxes first — so "second item done" fails and the
+reopen probe then legitimately succeeds on an item that was never done. The push
+check is the documented model-dependent flake. Candidate follow-up for the delivery
+lead to file if wanted; deliberately out of this diff.
+
+### Impact class
+
+**Behavioral** (ADR 0016): a generated agent seam shipped to adopters plus
+methodology carriers (`agents.md`, `engineering.md`). Channel: re-run `arggon init`
+— untouched seam files refresh, acked/modified ones surface as `--propose` side
+files. No `skills/arggon-cli/**` change, so no skill-copy sync is required.
+
+Acceptance boxes are ticked against the evidence above; bullet 2 is ticked for the
+observed successful envelope, with the causality boundary stated in Probe 2.
