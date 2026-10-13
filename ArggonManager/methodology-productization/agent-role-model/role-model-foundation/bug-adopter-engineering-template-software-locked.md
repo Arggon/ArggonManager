@@ -337,3 +337,13 @@ Execution. I ran no gate: not npm test (2933 tests), not argong validate, not pr
 1. cd /home/arggon/Projects/ArggonManager-bug-adopter-engineering-template-software-locked && npx vitest run cli/src/adopter-template-invariant-drift.test.ts cli/src/init-docs.test.ts — demonstrates the guard passes and the rewritten init-docs.test.ts orchestration assertions (delivery lead / project's own bar / not.toMatch(/\bcoordinat/i)) hold on the new template. A failure here would mean the family walk fires on something I did not see.
 2. Same cwd: printf 'Humans and agents follow the same rules.\n' >> templates/docs/docs/convention.md && npx vitest run cli/src/adopter-template-invariant-drift.test.ts; git checkout templates/docs/docs/convention.md — demonstrates the superseded-parity clause actually fails (the PR #638 shape). If it passes, the guard is theatre and finding (c) is wrong.
 3. Same cwd: npx vitest run cli/src/init-docs.test.ts with git stash of the templates/docs/AGENTS.md hunk — demonstrates the 2 KB budget assertion is load-bearing on the new router (I compute the render at ~2021-2030 bytes against the 2048 budget; if the budget test fails without the trims, the trims were forced, not cosmetic).
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 38b91426 (PR #758); auto-done flip landed as #765. Verifier probes ran on the merged head (1e4afbd4):
+- `npx vitest run cli/src/adopter-template-invariant-drift.test.ts cli/src/init-docs.test.ts` — 2 files / 48 tests passed (exit 0)
+- `npx prettier --check` on the five touched files — clean (repo-wide drift is pre-existing and known)
+- `arggon validate` — ok, 0 warnings
+Not covered by the verifier: the review's red-run negative controls (they require temporary tree edits, outside the read-only contract); the maker's own red-run evidence is recorded above. The lead also transcribed the live Context + Acceptance (the new PLACEHOLDER_BODY gate requires live prose; the contract had lived only in comments).
+Follow-ups filed from this item's review: task-adopter-template-family-followups (CONTRIBUTING / PR-template software locks, zcode goal-mode pre-rename word, guard header wording, docs-only exemption placement).
