@@ -5,6 +5,8 @@ id: task-capability-matrix-followups-from-review
 title: "Capability matrix review follow-ups: ADR-0020 characterization line, stale \"docs + CLAUDE.md\" ADR statement, `gap` criterion wording, lint-scope comment, README pointer spec S1 owes"
 assignee: arggon-delivery-lead
 branch: feat/task-capability-matrix-followups-from-review
+
+
 parent: story-capability-matrix
 labels: [docs]
 created: "2026-10-03"
@@ -40,6 +42,7 @@ Five non-blocking findings from the reviewer of PR #600 (task-capability-matrix)
 
 ## Notes
 
+<<<<<<< HEAD
 ### 2026-10-13 @ses_eca8380bdffe1mNEVdrYKdoMXg
 ### Maker evidence — PR #772 (head 15bf460d): all five rows implemented, acceptance ticked 5/5
 
@@ -62,3 +65,11 @@ Open question (non-blocking): a semantically-neutral frontmatter re-serializatio
 ### handoff 2026-10-13 @ses_eca8380bdffe1mNEVdrYKdoMXg (session: ses_eca8380bdffe1mNEVdrYKdoMXg) — next: Review + merge PR #772, verify the 5 acceptance ticks against the diff, then flip this item done.
 - branch: feat/task-capability-matrix-followups-from-review
 - open questions: Item-file frontmatter re-serialized between commits - writer unidentified (hook/validate/edit tool ruled out); judge derivation wording 'once understated'.
+=======
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 18d64239 (PR #772); auto-done flip landed. Five review follow-ups closed: the derivation sentence credits the transcription step (the ADR models the bundle state; its amendments mark the corrected points), the gap criterion keeps `package: zcode` vs `docs + CLI floor:` unblurred, the false-absence lint comment states its true scope, README carries the §S1 matrix pointer, and ADR 0020's stale line is linked to its now-done separate item.
+Evidence: matrix suite 26/26, full suite 3311, provenance-audit + adapter-selection + pack-contents + init suites 162/162, lint/structure/validate/prettier green; CI green. Template byte-identity + x-generated checksum re-verified after the final edit (matrix 10,925 B ≤ 16,384 cap).
+Note: an interrupted earlier attempt left 5 uncommitted files — adopted after verification, not trusted blindly; its vitest artifact freeze was repaired (build artifacts only). The frontmatter re-serialization observation stays recorded on the item.
+>>>>>>> 8ab0023c (chore(tasks): commented task-capability-matrix-followups-from-review)
