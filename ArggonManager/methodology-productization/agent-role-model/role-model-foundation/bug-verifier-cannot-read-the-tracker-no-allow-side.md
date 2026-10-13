@@ -1,15 +1,18 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-verifier-cannot-read-the-tracker-no-allow-side
 title: "Verifier cannot read the tracker: no allow side"
+assignee: arggon-delivery-lead
+branch: fix/bug-verifier-cannot-read-the-tracker-no-allow-side
 parent: role-model-foundation
 labels: [permissions, arggon-seam, verifier, docs]
 priority: p2
 created: "2026-10-11"
-updated: "2026-10-11"
+updated: "2026-10-13"
+claimed_at: "2026-10-13T13:29:09.848Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-verifier-cannot-read-the-tracker-no-allow-side
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-verifier-cannot-read-the-tracker-no-allow-side.md
   Leaves live only under a story. id is the filename stem: bug-verifier-cannot-read-the-tracker-no-allow-side.
