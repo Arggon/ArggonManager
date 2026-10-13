@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-nonlockstep-red-state-expectations
 title: The non-lockstep guard reds on the ordinary between-releases proposal (root-only accumulation) — set the expected reading or pick a softer signal
+assignee: arggon-delivery-lead
+branch: feat/task-nonlockstep-red-state-expectations
 parent: story-release-pipeline
 labels: [release, docs]
 created: "2026-10-13"
 updated: "2026-10-13"
+claimed_at: "2026-10-13T21:06:26.343Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-nonlockstep-red-state-expectations
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-nonlockstep-red-state-expectations.md
