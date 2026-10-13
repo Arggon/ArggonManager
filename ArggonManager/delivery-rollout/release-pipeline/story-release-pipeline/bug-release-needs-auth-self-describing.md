@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-release-needs-auth-self-describing
 title: "A failed release publish reports `npm ENEEDAUTH` with no pointer to the one-time npmjs.com trusted-publisher setup that resolves it — the runbook names the cause, but nothing on the failure path does"
 assignee: arggon-delivery-lead
@@ -9,8 +9,6 @@ parent: story-release-pipeline
 labels: [release, docs, failure-mode]
 created: "2026-10-09"
 updated: "2026-10-12"
-claimed_at: "2026-10-12T13:30:29.065Z"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-release-needs-auth-self-describing
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-needs-auth-self-describing.md
@@ -153,3 +151,10 @@ verdict: approve (artifact + evidence; CI-only change — offline fixture smoke 
 - Verifier execution evidence (this wave, worktree): new suite 39/39; full `npm run test` 145 files / 3160 tests pass; `test:structure` 5/5 green; offline smoke — ENEEDAUTH log → pointer block with `npm trust list`, the binding and the case-sensitivity warning (1 occurrence); E404 log → 0 pointer occurrences.
 - Two non-blocking review observations (message-fallback branch vs docstring; spawnSync maxBuffer edge) are filed as a follow-up under story-release-pipeline — not blockers.
 - Merging now; auto-done flips this item on merge.
+
+### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead — merge verification (PR #741, merge commit 390768d)
+
+- CI green on the PR before merge (cli 6m02s, tasks-validate, ui-smoke); merged with a merge commit (the branch carries tracker auto-commits — never squash).
+- The `release.yml` run on the merge push was green (guard rule 0: version unchanged from parent → not a release push).
+- Auto-done flipped this item to `done` (#742); follow-up `task-publish-auth-hint-review-observations` carries the two non-blocking review observations.

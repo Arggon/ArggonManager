@@ -42,15 +42,18 @@
 // prints a loud visible warning and exits 0 — the crying-wolf defect is the
 // entire reason this item exists. Only a genuine stuck PR reddens.
 //
-// SEAM (bug-autorelease-label-lifecycle-unowned, lands AFTER this item): that
-// sibling makes release.yml flip the label after tagging and extends the
-// failure message below with the manual recovery (re-tag / flip the label by
-// hand). The seam is the marked comment at the FAIL message; do not fold the
-// recovery in here.
+// LANDED (bug-autorelease-label-lifecycle-unowned): release.yml now flips the
+// label (`cli/release-label-flip.mjs`, immediately after the tag↔version
+// agreement assert), so in the steady state this check finds nothing even
+// though release-please's own tagging path never runs. The failure message
+// below carries the manual recovery for the residual cases — a run that died
+// between the tag and the flip, or a flip that could not reach GitHub — and
+// release.md documents the lifecycle. The seam is at the marked comment.
 import { spawnSync } from "node:child_process";
 import { writeSync } from "node:fs";
 
 const AUTORELEASE_PENDING_LABEL = "autorelease: pending";
+const AUTORELEASE_TAGGED_LABEL = "autorelease: tagged";
 // release-please scans the 200 most-recently-merged PRs (manifest.ts
 // findMergedReleasePullRequests); a stuck release PR is rare and recent, so a
 // generous window cannot miss it.
@@ -133,9 +136,13 @@ function main() {
       `outstanding - aborting"). While any merged release PR stays pending, release-please opens NO new\n` +
       `release PR — the pipeline is dead, exactly as it was dead 2026-10-02 → 2026-10-07 behind green runs.\n\n` +
       `${list}\n\n` +
-      // SEAM (bug-autorelease-label-lifecycle-unowned): that sibling appends the manual
-      // recovery (re-tag vX.Y.Z, or flip the PR's label by hand) here. It also makes
-      // release.yml flip the label right after tagging so the stuck window closes promptly.
+      // The manual recovery (bug-autorelease-label-lifecycle-unowned): the flip
+      // is automated in release.yml, but a run that died between the tag and the
+      // flip — or a flip that could not reach GitHub — leaves this state, and
+      // the red run is where the operator reads how to clear it.
+      `Manual recovery (one command per PR above; release.yml normally does this automatically in\n` +
+      `the run that creates the tag):\n` +
+      `  gh pr edit <n> --add-label "${AUTORELEASE_TAGGED_LABEL}" --remove-label "${AUTORELEASE_PENDING_LABEL}"\n\n` +
       `First suspect is the tag↔config agreement cli/src/release-config-agreement.test.ts pins: ` +
       `release.yml tags the plain vX.Y.Z (git tag -a "v\${VERSION}") and release-please-config.json must set ` +
       `"include-component-in-tag": false so release-please looks for that same tag.\n`,

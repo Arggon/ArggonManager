@@ -1244,6 +1244,146 @@ describe("arggon cleanup", () => {
     expect(existsSync(join(dir, "node_modules", "fake-gate-dep", "index.js"))).toBe(true);
   });
 
+  it("honestly skips a worktree with untracked generated artifacts, then reaps it with --force", () => {
+    const dir = initRepo();
+    const alpha = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    const wt = alpha.worktreePath!;
+    // The incident's shape (2026-10-12): untracked generated scaffolding that
+    // only ever lives in the worktree — never committed, never in a PR. Plain
+    // `git worktree remove` refuses it.
+    writeFileSync(join(wt, "harness-output.json"), "{}\n", "utf8");
+    mkdirSync(join(wt, "generated"), { recursive: true });
+    writeFileSync(join(wt, "generated", "spec.json"), "{}\n", "utf8");
+    runUpdate({ cwd: wt, id: "task-alpha", status: "done", now: NOW });
+    git(["add", "ArggonManager"], wt);
+    git(["commit", "--quiet", "-m", "close task-alpha"], wt);
+    git(["merge", "--quiet", "feat/task-alpha"], dir);
+
+    // Default: conservative. The receipt says WHY, names the exact remedy, and
+    // nothing is attempted (no raw git failure).
+    const refused = runCleanup({ cwd: dir, prune: true, noGh: true });
+
+    const refusedEntry = refused.entries.find((e) => e.id === "task-alpha")!;
+    expect(refusedEntry.removable).toBe(false);
+    expect(refusedEntry.reason).toContain("untracked");
+    expect(refusedEntry.reason).toContain("harness-output.json");
+    expect(refusedEntry.reason).toContain("arggon cleanup --prune --force");
+    expect(refusedEntry.reason).toContain("cleanup({ prune: true, force: true })");
+    expect(refusedEntry.reason).toContain("git worktree remove --force");
+    expect(refusedEntry.reason).toContain("git branch -D feat/task-alpha");
+    expect(refusedEntry.blockingPaths?.sort()).toEqual(["generated/", "harness-output.json"]);
+    expect(refusedEntry.blockingTotal).toBe(2);
+    expect(refusedEntry.blockingTracked).toBeUndefined();
+    expect(refusedEntry.forced).toBeUndefined();
+    expect(refused.pruned).toEqual([]);
+    expect(refused.failures).toEqual([]);
+    // Nothing was touched: artifacts, worktree, branch and record all survive.
+    expect(existsSync(join(wt, "generated", "spec.json"))).toBe(true);
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(true);
+    const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
+    expect(parseFrontmatter(raw).data.worktree_path).toBe(wt);
+
+    // Armed: the removal passes --force for exactly this entry, and the
+    // receipt says the discard was forced.
+    const forced = runCleanup({ cwd: dir, prune: true, noGh: true, pruneForce: true });
+
+    expect(forced.failures).toEqual([]);
+    const forcedEntry = forced.entries.find((e) => e.id === "task-alpha")!;
+    expect(forcedEntry.removable).toBe(true);
+    expect(forcedEntry.forced).toBe(true);
+    expect(forcedEntry.action).toContain("forced past its untracked content");
+    expect(forced.pruned).toEqual([
+      { id: "task-alpha", action: `removed worktree ${wt}`, forced: true },
+      { id: "task-alpha", action: "deleted branch feat/task-alpha" },
+      { id: "task-alpha", action: "cleared worktree_path" },
+    ]);
+    expect(existsSync(wt)).toBe(false);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+  });
+
+  it("never force-removes uncommitted tracked work, with or without the force opt-in", () => {
+    const dir = initRepo();
+    const alpha = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    const wt = alpha.worktreePath!;
+    writeFileSync(join(wt, "tracked.txt"), "committed\n", "utf8");
+    git(["add", "tracked.txt"], wt);
+    git(["commit", "--quiet", "-m", "add tracked"], wt);
+    // One tracked modification plus one untracked artifact: the tracked change
+    // vetoes the forced removal too.
+    writeFileSync(join(wt, "tracked.txt"), "modified\n", "utf8");
+    writeFileSync(join(wt, "artifact.json"), "{}\n", "utf8");
+    runUpdate({ cwd: wt, id: "task-alpha", status: "done", now: NOW });
+    git(["add", "ArggonManager"], wt);
+    git(["commit", "--quiet", "-m", "close task-alpha"], wt);
+    git(["merge", "--quiet", "feat/task-alpha"], dir);
+
+    for (const pruneForce of [false, true]) {
+      const result = runCleanup({ cwd: dir, prune: true, noGh: true, pruneForce });
+
+      const entry = result.entries.find((e) => e.id === "task-alpha")!;
+      expect(entry.removable).toBe(false);
+      expect(entry.reason).toContain("tracked file has uncommitted changes");
+      expect(entry.reason).toContain("never discards tracked work");
+      expect(entry.blockingTracked).toEqual(["tracked.txt"]);
+      expect(entry.blockingTrackedTotal).toBe(1);
+      expect(entry.blockingTotal).toBe(2);
+      expect(entry.forced).toBeUndefined();
+      expect(result.pruned).toEqual([]);
+      expect(result.failures).toEqual([]);
+      // The uncommitted work is intact, not merely reported.
+      expect(readFileSync(join(wt, "tracked.txt"), "utf8")).toBe("modified\n");
+      expect(existsSync(wt)).toBe(true);
+      expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(true);
+    }
+  });
+
+  it("refuses --force without --prune (the flag would never be used)", () => {
+    const { dir } = initCleanupRepo();
+
+    expect(() => runCleanup({ cwd: dir, pruneForce: true })).toThrow(/--force requires --prune/);
+  });
+
+  it("threads --force through the CLI surface (human and --json)", () => {
+    const dir = initRepo();
+    const alpha = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    const wt = alpha.worktreePath!;
+    writeFileSync(join(wt, "harness-output.json"), "{}\n", "utf8");
+    runUpdate({ cwd: wt, id: "task-alpha", status: "done", now: NOW });
+    git(["add", "ArggonManager"], wt);
+    git(["commit", "--quiet", "-m", "close task-alpha"], wt);
+    git(["merge", "--quiet", "feat/task-alpha"], dir);
+
+    // Without the flag the human path reports the skip and exits 0 (a skip is
+    // not a failure) — no raw git error.
+    const skipped = runCli(["cleanup", "--prune", "--no-gh"], dir);
+    expect(skipped.status).toBe(0);
+    expect(skipped.stdout).toContain("--force");
+
+    const forced = runCli(["cleanup", "--prune", "--force", "--no-gh", "--json"], dir);
+    expect(forced.status, forced.stderr).toBe(0);
+    const envelope = JSON.parse(forced.stdout) as {
+      pruned: Array<{ id: string; action: string; forced?: boolean }>;
+      failures: string[];
+    };
+    expect(envelope.failures).toEqual([]);
+    expect(envelope.pruned[0]).toEqual({
+      id: "task-alpha",
+      action: `removed worktree ${wt}`,
+      forced: true,
+    });
+    expect(existsSync(wt)).toBe(false);
+  });
+
   it("emits the standard --json envelope via the CLI", () => {
     const { dir } = initCleanupRepo();
     const r = runCli(["cleanup", "--json", "--no-gh"], dir);

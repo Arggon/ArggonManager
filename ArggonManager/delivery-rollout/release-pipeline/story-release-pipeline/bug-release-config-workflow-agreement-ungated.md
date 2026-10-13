@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-release-config-workflow-agreement-ungated
 title: "Nothing gates the release-please config against the tags `release.yml` actually creates — a one-word omission (`include-component-in-tag`) silently killed releases for five days, and every aborted run reported `success`"
 assignee: arggon-delivery-lead
@@ -9,8 +9,6 @@ parent: story-release-pipeline
 labels: [ci, release, gate-fidelity]
 created: "2026-10-07"
 updated: "2026-10-12"
-claimed_at: "2026-10-12T13:30:32.525Z"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-release-config-workflow-agreement-ungated
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-config-workflow-agreement-ungated.md
@@ -254,3 +252,20 @@ verdict: approve (lead merge call) — the standards review's request-changes wa
 - Verifier execution evidence (this wave, worktree): live predicate `node cli/release-abort-check.mjs --repo Arggon/ArggonManager` → exit 1 naming #664 (verbatim); `gh pr list --state merged --label "autorelease: pending"` → exactly #664; new suites 18/18; full `npm run test` 145 files / 3160 tests pass; `test:structure` + `lint:structure` green.
 - Resolution I am executing now: merge → observe the real release-please.yml run on the merge push go RED naming #664 (that observation IS AC#5's "fail loudly" evidence against live state) → flip #664 to `autorelease: tagged` (the documented manual recovery; `bug-autorelease-label-lifecycle-unowned` automates this flip next) → observe the following run green. The observed evidence lands as a follow-up comment on this item.
 - Merging now; auto-done flips this item on merge.
+
+### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead — merge verification (PR #740, merge commit 306e2a6)
+
+The standards review's request-changes is closed by the live observation it asked for, against real state:
+
+1. **Real red, naming #664** — the release-please.yml run on the merge push (run 38282448930, sha 306e2a6) failed with the backstop's message verbatim: `release-abort-check: FAIL — release-please is STUCK and this run would otherwise report success.` / `1 MERGED release PR(s) still carry the 'autorelease: pending' label` / `#664 chore: release main (release-please--branches--main)`. That is AC#5's "fail loudly" branch, observed on the live stuck state — the abort can no longer hide inside green.
+2. **Recovery executed** (the documented manual path): `gh pr edit 664 --add-label "autorelease: tagged" --remove-label "autorelease: pending"`; the merged-pending query now returns [].
+3. **Green next run**: the following release-please.yml run (this comment's own tracker push) is the healthy-state observation; its result is recorded in the comment below.
+4. Merge confirmed on main; auto-done flipped this item to `done` (#743). The `release.yml` run on the same merge push was green (guard rule 0: version unchanged).
+
+### 2026-10-12 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead — AC#5 green side observed (follow-up)
+
+- The next release-please.yml run after the label flip (run 38283343454, push aeb7b7b): **abort check OK** — verbatim `release-abort-check: OK — no merged release PRs still carrying 'autorelease: pending'; release-please is not aborting.` — and **release PR #744 opened** (`chore: release main`), the first release proposal since 2026-10-09.
+- So both branches of AC#5 are now observed live: RED naming #664 on the stuck state, and quiet OK + a release PR on the healthy state.
+- That run also concluded failure, but from a different, newly-exposed step: `Sync package-lock.json onto the release PR branch` — `npm install --package-lock-only` runs the root `prepare` → `npm run build`, and tsc fails on the runner without an install (TS2591). Filed as `bug-release-lockfile-sync-step-cannot-run` with evidence and a real-run verification requirement. It is not this item's gate.

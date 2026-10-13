@@ -107,6 +107,9 @@ describe("release-abort-check (bug-release-config-workflow-agreement-ungated)", 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("release-abort-check: OK");
     expect(result.stdout).toContain("not aborting");
+    // The recovery belongs to the red path only — a green run must not read as
+    // if something needs clearing.
+    expect(result.stdout).not.toContain("Manual recovery");
   });
 
   it("red path: a merged PR stuck `autorelease: pending` -> exit 1 and it is surfaced", () => {
@@ -141,6 +144,28 @@ describe("release-abort-check (bug-release-config-workflow-agreement-ungated)", 
     expect(result.stdout).toContain("#120");
     expect(result.stdout).toContain("#123");
     expect(result.stdout).toContain("2 MERGED release PR(s)");
+  });
+
+  it("red path names the manual recovery (the flip landed in release.yml; this is the residual case)", () => {
+    // bug-autorelease-label-lifecycle-unowned: release.yml flips the label in
+    // the run that creates the tag, so a red here means the flip did not land
+    // (a run that died between the tag and the flip, or a flip that could not
+    // reach GitHub). The red run is where the operator reads the one command
+    // that clears it — byte-identical to what cli/release-label-flip.mjs runs.
+    const stuck = JSON.stringify([
+      {
+        number: 664,
+        title: "chore: release main",
+        headRefName: "release-please--branches--main",
+      },
+    ]);
+    const gh = makeGh({ stdout: `${stuck}\n`, status: 0 });
+    const result = runCheck(gh);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("Manual recovery");
+    expect(result.stdout).toContain(
+      'gh pr edit <n> --add-label "autorelease: tagged" --remove-label "autorelease: pending"',
+    );
   });
 
   it("a gh query failure fails OPEN with a warning (exit 0), never a false red", () => {

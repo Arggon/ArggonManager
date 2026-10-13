@@ -80,8 +80,9 @@ namespace:
   W3 eight plus `start` from W4: nine) so the runtime keeps them in its Code
   Mode catalog; a kernel failure becomes a typed tool error (`ArgonToolError`:
   kernel code + envelope) and the session continues. The whole 15-definition
-  payload measures 11,821 B ≤ 12,288 B advisory (ADR 0006; W7 re-measure,
-  trimmed from the W4-era 12,182 B).
+  payload measures 12,189 B ≤ 12,288 B advisory (ADR 0006; re-measured with
+  the `cleanup` `force` input in bug-cleanup-prune-untracked-artifacts-no-force,
+  which is declared bare because of the bound — 99 B of headroom).
 - **Worktree lifecycle tools (W4)** — `tools.arggon.start`, `branch` and
   `cleanup` own the item worktree through the V2 worktree domain
   (`ctx.worktree.create/list/remove`). For a fresh worktree, `start` uses the
@@ -110,7 +111,7 @@ namespace:
   | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
   | `start`   | `id`, `branch`, `worktreePath` (`null` with `worktree: false`), `worktreeCreated`, `branchCreated`, `pushed`, `item`, `preparation?` (bounded `ready`/install/workspace/dependency-coverage receipt: `ready`, `install`, `linkedNodeModules`, `builtWorkspaces`, `linkedWorkspaces`, `manifestCoverage` (`"satisfied"` | `"stale"` | `"unknown"`), `missingDependencies` (kernel-capped at 10 names), `missingDependenciesTotal` and `gateBins` (which node_modules each declared gate binary resolves from — `"worktree"` | `"external"` | `"path"` | `"missing"` — bounded at 8), the bounded preparation log `steps` (`{ step, outcome, pkg? }`, bug-start-install-ordering, kernel-capped at 16) with `stepsTruncated` when the kernel's own cap dropped entries (mirrored, see below), plus `truncated` when a list was capped; `ready` is the conjunction of "an install is present", "no worktree-owned package resolves into the primary", "the install provides the worktree's declared `dependencies`/`devDependencies`" and "every reported gate bin resolves inside the worktree — the clause is vacuous when nothing declared exposes a bin", so a stale primary mirror is reported as `ready: false` **with the missing names in the payload** and a gate bin resolving from a sibling checkout's `.bin` (or nowhere) is named instead of silently running the gate on a foreign install — see [`agents.md`](./agents.md) §4 for the remedy), `claimCommitted`, `claimCommit` (`committed`, `not-needed`, `failed`, or `not-attempted` with a bounded reason), `commit?`, and `rollback?` on a refused claim |
   | `branch`  | `id`, `branch`, `item`, `commit?`                                                                                                                                                                                                                                                                                      |
-  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverPath?`, `leftoverBranch?`, `via?`), `failures[]`, `commit?`                                                                                                         |
+  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `forced?`, `blockingPaths?`, `blockingTotal?`, `blockingTracked?`, `blockingTrackedTotal?`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverPath?`, `leftoverBranch?`, `forced?`, `via?`), `failures[]`, `commit?`  |
 
   `start`'s `preparation` receipt is the bounded pre-claim dependency receipt
   the row above describes plus two ADDITIVE fragments the kernel builds in the
@@ -187,8 +188,12 @@ namespace:
   checked against the directory and `git worktree list` before anything else
   happens, and a domain that resolves without removing (or fails) falls through
   to the literal `git worktree remove` fallback — the same primitive the `start`
-  rollback uses, without its force policy, so git keeps refusing dirty
-  worktrees. `removed worktree`, `deleted branch` and `cleared worktree_path`
+  rollback uses, with the force policy of the shared classification instead of
+  the rollback's blanket force, so git keeps refusing dirty worktrees unless
+  the caller armed `force` for an entry whose blockers are ALL untracked
+  (bug-cleanup-prune-untracked-artifacts-no-force; tracked modifications are
+  never force-discarded, and the skip names the blockers and the remedy).
+  `removed worktree`, `deleted branch` and `cleared worktree_path`
   are reported only when the removal is observably complete; otherwise the
   candidate reports one bounded `failed` action plus a `failures[]` entry
   carrying `leftoverPath` (the worktree that is still there) and
