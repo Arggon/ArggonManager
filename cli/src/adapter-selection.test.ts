@@ -10,7 +10,6 @@
  * adopter-edited generated file is never overwritten.
  */
 import {
-  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync as _mkdtempSync,
@@ -21,8 +20,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { readGeneratedState } from "@arggondev/lib";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -37,8 +35,6 @@ import { currentGeneratedTemplates, GENERATED_DOC_COUNT } from "./docs.js";
 import { dryRunInit, runInit, type InitOptions, type InitResult } from "./init.js";
 import { formatDoctorReport, runDoctor } from "./doctor.js";
 import { runCli } from "./test-spawn.js";
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -80,7 +76,15 @@ const PER_AGENT_COUNT: Record<string, number> = Object.fromEntries(
 );
 
 /** Docs+CLI outputs that are NOT adapter seams — the always-complete floor. */
-const NON_ADAPTER_DOCS = ["AGENTS.md", "CONTRIBUTING.md", "SECURITY.md", ".editorconfig"];
+const NON_ADAPTER_DOCS = [
+  "AGENTS.md",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
+  ".editorconfig",
+  // task-matrix-reaches-adopters: the capability matrix is product data, not a
+  // seam — it is generated whatever `--agents` says, like the docs it reports on.
+  "adapters/capability-matrix.json",
+];
 
 function existsIn(root: string, rel: string): boolean {
   return existsSync(join(root, ...rel.split("/")));
@@ -567,14 +571,10 @@ describe("doctor --agents: per-agent report", () => {
 
   it("reuses the capability-matrix reader: per-agent gap rows come from it", () => {
     const dir = tempDir();
+    // `init` generates the tree's own copy (task-matrix-reaches-adopters:
+    // `templates/docs/adapters/capability-matrix.json` → `adapters/…`), which is
+    // exactly what tree-only resolution reads — no per-test copy needed.
     runInit({ dir, force: false });
-    // Give the fixture tree this repo's committed matrix (tree-only resolution
-    // means the fixture must CARRY it, exactly as an adopter tree would).
-    mkdirSync(join(dir, "adapters"), { recursive: true });
-    cpSync(
-      join(repoRoot, "adapters/capability-matrix.json"),
-      join(dir, "adapters/capability-matrix.json"),
-    );
     const result = runDoctor({ cwd: dir, agents: true });
     const matrix = result.matrix;
     expect(matrix.present).toBe(true);
@@ -597,10 +597,11 @@ describe("doctor --agents: per-agent report", () => {
   it("snapshots the per-agent human block on a full init (the report's contract)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    // A full init with no markers narrowing it and no matrix in the tree: every
-    // file is present, every agent is detected, every gap list is empty. That is
-    // the deterministic shape, so the block's exact wording — the report an
-    // operator reads — is pinned rather than merely probed for substrings.
+    // A full init with no markers narrowing it: every file is present, every
+    // agent is detected, and the init-generated matrix gives claude its two
+    // documented gaps (task-matrix-reaches-adopters). That is the deterministic
+    // shape, so the block's exact wording — the report an operator reads — is
+    // pinned rather than merely probed for substrings.
     //
     // Only the per-agent lines are snapshotted: they carry counts and statuses,
     // never a path, so they do not move with a new template, while the file
@@ -610,16 +611,24 @@ describe("doctor --agents: per-agent report", () => {
       .filter((line) => /^ {2}agent[s]?\b/.test(line) || /^ {4}gap:/.test(line));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "  agents: claude, opencode, zcode (adapter selection: init --agents / --no-agents; report-only)
-        agent claude: 2 file(s) — 2 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)
+        agent claude: 2 file(s) — 2 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 2 capability gap(s)
+          gap: discipline-enforceable x claude — no claude:plugin.hooks.PreToolUse gate and no permission DSL: the OpenCode deny rules and the ZCode PreToolUse gate have no Claude Code equivalent, so the kernel, pre-commit and CI carry it alone. (report-only)
+          gap: docs-travel-with-code x claude — no session context hook injects the active work item (the OpenCode session.hook('context') block), so the agent must fetch it with \`arggon show\`; the playbook still travels via CLAUDE.md. (report-only)
         agent opencode: 18 file(s) — 18 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)
         agent zcode: 23 file(s) — 23 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)"
     `);
   });
 
   it("reports a tree with no matrix as present:false, exit 0, never a failure", () => {
+    // Since task-matrix-reaches-adopters `init` generates the matrix, so the
+    // no-matrix shape is a tree that LOST it (an adopter who deleted it, or a
+    // tree initialized before the destination shipped) — reached here by
+    // removing the init-generated file.
     const dir = tempDir();
     runInit({ dir, force: false });
+    rmSync(join(dir, "adapters"), { recursive: true, force: true });
     const result = runDoctor({ cwd: dir, agents: true });
+    expect(result.matrix.present).toBe(false);
     expect(result.agents!.matrix.present).toBe(false);
     for (const entry of result.agents!.agents) {
       expect(entry.gaps.total).toBe(0);
@@ -642,11 +651,6 @@ describe("doctor --agents: per-agent report", () => {
   it("human output carries one line per agent, with the gap rows attached", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    mkdirSync(join(dir, "adapters"), { recursive: true });
-    cpSync(
-      join(repoRoot, "adapters/capability-matrix.json"),
-      join(dir, "adapters/capability-matrix.json"),
-    );
     const text = formatDoctorReport(runDoctor({ cwd: dir, agents: true }));
     // One `agent <id>:` line per known agent, in registry order.
     for (const agent of AGENT_IDS) {

@@ -128,6 +128,11 @@ describe("npm pack contents", () => {
       "dist/cli.js",
       "dist/build-info.json",
       "templates/task.md",
+      // task-matrix-reaches-adopters: the capability matrix ships as an init
+      // TEMPLATE (`templates/` is already allowed) and `arggon init` writes it
+      // to `adapters/capability-matrix.json` in the adopter tree — the route
+      // that needs no `files` change, hence no release bump.
+      "templates/docs/adapters/capability-matrix.json",
       // W6 task-native-headless-ci: the adopter CI recipe ships with the pack.
       "templates/docs/github/workflows/arggon.yml",
       "skills/arggon-cli/SKILL.md",
