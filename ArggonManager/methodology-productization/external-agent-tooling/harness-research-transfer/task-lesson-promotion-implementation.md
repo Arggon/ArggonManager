@@ -63,3 +63,9 @@ Not flipped to `done` — completion is the delivery lead's call after merge.
 ### handoff 2026-10-13 @ses_ec8e84466ffeY3Gpdkc55cQeEv (session: ses_ec8e84466ffeY3Gpdkc55cQeEv) — next: Review PR #795 (Behavioral) against the acceptance checklist, then merge; delete the claim's worktree after merge (tools.arggon.cleanup).
 - branch: feat/task-lesson-promotion-implementation
 - open questions: ZCode maker prompt has no trigger (scoped out; follow-up?); pre-existing doctor hint: skill frontmatter version 0.5.0 vs package 0.9.0; references/pitfalls.md header still read-only-contract
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 268d9088 (PR #795); flipped by the lead after ticking the five rows (the maker left the live checklist to completion). ADR 0027's write path is in place: the promotion rule in `docs/agents.md` (promote-never-store, carrier table, ≤160-char bound + mandatory citation, supersede-in-place, per-carrier staleness, carrier-edit obligations), the trigger sentence in the opencode maker template + regenerated seam copy, ledger checksum refreshed. Impact class Behavioral stated in the PR and on the item; `context:report --strict` passes (AGENTS.md 2,044/2,048 B; tools/list 16,296/16,384 B; maker prompt read-only, on-demand). Full suite 3,367 green; CI green.
+Follow-up filed: task-zcode-maker-lesson-trigger (ZCode seam parity — its maker prompt carries no trigger).
