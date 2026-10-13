@@ -9,7 +9,6 @@ parent: story-release-pipeline
 labels: [release, ci]
 created: "2026-10-13"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-release-proposal-non-lockstep-undetected
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-proposal-non-lockstep-undetected.md

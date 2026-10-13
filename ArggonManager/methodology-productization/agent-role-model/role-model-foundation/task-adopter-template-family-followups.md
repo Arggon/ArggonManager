@@ -9,7 +9,6 @@ parent: role-model-foundation
 labels: [docs, templates, methodology]
 created: "2026-10-13"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-adopter-template-family-followups
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-adopter-template-family-followups.md

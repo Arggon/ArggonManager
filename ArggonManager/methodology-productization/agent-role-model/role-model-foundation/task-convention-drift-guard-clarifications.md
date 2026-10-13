@@ -9,7 +9,6 @@ parent: role-model-foundation
 labels: [tests, docs, cli]
 created: "2026-10-13"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-convention-drift-guard-clarifications
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-convention-drift-guard-clarifications.md
