@@ -10,7 +10,6 @@ labels: [permissions, arggon-seam, verifier, docs]
 priority: p2
 created: "2026-10-11"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-verifier-cannot-read-the-tracker-no-allow-side
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-verifier-cannot-read-the-tracker-no-allow-side.md

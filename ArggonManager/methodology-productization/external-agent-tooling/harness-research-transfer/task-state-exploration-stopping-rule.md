@@ -10,7 +10,6 @@ labels: [methodology, research, exploration]
 priority: p3
 created: "2026-10-05"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-state-exploration-stopping-rule
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-state-exploration-stopping-rule.md

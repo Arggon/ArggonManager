@@ -5,13 +5,10 @@ id: task-capability-matrix-followups-from-review
 title: "Capability matrix review follow-ups: ADR-0020 characterization line, stale \"docs + CLAUDE.md\" ADR statement, `gap` criterion wording, lint-scope comment, README pointer spec S1 owes"
 assignee: arggon-delivery-lead
 branch: feat/task-capability-matrix-followups-from-review
-
-
 parent: story-capability-matrix
 labels: [docs]
 created: "2026-10-03"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-capability-matrix-followups-from-review
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-capability-matrix/task-capability-matrix-followups-from-review.md
