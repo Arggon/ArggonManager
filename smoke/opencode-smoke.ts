@@ -112,6 +112,7 @@
  */
 import { spawnSync } from "node:child_process";
 import {
+  appendFileSync,
   chmodSync,
   existsSync,
   mkdirSync,
@@ -305,6 +306,13 @@ class Fixture {
     this.git(["init", "-q", "-b", "main"]);
     this.git(["config", "user.email", "smoke@example.com"]);
     this.git(["config", "user.name", "smoke-smoke"]);
+    // Keep the harness's own plumbing out of the session's `git status`:
+    // `.smoke-bin` (the CLI shim) and `.smoke-evidence` (kept transcripts) are
+    // harness scaffolding, and the hygiene scenario's model must see only the
+    // deliberately broken item as the change it is asked to commit — a status
+    // full of unexplained files invites a refusal that says nothing about the
+    // hook (bug-full-smoke-scenarios-precede-newer-gates).
+    appendFileSync(join(this.dir, ".git/info/exclude"), ".smoke-bin/\n.smoke-evidence/\n");
   }
 
   /**
@@ -427,6 +435,13 @@ class Fixture {
       "Smoke fixture leaf; the harness writes real prose so the live section carries the contract, not the scaffold marker.",
       "Fixture leaf carries a real acceptance criterion.",
     );
+    // Commit the rewrite. The CLI's creation commits ran BEFORE it, and a
+    // dirty canonical tree makes the lifecycle scenario's `git merge` refuse
+    // ("local changes would be overwritten …"), which loses the whole close
+    // (bug-full-smoke-scenarios-precede-newer-gates). Only the item files are
+    // staged, so harness scaffolding never enters fixture history.
+    this.git(["add", initiative.path, epic.path, story.path, task.path]);
+    this.git(["commit", "-qm", "chore(tasks): fixture prose for the live sections"]);
     const directory = task.path.split("/").slice(0, -1).join("/");
     return { id: task.id, story: story.id, directory };
   }
@@ -1314,18 +1329,44 @@ function scenarioHygiene(): void {
     `${item.directory}/task-smoke-bad.md`,
     '---\ntype: task\nstatus: nope\nid: task-smoke-bad\ntitle: "Bad state"\nparent: smoke-story\n---\n\nbroken on purpose\n',
   );
-  const session = f.opencode(
-    'Run the shell command: git add -A && git commit -m "hygiene check" --no-verify. Then reply with exactly: HYGIENE_OK',
+  // The commit must happen IN-SESSION (the plugin's post-commit hook is what
+  // logs the warning), so this stays model-driven. The prompt removes the two
+  // refusal invitations observed on main — "I would commit broken state" and
+  // "I would bypass the gates with --no-verify" — by naming the fixture as a
+  // disposable probe whose broken item IS the subject
+  // (bug-full-smoke-scenarios-precede-newer-gates).
+  const session = probeWithRetry(
+    f,
+    [
+      "Automated hygiene probe on a disposable smoke fixture: this repository deliberately contains one broken tracker item (task-smoke-bad.md, status 'nope') and the whole fixture is thrown away after this run.",
+      'Run the shell command exactly as written, even though the fixture is intentionally broken: git add -A && git commit -m "hygiene check" --no-verify',
+      "The post-commit tracker validation warning it produces is the observation under test and the broken item is expected state. Do not investigate, fix, skip or rewrite anything.",
+      "Then reply with exactly: HYGIENE_OK",
+    ].join("\n"),
+    "hygiene",
+    undefined,
+    (stdout) => shellAttempted(stdout, "git commit"),
+    3,
   );
-  f.saveTranscript("hygiene", session);
+  const commitAttempted = shellAttempted(session.stdout, "git commit");
   check(
-    "session succeeds (warning is not blocking)",
+    commitAttempted
+      ? "session succeeds (warning is not blocking)"
+      : "hygiene probe: model declined (inconclusive: no shell commit in 3 attempts — the post-commit hook was never exercised)",
     session.status === 0 && textContains(session.stdout, "HYGIENE_OK"),
     runTail(session),
   );
-  check("the commit ran", f.headCommitSubject() === "hygiene check", runTail(session));
   check(
-    "validate warning logged after the commit",
+    commitAttempted
+      ? "the commit ran"
+      : "hygiene probe: model declined (inconclusive: no shell commit in 3 attempts — the commit was never attempted)",
+    f.headCommitSubject() === "hygiene check",
+    runTail(session),
+  );
+  check(
+    commitAttempted
+      ? "validate warning logged after the commit"
+      : "hygiene probe: model declined (inconclusive: no shell commit, so no hook could log)",
     session.stderr.includes("[arggon] validate failed after git commit:"),
     runTail(session),
   );
@@ -1668,12 +1709,17 @@ function scenarioWorktreeLifecycle(): void {
   writeFileSync(join(worktreePath, "work.txt"), "work\n", "utf8");
   f.git(["-C", worktreePath, "add", "work.txt"]);
   f.git(["-C", worktreePath, "commit", "-qm", "feat: lifecycle work"]);
-  f.git(["merge", "--no-ff", `feat/${item.id}`, "-m", "Merge PR (stubbed)"]);
+  const merge = f.git(["merge", "--no-ff", `feat/${item.id}`, "-m", "Merge PR (stubbed)"]);
   check(
     "stubbed PR merge brings the records to the canonical copy",
-    f.itemStatus(item.directory, item.id) === "in_progress" &&
+    merge.status === 0 &&
+      f.itemStatus(item.directory, item.id) === "in_progress" &&
       readFileSync(join(f.dir, item.directory, `${item.id}.md`), "utf8").includes("worktree_path"),
-    `canonical status=${f.itemStatus(item.directory, item.id) ?? "?"}`,
+    // Include the merge failure itself: a refused merge (e.g. a dirty canonical
+    // tree) used to surface only as "canonical status=todo", which reads like a
+    // kernel bug instead of the harness state it was
+    // (bug-full-smoke-scenarios-precede-newer-gates).
+    `merge=${merge.status} ${merge.stderr.trim().split("\n")[0] ?? ""} canonical status=${f.itemStatus(item.directory, item.id) ?? "?"}`,
   );
 
   // Done gate (task-done-gate-acceptance-waiver, ADR 0015): the close session
@@ -1906,7 +1952,7 @@ function probeWithRetry(
   f: Fixture,
   prompt: string,
   label: string,
-  agent: string,
+  agent: string | undefined,
   ready: (stdout: string) => boolean,
   attempts: number,
 ): RunResult {
