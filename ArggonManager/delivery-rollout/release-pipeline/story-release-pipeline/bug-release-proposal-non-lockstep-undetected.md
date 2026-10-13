@@ -98,3 +98,7 @@ Note: the local `npm test` provenance-audit failure is pre-existing and unrelate
 ### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
 ### Second live pass — #770 (2026-10-13, delivery lead)
 The shipped check earned its keep on its first day: it caught release PR #770 (root 0.9.0 / lib 0.8.0) live, exactly the class this item exists for. On the product owner's instruction the lead pushed the empty `Release-As: 0.9.0` trigger (599ed27d); release-please rebuilt #770 lockstep (0.9.0 == 0.9.0) and the maintenance run went green — abort check + lockstep check both pass. This time the `@arggondev/lib` pin carried **exact** (`"0.9.0"`, no caret): the one-time un-pin from the 0.8.0 release stayed sticky through the machine update, as predicted — no manual pin step was needed. #770 is CLEAN (cli/tasks-validate/ui-smoke green, head 3cc3513a); the merge remains the owner's click.
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+### Shipped — v0.9.0 (2026-10-13, delivery lead)
+#770 merged (20373133, squash) and release.yml run 38431048001 published it: tag v0.9.0 → **Assert root-lib lockstep BEFORE tagging** (the wave-3 hardening, first production run — pass) → tag agreement → GitHub Release with both tarballs → lib first → registry poll → CLI → assets. Verified: `arggon-manager@0.9.0` live (`latest`), `@arggondev/lib@0.9.0` live, and the exact kernel pin shipped automatically (`"@arggondev/lib": "0.9.0"` — the machine carried last release's un-pin with no manual step).
