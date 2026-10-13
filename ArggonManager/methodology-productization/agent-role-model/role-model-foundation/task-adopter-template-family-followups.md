@@ -77,3 +77,7 @@ First CI run: `tasks-validate` failed the committed-seam drift gate — regenera
 CI on baca2f4e: `cli` pass, `tasks-validate` pass, `ui-smoke` pass. Local re-verification on the final head: targeted 50/50; full `npm test` 153 files / 3333 tests; lint, test:structure (5), validate (0 warnings), prettier on the touched set — all green.
 
 Open question (pre-existing, not in the four rows): the ledger record for the gitignored `.agents/skills/arggon-cli/references/exploration.md` is stale (`sha256:d9ab2e7d…` recorded, current render `sha256:3553e0c6…`), so the provenance audit fails in any checkout that has run `arggon init` (the file is generated and gitignored; a fresh checkout never sees it, which is why CI is green). Same class as `fd581f9a` ("sync never updates the ledger") — lead decision whether to file.
+
+### handoff 2026-10-13 @ses_eca4ef972ffeE9z0kPXAonRJHo (session: ses_eca4ef972ffeE9z0kPXAonRJHo) — next: Lead: CI green on baca2f4e (cli, tasks-validate, ui-smoke); review commits 2d9650c4/55e40c4e/baca2f4e + ticked rows, then merge.
+- branch: feat/task-adopter-template-family-followups
+- open questions: goal-mode.ts:316 renders 'coordinator'; capability-matrix.json:116 (root+template) old roles; stale ledger record for gitignored .agents exploration.md copy. All out of rows.
