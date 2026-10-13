@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-capability-matrix-followups-from-review
 title: "Capability matrix review follow-ups: ADR-0020 characterization line, stale \"docs + CLAUDE.md\" ADR statement, `gap` criterion wording, lint-scope comment, README pointer spec S1 owes"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-capability-matrix
 labels: [docs]
 created: "2026-10-03"
 updated: "2026-10-13"
-claimed_at: "2026-10-13T13:29:16.803Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-capability-matrix-followups-from-review
 ---
 <!--
