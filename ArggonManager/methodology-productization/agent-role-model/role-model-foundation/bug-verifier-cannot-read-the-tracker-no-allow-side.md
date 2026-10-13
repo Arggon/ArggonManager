@@ -393,3 +393,7 @@ files. No `skills/arggon-cli/**` change, so no skill-copy sync is required.
 
 Acceptance boxes are ticked against the evidence above; bullet 2 is ticked for the
 observed successful envelope, with the causality boundary stated in Probe 2.
+
+### handoff 2026-10-13 @ses_eca8380c1ffeQSEWbCVjqOL52V (session: ses_eca8380c1ffeQSEWbCVjqOL52V) — next: Review PR #774 (both carriers + pinned allow/deny tests + the verifier probe), then merge; re-check with a scratch-tree `arggon init` render.
+- branch: fix/bug-verifier-cannot-read-the-tracker-no-allow-side
+- open questions: Mechanism claim unverified: reads already worked on 2.0.26 (base allow-all); 2026-10-11 cause unknown. `arggon_branch` kept denied by design. Pre-existing w4 smoke failures unfiled.
