@@ -106,3 +106,31 @@ PR #753 opened `BEHIND` (main had moved while the branch was open). Ran the doc'
 - Auto-merge deliberately NOT armed — merging is the delivery lead's call, not the maker's.
 
 Gate caveat (expected vs observed, for the standards reviewer): `npx prettier --check ArggonManager/docs/engineering.md` is clean. The item file was prettier-clean at the authored commit (`6f6b3f81`), but the native `comment`/`handoff` appends rewrote it into the tracker tool's standard shape (no blank line after the frontmatter, none after the appended headings) — the same shape as 18/18 sibling items in this folder, all of which fail `prettier --check`; no workflow runs prettier (grep across `.github/workflows/` is empty). I deliberately did not reformat the tracker file. Re-ran on the refreshed head: `npm run arggon -- validate` ok, doc-contract backstop 3 files / 46 tests passed.
+
+### 2026-10-13 @practice-standards-reviewer
+### 2026-10-12 @practice-standards-reviewer
+
+verdict: request-changes (impact class missing; two doc-accuracy corrections)
+
+Read: `gh pr diff 753` (exactly 2 files), the item + all comments, `engineering.md` §Review bar / §Naming, commits, PRs, `agents.md` §Changing the methodology itself, live repo settings + branch protection, PRs #746/#747/#753, workflows, `exploration-repo-visibility-011`, `exploration-ci-pipeline-wall-clock-022` §F, ADR 0023. Did not run the project's gates (verifier territory); on head `05edfb09` the required `cli` check is green (`cli`/`tasks-validate`/`ui-smoke` all SUCCESS).
+
+**What holds**
+
+- Scope is exact and the no-helper decision is sound: `engineering.md` (+24) + the item file (+44/−4); no script, no dependency; a wrapper over one `gh api` call would be dead weight once a queue lands.
+- The refresh half is real and demonstrated: `gh api -X PUT …/pulls/753/update-branch` left `0a4206bb` "Merge branch 'main' into …" on the branch (18 files from main, none of this PR's two files); #753 is now CLEAN/MERGEABLE. Live settings confirm the premise: `allow_auto_merge: true`, required `cli` check with strict up-to-date.
+- Bot exclusion is consistent with `agents.md` §Auto-done (flip PRs self-merge `--squash`; update-branch cannot repair them) and release-please's own branch updates; the human flow adds no squash path.
+- Boxes 1–3 are ticked on evidence that exists; box 4 is unchecked with a real before-record (#746 merged 18:50Z, #747 18:57Z on 2026-10-12, both after a manual bump — e.g. `e9b302f8`) and the after-measurement honestly deferred to the lead's wave merges.
+
+**Blocking findings**
+
+1. **Methodology impact class is missing.** This PR touches a named methodology carrier (`ArggonManager/docs/engineering.md`; `agents.md` §Changing the methodology itself), so the PR description *and* an item comment must state the impact class (engineering.md §Review bar → §Docs; agents.md lines 541–546: "a behavioral change without it is a change request"). Neither does: the PR body is Problem/Approach/Test-plan only, and no item comment contains "impact class"/"advisory"/"behavioral". The change documents a new procedure the delivery lead follows — it reads **behavioral** — which also decides whether `skills/arggon-cli/` must move in the same PR (its `references/pitfalls.md` carries the merge-never-squash rule). State the class in both places; if behavioral, add the ADR 0016 reference and check the skill sync.
+
+2. **The `--auto` promise does not hold under this doc's own premise.** "Arming auto-merge once … means the merge lands without a second visit" — GitHub auto-merge does **not** refresh a branch that falls behind after it is armed; with strict up-to-date it waits at `BEHIND` indefinitely. Since the doc's premise is that `main` moves continuously (tracker auto-commits), a main movement during the ~5–7 min check re-run strands the armed PR — the failure mode 2026 field reports name ("auto-merge … never refreshes a stale branch"; `gh`-update sweeps exist precisely for this). The demo deliberately did not arm auto-merge, so this half is also unexercised on the repo. Fix (either): drop `--auto` from the default (refresh → merge once checks finish — what the demo actually did), or keep it and name the re-strand + recovery (`update-branch` again; auto-merge stays armed for a write-access actor).
+
+3. **The merge queue cannot be enabled on this repo as recommended.** The maker's note says "the repo is org-owned and public, where the queue is available", and the new closing sentence implies an available owner setting. Live API: `owner.type: User`; the repo's own `exploration-repo-visibility-011` (2026-09-22) says "owned by a user account (not an org)". GitHub docs: "Pull request merge queues are available in any public repository owned by an organization, or in private repositories owned by organizations using GitHub Enterprise Cloud" — not user-owned repos (the ruleset API rejects `merge_queue` with 422 there). The queue is a delivery-model change (ADR 0023; exploration-022 §F) **plus** an org-transfer precondition — the missing constraint. Correct the note and soften/correct the engineering.md sentence; the `merge_group` CI follow-up is moot until then.
+
+**Minor**
+
+4. The PR body's test plan claims `prettier --check` clean "on engineering.md and the item file"; at head the item file is not prettier-clean (kernel comment/handoff shape, disclosed in the item's live-demo comment). Disclosure is honest and no workflow runs prettier, but the PR-body claim is false at head — correct or qualify it.
+
+Requested changes: impact class in PR description + item comment; the F2 fix; the F3 correction. Nothing else blocks: placement under §Naming, commits, PRs is the location the lead's decision comment chose, the text restates no ADR status, and it duplicates no agents.md rule.
