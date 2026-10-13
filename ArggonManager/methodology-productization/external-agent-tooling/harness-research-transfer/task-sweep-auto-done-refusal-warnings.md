@@ -27,10 +27,10 @@ Follow-up proposed as text in `task-measure-kernel-refusal-rate` (PR #726), whic
 
 ## Acceptance
 
-- [ ] Sweeps the 497 auto-done run logs for executed `::warning::` refusal / illegal-transition lines (bounded read of an existing source, ~15 min, no new surface)
-- [ ] Reports the done-gate merge-time refusal rate with flip attempts as denominator, with the same honest limits as the parent item
-- [ ] If that rate is also ~0, links the parent report from exploration-021's Recommendation and closes the AutoHarness question for this repo; if high, files the substrate follow-up (do not scope it here)
-- [ ] `arggon validate` green; PR opened. Advisory unless a surface is added
+- [x] Sweeps the 497 auto-done run logs for executed `::warning::` refusal / illegal-transition lines (bounded read of an existing source, ~15 min, no new surface)
+- [x] Reports the done-gate merge-time refusal rate with flip attempts as denominator, with the same honest limits as the parent item
+- [x] If that rate is also ~0, links the parent report from exploration-021's Recommendation and closes the AutoHarness question for this repo; if high, files the substrate follow-up (do not scope it here)
+- [x] `arggon validate` green; PR opened. Advisory unless a surface is added
 
 ## Notes
 
