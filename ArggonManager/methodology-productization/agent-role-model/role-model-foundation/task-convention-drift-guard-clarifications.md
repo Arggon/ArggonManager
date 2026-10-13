@@ -59,3 +59,8 @@ Derivation property kept: no option name added to the test — literals remain t
 ### handoff 2026-10-13 @ses_eca4ef96fffetnKma4I21dSuAY (session: ses_eca4ef96fffetnKma4I21dSuAY) — next: Delivery lead: review + merge PR #780; maker work complete (gates green, controls reverted, checklist ticked).
 - branch: feat/task-convention-drift-guard-clarifications
 - open questions: Marker stays line-scoped by decision (documented, not tightened): a marker off the comparison line does not exempt and fails rule 2; templates/docs/** + README bug-note out of scope as in #759
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 99e51db5 (PR #780); auto-done flip landed. Marker scope documented as line-level with a misplaced-marker premise case; the mismatch message classifies kernel-extra vs doc-extra; duplicate section dispatch is impossible (blocks merged; re-listed keys still fail the one-branch-per-option assertion) and pinned by a new premise test. Focused 19/19, full suite green (CI-equivalent), negative controls reverted and verified.
