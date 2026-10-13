@@ -27,9 +27,9 @@ PR #762 re-measured the `doctor --agents` sample block and its caption, but the 
 
 ## Acceptance
 
-- [ ] shipped doc samples name only shipped seam ids (json-output.md plain doctor sample + every other hit from a grep for retired ids across `ArggonManager/docs/**`)
-- [ ] a guard covers the shipped docs samples (or the template-family walk is extended to `ArggonManager/docs/**`) so a retired id cannot ship green
-- [ ] grep evidence in the item; `arggon validate` + affected suites green
+- [x] shipped doc samples name only shipped seam ids (json-output.md plain doctor sample + every other hit from a grep for retired ids across `ArggonManager/docs/**`)
+- [x] a guard covers the shipped docs samples (or the template-family walk is extended to `ArggonManager/docs/**`) so a retired id cannot ship green
+- [x] grep evidence in the item; `arggon validate` + affected suites green
 
 ## Notes
 

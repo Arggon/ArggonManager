@@ -27,10 +27,10 @@ Observed live on the guard's first day (bug-release-proposal-non-lockstep-undete
 
 ## Acceptance
 
-- [ ] `cli/release-lockstep-check.mjs`'s failure message (and the `release.md` section) state the expected reading: between releases, a root-only accumulating proposal is the normal non-lockstep state; the red run means "do not merge this yet — a Release-As decision is pending", not "the pipeline is broken"
-- [ ] `release.md` documents the expected red window so a red run on this workflow is not misread
-- [ ] decide and record whether the check stays failing (current) or uses a softer signal for the ordinary accumulation case — with the merge-time protection (pre-tag assert) unchanged either way
-- [ ] tests updated; `arggon validate` green; PR opened
+- [x] `cli/release-lockstep-check.mjs`'s failure message (and the `release.md` section) state the expected reading: between releases, a root-only accumulating proposal is the normal non-lockstep state; the red run means "do not merge this yet — a Release-As decision is pending", not "the pipeline is broken"
+- [x] `release.md` documents the expected red window so a red run on this workflow is not misread
+- [x] decide and record whether the check stays failing (current) or uses a softer signal for the ordinary accumulation case — with the merge-time protection (pre-tag assert) unchanged either way
+- [x] tests updated; `arggon validate` green; PR opened
 
 ## Notes
 

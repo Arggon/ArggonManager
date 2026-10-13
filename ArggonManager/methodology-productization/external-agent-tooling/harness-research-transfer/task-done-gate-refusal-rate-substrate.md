@@ -27,11 +27,11 @@ The sweep `task-sweep-auto-done-refusal-warnings` (PR #779, merged) refuted its 
 
 ## Acceptance
 
-- [ ] the 52 refusal events are classified (top causes) with the corrected method, and the ephemeral design is accounted for in what can be measured
-- [ ] decide and record whether the substrate needs work (pre-check on the flip path, message quality, or the rate is acceptable noise) and link exploration-021
-- [ ] the measurement correction is captured where future sweeps find it (the `##[warning]` render vs the literal `::warning::` trap)
-- [ ] reconciled with ADR 0025's 117/482 if the two are the same population
-- [ ] `arggon validate` green; PR opened. Advisory unless a surface is added
+- [x] the 52 refusal events are classified (top causes) with the corrected method, and the ephemeral design is accounted for in what can be measured
+- [x] decide and record whether the substrate needs work (pre-check on the flip path, message quality, or the rate is acceptable noise) and link exploration-021
+- [x] the measurement correction is captured where future sweeps find it (the `##[warning]` render vs the literal `::warning::` trap)
+- [x] reconciled with ADR 0025's 117/482 if the two are the same population
+- [x] `arggon validate` green; PR opened. Advisory unless a surface is added
 
 ## Notes
 
