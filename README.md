@@ -77,6 +77,7 @@ The carriers, one hop from here:
 - [Engineering conventions](ArggonManager/docs/engineering.md) — §Roles and authority (role table, authority map, human-only powers) and §Review bar (bars, tiers, verdict and acceptance conventions)
 - [Task convention](ArggonManager/docs/convention.md)
 - [arggon-cli skill](skills/arggon-cli/SKILL.md)
+- [Capability matrix](adapters/capability-matrix.json) — methodology invariant × agent: which native mechanism each shipped seam actually delivers, and where the client-native layer is still missing (reported by `arggon doctor`, report-only)
 
 Per-agent enforcement (OpenCode V2, ZCode, Claude Code) builds on the same kernel — one rules path, no forks — see the [native agent adapters epic](ArggonManager/methodology-productization/native-agent-adapters/native-agent-adapters.md) and [spec methodology-adapters-017](ArggonManager/docs/specs/spec-methodology-adapters-017.md).
 
