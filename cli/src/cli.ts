@@ -2891,6 +2891,11 @@ program
     false,
   )
   .option(
+    "--force",
+    "with --prune: also remove terminal+merged worktrees whose untracked files block 'git worktree remove' (nothing is discarded without this flag; tracked changes are never force-discarded)",
+    false,
+  )
+  .option(
     "--no-commit",
     "keep the tracker dirty: skip the tracker auto-commit of the cleared worktree_path records (default: on with --prune; x-tracker.auto-commit: false opts out tree-wide)",
   )
@@ -2912,6 +2917,7 @@ program
   .action(
     (opts: {
       prune?: boolean;
+      force?: boolean;
       commit?: boolean;
       gh?: boolean;
       release?: string;
@@ -2928,6 +2934,7 @@ program
           // the flag is passed); reading `noGh` made the flag a silent no-op
           // (bug-cleanup-no-gh-ignored).
           noGh: opts.gh === false,
+          ...(opts.force === true ? { pruneForce: true } : {}),
           ...(opts.release !== undefined ? { release: opts.release } : {}),
           ...(opts.takeOverWorktree === true ? { releaseTakeOverWorktree: true } : {}),
         });
