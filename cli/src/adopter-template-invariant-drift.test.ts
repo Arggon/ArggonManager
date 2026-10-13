@@ -31,16 +31,24 @@
  *
  *  1. THE CARRIERS ARE ONE BLOCK. The four ADR 0020 carriers carry a
  *     byte-identical `- **Invariants:**` line (and one `- **Scope:**` line).
- *     Without this precondition "the carriers' invariant block" has no
- *     meaning, and a guard compared against a moving target would be theatre.
- *  2. THE FAMILY CANNOT CONTRADICT IT. The adopter doc templates are walked as
- *     ONE set — the whole family, not the one file that happened to break —
- *     and no member may carry the superseded flat-parity sentence, a retired
- *     agent id, or the pre-rename role word. A member that restates an
- *     invariant or the scope must restate it byte-identically to the carriers.
- *  3. THE FAMILY CANNOT SHRINK. The members the guard leans on are required to
- *     exist and to carry the block, so the guard cannot be disarmed by
- *     deleting a template, and the walk itself is asserted non-vacuous.
+ *     Blockquote prefixes are normalized away, so the README's plain list
+ *     items and the doc carriers' blockquote bullets are compared as the same
+ *     block (before task-adopter-template-family-followups the parser saw only
+ *     the blockquote form, so the README contributed nothing while the header
+ *     claimed it did). Without this precondition "the carriers' invariant
+ *     block" has no meaning, and a guard compared against a moving target
+ *     would be theatre.
+ *  2. THE FAMILY CANNOT CONTRADICT IT. Every `.md` under the adopter template
+ *     root — the governing templates AND the adapter-seam subtrees — is walked
+ *     as ONE set, not the one file that happened to break. No member may carry
+ *     the superseded flat-parity sentence, a retired agent id, or the
+ *     pre-rename role word; a member that restates an invariant or the scope
+ *     must restate it byte-identically to the carriers.
+ *  3. THE FAMILY CANNOT SHRINK. Every member the guard leans on is required to
+ *     exist — including one from each adapter-seam subtree — and the two that
+ *     render into an adopting repo's carriers must carry the block, so the
+ *     guard cannot be disarmed by deleting a template or by silently
+ *     re-excluding a subtree, and the walk itself is asserted non-vacuous.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -54,7 +62,9 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
  * The four ADR 0020 carriers (the README methodology section plus the three
  * declared doc carriers). PR #636 rewired their `- **Invariants:**` header
  * blocks to byte-identical text; that is the block the adopter templates must
- * not contradict.
+ * not contradict. The README carries its copy as plain list items while the
+ * three doc carriers quote it — `bulletsOf` normalizes the prefix away so all
+ * four are actually compared.
  */
 const CARRIERS = [
   "ArggonManager/docs/agents.md",
@@ -64,17 +74,19 @@ const CARRIERS = [
 ];
 
 /**
- * Adapter-seam subtrees, excluded from the family walk: the OpenCode/ZCode
- * seam templates are generated agent contracts, swept by their own items (the
- * agent rename, PR #641, and the gate-matcher binding in
- * `cli/src/adapter-orphan-reaping.test.ts`) — not the governing docs a new
- * adopter reads first. Everything else under `templates/docs/` is the family.
+ * The adapter-seam subtrees are part of the family. PR #758 excluded them
+ * because the agent rename (PR #641) owned the seam ids; #641 merged, and the
+ * exclusion only kept the exact defect this guard exists to catch — the
+ * pre-rename "coordinator" at
+ * `templates/docs/zcode/arggon/commands/arggon-goal.md` — out of the walk.
+ * `REQUIRED_MEMBERS` names one file per subtree so the walk cannot silently
+ * shrink back to the governing docs.
  */
-const SEAM_PREFIXES = ["templates/docs/opencode/", "templates/docs/zcode/"];
+const SEAM_SUBTREES = ["templates/docs/opencode/", "templates/docs/zcode/"];
 
 /**
  * The members the guard leans on. Required to exist so the guard cannot be
- * disarmed by deleting a template.
+ * disarmed by deleting a template or by re-excluding a seam subtree.
  *
  * Path note: the item body named `templates/docs/docs/AGENTS.md` and
  * `templates/docs/docs/agents.md` — neither exists on disk. The adopter router
@@ -88,6 +100,8 @@ const REQUIRED_MEMBERS = [
   "templates/docs/AGENTS.md",
   "templates/docs/docs/engineering.md",
   "templates/docs/docs/convention.md",
+  "templates/docs/opencode/agents/arggon-delivery-lead.md",
+  "templates/docs/zcode/arggon/commands/arggon-goal.md",
 ];
 
 /** The two templates that render into an adopting repo's own carriers. */
@@ -125,7 +139,10 @@ const SUPERSEDED_PARITY = "humans and agents follow the same rules";
 function bulletsOf(path: string): Map<string, string> {
   const found = new Map<string, string>();
   for (const line of readFileSync(join(repoRoot, path), "utf8").split("\n")) {
-    const match = /^>\s*(- \*\*[^*]+\*\*.*)$/.exec(line.trim());
+    // The doc carriers quote the block (`> - **Scope:** …`) while the README
+    // carries plain list items (`- **Scope:** …`); both forms must be seen, or
+    // a carrier the parser cannot see weakens the "four carriers" claim.
+    const match = /^(?:>\s*)?(- \*\*[^*]+\*\*.*)$/.exec(line.trim());
     // `- **Scope:** …` splits on `**` as ["- ", "Scope:", " …"] — the label
     // carries its own colon, which every lookup below drops.
     if (match) found.set(match[1]!.split("**")[1]!.replace(/:$/, ""), match[1]!);
@@ -164,8 +181,7 @@ function templateFamily(root: string): string[] {
 
 describe("adopter templates follow the carriers' invariant block", () => {
   const familyRoot = join(bundledTemplatesDir(), "docs");
-  const walked = templateFamily(familyRoot);
-  const family = walked.filter((path) => !SEAM_PREFIXES.some((prefix) => path.startsWith(prefix)));
+  const family = templateFamily(familyRoot);
 
   /** The carriers' blocks, read at run time: the single source of truth. */
   const carrierInvariants = new Set(
@@ -179,13 +195,14 @@ describe("adopter templates follow the carriers' invariant block", () => {
     ),
   );
 
-  it("walks the whole family — never silently empty, and the seam exclusion is a decision", () => {
+  it("walks the whole family — never silently empty, and the seam subtrees are covered", () => {
     // A vacuous walk would make every clause below pass for free.
     expect(family.length).toBeGreaterThan(10);
-    // The exclusion is deliberate: both seam subtrees exist and carry files the
-    // walk would otherwise have collected.
-    for (const seam of SEAM_PREFIXES) {
-      expect(walked.some((path) => path.startsWith(seam))).toBe(true);
+    // Coverage runs the other way now: both seam subtrees exist and are IN the
+    // walk, so the clauses below apply to them (PR #758 excluded them while
+    // PR #641 owned the seam ids; that reason is gone).
+    for (const seam of SEAM_SUBTREES) {
+      expect(family.some((path) => path.startsWith(seam))).toBe(true);
     }
     // The members the guard leans on are in the walk, and on disk.
     for (const member of REQUIRED_MEMBERS) {
@@ -195,9 +212,16 @@ describe("adopter templates follow the carriers' invariant block", () => {
 
   it("the four carriers carry ONE invariant block and ONE scope statement", () => {
     // Precondition: without byte-identical carriers there is no single block
-    // for the templates to contradict.
+    // for the templates to contradict. Every carrier must contribute — a
+    // carrier the parser cannot see (README carried plain list items before
+    // task-adopter-template-family-followups) would make the "four carriers"
+    // claim broader than the assertion.
     expect(carrierInvariants.size).toBe(1);
     expect(carrierScopes.size).toBe(1);
+    for (const path of CARRIERS) {
+      expect(bulletOf(path, "Invariants"), `${path} must carry the invariant block`).not.toBeNull();
+      expect(bulletOf(path, "Scope"), `${path} must carry the scope statement`).not.toBeNull();
+    }
     // The domain-neutrality clause the adopter templates were missing: a rule
     // is named by what the project declares, never by software artifacts.
     expect(carrierScopes).toEqual(new Set(["- **Scope:** any project — not only software."]));

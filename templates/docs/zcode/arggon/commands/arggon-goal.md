@@ -26,4 +26,4 @@ Start a ZCode Goal Mode loop on $ARGUMENTS, following the ArggonManager rules.
    sibling item, never enter another item's worktree, and never loop while a
    reviewer dispatch is in flight (that window is read-only).
 5. Report the item id, the objective line and the worktree path when the loop
-   starts, so the coordinator can follow the claim.
+   starts, so the delivery lead can follow the claim.

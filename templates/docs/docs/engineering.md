@@ -34,7 +34,9 @@ A change is acceptable when it satisfies the bar above and a reviewer can answer
 
 **Blocking end-to-end check (blocks merge):** a change is exercised end-to-end before approval, not only checked in parts. The check is the one this project declares — run it and record expected-vs-observed evidence in the review verdict. Blocking means the verdict says so, the evidence is attached, and someone owns the call.
 
-_Worked examples (software):_ a CLI change — probe the changed commands on a fixture; a UI change — drive a real browser (e.g. Playwright CLI): it renders, matches the data, and one state change round-trips and persists. Docs-only changes are exempt.
+Docs-only changes are exempt from the end-to-end check: there is no behavior change to exercise.
+
+_Worked examples (software):_ a CLI change — probe the changed commands on a fixture; a UI change — drive a real browser (e.g. Playwright CLI): it renders, matches the data, and one state change round-trips and persists.
 
 ## Definition of done
 
