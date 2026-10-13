@@ -330,12 +330,14 @@ Use a 4-digit monotonic number. Title is kebab-case.
 
 `main` moves continuously (tracker auto-commits, auto-done flips), and branch protection requires a PR to be up to date with `main` before merging — so on a wave the second PR is refused: `BEHIND` ("the head branch is not up to date with the base branch") or _"Base branch was modified. Review and try the merge again."_ (2026-10-12: [#746](https://github.com/Arggon/ArggonManager/pull/746) and [#747](https://github.com/Arggon/ArggonManager/pull/747)). The refusal is the protection working — it is what stops two individually-green PRs from merging into a semantically broken combination — so refresh the branch, never relax the requirement.
 
-- **Default — refresh server-side, no worktree dance.** Ask GitHub to update the PR branch, then merge once the checks finish. Arming auto-merge once (the repo allows it) means the merge lands without a second visit:
+- **Default — refresh server-side, no worktree dance.** Ask GitHub to update the PR branch, then merge once the checks finish; arming auto-merge once saves the second visit:
 
   ```bash
   gh api -X PUT repos/Arggon/ArggonManager/pulls/<n>/update-branch
   gh pr merge <n> --merge --auto
   ```
+
+  Auto-merge does **not** refresh a branch that falls behind after it is armed, and `main` keeps moving — if the PR re-strands at `BEHIND` while armed, run the `update-branch` command again; the armed auto-merge completes once the checks pass.
 
 - **Fallback — the API cannot apply the update** (a real conflict, or a 422 when GitHub cannot rebase the branch): merge locally in the item's worktree, resolve the conflicts there, push, then merge normally:
 
@@ -348,7 +350,7 @@ Use a 4-digit monotonic number. Title is kebab-case.
 
 - **Bot-owned PR branches are excluded.** A release-please release PR — and an auto-done flip PR — is managed by the bot's own rebase/retry path; never refresh or merge one by hand.
 
-Enabling the **merge queue** on `main` (owner setting) would remove this step entirely — it refreshes queued PRs itself; until then, refresh as above.
+A **merge queue** on `main` would remove this step entirely — it refreshes queued PRs itself — but GitHub offers merge queues only to organization-owned repositories, and this repo is owned by a user account: the precondition is an org transfer (or a non-native queue). Until then, the refresh flow above is the remedy.
 
 ---
 
