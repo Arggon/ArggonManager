@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-lesson-promotion-implementation
 title: "Implement ADR 0027 lesson promotion: agents.md rule + maker-prompt trigger (Behavioral)"
+assignee: arggon-delivery-lead
+branch: feat/task-lesson-promotion-implementation
 parent: harness-research-transfer
 labels: [methodology, context-budget]
 created: "2026-10-13"
 updated: "2026-10-13"
+claimed_at: "2026-10-13T21:06:19.321Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-lesson-promotion-implementation
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-lesson-promotion-implementation.md
