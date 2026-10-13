@@ -50,20 +50,20 @@ that; this re-derives the idea on our substrate so the comparison is honest.
 
 ## Acceptance
 
-- [ ] Classified first (spike / bounded / greenfield) with the ratchet recorded — if the design turns out to be a new subsystem others depend on, it is **greenfield** and goes through the six-phase protocol
-- [ ] States the **gap** before any design: the concrete question "what does an agent do today that it would do differently if last run's lesson were on the item?" — a design that cannot answer that is rejected
-- [ ] Evaluates at least three shapes against ADR 0022's bar: (a) a lessons section in the item body,
+- [x] Classified first (spike / bounded / greenfield) with the ratchet recorded — if the design turns out to be a new subsystem others depend on, it is **greenfield** and goes through the six-phase protocol
+- [x] States the **gap** before any design: the concrete question "what does an agent do today that it would do differently if last run's lesson were on the item?" — a design that cannot answer that is rejected
+- [x] Evaluates at least three shapes against ADR 0022's bar: (a) a lessons section in the item body,
       (b) a per-area note file the agent must read before claiming, (c) a `docs/labs`-style
       synthesized playbook promoted by a human
-- [ ] **Decides where the lesson lives so it travels**: ADR 0006's context budget applies —
+- [x] **Decides where the lesson lives so it travels**: ADR 0006's context budget applies —
       anything added to an item or to always-loaded context is paid every session, so a
       bounded size and a `doctor --budget`-style measurement are part of the answer, not an afterthought
-- [ ] Accounts for **staleness**: a lesson store rots the way `playbook status` rots (90-day threshold). Either it inherits that mechanism or it names why not
-- [ ] Accounts for **contradiction**: two items learning opposite lessons from one area, and a lesson that stops being true after a change. ADR 0016's propose/absorb channel is the obvious mechanism to evaluate
-- [ ] Answers the falsifiable question ADR 0022 set: _if this spike shows no value, is that evidence to revisit `autoctx`?_ — decide it now, while nobody is invested
-- [ ] Recommendation with trade-offs; if greenfield, a spec + `spec analyze` clean before any implementation task (ADR 0017)
-- [ ] ADR only if the answer changes a carrier, gate or command
-- [ ] `arggon validate` + `spec validate` green; `spec analyze` reports no NEW finding naming this item
+- [x] Accounts for **staleness**: a lesson store rots the way `playbook status` rots (90-day threshold). Either it inherits that mechanism or it names why not
+- [x] Accounts for **contradiction**: two items learning opposite lessons from one area, and a lesson that stops being true after a change. ADR 0016's propose/absorb channel is the obvious mechanism to evaluate
+- [x] Answers the falsifiable question ADR 0022 set: _if this spike shows no value, is that evidence to revisit `autoctx`?_ — decide it now, while nobody is invested
+- [x] Recommendation with trade-offs; if greenfield, a spec + `spec analyze` clean before any implementation task (ADR 0017)
+- [x] ADR only if the answer changes a carrier, gate or command
+- [x] `arggon validate` + `spec validate` green; `spec analyze` reports no NEW finding naming this item
 
 ## Notes
 
