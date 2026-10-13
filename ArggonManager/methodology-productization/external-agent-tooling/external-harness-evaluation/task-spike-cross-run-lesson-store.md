@@ -135,3 +135,7 @@ PR #761 (docs-only, Advisory) — https://github.com/Arggon/ArggonManager/pull/7
 **Gates** (worktree `/home/arggon/Projects/ArggonManager-task-spike-cross-run-lesson-store`, commit ecf4bc25): `arggon validate` ok 0 warnings (also the pre-commit hook); `spec validate` ok 38 docs 0 warnings; `spec analyze` **4 findings, identical to the pre-change baseline, none naming this work**; `adr-index-parity` + `adr-status-doc-contract` **18/18**; prettier --check clean on every authored file. `npm test` is not required for a docs-only change — say so explicitly — the two ADR contract tests were run as the targeted defence. **Pre-existing drift:** the item file carries one blank-line drift and **574 tracker .md files fail the same prettier check on main** (no `format:check` gate exists) — left alone and reported, not fixed in this diff.
 
 **Observed vs expected:** expected the spike to end in a carrier build; observed that the carriers already exist and only the write path is missing, which moves the deliverable from a store to a rule — hence the ADR.
+
+### handoff 2026-10-13 @arggon-maker (session: ses_eccb87006ffeFqi5BMJYtIfeJa) — next: Delivery lead: review PR #761 (docs-only). Decision is recorded (ADR 0027 Proposed); item stays in_progress. No merge from the maker session.
+- branch: feat/task-spike-cross-run-lesson-store
+- open questions: File the bounded implementation item (rule in docs/agents.md + trigger in templates/docs/opencode/agents/arggon-maker.md)?; ADR 0027 number collides if a concurrent ADR takes 0027 before merge -> mer…
