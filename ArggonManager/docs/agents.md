@@ -506,6 +506,7 @@ Agents and humans keep the docs alive **in the same PR as the change** — never
 | Cross-cutting decision (stack, identity, schema model, new top-level package) | ADR under `ArggonManager/docs/adr/` — see the ADR process in `ArggonManager/docs/engineering.md` (4-digit id, `Proposed` in the PR, `Accepted` on merge, supersede instead of rewriting) |
 | Non-trivial feature worth design review                                       | Spec in `ArggonManager/docs/specs/` + implementation plan in `ArggonManager/docs/plans/` (see below)                                                                                     |
 | Agent playbook rules themselves                                               | This file (`ArggonManager/docs/agents.md`)                                                                                                                                               |
+| A lesson — a trap that bit you, or an approach this item refuted              | The carrier that owns the topic, as one line ≤ 160 characters with a citation — see §Promoting lessons                                                                                   |
 
 ### Specs and plans (for non-trivial features)
 
@@ -529,6 +530,23 @@ Stack/technology decisions follow the pipeline: **explore → ADR → playbook �
 4. `arggon playbook status` flags playbooks older than the threshold (default 90 days, `x-playbooks.max-age-days` in the tracker `.convention.yml`); `--file-task <story-id>` files one re-research task per stale playbook into the tracker. After re-researching, `arggon playbook refresh <tech> --version <v>` updates the frontmatter.
 
 Agents follow `ArggonManager/docs/playbooks/` by default (the init-generated `AGENTS.md` points there) and refresh playbooks when `playbook status` flags them stale.
+
+### Promoting lessons (promote, never store)
+
+A lesson — a trap that bit you, or an approach this item refuted — is **promoted, never stored**: when the work **repeats** a class another item already met, write it into the carrier that already owns the topic. No lesson store, no lessons section, no new file type.
+
+| Lesson kind                           | Carrier (the one that owns the topic)      |
+| ------------------------------------- | ------------------------------------------ |
+| Loop/tool mechanics, repo conventions | `skills/arggon-cli/references/pitfalls.md` |
+| Technology behaviour                  | `ArggonManager/docs/playbooks/<tech>.md`   |
+| A refuted approach (a dead end)       | the `## Context` of a tracker item         |
+| A cross-cutting decision              | an ADR under `ArggonManager/docs/adr/`     |
+
+- **One line, ≤ 160 characters excluding the citation, with a mandatory citation** (`— <item-id>` or `— ADR NNNN`); the rationale stays in the item that produced the lesson. The bound stops a carrier from becoming the unbounded per-item record it indexes; the citation is what makes the line findable and supersedable by the change that moves the mechanism. `references/pitfalls.md` also holds a total ceiling of **12,288 B** (read with `wc -c` when the file is edited): a section that does not fit shortens or supersedes a line, it never raises the ceiling in the same PR.
+- **The promotion moment is the second occurrence.** A maker promotes when the work repeats a class another item already met; the standards reviewer checks the promoted line like any other doc that must travel with the change; the delivery lead may consolidate a class the tracker shows repeating. No new ceremony, no new role, no new merge step.
+- **Contradiction supersedes, never juxtaposes.** Rewrite the line in place with a dated note naming what changed and which item produced it (`superseded <date> by <item-id>: <reason>`); appending a second, contradicting bullet is forbidden — two answers in one carrier with no way to choose is worse than either.
+- **Staleness is per carrier.** Technology lessons inherit `arggon playbook status` (`x-playbooks.max-age-days`, default 90). Mechanism lessons carry **no clock**: a lesson becomes false when the mechanism changes, not when the date advances, and the citation is the pointer that change follows.
+- **A carrier edit is a methodology edit.** A lesson landing in `skills/arggon-cli/**` or `templates/**` reaches adopting repos through the [ADR 0016](./adr/0016-adopter-upgrade-channel.md) propose channel, never by overwrite, and states its impact class, keeping the skill and its copies byte-equal (§Changing the methodology itself).
 
 ### Verification before opening the PR
 
