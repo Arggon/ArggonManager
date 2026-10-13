@@ -10,7 +10,6 @@ labels: [docs, templates, methodology]
 priority: p2
 created: "2026-10-04"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-adopter-engineering-template-software-locked
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-adopter-engineering-template-software-locked.md

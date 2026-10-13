@@ -10,7 +10,6 @@ labels: []
 created: "2026-10-02"
 updated: "2026-10-13"
 depends_on: [task-adapter-selection-flags, task-capability-matrix]
-worktree_path: /home/arggon/Projects/ArggonManager-task-opencode-prompt-stamp
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/task-opencode-prompt-stamp.md

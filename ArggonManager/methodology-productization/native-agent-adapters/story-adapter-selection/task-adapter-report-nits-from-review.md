@@ -9,7 +9,6 @@ parent: story-adapter-selection
 labels: [docs, tests]
 created: "2026-10-03"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-adapter-report-nits-from-review
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-adapter-selection/task-adapter-report-nits-from-review.md

@@ -10,7 +10,6 @@ labels: [tests, docs, cli]
 priority: p2
 created: "2026-10-04"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-x-tracker-option-list-has-no-doc-drift-guard
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/bug-x-tracker-option-list-has-no-doc-drift-guard.md

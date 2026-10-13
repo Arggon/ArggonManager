@@ -10,7 +10,6 @@ labels: [methodology, evaluation, spike]
 priority: p2
 created: "2026-10-05"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-spike-cross-run-lesson-store
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/external-harness-evaluation/task-spike-cross-run-lesson-store.md

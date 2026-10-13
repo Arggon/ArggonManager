@@ -9,7 +9,6 @@ parent: story-capability-matrix
 labels: [adopters, packaging]
 created: "2026-10-02"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-matrix-reaches-adopters
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-capability-matrix/task-matrix-reaches-adopters.md
