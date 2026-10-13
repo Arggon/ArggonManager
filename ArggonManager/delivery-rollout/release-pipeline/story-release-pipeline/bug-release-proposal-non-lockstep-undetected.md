@@ -50,3 +50,8 @@ The product owner instructed the delivery lead to fix the failing release. Actio
 - release-please updated #764 to lockstep: root 0.8.0 == lib 0.8.0 (09f10bab + lockfile sync c58d8302).
 - Release PR head 5fd10db4 is fully green: cli pass, tasks-validate pass, ui-smoke pass. Mergeable when checked.
 The durable-guard acceptance rows on this item (maintenance-run surfacing, pre-tag lockstep assert, runbook) remain open — they are prevention, not needed to clear this release.
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+### Released — 2026-10-13 (delivery lead, post-merge verification)
+#764 merged (79a6ee6c, squash `chore: release main (#764)`). release.yml run 38404213674 — every step green: tag v0.8.0 → label flip (`autorelease: tagged`) → GitHub Release with both tarballs → lib published first → registry poll → CLI published → assets attached.
+Verified independently: npm `arggon-manager@0.8.0` live (`latest`), `@arggondev/lib@0.8.0` live, and the exact kernel pin shipped (`"@arggondev/lib": "0.8.0"` — the first exact release since v0.4.x, see bug-kernel-pin-never-exact). The live-PR acceptance row is met; the prevention rows (maintenance-run surfacing + pre-tag lockstep assert + runbook) remain open.
