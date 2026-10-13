@@ -74,3 +74,7 @@ A second `arggon-maker` session `ses_ec9bb52ceffeixWrHgtUfu66Ux` (same worktree,
 ### Open questions
 - Rows 1–4 are satisfied per the evidence above; the lead owns ticking and the done flip.
 - The PR body's Verification section is still the placeholder (I left the PR surface to the concurrent session to avoid a body clobber; happy to fill it if the lead prefers).
+
+### handoff 2026-10-13 @ses_ec9dcc299ffeily32bDj35KdW0 (session: ses_ec9dcc299ffeily32bDj35KdW0) — next: Delivery lead: tick acceptance rows 1-4 from the evidence comment, resolve the dual-maker collision (peer ses_ec9bb52c) and verify PR #790; do not merge until the collision is decided.
+- branch: feat/task-plugin-smoke-home-isolation
+- open questions: 7 full-smoke failures classified pre-existing (model judgment / fixture-vs-kernel drift, 2 deterministic done-gate); no pre-change baseline run; PR body Verification section still placeholder.
