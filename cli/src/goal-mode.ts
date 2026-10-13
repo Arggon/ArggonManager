@@ -313,7 +313,7 @@ export function deriveGoal(
 const NO_GOAL_OBJECTIVE =
   "DEFINE THE GOAL FIRST: the done gate is satisfied for this item — every acceptance " +
   "criterion in its live Acceptance section is ticked, so there is nothing verifiable " +
-  "to loop on. Either the work is finished — merge the PR and let the coordinator flip " +
+  "to loop on. Either the work is finished — merge the PR and let the delivery lead flip " +
   "the item — or write a new criterion into the item's live Acceptance section before " +
   "starting a goal.";
 

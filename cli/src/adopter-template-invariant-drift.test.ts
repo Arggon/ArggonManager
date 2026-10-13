@@ -38,10 +38,14 @@
  *     claimed it did). Without this precondition "the carriers' invariant
  *     block" has no meaning, and a guard compared against a moving target
  *     would be theatre.
- *  2. THE FAMILY CANNOT CONTRADICT IT. Every `.md` under the adopter template
- *     root — the governing templates AND the adapter-seam subtrees — is walked
- *     as ONE set, not the one file that happened to break. No member may carry
- *     the superseded flat-parity sentence, a retired agent id, or the
+ *  2. THE FAMILY CANNOT CONTRADICT IT. Every file under the adopter template
+ *     root — the governing templates AND the adapter-seam subtrees, whatever
+ *     its extension — is walked as ONE set, not the one file that happened to
+ *     break. The old Markdown-only filter is exactly how the pre-rename role
+ *     word survived in `templates/docs/adapters/capability-matrix.json`
+ *     (task-retired-role-words-product-text): a template `arggon init` copies
+ *     byte-for-byte is a family member even when it is not `.md`. No member may
+ *     carry the superseded flat-parity sentence, a retired agent id, or the
  *     pre-rename role word; a member that restates an invariant or the scope
  *     must restate it byte-identically to the carriers.
  *  3. THE FAMILY CANNOT SHRINK. Every member the guard leans on is required to
@@ -102,6 +106,11 @@ const REQUIRED_MEMBERS = [
   "templates/docs/docs/convention.md",
   "templates/docs/opencode/agents/arggon-delivery-lead.md",
   "templates/docs/zcode/arggon/commands/arggon-goal.md",
+  // The non-Markdown member: a JSON template `arggon init` renders byte-for-byte
+  // into an adopting tree (task-retired-role-words-product-text). Pinning it
+  // here is what stops the walk from being narrowed back to `.md` — the filter
+  // that let the pre-rename role word survive in this very file.
+  "templates/docs/adapters/capability-matrix.json",
 ];
 
 /** The two templates that render into an adopting repo's own carriers. */
@@ -160,7 +169,16 @@ function normalized(text: string): string {
   return text.replace(/\s+/g, " ").toLowerCase();
 }
 
-/** Every Markdown file under the adopter doc-template root, as repo-relative paths. */
+/**
+ * Every file under the adopter doc-template root, as repo-relative paths —
+ * `.md` and non-`.md` alike. The Markdown-only filter this walk used to carry
+ * is exactly what let the pre-rename role word survive in
+ * `templates/docs/adapters/capability-matrix.json`
+ * (task-retired-role-words-product-text): `arggon init` copies that JSON into
+ * an adopting tree byte-for-byte, so it is a family member by this guard's own
+ * definition. `REQUIRED_MEMBERS` pins the JSON so the walk cannot be narrowed
+ * back to Markdown without failing.
+ */
 function templateFamily(root: string): string[] {
   const templatesRoot = bundledTemplatesDir();
   const found: string[] = [];
@@ -171,7 +189,6 @@ function templateFamily(root: string): string[] {
         walk(abs);
         continue;
       }
-      if (!entry.endsWith(".md")) continue;
       found.push(`templates/${relative(templatesRoot, abs).split("\\").join("/")}`);
     }
   };
