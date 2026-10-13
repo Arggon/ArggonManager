@@ -60,3 +60,7 @@ Gates on 9ef55be9 (all green):
 - argon doctor --agents: the four .opencode/agents/* files and the 11 commands classify present; 0 stale, 0 missing (only opencode.jsonc is adopter-edited, pre-existing).
 - CI drift emulation after the commit: node dist/cli.js init --no-commit leaves git status --porcelain (excluding the state file) empty.
 - PR #788: https://github.com/Arggon/ArggonManager/pull/788
+
+### handoff 2026-10-13 @ses_ec9dcc297ffe65zmdw5Lg4uIOi (session: ses_ec9dcc297ffe65zmdw5Lg4uIOi) — next: Delivery lead: review PR #788 (head 9ef55be9 + tracker commits); standards-reviewer verdict, then merge and flip done.
+- branch: feat/task-seam-nits-v1-schema-and-marker
+- open questions: exploration.md ledger refresh folded here or its own item?; docs cite runtime v2.0.26 while agents.md smoke evidence still says v2.0.12 (pre-existing).
