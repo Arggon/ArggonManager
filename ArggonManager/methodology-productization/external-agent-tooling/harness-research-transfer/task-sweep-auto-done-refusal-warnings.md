@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-sweep-auto-done-refusal-warnings
 title: Sweep auto-done logs for merge-time done-gate refusal rate
+assignee: arggon-delivery-lead
+branch: feat/task-sweep-auto-done-refusal-warnings
 parent: harness-research-transfer
 labels: []
 created: "2026-10-11"
-updated: "2026-10-11"
+updated: "2026-10-13"
+claimed_at: "2026-10-13T14:34:54.960Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-sweep-auto-done-refusal-warnings
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-sweep-auto-done-refusal-warnings.md
   Leaves live only under a story. id is the filename stem: task-sweep-auto-done-refusal-warnings.
