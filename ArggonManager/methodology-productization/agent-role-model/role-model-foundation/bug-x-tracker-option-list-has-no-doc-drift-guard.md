@@ -153,3 +153,13 @@ Execution. I ran nothing: no `vitest`, no `prettier --check`, no `npm run build`
 1. `cd /home/arggon/Projects/ArggonManager-bug-x-tracker-option-list-has-no-doc-drift-guard && npx vitest run cli/src/convention-option-doc-contract.test.ts` — demonstrates the 18 assertions actually pass on this tree. If it fails, my hand-trace of the derivations is wrong somewhere and the derivation claim (a) falls.
 2. Same cwd: `npx vitest run cli/src/convention-option-doc-contract.test.ts` with `git stash` of the `ArggonManager/docs/convention.md` hunk restored (i.e. run the test against the pre-edit doc) — demonstrates the two doc completions were load-bearing, not cosmetic. If the test passes without the doc edits, the guard does not actually govern the parse-error sentence.
 3. `cd /home/arggon/Projects/ArggonManager-bug-x-tracker-option-list-has-no-doc-drift-guard && git diff --exit-code -- lib/src/convention.ts && npx prettier --check cli/src/convention-option-doc-contract.test.ts ArggonManager/docs/convention.md` — demonstrates the escape hatch is unused in the shipped kernel and both touched files are prettier-clean.
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 7015730b (PR #759); auto-done flip #768. Verifier probes on the merged head (34000e79):
+- `npx vitest run cli/src/convention-option-doc-contract.test.ts` — 18/18 passed (exit 0)
+- `git diff --exit-code -- lib/src/convention.ts` — exit 0, the escape hatch is unused in the shipped kernel
+- `npx prettier --check` on the two touched files — clean
+The merged head also carries the lead's live-Context transcription (PLACEHOLDER_BODY gate).
+Follow-ups filed: task-convention-drift-guard-clarifications (marker line-scoping, mismatch message, duplicate-dispatch hazard); bug-retired-agent-ids-in-doc-samples (the sibling shipped-sample class).
