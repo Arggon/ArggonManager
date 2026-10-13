@@ -43,7 +43,7 @@ upstream is ticked with the commit that resolved it rather than re-fixed here.
 - [x] README `doctor --agents` sample emits only strings the shipped CLI can emit, cross-checked against the pinned inline snapshot in `cli/src/adapter-selection.test.ts` (`0 adopter-edited (yours; init skips it unless --backup)`; `claude` 2 / `opencode` 18 / `zcode` 23 `file(s)`). Finding 1's pre-round-2 `never overwritten` line was already fixed upstream in `d4a7a436`; the drift still live on this base (`zcode: 19` → `23`) is fixed here.
 - [x] `json-output.md`'s `agents.agents[].files` row carries ONE claim for `adopter-edited` — the superseded "never overwrites it" clause and its dangling `)` are gone (finding 2).
 - [x] `json-output.md` documents every `agents.agents[].counts` key the code emits and the pinned `Object.keys(entry.counts)` asserts: `total, present, acknowledged, acknowledged-drifted, adopter-edited, stale, missing, unverified, orphaned` (finding 3). The doc's JSON sample's three `counts` blocks are also valid JSON now — each was missing the comma before `orphaned`, so the one JSON sample in that section did not parse.
-- [x] The sample caption no longer mis-describes the 9th `adopter-edited` row: 8 of the 9 are among the 12 `docs` reports as `modified`, and the 9th carries no `x-generated` entry at all, so `docs` cannot see it and the `agents` block is the only surface that reports it (finding 4).
+- [x] The `--agents` sample block in `json-output.md` is re-measured against this repo's own tree (recorded 2026-10-13, commit `fee7979b`) and names no retired seam path: every count, shown row and elision total matches a live `arggon doctor --json --agents` run, `zcode.total: 23` matches README, and its one `adopter-edited` row (`opencode.jsonc`) is the checksum divergence the `docs` block also counts as `modified` (finding 4, re-scoped by the round-2 verdict).
 - [x] The matrix honesty assertion enforces the shipped identity `written + replaced + skipped === total` (finding 5).
 - [x] The read-once argument is applied to the state file: `runDoctor` reads the convention once and hands `config.generated` to `runAdapterReport`, which no longer re-reads `.convention.yml` through `readGeneratedState`.
 - [x] `npx prettier --check` clean on every file this item touches, `arggon validate` green, `npm test` green (pre-existing repo-wide prettier drift reported, not reformatted).
@@ -52,18 +52,19 @@ upstream is ticked with the commit that resolved it rather than re-fixed here.
 ## Notes
 
 ### 2026-10-11 @ses_ed543078fffeOz1k5gNQ7Y2rB9
+
 ## Round-2 nits closed — evidence (commit 33720115, branch feat/task-adapter-report-nits-from-review)
 
 ### Gates run (all in the worktree, all green)
 
-| Gate | Expected | Observed |
-| --- | --- | --- |
-| \`npx tsc -p tsconfig.json --noEmit\` | exit 0 | exit 0 |
-| \`npx eslint cli/src/doctor.ts cli/src/adapter-selection.test.ts\` | clean | clean (no output) |
-| \`npm run test:structure\` | 5 passed | 5 passed, 0 failed |
-| \`npm run arggon -- validate\` | ok, 0 warnings | ok (0 warning(s), convention v5) |
-| \`npm test\` | green | **136 files / 2927 tests passed** (5 skipped) |
-| \`npx prettier --check\` on the 5 touched files | clean | "All matched files use Prettier code style!" |
+| Gate                                                               | Expected       | Observed                                      |
+| ------------------------------------------------------------------ | -------------- | --------------------------------------------- |
+| \`npx tsc -p tsconfig.json --noEmit\`                              | exit 0         | exit 0                                        |
+| \`npx eslint cli/src/doctor.ts cli/src/adapter-selection.test.ts\` | clean          | clean (no output)                             |
+| \`npm run test:structure\`                                         | 5 passed       | 5 passed, 0 failed                            |
+| \`npm run arggon -- validate\`                                     | ok, 0 warnings | ok (0 warning(s), convention v5)              |
+| \`npm test\`                                                       | green          | **136 files / 2927 tests passed** (5 skipped) |
+| \`npx prettier --check\` on the 5 touched files                    | clean          | "All matched files use Prettier code style!"  |
 
 Notes on the gates: \`npm test\` needed \`npm run build\` first — this worktree had no \`dist/\`, which is what the pre-existing \`headless-ci.test.ts\` failure was ("run \`npm run build\` first"), not a regression. After the build the whole suite is green. Repo-wide \`prettier --check .\` is **red for 648 files** (pre-existing drift from another lane: lib/src/**, templates/**, smoke/**, and every one of the 596 tracker \`.md\` files, all of which want a blank line after the frontmatter fence). I did not reformat any file outside this item — reported, not touched. Prettier leaves embedded code blocks in markdown alone, so the JSON sample below is safe to hand-fix.
 
@@ -127,6 +128,7 @@ Regression check: I ran \`--json doctor --agents\` before and after the change a
 3. The \`arggon-prover.md\` / pre-round-2 agent names that appear nowhere after these edits.
 
 ### handoff 2026-10-11 @arggon-maker (session: ses_ed543078fffeOz1k5gNQ7Y2rB9) — next: Open the PR for 33720115; all seven acceptance rows are ticked and green. Standards reviewer: note F1 and F3's contract row were already fixed upstream (d4a7a436, 7f0191252) — check the diff only cla…
+
 - branch: feat/task-adapter-report-nits-from-review
 - open questions: Should the agents JSON sample be re-measured (zcode 19/16 vs the live 23/all-present) in its own item? Does README:293 'refuses to rewrite' need the same one-claim tightening as json-output.md? Is RE…
 
@@ -181,3 +183,19 @@ Preferred: re-measure. It removes the README/json-output contradiction at the sa
 ## Note for the delivery lead (cross-item, not this item's scope)
 
 ArggonManager/docs/json-output.md:852 and :962 carry retired agent ids in --agents samples. The guard added by the sibling item bug-adopter-engineering-template-software-locked sweeps templates/docs/** for exactly this class but not ArggonManager/docs/**, and the two smokes/agents.md samples are outside both sweeps. This wants its own item: retired seam ids in the shipped doc samples, with the same family-walk treatment the adopter templates just got.
+
+### 2026-10-13 @arggon-maker
+## Round-2 verdict closed — the `--agents` sample block is re-measured (not annotated)
+
+Re-measurement route, as preferred. Measured on a clean tree at `fee7979b` after `npm run build`; the sample block in `ArggonManager/docs/json-output.md` now equals a live run field by field.
+
+- Command: `npm run arggon -- doctor --json --agents` (run before and after the doc edits — identical counts).
+- Assert: extracted the doc's fenced `agents` block and compared it programmatically against the live payload — per-agent counts, every shown `files[]` row, every elision total, the `matrix` block: `ALL CHECKS: PASS`; the block also parses as JSON.
+- Verdict item 1 (README/json-output contradiction): live `zcode.total` is 23 (23 present), not 19 — the sample now says 23 and matches `README.md:302`, so the README 19→23 edit and this doc land consistent.
+- Verdict item 2 (retired seam path): the block's opencode row is now `opencode.jsonc`, the live report's one `adopter-edited` file. No retired seam path remains in the block. `arggon-coordinator|arggon-reviewer|arggon-worker` still appear at `json-output.md:857` in the plain (non-`--agents`) `doctor` sample — the verdict assigns that instance to its own item; flagged to the delivery lead, not touched here.
+- Verdict item 3 (caption asserted a live-tree split): the live tree has ONE `adopter-edited` row, not nine. The caption now states the recorded snapshot (2026-10-13, commit `fee7979b`), the abridgement rule, and the relation it can prove: `opencode.jsonc`'s recorded `x-generated` checksum no longer matches the bytes on disk, so it is also one of the `docs` block's `modified` destinations. Independent recompute: 62 managed entries → 44 untouched, 5 acknowledged-equal, 6 acknowledged-drifted, 7 non-acked checksum mismatches (incl. `opencode.jsonc`) — exactly the live `docs` block.
+- The claude counts in the sample (total 2, present 1, acknowledged 1) needed no edit — they already matched the live run. The zcode elision marker moved 18→22 (1 shown of 23).
+
+Why not the fixture route the verdict sketched: measured on a throwaway `git init` tree — `arggon init --full` reports every file `present`; then `arggon adopt --ack` reports `acknowledged` everywhere except the two always-`present` vendored plugin copies (`.opencode/plugins/arggon/index.ts`, `tui.tsx`); a hand edit after the ack reports `acknowledged-drifted`. A full ack re-baselines every state entry, so a fixture cannot carry plain `acknowledged` and plain `adopter-edited` at the same time — this repo's own tree is the tree that does, which is why the real run is the honest sample.
+
+Gates (all in this worktree): `npm run build` green; `npx vitest run cli/src/adapter-selection.test.ts cli/src/doctor.test.ts cli/src/prose-format.test.ts cli/src/mcp-doc-contract.test.ts` → 4 files / 114 tests passed; `npm test` → 149 files / 3247 tests passed; `npm run lint` exit 0; `npm run test:structure` 5 passed / 0 failed; `arggon validate` ok (0 warnings); `prettier --check` clean and byte-stable under `--write` on both touched files. The item file was normalized by the repo's configured on-edit formatter (`opencode.jsonc` `formatter.prettier`) — kept so the touched file passes its prettier gate; `json-output.md` was already clean and changed only in the intended lines.
