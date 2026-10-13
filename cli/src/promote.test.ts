@@ -50,8 +50,21 @@ const LATER = new Date("2026-09-16T12:00:00Z");
 function primedTree(): { dir: string; tasks: string } {
   const dir = mkdtempSync(join(tmpdir(), "arggon-promote-"));
   runInit({ dir, force: false });
-  runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
-  runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
+  // Real seed prose (task-validate-refuses-placeholder-bodies): the scaffold
+  // IS the placeholder, so default bodies would fail `validate` here.
+  const container = "## Context\n\nSeed.\n\n## Acceptance\n\nSeed.\n";
+  // The promotion test asserts the H1 title travels with the file, so the
+  // leaf keeps its scaffold-style `# Title` heading (real sections below it).
+  const leaf = "# Add rate limiting\n\n## Context\n\nSeed.\n\n## Acceptance\n\n- [x] seed\n";
+  runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW, body: container });
+  runCreate({
+    cwd: dir,
+    type: "epic",
+    title: "Auth",
+    parent: "launch-mvp",
+    now: NOW,
+    body: container,
+  });
   runCreate({
     cwd: dir,
     type: "story",
@@ -59,6 +72,7 @@ function primedTree(): { dir: string; tasks: string } {
     parent: "auth",
     id: "story-login",
     now: NOW,
+    body: container,
   });
   runCreate({
     cwd: dir,
@@ -67,6 +81,7 @@ function primedTree(): { dir: string; tasks: string } {
     parent: "story-login",
     id: "rate-limit",
     now: NOW,
+    body: leaf,
   });
   return { dir, tasks: join(dir, "ArggonManager") };
 }

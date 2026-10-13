@@ -80,8 +80,9 @@ namespace:
   W3 eight plus `start` from W4: nine) so the runtime keeps them in its Code
   Mode catalog; a kernel failure becomes a typed tool error (`ArgonToolError`:
   kernel code + envelope) and the session continues. The whole 15-definition
-  payload measures 11,821 B ≤ 12,288 B advisory (ADR 0006; W7 re-measure,
-  trimmed from the W4-era 12,182 B).
+  payload measures 12,189 B ≤ 12,288 B advisory (ADR 0006; re-measured with
+  the `cleanup` `force` input in bug-cleanup-prune-untracked-artifacts-no-force,
+  which is declared bare because of the bound — 99 B of headroom).
 - **Worktree lifecycle tools (W4)** — `tools.arggon.start`, `branch` and
   `cleanup` own the item worktree through the V2 worktree domain
   (`ctx.worktree.create/list/remove`). For a fresh worktree, `start` uses the
@@ -110,7 +111,7 @@ namespace:
   | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
   | `start`   | `id`, `branch`, `worktreePath` (`null` with `worktree: false`), `worktreeCreated`, `branchCreated`, `pushed`, `item`, `preparation?` (bounded `ready`/install/workspace/dependency-coverage receipt: `ready`, `install`, `linkedNodeModules`, `builtWorkspaces`, `linkedWorkspaces`, `manifestCoverage` (`"satisfied"` | `"stale"` | `"unknown"`), `missingDependencies` (kernel-capped at 10 names), `missingDependenciesTotal` and `gateBins` (which node_modules each declared gate binary resolves from — `"worktree"` | `"external"` | `"path"` | `"missing"` — bounded at 8), the bounded preparation log `steps` (`{ step, outcome, pkg? }`, bug-start-install-ordering, kernel-capped at 16) with `stepsTruncated` when the kernel's own cap dropped entries (mirrored, see below), plus `truncated` when a list was capped; `ready` is the conjunction of "an install is present", "no worktree-owned package resolves into the primary", "the install provides the worktree's declared `dependencies`/`devDependencies`" and "every reported gate bin resolves inside the worktree — the clause is vacuous when nothing declared exposes a bin", so a stale primary mirror is reported as `ready: false` **with the missing names in the payload** and a gate bin resolving from a sibling checkout's `.bin` (or nowhere) is named instead of silently running the gate on a foreign install — see [`agents.md`](./agents.md) §4 for the remedy), `claimCommitted`, `claimCommit` (`committed`, `not-needed`, `failed`, or `not-attempted` with a bounded reason), `commit?`, and `rollback?` on a refused claim |
   | `branch`  | `id`, `branch`, `item`, `commit?`                                                                                                                                                                                                                                                                                      |
-  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverPath?`, `leftoverBranch?`, `via?`), `failures[]`, `commit?`                                                                                                         |
+  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `forced?`, `blockingPaths?`, `blockingTotal?`, `blockingTracked?`, `blockingTrackedTotal?`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverPath?`, `leftoverBranch?`, `forced?`, `via?`), `failures[]`, `commit?`  |
 
   `start`'s `preparation` receipt is the bounded pre-claim dependency receipt
   the row above describes plus two ADDITIVE fragments the kernel builds in the
@@ -187,8 +188,12 @@ namespace:
   checked against the directory and `git worktree list` before anything else
   happens, and a domain that resolves without removing (or fails) falls through
   to the literal `git worktree remove` fallback — the same primitive the `start`
-  rollback uses, without its force policy, so git keeps refusing dirty
-  worktrees. `removed worktree`, `deleted branch` and `cleared worktree_path`
+  rollback uses, with the force policy of the shared classification instead of
+  the rollback's blanket force, so git keeps refusing dirty worktrees unless
+  the caller armed `force` for an entry whose blockers are ALL untracked
+  (bug-cleanup-prune-untracked-artifacts-no-force; tracked modifications are
+  never force-discarded, and the skip names the blockers and the remedy).
+  `removed worktree`, `deleted branch` and `cleared worktree_path`
   are reported only when the removal is observably complete; otherwise the
   candidate reports one bounded `failed` action plus a `failures[]` entry
   carrying `leftoverPath` (the worktree that is still there) and
@@ -310,24 +315,41 @@ sat in orphaned worktrees. So the hole is not "the wrong directory is resolved"
 
 #### The binding guard: resolved vs expected
 
-Every call is now also held against the per-worktree identity the caller
-declares, read from the documented env contract
-([spec worktree-env-contract-016](specs/spec-worktree-env-contract-016.md)) — the
-`.arggon.env` `start --worktree` writes at a worktree root, which until now was
-written, reported and reaped but **never read back for resolution**. Two sources,
-either of which is an expectation the resolution can be held to:
+Every call is now also held against the per-worktree identity in scope for it.
+There are three sources, in the order the seam consults them — the first two are
+declarations the **caller** makes, the third is the declaration the **dispatch
+surface** made:
 
-| source             | carrier                                                                                                                  | what it declares                                                                                                                                            |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| on disk            | `.arggon.env` at the resolved directory (or up to 8 parents, so a session opened below the worktree root still finds it) | `ARGGON_WORKTREE_PATH` plus the rest of the identity — `ARGGON_WORKTREE_ID`, `ARGON_ITEM`, `ARGGON_WORKTREE_BRANCH`, `ARGGON_STATE_DIR`, `ARGGON_CACHE_DIR` |
-| in the environment | the host `process.env`, when the worktree session sourced that file (the pairing the README documents)                   | the same keys                                                                                                                                               |
+| source              | carrier                                                                                                                                              | what it declares                                                                                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| on disk             | `.arggon.env` at the resolved directory (or up to 8 parents, so a session opened below the worktree root still finds it)                             | `ARGGON_WORKTREE_PATH` plus the rest of the identity — `ARGGON_WORKTREE_ID`, `ARGON_ITEM`, `ARGGON_WORKTREE_BRANCH`, `ARGGON_STATE_DIR`, `ARGGON_CACHE_DIR` |
+| in the environment  | the host `process.env`, when the worktree session sourced that file (the pairing the README documents)                                               | the same keys                                                                                                                                               |
+| the claim footprint | `.arggon.env` in a **sibling worktree** of the resolved checkout, discovered through `git worktree list --porcelain` and keyed by the call's item id | the same keys — for the item this very call names                                                                                                           |
+
+The first two are read from the documented env contract
+([spec worktree-env-contract-016](specs/spec-worktree-env-contract-016.md)): the
+`.arggon.env` `start --worktree` writes at a worktree root, which until 2026-10-05
+was written, reported and reaped but **never read back for resolution**. The
+third source closes the hole the first two left
+([bug-native-guard-silent-without-worktree-declaration](../agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-native-guard-silent-without-worktree-declaration.md)):
+both caller sources are _reconciling_ — they hold the resolution against a
+declaration the caller made — so a worker that never moved its session and never
+sourced anything declared nothing, and the 2026-10-05 incident (7 open PRs
+invisible to the tracker: writes from the primary answering `ok: true` with a
+hash while the claim, the branch and the work sat in a worktree) still
+reproduced in silence. The claim itself is the missing declaration:
+`start --worktree` — the dispatch surface — writes the worktree's `.arggon.env`
+the moment it claims, so the expectation exists **before the worker's first
+tracker write**, with nothing sourced. The guard now reads it from the claim's
+checkout.
 
 The rule is deliberately narrow so it cannot wedge correct work:
 
-- **No declaration anywhere** → no expectation, no refusal, behavior unchanged.
-  This is the ordinary plain checkout, and it is why a primary checkout — which
-  has no `.arggon.env` — is never refused.
-- **The resolved checkout IS a declared worktree** → the session is where it
+- **No declaration anywhere AND no worktree claims the item** → no expectation,
+  nothing reported, nothing refused, and the envelope stays byte-identical to
+  the CLI's. This is the ordinary primary checkout, an adopter without
+  worktrees, and a follow-up item filed straight into the tracker.
+- **The resolved checkout IS the declared worktree** → the session is where it
   says it is; the write proceeds there.
 - **The caller declared a worktree and the call resolved somewhere else** →
   the disagreement. A **write** is refused with `error.code:
@@ -336,13 +358,59 @@ The rule is deliberately narrow so it cannot wedge correct work:
   stale declaration). Nothing is written. A **read** is never refused — it
   reports the same information on the envelope, so the state is detectable
   without mutating anything.
+- **No caller declaration, but a sibling worktree claims the call's item** →
+  the same disagreement, and it is **reported, not refused**: every item-scoped
+  envelope, read or write, carries `trackerRoot` and `trackerRootMismatch` naming
+  the claiming worktree and the file its declaration was read from. The write
+  still lands where the session resolved — the deliberate decision recorded
+  below, not an oversight.
 
 Identity is compared **by path only**, never by `ARGGON_WORKTREE_ID`: a
 long-lived `opencode serve` can carry a stale id from an earlier worktree
 session while sitting at the right path, and refusing there would block correct
 work. The id, branch and state/cache dirs are still read and reported. Reading
 the contract is never fatal — a missing, unreadable, oversized or
-identity-free file declares nothing and degrades to the previous behavior.
+identity-free file declares nothing and degrades to the previous behavior, and
+the same holds for the footprint scan: a failed `git` call, an empty worktree
+listing, or a worktree without the contract file (`x-worktree.env: false`, a
+pre-spec-016 worktree, a plain `git worktree add`) declares nothing. The scan is
+bounded — at most 64 worktree roots, one bounded `.arggon.env` read per root —
+so a call can never turn into a crawl of the repo's worktrees.
+
+#### Design decision: who declares, when, and what a legitimate unsourced write looks like
+
+Recorded here rather than left implicit in code, because it decides what the seam
+refuses and what it merely shows:
+
+- **Who declares:** the **dispatch surface**, not the worker.
+  `tools.arggon.start({ worktree: true })` (CLI: `arggon start <id> --worktree`)
+  writes the worktree's `.arggon.env` at claim time. The worker never sources
+  anything and never has to remember to; the README's sourced-environment
+  pairing stays supported but is no longer load-bearing.
+- **When:** at claim, before the maker is dispatched — so the expectation exists
+  before the first tracker write, the property the incident lacked.
+- **What a legitimate unsourced primary-checkout write looks like:** two shapes.
+  (a) An item **no worktree claims anywhere** — creation, follow-up filing, an
+  adopter without worktrees, an env-contract opt-out: there is no footprint, so
+  nothing is reported and the envelope is byte-identical. (b) The **claim's own
+  lifecycle, run from the canonical checkout** — the post-merge terminal flip
+  (`/arggon-done`) and the unclaim of a dropped claim both write `update` from
+  the primary while the worktree still exists, and no native remedy would land
+  them on the right branch (moving the session would write an already-merged
+  branch). Case (b) is why the footprint **reports** while the caller-declared
+  case **refuses**: a caller declaration is a stated expectation with a clean
+  recovery (clear it, or move); a claim footprint is information the seam adds,
+  not a violation it adjudicates.
+- **What is never touched:** sessions that cannot declare at all. The guard is
+  native-surface only — the CLI resolves its root from its own cwd and can never
+  hold two candidates against each other — so humans, CI and scripts keep the
+  complete surface unchanged.
+- **Exempt by shape:** the worktree-lifecycle tools (`start`, `branch`,
+  `cleanup`) are never held to the footprint: they manage the claim from the
+  canonical checkout by design (an attach MUST work from the primary). Only the
+  item-scoped kernel tools (`update`, `show`, `comment`, `handoff`) carry the
+  item id the scan keys on; the pool reads (`list`, `next`) name no item and stay
+  byte-identical.
 
 #### Additive receipt fields
 
@@ -356,11 +424,11 @@ sits 126 B under the ADR 0006 advisory catalog budget, and it already documents
 that it never rejects a valid envelope — `additionalProperties` defaults to
 `true`).
 
-| field                 | type     | meaning                                                                                                                                                                                                                                 |
-| --------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `trackerRoot`         | `string` | The absolute checkout the tracker root resolved from (the tracker dir's parent). Always present alongside `trackerWorktree` or `trackerRootMismatch`, so a mismatch can never be reported without saying which checkout it resolved to. |
-| `trackerWorktree`     | `object` | The identity read from the resolved checkout: `{ source, path?, id?, item?, branch?, stateDir?, cacheDir? }`, in the documented key order. `source` is the `.arggon.env` path or the literal `process.env`.                             |
-| `trackerRootMismatch` | `object` | The disagreement: `{ resolved, declared[], sources[] }` — what the call bound to, every worktree the caller declared, and where each declaration came from. Present on reads (never fatal) and carried by the refusal on writes.        |
+| field                 | type     | meaning                                                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `trackerRoot`         | `string` | The absolute checkout the tracker root resolved from (the tracker dir's parent). Always present alongside `trackerWorktree` or `trackerRootMismatch`, so a mismatch can never be reported without saying which checkout it resolved to.                                                                                                                                                        |
+| `trackerWorktree`     | `object` | The identity read from the resolved checkout: `{ source, path?, id?, item?, branch?, stateDir?, cacheDir? }`, in the documented key order. `source` is the `.arggon.env` path or the literal `process.env`.                                                                                                                                                                                    |
+| `trackerRootMismatch` | `object` | The disagreement: `{ resolved, declared[], sources[] }` — what the call bound to, every worktree in scope for this call (declared by the caller, or claiming the item as the footprint), and where each declaration came from. Present on reads (never fatal); on writes it is carried by the caller-declared refusal, and reported (never fatal) when the expectation is the claim footprint. |
 
 Deterministic evidence: `opencode/plugins/arggon/tools.test.ts` →
 `"tracker-root binding against the declared worktree identity"` builds a real
@@ -369,15 +437,28 @@ drives the seam in four states — session left in the primary with the worktree
 declared (every writing tool refuses, both checkouts byte-identical afterwards);
 the same read reporting the mismatch and the resolved root instead of refusing;
 session correctly in the worktree (`.arggon.env` read in full, the commit on the
-worktree branch, the primary untouched); and a plain checkout that declares
-nothing (no refusal, envelope byte-identical to the CLI's). One further case
-covers a stale `.arggon.env` naming another worktree with no environment
-involved. `"worktree identity parsing"` pins the parser against missing,
-oversized, malformed and non-contract files. Neutralizing
-`trackerRootMismatch` fails 5 of those 8 — the 3 that survive are the ones that
-pin deliberately unchanged behavior.
+worktree branch, the primary untouched); and a primary checkout with no claiming
+worktree anywhere (no refusal, envelope byte-identical to the CLI's), plus a
+sibling worktree claiming a DIFFERENT item, which declares nothing for this one.
+One further case covers a stale `.arggon.env` naming another worktree with no
+environment involved. `"the claim footprint declares for an unsourced session"`
+drives the incident state itself — session bound to checkout A, worktree B
+claiming the item, NOTHING sourced — and pins that the WRITE reports `trackerRoot`
 
-- **Permissions (W4)** — the generated seam adds minimal shell gates (deny
+- `trackerRootMismatch` (naming the claiming worktree and the `.arggon.env` its
+  declaration was read from) instead of proceeding silently, that the same READ
+  reports it, that the caller-declared refusal is unchanged once a declaration IS
+  sourced, that the claim's own lifecycle still works from the canonical checkout
+  (post-merge flip reported and landed; `start` attaches and is never held to the
+  footprint), and that the pool reads stay byte-identical. The scan's own pins: the
+  porcelain parser, the hit / miss / skip-the-resolved-root discovery, the 64-root
+  bound and the degrade-when-git-cannot-answer path. `"worktree identity parsing"`
+  pins the parser against missing, oversized, malformed and non-contract files.
+  Neutralizing `trackerRootMismatch` fails 10 of the 22 binding tests — 5 from the
+  caller-declared suite, 4 from the claim-footprint suite and 1 from the parsing
+  suite; the survivors pin deliberately unchanged behavior.
+
+* **Permissions (W4)** — the generated seam adds minimal shell gates (deny
   `git commit --no-verify*`, `git push --force*`, `git push -f*`) that
   complement — never replace — the kernel invariants; the shipped agents add
   role gates (reviewer `edit`/subagent denied plus read-only shell gates;
@@ -386,11 +467,11 @@ pin deliberately unchanged behavior.
   `<server>_<tool>` (`arggon_arggon_update`): a `deny` removes the tool from
   the Code Mode catalog. The base policy stays allow-all, so ordinary and
   headless sessions are never blocked.
-- **MCP is out of the default path (W3)** — the plugin no longer registers
+* **MCP is out of the default path (W3)** — the plugin no longer registers
   `mcp.servers.arggon` and never touches `ctx.mcp`; the generated config carries
   no MCP stanza. `arggon mcp` and `.mcp.json` remain for non-OpenCode clients
   that configure it explicitly (`doctor` reports a present stanza as optional).
-- **TUI board and status (W5)** — `.opencode/plugins/arggon/tui.tsx` (the
+* **TUI board and status (W5)** — `.opencode/plugins/arggon/tui.tsx` (the
   vendored TUI entry: OpenCode discovers it beside the server bundle) registers
   a `session.panel` contribution named `arggon.board` and a one-line
   `sidebar.content` status. The panel renders the current tree
@@ -401,26 +482,26 @@ pin deliberately unchanged behavior.
   `board.ts` → the inlined kernel (no rule fork, no writes); the vendored TUI
   entry imports the board surface from the bundle relatively and lets the
   runtime resolve `solid-js`, so the adopter tree still needs no `node_modules`.
-- **Session ↔ item correlation** — `ARGON_ITEM` env → observed `arggon` calls
+* **Session ↔ item correlation** — `ARGON_ITEM` env → observed `arggon` calls
   (shell invocations and Code Mode `tools.arggon.<name>(…)` calls) →
   `feat/<id>` / `fix/<id>` branch. For the prompt-admission stamp the
   **worktree env contract** (`.arggon.env`, spec-worktree-env-contract-016) is
   consulted first, because it is the only source that names the session's own
   worktree; the chain above is its fallback on a plain checkout.
-- **Bounded context** — injects an `arggon show --json`-shaped item block
+* **Bounded context** — injects an `arggon show --json`-shaped item block
   (≤ 1024 B) per model call, so it is present after compaction by construction.
-- **Prompt-admission stamp (T4)** — the `prompt` hook writes a bounded
+* **Prompt-admission stamp (T4)** — the `prompt` hook writes a bounded
   branch/item stamp into the admitted prompt's own `metadata`
   (`payload.metadata.arggon`), so a persisted user message carries the item it
   was opened under. Metadata only: the prompt text, files, agents, skills and
   `delivery` are left byte-identical, and nothing permission-related is touched.
-- **Compaction retention (T4)** — the `compaction` hook re-injects the item
+* **Compaction retention (T4)** — the `compaction` hook re-injects the item
   block into the checkpoint-summary request's system instructions exactly once,
   so the summary is produced WITH the item in scope. It never sets `result`: the
   model still writes the summary.
-- **Session ergonomics** — renames the session to the claimed item; surfaces
+* **Session ergonomics** — renames the session to the claimed item; surfaces
   the recorded `worktree_path` for `session_move`.
-- **Hygiene signal** — logs a non-blocking warning when `arggon validate`
+* **Hygiene signal** — logs a non-blocking warning when `arggon validate`
   fails after a commit (the pre-commit/CI gates stay authoritative).
 
 Every path is wrapped: a plugin failure logs and no-ops. The CLI and MCP keep

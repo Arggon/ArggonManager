@@ -707,6 +707,18 @@ export type BoardDetailPayload = {
     /** Comments omitted by the kernel tail (allComments - tail). */
     hidden_comments: number;
     dependencies: Array<{ id: string; status: string | null; terminal: boolean }>;
+    /**
+     * Hierarchy edges through the kernel's recorded `parent` frontmatter
+     * (task-web-board-hierarchy-links): `parent` is null when the item has no
+     * parent; a parent id with no item in the tree reports `status: null`
+     * (dangling — `validate` flags it, the drawer never links it).
+     * `children` lists every item whose `parent` is this item's id, in
+     * lexicographic id order with live kernel statuses. Both ride the same
+     * `loadItems` read as `dependencies` — there is no second hierarchy
+     * source. Additive within `schemaVersion: 1`.
+     */
+    parent: { id: string; status: string | null } | null;
+    children: Array<{ id: string; status: string }>;
     pr: PrInfo | null;
   };
 };
@@ -773,12 +785,33 @@ export function parseAcceptanceRows(body: string): AcceptanceRow[] {
 type BoundedParts = { prose: string; allComments: ShowComment[]; comments: ShowComment[] };
 
 /**
+ * Child index over one `loadItems` read (task-web-board-hierarchy-links):
+ * parent id -> direct children in lexicographic id order. Built once per
+ * detail assembly (per route hit in `buildBoardDetail`, once per export in
+ * `buildBoardDetailMap`); the drawer reads no second hierarchy source.
+ */
+function buildChildrenIndex<T extends { id: string; parent?: string | null; status: string }>(
+  items: readonly T[],
+): Map<string, Array<{ id: string; status: string }>> {
+  const index = new Map<string, Array<{ id: string; status: string }>>();
+  for (const item of sortById(items)) {
+    if (!item.parent) continue;
+    const list = index.get(item.parent) ?? [];
+    list.push({ id: item.id, status: item.status });
+    index.set(item.parent, list);
+  }
+  return index;
+}
+
+/**
  * The one detail-payload assembly, shared by the serve route and the static
  * embedding (task-board-static-details): clip the bounded prose, clip each
  * tail comment, parse the acceptance rows and the done-gate verdict from the
  * CANONICAL body, map dependencies through the shared status index (the
  * ADR 0004 open/terminal rule; unknown ids count as open, exactly like the
- * card's blocked-by line) and match the PR overlay snapshot. Pure: no reads
+ * card's blocked-by line), resolve the `parent` edge and the child list
+ * through the same `loadItems` read (task-web-board-hierarchy-links — no
+ * parallel hierarchy) and match the PR overlay snapshot. Pure: no reads
  * beyond the inputs, no writes.
  *
  * The acceptance fields read `acceptanceBody(kernelItem)` — the whole body,
@@ -793,6 +826,7 @@ function detailPayloadOf(
   contractItem: WorkItem,
   bounded: BoundedParts,
   statusById: ReturnType<typeof buildStatusIndex>,
+  childrenByParent: Map<string, Array<{ id: string; status: string }>>,
   prs?: Map<string, PrInfo>,
 ): BoardDetailPayload {
   const prose = clipDetailText(bounded.prose, MAX_DETAIL_PROSE_BYTES);
@@ -810,6 +844,8 @@ function detailPayloadOf(
     const status = entry ? entry.status : null;
     return { id: depId, status, terminal: status === "done" || status === "cancelled" };
   });
+  const parentId = kernelItem.parent ? kernelItem.parent : null;
+  const parentEntry = parentId ? statusById.get(parentId) : undefined;
   const acceptance = parseAcceptanceRows(acceptanceBody(kernelItem));
   return {
     ok: true,
@@ -823,6 +859,8 @@ function detailPayloadOf(
       comments,
       hidden_comments: bounded.allComments.length - bounded.comments.length,
       dependencies,
+      parent: parentId ? { id: parentId, status: parentEntry ? parentEntry.status : null } : null,
+      children: childrenByParent.get(kernelItem.id) ?? [],
       pr: contractItem.branch ? (prs?.get(contractItem.branch) ?? null) : null,
     },
   };
@@ -831,12 +869,12 @@ function detailPayloadOf(
 /**
  * Assemble the `/api/item` payload through the kernel bounded read path:
  * `runShow` (ADR 0006 — prose + the last `DEFAULT_TAIL_COMMENTS` comments,
- * never the full body) plus the shared status index for dependency states.
- * Pure read: no writes, no locks, no commit. `id` not found throws `runShow`'s
- * message (the route maps it to 404). Cost: two kernel reads per request
- * (O(n) over the tracker — `runShow` for the item, `loadItems` for the
- * dependency index); the route is triggered by a user opening one drawer,
- * never by the poll loop.
+ * never the full body) plus the shared status index for dependency states and
+ * the child index for hierarchy edges. Pure read: no writes, no locks, no
+ * commit. `id` not found throws `runShow`'s message (the route maps it to
+ * 404). Cost: two kernel reads per request (O(n) over the tracker — `runShow`
+ * for the item, `loadItems` for the dependency and child indexes); the route
+ * is triggered by a user opening one drawer, never by the poll loop.
  */
 export function buildBoardDetail(opts: {
   cwd: string;
@@ -845,12 +883,14 @@ export function buildBoardDetail(opts: {
   prs?: Map<string, PrInfo>;
 }): BoardDetailPayload {
   const shown = runShow({ cwd: opts.cwd, id: opts.id });
-  const statusById = buildStatusIndex(loadItems(findTasksDir(opts.cwd)));
+  const items = loadItems(findTasksDir(opts.cwd));
+  const statusById = buildStatusIndex(items);
   return detailPayloadOf(
     shown.item,
     toContractWorkItem(shown.item, shown.root),
     shown,
     statusById,
+    buildChildrenIndex(items),
     opts.prs,
   );
 }
@@ -873,6 +913,7 @@ export function buildBoardDetailMap(opts: {
   prs?: Map<string, PrInfo>;
 }): Record<string, BoardDetailPayload> {
   const statusById = buildStatusIndex(opts.items);
+  const childrenByParent = buildChildrenIndex(opts.items);
   const map: Record<string, BoardDetailPayload> = {};
   for (const kernelItem of opts.items) {
     map[kernelItem.id] = detailPayloadOf(
@@ -880,6 +921,7 @@ export function buildBoardDetailMap(opts: {
       toContractWorkItem(kernelItem, opts.root),
       showBoundedParts(kernelItem),
       statusById,
+      childrenByParent,
       opts.prs,
     );
   }
@@ -922,6 +964,7 @@ body.drawer-open { overflow: hidden; }
 .drawer-dep.open { color: var(--blocked-fg); }
 .drawer-dep.terminal { color: var(--green); }
 .drawer-dep.missing { color: var(--red); }
+.drawer-child { font-size: 12px; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
 .drawer-note { color: var(--meta); font-size: 11px; margin-top: 4px; }
 .drawer-comment { margin-top: 8px; }
 .drawer-who { color: var(--meta); font-size: 11px; }
@@ -987,7 +1030,10 @@ const MOVE_PROMPT_MARKUP = `<div id="board-move-prompt" class="move-prompt" hidd
  * Untrusted tracker content is rendered exclusively through `textContent` and
  * `createElement` — the body is markdown text, never HTML (a hostile
  * `<img onerror>` line stays a literal string). PR links only get an href for
- * an absolute http(s) URL.
+ * an absolute http(s) URL. Hierarchy links (parent, children) carry the
+ * target id in a `data-detail-id` attribute and an inert `#` href: the drawer
+ * wiring intercepts the click and opens that item's detail in place, so a
+ * hostile id can neither inject markup nor navigate away.
  */
 export function renderBoardDetail(container: HTMLElement, payload: BoardDetailPayload): void {
   const doc = container.ownerDocument;
@@ -1027,7 +1073,31 @@ export function renderBoardDetail(container: HTMLElement, payload: BoardDetailPa
   container.appendChild(
     row("assignee", item.assignee ? "@" + String(item.assignee) : "unassigned"),
   );
-  if (item.parent) container.appendChild(row("parent", String(item.parent)));
+  // Hierarchy edges (task-web-board-hierarchy-links): the parent renders as a
+  // link that opens the parent's detail; a dangling parent id (no item in the
+  // tree) renders as honest text, never a dead link; no parent renders "none".
+  // A stale snapshot without the edge falls back to the item's own parent id
+  // as plain text.
+  const parentEdge = detail.parent;
+  const parentId =
+    parentEdge && parentEdge.id ? String(parentEdge.id) : item.parent ? String(item.parent) : null;
+  const parentStatus = parentEdge && parentEdge.status ? String(parentEdge.status) : null;
+  if (parentId === null) {
+    container.appendChild(row("parent", "none"));
+  } else if (parentStatus === null) {
+    container.appendChild(row("parent", parentEdge ? parentId + " · missing" : parentId));
+  } else {
+    const parentLine = el("div", "drawer-row");
+    parentLine.appendChild(el("span", "drawer-k", "parent"));
+    const parentValue = el("span", "drawer-v");
+    const parentLink = doc.createElement("a");
+    parentLink.setAttribute("href", "#" + encodeURIComponent(parentId));
+    parentLink.setAttribute("data-detail-id", parentId);
+    parentLink.textContent = parentId + " · " + parentStatus;
+    parentValue.appendChild(parentLink);
+    parentLine.appendChild(parentValue);
+    container.appendChild(parentLine);
+  }
   container.appendChild(
     row("labels", item.labels && item.labels.length > 0 ? item.labels.join(", ") : "none"),
   );
@@ -1049,6 +1119,23 @@ export function renderBoardDetail(container: HTMLElement, payload: BoardDetailPa
     depsSection.appendChild(el("div", "drawer-dep " + depClass, String(dep.id) + " · " + state));
   }
   container.appendChild(depsSection);
+
+  // Children (task-web-board-hierarchy-links): every item whose `parent` is
+  // this item's id, each a link opening that child's detail. Childless items
+  // render the honest "none" note, never an empty section.
+  const childrenSection = section("children", "drawer-children");
+  const children = detail.children || [];
+  if (children.length === 0) childrenSection.appendChild(el("div", "drawer-note", "none"));
+  for (let h = 0; h < children.length; h++) {
+    const childLine = el("div", "drawer-child");
+    const childLink = doc.createElement("a");
+    childLink.setAttribute("href", "#" + encodeURIComponent(String(children[h].id)));
+    childLink.setAttribute("data-detail-id", String(children[h].id));
+    childLink.textContent = String(children[h].id) + " · " + String(children[h].status);
+    childLine.appendChild(childLink);
+    childrenSection.appendChild(childLine);
+  }
+  container.appendChild(childrenSection);
 
   const prSection = section("pull request", "drawer-pr");
   const pr = detail.pr;
@@ -1150,6 +1237,10 @@ export function renderBoardDetail(container: HTMLElement, payload: BoardDetailPa
  * the drawer before the filter input's own Escape-to-clear can run. Tab is
  * trapped inside the panel while the drawer is open
  * (task-board-keyboard-a11y) and focus returns to the opening card on close.
+ * Parent/children hierarchy links (task-web-board-hierarchy-links) are plain
+ * `a[href]` anchors in the existing tab order: a delegated click opens the
+ * linked item's detail in place through the same fetch/snapshot path, keeping
+ * the board card that owns focus restoration.
  *
  * `embeddedDetails` is the static export's snapshot
  * (task-board-static-details): when non-null the drawer renders the
@@ -1187,10 +1278,9 @@ export function wireBoardDetail(
     if (restoreFocus && lastCard && lastCard.isConnected) lastCard.focus();
   }
 
-  function open(card: Element): void {
-    const id = card.getAttribute("data-id") || "";
+  function openById(id: string, card: Element | null): void {
     if (!id) return;
-    lastCard = card as HTMLElement;
+    if (card) lastCard = card as HTMLElement;
     const current = ++seq;
     drawerEl.hidden = false;
     drawerEl.setAttribute("aria-hidden", "false");
@@ -1255,6 +1345,25 @@ export function wireBoardDetail(
           "detail unavailable — " + (err && err.message ? err.message : "fetch failed");
       });
   }
+
+  function open(card: Element): void {
+    const id = card.getAttribute("data-id") || "";
+    openById(id, card);
+  }
+
+  // Hierarchy links (task-web-board-hierarchy-links): the parent/children
+  // anchors the renderer emits carry `data-detail-id` and an inert `#` href.
+  // Intercept the click before navigation and open that item's detail in
+  // place — same fetch/snapshot path as a card open, without stealing the
+  // board card that owns focus restoration on close.
+  document.addEventListener("click", function (event) {
+    const target = event.target as Element | null;
+    if (!target || typeof target.closest !== "function") return;
+    const link = target.closest("#board-drawer a[data-detail-id]");
+    if (!link) return;
+    event.preventDefault();
+    openById(link.getAttribute("data-detail-id") || "", null);
+  });
 
   document.addEventListener("click", function (event) {
     const target = event.target as Element | null;

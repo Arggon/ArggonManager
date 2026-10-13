@@ -226,9 +226,19 @@ function normalize(envelope: Envelope, dir: string): Envelope {
 
 function seedTree(dir: string): void {
   runInit({ dir, force: false });
-  runCreate({ cwd: dir, type: "initiative", title: "Launch MVP" });
-  runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp" });
-  runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login" });
+  // Real seed prose (task-validate-refuses-placeholder-bodies): the scaffold
+  // IS the placeholder, so default bodies would fail `validate` here.
+  const container = "## Context\n\nSeed.\n\n## Acceptance\n\nSeed.\n";
+  runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", body: container });
+  runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", body: container });
+  runCreate({
+    cwd: dir,
+    type: "story",
+    title: "Login",
+    parent: "auth",
+    id: "story-login",
+    body: container,
+  });
 }
 
 function twinTrees(): { cliDir: string; mcpDir: string } {

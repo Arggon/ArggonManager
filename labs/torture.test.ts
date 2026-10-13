@@ -91,7 +91,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "../cli/src/init.js";
-import { satisfyAcceptance } from "../test/acceptance.js";
+import { satisfyAcceptance, satisfyPlaceholders } from "../test/acceptance.js";
 import { removeFixtureTree } from "../cli/src/test-tmp.js";
 
 import { GENERATED_DOC_COUNT } from "../cli/src/docs.js";
@@ -126,9 +126,26 @@ function gitCommitIfDirty(cwd: string, message: string): void {
 function freshTree(prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), `arggon-lab-${prefix}-`));
   runInit({ dir, force: false });
-  runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch" });
-  runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "auth" });
-  runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login" });
+  // Real seed prose (task-validate-refuses-placeholder-bodies): the scaffold
+  // IS the placeholder, so default bodies would fail `validate` here.
+  const container = "## Context\n\nSeed.\n\n## Acceptance\n\nSeed.\n";
+  runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", body: container });
+  runCreate({
+    cwd: dir,
+    type: "epic",
+    title: "Auth",
+    parent: "launch",
+    id: "auth",
+    body: container,
+  });
+  runCreate({
+    cwd: dir,
+    type: "story",
+    title: "Login",
+    parent: "auth",
+    id: "story-login",
+    body: container,
+  });
   return dir;
 }
 
@@ -141,9 +158,26 @@ function freshGitTree(prefix: string, tracker: string): string {
   runInit({ dir, force: false });
   const yml = join(dir, "ArggonManager/.convention.yml");
   writeFileSync(yml, `${readFileSync(yml, "utf8")}${tracker}`, "utf8");
-  runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch" });
-  runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "auth" });
-  runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login" });
+  // Real seed prose (task-validate-refuses-placeholder-bodies): the scaffold
+  // IS the placeholder, so default bodies would fail `validate` here.
+  const container = "## Context\n\nSeed.\n\n## Acceptance\n\nSeed.\n";
+  runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", body: container });
+  runCreate({
+    cwd: dir,
+    type: "epic",
+    title: "Auth",
+    parent: "launch",
+    id: "auth",
+    body: container,
+  });
+  runCreate({
+    cwd: dir,
+    type: "story",
+    title: "Login",
+    parent: "auth",
+    id: "story-login",
+    body: container,
+  });
   // Fixture repo, not a working checkout: stage everything so `git status`
   // starts clean (init ran in-process, so nothing else commits the scaffold).
   git(["add", "-A"], dir);
@@ -199,12 +233,16 @@ function frontmatter(dir: string, ...segments: string[]): Record<string, string>
 describe("lab: mixed concurrent operations on one item family (suizo / bug-claim-race-no-lock)", () => {
   it("N=8 processes (claims, sibling-done cascade pressure, comments): one claimant, deterministic losers, validate ok", async () => {
     const dir = freshTree("mixed");
+    // Real prose (task-validate-refuses-placeholder-bodies): the scaffold IS
+    // the placeholder, so default bodies would fail the closing `validate`.
+    const leaf = "## Context\n\nSeed.\n\n## Acceptance\n\n- [x] seed\n";
     runCreate({
       cwd: dir,
       type: "task",
       title: "Race target",
       parent: "story-login",
       id: "task-target",
+      body: leaf,
     });
     runCreate({
       cwd: dir,
@@ -212,6 +250,7 @@ describe("lab: mixed concurrent operations on one item family (suizo / bug-claim
       title: "Sibling",
       parent: "story-login",
       id: "task-sibling",
+      body: leaf,
     });
     // v0 transitions: todo -> done is illegal, so prime the sibling to
     // in_progress up front; the spawned processes then close it (cascade
@@ -297,8 +336,11 @@ describe("lab: concurrent tracker auto-commit contention (suizo lock-transitorio
   it("N=6 commenting processes with x-tracker.auto-commit: all mutations committed, no index.lock debris", async () => {
     const dir = freshGitTree("autocommit", "x-tracker:\n  auto-commit: true\n");
     const ids = ["task-a", "task-b", "task-c", "task-d", "task-e", "task-f"];
+    // Real prose (task-validate-refuses-placeholder-bodies): the scaffold IS
+    // the placeholder, so default bodies would fail the closing `validate`.
+    const leaf = "## Context\n\nSeed.\n\n## Acceptance\n\n- [x] seed\n";
     for (const id of ids) {
-      runCreate({ cwd: dir, type: "task", title: id, parent: "story-login", id });
+      runCreate({ cwd: dir, type: "task", title: id, parent: "story-login", id, body: leaf });
     }
     gitCommitIfDirty(dir, "seed tasks");
 
@@ -390,6 +432,10 @@ describe("lab: concurrent tracker auto-commit contention (suizo lock-transitorio
         title: "Race target",
         parent: "story-login",
         id: "task-a",
+        // Real prose (task-validate-refuses-placeholder-bodies): the scaffold
+        // IS the placeholder, so a default body would fail the closing
+        // `validate`.
+        body: "## Context\n\nSeed.\n\n## Acceptance\n\n- [x] seed\n",
       });
       gitCommitIfDirty(dir, "seed race target");
 
@@ -490,6 +536,10 @@ describe("lab: synthetic legacy tree, full adoption flow (guardian/cuentas/suizo
     expect(readFileSync(agentsPath, "utf8")).toBe(swept);
 
     // The tree is coherent and cleanup runs clean (no worktrees to prune).
+    // The adopt-scaffolded items carry template placeholders (as every
+    // `create` does), so the lab authors them — import, then author, then
+    // green — before asserting (task-validate-refuses-placeholder-bodies).
+    satisfyPlaceholders(dir);
     expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
     const cleanup = runCli(["cleanup", "--json"], dir);
     expect(cleanup.body).toMatchObject({ ok: true });
@@ -789,7 +839,10 @@ describe("lab: long MCP session (estanteria 53-call session)", () => {
       server.child.kill("SIGTERM");
     }
 
-    // The tree survived the session.
+    // The tree survived the session. The MCP-created tasks scaffold template
+    // placeholders (as every `create` does), so the lab authors them before
+    // asserting (task-validate-refuses-placeholder-bodies).
+    satisfyPlaceholders(dir);
     expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
     removeFixtureTree(dir);
   }, 90_000); // ~31 sequential MCP round trips over a tsx-hosted server
