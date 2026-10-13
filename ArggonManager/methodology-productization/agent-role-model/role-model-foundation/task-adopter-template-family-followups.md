@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adopter-template-family-followups
 title: "Adopter template family follow-ups: CONTRIBUTING / PR-template software locks, zcode goal-mode pre-rename word, guard wording"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: role-model-foundation
 labels: [docs, templates, methodology]
 created: "2026-10-13"
 updated: "2026-10-13"
-claimed_at: "2026-10-13T14:34:48.021Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adopter-template-family-followups
 ---
 <!--
