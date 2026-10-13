@@ -60,3 +60,8 @@ Observed live on the guard's first day (bug-release-proposal-non-lockstep-undete
 ### handoff 2026-10-13 @ses_ec8e84465ffdKy4ziBWlFDBZQD (session: ses_ec8e84465ffdKy4ziBWlFDBZQD) — next: Standards review of PR #794, then CI; merge + done are the lead's. Check the pinned EXPECTED READING wording and that the pin guard's message/behavior is unchanged.
 - branch: feat/task-nonlockstep-red-state-expectations
 - open questions: Dispatch's stale-ledger provenance-audit failure did not reproduce (green after build); docs/ci.md left untouched if the window is wanted there too; softer-signal alternative + rejection recorded in …
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as cf42c329 (PR #794); flipped by the lead (rows verified and ticked). Decision recorded: the check keeps failing — the predicate cannot classify intent, and a softer signal would repeat the 2026-10-02 outage shape; the FAIL block now prints the expected reading ("do not merge this PR yet — a Release-As decision is pending", not "the pipeline is broken"), pinned by a new red-path test on the #786 shape, and the runbook documents the red window. Merge-time protection unchanged. Focused 21/21; full suite 3,368 green, 0 failed; actionlint clean; CI green. Live witness: #786 went 0.9.1/0.9.0 (red, pre-trigger) → 0.10.0/0.10.0 (green).
