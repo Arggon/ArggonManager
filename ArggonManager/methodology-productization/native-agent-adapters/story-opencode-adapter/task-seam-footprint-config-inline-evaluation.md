@@ -265,3 +265,7 @@ Evidence (maker run, 2026-10-12; branch feat/task-seam-footprint-config-inline-e
 - Idiom: published config.json (fetched, 39,039 B) names `plugin` (singular) + inline agent/command; V2 docs/runtime use `plugins` (plural); both keys load and `opencode debug config` normalizes singular to plural. Owner's `plugins` is correct for V2; the published schema is stale V1. Owner's file untouched.
 - Gates: `npm run arggon -- validate` → ok (0 warnings, convention v5); `npx prettier --check <item.md>` → pass (.gitignore has no prettier parser; verified with `git check-ignore -v`); `npm run test:structure` → 5 passed; `npm run lint:structure` → clean; ignore probe: simulated `.opencode/harness/friction.jsonl` + `.opencode/opencode.json` leave git status clean; `git worktree remove` refuses untracked harness state and succeeds once ignored.
 - Out of scope, reported: agents carry the x-generated marker twice (templates have one); primary plugin copies stale; global arggon plugin duplicates the project id.
+
+### handoff 2026-10-13 @ses_ecd832dc8ffeqhaGFiLKLTG8Eh (session: ses_ecd832dc8ffeqhaGFiLKLTG8Eh) — next: Review PR #754 (feat/task-seam-footprint-config-inline-evaluation); record the box-1 decision (recommendation: keep the file seam), then merge or spin follow-ups for boxes 2/3.
+- branch: feat/task-seam-footprint-config-inline-evaluation
+- open questions: Keep vs inline (boxes 2/3 conditional); global duplicate arggon plugin install in ~/.config/opencode; double x-generated marker on agents; stale primary plugin copies
