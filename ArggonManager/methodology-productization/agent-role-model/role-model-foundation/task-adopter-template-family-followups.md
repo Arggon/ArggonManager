@@ -64,3 +64,7 @@ Negative controls (guard keeps teeth; each probe reverted):
 - CONTRIBUTING reverted to "Tests pass locally" → FAIL the new init-docs assertion.
 
 Not in the diff, reported for the lead: `cli/src/goal-mode.ts:316` still renders "let the coordinator flip the item" in the goal contract; `adapters/capability-matrix.json:116` and its template copy name "(coordinator, worker, reviewer)". Same class, outside this item's four rows.
+
+### handoff 2026-10-13 @ses_eca4ef972ffeE9z0kPXAonRJHo (session: ses_eca4ef972ffeE9z0kPXAonRJHo) — next: Lead: review commits 2d9650c4 + d7172414 against the four ticked rows, then merge the PR; auto-done needs the live checklist (ticked).
+- branch: feat/task-adopter-template-family-followups
+- open questions: goal-mode.ts:316 still renders 'coordinator'; capability-matrix.json:116 (root+template) names old roles. Out of rows; lead decides follow-ups.
