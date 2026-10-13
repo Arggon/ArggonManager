@@ -12,7 +12,6 @@ updated: "2026-10-13"
 claimed_at: "2026-10-13T16:39:49.749Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-plugin-smoke-home-isolation
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/task-plugin-smoke-home-isolation.md
   Leaves live only under a story. id is the filename stem: task-plugin-smoke-home-isolation.
@@ -87,3 +86,26 @@ A second `arggon-maker` session `ses_ec9bb52ceffeixWrHgtUfu66Ux` (same worktree,
 
 - branch: feat/task-plugin-smoke-home-isolation
 - open questions: 7 full-smoke failures classified pre-existing (model judgment / fixture-vs-kernel drift, 2 deterministic done-gate); no pre-change baseline run; PR body Verification section still placeholder.
+
+### 2026-10-13 @ses_ec9bb52ceffeixWrHgtUfu66Ux
+### Finishing maker session (ses_ec9bb52c…) — commits, PR #790, gates (2026-10-13)
+
+Dispatched by the delivery lead to verify/finish/land the interrupted working tree. I committed and pushed it (nothing was lost), opened PR #790 and ran the gates on the final head `eabf0fe7`.
+
+- Commits: `1b4bdc7f` fix(plugin): onCompaction id read like onContext (+ regenerated bundle); `56e2317f` feat(smoke): hermetic HOME for both smokes + new `smoke/opencode-hermetic.{ts,test.ts}` + `smoke:opencode:prompt-stamp` + docs; `eabf0fe7` acceptance ticks (verified rows only).
+- PR #790 (base main, head eabf0fe7) — the body carries the full verification table.
+
+Hermetic evidence on this adversarial box (machine-global `~/.config/opencode/plugins/arggon/index.ts`, 402 005 bytes, present throughout the runs):
+- `npm run smoke:opencode` (full, alone, hermetic home /tmp/arggon-smoke-hermetic-Hyx8mo, 1 credential seeded for opencode-go): 17 scenarios / 143 checks -> 138 ok / 5 FAIL, and **0 of the 21 plugin-load checks failed**; every `loading plugin id=...` line across all kept fixtures names a `/tmp/arggon-smoke-*` fixture copy; **0** occurrences of the machine-global plugin dir in any fixture log; the fresh-init byte check "the vendored plugin is this checkout's committed bundle byte for byte" passed.
+- `npm run smoke:native-start-cold`: PASS, incl. "the move fixture's vendored plugin is this checkout's committed bundle byte for byte" and "the host loaded the fixture's plugin, not a machine-global copy".
+- `npm run smoke:opencode:prompt-stamp` (the new script): PASS 13/13.
+
+The 5 full-smoke failures are pre-existing and unrelated to HOME/plugin identity (deterministic repros outside the smoke, kernel identical to main):
+- `validate` on a fresh scaffold chain -> 4x PLACEHOLDER_BODY (the native-tools harness script dies at its `validate` call; reproduced in a fresh fixture).
+- `update --status done` on a scaffold item -> UPDATE_FAILED acceptance-criteria refusal (kills the lifecycle close script and the invariants fixture's "second item done"; reproduced, `--waive` bypasses).
+- the model declines the steal/reopen probe script and the reviewer `git push` probe (both harness attempts; transcripts: "executed: false", "I'm not running the push").
+Recommend follow-up items (delivery lead's call; I did not file).
+
+Gates on eabf0fe7: `npm run build` ok; `npm run lint` ok; `npm run test:structure` 5 passed; `npm run check:plugin` exit 0; `npm run arggon -- validate` ok (0 warnings); `npm test` 3356/3357 - the single failure is `cli/src/provenance-audit.test.ts`, an artifact of this worktree's gitignored regenerated `.agents/skills/.../exploration.md` vs the committed ledger (falsified: swapping in the primary checkout's generated copy -> 6/6 pass; a main archive passes vacuously, no `.agents` there); prettier clean on every touched file except `smoke/native-start-cold-smoke.ts` (pre-existing drift at base under prettier 3.9.6; the added lines are outside every formatting delta).
+
+Collision (for the delivery lead): the peer maker session `ses_ec9dcc29...` was live in this worktree; its evidence comment/handoff landed on this branch at 14:34, before my acceptance ticks at 14:39, and its full-smoke run overlapped mine (its hygiene scenario split differently - model nondeterminism). Tree content is identical across both sessions; branch and PR head is eabf0fe7. Please decide the writer of record, then review; do not merge until the collision is decided.
