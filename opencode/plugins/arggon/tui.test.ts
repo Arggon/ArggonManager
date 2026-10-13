@@ -19,12 +19,18 @@ import {
   ARGON_BOARD_BIND,
   ARGON_BOARD_COMMAND,
   ARGON_BOARD_SLASH,
+  BOARD_REFRESH_EVENTS,
+  boardRefreshSurface,
+  connectBoardRefresh,
   createBoardController,
   registerArgonTui,
+  subscribeBoardRefresh,
   type ArgonTuiContext,
+  type ArgonTuiEventSurface,
   type ArgonTuiSlot,
   type BoardControllerOptions,
 } from "./tui.js";
+import { __runCleanups } from "../../../test/tui-runtime-stub.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const tmpDirs: string[] = [];
@@ -91,6 +97,14 @@ function fixture(): string {
 
 type SlotRecord = { slot: ArgonTuiSlot; render: (props?: unknown) => unknown };
 
+/** One event-stream subscription the plugin registered on the fake context. */
+type EventRecord = {
+  type: string;
+  handler: (event: unknown) => void;
+  /** True once the plugin called the returned unsubscribe. */
+  off: boolean;
+};
+
 type FakeContext = {
   context: ArgonTuiContext;
   slots: SlotRecord[];
@@ -98,6 +112,10 @@ type FakeContext = {
   toasts: string[];
   opened: string[];
   unregistered: string[];
+  /** Subscriptions registered through `data.on`, in order (T4). */
+  events: EventRecord[];
+  /** Emit one host event to every subscriber of that type. */
+  emit(type: string): void;
 };
 
 function fakeContext(cwd: string, openResult: unknown = true): FakeContext {
@@ -106,6 +124,7 @@ function fakeContext(cwd: string, openResult: unknown = true): FakeContext {
   const toasts: string[] = [];
   const opened: string[] = [];
   const unregistered: string[] = [];
+  const events: EventRecord[] = [];
   const context: ArgonTuiContext = {
     location: { directory: cwd },
     ui: {
@@ -132,9 +151,21 @@ function fakeContext(cwd: string, openResult: unknown = true): FakeContext {
     },
     data: {
       location: { vcs: { info: () => ({ branch: { current: "feat/task-one" } }) } },
+      on: (type: string, handler: (event: unknown) => void) => {
+        const record: EventRecord = { type, handler, off: false };
+        events.push(record);
+        return () => {
+          record.off = true;
+        };
+      },
     },
   };
-  return { context, slots, layers, toasts, opened, unregistered };
+  const emit = (type: string): void => {
+    for (const record of events) {
+      if (record.type === type && !record.off) record.handler({ type });
+    }
+  };
+  return { context, slots, layers, toasts, opened, unregistered, events, emit };
 }
 
 /** Render the stubbed JSX element tree to text (see test/tui-runtime-stub.ts). */
@@ -537,5 +568,174 @@ describe("board panel controller (selection, jumps, detail)", () => {
     controller.jumpParent();
     expect(toasts.at(-1)).toBe("arggon board: parent not found");
     expect(controller.selection().id).toBe("orphan");
+  });
+});
+
+describe("board panel event-stream refresh (T4)", () => {
+  /** A tracking surface: records subscriptions and lets the test emit. */
+  function recordingSurface() {
+    const subs: Array<{ type: string; handler: (event: unknown) => void; off: boolean }> = [];
+    const surface: ArgonTuiEventSurface = {
+      on: (type, handler) => {
+        const record = { type, handler, off: false };
+        subs.push(record);
+        return () => {
+          record.off = true;
+        };
+      },
+    };
+    return {
+      surface,
+      subs,
+      emit: (type: string) => {
+        for (const record of subs) if (record.type === type && !record.off) record.handler({ type });
+      },
+    };
+  }
+
+  it("subscribes exactly the allow-listed events and unsubscribes them on dispose", () => {
+    const calls: string[] = [];
+    const { surface, subs, emit } = recordingSurface();
+    const dispose = subscribeBoardRefresh(surface, () => calls.push("reload"));
+    expect(subs.map((record) => record.type)).toEqual([...BOARD_REFRESH_EVENTS]);
+    expect(BOARD_REFRESH_EVENTS).toEqual(["session.shell.ended", "session.step.ended"]);
+
+    // An unrelated event never reloads: the panel is not a catch-all listener.
+    emit("session.created");
+    emit("message.updated");
+    expect(calls).toEqual([]);
+
+    emit("session.shell.ended");
+    emit("session.step.ended");
+    expect(calls).toEqual(["reload", "reload"]);
+
+    dispose();
+    expect(subs.every((record) => record.off)).toBe(true);
+    emit("session.step.ended");
+    expect(calls).toEqual(["reload", "reload"]);
+  });
+
+  it("is failure-isolated: a broken surface or reload never throws into the host", () => {
+    // A host whose `on` throws for one type still gets the other subscription.
+    const subscribed: string[] = [];
+    const partial: ArgonTuiEventSurface = {
+      on: (type) => {
+        if (type === "session.shell.ended") throw new Error("no subscribers");
+        subscribed.push(type);
+        return () => {
+          throw new Error("unsubscribe failed");
+        };
+      },
+    };
+    const dispose = subscribeBoardRefresh(partial, () => {
+      throw new Error("reload failed");
+    });
+    expect(subscribed).toEqual(["session.step.ended"]);
+    expect(() => dispose()).not.toThrow();
+
+    // A missing surface is a no-op, with a disposer that is safe to call twice.
+    const noop = subscribeBoardRefresh(undefined, () => {
+      throw new Error("never called");
+    });
+    expect(typeof noop).toBe("function");
+    expect(() => {
+      noop();
+      noop();
+    }).not.toThrow();
+  });
+
+  it("detects the host event surface only when data.on is a function", () => {
+    const { surface } = recordingSurface();
+    expect(boardRefreshSurface({ data: { on: surface.on } })?.on).toBeTypeOf("function");
+    expect(boardRefreshSurface({})).toBeUndefined();
+    expect(boardRefreshSurface({ data: {} })).toBeUndefined();
+    expect(boardRefreshSurface({ data: { on: 1 as unknown as ArgonTuiEventSurface["on"] } })).toBe(
+      undefined,
+    );
+    // A throwing accessor degrades instead of breaking the panel.
+    const hostile = {} as ArgonTuiContext;
+    Object.defineProperty(hostile, "data", {
+      get() {
+        throw new Error("no data here");
+      },
+    });
+    expect(boardRefreshSurface(hostile)).toBeUndefined();
+  });
+
+  it("reloads a real controller on the allow-listed events (event → refresh path)", () => {
+    const root = fixture();
+    const { context, emit } = fakeContext(root);
+    const controller = createBoardController({
+      cwd: root,
+      width: () => 80,
+      readSnapshot: () => boardSnapshot(root, { envItem: null }),
+    });
+    const dispose = connectBoardRefresh(controller, context);
+    expect(controller.lines()[0]).toContain("5 item(s)");
+
+    // The tracker changes BEHIND the open panel (the session ran arggon).
+    write(
+      root,
+      "ArggonManager/arggon-manager/launch/core/story-a/task-live.md",
+      "---\ntype: task\nstatus: todo\nid: task-live\ntitle: Live\nparent: story-a\n---\n\n# Live\n",
+    );
+
+    // An unrelated event leaves the panel as it was: no read happened.
+    emit("session.created");
+    expect(controller.lines()[0]).toContain("5 item(s)");
+    expect(controller.lines().join("\n")).not.toContain("task-live");
+
+    // A work-landed event re-reads the tracker and updates what the panel draws.
+    emit("session.step.ended");
+    expect(controller.lines()[0]).toContain("6 item(s)");
+    expect(controller.lines().join("\n")).toContain("task-live — Live");
+
+    // The shell signal (the TUI's own shell endpoint, observed on 2.0.26) is
+    // the second work-landed event.
+    write(
+      root,
+      "ArggonManager/arggon-manager/launch/core/story-a/task-shell.md",
+      "---\ntype: task\nstatus: todo\nid: task-shell\ntitle: Shell\nparent: story-a\n---\n\n# Shell\n",
+    );
+    emit("session.shell.ended");
+    expect(controller.lines()[0]).toContain("7 item(s)");
+    expect(controller.lines().join("\n")).toContain("task-shell — Shell");
+
+    // Disposed with the panel: no further reloads.
+    dispose();
+    write(
+      root,
+      "ArggonManager/arggon-manager/launch/core/story-a/task-gone.md",
+      "---\ntype: task\nstatus: todo\nid: task-gone\ntitle: Gone\nparent: story-a\n---\n\n# Gone\n",
+    );
+    emit("session.shell.ended");
+    expect(controller.lines()[0]).toContain("7 item(s)");
+  });
+
+  it("wires the mounted panel to the event stream and disposes it with the lifecycle", () => {
+    const root = fixture();
+    const { context, slots, events, emit } = fakeContext(root);
+    registerArgonTui(context, { cwd: root });
+    const panel = slots.find((entry) => entry.slot.append === "session.panel")!;
+    __runCleanups();
+    expect(events).toEqual([]);
+
+    render(panel.render({ name: "arggon.board", width: 80 }));
+    expect(events.map((record) => record.type)).toEqual([...BOARD_REFRESH_EVENTS]);
+
+    // The panel's subscription is registered through `onCleanup`: running the
+    // component's cleanups (what Solid does on unmount) disposes the whole
+    // subscription — one cleanup that unsubscribes both allow-listed events.
+    expect(__runCleanups()).toBe(1);
+    expect(events.every((record) => record.off)).toBe(true);
+    emit("session.step.ended");
+    expect(events.every((record) => record.off)).toBe(true);
+  });
+
+  it("declares no timer anywhere in the refresh path (no polling fallback)", () => {
+    const source = readFileSync(join(here, "tui.tsx"), "utf8");
+    expect(source).not.toMatch(/setInterval|setTimeout|requestAnimationFrame/);
+    expect(source).toContain("BOARD_REFRESH_EVENTS");
+    expect(source).toContain("onCleanup(connectBoardRefresh(board, context))");
   });
 });

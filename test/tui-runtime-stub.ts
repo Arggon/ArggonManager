@@ -51,6 +51,26 @@ export function For(props: {
   return (props.each ?? []).map((item, index) => props.children?.(item, () => index) ?? null);
 }
 
+/**
+ * `onCleanup` double (T4 event-driven refresh): the panel registers its
+ * event-stream disposer on mount. There is no reactive root in this double, so
+ * the callbacks are collected and `__runCleanups()` runs (and clears) them —
+ * that is how the wiring test asserts the panel really hands its subscription
+ * to the lifecycle instead of leaking it.
+ */
+const cleanups: Array<() => void> = [];
+
+export function onCleanup(fn: () => void): void {
+  cleanups.push(fn);
+}
+
+/** Run and clear every registered cleanup; returns how many there were. */
+export function __runCleanups(): number {
+  const pending = cleanups.splice(0);
+  for (const fn of pending) fn();
+  return pending.length;
+}
+
 /** `usePlugin()` double (the vendored file closes over the context instead). */
 export function usePlugin(): unknown {
   return undefined;
