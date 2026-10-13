@@ -57,3 +57,7 @@ Observed live on the guard's first day (bug-release-proposal-non-lockstep-undete
 **Scope guard.** No lockstep semantics or pin-check behavior changed; the open release PR branch (#786) was not touched (read-only `gh api` only); no release was triggered.
 
 **Acceptance mapping (maker's claim — delivery lead verifies).** Rows 1–4 implemented; body checkboxes left for the lead per the standing flow.
+
+### handoff 2026-10-13 @ses_ec8e84465ffdKy4ziBWlFDBZQD (session: ses_ec8e84465ffdKy4ziBWlFDBZQD) — next: Standards review of PR #794, then CI; merge + done are the lead's. Check the pinned EXPECTED READING wording and that the pin guard's message/behavior is unchanged.
+- branch: feat/task-nonlockstep-red-state-expectations
+- open questions: Dispatch's stale-ledger provenance-audit failure did not reproduce (green after build); docs/ci.md left untouched if the window is wanted there too; softer-signal alternative + rejection recorded in …
