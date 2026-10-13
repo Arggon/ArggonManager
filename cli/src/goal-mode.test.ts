@@ -414,6 +414,28 @@ describe("runGoal (rendered contract from a real item)", () => {
     expect(result.goal.identity).toBe("Arggon");
   });
 
+  it("renders the shipped role vocabulary — never the pre-rename role word (ADR 0021 §6.1)", () => {
+    // The rendered contract is PRODUCT TEXT the CLI emits, not a template the
+    // family walk in adopter-template-invariant-drift.test.ts can see — and the
+    // no-goal objective is exactly where the retired pre-rename role word
+    // survived (task-retired-role-words-product-text). Assert on what the
+    // rendered contract actually says, in both shapes, never on a source
+    // constant: a future "fix" that rewords the text back fails here.
+    const preRenameRole = /\bcoordinators?\b/i;
+    const open = treeWithTask("- [ ] open criterion", { assignee: "Arggon" });
+    const done = treeWithTask("- [x] shipped", { assignee: "Arggon" });
+    const openContract = runGoal({ cwd: open.dir, id: open.id, login: "Arggon" }).contract;
+    const doneResult = runGoal({ cwd: done.dir, id: done.id, login: "Arggon" });
+    // Precondition: this IS the done-gate-satisfied shape whose objective
+    // carries the flip sentence — a drift here would make the positive pin
+    // below vacuous.
+    expect(doneResult.goal.gateUnchecked).toBe(false);
+    expect(doneResult.goal.objective).toContain("delivery lead");
+    for (const contract of [openContract, doneResult.contract]) {
+      expect(contract).not.toMatch(preRenameRole);
+    }
+  });
+
   it("agrees with the done gate on a CRLF item, end to end", () => {
     const { dir, id } = treeWithTask("- [ ] crlf criterion\n- [x] done one", {
       assignee: "Arggon",

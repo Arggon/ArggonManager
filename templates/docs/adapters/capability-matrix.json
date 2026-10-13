@@ -113,7 +113,7 @@
     {
       "invariant": "docs-travel-with-code",
       "agent": "zcode",
-      "mechanism": "zcode:plugin bundle - the generated commands/, agents/ (coordinator, worker, reviewer) and the `arggon-cli` skill are refreshed by `arggon init` with provenance and never overwriting adopter edits",
+      "mechanism": "zcode:plugin bundle - the generated commands/, agents/ (`arggon-maker`, `arggon-standards-reviewer`; the delivery lead is the main session) and the `arggon-cli` skill are refreshed by `arggon init` with provenance and never overwriting adopter edits",
       "package": "zcode",
       "gap": false,
       "note": null

@@ -178,8 +178,13 @@ true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
 - **Never invent V2 fields from the V1 schema.** V2 server names live under
   `mcp.servers` (never directly under `mcp`), servers switch off with `disabled`
   (there is no `enabled`), and V1-era keys (`autoupdate`, `tools`, `maxSteps`,
-  `permission`) are wrong here. `https://opencode.ai/config.json` is the
-  field-level source of truth.
+  `permission`) are wrong here. The published `https://opencode.ai/config.json`
+  schema is **V1**, not a field-level source of truth for V2: the vendor's V2
+  guidance (runtime v2.0.26) says verbatim, "The schema served from
+  <https://opencode.ai/config.json> may describe V1 even though V2 configuration
+  files include that URL for editor integration. Never use it to infer V2 field
+  names or shapes." Take V2 names from the V2 docs (`plugins`, `agents` with
+  `system`/`permissions`, `commands`), never from that schema.
 - Config precedence (https://opencode.ai/v2/docs/config/): files merge farthest
   → closest, direct `opencode.json(c)` then `.opencode/opencode.json(c)`, so
   **every `.opencode` config overrides every direct config**. Hence the seam

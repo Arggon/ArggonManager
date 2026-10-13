@@ -60,24 +60,33 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: node cli/release-abort-check.mjs --repo "$GITHUB_REPOSITORY"
 
-      - name: Surface a non-lockstep release PR (root and lib versions must move together)
-        # bug-release-proposal-non-lockstep-undetected: release-please bumps only
-        # the components whose paths a wave touched, so it can auto-propose a
-        # root-only bump (#764: root 0.8.0, lib 0.7.1) while
-        # release-please-config.json's extra-files rule rewrites the root's
-        # kernel pin assuming lockstep. That proposal must never merge —
-        # release.yml refuses to tag it — but its only red surface was the PR's
-        # own approval-gated CI, so #764 sat undetected until a human approved
-        # the runs. This step reads both package.json versions AT the PR's head
-        # ref and reddens the maintenance run when they differ, naming both
-        # versions and the empty `Release-As: X.Y.Z` remedy. The logic is the
-        # tested, injectable-gh script cli/release-lockstep-check.mjs
-        # (cli/release-lockstep-check.test.ts witnesses the green and red paths
-        # offline). It runs on EVERY push with no `if:`, BEFORE the lockfile
-        # sync below — a non-lockstep proposal must fail before this workflow
-        # mutates its branch. No open PR and a lockstep proposal are silent; a
-        # gh query/read failure warns and exits 0 rather than cry wolf (the
-        # pre-tag gate in release.yml is the backstop).
+      - name: Surface a broken release PR (non-lockstep versions or a non-exact kernel pin)
+        # bug-release-proposal-non-lockstep-undetected + bug-kernel-pin-never-exact.
+        # Two shapes an open release PR must never merge:
+        #  - non-lockstep versions (#764: root 0.8.0, lib 0.7.1). release-please
+        #    bumps only the components whose paths a wave touched, while
+        #    release-please-config.json's extra-files rule rewrites the root's
+        #    kernel pin assuming lockstep; release.yml refuses to tag it, but
+        #    its only red surface was the PR's own approval-gated CI.
+        #  - a kernel pin that is not the bare released version. ADR 0018 §2 /
+        #    spec-release-pipeline-015 A3 require `"@arggondev/lib": "X.Y.Z"`
+        #    (no ^/~/range operator). Through v0.7.1 every release shipped a
+        #    caret — the C1 amendment's one-time hand-unpin never executed and
+        #    nothing detected it; the 0.8.0 PR un-pinned (5fd10db4) and v0.9.0
+        #    kept it exact automatically (#770), because release-please's
+        #    extra-files updater preserves the operator that is there (its
+        #    absence included). The guard keeps it that way: a test in
+        #    cli/release-lockstep-check.test.ts pins main's own pin, and this
+        #    step catches a broken proposal while it is still open.
+        # The logic is the tested, injectable-gh script
+        # cli/release-lockstep-check.mjs: it reads both package.json files AT
+        # the PR's head ref and reddens the maintenance run naming the values
+        # and the fix (cli/release-lockstep-check.test.ts witnesses the green
+        # and red paths offline). It runs on EVERY push with no `if:`, BEFORE
+        # the lockfile sync below — a broken proposal must fail before this
+        # workflow mutates its branch. No open PR and a clean proposal are
+        # silent; a gh query/read failure warns and exits 0 rather than cry
+        # wolf (the pre-tag gate in release.yml is the backstop).
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}

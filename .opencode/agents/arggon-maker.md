@@ -1,6 +1,5 @@
 ---
 # arggon:generated template="opencode/agents/arggon-maker.md"
-# arggon:generated template="opencode/agents/arggon-maker.md"
 description: ArggonManager maker — owns exactly one already-claimed item, works inside the worktree the delivery lead created for it, reports findings back to the delivery lead
 mode: subagent
 permissions:

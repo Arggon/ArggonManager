@@ -19,7 +19,7 @@ x-generated:
     generatedAt: "2026-10-13T02:56:53.578Z"
   .agents/skills/arggon-cli/references/exploration.md:
     template: "skills/arggon-cli/references/exploration.md"
-    checksum: "sha256:d9ab2e7dc76ab8aa5b80fbdb659b7879c9348b593318ba0acfe0e2bb738f92ee"
+    checksum: "sha256:3553e0c6084ca5c138cf2a9a1ddd4f157728bc0917928c00f1d9f4a7fb75a6f1"
     arggonVersion: "0.7.0"
     generatedAt: "2026-10-13T02:56:53.578Z"
   .agents/skills/arggon-cli/references/json-contract.md:
@@ -88,7 +88,7 @@ x-generated:
     generatedAt: "2026-10-13T02:56:53.578Z"
   .opencode/agents/arggon-maker.md:
     template: "docs/opencode/agents/arggon-maker.md"
-    checksum: "sha256:f8246206c05f66fe18366ba18c0ca39d9bad00fd84965a69448194ad32da9604"
+    checksum: "sha256:899d4e8426bfc2d3a63cbab4a93069325c4f03865c74025b1e422cf710bef959"
     arggonVersion: "0.7.0"
     generatedAt: "2026-10-13T02:56:53.578Z"
   .opencode/agents/arggon-standards-reviewer.md:
@@ -98,7 +98,7 @@ x-generated:
     generatedAt: "2026-10-13T02:56:53.578Z"
   .opencode/agents/arggon-verifier.md:
     template: "docs/opencode/agents/arggon-verifier.md"
-    checksum: "sha256:d89757296772989d7f4bec7e07709cdeab5753cd2f7b1532d583fa5b32a9f54c"
+    checksum: "sha256:9e24ab68b5648fb4b5389cc06d2ee861f93475793087874a8dd83fa36883052e"
     arggonVersion: "0.7.0"
     generatedAt: "2026-10-13T02:56:53.578Z"
   .opencode/commands/arggon-adopt.md:
@@ -330,7 +330,7 @@ x-generated:
     acknowledged: true
   adapters/capability-matrix.json:
     template: "docs/adapters/capability-matrix.json"
-    checksum: "sha256:4f4481f774b5d0baa1b74fc81da6c17eedbf5870b749f7f8db690382a2221fbf"
+    checksum: "sha256:d95ed44a0502a4fc0ef42173591194cd872208e18aab2850564be687b5ce15b5"
     arggonVersion: "0.7.0"
     generatedAt: "2026-10-13T03:40:00.000Z"
   opencode.jsonc:
