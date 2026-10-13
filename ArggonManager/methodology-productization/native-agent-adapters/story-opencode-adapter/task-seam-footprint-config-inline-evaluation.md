@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-seam-footprint-config-inline-evaluation
 title: "Seam footprint: evaluate loading the OpenCode plugin via config and inlining agents/commands into opencode.json(c) — 15 tracked files + generated plugin copies vs config keys"
 assignee: arggon-delivery-lead
@@ -8,8 +8,7 @@ branch: feat/task-seam-footprint-config-inline-evaluation
 parent: story-opencode-adapter
 labels: [opencode-seam, methodology, evaluation]
 created: "2026-10-12"
-updated: "2026-10-12"
-claimed_at: "2026-10-12T23:39:26.165Z"
+updated: "2026-10-13"
 worktree_path: /home/arggon/Projects/ArggonManager-task-seam-footprint-config-inline-evaluation
 ---
 <!--
