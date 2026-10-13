@@ -12,6 +12,7 @@ updated: "2026-10-11"
 claimed_at: "2026-10-11T09:57:59.738Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adapter-report-nits-from-review
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-adapter-selection/task-adapter-report-nits-from-review.md
   Leaves live only under a story. id is the filename stem: task-adapter-report-nits-from-review.
@@ -185,6 +186,7 @@ Preferred: re-measure. It removes the README/json-output contradiction at the sa
 ArggonManager/docs/json-output.md:852 and :962 carry retired agent ids in --agents samples. The guard added by the sibling item bug-adopter-engineering-template-software-locked sweeps templates/docs/** for exactly this class but not ArggonManager/docs/**, and the two smokes/agents.md samples are outside both sweeps. This wants its own item: retired seam ids in the shipped doc samples, with the same family-walk treatment the adopter templates just got.
 
 ### 2026-10-13 @arggon-maker
+
 ## Round-2 verdict closed — the `--agents` sample block is re-measured (not annotated)
 
 Re-measurement route, as preferred. Measured on a clean tree at `fee7979b` after `npm run build`; the sample block in `ArggonManager/docs/json-output.md` now equals a live run field by field.

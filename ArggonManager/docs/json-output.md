@@ -906,7 +906,7 @@ With `--budget`, an additive `budget` section appears (values illustrative; re-m
 
 The additive `mcp` object (task-schema-budget) measures the LIVE MCP `tools/list` payload, fetched in-process against `runMcpServer` (the same surface `mcp-parity.test.ts` drives): `totalBytes` is checked against the advisory `MCP_TOOLS_BUDGET_BYTES` (12,288 B — ~36% headroom over the 9,040 B live baseline recorded 2026-09-15, commit `5d6c504`), `tokenEstimate` is ~chars/4 (the baseline method), and `largestTools` names the three heaviest tool definitions so schema bloat is attributable, not just visible.
 
-With `--agents`, an additive `agents` section appears. This is a real run against this repo's own tree (`files[]` and `gaps.rows[]` abridged to one row plus an elision marker), re-measurable with `arggon doctor --json --agents`. Its 9 `adopter-edited` rows are this tree's own divergences, but they are not all `docs.modified` entries: 8 of them are checksum divergences that also land among the 12 the `docs` block reports as `modified` (the rest of those being non-adapter destinations), and the 9th is a file on disk with **no `x-generated` entry at all** — `docs` walks recorded provenance only, so it cannot see that row and this block is the ONLY surface that reports it:
+With `--agents`, an additive `agents` section appears. This is a real run against this repo's own tree, recorded 2026-10-13 (commit `fee7979b`); `files[]` and `gaps.rows[]` are abridged to one row per agent plus an elision marker, and every count is exact for that tree. Its one `adopter-edited` row is this repo's own `opencode.jsonc` — a recorded `x-generated` checksum that no longer matches the bytes on disk, the same mismatch that also lands it in the `docs` block's `modified` bucket. Re-running `arggon doctor --json --agents` reports a tree's own counts; each status is defined in the row above and names what `arggon init` would do with the file:
 
 ```json
 {
@@ -964,7 +964,7 @@ With `--agents`, an additive `agents` section appears. This is a real run agains
         "detected": true,
         "files": [
           {
-            "path": ".opencode/agents/arggon-coordinator.md",
+            "path": "opencode.jsonc",
             "status": "adopter-edited"
           },
           {
@@ -974,10 +974,10 @@ With `--agents`, an additive `agents` section appears. This is a real run agains
         "truncated": false,
         "counts": {
           "total": 18,
-          "present": 12,
+          "present": 17,
           "acknowledged": 0,
           "acknowledged-drifted": 0,
-          "adopter-edited": 6,
+          "adopter-edited": 1,
           "stale": 0,
           "missing": 0,
           "unverified": 0,
@@ -999,16 +999,16 @@ With `--agents`, an additive `agents` section appears. This is a real run agains
             "status": "present"
           },
           {
-            "path": "… 18 more"
+            "path": "… 22 more"
           }
         ],
         "truncated": false,
         "counts": {
-          "total": 19,
-          "present": 16,
+          "total": 23,
+          "present": 23,
           "acknowledged": 0,
           "acknowledged-drifted": 0,
-          "adopter-edited": 3,
+          "adopter-edited": 0,
           "stale": 0,
           "missing": 0,
           "unverified": 0,
