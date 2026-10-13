@@ -9,7 +9,6 @@ parent: story-opencode-adapter
 labels: [opencode-seam, docs, review-followup]
 created: "2026-10-13"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-seam-nits-v1-schema-and-marker
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/task-seam-nits-v1-schema-and-marker.md

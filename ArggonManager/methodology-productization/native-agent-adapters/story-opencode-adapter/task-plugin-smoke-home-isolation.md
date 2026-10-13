@@ -9,7 +9,6 @@ parent: story-opencode-adapter
 labels: [opencode-seam, tests, review-followup]
 created: "2026-10-13"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-plugin-smoke-home-isolation
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/task-plugin-smoke-home-isolation.md

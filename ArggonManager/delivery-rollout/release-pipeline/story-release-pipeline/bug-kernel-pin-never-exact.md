@@ -9,7 +9,6 @@ parent: story-release-pipeline
 labels: [release, adopters]
 created: "2026-10-13"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-kernel-pin-never-exact
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-kernel-pin-never-exact.md
