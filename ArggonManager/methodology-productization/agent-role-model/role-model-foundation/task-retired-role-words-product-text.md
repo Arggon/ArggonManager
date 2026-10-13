@@ -57,3 +57,8 @@ Out of scope, reported for the lead (not in this diff): `ArggonManager/docs/agen
 ### handoff 2026-10-13 @ses_ec9dcc293ffeyooHsG9CAdABL0 (session: ses_ec9dcc293ffeyooHsG9CAdABL0) — next: Lead: review 6bbf2fdc + guards against the four ticked rows, then merge the PR; auto-done flips on merge. Negative controls in the evidence comment.
 - branch: feat/task-retired-role-words-product-text
 - open questions: docs/agents.md:198,272,636 still carry retired role vocabulary (carrier, not template) — out of rows; no sibling item covers it; lead decides follow-up.
+
+### 2026-10-13 @ses_ec9dcc293ffeyooHsG9CAdABL0
+### CI green on PR #787 (head a26c67ea)
+
+All three lanes pass on the pushed branch: `cli` 6m45s (154 files / 3348 tests, lint, structure, build), `tasks-validate` 23s (tracker + committed-seam drift), `ui-smoke` 2m20s. PR: https://github.com/Arggon/ArggonManager/pull/787 — left `in_progress` for the delivery lead's merge/flip.
