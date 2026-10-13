@@ -100,3 +100,7 @@ Expected → observed (3 consecutive runs, same result, ~60 s each):
 - `smoke:tui` and `smoke:opencode*` still inherit `process.env` (no hermetic HOME), so a machine-global `~/.config/opencode/plugins/arggon` can shadow their fixture — already tracked as `task-plugin-smoke-home-isolation`.
 - `smoke/opencode-prompt-stamp-smoke.ts` asserts the vendored bundle is byte-equal to the committed artifact; `arggon init` prepends `// arggon:generated template="…"` to BOTH vendored files, so that equality only holds because the smoke overwrites the copy with `copyFileSync`. My smoke strips the marker instead (see `vendoredSourceMatches`) — worth a look if that sibling smoke is ever re-pointed at a plain init fixture.
 - The new smoke is maintainer-run (like the T4 sibling): CI has no `opencode` binary, so it would report `skipped`. Wiring it into CI needs an install step — a lead call, not made here.
+
+### handoff 2026-10-13 @ses_eca8380c0ffersLXopMkATS3NS (session: ses_eca8380c0ffersLXopMkATS3NS) — next: Review PR #773 (feat/task-opencode-event-panel): verify the two allow-listed events + onCleanup disposal in tui.tsx, run `npm run smoke:opencode:panel-refresh` (maintainer, model-free) and the standa…
+- branch: feat/task-opencode-event-panel
+- open questions: smoke:tui/opencode* still not hermetic-HOME (task-plugin-smoke-home-isolation); prompt-stamp smoke's byte-equality relies on its own copyFileSync because init prepends a provenance marker to both ven…
