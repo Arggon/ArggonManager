@@ -83,3 +83,8 @@ Observed: 2 failed / 3 passed — rule 1 reports `ArggonManager/docs/json-output
 ### handoff 2026-10-13 @ses_ec8e84465ffexqO6yOcub1DHa4 (session: ses_ec8e84465ffexqO6yOcub1DHa4) — next: Delivery lead: standards-review PR #796 (b08f1b05 + comment 378eb663): doc sample fixed, guard cli/src/agent-id-doc-contract.test.ts green with a reverted negative control; do not merge.
 - branch: fix/bug-retired-agent-ids-in-doc-samples
 - open questions: ADR 0010:53-54 still names retired ids (record, not fixed; no item found) - file one?; guard surface = ArggonManager/docs live + README + skills, record dirs exempt.
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 78ae2b30 (PR #796); flipped by the lead (rows verified and ticked). The plain `doctor` sample now lists the four shipped agent ids; the new sibling guard (`cli/src/agent-id-doc-contract.test.ts`) covers live docs + README + skills minus the four record subtrees, pins the exact retired-id set AND the corpus-derived shipped set, and its reverted negative control fails as designed. Grep evidence: zero live hits (the only pre-fix hit was `json-output.md:857`); the item's `smokes/` reference does not exist in this checkout (measured, 0 hits). Full suite 3,372 green; CI green.
