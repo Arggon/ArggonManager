@@ -27,9 +27,32 @@ Three non-blocking notes from the standards review of `bug-x-tracker-option-list
 
 ## Acceptance
 
-- [ ] convention.md + the suite message state the marker's exact scope (line-level, and which line)
-- [ ] the mismatch message distinguishes "kernel has an extra option" from "doc names an option the kernel lacks"
-- [ ] the duplicate-dispatch hazard is impossible or pinned by an explicit test/comment
-- [ ] `npx vitest run cli/src/convention-option-doc-contract.test.ts` green; `arggon validate` ok
+- [x] convention.md + the suite message state the marker's exact scope (line-level, and which line)
+- [x] the mismatch message distinguishes "kernel has an extra option" from "doc names an option the kernel lacks"
+- [x] the duplicate-dispatch hazard is impossible or pinned by an explicit test/comment
+- [x] `npx vitest run cli/src/convention-option-doc-contract.test.ts` green; `arggon validate` ok
 
 ## Notes
+
+### 2026-10-13 @ses_eca4ef96fffetnKma4I21dSuAY
+## Delivery evidence (arggon-maker)
+
+Change on branch `feat/task-convention-drift-guard-clarifications` (PR #780): one test file (`cli/src/convention-option-doc-contract.test.ts`) + one doc clause (`ArggonManager/docs/convention.md` §Tracker hygiene).
+
+### Decisions
+1. Marker scope: DESCRIBED as line-scoped, not tightened. `undocumented-by-design` is read off the same source line as the option's `key === "…"` / `key !== "…"` comparison; a marker elsewhere in the block does not exempt and rule 2 fails loud. A branch-scoped walk would need block-structure parsing in a line walker and would silently widen the exemption.
+2. Mismatch message: rule 3 classifies each mismatched name by side — kernel boolean missing from the sentence; kernel boolean that is exempt (the sentence must not name it); a sentence name the kernel does not validate as a boolean (or reads not at all). Rule 2's message now names the marker's exact line.
+3. Duplicate dispatch: made impossible by merging a repeated section's blocks into ONE bucket (split handlers read all keys; a key re-listed in both blocks stays visible to the one-branch-per-option assertion), and pinned by a premise test that fails against the old overwrite.
+
+### Gates (worktree)
+- `npx vitest run cli/src/convention-option-doc-contract.test.ts`: 19/19 (18 original + 1 new premise test).
+- `arggon validate`: ok, 0 warnings, convention v5.
+- `npm run build`: ok (postbuild plugin bundle byte-identical, `git status` unchanged besides the two files).
+- `npm test`: 153 files / 3332 tests, 0 failed.
+- `npm run lint`: exit 0; `npm run test:structure`: exit 0; `npx prettier --check` on both touched files: clean.
+
+### Negative controls (both reverted; kernel unmodified in the final diff, sha256 verified)
+1. Synthetic `future-marked` (marked boolean, wrongly named by the doc's boolean sentence) + `future-open` (unmarked, omitted), added to all three kernel faces: exactly the two doc rules failed. Rule 2's message named the exact marker line; rule 3 distinguished `future-open` ("validated as a boolean by the kernel but missing from the sentence") from `future-marked` ("validated as a boolean by the kernel but exempt — its `key === "…"` line carries `undocumented-by-design`, so the sentence must not name it").
+2. Walker reverted to the old `sections.set` overwrite: the new premise test failed on the dropped `first-option`; restored byte-identical.
+
+Derivation property kept: no option name added to the test — literals remain the SECTIONS table (structure) and the marker string.
