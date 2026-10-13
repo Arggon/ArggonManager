@@ -50,21 +50,21 @@ generated context artifact.
 
 ## Acceptance
 
-- [ ] States the stop condition as a **checkable rule**, in `references/exploration.md`'s
+- [x] States the stop condition as a **checkable rule**, in `references/exploration.md`'s
       own language, with the phase it belongs to
-- [ ] Says what _ends_ a frontier round and what _ends_ the hunt — the two are currently
+- [x] Says what _ends_ a frontier round and what _ends_ the hunt — the two are currently
       indistinguishable in the protocol's prose
-- [ ] Names the failure it prevents (stopping early and shipping a spec over a live
+- [x] Names the failure it prevents (stopping early and shipping a spec over a live
       unknown, versus grinding rounds over a closed space) — a rule with no failure mode is
       a slogan
-- [ ] Survives **domain neutrality** (ADR 0021 §6.2): the rule must not presuppose a
+- [x] Survives **domain neutrality** (ADR 0021 §6.2): the rule must not presuppose a
       software repo, a file tree, or a test suite
-- [ ] Does not add a gate, a new command or a new blocking step — this is advice to the
+- [x] Does not add a gate, a new command or a new blocking step — this is advice to the
       agent doing the exploration, not machinery
-- [ ] Keeps ADR 0017's hard gate intact: no implementation task before a spec with clean
+- [x] Keeps ADR 0017's hard gate intact: no implementation task before a spec with clean
       `spec analyze`
-- [ ] `arggon validate` green; PR opened. Impact class **Advisory**
-- [ ] `spec validate` + `spec analyze` green, with no NEW finding naming this item
+- [x] `arggon validate` green; PR opened. Impact class **Advisory**
+- [x] `spec validate` + `spec analyze` green, with no NEW finding naming this item
 
 ## Notes
 
