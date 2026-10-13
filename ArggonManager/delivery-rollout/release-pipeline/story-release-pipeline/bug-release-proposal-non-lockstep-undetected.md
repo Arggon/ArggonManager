@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-release-proposal-non-lockstep-undetected
 title: A non-lockstep auto-proposal is undetected in the maintenance run — and the lockstep assert runs after the tag
+assignee: arggon-delivery-lead
+branch: fix/bug-release-proposal-non-lockstep-undetected
 parent: story-release-pipeline
 labels: [release, ci]
 created: "2026-10-13"
 updated: "2026-10-13"
+claimed_at: "2026-10-13T14:34:44.598Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-release-proposal-non-lockstep-undetected
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/bug-release-proposal-non-lockstep-undetected.md
@@ -35,23 +39,53 @@ Found 2026-10-13 investigating the red `cli` run on release PR #764 (run 3834432
 
 ## Acceptance
 
-- [ ] `release-please.yml` surfaces a non-lockstep OPEN release PR as a red maintenance run (not only as the PR's approval-gated CI), naming both versions and the remedy (empty `Release-As: X.Y.Z` commit to main); logic in a tested, injectable-gh script per the `cli/release-abort-check.mjs` pattern
-- [ ] its test proves the green path (lockstep → exit 0, silent) and the red path (root != lib → non-zero, message carries both versions + remedy), injectable rather than live
-- [ ] `release.yml` asserts root-lib lockstep BEFORE creating/pushing the tag, so a broken release commit cannot strand a tag; the tag↔commit agreement assert stays after the tag as today
-- [ ] `ArggonManager/docs/runbooks/release.md` documents the non-lockstep case, the Release-As remedy, and the stranded-tag recovery if one ever lands
+- [x] `release-please.yml` surfaces a non-lockstep OPEN release PR as a red maintenance run (not only as the PR's approval-gated CI), naming both versions and the remedy (empty `Release-As: X.Y.Z` commit to main); logic in a tested, injectable-gh script per the `cli/release-abort-check.mjs` pattern
+- [x] its test proves the green path (lockstep → exit 0, silent) and the red path (root != lib → non-zero, message carries both versions + remedy), injectable rather than live
+- [x] `release.yml` asserts root-lib lockstep BEFORE creating/pushing the tag, so a broken release commit cannot strand a tag; the tag↔commit agreement assert stays after the tag as today
+- [x] `ArggonManager/docs/runbooks/release.md` documents the non-lockstep case, the Release-As remedy, and the stranded-tag recovery if one ever lands
 - [x] the live #764 state is recorded here once cleared (owner pushes the Release-As commit → #764 updates lockstep → CI re-approved and green)
 
 ## Notes
 
 ### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
 ### Resolution record — 2026-10-13 (delivery lead)
+
 The product owner instructed the delivery lead to fix the failing release. Actions taken on that instruction (runbook step 1; merge remains the owner's click — releases are human by design):
+
 - Lead pushed the empty `Release-As: 0.8.0` trigger to main (7d972ed5). Version 0.8.0 = the minor the convention derives (new adopter-facing features).
 - release-please updated #764 to lockstep: root 0.8.0 == lib 0.8.0 (09f10bab + lockfile sync c58d8302).
 - Release PR head 5fd10db4 is fully green: cli pass, tasks-validate pass, ui-smoke pass. Mergeable when checked.
-The durable-guard acceptance rows on this item (maintenance-run surfacing, pre-tag lockstep assert, runbook) remain open — they are prevention, not needed to clear this release.
+  The durable-guard acceptance rows on this item (maintenance-run surfacing, pre-tag lockstep assert, runbook) remain open — they are prevention, not needed to clear this release.
 
 ### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
 ### Released — 2026-10-13 (delivery lead, post-merge verification)
+
 #764 merged (79a6ee6c, squash `chore: release main (#764)`). release.yml run 38404213674 — every step green: tag v0.8.0 → label flip (`autorelease: tagged`) → GitHub Release with both tarballs → lib published first → registry poll → CLI published → assets attached.
 Verified independently: npm `arggon-manager@0.8.0` live (`latest`), `@arggondev/lib@0.8.0` live, and the exact kernel pin shipped (`"@arggondev/lib": "0.8.0"` — the first exact release since v0.4.x, see bug-kernel-pin-never-exact). The live-PR acceptance row is met; the prevention rows (maintenance-run surfacing + pre-tag lockstep assert + runbook) remain open.
+
+### 2026-10-13 @ses_eca4ef973ffeRAmpvyBGPnMWrE
+### Prevention landed — PR #782 (maker)
+
+All four open acceptance rows implemented on `fix/bug-release-proposal-non-lockstep-undetected` (commit cfded09a, PR #782). Item left `in_progress`; merge + done are the delivery lead's.
+
+**Rows 1+2 — maintenance-run surfacing.** New `cli/release-lockstep-check.mjs` follows the `cli/release-abort-check.mjs` shape: injectable gh on `GH_BIN`, `--repo`/`GITHUB_REPOSITORY`, fail-closed when no repository, warn-and-exit-0 when gh cannot query/read (the pre-tag gate stays the backstop). It finds the open release PR on `release-please--branches--main` and reads both `package.json` versions AT that head ref via `gh api ...?ref=<branch> -H "Accept: application/vnd.github.raw+json"` (media type probed read-only against the live repo before coding). Verdicts: lockstep → exit 0 silent; no open PR → exit 0 silent; root != lib → exit 1 with both versions and the empty `Release-As: X.Y.Z` remedy (higher proposal). Wired into `release-please.yml` on every push, no `if:`, after the abort check and before the lockfile sync; workflow contract pinned by tests.
+- `npx vitest run cli/release-lockstep-check.test.ts` → 13/13 (green, red, quiet, gh-failure, missing gh, unparseable, no-repo, argv pin, workflow contract).
+
+**Live smoke — the check caught the defect live (read-only).** `node cli/release-lockstep-check.mjs --repo Arggon/ArggonManager` → exit 1 today on open release PR #770: `root (arggon-manager) 0.9.0 != lib (@arggondev/lib) 0.8.0` (main is lockstep 0.8.0/0.8.0). `gh pr checks 770` → "no checks reported" — its CI is still approval-gated, i.e. #770 is undetected exactly as #764 was. **Needs the product-owner remedy (empty `Release-As: 0.9.0` commit to main) before merge.** After this PR merges, a push to main while #770 is open reddens `release-please.yml` — the intended signal, but coordinate the order if a red run is unwanted.
+
+**Row 3 — pre-tag lockstep.** `release.yml` split: new `Assert root-lib lockstep BEFORE tagging` sits beside the notes `--check` gate, before the tag step; `Assert tag-version agreement` stays post-tag. `cli/release-label-flip.test.ts`'s workflow contract was updated for the rename (tag → agreement → flip order unchanged).
+
+**Row 4 — docs.** Root `release.md`: new §Exception: the release PR is non-lockstep (root != lib) — mechanism, both detection surfaces, the Release-As remedy, and the stranded-tag recovery (never move/delete the tag, clear the stuck label, fix lockstep forward with the next version). `ArggonManager/docs/runbooks/release.md` documents the same three points and points at the exception section.
+
+**Gates (from the item worktree).**
+- focused trio (`release-lockstep-check` + `release-label-flip` + `release-config-agreement`): 40/40 pass.
+- `npm run build` then `npm test` → 3343 passed, 1 failed: `cli/src/provenance-audit.test.ts` "this repo's own committed seam has no ledger violations" → stale-checksum for `.agents/skills/arggon-cli/references/exploration.md` (gitignored derived copy). **Pre-existing on main, proven unrelated**: the record in `ArggonManager/.convention.yml` was generated 2026-10-13T02:56:53Z (arggon 0.7.0) and `skills/arggon-cli/references/exploration.md` changed at 10:36:04 today (d7dea8c5); my branch is byte-identical to main for both paths; fresh CI checkouts are green because `auditGeneratedProvenance` skips absent destinations (`cli/src/docs.ts:1675`), while the suite's `skill-copy.test.ts` regenerates the local copy. `npx vitest run --exclude cli/src/provenance-audit.test.ts` → 153/153 files, 3338/3338 tests, exit 0.
+- `npm run lint` exit 0; `npm run test:structure` 5/5 exit 0; `npm run arggon -- validate` ok (0 warnings); `npx prettier --check` on all touched files clean; `actionlint` on both workflows exit 0.
+
+**Open question for the lead.** #770's repair (Release-As: 0.9.0) is a product-owner act; recommend fixing it before this PR merges so no main push reddens the maintenance run (or accept the red as the designed signal). The stale `.convention.yml` checksum is unfiled work, out of this item's scope.
+
+### handoff 2026-10-13 @ses_eca4ef973ffeRAmpvyBGPnMWrE (session: ses_eca4ef973ffeRAmpvyBGPnMWrE) — next: Delivery lead: get #770 repaired (product owner pushes empty `Release-As: 0.9.0` commit), review and merge PR #782, verify the merge, then flip the item done.
+- branch: fix/bug-release-proposal-non-lockstep-undetected
+- open questions: #770 is live non-lockstep (0.9.0/0.8.0): fix before merge or accept the designed red; pre-existing provenance-audit local failure (stale .convention.yml checksum) is unfiled.

@@ -60,6 +60,29 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: node cli/release-abort-check.mjs --repo "$GITHUB_REPOSITORY"
 
+      - name: Surface a non-lockstep release PR (root and lib versions must move together)
+        # bug-release-proposal-non-lockstep-undetected: release-please bumps only
+        # the components whose paths a wave touched, so it can auto-propose a
+        # root-only bump (#764: root 0.8.0, lib 0.7.1) while
+        # release-please-config.json's extra-files rule rewrites the root's
+        # kernel pin assuming lockstep. That proposal must never merge —
+        # release.yml refuses to tag it — but its only red surface was the PR's
+        # own approval-gated CI, so #764 sat undetected until a human approved
+        # the runs. This step reads both package.json versions AT the PR's head
+        # ref and reddens the maintenance run when they differ, naming both
+        # versions and the empty `Release-As: X.Y.Z` remedy. The logic is the
+        # tested, injectable-gh script cli/release-lockstep-check.mjs
+        # (cli/release-lockstep-check.test.ts witnesses the green and red paths
+        # offline). It runs on EVERY push with no `if:`, BEFORE the lockfile
+        # sync below — a non-lockstep proposal must fail before this workflow
+        # mutates its branch. No open PR and a lockstep proposal are silent; a
+        # gh query/read failure warns and exits 0 rather than cry wolf (the
+        # pre-tag gate in release.yml is the backstop).
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node cli/release-lockstep-check.mjs --repo "$GITHUB_REPOSITORY"
+
       # release-please does not update lockfiles (googleapis/release-please#1993,
       # open): the release PR bumps both package versions and rewrites the root's
       # kernel dependency to the exact released version, so an unsynced
