@@ -79,3 +79,8 @@ Remaining on this item: the machine-owned normalization + guard, the `release.md
 ### handoff 2026-10-13 @ses_ec9dcc298ffeLS5eOrNXTRs44z (session: ses_ec9dcc298ffeLS5eOrNXTRs44z) — next: Standards review + merge PR #789; then flip bug-kernel-pin-never-exact done (all four acceptance rows satisfied). No release trigger needed — guard is passive.
 - branch: fix/bug-kernel-pin-never-exact
 - open questions: Pre-existing spec prettier drift left unswept (5/24 specs drift; precedent says leave) — file a sweep item?; local provenance failure unchanged (bug-skill-source-edit-leaves-ledger-stale); doc-claim …
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 838bb46f (PR #789); flipped by the lead after ticking the five rows (the maker left them for completion). Decision recorded: no normalization step — exactness is sticky (`GenericJson` preserves the absence of an operator; observed on the real release PR: `"0.8.0"` → `"0.9.0"` with no caret), and the lockfile sync cannot clobber `package.json`; the durable fix is detection on both sides. `cli/release-lockstep-check.mjs` now also reads the pin at the PR head ref and reddens on range/stale/missing, naming the fix (20/20 tests incl. a main-side test); `release.md` + the spec C1/A3 record corrected (the root operator manual did carry the one-time exception; the canonical runbook did not) with a history-preserving note on `task-release-workflow`. Live: v0.8.0 (un-pin) and v0.9.0 (automatic) both shipped exact.
