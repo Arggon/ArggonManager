@@ -195,3 +195,20 @@ auto-harness gate declined a read-only `arggon` tool call and demanded checkers 
   (`.github/workflows/` contains none). The one deliberately edited file,
   `skills/arggon-cli/references/exploration.md`, is clean. I did not reformat tracker files: out of
   this item's scope, re-dirtied by the next tracker write, and a 587-file diff.
+
+### 2026-10-13 @ses_eca8380bcffeJ9iFxVFsZRDkkQ
+### Re-verification by dispatched maker (stale dispatch premise) — checklist ticked, PR #771
+
+This session was dispatched with "an earlier attempt was interrupted before doing any work; the worktree is clean". That premise was stale: the worktree already carried commits `2cfcaafb..30e9b977` and **PR #771 was already open** with the full evidence comment above. No work was redone — this session verified the existing head instead, then left the checklist honest.
+
+Independently re-ran every gate on head `30e9b977` (before this session's tick commit):
+
+- `arggon validate` → ok (0 warnings, convention v5)
+- `npx vitest run cli/src/skill-copy.test.ts` → 8/8 passed; `npm run skills:sync` idempotent (7 files, `git status` clean after)
+- `.agents/skills/**` is gitignored (`.gitignore:14`; `git ls-files .agents` empty) — the derived copy is the generated marker + source, and `diff` shows only that marker line, so the prior note holds
+- `spec validate` → ok (38 docs, 0 warnings)
+- `spec analyze` → 4 findings, `diff` against the `main` baseline byte-identical; none names this item
+- `npx prettier --check skills/arggon-cli/references/exploration.md` → clean; the tracker item file still fails on tracker-generated seams repo-wide (unchanged, pre-existing; no prettier step in CI)
+- PR CI: `tasks-validate` pass, `ui-smoke` pass; the `cli` run for the previous head was success (a fresh one runs for the new head)
+
+**Ticked the live `## Acceptance` section only** (commit `cba3688a`, 8/8, each supported by the checks above); the dated history copy under Notes is untouched. `agents.md` §5 / auto-done requires the live checklist ticked before merge — the bot never edits checklists — so this is the honest state, not a pre-judgement of review. Status stays `in_progress`; impact class **Advisory**; no merge, no done flip (delivery lead's call).
