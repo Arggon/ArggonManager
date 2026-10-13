@@ -87,6 +87,16 @@ jobs:
         # workflow mutates its branch. No open PR and a clean proposal are
         # silent; a gh query/read failure warns and exits 0 rather than cry
         # wolf (the pre-tag gate in release.yml is the backstop).
+        #
+        # A red run between releases is EXPECTED, not a pipeline failure: a
+        # root-only accumulating proposal is the ordinary state while the
+        # version is undecided, so this step reds on every push until the
+        # Release-As commit lands and it stays a hard failure by design — a
+        # warning inside a green run is the 2026-10-02 → 2026-10-07 outage
+        # shape. The FAIL message states the reading ("do not merge this PR
+        # yet — a Release-As decision is pending", not "the pipeline is
+        # broken"); release.md §Exception: the release PR is non-lockstep
+        # (root != lib) documents the window.
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}

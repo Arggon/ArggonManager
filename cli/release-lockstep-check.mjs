@@ -30,6 +30,31 @@
 // -> exit 1, naming both versions and the remedy; equal -> exit 0, silent; no
 // open release PR -> exit 0, silent (the ordinary push).
 //
+// THE EXPECTED RED WINDOW — WHY THE RUN STAYS RED (decided 2026-10-13,
+// task-nonlockstep-red-state-expectations). With `chore` deliberately
+// releasable (release-please-config.json maps it to the Changed section) and
+// lib bumped only when it has commits, a ROOT-ONLY accumulating proposal is
+// the ORDINARY between-releases state: it is non-lockstep from the moment
+// release-please opens it until someone decides the version, and this run is
+// red on every push to main in that window. That red is the intended signal —
+// "do not merge this PR yet — a Release-As decision is pending" — not a
+// pipeline failure and not a release-please outage. #770 (root 0.9.0 /
+// lib 0.8.0) was a real catch before v0.9.0 shipped and #786 (root 0.9.1 /
+// lib 0.9.0) was ordinary accumulation after it; the check cannot tell them
+// apart because they are the SAME state, and both clear the same way — the
+// owner's empty `Release-As: X.Y.Z` commit rewrites the proposal lockstep and
+// the next run exits 0 (#786 closed exactly that way on 2026-10-13, from
+// 0.9.1/0.9.0 to 0.10.0/0.10.0). The FAIL block below prints this reading so
+// a red run is not misread.
+//
+// WHY NOT A SOFTER SIGNAL. Considered and rejected: exit 0 with a notice or an
+// annotation for the ordinary accumulation. It would recreate the blindness
+// this guard exists to close — the 2026-10-02 → 2026-10-07 outage was a
+// `logger.warn` inside a run that reported success — and the check has no way
+// to classify intent: an open non-lockstep proposal must not merge whatever
+// the reason. The merge-time protection is unchanged on either path:
+// release.yml's pre-tag lockstep assert still refuses a broken release commit.
+//
 // THE SECOND CONCERN: THE EXACT KERNEL PIN (bug-kernel-pin-never-exact). The
 // same read also yields the root's `dependencies["@arggondev/lib"]`, and the
 // open PR must carry the BARE released version — no `^`/`~`/range operator
@@ -302,7 +327,14 @@ function main() {
       .join("\n\n");
     writeSync(
       1,
-      `release-lockstep-check: FAIL — an OPEN release PR proposes a NON-LOCKSTEP release, which must not merge.\n` +
+      `release-lockstep-check: FAIL — an OPEN release PR proposes a NON-LOCKSTEP release, which must not merge.\n\n` +
+        `EXPECTED READING — between releases a root-only accumulating proposal is the NORMAL non-lockstep\n` +
+        `state, not a pipeline failure. 'chore' commits are deliberately releasable and lib moves only when\n` +
+        `it has commits, so a wave that leaves lib/ untouched keeps this run red on every push until someone\n` +
+        `decides the version. The red run means "do not merge this PR yet — a Release-As decision is\n` +
+        `pending", not "the pipeline is broken" and not "release-please is down"; it goes green by itself\n` +
+        `when the Release-As commit below lands. A fresh proposal nobody has sized yet (#770) and expected\n` +
+        `accumulation after a release (#786) are the same red — both must clear this way.\n\n` +
         `Every release is lockstep (root version == lib version; ADR 0018 §1/§2, spec-release-pipeline-015\n` +
         `invariant 1) and release.yml refuses to tag a non-lockstep release commit, so merging this PR\n` +
         `would strand the release (the 2026-10-02 → 2026-10-07 outage class).\n\n` +
@@ -314,7 +346,8 @@ function main() {
         `trailer pushed to main — release-please applies an empty commit to every component path\n` +
         `(CommitSplit includeEmpty: true) and updates the release PR to a lockstep proposal. X.Y.Z is the\n` +
         `version you intend to release; the remedy command above uses the higher of the two proposals.\n` +
-        `See release.md §Exception: the release PR is non-lockstep.\n`,
+        `See release.md §Exception: the release PR is non-lockstep (root != lib) — the expected red window\n` +
+        `included.\n`,
     );
   }
 

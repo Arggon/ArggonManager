@@ -56,6 +56,20 @@ reddens the maintenance run on an open non-lockstep PR, naming both versions;
 release commit cannot strand a tag. A lockstep proposal and a push with no open
 release PR stay silent.
 
+**The red window is expected — not a pipeline failure.** Between releases, a wave
+that leaves `lib/` untouched yields a root-only accumulating proposal (`chore`
+commits are deliberately releasable; lib is bumped only when it has commits), so
+this run reds on every push to `main` until someone decides the version. The red
+means **"do not merge this PR yet — a Release-As decision is pending"**; it
+clears by itself when the Release-As commit lands (release-please rewrites the
+proposal lockstep and the next run exits 0 — observed on #786, 0.9.1/0.9.0 →
+0.10.0/0.10.0). The check **stays a hard failure** by decision
+(`task-nonlockstep-red-state-expectations`, 2026-10-13): a softer signal for this
+case would repeat the shape of the 2026-10-02 → 2026-10-07 outage — a warning
+inside a run that reported success — and an open non-lockstep proposal must not
+merge whatever the reason. The merge-time protection is unchanged (`release.yml`'s
+pre-tag assert) and the check's FAIL message carries the same reading.
+
 **Remedy — force both packages with an empty `Release-As` commit.** An empty
 commit is applied to every component path (`CommitSplit includeEmpty: true`), so
 the trailer sets BOTH packages and release-please updates the PR to a lockstep

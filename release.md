@@ -165,6 +165,37 @@ invariant 1), so it must never merge.
   ran, and release-please wedged on the merged release PR — the 2026-10-02 →
   2026-10-07 outage class.)
 
+**Expected red window — the red maintenance run is normal here, not a pipeline
+failure.** `chore` commits are deliberately releasable (they land in the Changed
+section) and release-please bumps lib only when a wave touched `lib/`, so a wave
+of root-only work leaves a root-only accumulating proposal: non-lockstep from the
+moment release-please opens it until someone decides the version, with the
+`release-please.yml` run red on every push to `main` in between. The red means
+**"do not merge this PR yet — a Release-As decision is pending"** — it is the
+guard keeping the proposal out of `main` while the decision is open — and it goes
+green by itself when the Release-As commit lands (release-please rewrites the PR
+lockstep; the next run exits 0). Both #770 (root 0.9.0 / lib 0.8.0, before
+v0.9.0) and #786 (root 0.9.1 / lib 0.9.0, after it) wore this same red: the first
+was a fresh proposal nobody had sized, the second expected accumulation, and the
+check cannot tell intent apart because an open non-lockstep proposal must not
+merge either way. #786 closed the way the window always closes: the empty
+`Release-As: 0.10.0` commit rewrote it to 0.10.0 / 0.10.0 and the next run was
+green.
+
+**Decision — the check stays failing (`task-nonlockstep-red-state-expectations`,
+2026-10-13).** A softer signal for the ordinary accumulation case (exit 0 with a
+notice or an annotation) was considered and rejected: it would recreate the
+blindness this guard exists to close — the 2026-10-02 → 2026-10-07 outage was a
+`logger.warn` inside a run that reported success — and the check cannot classify
+intent, so the only honest predicate is "an open release PR whose versions differ
+must not merge". What changed is the reading, not the signal: the check's FAIL
+block now prints the expected reading above, the runbook
+(`ArggonManager/docs/runbooks/release.md`) and the `release-please.yml` step
+comment carry the window, and the wording is pinned by
+`cli/release-lockstep-check.test.ts`. The merge-time protection is unchanged on
+either path: `release.yml`'s pre-tag root-lib assert still refuses a non-lockstep
+release commit.
+
 **Remedy — force both packages with a `Release-As` trailer.** release-please
 applies an **empty** commit to every component path (`CommitSplit
 includeEmpty: true`), so an empty commit whose message carries the trailer sets
