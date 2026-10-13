@@ -396,3 +396,10 @@ observed successful envelope, with the causality boundary stated in Probe 2.
 ### handoff 2026-10-13 @ses_eca8380c1ffeQSEWbCVjqOL52V (session: ses_eca8380c1ffeQSEWbCVjqOL52V) — next: Review PR #774 (both carriers + pinned allow/deny tests + the verifier probe), then merge; re-check with a scratch-tree `arggon init` render.
 - branch: fix/bug-verifier-cannot-read-the-tracker-no-allow-side
 - open questions: Mechanism claim unverified: reads already worked on 2.0.26 (base allow-all); 2026-10-11 cause unknown. `arggon_branch` kept denied by design. Pre-existing w4 smoke failures unfiled.
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 72ff9a71 (PR #774); auto-done flip landed. The verifier's tracker reads are now an explicit, tested contract: `effect: allow` for show/list/next/report/validate (both spellings) in the seam AND the template; `comment` joins the denied write set; `branch` stays denied — it records a branch (a write), an allow would override its deny under last-match-wins, and `show` returns the branch field, so no read capability is lost. That deviates from the item's "at minimum … arggon_branch (read-side)" list with the recorded reason — accepted by the lead.
+Honest correction accepted: on opencode 2.0.26 the unmodified seam already answered reads (base policy allow-all), so the allows pin the read set rather than unblocking it — and the docs state exactly that (config-enforced write side + stated read set). The 2026-10-11 incident cause remains unexplained and is flagged on the item, not silently closed.
+Evidence: real-session probe before→after + negative controls (smoke scenario 11/11, model-driven, run alone); init-opencode pins (allow set, deny set, seam/template byte parity); checksum refreshed; full suite 3315; CI green.
