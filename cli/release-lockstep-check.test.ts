@@ -13,7 +13,13 @@
  *   - green: a lockstep proposal with the bare pin -> exit 0, silent (no
  *     failure, no noise);
  *   - red:   root != lib -> exit 1, the message carrying both versions and the
- *           empty `Release-As: X.Y.Z` remedy;
+ *           empty `Release-As: X.Y.Z` remedy — and the EXPECTED READING that
+ *           makes the ordinary between-releases accumulation legible: the red
+ *           run means "do not merge this PR yet — a Release-As decision is
+ *           pending", not "the pipeline is broken" (decided 2026-10-13,
+ *           task-nonlockstep-red-state-expectations: the run KEEPS failing —
+ *           an open non-lockstep proposal must not merge whatever the reason —
+ *           and the wording is pinned by a test below so it cannot drop);
  *   - red:   a pin that is not the bare released version (a range operator, a
  *           stale exact version, or missing) -> exit 1, naming the value and
  *           the fix (edit package.json, then re-run so the lockfile sync
@@ -219,6 +225,43 @@ describe("release-lockstep-check (bug-release-proposal-non-lockstep-undetected)"
     expect(result.stdout).not.toContain("release-lockstep-check: OK");
   });
 
+  it("red path: the ordinary accumulation carries the expected reading, pinned", () => {
+    // #786's shape: after v0.9.0 shipped, tracker `chore` commits left the
+    // proposal root-only (0.9.1 / 0.9.0) — the ORDINARY between-releases
+    // state, red on every push until the version is decided. The decision
+    // (task-nonlockstep-red-state-expectations) KEEPS that red — an open
+    // non-lockstep proposal must not merge whatever the reason — so what is
+    // pinned here is the reading: the red means a Release-As decision is
+    // pending, not that the pipeline is broken.
+    const { bin } = makeGh([
+      { stdout: prList({ number: 786, headRefName: HEAD }) },
+      { stdout: manifest("arggon-manager", "0.9.1", "0.9.1") },
+      { stdout: manifest("@arggondev/lib", "0.9.0") },
+    ]);
+
+    const result = runCheck(bin);
+    expect(result.status).toBe(1);
+    // Flatten the wrap: the pinned phrases are logical sentences, not lines.
+    const message = result.stdout.replace(/\s+/g, " ");
+    expect(message).toContain(
+      "EXPECTED READING — between releases a root-only accumulating proposal is the NORMAL " +
+        "non-lockstep state, not a pipeline failure.",
+    );
+    expect(message).toContain(
+      'The red run means "do not merge this PR yet — a Release-As decision is pending", ' +
+        'not "the pipeline is broken" and not "release-please is down";',
+    );
+    expect(message).toContain(
+      "A fresh proposal nobody has sized yet (#770) and expected accumulation after a release " +
+        "(#786) are the same red — both must clear this way.",
+    );
+    // The ordinary case still prints the concrete remedy — the higher of the
+    // two proposals — and stays non-zero.
+    expect(message).toContain(
+      'git commit --allow-empty -m "chore(release): 0.9.1" -m "Release-As: 0.9.1" && git push origin main',
+    );
+  });
+
   it("red path: the remedy forces the higher proposal when lib is ahead", () => {
     const { bin } = makeGh([
       { stdout: prList({ number: 771, headRefName: HEAD }) },
@@ -249,8 +292,10 @@ describe("release-lockstep-check (bug-release-proposal-non-lockstep-undetected)"
     // edit needs (npm ci compares the lockfile against the changed spec).
     expect(result.stdout).toContain('set dependencies["@arggondev/lib"] to "0.10.0"');
     expect(result.stdout).toContain("Re-run all jobs");
-    // Versions are lockstep here: the pin is the only broken concern.
+    // Versions are lockstep here: the pin is the only broken concern, and a
+    // pin defect is never the expected window — no EXPECTED READING block.
     expect(result.stdout).not.toContain("NON-LOCKSTEP");
+    expect(result.stdout).not.toContain("EXPECTED READING");
   });
 
   it("red path: a stale exact pin (not the released version) exits non-zero", () => {
