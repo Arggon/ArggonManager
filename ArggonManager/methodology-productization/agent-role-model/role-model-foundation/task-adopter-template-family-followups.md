@@ -80,3 +80,9 @@ Open question (pre-existing, not in the four rows): the ledger record for the gi
 ### handoff 2026-10-13 @ses_eca4ef972ffeE9z0kPXAonRJHo (session: ses_eca4ef972ffeE9z0kPXAonRJHo) — next: Lead: CI green on baca2f4e (cli, tasks-validate, ui-smoke); review commits 2d9650c4/55e40c4e/baca2f4e + ticked rows, then merge.
 - branch: feat/task-adopter-template-family-followups
 - open questions: goal-mode.ts:316 renders 'coordinator'; capability-matrix.json:116 (root+template) old roles; stale ledger record for gitignored .agents exploration.md copy. All out of rows.
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 52a6a702 (PR #781); auto-done flip landed. The template-family guard now walks the seam subtrees (the #758 exclusion is gone) and really compares all four carriers (blockquote-normalizing `bulletsOf`); CONTRIBUTING/PR-template checks are restated project-neutrally; the goal-mode template uses the shipped role word; the docs-only exemption is a general clause. Negative controls (reverted) proved each clause fires; the anti-shrink walk test is added.
+Residual findings filed: task-retired-role-words-product-text (goal-mode.ts:316 product text + the capability-matrix note).
