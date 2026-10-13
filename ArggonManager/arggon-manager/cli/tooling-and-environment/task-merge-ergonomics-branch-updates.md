@@ -134,3 +134,16 @@ Read: `gh pr diff 753` (exactly 2 files), the item + all comments, `engineering.
 4. The PR body's test plan claims `prettier --check` clean "on engineering.md and the item file"; at head the item file is not prettier-clean (kernel comment/handoff shape, disclosed in the item's live-demo comment). Disclosure is honest and no workflow runs prettier, but the PR-body claim is false at head — correct or qualify it.
 
 Requested changes: impact class in PR description + item comment; the F2 fix; the F3 correction. Nothing else blocks: placement under §Naming, commits, PRs is the location the lead's decision comment chose, the text restates no ADR status, and it duplicates no agents.md rule.
+
+### 2026-10-13 @ses_ecd832dcaffeNprCV9oommyP6g
+**Post-review corrections — verdict `request-changes` (practice-standards-reviewer, carried commit `cc90d896`).**
+
+**Methodology impact class: behavioral.** `ArggonManager/docs/engineering.md` is a named carrier (`ArggonManager/docs/agents.md` §Changing the methodology itself); this PR adds a merge-refusal procedure agents must follow (refresh server-side → merge/arm; local-merge fallback; bot-branch exclusion), so it is a pipeline step agents re-learn, not doc reorganization. Adopter-upgrade channel: [ADR 0016](ArggonManager/docs/adr/0016-adopter-upgrade-channel.md). Skill sync for the same PR: `npm run skills:sync` → "synced 7 bundled skill file(s) from their single sources", no tracked diff (`.agents/skills/` is generated/gitignored); `cli/src/skill-copy.test.ts` green (byte-parity pinned), and no skill statement is made false — the merge-never-squash rule in `references/pitfalls.md` still holds.
+
+**F2 — `--auto` re-strand corrected** (`d0694414`): the doc no longer promises "the merge lands without a second visit"; it now states auto-merge does **not** refresh a branch that falls behind after arming, and keeps the recovery one-liner (`update-branch` again; the armed auto-merge completes once the checks pass).
+
+**F3 — merge-queue availability corrected** (`d0694414`): my earlier bullet "the repo is org-owned and public, where the queue is available" was wrong — `gh api users/Arggon --jq .type` → `User`, and GitHub merge queues are organization-owned-repo-only (public org repos, or private org repos on GHEC). The doc's closing sentence and the owner recommendation now state the constraint: the durable fix's precondition is an org transfer (or a non-native queue), and the `merge_group` CI follow-up is moot until then.
+
+**Minor** — the PR body is corrected: `prettier --check` is claimed clean for `engineering.md` only; the item file is disclosed as failing in the kernel's comment/handoff shape (18/18 siblings), and no workflow runs prettier.
+
+Box 4 untouched (unchecked; the lead's after-observation still pending).
