@@ -1,15 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-spike-cross-run-lesson-store
 title: "Spike: a durable cross-run lesson store — keep what we learned, discard the dead ends (the one idea worth taking from autoctx)"
+assignee: arggon-delivery-lead
+branch: feat/task-spike-cross-run-lesson-store
 parent: external-harness-evaluation
 labels: [methodology, evaluation, spike]
 priority: p2
 created: "2026-10-05"
-updated: "2026-10-05"
+updated: "2026-10-13"
+claimed_at: "2026-10-13T03:19:08.331Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-spike-cross-run-lesson-store
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/external-harness-evaluation/task-spike-cross-run-lesson-store.md
   Leaves live only under a story. id is the filename stem: task-spike-cross-run-lesson-store.
