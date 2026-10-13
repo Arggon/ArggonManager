@@ -206,3 +206,8 @@ Full auto-done sweep landed after the report (background job sh_12d1bdb48001ZBpo
 
 - branch: feat/task-measure-kernel-refusal-rate
 - open questions: None open; closure + exploration link are lead calls
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+### Refutation — 2026-10-13 (delivery lead record)
+The 0/220 in this item's report is a measurement artifact, not the measured rate. The sweep it queued (`task-sweep-auto-done-refusal-warnings`, PR #779, merged) re-read all 534 auto-done run logs AND the check-run annotations API — exact agreement, 239 step-level warnings each — and found the done-gate merge-time refusal rate is **16.0% (42/262)** in this item's window and **18.1% (52/288)** full-window, 52 events across 49 distinct items. Root cause of the zero: the sweep keyed on the literal `::warning::`, which never appears as executed output — the runner renders an executed warning as `##[warning]<msg>`.
+Follow-up filed: `task-done-gate-refusal-rate-substrate` (classify the refusals; decide the substrate work). exploration-021's closure note was corrected to "not closed" in PR #779. This item stays done; read its report with this comment attached.
