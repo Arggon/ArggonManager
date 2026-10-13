@@ -14,10 +14,14 @@
  * (`present: false` + `error`) that still exits 0.
  *
  * Resolution is the EXAMINED TREE only — `<root>/adapters/capability-matrix.json`,
- * the copy the tree commits — deliberately with no fallback to the installed
- * package. Two reasons, both learned the hard way:
- *   - the matrix is a repo asset (it declares THIS product's adapters), not an
- *     installation asset, so the tree that owns it is the only authority;
+ * the copy the tree carries: committed by this repo, and written by `arggon init`
+ * for every adopter (from `templates/docs/adapters/capability-matrix.json`, a
+ * tier-1 generated destination with the same never-overwrite provenance as every
+ * other doc) — deliberately with no fallback to the installed package. Two
+ * reasons, both learned the hard way:
+ *   - the tree that carries the file is the only authority for it: an adopter can
+ *     edit or replace its copy (init protects it like any generated doc), so a
+ *     package fallback would report rows from a file the tree does not have;
  *   - a package fallback made `doctor --json` differ between the packed bin and
  *     the checkout CLI on the very same tree (the checkout resolves
  *     `packageRoot()` to the repo, the packed bin to an install dir), which

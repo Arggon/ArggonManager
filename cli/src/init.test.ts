@@ -121,6 +121,10 @@ const TIER1_DOCS = [
   "CLAUDE.md",
   "CONTRIBUTING.md",
   "SECURITY.md",
+  // task-matrix-reaches-adopters: the committed capability matrix ships as a
+  // tier-1 generated destination (`templates/docs/adapters/**` maps 1:1), so
+  // `arggon doctor` reports it in an adopter tree.
+  "adapters/capability-matrix.json",
   "opencode.jsonc",
 ];
 

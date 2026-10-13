@@ -328,6 +328,11 @@ x-generated:
     arggonVersion: "0.3.0"
     generatedAt: "2026-09-17T17:52:07.195Z"
     acknowledged: true
+  adapters/capability-matrix.json:
+    template: "docs/adapters/capability-matrix.json"
+    checksum: "sha256:cf6513d2c9ddb07918ff53cd023727ba02869f8de8fb94570e9aca4ce1a5c7de"
+    arggonVersion: "0.7.0"
+    generatedAt: "2026-10-13T03:40:00.000Z"
   opencode.jsonc:
     template: "docs/opencode.jsonc"
     checksum: "sha256:a88b8cf0a12b5048812eadacae79e2c636e09ec9a8528ff71edd1bef7dc039dd"
