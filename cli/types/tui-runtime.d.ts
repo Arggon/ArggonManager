@@ -25,4 +25,9 @@ declare module "solid-js" {
     each?: readonly T[];
     children?: (item: T, index: () => number) => unknown;
   }): unknown;
+  /**
+   * Lifecycle registration (T4 event-driven refresh): the panel hands the
+   * event-stream disposer to the component's cleanup.
+   */
+  export function onCleanup(fn: () => void): void;
 }
