@@ -23,6 +23,17 @@ playwright-report/
 # recreates the copy. The board surface itself is inlined in the bundle above.
 .opencode/plugins/arggon/tui.tsx
 
+# task-seam-footprint-config-inline-evaluation: machine-local OpenCode
+# agent-tooling scratch — NOT the seam. `.opencode/opencode.json` is this
+# machine's local harness plugin registration (an absolute path outside the
+# repo) and `.opencode/harness/` is that harness's state; the project config is
+# the tracked `opencode.jsonc`. Untracked, they showed in `git status` and made
+# `git worktree remove` refuse a worktree where a session had run the harness
+# (untracked ≠ ignored). Ignored, they no longer block pruning; a fresh clone
+# never sees them.
+.opencode/opencode.json
+.opencode/harness/
+
 # Tooling artifacts (video2code / video-agent sessions)
 .v2c/
 .video_agent/
