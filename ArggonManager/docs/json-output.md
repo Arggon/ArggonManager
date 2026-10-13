@@ -854,7 +854,12 @@ Init still **writes** the tracker `.convention.yml` (`ArggonManager/.convention.
     "v1": { "findings": [], "truncated": false },
     "artifacts": {
       "config": true,
-      "agents": ["arggon-coordinator", "arggon-reviewer", "arggon-worker"],
+      "agents": [
+        "arggon-delivery-lead",
+        "arggon-maker",
+        "arggon-standards-reviewer",
+        "arggon-verifier"
+      ],
       "commands": [
         "arggon-adr",
         "arggon-done",
