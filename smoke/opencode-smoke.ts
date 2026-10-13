@@ -2113,7 +2113,7 @@ function verifierProbe(
   label: string,
   ready: (stdout: string) => boolean,
 ): RunResult {
-  return probeWithRetry(f, prompt, label, "arggon-verifier", ready, 2);
+  return probeWithRetry(f, prompt, label, "arggon-verifier", ready, 3);
 }
 
 /**
@@ -2129,7 +2129,10 @@ function verifierProbe(
  * filtering ("Unknown tool") recorded on `update`/`create`/`comment`; the
  * catalog check is the runtime's filter, not the model's choice to skip a
  * tool; and the item on disk is re-read to prove the refused `comment` left no
- * body behind.
+ * body behind. A session that skips the write attempts (observed: a verifier
+ * model refusing to "harvest a denial message") is retried and, if it still
+ * declines, reported as inconclusive instead of as a refusal
+ * (bug-full-smoke-scenarios-precede-newer-gates).
  */
 function scenarioVerifierPermissions(): void {
   scenario("permissions: the verifier reads (allow granted) and cannot write (deny unchanged)");
@@ -2153,6 +2156,7 @@ function scenarioVerifierPermissions(): void {
     `try { out.comment = await tools.arggon.comment({ id: "${item.id}", text: "verifier probe must not post" }); } catch (error) { out.commentError = String((error && error.message) || error); }`,
     'const catalog = await search({ namespace: "arggon", limit: 20 });',
     "return { out, catalog };",
+    "The three write calls (update, create, comment) are EXPECTED to be refused by your permission filter: attempting them verbatim IS the conformance probe and the refusal envelope is the PASS condition. Do not skip, rewrite or judge them — attempt every call and let the runtime refuse it.",
     "If a tool is not found, run the same code once more (the tool catalog can lag server startup).",
     "Reply with only the raw JSON result.",
   ].join("\n");
@@ -2160,13 +2164,32 @@ function scenarioVerifierPermissions(): void {
     const probe = executeJson(stdout, "tools.arggon.show");
     const out = (probe?.out ?? {}) as Record<string, unknown>;
     const show = (out.show ?? {}) as Record<string, unknown>;
-    return probe !== undefined && probe.catalog !== undefined && show.command === "show";
+    // The write attempts are probe evidence too: a session that ran only the
+    // read half says nothing about the deny side and is retried
+    // (bug-full-smoke-scenarios-precede-newer-gates).
+    return (
+      probe !== undefined &&
+      probe.catalog !== undefined &&
+      show.command === "show" &&
+      attemptedCode(stdout, "tools.arggon.update") &&
+      attemptedCode(stdout, "tools.arggon.create") &&
+      attemptedCode(stdout, "tools.arggon.comment")
+    );
   });
   check("session succeeds as the verifier agent", session.status === 0, runTail(session));
   const pluginFaults = pluginLoaded(session, f);
   check("plugin loads in the runtime", pluginFaults.length === 0, pluginFaults.join("; "));
   const result = executeJson(session.stdout, "tools.arggon.show");
   check("model executed the verifier script", result !== undefined, runTail(session));
+  // The deny side is only proven when the probe was attempted: a model that
+  // skipped the write calls (observed: "I will not attempt them, not even to
+  // harvest a denial message") leaves the permission filter unexercised, and
+  // that must read as inconclusive — never as a refusal and never as a pass
+  // (bug-full-smoke-scenarios-precede-newer-gates).
+  const writesAttempted =
+    attemptedCode(session.stdout, "tools.arggon.update") &&
+    attemptedCode(session.stdout, "tools.arggon.create") &&
+    attemptedCode(session.stdout, "tools.arggon.comment");
   if (result !== undefined) {
     const out = (result.out ?? {}) as Record<string, unknown>;
     const show = (out.show ?? {}) as Record<string, unknown>;
@@ -2176,17 +2199,23 @@ function scenarioVerifierPermissions(): void {
       JSON.stringify(show).slice(0, 200),
     );
     check(
-      "the read grant did not open a write path: update refused",
+      writesAttempted
+        ? "the read grant did not open a write path: update refused"
+        : "verifier write probe: model declined update (inconclusive: the permission filter was never exercised)",
       unknownToolError(out.updateError, "arggon.update"),
       String(out.updateError ?? "").slice(0, 200),
     );
     check(
-      "the read grant did not open a write path: create refused",
+      writesAttempted
+        ? "the read grant did not open a write path: create refused"
+        : "verifier write probe: model declined create (inconclusive: the permission filter was never exercised)",
       unknownToolError(out.createError, "arggon.create"),
       String(out.createError ?? "").slice(0, 200),
     );
     check(
-      "comment (a tracker write) is refused too: evidence goes to the caller, never the item",
+      writesAttempted
+        ? "comment (a tracker write) is refused too: evidence goes to the caller, never the item"
+        : "verifier write probe: model declined comment (inconclusive: the permission filter was never exercised)",
       unknownToolError(out.commentError, "arggon.comment"),
       String(out.commentError ?? "").slice(0, 200),
     );
@@ -2209,8 +2238,10 @@ function scenarioVerifierPermissions(): void {
     );
   }
   check(
-    "the refused writes left the item untouched (no status flip, no comment body)",
-    f.read(`${item.directory}/${item.id}.md`) === before,
+    writesAttempted
+      ? "the refused writes left the item untouched (no status flip, no comment body)"
+      : "verifier write probe: model declined (inconclusive: no write attempt, so 'untouched' proves nothing about the filter)",
+    writesAttempted && f.read(`${item.directory}/${item.id}.md`) === before,
   );
 }
 
