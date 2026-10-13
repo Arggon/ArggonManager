@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-release-label-flip-verification-index-lag
 title: "release-label-flip's post-flip verification reads the search index ~0.4s after the edit and can warn 'still pending' on a healthy release (observed live on v0.7.0)"
 assignee: arggon-delivery-lead
@@ -8,8 +8,7 @@ branch: fix/bug-release-label-flip-verification-index-lag
 parent: story-release-pipeline
 labels: [release, ci, failure-mode]
 created: "2026-10-12"
-updated: "2026-10-12"
-claimed_at: "2026-10-12T22:10:25.913Z"
+updated: "2026-10-13"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-label-flip-verification-index-lag
 ---
 <!--
