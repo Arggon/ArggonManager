@@ -59,3 +59,7 @@ Gates at head `15bf460d`: `npm run build` clean; `npx vitest run cli/src/capabil
 Environment note: the killed attempt had left vitest's artifact freeze on (`lib/dist` + `dist` 0444/0555, `test/kernel-artifacts.ts`); the first build failed EACCES because of that, not the tree. Modes restored to 0755/0644 (the teardown's own behaviour), then all gates green.
 
 Open question (non-blocking): a semantically-neutral frontmatter re-serialization of this item file appeared in the worktree between the two commits (title quote style, blank line after frontmatter). Pre-commit hook, `arggon validate` and the edit tool were each ruled out by direct probe; content unchanged.
+
+### handoff 2026-10-13 @ses_eca8380bdffe1mNEVdrYKdoMXg (session: ses_eca8380bdffe1mNEVdrYKdoMXg) — next: Review + merge PR #772, verify the 5 acceptance ticks against the diff, then flip this item done.
+- branch: feat/task-capability-matrix-followups-from-review
+- open questions: Item-file frontmatter re-serialized between commits - writer unidentified (hook/validate/edit tool ruled out); judge derivation wording 'once understated'.
