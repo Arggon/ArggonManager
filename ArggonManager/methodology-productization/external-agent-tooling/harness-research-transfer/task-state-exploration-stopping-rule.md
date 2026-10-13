@@ -175,3 +175,23 @@ auto-harness gate declined a read-only `arggon` tool call and demanded checkers 
 ### handoff 2026-10-13 @arggon-maker — next: Review PR #771 (docs-only, impact Advisory) against the item's acceptance criteria; tick the live checklist and flip done after merge — full evidence in the comment above.
 - branch: feat/task-state-exploration-stopping-rule
 - open questions: checklist left unticked for the lead; tools.arggon.show reads main checkout (todo/unclaimed) despite the committed claim; auto-harness gate declined a read-only arggon call (out of scope)
+
+### 2026-10-13 @arggon-maker
+### Follow-up — wording: "different checks"; plus a prettier observation
+
+- `d7dea8c5` (text re-read against the domain-neutrality criterion): "The two stops are different
+  tests" → "different **checks**". "Tests" reads as test-suite vocabulary in a rule that must
+  presuppose no software project, file tree or suite; "checks" is neutral and matches the rule's own
+  "Checkable form". Wording only — the rule's content is unchanged.
+- Re-verified after the tweak (head `d7dea8c5`): `npx prettier --check
+  skills/arggon-cli/references/exploration.md` clean; `skill-copy.test.ts` 8/8 passed; `arggon
+  validate` ok (0 warnings); `spec validate` ok (38 docs); `spec analyze` 4 findings — unchanged
+  from the pre-change baseline, none naming this item; `skills:sync` re-run and the derived copy is
+  byte-equal again.
+- **Prettier observation (not a defect of this change).** This item's file fails `prettier --check`
+  because the tracker tree is not prettier-clean repo-wide: 587 tracker markdown files fail on this
+  head, including untouched siblings in this same story directory, and the missing blank lines are
+  at the frontmatter/comment-section seams the tracker itself writes. CI runs no prettier step at all
+  (`.github/workflows/` contains none). The one deliberately edited file,
+  `skills/arggon-cli/references/exploration.md`, is clean. I did not reformat tracker files: out of
+  this item's scope, re-dirtied by the next tracker write, and a 587-file diff.
