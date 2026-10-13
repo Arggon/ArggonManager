@@ -8,7 +8,6 @@ labels: [seam, provenance, cli]
 created: "2026-10-13"
 updated: "2026-10-13"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-skill-source-edit-leaves-ledger-stale.md
   Leaves live only under a story. id is the filename stem: bug-skill-source-edit-leaves-ledger-stale.
@@ -72,3 +71,7 @@ again locally. This item is about the mechanism, not that one record.
 Re-recording the checksum alone was not the whole repair: setting the entry's `arggonVersion` to `0.7.0` (the version whose sync actually wrote the copy) made the `tasks-validate` drift gate demand the **post-release re-pin** — `ARGGON_VERSION (0.6.0) lags the committed arggon seam (0.7.0)`, exactly as `release.md` §"The re-pin" prescribes after a release. The re-pin was overdue for 0.7.0 and was completed the same hour: both pins (`templates/docs/github/workflows/arggon.yml`, `.github/workflows/arggon.yml`) bumped to `0.7.0` and the seam regenerated with the 0.7.0 build (`5520c227`); `ci-seam-pin.test.ts` + `provenance-audit.test.ts` green (16/16).
 
 Lesson for this item's fix: **whoever updates the ledger must respect the pin** — a version stamp newer than `ARGGON_VERSION` is a re-pin request, not a bookkeeping edit. Either the fix's mechanism keeps the stamp at the pin, or it (correctly) routes the re-pin flow. Record this in the acceptance's decision.
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+### Recurrence — 2026-10-13 (delivery lead)
+Same class, new instance: PR #771 merged a source edit to `skills/arggon-cli/references/exploration.md` (the ADR 0017 stopping rule). In any local checkout where `arggon init` / `npm run skills:sync` has materialized `.agents/skills/arggon-cli/references/exploration.md`, the `x-generated` ledger record for that derived copy is now stale — `cli/src/provenance-audit.test.ts` fails locally (three separate wave-3 worktrees hit it this session; fresh checkouts and CI skip the absent destination at `docs.ts:1675`, so CI stays green). Third observed instance of sync-never-updates-the-ledger (`json-contract.md` after #751; `exploration.md` after #771). Reinforces the item's acceptance: the sync path should re-record the derived copy's checksum.
