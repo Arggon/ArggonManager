@@ -80,3 +80,7 @@ Observed: 2 failed / 3 passed — rule 1 reports `ArggonManager/docs/json-output
 **Found, not fixed (report to the delivery lead)**
 
 - `ArggonManager/docs/adr/0010-opencode2-native-architecture.md:53-54` still names `arggon-coordinator` / `arggon-worker` / `arggon-reviewer` as the shipped agents. It is a dated record (exempt by this guard and by the same posture as ADR 0021's untouched rows), but it is factually stale. No item for it found in the tracker; the sibling item `bug-adr-0021-s5-lists-retired-agent-ids` flagged it as out of scope.
+
+### handoff 2026-10-13 @ses_ec8e84465ffexqO6yOcub1DHa4 (session: ses_ec8e84465ffexqO6yOcub1DHa4) — next: Delivery lead: standards-review PR #796 (b08f1b05 + comment 378eb663): doc sample fixed, guard cli/src/agent-id-doc-contract.test.ts green with a reverted negative control; do not merge.
+- branch: fix/bug-retired-agent-ids-in-doc-samples
+- open questions: ADR 0010:53-54 still names retired ids (record, not fixed; no item found) - file one?; guard surface = ArggonManager/docs live + README + skills, record dirs exempt.
