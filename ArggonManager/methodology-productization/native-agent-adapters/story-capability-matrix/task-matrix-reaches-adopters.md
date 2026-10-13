@@ -101,3 +101,7 @@ Expected vs observed: expected `matrix.present: true` with the committed file's 
 - `npx prettier --check` on every touched file ✓ (one formatting-only hunk in `adapter-selection.test.ts`, a pre-existing drift line in a touched file)
 
 **PR: #763** — `gh pr create --base main --head feat/task-matrix-reaches-adopters`. Not merged; the done flip is the delivery lead's call.
+
+### handoff 2026-10-13 @arggon-maker (session: ses_eccb87007ffdvyi3SiDGkrAOJi) — next: Review PR #763 (decision + fixture evidence in the comment above); merge if green; the next release+re-pin refreshes the new ledger stamp
+- branch: feat/task-matrix-reaches-adopters
+- open questions: ledger stamp kept at pin 0.7.0 (pinned init could reap the copy until next release+re-pin); mid-cycle new destinations cannot satisfy both pin-lag and downgrade-refusal
