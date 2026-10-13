@@ -45,11 +45,11 @@ Current PR #764 repeats it (`^0.8.0`), so the live release would ship the caret 
 
 ## Acceptance
 
-- [ ] the root pin is EXACT on main and in the next release PR (`"@arggondev/lib": "X.Y.Z"`, no range operator); the fix lives in the existing `release-please.yml` PR-branch sync (machine-owned, idempotent under release-please updates) or a mechanism proven not to be clobbered, not a timing-fragile manual edit
-- [ ] a guard detects a non-exact pin where it can still be fixed (release-PR run) and/or on main (test), so spec A3 is continuously enforced instead of verified once; a failure names the fix
-- [ ] `release.md` documents whatever mechanism ships (the current "documented in release.md" claim is false — correct it) and the spec A3 / `task-release-workflow` record states what actually happened (hand-unpin never executed through v0.7.1)
-- [ ] the live #764 release ships the exact pin — a one-time hand-unpin at merge time is tolerable only if the machine keeps it exact from the next release onward, and the spec's rejected-alternative note is amended accordingly
-- [ ] if the owner prefers a range pin instead of exact, that is a recorded decision change (ADR 0018 amendment / superseding ADR), never a silent drift
+- [x] the root pin is EXACT on main and in the next release PR (`"@arggondev/lib": "X.Y.Z"`, no range operator); the fix lives in the existing `release-please.yml` PR-branch sync (machine-owned, idempotent under release-please updates) or a mechanism proven not to be clobbered, not a timing-fragile manual edit
+- [x] a guard detects a non-exact pin where it can still be fixed (release-PR run) and/or on main (test), so spec A3 is continuously enforced instead of verified once; a failure names the fix
+- [x] `release.md` documents whatever mechanism ships (the current "documented in release.md" claim is false — correct it) and the spec A3 / `task-release-workflow` record states what actually happened (hand-unpin never executed through v0.7.1)
+- [x] the live #764 release ships the exact pin — a one-time hand-unpin at merge time is tolerable only if the machine keeps it exact from the next release onward, and the spec's rejected-alternative note is amended accordingly
+- [x] if the owner prefers a range pin instead of exact, that is a recorded decision change (ADR 0018 amendment / superseding ADR), never a silent drift
 
 ## Notes
 
