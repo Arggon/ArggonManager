@@ -70,3 +70,8 @@ Gates: `npm run arggon -- validate` -> ok (0 warnings, convention v5); `npx pret
 ### handoff 2026-10-13 @ses_ec8e84464ffeN0V05xDVKlh804 (session: ses_ec8e84464ffeN0V05xDVKlh804) — next: Lead: review PR #797 + the item comment (classification + decision); tick the 5 Acceptance rows; merge. No gate/substrate change recommended; done flip stays the lead's.
 - branch: feat/task-done-gate-refusal-rate-substrate
 - open questions: Optional follow-up: annotate the kernel's refusal reason/rows (CI can't distinguish the two causes). 2 post-cutoff refusals excluded from the 52. Filing new items is the lead's call.
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as c6475d0c (PR #797); flipped by the lead (rows verified and ticked). The 52 refusals are classified with the corrected method: 26 (50%) no live contract authored (all 26 still the exact `create` scaffold), 22 (42%) authored but unticked at merge, 4 (8%) pre-scoping (09-30→10-02); per-run log and annotation sources agree, 0 disagreements. Decision recorded: no gate or substrate change — the refusals are the gate tolerating an incomplete contract exactly as ADR 0015/0025 designed; the levers are authoring-side and already tracked. Measurement correction captured in `docs/labs/telemetry-mining.md` (the `##[warning]` vs `::warning::` trap, annotation path, sha-reconstruction rule). ADR 0025's 117/482 confirmed a different population, mechanism-mapped to its corrected 5/56/56 split. All 49 items are done today; median refusal→recovery 0.18 h.
