@@ -39,7 +39,7 @@ Found 2026-10-13 investigating the red `cli` run on release PR #764 (run 3834432
 - [ ] its test proves the green path (lockstep → exit 0, silent) and the red path (root != lib → non-zero, message carries both versions + remedy), injectable rather than live
 - [ ] `release.yml` asserts root-lib lockstep BEFORE creating/pushing the tag, so a broken release commit cannot strand a tag; the tag↔commit agreement assert stays after the tag as today
 - [ ] `ArggonManager/docs/runbooks/release.md` documents the non-lockstep case, the Release-As remedy, and the stranded-tag recovery if one ever lands
-- [ ] the live #764 state is recorded here once cleared (owner pushes the Release-As commit → #764 updates lockstep → CI re-approved and green)
+- [x] the live #764 state is recorded here once cleared (owner pushes the Release-As commit → #764 updates lockstep → CI re-approved and green)
 
 ## Notes
 
