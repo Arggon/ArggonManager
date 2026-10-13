@@ -53,3 +53,7 @@ Gates (worktree, head 6bbf2fdc): `npm run build` ok; focused (goal-mode, adopter
 Negative controls (each probe reverted): "coordinator" put back in goal-mode.ts → the new goal-mode assertion FAILs ("expected 'DEFINE THE GOAL FIRST: …' to contain 'delivery lead'"); "(coordinator, worker, reviewer)" put back in the matrix template → the family walk FAILs with "uses the pre-rename role word \"coordinator\" — ADR 0021 §6.1 ships \"delivery lead\"".
 
 Out of scope, reported for the lead (not in this diff): `ArggonManager/docs/agents.md` (this repo's carrier, never rendered into an adopter tree, so the family guard does not walk it) still carries live retired vocabulary — `:198` "ask the coordinator if you cannot tell", `:272` "when a coordinator `arggon comment`", `:636` ".opencode/agents/arggon-{coordinator,worker,reviewer,prover}.md". No sibling item under `role-model-foundation` covers these; a separate decision/follow-up.
+
+### handoff 2026-10-13 @ses_ec9dcc293ffeyooHsG9CAdABL0 (session: ses_ec9dcc293ffeyooHsG9CAdABL0) — next: Lead: review 6bbf2fdc + guards against the four ticked rows, then merge the PR; auto-done flips on merge. Negative controls in the evidence comment.
+- branch: feat/task-retired-role-words-product-text
+- open questions: docs/agents.md:198,272,636 still carry retired role vocabulary (carrier, not template) — out of rows; no sibling item covers it; lead decides follow-up.
