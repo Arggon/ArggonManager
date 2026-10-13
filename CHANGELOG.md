@@ -6,6 +6,55 @@ All notable changes to ArggonManager are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0](https://github.com/Arggon/ArggonManager/compare/v0.7.1...v0.8.0) (2026-10-13)
+
+
+### Added
+
+* **init:** generate adapters/capability-matrix.json in adopter trees (task-matrix-reaches-adopters) ([7fe0e9b](https://github.com/Arggon/ArggonManager/commit/7fe0e9bb77ff72d17418e0f5ccf7728d50f58baa))
+* **init:** ship adapters/capability-matrix.json to adopter trees (task-matrix-reaches-adopters) ([c1574da](https://github.com/Arggon/ArggonManager/commit/c1574daf1e322682b2690671572380c6ad1382e7))
+* **opencode:** prompt-admission stamp + compaction retention T4 (task-opencode-prompt-stamp) ([8760414](https://github.com/Arggon/ArggonManager/commit/87604141932c3bc647232f1c475e1404de1b906c))
+
+
+### Fixed
+
+* **templates:** domain-neutral adopter doc templates + family drift guard (bug-adopter-engineering-template-software-locked) ([38b9142](https://github.com/Arggon/ArggonManager/commit/38b914263c79b3498eecf5e247c8e9908395f98f))
+
+
+### Changed
+
+* **adapters:** re-measure the doctor --agents sample (task-adapter-report-nits-from-review) ([29b083f](https://github.com/Arggon/ArggonManager/commit/29b083f6be3e9a80b0e7bf5d648c326f9b92e783))
+* **adapters:** re-measure the doctor --agents sample against the live tree ([0bb45d6](https://github.com/Arggon/ArggonManager/commit/0bb45d642b11361a20c3f8ed5f6a2f1188de80d7))
+* **adr:** accept ADR 0027 on landing (task-spike-cross-run-lesson-store) ([4d5b3c4](https://github.com/Arggon/ArggonManager/commit/4d5b3c4c70797ab22cea3efd5ecd362b7df41e11))
+* **auto:** mark items done (PR [#758](https://github.com/Arggon/ArggonManager/issues/758) merged) ([#765](https://github.com/Arggon/ArggonManager/issues/765)) ([6990e55](https://github.com/Arggon/ArggonManager/commit/6990e55717c12ae276bb71e60220612aab03c6aa))
+* **auto:** mark items done (PR [#759](https://github.com/Arggon/ArggonManager/issues/759) merged) ([#768](https://github.com/Arggon/ArggonManager/issues/768)) ([6a530dc](https://github.com/Arggon/ArggonManager/commit/6a530dc40eeaed23945055a10bf5cdeb7184f554))
+* **auto:** mark items done (PR [#760](https://github.com/Arggon/ArggonManager/issues/760) merged) ([#767](https://github.com/Arggon/ArggonManager/issues/767)) ([4225038](https://github.com/Arggon/ArggonManager/commit/4225038ccd79edabb3e7e069c9c70bd96ab02b34))
+* **auto:** mark items done (PR [#761](https://github.com/Arggon/ArggonManager/issues/761) merged) ([#769](https://github.com/Arggon/ArggonManager/issues/769)) ([3637ff7](https://github.com/Arggon/ArggonManager/commit/3637ff738cd46141bf1b9578b90b28ada5f86239))
+* **auto:** mark items done (PR [#762](https://github.com/Arggon/ArggonManager/issues/762) merged) ([#766](https://github.com/Arggon/ArggonManager/issues/766)) ([cde862e](https://github.com/Arggon/ArggonManager/commit/cde862e7b15b809a37088ed4a620ed4fa8e80846))
+* **release:** 0.8.0 ([7d972ed](https://github.com/Arggon/ArggonManager/commit/7d972ed5c97e5ec8bb5e46081c78756365e90f03))
+* **spike:** cross-run lesson store — no store, promote into existing carriers (task-spike-cross-run-lesson-store) ([f01c1ed](https://github.com/Arggon/ArggonManager/commit/f01c1eddf40ad3976a343833a67de5fa0b9d06d1))
+* **spike:** decide the cross-run lesson store — promote into existing carriers ([ecf4bc2](https://github.com/Arggon/ArggonManager/commit/ecf4bc259dba1249239d5f1f1a0e374ef2d9092a))
+* **tasks:** claimed task-matrix-reaches-adopters ([57d1098](https://github.com/Arggon/ArggonManager/commit/57d109841c46b6817ba3e9bf9b3b0aad7c09a610))
+* **tasks:** claimed task-spike-cross-run-lesson-store ([ddf23f1](https://github.com/Arggon/ArggonManager/commit/ddf23f104bdd17c23cf466cafff8d9da17ca25b9))
+* **tasks:** commented bug-adopter-engineering-template-software-locked ([78f94c3](https://github.com/Arggon/ArggonManager/commit/78f94c3dc65dd1c9877822cdbe3a4c42b96627d7))
+* **tasks:** commented bug-x-tracker-option-list-has-no-doc-drift-guard ([3290b89](https://github.com/Arggon/ArggonManager/commit/3290b899a337bb1c946a87a223e52b2ee3324e56))
+* **tasks:** commented task-adapter-report-nits-from-review ([ba8c80c](https://github.com/Arggon/ArggonManager/commit/ba8c80c28a85862f48f11702d3789945a27a2389))
+* **tasks:** commented task-adapter-report-nits-from-review ([d770775](https://github.com/Arggon/ArggonManager/commit/d770775fe4ddaab2b3d68775f798640605765828))
+* **tasks:** commented task-adapter-report-nits-from-review ([346c78b](https://github.com/Arggon/ArggonManager/commit/346c78b08f41dbb991552a18b8b24a4eee80ec28))
+* **tasks:** commented task-matrix-reaches-adopters ([fed486d](https://github.com/Arggon/ArggonManager/commit/fed486d6fd32da820ac3ac8325a9868f39266a03))
+* **tasks:** commented task-matrix-reaches-adopters ([31729ac](https://github.com/Arggon/ArggonManager/commit/31729aca845942d65bacd32d5e0446a3e4cf9ba8))
+* **tasks:** commented task-matrix-reaches-adopters ([6885b7b](https://github.com/Arggon/ArggonManager/commit/6885b7b58a49b6360c32e72742240dfbb3731d4b))
+* **tasks:** commented task-opencode-prompt-stamp ([98db591](https://github.com/Arggon/ArggonManager/commit/98db59151d1284173d04c1a795bb604c6e491aeb))
+* **tasks:** commented task-spike-cross-run-lesson-store ([e542058](https://github.com/Arggon/ArggonManager/commit/e542058cbebc890714c3e0168ef2ec34a73f2d1a))
+* **tasks:** commented task-spike-cross-run-lesson-store ([445da38](https://github.com/Arggon/ArggonManager/commit/445da38f1e742003f147f7fc9e3d904f058adc8a))
+* **tasks:** commented task-spike-cross-run-lesson-store ([5dd2081](https://github.com/Arggon/ArggonManager/commit/5dd20811a4a3e8f67c5beae81e6c834c6752e755))
+* **tasks:** done task-matrix-reaches-adopters ([30c7dba](https://github.com/Arggon/ArggonManager/commit/30c7dbae135e08d56a0b71a945c4f35513aed2a9))
+* **tasks:** file bug-kernel-pin-never-exact (context + acceptance) ([aec131e](https://github.com/Arggon/ArggonManager/commit/aec131ef292244433277d6cad0ff6c0a609205b0))
+* **tasks:** file bug-release-proposal-non-lockstep-undetected (context + acceptance) ([5dd585e](https://github.com/Arggon/ArggonManager/commit/5dd585e0dcb74f8ed948c8ab0954a19df4048dd5))
+* **tasks:** file wave-1 review follow-ups (8 items) under methodology-productization ([fdca507](https://github.com/Arggon/ArggonManager/commit/fdca5070386905ca7f0908987a0cae7c9b44f6a1))
+* **tasks:** pruned bug-adopter-engineering-template-software-locked, bug-x-tracker-option-list-has-no-doc-drift-guard, task-adapter-report-nits-from-review, task-matrix-reaches-adopters, task-opencode-prompt-stamp, task-spike-cross-run-lesson-store ([06f0faf](https://github.com/Arggon/ArggonManager/commit/06f0faffd29b99d73420dd0cea550f9e9c537be0))
+* **tasks:** tick acceptance on task-matrix-reaches-adopters (lead merge verification) ([654c055](https://github.com/Arggon/ArggonManager/commit/654c055f93746e4ec7a9dafa0003d3dfe9922c7e))
+
 ## [Unreleased]
 
 ### Changed
