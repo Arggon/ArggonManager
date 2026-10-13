@@ -89,3 +89,7 @@ Sampled: `task-exploration-decision-records` refused in run 36717332625 (2026-09
 - `task-measure-kernel-refusal-rate` (done, PR #726) carries the refuted 0/220 in its report and its one-line verdict; correcting a `done` item is outside maker scope — flagged for the lead.
 
 Gates: `npm run arggon -- validate` → ok (0 warnings, convention v5); `npx prettier --check` on the touched file → clean. `npm test` not run and not required: this is a docs/analysis-only change with no code surface (the sweep scripts live in `/tmp/opencode/sweep`, deliberately not committed).
+
+### handoff 2026-10-13 @ses_eca4ef96effeP7GhkMP8PrO6xn (session: ses_eca4ef96effeP7GhkMP8PrO6xn) — next: Lead: verify PR #779 (docs correction) + evidence comment, file the substrate follow-up, decide correcting done item task-measure-kernel-refusal-rate, tick Acceptance
+- branch: feat/task-sweep-auto-done-refusal-warnings
+- open questions: Parent's 0/220 is refuted (16.0%/18.1%) so AutoHarness is not closed; follow-up item unfiled (maker boundary); is 16-18% high enough to reclassify P1 per exploration-021 item 4?
