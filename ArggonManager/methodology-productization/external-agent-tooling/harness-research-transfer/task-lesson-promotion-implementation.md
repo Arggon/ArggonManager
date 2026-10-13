@@ -34,3 +34,29 @@ ADR 0027 (Accepted with PR #761) decided: no cross-run lesson store; lessons are
 - [ ] `arggon validate` ok; affected tests green; impact class stated in the PR
 
 ## Notes
+
+### 2026-10-13 @ses_ec8e84466ffeY3Gpdkc55cQeEv
+## Implementation complete — PR #795 (Behavioral)
+
+**Impact class: Behavioral** (`docs/agents.md` §Changing the methodology itself) — agents must re-learn a rule (nothing else: no command, no gate, no pipeline step, no command contract). Adopters meet it through the generated maker prompt as an ADR 0016 proposal, never by overwrite.
+
+### Files (commit 24471883, 4 files, +33/−1)
+- `ArggonManager/docs/agents.md` — new §Promoting lessons (promote, never store) + a change-type table row.
+- `templates/docs/opencode/agents/arggon-maker.md` — the trigger sentence (bound + citation inline).
+- `.opencode/agents/arggon-maker.md` — seam copy regenerated with `arggon init`; independently verified byte-equal to `---` + generated marker + template render (sha256 5e687b58…).
+- `ArggonManager/.convention.yml` — only the moved `x-generated` record's checksum; the regen's version/generatedAt churn stays uncommitted (task-adopter-template-family-followups convention).
+
+### Acceptance checklist evidence
+- **rule in agents.md + trigger in the template and its seam copy** — `git show 24471883 --stat`; seam render verified independently (marker + template == committed bytes).
+- **≤160-char bound + mandatory citation stated where the agent meets them** — agents.md bullet ("One line, ≤ 160 characters excluding the citation, with a mandatory citation") and the maker-prompt bullet (same two facts inline).
+- **skill copies stay byte-equal; ADR 0016 noted** — `skills/arggon-cli/**` untouched, so `.agents/skills/**` = generated marker + source bytes holds; parity asserted by `cli/src/skill-copy.test.ts` in the full suite. The shipped prompt names the carrier as *the `arggon-cli` skill's `references/pitfalls.md`* because an adopting tree carries `.agents/skills/arggon-cli/**`, not `skills/` (`BUNDLED_SKILLS`, `cli/src/docs.ts`); `docs/agents.md` carries the exact source path. ADR 0016 is stated in the rule bullet ("A carrier edit is a methodology edit") and in the PR body.
+- **context budget** — `npm run context:report -- --strict` → **verdict: all bounds pass** (exit 0); `arggon doctor --budget`: generated AGENTS.md 2,044/2,048 B, MCP `tools/list` 16,296/16,384 B — no fixed per-session surface moved. Only on-demand surfaces grew: maker prompt 3,375 → 3,985 B (READ-only assessment), `docs/agents.md` 108,665 → 111,660 B.
+- **gates** — `npm run build` pass; `npm test` **155 files / 3,367 tests pass**; `npm run lint` pass; `npm run test:structure` 5/5; `arggon validate` ok (0 warnings, v5); `npx prettier --check` on every touched file pass; CI drift-gate reproduction (`node dist/cli.js init --no-commit`, state file excluded) leaves every generated file byte-identical to the generator's render; provenance audit repo-self block green.
+- **impact class in the PR** — yes, § "Impact class: Behavioral" in PR #795.
+
+### Open questions for the delivery lead
+1. **ZCode seam** — `templates/docs/zcode/arggon/agents/arggon-maker.md` carries no trigger. Deliberate: the item scoped the opencode template + its generated seam copy. Decide whether ZCode adopters get it in a follow-up (needs its own wording pass + seam regen).
+2. **Pre-existing doctor hint** — the `arggon-cli` skill frontmatter version (0.5.0) lags the package version (0.9.0). It surfaces only once `init` materializes the derived `.agents/skills/**` copy in a fresh worktree; report-only, untouched here.
+3. **`references/pitfalls.md` still states a read contract in its header** — the write obligation now lives in agents.md §Promoting lessons and the prompt (ADR 0027 point 1 assigns it there). No skill edit, so the byte-equal copies are preserved.
+
+Not flipped to `done` — completion is the delivery lead's call after merge.
