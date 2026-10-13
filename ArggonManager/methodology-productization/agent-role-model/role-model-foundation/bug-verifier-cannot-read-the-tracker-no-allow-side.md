@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-verifier-cannot-read-the-tracker-no-allow-side
 title: "Verifier cannot read the tracker: no allow side"
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [permissions, arggon-seam, verifier, docs]
 priority: p2
 created: "2026-10-11"
 updated: "2026-10-13"
-claimed_at: "2026-10-13T13:29:09.848Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-verifier-cannot-read-the-tracker-no-allow-side
 ---
 <!--
