@@ -9,7 +9,6 @@ parent: harness-research-transfer
 labels: [methodology, telemetry]
 created: "2026-10-13"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-done-gate-refusal-rate-substrate
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-done-gate-refusal-rate-substrate.md

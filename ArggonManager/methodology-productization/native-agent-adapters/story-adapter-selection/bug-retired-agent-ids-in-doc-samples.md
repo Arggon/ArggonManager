@@ -9,7 +9,6 @@ parent: story-adapter-selection
 labels: [docs, tests, adopters]
 created: "2026-10-13"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-retired-agent-ids-in-doc-samples
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-adapter-selection/bug-retired-agent-ids-in-doc-samples.md

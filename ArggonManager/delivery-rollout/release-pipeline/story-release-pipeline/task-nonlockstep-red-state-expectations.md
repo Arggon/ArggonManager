@@ -9,7 +9,6 @@ parent: story-release-pipeline
 labels: [release, docs]
 created: "2026-10-13"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-nonlockstep-red-state-expectations
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-nonlockstep-red-state-expectations.md

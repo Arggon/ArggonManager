@@ -9,7 +9,6 @@ parent: harness-research-transfer
 labels: [methodology, context-budget]
 created: "2026-10-13"
 updated: "2026-10-13"
-worktree_path: /home/arggon/Projects/ArggonManager-task-lesson-promotion-implementation
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-lesson-promotion-implementation.md
