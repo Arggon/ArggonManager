@@ -84,24 +84,24 @@ The **id names the role**, never the software title and never the process verb (
 Two boundaries this makes explicit, because the roles otherwise blur (ADR 0021 §6.1):
 
 1. **Delivery lead ≠ priority owner.** A delivery lead _sequences_ delivery; the product owner _sets_ the `priority` field. The delivery lead recommends priority changes and owns wave planning, dispatch and tracker state — the product owner's authority map below is unchanged.
-2. **The verifier reports, it does not rule.** Checking the delivered thing against the specification and reporting observed-versus-expected is the whole job. The verifier does **not** decide the verdict: the reviewer's judgment and the delivery lead's merge call are unchanged — the role gets its teeth without becoming an approver.
+2. **The verifier reports, it does not rule.** Checking the delivered thing against the specification and reporting observed-versus-expected is the whole job. The verifier does **not** decide the verdict: the reviewer's judgment and the delivery lead's merge call are unchanged — the role gets its teeth without becoming an approver. The boundary is **config-enforced, not prompt-enforced**: the role's generated contract carries explicit `effect: allow` entries for the read-only tracker tools (`show`, `list`, `next`, `report`, `validate`, in both the native and the MCP spellings) and `deny` entries for every tracker write — `comment` included, since a body append is a write — plus `edit`, `subagent` and the four git history verbs, so the runtime drops the denied tools from the verifier's session catalog while the reads stay callable (`bug-verifier-cannot-read-the-tracker-no-allow-side`; `agents.md` §Orchestration).
 
 ### Authority map
 
 Bounded and named (ADR 0021 §2). No new authority is granted to any agent by this table.
 
-| Decision                           | Owner             | Enforced today                                                                                               |
-| ---------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------ |
-| Direction and priority             | **product owner** | recorded as `priority`; decided by a person                                                                  |
-| Product acceptance of a container  | **product owner** | recorded as an `accept:` comment (§Review bar → Product acceptance); never a gate                            |
-| Accepting residual risk            | **product owner** | ADR 0015 waiver — human-only, no agent parameter                                                             |
-| Taking over another writer's claim | **product owner** | `--steal` — armed config (`x-tracker.allow-steal`) + TTY confirmation                                        |
-| Publishing a release               | **product owner** | human-pushed version bump (spec-release-pipeline-015 AC 7)                                                   |
-| Exploring, specifying, planning    | agent             | the loop, unchanged                                                                                          |
-| Implementing, testing, docs        | agent             | the loop, unchanged                                                                                          |
-| Reviewing and proving              | agent             | `arggon-standards-reviewer` (read-only) / `arggon-verifier` (no mutation) split (`agents.md` §Orchestration) |
-| Verifying merges, flipping `done`  | agent             | delivery lead; the done gate still holds (ADR 0015)                                                          |
-| Filing follow-up work              | agent             | the delivery lead consolidates and files (`agents.md` §Orchestration)                                        |
+| Decision                           | Owner             | Enforced today                                                                                                                                                                       |
+| ---------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Direction and priority             | **product owner** | recorded as `priority`; decided by a person                                                                                                                                          |
+| Product acceptance of a container  | **product owner** | recorded as an `accept:` comment (§Review bar → Product acceptance); never a gate                                                                                                    |
+| Accepting residual risk            | **product owner** | ADR 0015 waiver — human-only, no agent parameter                                                                                                                                     |
+| Taking over another writer's claim | **product owner** | `--steal` — armed config (`x-tracker.allow-steal`) + TTY confirmation                                                                                                                |
+| Publishing a release               | **product owner** | human-pushed version bump (spec-release-pipeline-015 AC 7)                                                                                                                           |
+| Exploring, specifying, planning    | agent             | the loop, unchanged                                                                                                                                                                  |
+| Implementing, testing, docs        | agent             | the loop, unchanged                                                                                                                                                                  |
+| Reviewing and proving              | agent             | `arggon-standards-reviewer` (read-only) / `arggon-verifier` (executes gates; tracker reads granted, every tracker write denied — config-enforced) split (`agents.md` §Orchestration) |
+| Verifying merges, flipping `done`  | agent             | delivery lead; the done gate still holds (ADR 0015)                                                                                                                                  |
+| Filing follow-up work              | agent             | the delivery lead consolidates and files (`agents.md` §Orchestration)                                                                                                                |
 
 **The four irreversible powers are human-only, structurally — not undocumented exceptions** (ADR 0021 §1/§2; every row keeps the gate it already had, and this table grants nothing):
 

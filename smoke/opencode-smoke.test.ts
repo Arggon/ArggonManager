@@ -13,6 +13,9 @@ import {
   shellAttempted,
   shellCompleted,
   shellDenied,
+  unknownToolError,
+  VERIFIER_CATALOG_TOOLS,
+  VERIFIER_DENIED_TOOLS,
 } from "./opencode-smoke.js";
 
 // Unit tests for the harness's transcript parsers — the W4 permission checks
@@ -276,5 +279,37 @@ describe("opencode-smoke: reviewer catalog expectations", () => {
     const reviewer = [...REVIEWER_CATALOG_TOOLS, ...REVIEWER_DENIED_TOOLS].sort();
     expect(reviewer).toEqual([...NATIVE_TOOL_NAMES].sort());
     expect(new Set(reviewer).size).toBe(reviewer.length);
+  });
+});
+
+describe("opencode-smoke: verifier catalog expectations", () => {
+  // bug-verifier-cannot-read-the-tracker-no-allow-side: the verifier frontmatter
+  // grants the read-only tools explicitly and denies every tracker write, so
+  // these two sets are its permission contract — a new native tool must be
+  // classified here consciously, and `comment` must stay on the denied side.
+  it("partitions the fifteen native tools into granted reads and denied writes", () => {
+    const verifier = [...VERIFIER_CATALOG_TOOLS, ...VERIFIER_DENIED_TOOLS].sort();
+    expect(verifier).toEqual([...NATIVE_TOOL_NAMES].sort());
+    expect(new Set(verifier).size).toBe(verifier.length);
+  });
+
+  it("keeps comment on the denied side (the reviewer's verdict channel is not the verifier's)", () => {
+    expect([...REVIEWER_CATALOG_TOOLS]).toContain("comment");
+    expect([...VERIFIER_CATALOG_TOOLS]).not.toContain("comment");
+    expect([...VERIFIER_DENIED_TOOLS]).toContain("comment");
+  });
+
+  it("unknownToolError matches the runtime's permission-filtered denial shape", () => {
+    expect(unknownToolError("Unknown tool 'arggon.update'.", "arggon.update")).toBe(true);
+    expect(
+      unknownToolError(
+        "Unknown tool 'arggon.comment'. Did you mean tools.arggon.show?",
+        "arggon.comment",
+      ),
+    ).toBe(true);
+    // A missing/errored call or a non-permission failure is not a refusal.
+    expect(unknownToolError(undefined, "arggon.update")).toBe(false);
+    expect(unknownToolError("Permission denied", "arggon.update")).toBe(false);
+    expect(unknownToolError("Unknown tool 'arggon.update'.", "arggon.create")).toBe(false);
   });
 });

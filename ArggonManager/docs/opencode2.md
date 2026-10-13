@@ -462,11 +462,16 @@ claiming the item, NOTHING sourced — and pins that the WRITE reports `trackerR
   `git commit --no-verify*`, `git push --force*`, `git push -f*`) that
   complement — never replace — the kernel invariants; the shipped agents add
   role gates (reviewer `edit`/subagent denied plus read-only shell gates;
-  worker `arggon.create` denied; coordinator subagent allow-list). Native tool
+  worker `arggon.create` denied; coordinator subagent allow-list; verifier
+  `edit`/`subagent` plus every tracker write — `comment` included — denied,
+  with its read-only tracker tools granted explicitly in both spellings:
+  `bug-verifier-cannot-read-the-tracker-no-allow-side`). Native tool
   actions normalize to `<namespace>_<tool>` (`arggon_update`), MCP tools to
   `<server>_<tool>` (`arggon_arggon_update`): a `deny` removes the tool from
   the Code Mode catalog. The base policy stays allow-all, so ordinary and
-  headless sessions are never blocked.
+  headless sessions are never blocked; the verifier's explicit read `allow`s
+  exist because a read set that rests on that default is a default, not a
+  contract (`agents.md` §Orchestration).
 * **MCP is out of the default path (W3)** — the plugin no longer registers
   `mcp.servers.arggon` and never touches `ctx.mcp`; the generated config carries
   no MCP stanza. `arggon mcp` and `.mcp.json` remain for non-OpenCode clients

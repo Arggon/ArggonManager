@@ -1687,6 +1687,34 @@ export const REVIEWER_DENIED_TOOLS = [
 ] as const;
 
 /**
+ * The verifier's read-only native catalog (bug-verifier-cannot-read-the-tracker-no-allow-side):
+ * the permission block grants exactly these five reads — explicitly, in both
+ * the native and the MCP spelling — and the verifier's contract grants it no
+ * either: unlike the reviewer it has no verdict channel, so `comment` (a body
+ * append) is denied with the rest of the tracker write side.
+ */
+export const VERIFIER_CATALOG_TOOLS = ["list", "next", "report", "show", "validate"] as const;
+
+/** Every tracker write the verifier frontmatter denies, `comment` included. */
+export const VERIFIER_DENIED_TOOLS = [
+  "create",
+  "update",
+  "handoff",
+  "start",
+  "branch",
+  "cleanup",
+  "priority",
+  "sync",
+  "import_issues",
+  "comment",
+] as const;
+
+/** The denial shape a permission-filtered native tool produces (W4 probes). */
+export function unknownToolError(value: unknown, tool: string): boolean {
+  return new RegExp(`Unknown tool '${tool.replace(".", "\\.")}'`).test(String(value ?? ""));
+}
+
+/**
  * Reviewer probe session with a bounded retry: models occasionally answer with
  * a reduced script or skip an instructed shell command, which used to fail the
  * W4 permission checks for reasons that say nothing about the gates. Retry ONCE
@@ -1818,6 +1846,124 @@ function scenarioPermissions(): void {
   );
 }
 
+/**
+ * The verifier probe (bug-verifier-cannot-read-the-tracker-no-allow-side) with
+ * the same bounded retry as the reviewer probe — a model that answers with a
+ * reduced script says nothing about the gates, and the probe is read-only apart
+ * from the write attempts it expects to be refused.
+ */
+function verifierProbe(
+  f: Fixture,
+  prompt: string,
+  label: string,
+  ready: (stdout: string) => boolean,
+): RunResult {
+  const first = f.opencode(prompt, undefined, undefined, "arggon-verifier");
+  f.saveTranscript(label, first);
+  if (ready(first.stdout)) return first;
+  console.log(`  retry ${label}: the transcript is missing the probe evidence`);
+  const retry = f.opencode(prompt, undefined, undefined, "arggon-verifier");
+  f.saveTranscript(`${label}-retry`, retry);
+  return retry;
+}
+
+/**
+ * The verifier's read grant and its negative control, in ONE real session
+ * (bug-verifier-cannot-read-the-tracker-no-allow-side). The shipped contract
+ * grants the read-only tracker tools explicitly (`show`/`list`/`next`/`report`/
+ * `validate`, both spellings) and denies every tracker write — `comment`
+ * included — so the role can do the read half of its job while the write half
+ * stays config-refused rather than prompt-protected.
+ *
+ * What is asserted, and where: the SUCCESSFUL read envelope comes from the
+ * kernel through the tool state; the refusals are the runtime's permission
+ * filtering ("Unknown tool") recorded on `update`/`create`/`comment`; the
+ * catalog check is the runtime's filter, not the model's choice to skip a
+ * tool; and the item on disk is re-read to prove the refused `comment` left no
+ * body behind.
+ */
+function scenarioVerifierPermissions(): void {
+  scenario("permissions: the verifier reads (allow granted) and cannot write (deny unchanged)");
+  const f = new Fixture("verifier-permissions");
+  f.bootstrap();
+  const init = f.init();
+  check("init exits 0", init.status === 0, runTail(init));
+  const item = f.createTaskChain();
+  if (item === undefined) {
+    check("fixture item created", false, "create chain failed");
+    return;
+  }
+  const before = f.read(`${item.directory}/${item.id}.md`);
+
+  const prompt = [
+    "Use the execute tool with exactly this code:",
+    "const out = {};",
+    `try { out.show = await tools.arggon.show({ id: "${item.id}", meta: true }); } catch (error) { out.showError = String((error && error.message) || error); }`,
+    `try { out.update = await tools.arggon.update({ id: "${item.id}", status: "done" }); } catch (error) { out.updateError = String((error && error.message) || error); }`,
+    `try { out.create = await tools.arggon.create({ type: "task", title: "verifier probe" }); } catch (error) { out.createError = String((error && error.message) || error); }`,
+    `try { out.comment = await tools.arggon.comment({ id: "${item.id}", text: "verifier probe must not post" }); } catch (error) { out.commentError = String((error && error.message) || error); }`,
+    'const catalog = await search({ namespace: "arggon", limit: 20 });',
+    "return { out, catalog };",
+    "If a tool is not found, run the same code once more (the tool catalog can lag server startup).",
+    "Reply with only the raw JSON result.",
+  ].join("\n");
+  const session = verifierProbe(f, prompt, "verifier-permissions", (stdout) => {
+    const probe = executeJson(stdout, "tools.arggon.show");
+    const out = (probe?.out ?? {}) as Record<string, unknown>;
+    const show = (out.show ?? {}) as Record<string, unknown>;
+    return probe !== undefined && probe.catalog !== undefined && show.command === "show";
+  });
+  check("session succeeds as the verifier agent", session.status === 0, runTail(session));
+  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  const result = executeJson(session.stdout, "tools.arggon.show");
+  check("model executed the verifier script", result !== undefined, runTail(session));
+  if (result !== undefined) {
+    const out = (result.out ?? {}) as Record<string, unknown>;
+    const show = (out.show ?? {}) as Record<string, unknown>;
+    check(
+      "the verifier reads the item (show allowed: ok envelope)",
+      show.ok === true && show.command === "show" && show.item !== undefined,
+      JSON.stringify(show).slice(0, 200),
+    );
+    check(
+      "the read grant did not open a write path: update refused",
+      unknownToolError(out.updateError, "arggon.update"),
+      String(out.updateError ?? "").slice(0, 200),
+    );
+    check(
+      "the read grant did not open a write path: create refused",
+      unknownToolError(out.createError, "arggon.create"),
+      String(out.createError ?? "").slice(0, 200),
+    );
+    check(
+      "comment (a tracker write) is refused too: evidence goes to the caller, never the item",
+      unknownToolError(out.commentError, "arggon.comment"),
+      String(out.commentError ?? "").slice(0, 200),
+    );
+    const catalog = (result.catalog ?? {}) as {
+      items?: Array<{ path?: unknown }>;
+      remaining?: unknown;
+    };
+    const paths = (catalog.items ?? []).map((entry) => entry.path).sort();
+    const expected = VERIFIER_CATALOG_TOOLS.map((name) => `tools.arggon.${name}`).sort();
+    check(
+      "the verifier's Code Mode catalog is exactly the granted reads (permission filtering)",
+      JSON.stringify(paths) === JSON.stringify(expected) && catalog.remaining === 0,
+      JSON.stringify(paths),
+    );
+    const leaked = VERIFIER_DENIED_TOOLS.filter((name) => paths.includes(`tools.arggon.${name}`));
+    check(
+      "every tracker write is absent from the verifier catalog",
+      leaked.length === 0,
+      `present: ${leaked.join(", ") || "none"}`,
+    );
+  }
+  check(
+    "the refused writes left the item untouched (no status flip, no comment body)",
+    f.read(`${item.directory}/${item.id}.md`) === before,
+  );
+}
+
 function main(): void {
   console.log("smoke:opencode — OpenCode V2 plugin harness (W2 + W3)");
   if (!opencodeAvailable()) {
@@ -1832,10 +1978,15 @@ function main(): void {
   } else if (process.env.OPENCODE_SMOKE_ONLY?.startsWith("command:")) {
     // Dev aid: re-run one command scenario, e.g. OPENCODE_SMOKE_ONLY=command:adr.
     scenarioCommands(process.env.OPENCODE_SMOKE_ONLY.slice("command:".length));
+  } else if (process.env.OPENCODE_SMOKE_ONLY === "verifier-permissions") {
+    // Dev aid: re-run just the verifier read-grant/deny probe
+    // (bug-verifier-cannot-read-the-tracker-no-allow-side).
+    scenarioVerifierPermissions();
   } else if (process.env.OPENCODE_SMOKE_ONLY === "w4") {
     scenarioWorktreeLifecycle();
     scenarioInvariants();
     scenarioPermissions();
+    scenarioVerifierPermissions();
   } else {
     scenarioFreshInit();
     scenarioAdopterConfig();
@@ -1853,6 +2004,7 @@ function main(): void {
     scenarioWorktreeLifecycle();
     scenarioInvariants();
     scenarioPermissions();
+    scenarioVerifierPermissions();
   }
 
   if (failures.length > 0) {
