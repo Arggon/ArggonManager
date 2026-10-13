@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-release-proposal-non-lockstep-undetected
 title: A non-lockstep auto-proposal is undetected in the maintenance run — and the lockstep assert runs after the tag
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-release-pipeline
 labels: [release, ci]
 created: "2026-10-13"
 updated: "2026-10-13"
-claimed_at: "2026-10-13T14:34:44.598Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-release-proposal-non-lockstep-undetected
 ---
 <!--
