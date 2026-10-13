@@ -12,6 +12,7 @@ updated: "2026-10-13"
 claimed_at: "2026-10-13T14:34:48.021Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adopter-template-family-followups
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-adopter-template-family-followups.md
   Leaves live only under a story. id is the filename stem: task-adopter-template-family-followups.
@@ -32,9 +33,9 @@ Leftovers from `bug-adopter-engineering-template-software-locked` (merged as PR 
 
 ## Acceptance
 
-- [ ] `CONTRIBUTING.md` + `PULL_REQUEST_TEMPLATE.md` restate their checks as what the project declares (software case kept as a worked example)
-- [ ] the zcode goal-mode template uses the shipped role vocabulary; the family guard covers the seam templates or the exclusion is named with its reason
-- [ ] the guard header describes exactly what it compares; the docs-only exemption is lifted out of the software example
-- [ ] `cli/src/adopter-template-invariant-drift.test.ts` + init-docs tests green; `arggon validate` ok; prettier clean on touched files
+- [x] `CONTRIBUTING.md` + `PULL_REQUEST_TEMPLATE.md` restate their checks as what the project declares (software case kept as a worked example)
+- [x] the zcode goal-mode template uses the shipped role vocabulary; the family guard covers the seam templates or the exclusion is named with its reason
+- [x] the guard header describes exactly what it compares; the docs-only exemption is lifted out of the software example
+- [x] `cli/src/adopter-template-invariant-drift.test.ts` + init-docs tests green; `arggon validate` ok; prettier clean on touched files
 
 ## Notes
