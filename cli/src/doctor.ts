@@ -720,9 +720,20 @@ export function runAdapterReport(opts: {
   projectName: string | null;
   /** Matrix already read by runDoctor — reused, never parsed twice. */
   matrix: CapabilityMatrix;
+  /**
+   * `x-generated` entries ALREADY read by runDoctor — reused, never parsed
+   * twice. The same argument the matrix makes above: the `docs` block and this
+   * block classify the same provenance state, so they read one read of it and
+   * cannot disagree. (`docs` uses `readConventionConfig`, which throws on a
+   * malformed file; this block would have swallowed it as `{}` through
+   * `readGeneratedState`, i.e. reported every adapter file adopter-modified
+   * while `docs` had already failed the run. One shared read removes both the
+   * second parse and that asymmetry.)
+   */
+  state: Record<string, GeneratedEntry>;
 }): DoctorAdapters {
   const templatesDir = opts.templatesDir;
-  const state = readGeneratedState(opts.root);
+  const state = opts.state;
   const detected = new Set(detectAgents(opts.root));
   // Layout-aware so the destinations match what init writes on this tree.
   const layout = trackerAt(opts.root)?.layout ?? "arggon-manager";
@@ -1002,6 +1013,10 @@ export function runDoctor(opts: {
               // `unverified` (cannot decide) instead of a false `stale`.
               projectName: null,
               matrix,
+              // No tracker tree, so no earlier read to reuse: this branch never
+              // called readConventionConfig. The tolerant read answers `{}` for
+              // a tree carrying no `.convention.yml`, which is exactly the case.
+              state: readGeneratedState(opts.cwd),
             }),
           }
         : {}),
@@ -1134,6 +1149,9 @@ export function runDoctor(opts: {
             templatesDir,
             projectName: nameRes.name,
             matrix,
+            // The provenance state the `docs` block above already classified —
+            // read once, so the two blocks cannot disagree about the same bytes.
+            state: config.generated,
           }),
         }
       : {}),
