@@ -63,3 +63,8 @@ Gates on 9ef55be9 (all green):
 ### handoff 2026-10-13 @ses_ec9dcc297ffe65zmdw5Lg4uIOi (session: ses_ec9dcc297ffe65zmdw5Lg4uIOi) — next: Delivery lead: review PR #788 (head 9ef55be9 + tracker commits); standards-reviewer verdict, then merge and flip done.
 - branch: feat/task-seam-nits-v1-schema-and-marker
 - open questions: exploration.md ledger refresh folded here or its own item?; docs cite runtime v2.0.26 while agents.md smoke evidence still says v2.0.12 (pre-existing).
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as c311eb07 (PR #788); auto-done flip landed. `agents.md` line-655 now names the V1 published schema, quotes the vendor sentence, and points at the V2 names; the same claim checked and fixed in `playbooks/opencode.md`. The double `arggon:generated` marker traced to the emitter (`stampGeneratedContent` double-stamping templates that carried a baked marker); the two templates are sources again, regenerated output carries exactly one, and `init-opencode.test.ts` pins it (negative control failed on the pre-fix seam). `arggon doctor --agents` classification verified; full suite green.
