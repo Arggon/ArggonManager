@@ -1,15 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-state-exploration-stopping-rule
 title: "Write down the ADR 0017 exploration stopping rule (AutoContext: the Planner is the load-bearing component — 95%→40% without it)"
+assignee: arggon-delivery-lead
+branch: feat/task-state-exploration-stopping-rule
 parent: harness-research-transfer
 labels: [methodology, research, exploration]
 priority: p3
 created: "2026-10-05"
-updated: "2026-10-05"
+updated: "2026-10-13"
+claimed_at: "2026-10-13T13:29:20.235Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-state-exploration-stopping-rule
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-state-exploration-stopping-rule.md
   Leaves live only under a story. id is the filename stem: task-state-exploration-stopping-rule.
