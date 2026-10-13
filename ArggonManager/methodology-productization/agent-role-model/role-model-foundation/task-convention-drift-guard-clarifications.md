@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-convention-drift-guard-clarifications
 title: "Convention option-drift guard clarifications: marker scoping, mismatch message, duplicate-dispatch hazard"
+assignee: arggon-delivery-lead
+branch: feat/task-convention-drift-guard-clarifications
 parent: role-model-foundation
 labels: [tests, docs, cli]
 created: "2026-10-13"
 updated: "2026-10-13"
+claimed_at: "2026-10-13T14:34:51.468Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-convention-drift-guard-clarifications
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/agent-role-model/role-model-foundation/task-convention-drift-guard-clarifications.md
