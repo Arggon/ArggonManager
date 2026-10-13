@@ -12,6 +12,7 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T23:39:26.165Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-seam-footprint-config-inline-evaluation
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/task-seam-footprint-config-inline-evaluation.md
   Leaves live only under a story. id is the filename stem: task-seam-footprint-config-inline-evaluation.
@@ -115,7 +116,7 @@ exactly these two lines:
   (`{"plugins": ["/home/arggon/Projects/opencode-autoharness/src"]}`, a
   machine-absolute path). The project config is the tracked `opencode.jsonc`.
 - `.opencode/harness/` — 3,623 B (`friction.jsonl` 3,598 + `.policy-shown` 25);
-  that harness's state.
+  live state (3,861 B at review time); that harness's state.
 
 `arggon init --dry-run --json` here: the 15 agent/command files `updated`
 ("untouched since last generation — regenerated"), the 2 plugin copies
@@ -141,35 +142,49 @@ copies) — the per-file status model the seam is built on.
 
 ### Schema facts + the owner's idiom (acceptance 5)
 
-- Published `https://opencode.ai/config.json` (fetched 2026-10-12, 39,039 B,
-  root `$ref: #/$defs/Config`): the plugin field is **`plugin`** (singular;
-  array of `string | [string, object]`); there is **no `plugins`**. It does
-  define inline **`agent`** (record of AgentConfig: `prompt`, `description`,
-  `mode` `subagent|primary|all`, `permission`, `model`, `tools`, `temperature`,
-  …) and **`command`** (record; each entry requires `template`, optional
-  `description`/`agent`/`model`/`variant`/`subtask`).
-- V2 docs (opencode.ai/v2/docs/config, /v2/docs/build/plugins) document
-  **`plugins`** (plural), incl. local dirs / absolute paths / `file://` and
-  `{package, options}`.
-- Installed runtime: `opencode v2.0.26` (CLI) plus the running 2.0.27 desktop
-  service. **Both spellings load**; the singular is a legacy alias that
-  `opencode debug config` shows normalized to `plugins` in the parsed document
-  (the file on disk keeps `plugin`). Invalid values under either key are
-  silently dropped (V2 ignores excess/invalid properties) — so a config that
-  "passes" is not proof the key was applied; the load log is.
+- **V2 — the runtime in use** (`opencode v2.0.26` CLI plus the running 2.0.27
+  desktop service; V2 docs opencode.ai/v2/docs/config, /agents, /commands):
+  `plugins` (plural); **`agents`** with `system` (the prompt), `permissions`
+  (ordered `{action, resource, effect}` rules), `mode`, `description`, `model`,
+  `steps`, `hidden`, `color`, `disabled`, `request`; **`commands`** with each
+  entry requiring `template` (`description`/`agent`/`model`/`subagent`;
+  `subtask` is a deprecated alias). The V2 agents guide warns verbatim: "Do not
+  use legacy top-level fields such as `temperature`, `top_p`, `prompt`,
+  `permission`, `tools`, `disable`, or `maxSteps` in new V2 agent
+  configuration."
+- **The published schema is V1 — never infer V2 names from it.** The vendor's
+  V2 guidance shipped with the runtime (extracted from the installed v2.0.26
+  binary): "The schema served from https://opencode.ai/config.json may describe
+  V1 even though V2 configuration files include that URL for editor
+  integration. Never use it to infer V2 field names or shapes." For the record,
+  what it names: `plugin` (singular; array of `string | [string, object]`; no
+  `plugins`), `agent` (V1 AgentConfig: `prompt`, `permission`, `tools`,
+  `temperature`, …) and `command` (each requires `template`).
+- **Probed on the installed runtime (not inferred):** a config with the V2
+  `agents`/`commands` keys survives `opencode debug config` and
+  `opencode debug agents` lists the entry; a config with the V1
+  `agent`/`command` keys is **accepted as a compat alias and normalized in
+  memory** (`agent`→`agents`, `command`→`commands`, `prompt`→`system`,
+  `permission`→`permissions`; the file on disk keeps the V1 spelling). Same for
+  the plugin key: both `plugins` and `plugin` load; `debug config` normalizes
+  singular→plural.
+- **Invalid values are dropped silently (probed):** `{"plugins": 123}` and
+  `{"plugin": 123}` both come back from `opencode debug config` as `$schema`
+  only — so a config that "passes" is not proof the key was applied; the load
+  log (`msg="loading plugin"`) is. Observed for the plugin keys only.
 - Conclusion: the owner's `plugins` is the **correct V2 spelling**; the
-  published schema is the stale V1 shape, and `docs/agents.md`'s "field-level
-  source of truth is https://opencode.ai/config.json" inherits that drift.
-  Editor IntelliSense will flag `plugins`; the runtime applies it. The owner's
-  file was not touched.
+  published schema is the V1 shape the vendor says not to infer from, and
+  `docs/agents.md`'s "field-level source of truth is
+  https://opencode.ai/config.json" inherits that drift. Editor IntelliSense will
+  flag `plugins`; the runtime applies it. The owner's file was not touched.
 
 ### Options and real costs
 
-| Option                                                               | Real cost                                                                                                                                                                                                                     | What it buys                                                                                                                                                                                                                           | What it breaks / would take                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| (a) Keep the file seam (current shape)                               | 15 tracked files / 31,905 B content (72K blocks) + 3,088 B config; 2 gitignored derived copies (~549 KB + 18.5 KB sources)                                                                                                    | Per-file `x-generated` provenance + checksum state (refresh / modified-skip / ack baseline / backup / propose), `doctor --agents` per-file statuses, orphan reaping by recorded template, markdown diffs, capability-matrix derivation | Nothing — no change. The copies never enter git accounting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| (b) Inline agents/commands into `opencode.json(c)`                   | Collapses 15 files into `agent`/`command` keys — the schema supports `prompt`/`template` etc.                                                                                                                                 | One config surface; fewer files per adopter tree                                                                                                                                                                                       | Per-file provenance becomes per-key (no checksum/ack/backup/propose model exists for keys); `init` has no config-merge story — today **any** existing `opencode.json(c)`/`.opencode/opencode.json(c)` makes it skip the generated config entirely (`OPENCODE_CONFIG_CANDIDATES`), so adopters with their own config would get no agents/commands at all; `doctor --agents` per-file statuses need a per-key comparator; `capability-matrix.json`'s opencode derivation and its tests name the generated `.opencode/agents`/`.opencode/commands` + `opencode.jsonc`; prompts (3.4–6.2 KB agents, 0.5–1.9 KB commands) become escaped JSON strings. Would take a config-key generator + merge/update path, a per-key provenance/ack model (or a recorded scope reduction), doctor rework, matrix + seam-test updates (`init-opencode.test.ts`, `adapter-selection.test.ts`), and an adopter migration story. |
-| (c) Load the plugin via a config `plugin(s)` entry in this repo only | Still needs a resolvable artifact: absolute path (machine-specific, like the owner's harness), a package spec (requires the install the seam deliberately avoids), or the committed `opencode/plugins/arggon/index.bundle.ts` | One loading path in config instead of directory discovery                                                                                                                                                                              | Pointing at the committed bundle diverges this repo from every adopter's seam (they have no `opencode/` dir; they vendor the copy) and interacts with: `doctor`'s staleness detection (compares copy bytes vs the committed bundle; with no copy it reports missing/unverified — new comparator needed), `npm test`'s copy-rewrite step, the `.gitignore` entries for the copies, and the TUI entry (`tui.tsx` is discovered beside `index.ts` in the convention dir — a config entry pointing at the bundle leaves the TUI undiscovered unless the dir stays, i.e. a mixed shape). Buys little: the convention dir already loads with zero config (verified).                                                                                                                                                                                                                                             |
+| Option                                                               | Real cost                                                                                                                                                                                                                      | What it buys                                                                                                                                                                                                                           | What it breaks / would take                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (a) Keep the file seam (current shape)                               | 15 tracked files / 31,905 B content (72K blocks) + 3,088 B config; 2 gitignored derived copies (~549 KB + 18.5 KB sources)                                                                                                     | Per-file `x-generated` provenance + checksum state (refresh / modified-skip / ack baseline / backup / propose), `doctor --agents` per-file statuses, orphan reaping by recorded template, markdown diffs, capability-matrix derivation | Nothing — no change. The copies never enter git accounting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| (b) Inline agents/commands into `opencode.json(c)`                   | Collapses 15 files into V2 `agents`/`commands` keys (`system`/`permissions`; commands keep `template`) — the shapes the V2 runtime applies (the V1 `agent`/`command` spelling also loads, normalized in memory, but is legacy) | One config surface; fewer files per adopter tree                                                                                                                                                                                       | Per-file provenance becomes per-key (no checksum/ack/backup/propose model exists for keys); `init` has no config-merge story — today **any** existing `opencode.json(c)`/`.opencode/opencode.json(c)` makes it skip the generated config entirely (`OPENCODE_CONFIG_CANDIDATES`), so adopters with their own config would get no agents/commands at all; `doctor --agents` per-file statuses need a per-key comparator; `capability-matrix.json`'s opencode derivation and its tests name the generated `.opencode/agents`/`.opencode/commands` + `opencode.jsonc`; prompts (3.4–6.2 KB agents, 0.5–1.9 KB commands) become escaped JSON strings. Would take a config-key generator + merge/update path, a per-key provenance/ack model (or a recorded scope reduction), doctor rework, matrix + seam-test updates (`init-opencode.test.ts`, `adapter-selection.test.ts`), and an adopter migration story. |
+| (c) Load the plugin via a config `plugin(s)` entry in this repo only | Still needs a resolvable artifact: absolute path (machine-specific, like the owner's harness), a package spec (requires the install the seam deliberately avoids), or the committed `opencode/plugins/arggon/index.bundle.ts`  | One loading path in config instead of directory discovery                                                                                                                                                                              | Pointing at the committed bundle diverges this repo from every adopter's seam (they have no `opencode/` dir; they vendor the copy) and interacts with: `doctor`'s staleness detection (compares copy bytes vs the committed bundle; with no copy it reports missing/unverified — new comparator needed), `npm test`'s copy-rewrite step, the `.gitignore` entries for the copies, and the TUI entry (`tui.tsx` is discovered beside `index.ts` in the convention dir — a config entry pointing at the bundle leaves the TUI undiscovered unless the dir stays, i.e. a mixed shape). Buys little: the convention dir already loads with zero config (verified).                                                                                                                                                                                                                                             |
 
 ### Recommendation + the strongest argument against it
 
@@ -219,6 +234,14 @@ once `.opencode/harness/` is in the committed `.gitignore`. `start`'s scoped
 clean-tree rule only blocks untracked files under the tracker dir, so these
 never blocked `start`; the pruning refusal is the real cost.
 
+Precision (review): the ignore removes these from **git** accounting, not from
+seam discovery — `.opencode/opencode.json` is one of
+`OPENCODE_CONFIG_CANDIDATES`, so `findOpenCodeConfig` still sees it and, on a
+tree without a tracked config, `init` would present-skip the generated
+`opencode.jsonc` (the same code path option (b) collides with). This repo is
+unaffected (its root `opencode.jsonc` is tracked); "out of seam accounting"
+means git, not config discovery.
+
 **Template decision: no change to `templates/docs/gitignore`** (recorded, per
 mandate). Reasons: (1) `.opencode/opencode.json` is a legitimate adopter
 project-config location (one of `OPENCODE_CONFIG_CANDIDATES`) — ignoring it in
@@ -242,6 +265,8 @@ adopters to ignore its state, that belongs in its own install docs.
 - No template or init test touched → `test:structure` / `lint:structure` not
   required by the mandate; run anyway as extra evidence: `test:structure` →
   `5 passed; 0 failed`, `lint:structure` → clean (no findings).
+- Re-run after the standards-review fix (2026-10-13, this item text only):
+  `validate` → ok, `prettier --check` → pass; no code/template change.
 
 ### Out of scope, reported only
 
@@ -257,6 +282,7 @@ adopters to ignore its state, that belongs in its own install docs.
   owner may want to uninstall the global one.
 
 ### 2026-10-13 @ses_ecd832dc8ffeqhaGFiLKLTG8Eh
+
 Evidence (maker run, 2026-10-12; branch feat/task-seam-footprint-config-inline-evaluation, PR #754):
 
 - Inventory re-measured: 15 tracked seam files = 19,812 B agents + 12,093 B commands = 31,905 B content (72K in 4K blocks); root opencode.jsonc 3,088 B tracked/adopter-edited; plugin copies gitignored derived (expected 549,029 B = marker + 548,958 B bundle; primary copy 481,162 B is stale, doctor plugin.current=false; tui.tsx primary copy 15,742 B vs 18,524 B source).
@@ -267,15 +293,18 @@ Evidence (maker run, 2026-10-12; branch feat/task-seam-footprint-config-inline-e
 - Out of scope, reported: agents carry the x-generated marker twice (templates have one); primary plugin copies stale; global arggon plugin duplicates the project id.
 
 ### handoff 2026-10-13 @ses_ecd832dc8ffeqhaGFiLKLTG8Eh (session: ses_ecd832dc8ffeqhaGFiLKLTG8Eh) — next: Review PR #754 (feat/task-seam-footprint-config-inline-evaluation); record the box-1 decision (recommendation: keep the file seam), then merge or spin follow-ups for boxes 2/3.
+
 - branch: feat/task-seam-footprint-config-inline-evaluation
 - open questions: Keep vs inline (boxes 2/3 conditional); global duplicate arggon plugin install in ~/.config/opencode; double x-generated marker on agents; stale primary plugin copies
 
 ### 2026-10-13 @arggon-standards-reviewer
+
 verdict: request-changes (the inlining option is written in V1 key/field names; the decision input must be V2-shaped)
 
 Scope: item text only. The `.gitignore` hygiene change is verified as-is and needs no change.
 
 **Blocking finding — the (b) row and the "Schema facts" bullets state the inlining mechanism in the published (V1) schema's names, not V2's:**
+
 - Item text: "Collapses 15 files into `agent`/`command` keys — the schema supports `prompt`/`template` etc."; the Context bullet lists `agent` (`prompt`, `description`, `mode`, `permission`, `tools`, `temperature`, …). The same item concludes that schema is the stale V1 shape, and `docs/agents.md`'s own rule is "Never map V1 fields into V2 config".
 - V2 (the runtime in use) uses `agents`/`commands` (plural); the V2-native agent prompt field is `system`, permissions are `permissions`; the V2 agents guide says verbatim: "Do not use legacy top-level fields such as `temperature`, `top_p`, `prompt`, `permission`, `tools`, `disable`, or `maxSteps` in new V2 agent configuration." (V1 config is intended to stay compatible, so the V1 shape may still load — but then say that, and say which shape the option means.)
 - Sources read today: https://opencode.ai/v2/docs/config (fields list `agents`, `commands`, `plugins`; a `commands` entry uses `template`), https://opencode.ai/v2/docs/agents (JSONC example under `agents` with `system`/`permissions`).
@@ -283,6 +312,7 @@ Scope: item text only. The `.gitignore` hygiene change is verified as-is and nee
 - Same bullet, second item: "Invalid values under either key are silently dropped (V2 ignores excess/invalid properties)" has no probe recorded; probe it or mark it as an inference.
 
 **Verified by reading (no action; evidence for the record):**
+
 - Inventory exact: `git ls-files .opencode` = 15; `wc -c` agents 19,812 + commands 12,093 = 31,905 B; `du` 28K/44K; root `opencode.jsonc` 3,088 B tracked. Plugin copies gitignored/derived: primary 481,162 + 15,742 = 496,904 B (stale), expected 549,029 B = 71-B init marker + 548,958-B bundle (arithmetic checks against `stampGeneratedContent` + `BUNDLE_BANNER`).
 - Owner's idiom: `plugins` is the V2 spelling and the published schema is V1 — additionally supported by the vendor's V2 guidance: "The schema served from https://opencode.ai/config.json may describe V1 ... Never use it to infer V2 field names or shapes." Citing that sentence removes the inferential character from the item's conclusion.
 - (b)'s central cost is real: `findOpenCodeConfig` (cli/src/adapters.ts:70-75, cli/src/docs.ts:578-585) returns the first non-arggon config, and init present-skips the generated config (cli/src/docs.ts:1408-1419); cli/src/init-opencode.test.ts "opencode seam: conditional config" covers all four shapes. An adopter with their own config gets no generated config, so inlining agents/commands there would deliver nothing.
@@ -292,6 +322,7 @@ Scope: item text only. The `.gitignore` hygiene change is verified as-is and nee
 - Scope: `gh pr diff 754` = exactly `.gitignore` + the item; no seam rework; the owner's file is not in the diff. Acceptance: boxes 4/5 ticked with the evidence above, 2/3 conditional and honestly unticked, 1 left to the lead — correct by design.
 
 **Non-blocking, record only:**
+
 - `docs/agents.md:655` ("the field-level source of truth is https://opencode.ai/config.json") is contradicted by the vendor V2 guidance and is the drift this item found. It is a methodology carrier — the fix belongs in its own item with an impact-class statement; please file it (AGENTS.md: findings become items), e.g. under story-opencode-adapter.
 - The machine-local file still participates in seam discovery: in the primary checkout `findOpenCodeConfig` sees `.opencode/opencode.json` and init present-skips the generated `opencode.jsonc` (same code path as (b)). Pre-existing and unchanged by gitignoring; one line in the item would keep box 4's "out of seam accounting" precise (out of git accounting, still a config candidate).
 - Primary harness state grew between measurement and review (`friction.jsonl` 3,598 → 3,861 B) — live state; reinforces the machine-local argument.
