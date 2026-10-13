@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-done-gate-refusal-rate-substrate
 title: "Done-gate merge-time refusal rate is 16–18%, not 0: classify the substrate with the corrected measurement"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: harness-research-transfer
 labels: [methodology, telemetry]
 created: "2026-10-13"
 updated: "2026-10-13"
-claimed_at: "2026-10-13T21:06:29.751Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-done-gate-refusal-rate-substrate
 ---
 <!--
