@@ -597,7 +597,7 @@ npm test                      # 1438+ tests
 npm run smoke:opencode        # headless scenarios on a real OpenCode runtime: dependency-less bundle, one session per native command, the W4 worktree lifecycle + invariants + permissions
 npm run smoke:opencode:wave   # scripted coordinator/worker/reviewer wave (2 fixtures)
 npm run smoke:native-start-cold  # deterministic + model-free: the native tools.arggon.start cold worktree (dependency-requiring pre-commit gate, bounded readiness/claim-commit receipt, claim commit with only the item file, re-run attach, untouched installs)
-npx tsx smoke/opencode-prompt-stamp-smoke.ts   # deterministic + model-free (T4): the prompt-admission stamp, the compaction retention, the no-polling timeline and the off-contract silence on a real `opencode serve` + scripted provider
+npm run smoke:opencode:prompt-stamp  # deterministic + model-free (T4): the prompt-admission stamp, the compaction retention, the no-polling timeline and the off-contract silence on a real `opencode serve` + scripted provider
 npm run smoke:opencode:panel-refresh  # deterministic + model-free (T4): the open board panel refreshes from the OpenCode event stream (session shell endpoint → `session.shell.ended`) with no keypress, and a tracker change no event announced never appears (no polling)
 npm run smoke:tui             # TUI evidence on a real runtime: init seam, plugin discovery, PTY run, /arggon-board opens and renders the tree
 npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, item block, keep.tokens
@@ -608,15 +608,19 @@ sensitive**: run them on their own, without a concurrent test suite or another
 headless harness (a loaded machine can stall a provider call past the per-command
 timeout and leave a scenario half-done). The deterministic gates (`npm test`,
 lint/build/`check:plugin`, `validate`) are safe to run in parallel; `smoke:tui`,
-`smoke:native-start-cold` and `smoke/opencode-prompt-stamp-smoke.ts` are
+`smoke:native-start-cold` and `smoke:opencode:prompt-stamp` are
 model-free and cheap — the latter two need `npm run build` first, because they
 drive the native tools and the vendored bundle against **this checkout's**
-plugin source and kernel build, not a vendored or primary-copy build. The T4
-smoke additionally serves with a hermetic `HOME`: the plugin supervisor resolves
-plugin ids globally and keeps the first registration, so a machine-global
-`~/.config/opencode/plugins/arggon/index.ts` would shadow the fixture's vendored
-copy (`Duplicate plugin ID: arggon`) and the run would silently exercise the
-wrong plugin — the harness asserts the fixture's bytes are the ones under test.
+plugin source and kernel build, not a vendored or primary-copy build. The plugin
+smokes (`smoke:opencode`, `smoke:native-start-cold`'s move leg and the T4 two)
+all serve under a hermetic HOME now: the supervisor resolves plugin ids
+globally, so a machine-global
+`~/.config/opencode/plugins/arggon/index.ts` competes with the fixture's
+vendored copy for the same id and the run could silently exercise the wrong
+plugin — HOME/`XDG_*` point into a disposable root, each smoke asserts from the
+host's own log that the fixture's copy is the one that loaded, and
+`smoke:opencode` seeds the credentials its model-driven sessions need into the
+disposable data home through `opencode auth export`/`import`.
 
 ## Side-by-side installs
 

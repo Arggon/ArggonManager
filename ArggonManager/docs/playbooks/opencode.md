@@ -135,7 +135,7 @@ true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
   the same bounded item block to the checkpoint-summary request's `system`
   instructions, once per request (marker check) and never sets `result`, so the
   model still writes the summary. Evidence harness:
-  `npx tsx smoke/opencode-prompt-stamp-smoke.ts` — model-free (real
+  `npm run smoke:opencode:prompt-stamp` — model-free (real
   `opencode serve` + a scripted OpenAI-compatible provider), skipping when the
   binary is absent; it asserts the stamp on the persisted payload, the byte
   identical prompt text, one item block in the compaction request, the summary
