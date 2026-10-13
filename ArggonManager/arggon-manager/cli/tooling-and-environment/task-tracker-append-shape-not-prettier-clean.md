@@ -8,6 +8,7 @@ labels: [tracker-schema, docs, formatter]
 created: "2026-10-13"
 updated: "2026-10-13"
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-tracker-append-shape-not-prettier-clean.md
   Leaves live only under a story. id is the filename stem: task-tracker-append-shape-not-prettier-clean.
@@ -19,10 +20,23 @@ updated: "2026-10-13"
 
 ## Context
 
-<!-- Why this task exists. -->
+Observed 2026-10-12 across the improvement waves: when the kernel's `comment`/`handoff`
+writers append to an item body, the result is not prettier-clean and differs from the
+hand-authored template shape — no blank line after the frontmatter, no blank line after
+appended headings. Every item that receives a comment therefore shows as prettier-dirty
+against its authored state (makers kept re-discovering this; 18/18 sibling items share
+the shape). No workflow runs prettier over tracker files, so it is cosmetic — but it
+makes "prettier --check" a misleading local signal on item files and splits the corpus
+into two shapes.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] Decide and implement one: make the kernel's append shape prettier-clean (blank
+      line after frontmatter + after headings); or exempt `ArggonManager/**/*.md` from
+      prettier (config) and say so; or record why the two shapes coexist
+- [ ] If the writer changes: a test pins the emitted shape; existing items are NOT
+      mass-rewritten (append-only history) — new appends become canonical
+- [ ] `arggon validate` green; the decision recorded where the next author reads it
+      (`docs/convention.md` or the kernel writer's docblock)
 
 ## Notes

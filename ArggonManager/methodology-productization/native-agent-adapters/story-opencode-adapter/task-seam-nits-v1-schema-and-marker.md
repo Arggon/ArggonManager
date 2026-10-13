@@ -8,6 +8,7 @@ labels: [opencode-seam, docs, review-followup]
 created: "2026-10-13"
 updated: "2026-10-13"
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/task-seam-nits-v1-schema-and-marker.md
   Leaves live only under a story. id is the filename stem: task-seam-nits-v1-schema-and-marker.
@@ -19,10 +20,15 @@ updated: "2026-10-13"
 
 ## Context
 
-<!-- Why this task exists. -->
+Two nits from the PR #754 standards review (`task-seam-footprint-config-inline-evaluation`), recorded so they outlive the item:
+
+1. **`ArggonManager/docs/agents.md:655`** calls the published `https://opencode.ai/config.json` schema the "field-level source of truth". The vendor's own V2 guidance (shipped with the runtime, v2.0.26) says verbatim: _"The schema served from https://opencode.ai/config.json may describe V1 … Never use it to infer V2 field names or shapes."_ The published schema is V1 (`plugin`/`agent`/`command` singular); V2 uses `plugins`/`agents`/`commands` with `system`/`permissions`. `agents.md` is a methodology carrier — the correction is a real doc fix, not a nit pick.
+2. **The agents carry the `argon:generated` marker twice** (e.g. `.opencode/agents/arggon-maker.md` lines 2–3). Probably harmless, but it should be one marker; check whether the duplicate affects `stampGeneratedContent`/checksum parsing and fix the emitter.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] `agents.md:655` corrected to point at the V2 names (or explicitly warn the published schema is V1 — cite the vendor sentence); check `docs/playbooks/opencode.md` for the same claim
+- [ ] The double `argon:generated` marker identified (emitter or template), reduced to one, and a test pins single-marker emission for the opencode seam
+- [ ] `arggon doctor --agents` still classifies the touched seam files correctly; `npm run test` green
 
 ## Notes
