@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-state-exploration-stopping-rule
 title: "Write down the ADR 0017 exploration stopping rule (AutoContext: the Planner is the load-bearing component — 95%→40% without it)"
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [methodology, research, exploration]
 priority: p3
 created: "2026-10-05"
 updated: "2026-10-13"
-claimed_at: "2026-10-13T13:29:20.235Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-state-exploration-stopping-rule
 ---
 <!--
