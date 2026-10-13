@@ -193,11 +193,17 @@ describe("capability matrix: committed file matches its schema", () => {
       "CLAUDE.md",
       "pre-commit",
     ];
-    // Only the GAP CLAUSE is linted: a note's job is to name what the client
-    // cannot do, and everything after a contrastive connective ("..., so the
-    // kernel, pre-commit and CI carry it alone") is the enforcement story, not
-    // a claim of absence. Linting the whole note would flag the honest
-    // "what still enforces it" half as a false absence.
+    // Scope, precisely: this catches ONE failure shape — a note that CLAIMS a
+    // universal surface is missing — and it is not a general honesty gate: a
+    // note that invents an absence without naming a surface passes it (round-1's
+    // `state-in-git` note did), which is the shape the seam-derived test above
+    // ("credits the surfaces an init'd tree actually gives Claude Code") covers.
+    // Only the GAP CLAUSE is linted, too: a note's job is to name what the
+    // client cannot do, and everything after a contrastive connective ("..., so
+    // the kernel, pre-commit and CI carry it alone") is the enforcement story,
+    // not a claim of absence. Linting the whole note would flag the honest
+    // "what still enforces it" half as a false absence — that clause-scoped
+    // split is load-bearing, never "fix" it into a whole-note scan.
     const gapClause = (note: string): string =>
       note.split(/,?\s+(?:so|therefore|meanwhile|but)\s+/)[0] ?? note;
     for (const row of committed().rows.filter((r) => r.gap)) {
