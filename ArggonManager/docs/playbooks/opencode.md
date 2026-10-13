@@ -414,7 +414,18 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
   (`git push *` denies `git push origin main` with `Permission denied: shell`
   while `git status` still runs). The shipped defaults are deliberately
   non-breaking: no global `ask` (headless clients would stall), only narrow
-  `deny`s (force-push, `--no-verify`, reviewer mutations).
+  `deny`s (force-push, `--no-verify`, reviewer/verifier tracker writes) and one
+  explicit **read grant** — the verifier's
+  `show`/`list`/`next`/`report`/`validate`, both spellings
+  (`bug-verifier-cannot-read-the-tracker-no-allow-side`). Probe (2.0.26,
+  `opencode run --agent arggon-verifier`): with the entries present the five
+  reads return their envelopes while `update`/`create`/`comment` answer
+  `Unknown tool 'arggon.…'` and the catalog is exactly the granted reads. The
+  grant **pins** the read set; it does not by itself unblock it — the base
+  policy's allow-all already resolved an unmatched resource to `allow`, so the
+  entries are what make the read set a stated contract (agent rules are appended
+  last and win) rather than a runtime default, and the `comment` deny is the
+  catalog change a session actually observes.
 - **Transforms replay asynchronously (2.0.10; re-confirmed on 2.0.12).**
   `await ctx.tool.transform(cb)` resolves before `cb` runs: the runtime replays
   the registered callbacks when it rebuilds the registry (observed on 2.0.10

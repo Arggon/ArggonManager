@@ -50,6 +50,15 @@ const MUTATING_TRACKER_TOOLS = [
   "import_issues",
 ];
 
+/**
+ * Every read-only tracker tool the verifier role is contracted to use
+ * (`show`/`list`/`next`/`report`/`validate`). The grant is deliberately
+ * explicit in the verifier's frontmatter in both spellings
+ * (bug-verifier-cannot-read-the-tracker-no-allow-side); `branch` is NOT here —
+ * it records a branch and stays denied with the rest of the write side.
+ */
+const READ_ONLY_TRACKER_TOOLS = ["list", "next", "report", "show", "validate"];
+
 function runCli(args: string[], cwd: string = repoRoot) {
   return runCliBase(args, cwd);
 }
@@ -189,8 +198,10 @@ describe("opencode seam: fresh init", () => {
   // NAMES only. This is the whole deny surface as it stands after the rewrite,
   // one entry per shipped role, so a dropped deny, an added deny or a widened
   // resource fails here — the kind of edit a role-contract rewrite invites by
-  // accident. Allow-lists are deliberately NOT pinned: AC 3 derives them, and
-  // the primary's only allow-list is that one.
+  // accident. The primary's subagent allow-list is still not restated here
+  // (AC 3 derives it); the verifier's read allow-list IS pinned, in its own
+  // test below — a read grant is a role contract now
+  // (bug-verifier-cannot-read-the-tracker-no-allow-side).
   const GIT_HISTORY_DENIES = [
     "shell:git commit",
     "shell:git push",
@@ -207,6 +218,13 @@ describe("opencode seam: fresh init", () => {
     "arggon_arggon_update",
     "arggon_arggon_handoff",
   ];
+  /**
+   * `comment` is a tracker write too (a body append), but the standards
+   * reviewer keeps it as its verdict channel — only the verifier denies it
+   * (bug-verifier-cannot-read-the-tracker-no-allow-side): the verifier hands
+   * evidence to its caller and never posts.
+   */
+  const TRACKER_COMMENT_DENIES = ["arggon_comment", "arggon_arggon_comment"];
   const PERMISSION_CONTRACT: Record<string, string[]> = {
     // one nesting level, and no tracker writes of its own — the maker reports
     // findings to the delivery lead instead of filing them.
@@ -220,9 +238,15 @@ describe("opencode seam: fresh init", () => {
       ...GIT_HISTORY_DENIES,
     ].sort(),
     // the mirror image: shell IS the role (no shell deny), but edit, nesting,
-    // every tracker write and the history verbs are denied exactly as on the
-    // standards reviewer.
-    "arggon-verifier": ["edit", "subagent", ...TRACKER_WRITE_DENIES, ...GIT_HISTORY_DENIES].sort(),
+    // every tracker write — `comment` included — and the history verbs are
+    // denied exactly as on the standards reviewer.
+    "arggon-verifier": [
+      "edit",
+      "subagent",
+      ...TRACKER_WRITE_DENIES,
+      ...TRACKER_COMMENT_DENIES,
+      ...GIT_HISTORY_DENIES,
+    ].sort(),
   };
 
   it("the permission deny set is unchanged in kind across the rewrite (AC 12)", () => {
@@ -249,6 +273,50 @@ describe("opencode seam: fresh init", () => {
       expect(expected, `${role} has no pinned permission contract`).toBeDefined();
       expect(denies, `${role}: the deny set changed in kind`).toEqual(expected);
     }
+  });
+
+  /**
+   * The verifier's read grant (bug-verifier-cannot-read-the-tracker-no-allow-side).
+   * The role is contracted to read the items it verifies ("runs the gates a
+   * review verdict needs and returns expected-vs-observed evidence"), so its
+   * reads are granted EXPLICITLY in both spellings and nothing else is granted:
+   * a read that silently loses its allow leaves the verifier unable to do half
+   * its job, and an allow that widens to a mutating tool would open a write
+   * path. The drift guard is this test; the live negative control is the
+   * verifier probe in `smoke/opencode-smoke.ts`.
+   */
+  const VERIFIER_READ_ALLOWS = [
+    ...READ_ONLY_TRACKER_TOOLS.map((tool) => `arggon_${tool}`),
+    ...READ_ONLY_TRACKER_TOOLS.map((tool) => `arggon_arggon_${tool}`),
+  ].sort();
+
+  it("the verifier grants exactly the read-only tracker tools, in both spellings", () => {
+    const allowsOf = (body: string): string[] =>
+      [...body.matchAll(/action: (\S+)\s+resource: "?([^"\n]+?)"?\s+effect: allow/g)]
+        .map((m) => m[1]!)
+        .sort();
+    const template = readFileSync(
+      join(repoRoot, "templates/docs/opencode/agents/arggon-verifier.md"),
+      "utf8",
+    );
+    expect(allowsOf(template)).toEqual(VERIFIER_READ_ALLOWS);
+    // No allow entry may name a mutating or maintenance tool: the read grant
+    // must not open a write path (`branch` records a branch; `comment` appends
+    // to an item body; `create`/`update`/`handoff`/`start`/`cleanup`/`priority`/
+    // `sync`/`import_issues` mutate).
+    const mutating = new Set([...TRACKER_WRITE_DENIES, ...TRACKER_COMMENT_DENIES]);
+    expect(allowsOf(template).filter((action) => mutating.has(action))).toEqual([]);
+    // This tree's shipped seam IS the template's rendered bytes (marker
+    // inserted by `stampGeneratedContent`), so the grant above is the one this
+    // repo's own verifier sessions load — not merely what new adopters get.
+    const seam = readFileSync(join(repoRoot, ".opencode/agents/arggon-verifier.md"), "utf8");
+    expect(seam).toBe(
+      stampGeneratedContent(
+        ".opencode/agents/arggon-verifier.md",
+        "opencode/agents/arggon-verifier.md",
+        template,
+      ),
+    );
   });
 
   it("agents deny nested subagents and the standards reviewer denies edits (W4 probes)", () => {
@@ -290,6 +358,21 @@ describe("opencode seam: fresh init", () => {
     for (const action of ["arggon_update", "arggon_start", "arggon_cleanup"]) {
       expect(verifier, action).toMatch(
         new RegExp(`action: ${action}\\s+resource: "\\*"\\s+effect: deny`),
+      );
+    }
+    // Tracker WRITES are denied in both spellings, `comment` included — the
+    // verifier hands evidence to its caller instead of posting it.
+    for (const action of ["arggon_comment", "arggon_arggon_comment"]) {
+      expect(verifier, action).toMatch(
+        new RegExp(`action: ${action}\\s+resource: "\\*"\\s+effect: deny`),
+      );
+    }
+    // Tracker READS are granted in both spellings (bug-verifier-cannot-read-
+    // the-tracker-no-allow-side) — and the prompt points at the permission
+    // block, so "read-only" is config-enforced rather than prose-protected.
+    for (const action of VERIFIER_READ_ALLOWS) {
+      expect(verifier, action).toMatch(
+        new RegExp(`action: ${action}\\s+resource: "\\*"\\s+effect: allow`),
       );
     }
     // The evidence contract a verdict depends on: expected vs observed, and the
