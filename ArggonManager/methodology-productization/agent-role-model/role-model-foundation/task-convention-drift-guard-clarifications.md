@@ -56,3 +56,7 @@ Change on branch `feat/task-convention-drift-guard-clarifications` (PR #780): on
 2. Walker reverted to the old `sections.set` overwrite: the new premise test failed on the dropped `first-option`; restored byte-identical.
 
 Derivation property kept: no option name added to the test — literals remain the SECTIONS table (structure) and the marker string.
+
+### handoff 2026-10-13 @ses_eca4ef96fffetnKma4I21dSuAY (session: ses_eca4ef96fffetnKma4I21dSuAY) — next: Delivery lead: review + merge PR #780; maker work complete (gates green, controls reverted, checklist ticked).
+- branch: feat/task-convention-drift-guard-clarifications
+- open questions: Marker stays line-scoped by decision (documented, not tightened): a marker off the comparison line does not exempt and fails rule 2; templates/docs/** + README bug-note out of scope as in #759
