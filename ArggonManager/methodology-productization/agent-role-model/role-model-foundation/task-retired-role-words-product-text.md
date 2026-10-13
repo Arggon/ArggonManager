@@ -61,3 +61,8 @@ Out of scope, reported for the lead (not in this diff): `ArggonManager/docs/agen
 ### CI green on PR #787 (head a26c67ea)
 
 All three lanes pass on the pushed branch: `cli` 6m45s (154 files / 3348 tests, lint, structure, build), `tasks-validate` 23s (tracker + committed-seam drift), `ui-smoke` 2m20s. PR: https://github.com/Arggon/ArggonManager/pull/787 — left `in_progress` for the delivery lead's merge/flip.
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 6b820ccb (PR #787); auto-done flip landed. The goal-mode contract renders the shipped role ("delivery lead") and the capability matrix (root + byte-identical template) uses the ids the bundle ships; the family walk now includes non-Markdown templates — the exact Markdown-only filter that let this JSON escape — with `REQUIRED_MEMBERS` pinning it, and a rendered-contract assertion covers goal-mode. Negative controls (reverted) proved both guards fire; checksum refreshed; CI green.
