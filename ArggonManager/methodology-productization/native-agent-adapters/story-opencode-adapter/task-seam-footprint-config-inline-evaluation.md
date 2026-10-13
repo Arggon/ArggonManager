@@ -12,7 +12,6 @@ updated: "2026-10-12"
 claimed_at: "2026-10-12T23:39:26.165Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-seam-footprint-config-inline-evaluation
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/task-seam-footprint-config-inline-evaluation.md
   Leaves live only under a story. id is the filename stem: task-seam-footprint-config-inline-evaluation.
@@ -369,3 +368,24 @@ Text: "…so `findOpenCodeConfig` still sees it and, on a tree without a tracked
 - Box-5 probes: `opencode debug config` with the V1 `agent`/`command` keys and with invalid plugin values; `opencode api plugin.list`; the config `plugins` load probe.
 
 — standards review, session ses_ecd55780affe6zwYGBWpe2FVGm (read-only; no project files touched)
+
+### 2026-10-13 @arggon-standards-reviewer
+### 2026-10-13 @arggon-standards-reviewer
+
+verdict: approve (head e899cba4; supersedes the two request-changes above)
+
+Scope: item text + `.gitignore`. The fix commit e899cba4 is a fast-forward on the second verdict's commit (2e0edf8e) and touches only the item file (12+/6-: the precision paragraph + two whitespace-only blank lines).
+
+**Verified at head e899cba4 (clean tree; PR #754 head = e899cba4, state OPEN, base main):**
+
+- The corrected precision paragraph (item lines 237-247) now states the pinned behavior: git accounting ≠ discovery ("different layers"); `.opencode/opencode.json` is an `OPENCODE_CONFIG_CANDIDATES` entry; `findOpenCodeConfig` skips the signed root `opencode.jsonc` and returns the machine-local file **even while our root config exists**, so `init` present-skips the generated root config (same code path option (b) collides with).
+- Matches the code by reading: `isArggonGeneratedConfig` can claim only `OPENCODE_CONFIG_DEST` (cli/src/docs.ts:523-548), `findOpenCodeConfig` returns the first present non-arggon candidate (docs.ts:578-585; candidates order in cli/src/adapters.ts:70-75), present-skip at docs.ts:1408-1419. Pinned suite: `cli/src/init-opencode.test.ts:598-615` — "present-skips .opencode/opencode.json / .opencode/opencode.jsonc added after init while our root opencode.jsonc exists".
+- The recorded discriminator row is verbatim-consistent with the reason template at docs.ts:1415-1416 (`adopter OpenCode config present at ${existing} — config seam not generated (add "mcp.servers.arggon" manually if wanted)`, existing = `.opencode/opencode.json`), and the primary's input condition holds: root `opencode.jsonc` line 2 carries the generated signature, `.opencode/opencode.json` present (115 B).
+- No other text regressed: `git diff 2e0edf8e..HEAD` = the item file only; all prior corrections (V2 shapes, probes, scope/boxes, hygiene evidence) intact.
+- Scope still exactly `.gitignore` + the item file (`git diff --name-only main...HEAD`); the owner's `.opencode/opencode.json` is not in the diff; `git check-ignore -v` still hits .gitignore:34-35.
+
+**Not independently verified (read-only role):** the live `init --dry-run --json` execution and the gates. Verifier's durable form for the merge record: `npx vitest run cli/src/init-opencode.test.ts` plus the gates listed in the previous verdict (`arggon validate`, prettier on the item, `test:structure`, `lint:structure`).
+
+**Open, non-blocking (delivery-lead action):** the `docs/agents.md:655` drift follow-up (V1 schema named as field-level source of truth) is still unfiled under story-opencode-adapter.
+
+— standards review, session ses_ecd356ddcffe7X9XjrHphKI9Id (read-only; no project files touched)
