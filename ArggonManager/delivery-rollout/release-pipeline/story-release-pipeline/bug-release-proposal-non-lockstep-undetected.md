@@ -85,3 +85,7 @@ All four open acceptance rows implemented on `fix/bug-release-proposal-non-locks
 - `npm run lint` exit 0; `npm run test:structure` 5/5 exit 0; `npm run arggon -- validate` ok (0 warnings); `npx prettier --check` on all touched files clean; `actionlint` on both workflows exit 0.
 
 **Open question for the lead.** #770's repair (Release-As: 0.9.0) is a product-owner act; recommend fixing it before this PR merges so no main push reddens the maintenance run (or accept the red as the designed signal). The stale `.convention.yml` checksum is unfiled work, out of this item's scope.
+
+### handoff 2026-10-13 @ses_eca4ef973ffeRAmpvyBGPnMWrE (session: ses_eca4ef973ffeRAmpvyBGPnMWrE) — next: Delivery lead: get #770 repaired (product owner pushes empty `Release-As: 0.9.0` commit), review and merge PR #782, verify the merge, then flip the item done.
+- branch: fix/bug-release-proposal-non-lockstep-undetected
+- open questions: #770 is live non-lockstep (0.9.0/0.8.0): fix before merge or accept the designed red; pre-existing provenance-audit local failure (stale .convention.yml checksum) is unfiled.
