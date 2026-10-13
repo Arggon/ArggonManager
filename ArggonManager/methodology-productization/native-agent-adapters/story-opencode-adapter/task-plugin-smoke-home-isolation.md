@@ -112,3 +112,9 @@ Collision (for the delivery lead): the peer maker session `ses_ec9dcc29...` was 
 ### handoff 2026-10-13 @ses_ec9bb52ceffeixWrHgtUfu66Ux (session: ses_ec9bb52ceffeixWrHgtUfu66Ux) — next: Delivery lead: decide the dual-maker collision (this finishing session ses_ec9bb52c vs peer ses_ec9dcc29), then review PR #790 (head eabf0fe7); file follow-ups for the 5 pre-existing full-smoke failu…
 - branch: feat/task-plugin-smoke-home-isolation
 - open questions: full smoke exit 1 with 5 pre-existing failures (2 deterministic kernel/fixture: PLACEHOLDER_BODY validate, done-without-acceptance; 3 model refusals of probe scripts) - follow-up items?; npm test 335…
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 0ecb6007 (PR #790); auto-done flip landed. Both plugin smokes now serve hermetically (HOME/XDG_* temp dirs + fixture-bytes assertions) with the helper pinned by unit tests; `onCompaction`'s id read matches `onContext`; the `smoke:opencode-prompt-stamp` npm script is wired. Adversarial evidence with the machine-global plugin present: every `loading plugin` line in the full `smoke:opencode` run names a fixture copy and never the global dir (138/143 checks; the 5 failures are pre-existing harness-vs-gate drift with deterministic repros). Gates green apart from the known local-only provenance failure.
+Residual filed: bug-full-smoke-scenarios-precede-newer-gates. Note: a dual-session overlap occurred in this worktree (interrupted attempt + resume); PR content verified identical, no divergence landed.
