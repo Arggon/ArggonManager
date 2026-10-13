@@ -269,3 +269,34 @@ Evidence (maker run, 2026-10-12; branch feat/task-seam-footprint-config-inline-e
 ### handoff 2026-10-13 @ses_ecd832dc8ffeqhaGFiLKLTG8Eh (session: ses_ecd832dc8ffeqhaGFiLKLTG8Eh) — next: Review PR #754 (feat/task-seam-footprint-config-inline-evaluation); record the box-1 decision (recommendation: keep the file seam), then merge or spin follow-ups for boxes 2/3.
 - branch: feat/task-seam-footprint-config-inline-evaluation
 - open questions: Keep vs inline (boxes 2/3 conditional); global duplicate arggon plugin install in ~/.config/opencode; double x-generated marker on agents; stale primary plugin copies
+
+### 2026-10-13 @arggon-standards-reviewer
+verdict: request-changes (the inlining option is written in V1 key/field names; the decision input must be V2-shaped)
+
+Scope: item text only. The `.gitignore` hygiene change is verified as-is and needs no change.
+
+**Blocking finding — the (b) row and the "Schema facts" bullets state the inlining mechanism in the published (V1) schema's names, not V2's:**
+- Item text: "Collapses 15 files into `agent`/`command` keys — the schema supports `prompt`/`template` etc."; the Context bullet lists `agent` (`prompt`, `description`, `mode`, `permission`, `tools`, `temperature`, …). The same item concludes that schema is the stale V1 shape, and `docs/agents.md`'s own rule is "Never map V1 fields into V2 config".
+- V2 (the runtime in use) uses `agents`/`commands` (plural); the V2-native agent prompt field is `system`, permissions are `permissions`; the V2 agents guide says verbatim: "Do not use legacy top-level fields such as `temperature`, `top_p`, `prompt`, `permission`, `tools`, `disable`, or `maxSteps` in new V2 agent configuration." (V1 config is intended to stay compatible, so the V1 shape may still load — but then say that, and say which shape the option means.)
+- Sources read today: https://opencode.ai/v2/docs/config (fields list `agents`, `commands`, `plugins`; a `commands` entry uses `template`), https://opencode.ai/v2/docs/agents (JSONC example under `agents` with `system`/`permissions`).
+- Requested fix (2 lines): name the V2 keys/fields in the (b) row and the Context bullet (V2 `agents`/`commands`, `system`/`permissions`), or record the V1-compat route explicitly — but only claim alias acceptance if probed (`plugin` was probed; `agent`/`agents` was not).
+- Same bullet, second item: "Invalid values under either key are silently dropped (V2 ignores excess/invalid properties)" has no probe recorded; probe it or mark it as an inference.
+
+**Verified by reading (no action; evidence for the record):**
+- Inventory exact: `git ls-files .opencode` = 15; `wc -c` agents 19,812 + commands 12,093 = 31,905 B; `du` 28K/44K; root `opencode.jsonc` 3,088 B tracked. Plugin copies gitignored/derived: primary 481,162 + 15,742 = 496,904 B (stale), expected 549,029 B = 71-B init marker + 548,958-B bundle (arithmetic checks against `stampGeneratedContent` + `BUNDLE_BANNER`).
+- Owner's idiom: `plugins` is the V2 spelling and the published schema is V1 — additionally supported by the vendor's V2 guidance: "The schema served from https://opencode.ai/config.json may describe V1 ... Never use it to infer V2 field names or shapes." Citing that sentence removes the inferential character from the item's conclusion.
+- (b)'s central cost is real: `findOpenCodeConfig` (cli/src/adapters.ts:70-75, cli/src/docs.ts:578-585) returns the first non-arggon config, and init present-skips the generated config (cli/src/docs.ts:1408-1419); cli/src/init-opencode.test.ts "opencode seam: conditional config" covers all four shapes. An adopter with their own config gets no generated config, so inlining agents/commands there would deliver nothing.
+- Recommendation honesty: (a) is recommended and the strongest counter-argument (inlining retires a whole subsystem — a product decision) is stated; accepted.
+- Hygiene: `git check-ignore -v` → `.gitignore:34:.opencode/opencode.json` and `.gitignore:35:.opencode/harness/` (both hit, nested files included). Live check: this worktree carries `.opencode/harness/.policy-shown` and `git status --short` is clean — the ignore works. It cannot hide a seam artifact: the generated config destination is root `opencode.jsonc` (`OPENCODE_CONFIG_DEST`, cli/src/docs.ts:421); `.opencode/opencode.json(c)` are adopter-config candidates only; `.opencode/harness/` is third-party state; .gitignore never affects tracked files.
+- Template decision sound: `templates/docs/gitignore` carries only `.arggon.env` (4 lines) and is kept when the adopter has one; the `.zcode/` precedent sits in this repo's own .gitignore.
+- Scope: `gh pr diff 754` = exactly `.gitignore` + the item; no seam rework; the owner's file is not in the diff. Acceptance: boxes 4/5 ticked with the evidence above, 2/3 conditional and honestly unticked, 1 left to the lead — correct by design.
+
+**Non-blocking, record only:**
+- `docs/agents.md:655` ("the field-level source of truth is https://opencode.ai/config.json") is contradicted by the vendor V2 guidance and is the drift this item found. It is a methodology carrier — the fix belongs in its own item with an impact-class statement; please file it (AGENTS.md: findings become items), e.g. under story-opencode-adapter.
+- The machine-local file still participates in seam discovery: in the primary checkout `findOpenCodeConfig` sees `.opencode/opencode.json` and init present-skips the generated `opencode.jsonc` (same code path as (b)). Pre-existing and unchanged by gitignoring; one line in the item would keep box 4's "out of seam accounting" precise (out of git accounting, still a config candidate).
+- Primary harness state grew between measurement and review (`friction.jsonl` 3,598 → 3,861 B) — live state; reinforces the machine-local argument.
+- The double `arggon:generated` marker on agents is real (`.opencode/agents/arggon-maker.md` lines 2-3); the out-of-scope note is accurate.
+
+**Verifier (for the merge record; this verdict does not turn on it):** reproduce the maker's gates in the worktree — `npm run arggon -- validate`, `npx prettier --check <item>`, `npm run test:structure`, `npm run lint:structure`, `git check-ignore -v .opencode/opencode.json .opencode/harness/`, the worktree-prune probe, and for box 5 `opencode api plugin.list` / the config `plugins` load probe.
+
+— standards review, session ses_ecd6b7d30ffexsOrPyRjyceCMS (read-only; no project files touched)
