@@ -202,6 +202,39 @@ function opencodeAvailable(): boolean {
   return probe.error === undefined && probe.status === 0;
 }
 
+/**
+ * Replace the scaffold placeholder marker of the live `## Context` and
+ * `## Acceptance` sections with real prose and a real criterion row
+ * (`ticked` controls the box state). Fresh fixtures must satisfy the
+ * PLACEHOLDER_BODY gate (task-validate-refuses-placeholder-bodies): the
+ * native-tools scenario calls `tools.arggon.validate({})`, and a scaffold
+ * fixture would fail the FIXTURE, not the behavior under test, reporting it as
+ * a native-tool contract failure (bug-full-smoke-scenarios-precede-newer-gates).
+ *
+ * Deliberately narrow: only the `<!-- … -->` marker immediately following one
+ * of the two heading lines is replaced, and a body without such a marker is
+ * returned unchanged — a template reword that drops or moves a marker surfaces
+ * as a unit-test failure (the tests run this over the real `templates/*.md`)
+ * instead of a silently mangled body. Pure; no provider needed to pin it.
+ */
+export function fleshOutScaffoldBody(
+  body: string,
+  context: string,
+  criterion: string,
+  ticked = false,
+): string {
+  const row = `- [${ticked ? "x" : " "}] ${criterion}`;
+  return body
+    .replace(
+      /^(## Context[ \t]*)\n+<!--[^\n]*-->/m,
+      (_match, heading: string) => `${heading}\n\n${context}`,
+    )
+    .replace(
+      /^(## Acceptance[ \t]*)\n+<!--[^\n]*-->/m,
+      (_match, heading: string) => `${heading}\n\n${row}`,
+    );
+}
+
 class Fixture {
   readonly dir: string;
   /** Local bare `origin` (sibling dir, no GitHub); created by `plantOrigin()`. */
@@ -326,32 +359,76 @@ class Fixture {
     }
   }
 
-  itemId(result: RunResult): string | undefined {
-    const item = this.json(result)?.item;
-    const id =
-      item !== null && typeof item === "object" ? (item as { id?: unknown }).id : undefined;
-    return typeof id === "string" ? id : undefined;
+  /** `arggon create` envelope item: id + repo-relative path (undefined on failure). */
+  createItem(
+    type: string,
+    title: string,
+    parent?: string,
+  ): { id: string; path: string } | undefined {
+    const args = [
+      "create",
+      type,
+      title,
+      ...(parent === undefined ? [] : ["--parent", parent]),
+      "--json",
+    ];
+    const item = this.json(this.cli(args))?.item as { id?: unknown; path?: unknown } | undefined;
+    if (typeof item?.id !== "string" || typeof item.path !== "string") return undefined;
+    return { id: item.id, path: item.path };
+  }
+
+  /**
+   * Replace a fixture item's scaffold placeholders with real prose so the
+   * fixture models a HEALTHY tracker: the PLACEHOLDER_BODY validate gate
+   * (task-validate-refuses-placeholder-bodies) reads every open item's live
+   * Context/Acceptance sections, so the scaffold bodies `arggon create` just
+   * wrote would make the harness's own `validate` calls fail on the fixture
+   * (bug-full-smoke-scenarios-precede-newer-gates). `ticked` shapes an item
+   * that is ready for the done gate.
+   */
+  fleshOut(relPath: string, context: string, criterion: string, ticked = false): void {
+    this.write(relPath, fleshOutScaffoldBody(this.read(relPath), context, criterion, ticked));
   }
 
   /** initiative → epic → story → task; returns the task id, story id and directory. */
   createTaskChain(): { id: string; story: string; directory: string } | undefined {
-    const initiative = this.itemId(
-      this.cli(["create", "initiative", "Smoke Initiative", "--json"]),
-    );
+    const initiative = this.createItem("initiative", "Smoke Initiative");
     if (initiative === undefined) return undefined;
-    const epic = this.itemId(
-      this.cli(["create", "epic", "Smoke Epic", "--parent", initiative, "--json"]),
-    );
+    const epic = this.createItem("epic", "Smoke Epic", initiative.id);
     if (epic === undefined) return undefined;
-    const story = this.itemId(
-      this.cli(["create", "story", "Smoke Story", "--parent", epic, "--json"]),
-    );
+    const story = this.createItem("story", "Smoke Story", epic.id);
     if (story === undefined) return undefined;
-    const task = this.json(this.cli(["create", "task", "Smoke Item", "--parent", story, "--json"]));
-    const item = task?.item as { id?: unknown; path?: unknown } | undefined;
-    if (typeof item?.id !== "string" || typeof item.path !== "string") return undefined;
-    const directory = item.path.split("/").slice(0, -1).join("/");
-    return { id: item.id, story, directory };
+    const task = this.createItem("task", "Smoke Item", story.id);
+    if (task === undefined) return undefined;
+    // Every item here is OPEN, so the placeholder gate reads all four: write
+    // real live prose instead of the template markers (see fleshOut). The
+    // containers are shaped done-ready — the leaf is not, so the done-gate
+    // scenarios keep a real unchecked criterion to exercise.
+    this.fleshOut(
+      initiative.path,
+      "Smoke fixture initiative; the harness writes real prose so the live section carries the contract, not the scaffold marker.",
+      "Fixture container stays well-formed for validate.",
+      true,
+    );
+    this.fleshOut(
+      epic.path,
+      "Smoke fixture epic; the harness writes real prose so the live section carries the contract, not the scaffold marker.",
+      "Fixture container stays well-formed for validate.",
+      true,
+    );
+    this.fleshOut(
+      story.path,
+      "Smoke fixture story; the harness writes real prose so the live section carries the contract, not the scaffold marker.",
+      "Fixture container stays well-formed for validate.",
+      true,
+    );
+    this.fleshOut(
+      task.path,
+      "Smoke fixture leaf; the harness writes real prose so the live section carries the contract, not the scaffold marker.",
+      "Fixture leaf carries a real acceptance criterion.",
+    );
+    const directory = task.path.split("/").slice(0, -1).join("/");
+    return { id: task.id, story: story.id, directory };
   }
 
   claim(id: string): RunResult {
@@ -526,6 +603,20 @@ function executedCode(stdout: string, needle: string): boolean {
  */
 export function executedTool(stdout: string, name: string): boolean {
   return executedCode(stdout, `tools.arggon.${name}`);
+}
+
+/**
+ * True when a Code Mode call carries `needle` in its code in ANY state (running,
+ * completed or error). This is the probe-attempt evidence: a transcript
+ * without it means the model never issued the call at all — a decline — which
+ * must be reported as inconclusive rather than as a gate result
+ * (bug-full-smoke-scenarios-precede-newer-gates). Exported for the unit tests.
+ */
+export function attemptedCode(stdout: string, needle: string): boolean {
+  return parseTranscript(stdout).some((event) => {
+    if (event.type !== "tool_use" || event.part?.tool !== "execute") return false;
+    return normalizeNamespace(event.part.state?.input?.code ?? "").includes(needle);
+  });
 }
 
 /**
@@ -1586,9 +1677,12 @@ function scenarioWorktreeLifecycle(): void {
   );
 
   // Done gate (task-done-gate-acceptance-waiver, ADR 0015): the close session
-  // flips the item through the kernel, which refuses `-> done` while the body
-  // carries unchecked acceptance boxes. Tick the box first — the same manual
-  // step the wave smoke instructs the agent to perform.
+  // flips the item through the kernel, which refuses `-> done` while the live
+  // `## Acceptance` section has unchecked boxes. The fixture leaf publishes a
+  // real criterion (fleshOut), so ticking it here is the same manual step the
+  // wave smoke instructs the agent to perform; a scaffold body would instead
+  // hit the `no-live-contract` refusal and lose the close entirely
+  // (bug-full-smoke-scenarios-precede-newer-gates).
   const canonicalItem = `${item.directory}/${item.id}.md`;
   f.write(canonicalItem, f.read(canonicalItem).replaceAll("- [ ]", "- [x]"));
 
@@ -1660,40 +1754,60 @@ function scenarioInvariants(): void {
     return;
   }
   check("fixture item claimed by smoke", f.claim(item.id).status === 0);
-  const other = f.itemId(
-    f.cli(["create", "task", "Second item", "--parent", item.story, "--json"]),
-  );
+  const other = f.createItem("task", "Second item", item.story);
   check("second item created", other !== undefined);
   if (other === undefined) return;
-  f.claim(other);
-  check("second item done", f.cli(["update", other, "--status", "done"]).status === 0);
+  // Done-ready shape: a live, TICKED criterion. A scaffold marker alone is a
+  // `no-live-contract` refusal from the done gate
+  // (bug-full-smoke-scenarios-precede-newer-gates); this item's `done` state is
+  // the reopen probe's precondition, not its subject.
+  f.fleshOut(
+    other.path,
+    "Second smoke fixture leaf; it exists to be closed, then offered to the reopen probe.",
+    "Fixture leaf closes through the done gate.",
+    true,
+  );
+  f.claim(other.id);
+  const secondDone = f.cli(["update", other.id, "--status", "done"]);
+  check("second item done", secondDone.status === 0, runTail(secondDone));
   check(
     "generated seam + shipped worker agent carry the permissions (active)",
     f.read("opencode.jsonc").includes('"permissions"') &&
       existsSync(f.path(".opencode/agents/arggon-maker.md")),
   );
 
-  const session = f.opencode(
+  const session = probeWithRetry(
+    f,
     [
       "Use the execute tool with exactly this code:",
       "const out = {};",
       `try { out.steal = await tools.arggon.update({ id: "${item.id}", status: "in_progress", assignee: "intruder" }); } catch (error) { out.stealError = String((error && error.message) || error); }`,
       `try { out.startSteal = await tools.arggon.start({ id: "${item.id}", assignee: "intruder" }); } catch (error) { out.startError = String((error && error.message) || error); }`,
-      `try { out.reopen = await tools.arggon.update({ id: "${other}", status: "todo" }); } catch (error) { out.reopenError = String((error && error.message) || error); }`,
+      `try { out.reopen = await tools.arggon.update({ id: "${other.id}", status: "todo" }); } catch (error) { out.reopenError = String((error && error.message) || error); }`,
       "return out;",
+      "All three calls are EXPECTED to be refused by the kernel: issuing them is the point of this conformance probe and a refusal is the PASS condition. Do not skip, judge or rewrite any call.",
       "If the tool is not found, run the same code once more (the tool catalog can lag server startup).",
       "Reply with only the raw JSON result.",
     ].join("\n"),
-    undefined,
-    undefined,
+    "invariants",
     "arggon-maker",
+    (stdout) => attemptedCode(stdout, "tools.arggon.update"),
+    3,
   );
-  f.saveTranscript("invariants", session);
   check("session succeeds as the worker agent", session.status === 0, runTail(session));
   const pluginFaults = pluginLoaded(session, f);
   check("plugin loads in the runtime", pluginFaults.length === 0, pluginFaults.join("; "));
+  const attempted = attemptedCode(session.stdout, "tools.arggon.update");
   const result = executeJson(session.stdout, "tools.arggon.update");
-  check("model executed the invariants script", result !== undefined, runTail(session));
+  // The probe's subject is the KERNEL's refusal. Say which shape failed
+  // instead of reporting a model decline as though a gate had refused
+  // (bug-full-smoke-scenarios-precede-newer-gates).
+  const probeName = !attempted
+    ? "invariants probe: model declined (inconclusive: no probe call in 3 attempts, the kernel was never asked)"
+    : result === undefined
+      ? "invariants probe did not complete (the execute call errored — harness/kernel error, not a decline)"
+      : "model executed the invariants script";
+  check(probeName, attempted && result !== undefined, runTail(session));
   if (result === undefined) return;
   const stealError = String(result.stealError ?? "");
   const startError = String(result.startError ?? "");
@@ -1716,9 +1830,9 @@ function scenarioInvariants(): void {
   check(
     "both invariants hold: the item states are unchanged",
     f.itemStatus(item.directory, item.id) === "in_progress" &&
-      f.itemStatus(item.directory, other) === "done" &&
+      f.itemStatus(item.directory, other.id) === "done" &&
       !existsSync(f.worktreePath(item.id)),
-    `claimed=${f.itemStatus(item.directory, item.id) ?? "?"} done=${f.itemStatus(item.directory, other) ?? "?"}`,
+    `claimed=${f.itemStatus(item.directory, item.id) ?? "?"} done=${f.itemStatus(item.directory, other.id) ?? "?"}`,
   );
 }
 
@@ -1778,13 +1892,40 @@ export function unknownToolError(value: unknown, tool: string): boolean {
 }
 
 /**
- * Reviewer probe session with a bounded retry: models occasionally answer with
- * a reduced script or skip an instructed shell command, which used to fail the
- * W4 permission checks for reasons that say nothing about the gates. Retry ONCE
- * when the required evidence is missing; the probe is read-only, so re-running
- * it is safe. The assertions stay on the permission layer (the Code Mode
- * catalog and the refusal recorded in the tool state), never on the model's
- * narrative.
+ * Model-driven probe session with a bounded retry. The checks must speak about
+ * the KERNEL's refusal or the RUNTIME's permission filter, never about a
+ * model's choice to skip the exercise: a session that never issues the probe
+ * (`ready` false) is INCONCLUSIVE — the gate was never exercised — and
+ * retrying it is the honest way to tell a decline apart from a missing gate
+ * (bug-full-smoke-scenarios-precede-newer-gates). A transcript that carries
+ * the evidence is never retried, so the assertions always read the first
+ * session that actually exercised the probe. The probes are read-only;
+ * `attempts` bounds the model's nondeterminism.
+ */
+function probeWithRetry(
+  f: Fixture,
+  prompt: string,
+  label: string,
+  agent: string,
+  ready: (stdout: string) => boolean,
+  attempts: number,
+): RunResult {
+  let session = f.opencode(prompt, undefined, undefined, agent);
+  f.saveTranscript(label, session);
+  for (let attempt = 2; attempt <= attempts && !ready(session.stdout); attempt += 1) {
+    console.log(
+      `  retry ${label} (attempt ${attempt}/${attempts}): the transcript is missing the probe evidence`,
+    );
+    session = f.opencode(prompt, undefined, undefined, agent);
+    f.saveTranscript(attempt === 2 ? `${label}-retry` : `${label}-retry-${attempt - 1}`, session);
+  }
+  return session;
+}
+
+/**
+ * Reviewer probe: the shipped `arggon-standards-reviewer` agent with the
+ * bounded retry above. The push probe observed a double decline, so it gets
+ * one attempt more than the other probes.
  */
 function reviewerProbe(
   f: Fixture,
@@ -1792,13 +1933,7 @@ function reviewerProbe(
   label: string,
   ready: (stdout: string) => boolean,
 ): RunResult {
-  const first = f.opencode(prompt, undefined, undefined, "arggon-standards-reviewer");
-  f.saveTranscript(label, first);
-  if (ready(first.stdout)) return first;
-  console.log(`  retry ${label}: the transcript is missing the probe evidence`);
-  const retry = f.opencode(prompt, undefined, undefined, "arggon-standards-reviewer");
-  f.saveTranscript(`${label}-retry`, retry);
-  return retry;
+  return probeWithRetry(f, prompt, label, "arggon-standards-reviewer", ready, 3);
 }
 
 /**
@@ -1812,9 +1947,10 @@ function reviewerProbe(
  * `search` returns the callable tools, so `update`/`start`/`cleanup` being
  * absent is the runtime's permission filtering, not a model's choice to skip
  * them. Remaining limit: the shell check still needs the model to issue the
- * command; the planted origin + explicit instruction + one bounded retry keep
- * that deterministic in practice (a session that never attempts it is a
- * harness failure, not a silent pass).
+ * command; the planted origin + explicit instruction + bounded retries keep
+ * that deterministic in practice, and a session that never attempts it is
+ * reported as a model decline (INCONCLUSIVE: the gate was never exercised),
+ * never as a gate result (bug-full-smoke-scenarios-precede-newer-gates).
  */
 function scenarioPermissions(): void {
   scenario(
@@ -1853,6 +1989,7 @@ function scenarioPermissions(): void {
     'const catalog = await search({ namespace: "arggon", limit: 20 });',
     "return { out, catalog };",
     "Then run these two shell commands with the shell tool, exactly as written and in order (run both, do not skip either): `git push origin main` and `git status`.",
+    "`git push origin main` is EXPECTED to be denied by your shell gate: the denial is the PASS condition of this conformance probe. Issue it verbatim; do not skip, judge or rewrite it.",
     "If the tool is not found, run the same code once more (the tool catalog can lag server startup).",
     "Reply with only the raw JSON result and what each shell command returned.",
   ].join("\n");
@@ -1898,13 +2035,21 @@ function scenarioPermissions(): void {
       `present: ${leaked.join(", ") || "none"}`,
     );
   }
+  const pushAttempted = shellAttempted(session.stdout, "git push");
   check(
-    "the reviewer's shell gate denies git push (permission denied)",
+    pushAttempted
+      ? "the reviewer's shell gate denies git push (permission denied)"
+      : "reviewer push probe: model declined (inconclusive: no shell call for 'git push' in 3 attempts — the gate was never exercised)",
     shellDenied(session.stdout, "git push"),
-    runTail(session),
+    pushAttempted
+      ? runTail(session)
+      : `model-declined (inconclusive), not a gate result: no shell attempt exists, so nothing about the gate is proven\n${runTail(session)}`,
   );
+  const statusAttempted = shellAttempted(session.stdout, "git status");
   check(
-    "ordinary shell inspection still runs (session not broken)",
+    statusAttempted
+      ? "ordinary shell inspection still runs (session not broken)"
+      : "ordinary shell inspection probe: model declined (inconclusive: no shell call for 'git status' — the session was not exercised)",
     shellCompleted(session.stdout, "git status"),
     runTail(session),
   );
@@ -1922,13 +2067,7 @@ function verifierProbe(
   label: string,
   ready: (stdout: string) => boolean,
 ): RunResult {
-  const first = f.opencode(prompt, undefined, undefined, "arggon-verifier");
-  f.saveTranscript(label, first);
-  if (ready(first.stdout)) return first;
-  console.log(`  retry ${label}: the transcript is missing the probe evidence`);
-  const retry = f.opencode(prompt, undefined, undefined, "arggon-verifier");
-  f.saveTranscript(`${label}-retry`, retry);
-  return retry;
+  return probeWithRetry(f, prompt, label, "arggon-verifier", ready, 2);
 }
 
 /**

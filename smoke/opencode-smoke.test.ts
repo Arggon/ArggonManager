@@ -2,9 +2,12 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { placeholderSections } from "../lib/src/index.js";
 import {
+  attemptedCode,
   executeJson,
   executedTool,
+  fleshOutScaffoldBody,
   NATIVE_TOOL_NAMES,
   normalizeNamespace,
   parseTranscript,
@@ -146,6 +149,85 @@ describe("opencode-smoke: parseTranscript", () => {
     );
     expect(events).toHaveLength(1);
     expect(events[0]?.type).toBe("text");
+  });
+});
+
+// bug-full-smoke-scenarios-precede-newer-gates: the fixture scenarios create
+// items with `arggon create`, whose template body carries the `<!-- … -->`
+// scaffold marker in the live Context/Acceptance sections. The
+// PLACEHOLDER_BODY validate gate refuses every open item carrying one, so the
+// harness would fail its own `validate` calls on the fixture. These tests run
+// the rewrite over the REAL templates (CI has no `opencode` binary, so the
+// harness itself cannot pin this shape) and assert the live-section question
+// the gate asks, not a string list.
+describe("opencode-smoke: fleshOutScaffoldBody", () => {
+  const templatesDir = resolve(dirname(fileURLToPath(import.meta.url)), "..", "templates");
+  const template = (type: string): string => readFileSync(join(templatesDir, `${type}.md`), "utf8");
+
+  it.each(["task", "bug", "story", "epic", "initiative"])(
+    "removes the marker from the %s template's live sections",
+    (type) => {
+      const raw = template(type);
+      // The raw template trips the gate (the negative control for the rewrite).
+      expect(placeholderSections(raw)).not.toEqual([]);
+      const fleshed = fleshOutScaffoldBody(raw, "Real context prose.", "Real criterion.", false);
+      expect(placeholderSections(fleshed)).toEqual([]);
+      expect(fleshed).toContain("## Context\n\nReal context prose.");
+      expect(fleshed).toContain("## Acceptance\n\n- [ ] Real criterion.");
+      // The placement comment is OUTSIDE the live sections: untouched.
+      expect(fleshed).toContain("Placement (v0)");
+    },
+  );
+
+  it("writes the ticked row for a done-ready fixture item", () => {
+    const fleshed = fleshOutScaffoldBody(
+      template("task"),
+      "Second smoke fixture leaf.",
+      "Fixture leaf closes through the done gate.",
+      true,
+    );
+    expect(fleshed).toContain("## Acceptance\n\n- [x] Fixture leaf closes through the done gate.");
+    expect(placeholderSections(fleshed)).toEqual([]);
+  });
+
+  it("leaves a body without the marker line unchanged (never eats a later section)", () => {
+    const body =
+      "# T\n\n## Context\n\nReal context.\n\n## Acceptance\n\n- [ ] Real criterion.\n\n## Notes\n\n<!-- history -->\n";
+    expect(fleshOutScaffoldBody(body, "x", "y")).toBe(body);
+  });
+});
+
+// bug-full-smoke-scenarios-precede-newer-gates: a probe session where the
+// model never issues the call is a decline, and the harness must tell it apart
+// from a gate refusing the call. `attemptedCode` is that evidence — any state,
+// whatever spelling the model wrote.
+describe("opencode-smoke: attemptedCode", () => {
+  it("sees the attempt in any state and through the bracket spelling", () => {
+    const running = transcript({
+      tool: "execute",
+      state: { status: "running", input: { code: 'await tools["arggon"]["update"]({})' } },
+    });
+    const errored = transcript({
+      tool: "execute",
+      state: {
+        status: "error",
+        input: { code: "return await tools.arggon.update({})" },
+        error: "boom",
+      },
+    });
+    expect(attemptedCode(running, "tools.arggon.update")).toBe(true);
+    expect(attemptedCode(errored, "tools.arggon.update")).toBe(true);
+    expect(attemptedCode(transcript(), "tools.arggon.update")).toBe(false);
+  });
+
+  it("does not count a different tool or another namespace as the attempt", () => {
+    const shell = transcript({ tool: "shell", state: { input: { command: "ls" } } });
+    const otherNamespace = transcript({
+      tool: "execute",
+      state: { status: "completed", input: { code: 'await tools["context7"].x()' } },
+    });
+    expect(attemptedCode(shell, "tools.arggon.update")).toBe(false);
+    expect(attemptedCode(otherNamespace, "tools.arggon.update")).toBe(false);
   });
 });
 
