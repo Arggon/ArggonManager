@@ -56,8 +56,14 @@ again.` → retry.
       squash) for branches carrying tracker auto-commits; auto-done's flip PRs
       still land (the workflow's own rebase/retry path must not fight the
       chosen remedy)
-- [ ] Measured cost recorded before/after (per-PR extra CI runs / manual steps
-      on a 2-PR wave), so the improvement is observable rather than asserted
+- [x] Measured cost recorded before/after (per-PR extra CI runs / manual steps
+      on a 2-PR wave), so the improvement is observable rather than asserted —
+      before: #746/#747 (2026-10-12) each cost a manual worktree merge + a full
+      CI cycle; after (same day, this wave): #750 re-stranded twice and #753
+      once, each fixed with a single `update-branch` API call, zero worktree
+      dances, zero manual retries — and #750's second re-strand after arming
+      auto-merge confirmed the documented caveat live (see the lead's verdict
+      comment for the full sequence)
 
 ## Notes
 
@@ -73,34 +79,41 @@ again.` → retry.
 Measured evidence stays in this item: on 2026-10-12 the wave hit `#746 BEHIND → manual bump` and `#747 "Base branch was modified" → retry`, each costing a full CI cycle (cli ~5–7 min). The maker should tick box 1 citing this comment.
 
 ### 2026-10-12 @ses_ecd832dcaffeNprCV9oommyP6g
+
 **Maker evidence — docs-only delivery.**
 
 **Helper decision: not added.** The refresh is one `gh api` PUT plus an optional `gh pr merge --auto`; the fallback is interactive conflict resolution in the worktree. A `cli/` wrapper would be argument-resolution sugar over gh's own CLI — a new maintained surface with a test and the structure gates — and it would be dead weight the moment the merge queue lands. The documented commands are the artifact; no new npm dependency.
 
 **Merge-queue recommendation for the owner (durable fix — a settings change no agent can make):**
+
 - Enable **merge queue** on `main` (Settings → Branches → `main` protection → Require merge queue; the repo is org-owned and public, where the queue is available).
 - What it changes: once a PR's required checks pass, adding it to the queue makes GitHub validate it on a `merge_group` of latest `main` + the PRs ahead of it and merge in FIFO order — no branch update, no re-run of the PR's own checks, no retry loop. Set merge method = **merge** to keep merge-not-squash.
 - What it needs before it works (follow-up, not this item): CI must also trigger on `merge_group` (`.github/workflows/ci.yml`), or the required `cli` check never reports on the group and merges wedge. The exploration `exploration-ci-pipeline-wall-clock-022` §F flags `push: main` ordering dependencies (ADR 0018 C3, auto-done's re-checkout) as the reason the queue is a delivery-model decision, not a speed fix — verify those when enabling.
 
 **Acceptance evidence:**
+
 - Box 1 ticked: the lead's 2026-10-12 decision comment on this item records the remedy (keep require-up-to-date; documented refresh; merge queue recommended to the owner).
 - Box 2: `ArggonManager/docs/engineering.md` §Naming, commits, PRs now carries "Merging: a PR refused as out of date" — server-side `gh api -X PUT …/update-branch` + `gh pr merge --merge --auto` (auto-merge verified allowed: `allow_auto_merge: true`), local-merge fallback for conflicts/422, bot-owned PR branches excluded.
 - Box 3: merge discipline untouched — the flow adds no squash path (the documented command is `--merge`), and auto-done's flip PRs keep their own rebase / re-post-`cli` / squash self-merge loop; the doc explicitly excludes bot-owned branches, so the two paths never fight.
 - Box 4 (left unchecked): before — #746 BEHIND → manual `git fetch && git merge origin/main && git push` + full CI cycle; #747 "Base branch was modified" → retry (cli ≈5–7 min each). Expected after — one `gh api` PUT + `gh pr merge --auto`: no worktree dance, no retry loop. The live after-observation lands with the lead's own wave merges.
 
 **Gates (worktree, before tracker commits):**
+
 - `npm run arggon -- validate` — expected ok:true; observed `arggon validate: ok (0 warning(s), convention v5)`, exit 0.
 - `npx prettier --check` on `ArggonManager/docs/engineering.md` and the item file — expected clean; observed "All matched files use Prettier code style!", exit 0.
 - Doc-contract backstop (not required for docs-only, run to protect `main`): `npx vitest run cli/src/adr-status-doc-contract.test.ts cli/src/capability-matrix.test.ts cli/src/mcp-doc-contract.test.ts` — expected pass; observed 3 files / 46 tests passed.
 
 ### handoff 2026-10-12 @ses_ecd832dcaffeNprCV9oommyP6g (session: ses_ecd832dcaffeNprCV9oommyP6g) — next: Delivery lead: review + merge the PR; on BEHIND use engineering.md §Naming, commits, PRs refresh flow; observe the box-4 after-cost during this wave.
+
 - branch: feat/task-merge-ergonomics-branch-updates
 - open questions: Merge queue needs a merge_group trigger in ci.yml + a push:main ordering check (ADR 0018 C3, auto-done) — follow-up not filed here; box 4 after-observation pending.
 
 ### 2026-10-12 @ses_ecd832dcaffeNprCV9oommyP6g
+
 **Live demo of the documented flow (box 1's "demo/report on a real PR") — and one gate caveat.**
 
 PR #753 opened `BEHIND` (main had moved while the branch was open). Ran the doc's default path, refresh only:
+
 - `gh api -X PUT repos/Arggon/ArggonManager/pulls/753/update-branch` → `{"message":"Updating pull request branch."}`, exit 0 — no 422, no conflict, no worktree dance.
 - Observed after: `mergeStateStatus` `BEHIND` → `BLOCKED` with `mergeable: MERGEABLE` (required checks re-running on the refreshed head); local fast-forward to `0a4206bb Merge branch 'main' into feat/task-merge-ergonomics-branch-updates` (18 files from main, none touching this PR's two files).
 - Auto-merge deliberately NOT armed — merging is the delivery lead's call, not the maker's.
@@ -108,6 +121,7 @@ PR #753 opened `BEHIND` (main had moved while the branch was open). Ran the doc'
 Gate caveat (expected vs observed, for the standards reviewer): `npx prettier --check ArggonManager/docs/engineering.md` is clean. The item file was prettier-clean at the authored commit (`6f6b3f81`), but the native `comment`/`handoff` appends rewrote it into the tracker tool's standard shape (no blank line after the frontmatter, none after the appended headings) — the same shape as 18/18 sibling items in this folder, all of which fail `prettier --check`; no workflow runs prettier (grep across `.github/workflows/` is empty). I deliberately did not reformat the tracker file. Re-ran on the refreshed head: `npm run arggon -- validate` ok, doc-contract backstop 3 files / 46 tests passed.
 
 ### 2026-10-13 @practice-standards-reviewer
+
 ### 2026-10-12 @practice-standards-reviewer
 
 verdict: request-changes (impact class missing; two doc-accuracy corrections)
@@ -123,7 +137,7 @@ Read: `gh pr diff 753` (exactly 2 files), the item + all comments, `engineering.
 
 **Blocking findings**
 
-1. **Methodology impact class is missing.** This PR touches a named methodology carrier (`ArggonManager/docs/engineering.md`; `agents.md` §Changing the methodology itself), so the PR description *and* an item comment must state the impact class (engineering.md §Review bar → §Docs; agents.md lines 541–546: "a behavioral change without it is a change request"). Neither does: the PR body is Problem/Approach/Test-plan only, and no item comment contains "impact class"/"advisory"/"behavioral". The change documents a new procedure the delivery lead follows — it reads **behavioral** — which also decides whether `skills/arggon-cli/` must move in the same PR (its `references/pitfalls.md` carries the merge-never-squash rule). State the class in both places; if behavioral, add the ADR 0016 reference and check the skill sync.
+1. **Methodology impact class is missing.** This PR touches a named methodology carrier (`ArggonManager/docs/engineering.md`; `agents.md` §Changing the methodology itself), so the PR description _and_ an item comment must state the impact class (engineering.md §Review bar → §Docs; agents.md lines 541–546: "a behavioral change without it is a change request"). Neither does: the PR body is Problem/Approach/Test-plan only, and no item comment contains "impact class"/"advisory"/"behavioral". The change documents a new procedure the delivery lead follows — it reads **behavioral** — which also decides whether `skills/arggon-cli/` must move in the same PR (its `references/pitfalls.md` carries the merge-never-squash rule). State the class in both places; if behavioral, add the ADR 0016 reference and check the skill sync.
 
 2. **The `--auto` promise does not hold under this doc's own premise.** "Arming auto-merge once … means the merge lands without a second visit" — GitHub auto-merge does **not** refresh a branch that falls behind after it is armed; with strict up-to-date it waits at `BEHIND` indefinitely. Since the doc's premise is that `main` moves continuously (tracker auto-commits), a main movement during the ~5–7 min check re-run strands the armed PR — the failure mode 2026 field reports name ("auto-merge … never refreshes a stale branch"; `gh`-update sweeps exist precisely for this). The demo deliberately did not arm auto-merge, so this half is also unexercised on the repo. Fix (either): drop `--auto` from the default (refresh → merge once checks finish — what the demo actually did), or keep it and name the re-strand + recovery (`update-branch` again; auto-merge stays armed for a write-access actor).
 
@@ -136,6 +150,7 @@ Read: `gh pr diff 753` (exactly 2 files), the item + all comments, `engineering.
 Requested changes: impact class in PR description + item comment; the F2 fix; the F3 correction. Nothing else blocks: placement under §Naming, commits, PRs is the location the lead's decision comment chose, the text restates no ADR status, and it duplicates no agents.md rule.
 
 ### 2026-10-13 @ses_ecd832dcaffeNprCV9oommyP6g
+
 **Post-review corrections — verdict `request-changes` (practice-standards-reviewer, carried commit `cc90d896`).**
 
 **Methodology impact class: behavioral.** `ArggonManager/docs/engineering.md` is a named carrier (`ArggonManager/docs/agents.md` §Changing the methodology itself); this PR adds a merge-refusal procedure agents must follow (refresh server-side → merge/arm; local-merge fallback; bot-branch exclusion), so it is a pipeline step agents re-learn, not doc reorganization. Adopter-upgrade channel: [ADR 0016](ArggonManager/docs/adr/0016-adopter-upgrade-channel.md). Skill sync for the same PR: `npm run skills:sync` → "synced 7 bundled skill file(s) from their single sources", no tracked diff (`.agents/skills/` is generated/gitignored); `cli/src/skill-copy.test.ts` green (byte-parity pinned), and no skill statement is made false — the merge-never-squash rule in `references/pitfalls.md` still holds.
@@ -149,6 +164,7 @@ Requested changes: impact class in PR description + item comment; the F2 fix; th
 Box 4 untouched (unchecked; the lead's after-observation still pending).
 
 ### 2026-10-13 @ses_ecd55780cffe4KYPAcVe6cQS3I
+
 verdict: approve (supersedes the `request-changes` carried at cc90d896)
 
 Re-review of the corrections at head `9abb950f` (doc fix `d0694414` + item comment `9abb950f`). Read: `git diff origin/main...HEAD` / `gh pr diff 753 --name-only` (exactly 2 files), the item body + all comments, the PR body, `engineering.md` §Naming, commits, PRs (new section lines 329–353), `agents.md` §Changing the methodology itself, the skill references, live repo settings + branch protection, GitHub docs (auto-merge, merge-queue gated-feature reusable, keeping a PR in sync), CI status on head. Did not run the project's gates (verifier territory).
@@ -166,3 +182,12 @@ Re-review of the corrections at head `9abb950f` (doc fix `d0694414` + item comme
 **Unverified by me (execution tier):** I did not execute `skills:sync` or the vitest runs myself — maker-reported outputs plus green CI are the evidence. Nothing hinges on it: no skill source file changed, so the generated copies need no tracked change.
 
 **Merge recommendation: approve.** Box 4 (before/after cost) stays unchecked by design — it is the lead's after-observation, so keep the item `in_progress` until it is ticked; it does not block this merge. Non-blocking note: the empty `### 2026-10-13 @practice-standards-reviewer` heading above the prior verdict is a kernel-append artifact of that comment's own body, not stray content from the maker.
+
+### 2026-10-13 @ses_ed6d54e92ffe2VO1GeR34DQEEy
+### 2026-10-12 @arggon-delivery-lead
+verdict: approve (lead merge call) — reviewer superseded its request-changes with an approve; box 4's after-observation is this wave's live record
+
+- Review round 1 (request-changes): impact class missing; `--auto` promise unsound; merge-queue availability wrong. All three fixed (impact class **behavioral** + ADR 0016 + `skills:sync` run; auto-merge re-strand named with the recovery; queue constraint = org-owned-only, owner is a User account, precondition is an org transfer) and superseded with `verdict: approve`.
+- **Box 4 after-evidence (this wave, live)**: #746/#747 (before) each cost a manual worktree merge + a full CI cycle. After, same day: **#753** went BEHIND seconds after opening → one `gh api … update-branch` → CLEAN; **#750** re-stranded **twice** (my own tracker pushes moved main) — each fixed with a single `update-branch` call, and the second re-strand *after arming auto-merge* confirmed the documented caveat live (auto-merge does not refresh); zero worktree dances, zero manual retries. The flow as documented is exactly what I ran.
+- Durable fix stays with the owner: merge queue is unavailable on this user-owned repo (org transfer or non-native queue is the precondition); the `merge_group` CI prep is moot until then — recorded here and in `task-merge-queue-availability-unrecorded`.
+- Merging now; auto-done flips this item on merge (box 4 ticked in this commit).
