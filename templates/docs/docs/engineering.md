@@ -1,15 +1,22 @@
 # Engineering standards ({{PROJECT_NAME}})
 
-Project-owned review bar and definition of done. Keep this short, enforceable, and current — update it in the same PR that changes the standard.
+> **Methodology carrier.** Declared together with [`AGENTS.md`](../../AGENTS.md) and [`convention.md`](convention.md).
+>
+> - **Scope:** any project — not only software.
+> - **Invariants:** work-loop parity: any human and any agent may claim, work, review, comment and merge under the same kernel rules and the same JSON contracts; state lives in git; discipline is enforceable; docs travel with code; never-steal / never-reopen, with authority asymmetric and named — the irreversible overrides stay product-owner powers, structurally human-only.
+
+Project-owned review bar and definition of done. Keep this short, enforceable, and current — update it in the same PR that changes the standard. Every bar below is stated as what _this_ project declares, because "good" is a project decision, not a software noun; where a software example helps, it is marked as one.
 
 ## Review bar
 
-Operating principle: **code is cheap; good practices and sound software architecture are always important.** Architecture quality is part of "done" on every change — clear module boundaries, small surfaces, tests that travel with behavior, docs that travel with code. Code that is quick to write is never an excuse for structural debt deferred to "refactor later".
+Operating principle: **the artifact is cheap; sound structure and good practice are always important.** State the bar as what _your_ project declares — its boundaries, its surfaces, its checks, its ownership — so the bar survives any change of medium. Structure is part of "done" on every change: clear boundaries, small surfaces, verification that travels with the change, docs that travel with the change. An artifact that was quick to produce is never an excuse for structural debt deferred to "refactor later".
 
-A PR is reviewable when:
+_Worked example (software): code is cheap; sound architecture and good practice are always important — clear module boundaries, small surfaces, tests that travel with behavior, docs that travel with code._
+
+A change is reviewable when:
 
 - [ ] It does one thing (small, focused diff).
-- [ ] Tests cover the behavior change (new tests for new behavior, updated tests for changed behavior).
+- [ ] The verification this project declares for the change exists and covers it — new checks for new behavior, updated checks for changed behavior.
 - [ ] Docs affected by the change are updated **in the same PR** (README, `ArggonManager/docs/`, ADRs).
 - [ ] The work item id from the tracker (`ArggonManager/`) is referenced in the PR.
 - [ ] `arggon validate` passes (if the change touches `ArggonManager/` or templates).
@@ -22,24 +29,26 @@ A change is acceptable when it satisfies the bar above and a reviewer can answer
 
 **Non-functional bar** (every behavior change):
 
-- Scalability: payloads stay bounded; complexity is declared wherever inputs grow with the data (an O(n²) scan must justify its input ceiling); no unbounded reads or renders.
-- Security: untrusted content is parsed defensively; subprocess arguments are arrays, never shell-interpolated; nothing writes outside the repo root; secrets are never committed or logged; new runtime dependencies are justified in the PR.
+- Scalability: the artifact's cost stays bounded wherever its inputs grow with the data (a superlinear step must justify its input ceiling); no unbounded reads, renders or rework.
+- Security: untrusted input is treated as hostile at the boundary; anything that reaches a shell, a store or a third party is validated or parameterized, never interpolated; nothing writes outside the project root; secrets are never committed or logged; new runtime dependencies are justified in the PR.
 
-**Smoke gate (blocks merge):** a change is executed end-to-end before approval, not just unit-tested. CLI behavior changes: probe the changed commands on a fixture and record expected-vs-observed evidence in the review verdict. UI changes: smoke in a real browser (e.g. Playwright CLI) — it renders, matches the data, and one state change round-trips and persists. Docs-only changes are exempt.
+**Blocking end-to-end check (blocks merge):** a change is exercised end-to-end before approval, not only checked in parts. The check is the one this project declares — run it and record expected-vs-observed evidence in the review verdict. Blocking means the verdict says so, the evidence is attached, and someone owns the call.
+
+_Worked examples (software):_ a CLI change — probe the changed commands on a fixture; a UI change — drive a real browser (e.g. Playwright CLI): it renders, matches the data, and one state change round-trips and persists. Docs-only changes are exempt.
 
 ## Definition of done
 
 - [ ] Acceptance checklist in the work item body is complete.
-- [ ] Tests green locally and in CI (including lint/typecheck gates).
+- [ ] The verification this project declares is green locally and in CI (all of its gates, not only the fastest).
 - [ ] Docs updated in the same PR.
 - [ ] PR merged with the work item id referenced.
 - [ ] `arggon update <id> --status done` (never reopen afterwards).
 
 ## Testing expectations
 
-<!-- Project-specific: coverage expectations, what needs integration vs unit tests, fixtures policy. -->
+<!-- Project-specific: what must be verified and how — a run, a rehearsal, a review, a fixture — plus the split between part-level and whole-behavior checks. -->
 
-- TODO: unit vs integration split.
+- TODO: which checks are part-level (one part) and which are whole-behavior (end to end).
 - TODO: what must be covered before merge.
 
 ## ADRs

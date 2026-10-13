@@ -599,10 +599,16 @@ describe("init docs: orchestration by default (task-orchestration-default-refile
     expect(agents).toMatch(/### orchestration/i);
     expect(agents).toMatch(/delegated by default/i);
     expect(agents).toContain("file-disjoint");
-    expect(agents).toContain("coordinator");
+    // ADR 0021 §6.1/§6.2: the adopter template names the shipped role
+    // ("delivery lead"), never the pre-rename "coordinator" — and the review
+    // clause names the bar by what the project declares, not by a software
+    // job title ("lead architect"). The family-wide guard is
+    // cli/src/adopter-template-invariant-drift.test.ts.
+    expect(agents).toContain("delivery lead");
+    expect(agents).not.toMatch(/\bcoordinat/i);
     expect(agents).toMatch(/never steal a claim/i);
     expect(agents).toMatch(/code-review/i);
-    expect(agents).toMatch(/lead architect/i);
+    expect(agents).toMatch(/project's own bar/i);
   });
 });
 

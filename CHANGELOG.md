@@ -6,6 +6,30 @@ All notable changes to ArggonManager are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **templates:** restate the adopter doc templates as what the project declares — the software case survives as a clearly-marked worked example, and every bar keeps its teeth (blocking, evidenced, owned) (bug-adopter-engineering-template-software-locked)
+- **templates:** `docs/docs/convention.md` carries the two-axis rule (work-loop parity AND authority asymmetric and named) instead of the superseded parity sentence, and both it and `docs/docs/engineering.md` carry the carriers' byte-identical `- **Invariants:**` block
+- **templates:** `AGENTS.md` names the shipped **delivery lead** role instead of the pre-rename "coordinator", and points at the carrier that declares the invariants (the 2 KB context budget rules out carrying the block inline)
+
+### Fixed
+
+- **test:** drift-guard the adopter template family against the carriers' invariant block, so a template that regains the superseded parity sentence, a retired agent id or the pre-rename role word — or that diverges from the carriers' `- **Invariants:**` / `- **Scope:**` statements — fails the suite instead of shipping green (cli/src/adopter-template-invariant-drift.test.ts)
+
+### Adopter upgrade channel (ADR 0016)
+
+**Methodology-affecting: this change corrects templates `arggon init` writes into every adopting repo.**
+
+`init` **never overwrites an existing file**, and an `acknowledged` (`arggon adopt --ack`) or hand-edited generated doc is **skipped** on every re-run. So the corrected templates reach **new** trees only; an existing adopter's copies are untouched, and a corrected rule never reaches them by itself. Adopters must reconcile their own copies:
+
+1. `arggon doctor` reports the `outdated` bucket — every managed doc whose current template render differs from what is on disk.
+2. `arggon init --dry-run` previews the per-destination decision (`created` / `would-update` / `modified-skip` / `acked-skip`) without writing.
+3. `arggon init --propose` writes the new render **beside** the original as `<dest>.proposed-<version>` (whole-file, or section-level with `spec-propose-section-backports-007`); absorb it as a normal work item and re-ack the merged result with `arggon adopt --ack`.
+
+**`init --propose` is the intended carrier for this change and needs no new flag.** Every destination affected here — `AGENTS.md`, `ArggonManager/docs/convention.md`, `ArggonManager/docs/engineering.md` — is exactly an acked-or-modified doc in a fully adopted tree, which is the case `--propose` exists for. Nothing was added to `init` itself: the never-overwrite promise binds the fix exactly as it binds every other template change.
+
 ## [0.7.1](https://github.com/Arggon/ArggonManager/compare/v0.7.0...v0.7.1) (2026-10-13)
 
 
