@@ -41,6 +41,21 @@
 // has the same property (it flips when it tags, not when anything ships). A
 // failed publish is recovered by re-running the workflow, never by the label.
 //
+// HOW THE FLIP VERIFIES ITSELF (bug-release-label-flip-verification-index-lag).
+// The first live run (v0.7.0, run 38296293861) flipped #744 and then warned
+// "still 'autorelease: pending' … release-please WILL abort" on a release that
+// was clean minutes later: the verification RE-RAN the discovery query ~0.4 s
+// after the edit, and `gh pr list` is backed by GitHub's search index, which is
+// eventually consistent — a healthy flip can still be listed as pending. The
+// verification now reads each flipped PR back authoritatively (`gh pr view <n>
+// --repo <repo> --json labels`, the PR object itself, which reports the edit
+// immediately). A genuinely stuck label is still caught: "still pending" now
+// means the label really is on the PR, with no index lag between the edit and
+// the read to excuse it. The discovery query stays exactly as it was — it is
+// release-please's own predicate (merged PRs carrying `autorelease: pending`,
+// open PRs excluded), and a label it does not list is one release-please does
+// not see either.
+//
 // FAILURE POLICY: WARN, NEVER FAIL THE RUN (exit 0 on every path). (a) The step
 // sits before the publish, so a non-zero exit here would strand a tagged
 // release at the worst moment — nothing shipped because bookkeeping failed.
@@ -95,7 +110,11 @@ function stderrOf(run) {
   return (run.stderr || String(run.error || "")).trim() || "(no stderr)";
 }
 
-/** The abort predicate query: merged PRs still carrying the pending label. */
+/**
+ * The abort predicate query: merged PRs still carrying the pending label.
+ * DISCOVERY ONLY — never the post-flip verdict: it is backed by GitHub's search
+ * index, which lags the edit (see the header).
+ */
 function listPending(gh, repo) {
   return spawnSync(
     gh,
@@ -134,6 +153,35 @@ function flip(gh, repo, number) {
     ],
     { encoding: "utf8" },
   );
+}
+
+/**
+ * The authoritative read of one PR's labels — the post-flip verdict. `gh pr
+ * view` reads the PR object itself, so it reports the edit immediately; the
+ * `gh pr list` search query does not (the index lag this verification exists to
+ * stop trusting).
+ */
+function viewLabels(gh, repo, number) {
+  return spawnSync(gh, ["pr", "view", String(number), "--repo", repo, "--json", "labels"], {
+    encoding: "utf8",
+  });
+}
+
+/**
+ * What `gh pr view --json labels` says about the pending label: `true` still
+ * carries it, `false` cleared, `undefined` unreadable — and an unreadable
+ * verdict is never a green claim (the caller counts it as unverified).
+ */
+function stillPending(labelsRun) {
+  if (labelsRun.error || labelsRun.status !== 0) return undefined;
+  let parsed;
+  try {
+    parsed = JSON.parse(labelsRun.stdout);
+  } catch {
+    return undefined;
+  }
+  if (!Array.isArray(parsed?.labels)) return undefined;
+  return parsed.labels.some((label) => label?.name === AUTORELEASE_PENDING_LABEL);
 }
 
 function renderPending(prs) {
@@ -191,65 +239,77 @@ function main() {
     return;
   }
 
+  // Flip, then verify EACH PR against the PR OBJECT — never against the search
+  // query that found it. `gh pr list` reads GitHub's search index, which is
+  // eventually consistent: re-running it ~0.4 s after the edit is how the
+  // healthy v0.7.0 flip of #744 warned "release-please WILL abort" (run
+  // 38296293861). `remaining` holds what the PR itself still reports as
+  // pending; `unverified` counts reads that failed, so an unreadable label can
+  // never be reported as a clean release.
+  const remaining = [];
+  let flipped = 0;
+  let unverified = 0;
+
   for (const pr of stuck) {
     if (pr === null || typeof pr !== "object" || typeof pr.number !== "number") {
       warn(`skipping a malformed entry from ${gh} output: ${JSON.stringify(pr)}`);
+      // Fail closed for the WARNING (never the run): an entry we cannot read is
+      // an entry we cannot prove cleared, so it keeps the summary from claiming
+      // release-please is not aborting.
+      remaining.push(pr);
       continue;
     }
     const edited = flip(gh, repo, pr.number);
     if (edited.error || edited.status !== 0) {
       warn(
         `could not flip #${pr.number} ${pr.title ?? "(untitled)"} to '${AUTORELEASE_TAGGED_LABEL}' ` +
-          `(stderr: ${stderrOf(edited)}); continuing with the rest. Manual recovery: ${MANUAL_RECOVERY}`,
+          `(stderr: ${stderrOf(edited)}); continuing with the rest, and reading its label back ` +
+          `anyway. Manual recovery: ${MANUAL_RECOVERY}`,
+      );
+    } else {
+      flipped += 1;
+      info(
+        `flipped #${pr.number} ${pr.title ?? "(untitled)"}: '${AUTORELEASE_PENDING_LABEL}' -> '${AUTORELEASE_TAGGED_LABEL}'`,
+      );
+    }
+
+    // The verdict is the PR object, not the edit's exit code: `gh pr view`
+    // reports the edit immediately, and a label it still shows is really there.
+    const labelsRun = viewLabels(gh, repo, pr.number);
+    const pending = stillPending(labelsRun);
+    if (pending === undefined) {
+      unverified += 1;
+      warn(
+        `could not re-query to verify #${pr.number} ${pr.title ?? "(untitled)"}: ${gh} pr view ` +
+          `failed or returned an unreadable label payload (stderr: ${stderrOf(labelsRun)}; ` +
+          `output: ${(labelsRun.stdout || "").trim() || "(empty)"}). If its label is still ` +
+          `'${AUTORELEASE_PENDING_LABEL}', the release-please backstop reddens the next push; ` +
+          `manual recovery: ${MANUAL_RECOVERY}`,
       );
       continue;
     }
-    info(
-      `flipped #${pr.number} ${pr.title ?? "(untitled)"}: '${AUTORELEASE_PENDING_LABEL}' -> '${AUTORELEASE_TAGGED_LABEL}'`,
-    );
+    if (pending) remaining.push(pr);
   }
 
-  // Verify against the abort predicate itself, not against the edit exit codes:
-  // the point is that release-please stops reading the PR as untagged.
-  const after = listPending(gh, repo);
-  if (after.error || after.status !== 0) {
+  if (remaining.length > 0) {
     warn(
-      `flipped what it could but could not re-query to verify (stderr: ${stderrOf(after)}). ` +
-        `If a label is still '${AUTORELEASE_PENDING_LABEL}', the release-please backstop reddens ` +
-        `the next push; manual recovery: ${MANUAL_RECOVERY}`,
+      `still '${AUTORELEASE_PENDING_LABEL}' on ${remaining.length} merged release PR(s) after the flip — ` +
+        `release-please WILL abort until they are cleared. The backstop reddens the next push naming ` +
+        `them; manual recovery:\n${renderPending(remaining)}\n  ${MANUAL_RECOVERY}`,
     );
     return;
   }
-  let remaining;
-  try {
-    remaining = JSON.parse(after.stdout);
-  } catch {
+  if (unverified > 0) {
     warn(
-      `could not parse the verification query (output: ${after.stdout.trim()}). ` +
-        `If a label is still '${AUTORELEASE_PENDING_LABEL}', the release-please backstop reddens ` +
-        `the next push; manual recovery: ${MANUAL_RECOVERY}`,
+      `flipped what it could but could not verify ${unverified} merged release PR(s) — if a label ` +
+        `is still '${AUTORELEASE_PENDING_LABEL}', the release-please backstop reddens the next ` +
+        `push; manual recovery: ${MANUAL_RECOVERY}`,
     );
     return;
   }
-  if (!Array.isArray(remaining)) {
-    warn(
-      `unexpected verification output shape (expected an array). If a label is still ` +
-        `'${AUTORELEASE_PENDING_LABEL}', the release-please backstop reddens the next push; ` +
-        `manual recovery: ${MANUAL_RECOVERY}`,
-    );
-    return;
-  }
-  if (remaining.length === 0) {
-    info(
-      `OK — flipped ${stuck.length} merged release PR(s) to '${AUTORELEASE_TAGGED_LABEL}'; ` +
-        `release-please is not aborting.`,
-    );
-    return;
-  }
-  warn(
-    `still '${AUTORELEASE_PENDING_LABEL}' on ${remaining.length} merged release PR(s) after the flip — ` +
-      `release-please WILL abort until they are cleared. The backstop reddens the next push naming ` +
-      `them; manual recovery:\n${renderPending(remaining)}\n  ${MANUAL_RECOVERY}`,
+  info(
+    `OK — flipped ${flipped} merged release PR(s) to '${AUTORELEASE_TAGGED_LABEL}'; ` +
+      `release-please is not aborting.`,
   );
 }
 
