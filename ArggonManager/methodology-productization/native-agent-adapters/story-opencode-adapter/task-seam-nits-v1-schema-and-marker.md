@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-seam-nits-v1-schema-and-marker
 title: "Seam nits from PR #754 review: docs/agents.md:655 calls the V1 published schema the field-level source of truth (the vendor's V2 guidance says never infer V2 names from it); and the agents carry the argon:generated marker twice"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-opencode-adapter
 labels: [opencode-seam, docs, review-followup]
 created: "2026-10-13"
 updated: "2026-10-13"
-claimed_at: "2026-10-13T16:39:56.711Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-seam-nits-v1-schema-and-marker
 ---
 <!--
