@@ -215,3 +215,10 @@ Independently re-ran every gate on head `30e9b977` (before this session's tick c
 ### handoff 2026-10-13 @ses_eca8380bcffeJ9iFxVFsZRDkkQ (session: ses_eca8380bcffeJ9iFxVFsZRDkkQ) — next: Review + merge PR #771 (docs-only, Advisory; live checklist ticked 8/8, head cba3688a). Auto-done flips after merge; do not merge/done from the maker side.
 - branch: feat/task-state-exploration-stopping-rule
 - open questions: Stale dispatch premise (PR #771 already open from the prior maker — confirm no duplicate intent); cli check re-running for head cba3688a
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as 6b0db866 (PR #771); auto-done flip landed. Deliverable: the ADR 0017 stopping rule written into `skills/arggon-cli/references/exploration.md` — a checkable round-end condition (no askable, unsettled question remains) distinct from the hunt-end condition (a full pass raises nothing new), both failure modes named, domain-neutral wording, ADR 0017's hard gate untouched; impact class Advisory.
+Evidence: skill-copy 8/8, spec validate ok (38 docs), spec analyze findings byte-identical to baseline (none naming the item), validate ok 0 warnings, prettier clean; CI green (cli, tasks-validate, ui-smoke). Docs-only — npm test not run, stated.
+Note: the dispatch premise was stale (the interrupted earlier attempt had already opened #771 with full evidence); the resumed maker re-verified everything and finished — no duplicate branch/PR exists.
