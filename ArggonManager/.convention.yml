@@ -88,7 +88,7 @@ x-generated:
     generatedAt: "2026-10-13T02:56:53.578Z"
   .opencode/agents/arggon-maker.md:
     template: "docs/opencode/agents/arggon-maker.md"
-    checksum: "sha256:899d4e8426bfc2d3a63cbab4a93069325c4f03865c74025b1e422cf710bef959"
+    checksum: "sha256:5e687b58373ad7ba8feb7f6ac26cf717673d8d460642be742282611c2bfff3f4"
     arggonVersion: "0.7.0"
     generatedAt: "2026-10-13T02:56:53.578Z"
   .opencode/agents/arggon-standards-reviewer.md:
