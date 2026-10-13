@@ -104,3 +104,10 @@ Expected vs observed: expected `matrix.present: true` with the committed file's 
 ### handoff 2026-10-13 @arggon-maker (session: ses_eccb87007ffdvyi3SiDGkrAOJi) — next: Review PR #763 (decision + fixture evidence in the comment above); merge if green; the next release+re-pin refreshes the new ledger stamp
 - branch: feat/task-matrix-reaches-adopters
 - open questions: ledger stamp kept at pin 0.7.0 (pinned init could reap the copy until next release+re-pin); mid-cycle new destinations cannot satisfy both pin-lag and downgrade-refusal
+
+### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-13 (delivery lead)
+Merged as c1574daf (PR #763). Decision recorded on the item: path (b) — the matrix ships as a template-bundled `arggon init` destination (`templates/docs/adapters/capability-matrix.json` → `adapters/capability-matrix.json`), no publish-relevant field touched, version guard exit 0. Fixture proof in the maker's record: fresh init tree → `doctor` `matrix.present: true`, 5 × 3 = 15 rows, 2 gaps, invalid 0, tree-only source; pack↔checkout parity gate green in CI (149 files / 3250 tests).
+The lead ticked the six acceptance rows and flipped the item manually — auto-done skipped it because the boxes were unticked at merge time.
+Follow-up filed: task-capability-matrix-midcycle-destination (ledger stamp at the 0.7.0 pin; the pinned-binary orphan/reap window closes at the next release + re-pin).
