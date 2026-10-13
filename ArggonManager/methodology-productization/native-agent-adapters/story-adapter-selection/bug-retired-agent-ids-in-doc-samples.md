@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-retired-agent-ids-in-doc-samples
 title: "Retired agent ids survive in shipped doc samples (json-output.md plain doctor sample; ArggonManager/docs/** sits outside the family walk)"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-adapter-selection
 labels: [docs, tests, adopters]
 created: "2026-10-13"
 updated: "2026-10-13"
-claimed_at: "2026-10-13T21:06:22.875Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-retired-agent-ids-in-doc-samples
 ---
 <!--
