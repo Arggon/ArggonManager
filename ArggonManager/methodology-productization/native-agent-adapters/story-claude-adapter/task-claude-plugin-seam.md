@@ -211,3 +211,7 @@ vendored; agent files keep `arggon-*.md` (wire id, ADR 0021 §6.2a′);
 truncated the newest adapter's rows); `skills/arggon-cli/SKILL.md` one-word
 vocabulary fix (`coordinator` → `delivery-lead`, ADR 0021 §6.1) forced by the
 family drift guard now walking the vendored copy.
+
+### handoff 2026-10-14 @Arggon — next: Review PR #821 (maker work complete, all gates green); verify the 14 acceptance boxes against the evidence comment, then run the standards reviewer and merge.
+- branch: feat/task-claude-plugin-seam
+- open questions: Capability-matrix claude row deltas + ADR 0020 stale amendments belong to task-claude-matrix-and-docs / a follow-up item (reported in the PR); live SubagentStart hook dispatch not probed (needs a mod…
