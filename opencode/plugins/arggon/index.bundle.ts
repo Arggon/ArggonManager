@@ -12629,19 +12629,19 @@ async function nativeRelease(kernel, run) {
     const recordHome = (0, node_path_1.resolve)(root) !== (0, node_path_1.resolve)(path);
     const stale = classified.action?.startsWith("clear stale worktree_path record") === true;
     try {
-        if (!stale) {
-            if (run.compose !== undefined && !run.isComposeUnavailable()) {
-                const project = kernel.worktreeComposeProject(run.compose.declared, (0, node_path_1.basename)(path));
-                try {
-                    await nativeComposeDown(project, root);
-                    actions.push({ id, action: `reaped compose project ${project}` });
-                }
-                catch (error) {
-                    if (error?.code !== "ENOENT")
-                        throw error;
-                    run.compose.dockerUnavailable = true;
-                }
+        if (run.compose !== undefined && !run.isComposeUnavailable()) {
+            const project = kernel.worktreeComposeProject(run.compose.declared, (0, node_path_1.basename)(path));
+            try {
+                await nativeComposeDown(project, root);
+                actions.push({ id, action: `reaped compose project ${project}` });
             }
+            catch (error) {
+                if (error?.code !== "ENOENT")
+                    throw error;
+                run.compose.dockerUnavailable = true;
+            }
+        }
+        if (!stale) {
             kernel.unlinkNodeModulesLink(gitRoot, path);
             if (gitRoot !== (0, node_path_1.resolve)(root))
                 kernel.unlinkNodeModulesLink(root, path);
