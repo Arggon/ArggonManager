@@ -41,3 +41,8 @@ The maker's session died to the host tool-runtime fault after reproducing and de
 
 ### handoff 2026-10-14 @Arggon — next: Review + merge PR #820; tick the three acceptance rows at merge verification.
 - branch: fix/bug-smoke-sticky-header-settle-retry
+
+### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-14 (delivery lead)
+Merged as 1b6252e3 (PR #820); flipped by the lead. Root cause proven: `expect.poll` does not retry a probe that throws (Playwright 1.63 source), so the debounced SSE reload aborted the poll with `Execution context was destroyed` — red observed in a plain full lane (test #35, 1 failed / 45 passed; log on the item). Fix: the settle probe catches the destroyed-context throw and returns false, so the poll's bounded retry covers it; ceiling raised 10s → 30s. Green after: plain full `@smoke` lane 46/46 (39.5s). Limit stated honestly on the item: intermittent by nature; the mechanism is source-proven and the abort path is impossible by construction. Lead-applied and verified after the maker's session died to the outage.
