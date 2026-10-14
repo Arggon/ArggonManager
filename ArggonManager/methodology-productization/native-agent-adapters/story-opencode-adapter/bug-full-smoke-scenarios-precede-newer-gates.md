@@ -9,7 +9,6 @@ parent: story-opencode-adapter
 labels: [opencode-seam, tests]
 created: "2026-10-13"
 updated: "2026-10-14"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-full-smoke-scenarios-precede-newer-gates
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/bug-full-smoke-scenarios-precede-newer-gates.md
