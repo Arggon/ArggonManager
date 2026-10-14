@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: story-adapter-selection
 title: Adapter selection flags + doctor (spec S2)
 assignee: arggon-delivery-lead
@@ -8,7 +8,6 @@ parent: native-agent-adapters
 labels: []
 created: "2026-10-02"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T12:42:47.400Z"
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-adapter-selection/story-adapter-selection.md (story index; required).
