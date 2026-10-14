@@ -12,6 +12,7 @@ import {
   BUNDLED_SKILLS,
   arggonVersion,
   checksumOf,
+  claudeBundleSkillStagingPath,
   compareArggonVersions,
   generatedMarker,
 } from "./docs.js";
@@ -41,6 +42,16 @@ import { loadCliCommands, spliceGeneratedCommands } from "./skill-commands.js";
 // while CI (copies absent, gitignored) stayed green. The row is refreshed from
 // the SAME source-derived bytes that are written — never read back from the
 // destination — so a hand edit of a copy can never be recorded as generated.
+//
+// task-claude-plugin-seam (spec-claude-code-adapter-024): the Claude Code
+// bundle vendors the same skill as a THIRD copy, and it is a TRACKED template
+// (`templates/docs/claude/arggon/skills/arggon-cli/**`, materialized into
+// `.claude-marketplace/arggon/skills/arggon-cli/**` by `init`). One skill, two
+// destinations: this script writes the staging copy too — byte-equal to the
+// source and marker-less, because the `arggon:generated` marker is `init`'s to
+// stamp on every template it renders. There is no `x-generated` row for a
+// template path; the destination row is written by `init` when it materializes
+// the plugin in an adopter tree.
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 /**
@@ -105,6 +116,17 @@ export function syncBundledSkills(root: string = repoRoot): number {
     mkdirSync(dirname(copyPath), { recursive: true });
     const bytes = `${generatedMarker(source)}\n${spliced}`;
     writeFileSync(copyPath, bytes);
+    // The Claude bundle's staging copy (task-claude-plugin-seam): the same
+    // source bytes, marker-less, inside the committed template subtree the
+    // plugin is generated from. Written from the SAME `spliced` bytes as the
+    // `.agents` copy above, so the two destinations can never disagree about
+    // what the skill says.
+    const stagingDest = claudeBundleSkillStagingPath(source);
+    if (stagingDest !== null) {
+      const stagingPath = join(root, ...stagingDest.split("/"));
+      mkdirSync(dirname(stagingPath), { recursive: true });
+      writeFileSync(stagingPath, spliced);
+    }
     if (prevState === null) continue;
     const prev = prevState[dest];
     // An acknowledged row is an OWNERSHIP statement (`arggon adopt --ack`

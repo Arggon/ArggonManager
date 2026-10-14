@@ -49,6 +49,39 @@ const TIER1_DOCS = [
   ".agents/skills/arggon-cli/references/orchestration.md",
   ".agents/skills/arggon-cli/references/pitfalls.md",
   ".agents/skills/arggon-upgrade/SKILL.md",
+  // spec-claude-code-adapter-024 (task-claude-plugin-seam): the Claude Code
+  // plugin seam is tier-1 — marketplace catalog + the vendored declarative
+  // plugin, with the bundled arggon-cli skill. Order mirrors the template
+  // walk: the bundled sources come first, then the template docs in code-unit
+  // name order (`README.md` precedes the lowercase directories), and the
+  // command files carry the command word alone (the plugin namespace already
+  // carries `arggon`, so `/arggon:next` comes from `commands/next.md`).
+  ".claude-marketplace/.claude-plugin/marketplace.json",
+  ".claude-marketplace/arggon/.claude-plugin/plugin.json",
+  ".claude-marketplace/arggon/README.md",
+  ".claude-marketplace/arggon/agents/arggon-maker.md",
+  ".claude-marketplace/arggon/agents/arggon-standards-reviewer.md",
+  ".claude-marketplace/arggon/commands/adopt.md",
+  ".claude-marketplace/arggon/commands/adr.md",
+  ".claude-marketplace/arggon/commands/board.md",
+  ".claude-marketplace/arggon/commands/done.md",
+  ".claude-marketplace/arggon/commands/explore.md",
+  ".claude-marketplace/arggon/commands/goal.md",
+  ".claude-marketplace/arggon/commands/handoff.md",
+  ".claude-marketplace/arggon/commands/next.md",
+  ".claude-marketplace/arggon/commands/playbook.md",
+  ".claude-marketplace/arggon/commands/review.md",
+  ".claude-marketplace/arggon/commands/spec.md",
+  ".claude-marketplace/arggon/commands/start.md",
+  ".claude-marketplace/arggon/commands/status.md",
+  ".claude-marketplace/arggon/hooks/gate.mjs",
+  ".claude-marketplace/arggon/hooks/hooks.json",
+  ".claude-marketplace/arggon/skills/arggon-cli/SKILL.md",
+  ".claude-marketplace/arggon/skills/arggon-cli/references/exploration.md",
+  ".claude-marketplace/arggon/skills/arggon-cli/references/json-contract.md",
+  ".claude-marketplace/arggon/skills/arggon-cli/references/methodology.md",
+  ".claude-marketplace/arggon/skills/arggon-cli/references/orchestration.md",
+  ".claude-marketplace/arggon/skills/arggon-cli/references/pitfalls.md",
   ".editorconfig",
   ".github/CODEOWNERS",
   ".github/PULL_REQUEST_TEMPLATE.md",

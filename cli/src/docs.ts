@@ -366,6 +366,35 @@ export function isBundledSkillDest(dest: string): boolean {
   return BUNDLED_SKILLS.some((s) => s.dest === dest);
 }
 
+/**
+ * The source prefix of the ONE skill the Claude Code bundle vendors
+ * (spec-claude-code-adapter-024, task-claude-plugin-seam): the plugin manifest
+ * declares `skills: "./skills"`, so `init` materializes the skill under
+ * `.claude-marketplace/arggon/skills/arggon-cli/**` (the `claude/` prefix
+ * mapping). The `arggon-upgrade` skill is deliberately not vendored: the
+ * bundle ships the skill an adopting agent reads to run the arggon loop, and
+ * upgrade guidance is the generated docs' job.
+ */
+const CLAUDE_BUNDLED_SKILL_SOURCE = "skills/arggon-cli/";
+
+/**
+ * Staging path inside the Claude bundle's template subtree for one bundled
+ * skill source — `skills/arggon-cli/SKILL.md` →
+ * `templates/docs/claude/arggon/skills/arggon-cli/SKILL.md` — or `null` for any
+ * source that is not a file of the vendored `arggon-cli` skill.
+ *
+ * This is the "one skill, two destinations" seam: the committed source stays
+ * `skills/arggon-cli/**`; `npm run skills:sync` writes this staging copy
+ * (byte-equal, marker-less — the marker is `init`'s, like every other
+ * template), and `init` renders it into the adopter tree. The parity tests
+ * pin both hops, so a source edit that misses the staging copy fails CI
+ * instead of shipping a stale skill inside the plugin.
+ */
+export function claudeBundleSkillStagingPath(source: string): string | null {
+  if (!source.startsWith(CLAUDE_BUNDLED_SKILL_SOURCE)) return null;
+  return `templates/docs/claude/arggon/skills/${source.slice("skills/".length)}`;
+}
+
 /** Is this template id one of the bundled (package-root source) artifacts? */
 function isBundledSource(templateRel: string): boolean {
   return BUNDLED_SOURCES.some((s) => s.source === templateRel);
@@ -409,6 +438,12 @@ const DOC_PREFIX_MAP: { prefix: string; dest: string }[] = [
   // catalog + the vendored declarative plugin land under one root the user
   // adds as a local marketplace (the platform's one manual install step).
   { prefix: "zcode/", dest: ".zcode-marketplace/" },
+  // Claude Code plugin seam (spec-claude-code-adapter-024,
+  // task-claude-plugin-seam): same shape as the ZCode seam — the marketplace
+  // root (`.claude-plugin/marketplace.json`) plus the vendored plugin under
+  // `arggon/`, added as a local marketplace with
+  // `claude plugin marketplace add <repo>/.claude-marketplace`.
+  { prefix: "claude/", dest: ".claude-marketplace/" },
 ];
 
 /** Canonical (v5) destination of a template-relative path. */
@@ -476,12 +511,14 @@ function isGitignoreDestination(dest: string): boolean {
 
 /**
  * Markdown artifacts whose syntax requires YAML frontmatter on the first line
- * (OpenCode and ZCode agents/commands): their visible marker is a `#` comment
- * INSIDE the frontmatter instead of a leading HTML comment.
+ * (OpenCode, ZCode and Claude Code agents/commands): their visible marker is a
+ * `#` comment INSIDE the frontmatter instead of a leading HTML comment.
  */
 function isFrontmatterDestination(dest: string): boolean {
   return (
-    (dest.startsWith(".opencode/") || dest.startsWith(".zcode-marketplace/")) &&
+    (dest.startsWith(".opencode/") ||
+      dest.startsWith(".zcode-marketplace/") ||
+      dest.startsWith(".claude-marketplace/")) &&
     dest.endsWith(".md")
   );
 }

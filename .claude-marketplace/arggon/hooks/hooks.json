@@ -1,0 +1,60 @@
+{
+  "description": "ArggonManager seam gates: the global git gates every session, plus the reviewer dispatch backstop",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|Write|Edit|MultiEdit|NotebookEdit|mcp__.*)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/gate.mjs", "pre"],
+            "timeout": 10,
+            "statusMessage": "arggon gate"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "^arggon:arggon-standards-reviewer$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/gate.mjs", "subagent-start"],
+            "timeout": 10,
+            "statusMessage": "arggon gate"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "^arggon:arggon-standards-reviewer$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/gate.mjs", "subagent-stop"],
+            "timeout": 10,
+            "statusMessage": "arggon gate"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/gate.mjs", "stop"],
+            "timeout": 10,
+            "statusMessage": "arggon gate"
+          }
+        ]
+      }
+    ]
+  }
+}

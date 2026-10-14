@@ -47,12 +47,12 @@ this spec adds no rule, and the bundle is an **enhancer**, never a requirement.
 templates/docs/claude/                 # the template subtree this spec adds
 ├── .claude-plugin/marketplace.json    # the marketplace catalog (mirrors zcode/marketplace.json)
 └── arggon/                            # the vendored plugin root (mirrors zcode/arggon/)
-    ├── .claude-plugin/plugin.json     # manifest: mcpServers, hooks, agents, commands
+    ├── .claude-plugin/plugin.json     # manifest: mcpServers, hooks, commands, skills (no `agents` — see the client-facts note)
     ├── skills/arggon-cli/**           # the bundled skill, byte-equal to skills/arggon-cli/**
-    ├── commands/arggon-*.md           # the /arggon-* commands, against the MCP surface
-    ├── agents/arggon-maker.md         # subagent role
+    ├── commands/<command>.md          # the 13 commands, emitted as /arggon:<command> (the plugin name is the namespace; see the client-facts note)
+    ├── agents/arggon-maker.md         # subagent role (convention dir — the manifest omits `agents`)
     ├── agents/arggon-standards-reviewer.md
-    ├── hooks/hooks.json               # PreToolUse / PostToolUse / SubagentStart / SubagentStop
+    ├── hooks/hooks.json               # PreToolUse / SubagentStart / SubagentStop / Stop
     ├── hooks/gate.mjs                 # dependency-free Node gate script (no shell, no exec bit)
     └── README.md                     # the seam doc: install step + the role rule
 ```
@@ -67,14 +67,24 @@ CLAUDE.md                              # generated pointer: @AGENTS.md  (already
 .mcp.json                              # generated registration of arggon mcp (already shipped)
 ```
 
-Client surface facts the bundle is built against (Claude Code, accessed 2026-10-11):
+Client surface facts the bundle is built against (Claude Code, accessed 2026-10-11;
+re-probed on claude 2.1.289, 2026-10-14 — the corrections below carry that probe):
 
 - A plugin is a directory whose manifest is `<plugin-root>/.claude-plugin/plugin.json`;
-  the manifest declares `mcpServers`, `hooks`, `agents`, `commands` and `skills`. Every
+  the manifest declares `mcpServers`, `hooks`, `commands` and `skills`. It does **not**
+  declare `agents`: on the probed client (claude 2.1.289) the `agents` key — a single
+  path, an array, in-folder or out-of-folder — validates but REPLACES the convention
+  `agents/` scan and surfaces zero agents in `claude plugin details`; omitting the key
+  loads `agents/*.md` (probe: `Agents (2)`). The shipped manifest therefore omits it,
+  and a test pins the omission so an edit cannot silently disarm agent loading. Every
   component path is relative to the plugin root, must start with `./`, and must exist —
   `claude plugin validate` fails a path that is missing or escapes the root.
-- Components are **namespaced under the plugin name**: an agent `reviewer` in plugin
-  `deploy-tools` is `deploy-tools:reviewer`, and a marketplace entry may add components
+- A command is a flat `commands/<file>.md` and runs as `/<plugin>:<file>`; a plugin
+  agent is `agents/<name>.md` and is dispatched as `<plugin>:<name>`. Components are
+  therefore namespaced under the plugin name: the thirteen commands run as
+  `/arggon:<command>` (the file stems drop the ZCode seam's `arggon-` prefix, which
+  the namespace would repeat), the agents dispatch as `arggon:arggon-maker` /
+  `arggon:arggon-standards-reviewer`, and a marketplace entry may add components
   to a plugin manifest only in `strict`'s default mode. A `CLAUDE.md` at the **plugin
   root is not loaded as context**, and the validator warns about it.
 - `hooks/hooks.json` holds the plugin's event map wrapped in a top-level `"hooks"` key.

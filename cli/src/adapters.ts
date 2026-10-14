@@ -95,12 +95,16 @@ const AGENT_TEMPLATES: { agent: AgentId; match: (template: string) => boolean }[
       t.startsWith("opencode/plugins/arggon/"),
   },
   { agent: "zcode", match: (t) => t.startsWith("docs/zcode/") },
-  // claude-code has no bundle yet (spec §S6 is a follow-on story). The two
-  // surfaces an init'd tree already hands that client are the `CLAUDE.md`
-  // → `@AGENTS.md` pointer shim and the `.mcp.json` registration of
-  // `arggon mcp` — exactly the `claude:` mechanisms the committed capability
-  // matrix derives its claude rows from.
-  { agent: "claude", match: (t) => t === "docs/CLAUDE.md" || t === "docs/mcp-json" },
+  // claude: the two surfaces an init'd tree has always handed this client —
+  // the `CLAUDE.md` → `@AGENTS.md` pointer shim and the `.mcp.json`
+  // registration of `arggon mcp` (the `claude:` mechanisms the committed
+  // capability matrix derives its claude rows from) — PLUS the plugin bundle
+  // (`docs/claude/**` → `.claude-marketplace/**`, spec-claude-code-adapter-024),
+  // which lands only when the claude adapter is selected.
+  {
+    agent: "claude",
+    match: (t) => t === "docs/CLAUDE.md" || t === "docs/mcp-json" || t.startsWith("docs/claude/"),
+  },
 ];
 
 /** The agent whose seam a template generates, or null when it is not an adapter artifact. */
@@ -123,7 +127,10 @@ const AGENT_MARKERS: { agent: AgentId; markers: string[] }[] = [
     markers: [...OPENCODE_CONFIG_CANDIDATES, ".opencode"],
   },
   { agent: "zcode", markers: [".zcode-marketplace"] },
-  { agent: "claude", markers: ["CLAUDE.md", ".claude"] },
+  // `.claude-marketplace` is the Claude Code plugin bundle's detection marker
+  // (spec-claude-code-adapter-024): a tree that carries one has installed (or
+  // generated) the seam, exactly like `.zcode-marketplace` for ZCode.
+  { agent: "claude", markers: ["CLAUDE.md", ".claude", ".claude-marketplace"] },
 ];
 
 /**
@@ -278,8 +285,16 @@ export type AdapterArtifact = {
   reason: string;
 };
 
-/** Per-artifact rows cap; honest totals stay in `counts` when rows are cut. */
-export const MAX_ADAPTER_ARTIFACTS = 64;
+/**
+ * Per-artifact rows cap; honest totals stay in `counts` when rows are cut.
+ *
+ * task-claude-plugin-seam: the cap must stay ABOVE the shipped inventory —
+ * opencode (18) + zcode (23) + claude (28) is 67 destinations, so the old 64
+ * silently truncated the newest adapter's rows (and the deselection rows the
+ * `--agents` report exists to show). 96 keeps the whole inventory visible with
+ * headroom for the next seam; `counts` stays the honest total either way.
+ */
+export const MAX_ADAPTER_ARTIFACTS = 96;
 
 /** What `init` did (or would do) with every adapter destination (spec §S2). */
 export type AdapterSelectionReport = {
