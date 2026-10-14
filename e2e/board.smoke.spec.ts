@@ -132,7 +132,13 @@ function screenshotPath(name: string): string {
  *    filtered ancestry tree on the served board (after the `N of M` count) are
  *    each scanned at a settled point — never a sleep, never a `networkidle`
  *    guess, never a scan smuggled in after unrelated assertions have moved
- *    the page on.
+ *    the page on. task-tree-rows-open-detail adds the same discipline for the
+ *    tree's interactive states: the row-opened drawer (after its title), the
+ *    tree keyboard/roving state (after the Home focus assertion), the folded
+ *    tree (after its subtree is asserted hidden), the folded branch holding a
+ *    lens match (after its `N matches inside` marker), the offline tree-row
+ *    drawer on the static `--details` tree export (after its acceptance-row
+ *    count) and the terminal + fold composed tree (after its counts).
  */
 const AXE_WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] as const;
 
@@ -750,6 +756,208 @@ test.describe("@smoke board --serve", () => {
     await axeScan(page);
   });
 
+  test("a tree row click opens the detail drawer and Esc returns focus (task-tree-rows-open-detail)", async ({
+    page,
+  }) => {
+    // The tree was read-only before this item: the SAME drawer the columns
+    // open on a card click must open for the row's own item.
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+
+    const row = tree.locator(`.tree-node[data-id="${DETAIL_ITEM_ID}"] > .tree-row`);
+    await expect(row).toHaveCount(1);
+    await row.click();
+    const drawer = page.locator("#board-drawer");
+    await expect(drawer).toBeVisible();
+    await expect(drawer.locator(".drawer-title")).toHaveText("Board detail task");
+    // Same bounded content as the card path (serve fetch): deps and branch.
+    await expect(drawer.locator(".drawer-deps .drawer-dep.open")).toHaveText(
+      `${DETAIL_DEP_ID} · todo`,
+    );
+    await expect(drawer.locator(".drawer-row").filter({ hasText: "branch" })).toContainText(
+      "feat/task-board-detail",
+    );
+    // This state is scanned on its own (the title assertion above is its
+    // deterministic readiness signal): the row-as-trigger drawer.
+    await axeScan(page);
+
+    // Esc closes and focus returns to the ROW that opened it.
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(row).toBeFocused();
+
+    // The columns' own path is untouched by the row wiring.
+    await page.locator("#board-view-toggle").click();
+    const card = page.locator(`.card[data-id="${DETAIL_ITEM_ID}"]`);
+    await card.click();
+    await expect(drawer.locator(".drawer-title")).toHaveText("Board detail task");
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(card).toBeFocused();
+  });
+
+  test("tree rows are keyboard-reachable: Enter/Space open, arrows rove (task-tree-rows-open-detail)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+
+    // Roving focus: exactly one row is the tab stop, and the arrow keys move
+    // it in reading order (the row's own tab order keeps the fold control).
+    const anchor = tree.locator('.tree-row[tabindex="0"]');
+    await expect(anchor).toHaveCount(1);
+    await expect(anchor.locator("xpath=..")).toHaveAttribute("data-id", "board-smoke");
+
+    const row = tree.locator(`.tree-node[data-id="${DETAIL_ITEM_ID}"] > .tree-row`);
+    await row.focus();
+    const drawer = page.locator("#board-drawer");
+    await page.keyboard.press("Enter");
+    await expect(drawer).toBeVisible();
+    await expect(drawer.locator(".drawer-title")).toHaveText("Board detail task");
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(row).toBeFocused();
+
+    await page.keyboard.press(" ");
+    await expect(drawer).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+
+    // ArrowDown moves the roving anchor to the next visible row; Home brings
+    // it back to the tree's first row.
+    await page.keyboard.press("ArrowDown");
+    await expect(tree.locator('.tree-row[tabindex="0"]')).toHaveCount(1);
+    const afterArrow = await page.evaluate(() =>
+      document.activeElement?.closest(".tree-node")?.getAttribute("data-id"),
+    );
+    expect(afterArrow).not.toBeNull();
+    expect(afterArrow).not.toBe(DETAIL_ITEM_ID);
+    await page.keyboard.press("Home");
+    await expect(anchor).toBeFocused();
+    await expect(anchor.locator("xpath=..")).toHaveAttribute("data-id", "board-smoke");
+    // The tree keyboard state is a scanned surface of its own (the Home
+    // assertion above is its deterministic readiness signal).
+    await axeScan(page);
+  });
+
+  test("a container row folds and extends its subtree, persists, and reset restores it (task-tree-rows-open-detail)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+
+    const toggle = tree.locator('.tree-node[data-id="entries"] > .tree-row > .tree-toggle');
+    const child = tree.locator(`.tree-node[data-id="task-board-task"]`);
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(toggle).toHaveAttribute("aria-label", "collapse entries subtree");
+    await expect(child).toBeVisible();
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(toggle).toHaveText("+");
+    await expect(child).toBeHidden();
+    // The fold rides the EXISTING layout record (one key, one reset).
+    const stored = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("arggon-board-columns-v1") || "null"),
+    );
+    expect(stored?.treeCollapsed).toEqual(["entries"]);
+    // Folding never moves a counter: the lens verdict is untouched.
+    await expect(page.locator("#board-filter-count")).toHaveText(`${listItems.length} item(s)`);
+    await expect(page.locator("#board-tree-count")).toHaveText(String(listItems.length));
+    // The folded state is a scanned surface of its own (the hidden-child
+    // assertion above is its deterministic readiness signal).
+    await axeScan(page);
+
+    // The preference survives a reload, and expanding restores the subtree.
+    await page.reload();
+    await expect(tree).toBeVisible();
+    await expect(child).toBeHidden();
+    // The layout toggle composes: the fold survives a trip to the columns and
+    // back (it is not a property of the rendered rows).
+    await page.locator("#board-view-toggle").click();
+    await expect(page.locator("main.board")).toBeVisible();
+    await page.locator("#board-view-toggle").click();
+    await expect(tree).toBeVisible();
+    await expect(child).toBeHidden();
+    await toggle.click();
+    await expect(child).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    // Reset restores the default (expanded) and persists the reset.
+    await toggle.click();
+    await expect(child).toBeHidden();
+    await page.locator("#board-layout-reset").click();
+    await expect(child).toBeVisible();
+    const reset = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("arggon-board-columns-v1") || "null"),
+    );
+    expect(reset?.treeCollapsed).toEqual([]);
+    await page.reload();
+    await expect(child).toBeVisible();
+  });
+
+  test("a lens match inside a folded branch stays discoverable and the counts stay honest (task-tree-rows-open-detail)", async ({
+    page,
+  }) => {
+    // Decision (recorded on the item): a folded branch is MARKED with the
+    // matches inside instead of auto-expanding — the user's fold is never
+    // silently undone, and the lens answer stays visible.
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+
+    // Fold the whole epic that holds `entries` and the matching task.
+    const epicToggle = tree.locator('.tree-node[data-id="core"] > .tree-row > .tree-toggle');
+    await epicToggle.click();
+    await expect(tree.locator(`.tree-node[data-id="${DETAIL_ITEM_ID}"]`)).toBeHidden();
+
+    await page.locator("#board-filter-input").fill("label:detail");
+    // The match is inside the fold: its row stays hidden...
+    await expect(tree.locator(`.tree-node[data-id="${DETAIL_ITEM_ID}"]`)).toBeHidden();
+    // ...but the folded branch says so, in the row and in the disclosure's
+    // accessible name (the count is the lens verdict, not rendered rows).
+    const marker = tree.locator('.tree-node[data-id="core"] > .tree-row > .tree-matches');
+    await expect(marker).toHaveText("1 match inside");
+    await expect(epicToggle).toHaveAttribute("aria-label", "expand core subtree — 1 match inside");
+    await expect(page.locator("#board-filter-count")).toHaveText(
+      `1 of ${listItems.length} item(s)`,
+    );
+    await expect(page.locator("#board-tree-count")).toHaveText("1");
+    // The folded branch WITH its match is a scanned surface of its own.
+    await axeScan(page);
+
+    // Expanding the branch reveals the match's path — the marker clears.
+    await epicToggle.click();
+    await expect(tree.locator(`.tree-node[data-id="${DETAIL_ITEM_ID}"]`)).toBeVisible();
+    await expect(marker).toBeHidden();
+
+    // A folded branch whose subtree holds NO match invents no marker: under
+    // `type:epic` the folded `core` is the only match, everything inside is
+    // hidden by the lens, and the disclosure stays unadorned.
+    await page.locator("#board-filter-input").fill("type:epic");
+    await expect(marker).toBeHidden();
+    await epicToggle.click();
+    await expect(marker).toBeHidden();
+    await expect(epicToggle).toHaveAttribute("aria-label", "expand core subtree");
+
+    // Without a lens there is no verdict to report — "everything inside" is not
+    // information — so a fold stays unmarked even though its rows are visible
+    // in the lens's absence.
+    await page.locator("#board-filter-clear").click();
+    await expect(page.locator("#board-filter-count")).toHaveText(`${listItems.length} item(s)`);
+    await expect(tree.locator(`.tree-node[data-id="task-board-task"]`)).toBeHidden();
+    await expect(marker).toBeHidden();
+    await epicToggle.click();
+    await expect(tree.locator(`.tree-node[data-id="task-board-task"]`)).toBeVisible();
+  });
+
   test("the filterbar toggle switches layouts and round-trips through the URL", async ({
     page,
   }) => {
@@ -878,6 +1086,75 @@ test.describe("@smoke board --serve", () => {
     await expect(menu).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(menu).toBeHidden();
+  });
+
+  test("the static tree export with --details opens the drawer from a row, offline (task-tree-rows-open-detail)", async ({
+    page,
+  }) => {
+    // Serve and static-with-`--details` behave the same: the row opens the
+    // embedded payload with no server (a fetch would show "detail unavailable").
+    const boardFile = join(fixture, "tree-details-board.html");
+    runCli(fixture, ["board", "--group-by", "tree", "--details", "--out", boardFile]);
+    await page.goto(`file://${boardFile}`);
+    await expect(page.locator("h1")).toContainText("arggon board");
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+
+    const row = tree.locator(`.tree-node[data-id="${DETAIL_ITEM_ID}"] > .tree-row`);
+    await row.click();
+    const drawer = page.locator("#board-drawer");
+    await expect(drawer).toBeVisible();
+    await expect(drawer.locator(".drawer-title")).toHaveText("Board detail task");
+    await expect(drawer.locator(".drawer-acceptance .drawer-check")).toHaveCount(2);
+    // The drawer-over-row state is scanned on its own (the acceptance count is
+    // its deterministic readiness signal) — same gate, file:// document.
+    await axeScan(page);
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(row).toBeFocused();
+
+    // Keyboard parity offline: Enter on the focused row opens the same drawer.
+    await page.keyboard.press("Enter");
+    await expect(drawer.locator(".drawer-title")).toHaveText("Board detail task");
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+  });
+
+  test("a drawer-free static tree export keeps the fold and offers no fake affordance (task-tree-rows-open-detail)", async ({
+    page,
+  }) => {
+    const boardFile = join(fixture, "tree-plain-board.html");
+    runCli(fixture, ["board", "--group-by", "tree", "--out", boardFile]);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(String(error)));
+    await page.goto(`file://${boardFile}`);
+    await expect(page.locator("h1")).toContainText("arggon board");
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+
+    // No drawer payload: no drawer markup, no focusable/named rows, no
+    // pointer-cursor rule — and no anchors, so nothing navigates on a click.
+    await expect(page.locator("#board-drawer")).toHaveCount(0);
+    await expect(tree.locator(".tree-row[tabindex]")).toHaveCount(0);
+    await expect(tree.locator('.tree-row[role="group"]')).toHaveCount(0);
+    await expect(tree.locator("a")).toHaveCount(0);
+
+    // Clicking a row does nothing (no drawer to open, no navigation)...
+    const row = tree.locator(`.tree-node[data-id="${DETAIL_ITEM_ID}"] > .tree-row`);
+    const urlBefore = page.url();
+    await row.click();
+    await expect(page.locator("#board-drawer")).toHaveCount(0);
+    expect(page.url()).toBe(urlBefore);
+
+    // ...while the fold is a real, working affordance in the same export.
+    const toggle = tree.locator('.tree-node[data-id="entries"] > .tree-row > .tree-toggle');
+    await toggle.click();
+    await expect(tree.locator(`.tree-node[data-id="task-board-task"]`)).toBeHidden();
+    await page.reload();
+    await expect(tree.locator(`.tree-node[data-id="task-board-task"]`)).toBeHidden();
+    await toggle.click();
+    await expect(tree.locator(`.tree-node[data-id="task-board-task"]`)).toBeVisible();
+    expect(errors).toEqual([]);
   });
 
   test("a status move round-trips through the UI and persists", async ({ page }) => {
@@ -1932,6 +2209,51 @@ test.describe("@smoke board tree terminal layout", () => {
       4,
     );
     await expect(page.locator("#board-filter-count")).toHaveText("6 item(s)");
+  });
+
+  test("folding composes with the terminal rule and the lens (task-tree-rows-open-detail)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+    const story = tree.locator(`.tree-node[data-id="${TREE_STORY_ID}"]`);
+    const openChild = tree.locator(`.tree-node[data-id="${TREE_OPEN_CHILD_ID}"]`);
+    const leaf = tree.locator(`.tree-node[data-id="${TREE_CLOSED_LEAF_ID}"]`);
+    await page.locator("#board-terminal-toggle").click();
+    await expect(story).toHaveClass(/terminal-context/);
+    await expect(leaf).toBeHidden();
+    await expect(openChild).toBeVisible();
+
+    // Folding the cancelled story hides the open child but never the folded row
+    // itself: the fold is a display rule under the terminal verdict, so the
+    // control the user just used cannot vanish with its subtree.
+    const storyToggle = story.locator("> .tree-row > .tree-toggle");
+    await storyToggle.click();
+    await expect(openChild).toBeHidden();
+    await expect(story).toBeVisible();
+    await expect(story).toHaveClass(/terminal-context/);
+    // Neither mechanic moves a counter: the lens verdict keeps counting.
+    await expect(page.locator("#board-filter-count")).toHaveText("6 item(s)");
+    await expect(page.locator("#board-tree-count")).toHaveText("6");
+    // The composed state (fold + terminal hiding) is a scanned surface of its
+    // own; the counts above are its deterministic readiness signal.
+    await axeScan(page);
+
+    // A lens match inside the folded terminal branch is MARKED, not swallowed:
+    // the match row stays folded away while the branch reports it honestly.
+    await page.locator("#board-filter-input").fill(TREE_OPEN_CHILD_ID);
+    const marker = story.locator("> .tree-row > .tree-matches");
+    await expect(marker).toHaveText("1 match inside");
+    await expect(openChild).toBeHidden();
+    await expect(page.locator("#board-filter-count")).toHaveText("1 of 6 item(s)");
+    await expect(page.locator("#board-tree-count")).toHaveText("1");
+    // Expanding restores the match with both rules still applied.
+    await storyToggle.click();
+    await expect(openChild).toBeVisible();
+    await expect(marker).toBeHidden();
+    await expect(story).toHaveClass(/terminal-context/);
   });
 
   test("the static export hides terminal tree rows exactly like the served board", async ({

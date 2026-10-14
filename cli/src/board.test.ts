@@ -2249,6 +2249,46 @@ describe("renderBoardTree grouped ancestry (task-web-board-hierarchy-view)", () 
     expect(html).toContain("&lt;/script&gt;");
     expect(html).toContain("recorded parent &quot;&gt;&lt;script&gt; (missing)");
   });
+
+  it("carries a disclosure control on every container row, a spacer on leaves (task-tree-rows-open-detail)", () => {
+    const html = renderBoardTree(chain());
+    // Containers: the column controls' `–`/`+` shape, named for the subtree.
+    expect(treeNodeHtml(html, "story-board")).toContain(
+      '<button type="button" class="tree-toggle" aria-expanded="true" aria-label="collapse story-board subtree">&ndash;</button>',
+    );
+    expect(treeNodeHtml(html, "ui")).toContain('class="tree-toggle"');
+    // Leaves keep the id alignment without owning a fold they cannot make.
+    const leaf = treeNodeHtml(html, "task-leaf");
+    expect(leaf).toContain('<span class="tree-toggle-spacer" aria-hidden="true"></span>');
+    expect(leaf).not.toContain('tree-toggle"');
+    // The match marker ships hidden and empty: the client owns the count.
+    expect(treeNodeHtml(html, "story-board")).toContain(
+      '<span class="tree-matches" hidden></span>',
+    );
+    expect(html.match(/class="tree-matches"/g)).toHaveLength(2);
+    // Still no anchors: folding adds a button, never a link.
+    expect(html).not.toContain("<a ");
+  });
+
+  it("makes rows focusable and named only when interactive, inert otherwise", () => {
+    const inert = renderBoardTree(chain());
+    expect(inert).not.toContain("tabindex=");
+    expect(inert).not.toContain('role="group"');
+
+    const interactive = renderBoardTree(chain(), { interactive: true });
+    // Exactly one roving anchor, like the cards; every row is named.
+    expect(interactive.match(/tabindex="0"/g)).toHaveLength(1);
+    expect(interactive.match(/role="group"/g)).toHaveLength(5);
+    expect(interactive).toContain('role="group" aria-label="epic ui: UI (todo)" tabindex="0"');
+    expect(interactive).toContain(
+      'role="group" aria-label="story story-board: Board (in_progress)" tabindex="-1"',
+    );
+    // The first row in the pre-order walk is the anchor.
+    const first = interactive.indexOf('data-id="ui"');
+    const anchor = interactive.indexOf('tabindex="0"');
+    expect(anchor).toBeGreaterThan(first);
+    expect(anchor).toBeLessThan(interactive.indexOf('data-id="story-board"'));
+  });
 });
 
 describe("boardTreeDisplay (the lens inside the grouped-ancestry view)", () => {
@@ -2317,6 +2357,29 @@ describe("renderBoardHtml grouped-ancestry view (task-web-board-hierarchy-view)"
       '<section class="tree" id="board-tree" aria-labelledby="board-tree-heading" hidden>',
     );
     expect(columns).toContain('aria-pressed="false">grouped ancestry</button>');
+  });
+
+  it("gates tree-row interactivity on details mode, so a drawer-free export has no fake affordance", () => {
+    const plain = renderBoardHtml(treeItems(), { generatedAt: GENERATED_AT });
+    // No drawer payload, no endpoint, no focusable rows — but the fold control
+    // still ships (it folds, it never opens). The pointer-cursor rule is inert
+    // without the details body attribute.
+    expect(plain).not.toContain('data-detail-endpoint="/api/item"');
+    expect(plain).toContain("body[data-detail-endpoint] .tree-row { cursor: pointer; }");
+    expect(plain).not.toContain('tabindex="0"');
+    expect(plain).toContain('class="tree-toggle"');
+
+    const serve = renderBoardHtml(treeItems(), {
+      generatedAt: GENERATED_AT,
+      details: true,
+      live: true,
+    });
+    expect(serve).toContain('data-detail-endpoint="/api/item"');
+    expect(serve).toContain('role="group" aria-label="epic ui: UI (todo)" tabindex="0"');
+    // The drawer's delegated handlers accept rows beside cards; the id comes
+    // from the node, so the row markup keeps exactly one data-id per item.
+    expect(wireBoardDetail.toString()).toContain('.closest(".card, .tree-row")');
+    expect(wireBoardDetail.toString()).toContain('closest(".tree-node")');
   });
 
   it("carries BOTH layouts on every board, so the in-page toggle needs no server", () => {
@@ -2502,7 +2565,7 @@ describe("column controls (task-board-column-controls)", () => {
     // needs the lens verdict (a `context` ancestor must survive) and must be
     // recomputed after every lens refresh, hence the returned handle.
     for (const [mode, html] of renders()) {
-      expect(html, mode).toContain("boardColumns.syncTree()");
+      expect(html, mode).toContain("boardColumns.syncTree(hasLens)");
     }
     const source = wireBoardColumns.toString();
     expect(source).toContain('document.getElementById("board-tree")');
@@ -2518,9 +2581,33 @@ describe("column controls (task-board-column-controls)", () => {
     expect(source).toContain('"arggon-board-columns-v1"');
     expect(source).toContain("localStorage.getItem");
     expect(source).toContain("localStorage.setItem");
-    // Corrupt or missing storage degrades to the default layout. Whitespace
-    // varies between the tsc build and the tsx test transform, so match loose.
-    expect(source).toMatch(/collapsed:\s*\[\],\s*terminalHidden:\s*false/);
+    // Corrupt or missing storage degrades to the default layout — the tree fold
+    // included (both load paths carry the same defaults). Whitespace varies
+    // between the tsc build and the tsx test transform, so match loose.
+    expect(source).toMatch(/collapsed:\s*\[\],\s*terminalHidden:\s*false,\s*treeCollapsed:\s*\[\]/);
+    expect(source.match(/treeCollapsed:\s*\[\]/g)?.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("folds and extends a tree subtree from the row's disclosure control (task-tree-rows-open-detail)", () => {
+    const source = wireBoardColumns.toString();
+    // The control is delegated like the column one, writes the fold into the
+    // SAME layout preference, and the reset clears it with the rest.
+    expect(source).toContain('target.closest(".tree-toggle")');
+    expect(source).toContain('closest(".tree-node")');
+    expect(source).toContain("state.treeCollapsed.push(id)");
+    expect(source).toContain("state.treeCollapsed.indexOf(id)");
+    expect(source).toMatch(/collapsed:\s*\[\],\s*terminalHidden:\s*false,\s*treeCollapsed:\s*\[\]/);
+    // The fold is a display rule on the descendants and never feeds the
+    // terminal verdict — a folded row the terminal rule keeps stays on screen.
+    expect(source).toContain('node.classList.toggle("collapsed", collapsed)');
+    expect(source).toContain('toggle.setAttribute("aria-expanded"');
+    // A folded branch with a lens match inside is MARKED, with the lens verdict
+    // as the count (matched rows only, never the context path).
+    expect(source).toContain('row.querySelector(".tree-matches")');
+    expect(source).toContain("matches inside");
+    expect(source).toContain('classList.contains("context")');
+    // The match count only means something with a lens expression active.
+    expect(source).toContain('typeof hasLens === "boolean"');
   });
 });
 

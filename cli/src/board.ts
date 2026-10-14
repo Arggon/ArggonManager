@@ -950,6 +950,8 @@ export function buildBoardDetailMap(opts: {
 const DETAIL_CSS = `
 .card[tabindex="0"] { cursor: pointer; }
 .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* A tree row is focusable in details mode only (task-tree-rows-open-detail). */
+.tree-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .card-move { margin-left: auto; border: 1px solid var(--muted); background: var(--card); color: var(--fg-soft); border-radius: 4px; padding: 0 6px; font-size: 10px; font-family: inherit; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; }
 .card-move:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 body.drawer-open { overflow: hidden; }
@@ -1262,6 +1264,14 @@ export function renderBoardDetail(container: HTMLElement, payload: BoardDetailPa
  * was deleted between export and view, or the export predates it) closes the
  * drawer with a toast instead of a fetch error. Serve mode passes null and
  * keeps the fetch path.
+ *
+ * Grouped-ancestry rows open the same drawer (task-tree-rows-open-detail):
+ * the delegated click/Enter/Space selectors accept a `.tree-row` beside a
+ * `.card`, and the row's item id is read from its enclosing `.tree-node` (the
+ * renderer keeps one `data-id` per node, no duplicate attribute). The row is
+ * the focus-restore target, so closing returns focus exactly where it opened.
+ * Only `interactive` rows (details mode) are focusable, so this handler stays
+ * inert on a drawer-free export even though it is embedded there.
  */
 export function wireBoardDetail(
   toast: (message: string, kind?: string) => void,
@@ -1360,7 +1370,11 @@ export function wireBoardDetail(
   }
 
   function open(card: Element): void {
-    const id = card.getAttribute("data-id") || "";
+    // A card carries its own `data-id`; a tree row reads it from the node it
+    // belongs to (one id per node, never duplicated across the pair).
+    const own = card.getAttribute("data-id");
+    const node = own ? null : card.closest(".tree-node");
+    const id = own || (node ? node.getAttribute("data-id") || "" : "");
     openById(id, card);
   }
 
@@ -1383,7 +1397,7 @@ export function wireBoardDetail(
     if (!target || typeof target.closest !== "function") return;
     if (target.closest("#board-drawer")) return;
     if (target.closest("a, button, input, select, textarea")) return;
-    const card = target.closest(".card");
+    const card = target.closest(".card, .tree-row");
     if (card) open(card);
   });
 
@@ -1393,7 +1407,7 @@ export function wireBoardDetail(
     const target = event.target as Element | null;
     if (!target || typeof target.closest !== "function") return;
     if (target.closest("a, button, input, select, textarea")) return;
-    const card = target.closest(".card");
+    const card = target.closest(".card, .tree-row");
     if (!card) return;
     event.preventDefault();
     open(card);
@@ -1477,13 +1491,21 @@ export function trapBoardFocus(container: HTMLElement, event: Event): void {
 
 /**
  * Roving-tabindex arrow navigation over the board's cards
- * (task-board-keyboard-a11y, serve-only). Embedded with `toString()`; must
+ * (task-board-keyboard-a11y, details mode). Embedded with `toString()`; must
  * stay self-contained. Up/Down move within the focused card's column, Left/
  * Right to the nearest non-empty column in that direction (keeping the row
  * position), Home/End to the first/last visible card of the column. Focus
  * moves the roving anchor with it, so Tab re-enters the board on the same
  * card. Filtered-out cards are skipped everywhere. Returns the handle the
  * filter code uses to re-seat the anchor when it gets hidden.
+ *
+ * Grouped-ancestry rows (task-tree-rows-open-detail) are the second roving
+ * surface: Up/Down walk the visible rows in document order (the tree's reading
+ * order), Home/End jump to its ends. A row hidden by the lens, the terminal
+ * rule or a FOLDED ancestor (`inFoldedSubtree`) is skipped exactly like a card
+ * in a collapsed column — folding a subtree must never trap the anchor inside
+ * it. `ensureAnchor` seats the anchor in the layout that is actually visible,
+ * so the view toggle moves the keyboard entry point with the view.
  */
 export function wireBoardKeyboardNav(): { ensureAnchor(): void } {
   const columns: HTMLElement[] = Array.prototype.slice.call(
@@ -1507,7 +1529,51 @@ export function wireBoardKeyboardNav(): { ensureAnchor(): void } {
     const column = card.closest(".column");
     return column !== null && column.classList.contains("collapsed");
   }
+  /** A node inside a folded ancestor (task-tree-rows-open-detail). */
+  function inFoldedSubtree(node: Element): boolean {
+    let parent = node.parentElement ? node.parentElement.closest(".tree-node") : null;
+    while (parent) {
+      if (parent.classList.contains("collapsed")) return true;
+      parent = parent.parentElement ? parent.parentElement.closest(".tree-node") : null;
+    }
+    return false;
+  }
+  /** Visible tree rows, in reading order; empty when the tree is the hidden layout. */
+  function visibleRows(): HTMLElement[] {
+    const section = document.getElementById("board-tree");
+    if (!section || section.hidden) return [];
+    const rows = section.querySelectorAll(".tree-row");
+    const out: HTMLElement[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i] as HTMLElement;
+      const node = row.closest(".tree-node");
+      if (!node) continue;
+      if (
+        node.classList.contains("filtered-out") ||
+        node.classList.contains("terminal-hidden") ||
+        inFoldedSubtree(node)
+      ) {
+        continue;
+      }
+      out.push(row);
+    }
+    return out;
+  }
+  function setRowRoving(row: HTMLElement): void {
+    document.querySelectorAll("#board-tree .tree-row").forEach(function (element) {
+      const el = element as HTMLElement;
+      el.setAttribute("tabindex", el === row ? "0" : "-1");
+    });
+  }
   function ensureAnchor(): void {
+    const rows = visibleRows();
+    if (rows.length > 0) {
+      // The tree is the visible layout: its own anchor is the entry point.
+      const current = document.querySelector('#board-tree .tree-row[tabindex="0"]');
+      if (current && rows.indexOf(current as HTMLElement) !== -1) return;
+      setRowRoving(rows[0]);
+      return;
+    }
     const anchor = document.querySelector('.board .card[tabindex="0"]');
     if (anchor && !anchor.classList.contains("filtered-out") && !inCollapsedColumn(anchor)) {
       return;
@@ -1534,8 +1600,25 @@ export function wireBoardKeyboardNav(): { ensureAnchor(): void } {
     }
     const target = event.target as Element | null;
     if (!target || typeof target.closest !== "function") return;
-    // Never hijack the arrows of a control inside the card.
+    // Never hijack the arrows of a control inside the row.
     if (target.closest("a, button, input, select, textarea")) return;
+    const row = target.closest("#board-tree .tree-row") as HTMLElement | null;
+    if (row) {
+      const rows = visibleRows();
+      const at = rows.indexOf(row);
+      let nextRow: HTMLElement | null = null;
+      if (key === "ArrowDown") nextRow = rows[at + 1] || row;
+      else if (key === "ArrowUp") nextRow = rows[at - 1] || row;
+      else if (key === "Home") nextRow = rows[0] || row;
+      else if (key === "End") nextRow = rows[rows.length - 1] || row;
+      // Left/Right have no tree meaning here: the disclosure button is the
+      // fold control, in the row's own tab order.
+      if (!nextRow || nextRow === row) return;
+      event.preventDefault();
+      setRowRoving(nextRow);
+      nextRow.focus();
+      return;
+    }
     const card = target.closest(".card") as HTMLElement | null;
     if (!card) return;
     const column = card.closest(".column") as HTMLElement | null;
@@ -1573,12 +1656,13 @@ export function wireBoardKeyboardNav(): { ensureAnchor(): void } {
  * self-contained: no module-scope references, no template literals.
  *
  * State persists in localStorage under `arggon-board-columns-v1`
- * ({ collapsed: string[], terminalHidden: boolean }) — a documented choice:
- * the layout is a per-browser view preference, not tracker data, so it never
- * touches the git files that remain the source of truth. Missing, corrupt or
- * unavailable storage degrades to the default layout on every load (a write
- * failure just means the state does not persist). The reset button restores
- * the default layout and writes it, so the reset itself persists.
+ * ({ collapsed: string[], terminalHidden: boolean, treeCollapsed: string[] })
+ * — a documented choice: the layout is a per-browser view preference, not
+ * tracker data, so it never touches the git files that remain the source of
+ * truth. Missing, corrupt or unavailable storage degrades to the default
+ * layout on every load (a write failure just means the state does not
+ * persist). The reset button restores the default layout and writes it, so the
+ * reset itself persists.
  *
  * `terminalHidden` is a LAYOUT preference and covers BOTH layouts
  * (bug-tree-ignores-hide-terminal-toggle): the status columns hide whole, and
@@ -1593,18 +1677,33 @@ export function wireBoardKeyboardNav(): { ensureAnchor(): void } {
  * counts and the tree heading stay the lens verdict in both layouts.
  *
  * `ensureAnchor` is the roving-focus handle from `wireBoardKeyboardNav`
- * (serve mode; null in the static export): every layout application re-seats
- * the anchor, so collapsing the column that holds it never strands keyboard
- * entry into the board.
+ * (details mode; null in the drawer-free export): every layout application
+ * re-seats the anchor, so collapsing the column that holds it never strands
+ * keyboard entry into the board.
+ *
+ * Compact/extend (task-tree-rows-open-detail) rides the same preference: every
+ * container row's `–`/`+` disclosure folds its subtree, the fold state is
+ * `treeCollapsed` (container ids) in the same localStorage record, and the
+ * same reset button restores the default (expanded). A fold is a pure display
+ * rule on the descendants: the terminal and lens verdicts above it are
+ * untouched, counts never move, and a row the lens hides inside a folded
+ * subtree stays discoverable — the fold is MARKED with the honest count of
+ * matches inside (`N matches inside` on the row, and in the disclosure's
+ * accessible name) instead of silently swallowing the lens verdict. The marker
+ * only appears with a lens active, because without one "everything inside" is
+ * not information.
  *
  * Returns the tree handle the page's lens refresh calls after re-marking the
  * lens classes, so the terminal rule is recomputed against the fresh lens
- * verdict (a lens change moves which terminal rows are context).
+ * verdict (a lens change moves which terminal rows are context) and the folded
+ * branches re-count their matches.
  */
-export function wireBoardColumns(ensureAnchor?: (() => void) | null): { syncTree: () => void } {
+export function wireBoardColumns(ensureAnchor?: (() => void) | null): {
+  syncTree(hasLens?: boolean): void;
+} {
   const KEY = "arggon-board-columns-v1";
   const TERMINAL = ["done", "cancelled"];
-  type Layout = { collapsed: string[]; terminalHidden: boolean };
+  type Layout = { collapsed: string[]; terminalHidden: boolean; treeCollapsed: string[] };
   function store(state: Layout): void {
     try {
       localStorage.setItem(KEY, JSON.stringify(state));
@@ -1616,16 +1715,26 @@ export function wireBoardColumns(ensureAnchor?: (() => void) | null): { syncTree
     try {
       const raw = JSON.parse(localStorage.getItem(KEY) || "null") as Partial<Layout> | null;
       if (raw === null || typeof raw !== "object" || !Array.isArray(raw.collapsed)) {
-        return { collapsed: [], terminalHidden: false };
+        return { collapsed: [], terminalHidden: false, treeCollapsed: [] };
       }
       return {
         collapsed: raw.collapsed.filter((status) => typeof status === "string"),
         terminalHidden: raw.terminalHidden === true,
+        treeCollapsed: Array.isArray(raw.treeCollapsed)
+          ? raw.treeCollapsed.filter((id) => typeof id === "string")
+          : [],
       };
     } catch {
-      return { collapsed: [], terminalHidden: false };
+      return { collapsed: [], terminalHidden: false, treeCollapsed: [] };
     }
   }
+  /**
+   * Whether a lens expression is active. Required to keep the folded-branch
+   * match marker honest: without a lens every descendant "matches", so the
+   * marker would be noise. The page passes its own verdict on every refresh
+   * (`refreshTree`); layout-only calls (apply) reuse the last one.
+   */
+  let lensActive = false;
   /**
    * The terminal rule inside the grouped-ancestry tree
    * (bug-tree-ignores-hide-terminal-toggle). Reverse document order is
@@ -1639,8 +1748,17 @@ export function wireBoardColumns(ensureAnchor?: (() => void) | null): { syncTree
    * same `—` placeholder the empty columns use (the heading keeps counting the
    * lens verdict). No tree, or a tracker whose placeholder was rendered
    * server-side (no nodes at all), is a no-op.
+   *
+   * The same pass applies the fold state (task-tree-rows-open-detail): the
+   * `collapsed` class on the node, the disclosure's `aria-expanded`/glyph and
+   * — with a lens active — the `N matches inside` mark for a folded branch
+   * whose subtree holds matches. Folding deliberately does NOT feed the
+   * terminal verdict above: the fold is a display rule on the descendants, so
+   * a folded row the terminal rule keeps stays on screen (its own row is the
+   * toggle's home), and folding never hides anything the lens verdict counts.
    */
-  function syncTree(): void {
+  function syncTree(hasLens?: boolean): void {
+    if (typeof hasLens === "boolean") lensActive = hasLens;
     const section = document.getElementById("board-tree");
     if (!section) return;
     const nodes = section.querySelectorAll(".tree-node");
@@ -1668,6 +1786,48 @@ export function wireBoardColumns(ensureAnchor?: (() => void) | null): { syncTree
       // only `filtered-out`, and only the layout rule marks a row terminal.
       node.classList.toggle("terminal-hidden", lensShown && !layoutShown);
       node.classList.toggle("terminal-context", layoutShown && state.terminalHidden && terminal);
+      const id = node.getAttribute("data-id") || "";
+      const collapsed = id !== "" && state.treeCollapsed.indexOf(id) !== -1;
+      node.classList.toggle("collapsed", collapsed);
+      const row = node.querySelector(":scope > .tree-row");
+      const toggle = row ? (row.querySelector(".tree-toggle") as HTMLElement | null) : null;
+      const marker = row ? (row.querySelector(".tree-matches") as HTMLElement | null) : null;
+      // Matches inside a folded branch: the lens verdict (matched rows only,
+      // never the context path) — the structural truth behind the fold.
+      let inside = 0;
+      if (collapsed && lensActive) {
+        const descendants = node.querySelectorAll(".tree-node");
+        for (let k = 0; k < descendants.length; k++) {
+          const descendant = descendants[k];
+          if (
+            descendant.classList.contains("filtered-out") ||
+            descendant.classList.contains("context")
+          ) {
+            continue;
+          }
+          inside += 1;
+        }
+      }
+      if (marker) {
+        marker.textContent =
+          inside === 1 ? "1 match inside" : inside === 0 ? "" : inside + " matches inside";
+        marker.hidden = inside === 0;
+      }
+      if (toggle) {
+        toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        toggle.textContent = collapsed ? "+" : "\u2013";
+        toggle.setAttribute(
+          "aria-label",
+          (collapsed ? "expand " : "collapse ") +
+            id +
+            " subtree" +
+            (inside === 1
+              ? " \u2014 1 match inside"
+              : inside > 1
+                ? " \u2014 " + inside + " matches inside"
+                : ""),
+        );
+      }
     }
     const root = section.querySelector(".tree-root");
     const empty = section.querySelector(".tree-empty");
@@ -1727,6 +1887,22 @@ export function wireBoardColumns(ensureAnchor?: (() => void) | null): { syncTree
       store(state);
       return;
     }
+    // Compact/extend a tree subtree (task-tree-rows-open-detail). The control
+    // is a plain button, so it is keyboard-operable on its own (Enter/Space)
+    // and its click never reaches the row's drawer handler (that one skips
+    // buttons). The fold is written with the rest of the layout preference.
+    const treeToggle = target.closest(".tree-toggle");
+    if (treeToggle) {
+      const node = treeToggle.closest(".tree-node");
+      const id = node ? node.getAttribute("data-id") || "" : "";
+      if (id === "") return;
+      const at = state.treeCollapsed.indexOf(id);
+      if (at === -1) state.treeCollapsed.push(id);
+      else state.treeCollapsed.splice(at, 1);
+      apply(state);
+      store(state);
+      return;
+    }
     if (target.closest("#board-terminal-toggle")) {
       state.terminalHidden = !state.terminalHidden;
       apply(state);
@@ -1734,7 +1910,7 @@ export function wireBoardColumns(ensureAnchor?: (() => void) | null): { syncTree
       return;
     }
     if (target.closest("#board-layout-reset")) {
-      state = { collapsed: [], terminalHidden: false };
+      state = { collapsed: [], terminalHidden: false, treeCollapsed: [] };
       apply(state);
       store(state);
     }
@@ -2254,11 +2430,19 @@ export function boardTreeRoots(items: WorkItem[]): BoardTreeNode[] {
  * (task-web-board-hierarchy-view): one list item per tracked item, nested
  * through the recorded `parent` edges (`boardTreeRoots`), each row carrying
  * its own type badge, id, status and priority — the web-board reading of the
- * OpenCode panel's `boardTreeLines`. Read-only by design (no anchors at all,
- * so a dangling parent can never become a dead link): the layout is for
- * reading the tree, and the columns view stays one toggle away for moves, the
- * drawer and drag-and-drop. Every repo-controlled byte goes through
+ * OpenCode panel's `boardTreeLines`. No anchors at all, so a dangling parent
+ * can never become a dead link. Every repo-controlled byte goes through
  * `escapeHtml`.
+ *
+ * Every CONTAINER row leads with a `–`/`+` disclosure control that folds and
+ * extends its subtree (task-tree-rows-open-detail): the markup is rendered on
+ * every board and the client (`wireBoardColumns`) owns the fold state — like
+ * the column controls, folding is a view preference, never tracker data.
+ * `interactive` (the details mode: `--serve` or a static `--details` export)
+ * additionally makes the ROW focusable and named like a card, so a click or
+ * Enter/Space opens the same detail drawer the columns open; a board without
+ * the drawer payload renders inert rows — no fake affordance — while the
+ * disclosure control keeps working (it folds, it does not open).
  *
  * Honest partial chains: an item with no parent edge, or a blank one, renders
  * as a top-level row (that is the shape the tracker has); an item whose
@@ -2272,14 +2456,16 @@ export function boardTreeRoots(items: WorkItem[]): BoardTreeNode[] {
  */
 export function renderBoardTree(
   items: WorkItem[],
-  opts: { openDeps?: (item: WorkItem) => string[] } = {},
+  opts: { openDeps?: (item: WorkItem) => string[]; interactive?: boolean } = {},
 ): string {
   const esc = escapeHtml;
   const openDeps = opts.openDeps ?? ((): string[] => []);
+  const interactive = opts.interactive === true;
   const known = new Set(items.map((item) => item.id));
   const roots = boardTreeRoots(items);
   if (roots.length === 0) return '<div class="empty">—</div>';
-  const rowOf = (item: WorkItem): string => {
+  let rovingRow = false;
+  const rowOf = (item: WorkItem, isContainer: boolean): string => {
     const type = esc(item.type);
     const priority = item.priority
       ? `\n  <span class="priority ${esc(item.priority)}">${esc(item.priority)}</span>`
@@ -2297,7 +2483,29 @@ export function renderBoardTree(
       parent !== "" && !known.has(parent)
         ? `\n  <span class="tree-missing">↳ recorded parent ${esc(parent)} (missing)</span>`
         : "";
-    return `<div class="tree-row">
+    // Compact/extend (task-tree-rows-open-detail): every CONTAINER row leads
+    // with a disclosure control (the column controls' `–`/`+` shape), leaf
+    // rows carry an equal-width spacer so ids stay aligned. The control works
+    // on EVERY board — folding a subtree needs no detail payload; the server
+    // renders it expanded and the client restores the persisted fold.
+    const toggle = isContainer
+      ? `<button type="button" class="tree-toggle" aria-expanded="true" aria-label="collapse ${esc(item.id)} subtree">&ndash;</button>`
+      : `<span class="tree-toggle-spacer" aria-hidden="true"></span>`;
+    // The branch's match marker (see wireBoardColumns): a container whose
+    // subtree is folded while a lens hides a match inside gets "N matches
+    // inside". Rendered hidden; the client owns both the count and the fold.
+    const matches = isContainer ? `<span class="tree-matches" hidden></span>` : "";
+    // Interactive rows (details mode only): focusable + named like a card, so
+    // Enter/Space opens the same drawer. Without the drawer payload the row
+    // stays inert — a static export offers no fake affordance — and only the
+    // disclosure control (which folds, not opens) is wired.
+    const cardLabel = `${item.type} ${item.id}: ${item.title ?? item.id} (${item.status}${item.assignee ? `, @${item.assignee}` : ""})`;
+    const interactiveAttrs = interactive
+      ? ` role="group" aria-label="${esc(cardLabel)}" tabindex="${rovingRow ? "-1" : "0"}"`
+      : "";
+    if (interactive) rovingRow = true;
+    return `<div class="tree-row"${interactiveAttrs}>
+  ${toggle}${matches}
   <span class="type" data-type="${type}" style="--type-color: ${TYPE_COLORS[item.type]}">${type}</span>
   <code>${esc(item.id)}</code>
   <span class="status-chip ${esc(item.status)}">${esc(item.status)}</span>${priority}${title}${assignee}${blockedBadge}${missingMark}
@@ -2306,11 +2514,15 @@ export function renderBoardTree(
   const nodeOf = (node: BoardTreeNode): string => {
     const parent = typeof node.item.parent === "string" ? node.item.parent : "";
     const classes = parent !== "" && !known.has(parent) ? "tree-node missing-parent" : "tree-node";
+    // The row is rendered BEFORE the children are walked: the roving anchor
+    // (interactive mode) must land on the first row in reading order, exactly
+    // like the column renderer seats it on the first card.
+    const row = rowOf(node.item, node.children.length > 0);
     const children =
       node.children.length > 0
         ? `\n<ul class="tree-children">\n${node.children.map(nodeOf).join("\n")}\n</ul>`
         : "";
-    return `<li class="${classes}" data-id="${esc(node.item.id)}" data-type="${esc(node.item.type)}" data-status="${esc(node.item.status)}">${rowOf(node.item)}${children}</li>`;
+    return `<li class="${classes}" data-id="${esc(node.item.id)}" data-type="${esc(node.item.type)}" data-status="${esc(node.item.status)}">${row}${children}</li>`;
   };
   return `<ul class="tree-root">\n${roots.map(nodeOf).join("\n")}\n</ul>`;
 }
@@ -2599,7 +2811,7 @@ export function renderBoardHtml(
   // other stays one click away. The status columns (and with them drag/drop,
   // the drawer and the keyboard move surface) are therefore never lost.
   const viewDefault: "columns" | "tree" = opts.groupBy === "tree" ? "tree" : "columns";
-  const treeHtml = renderBoardTree(sorted, { openDeps });
+  const treeHtml = renderBoardTree(sorted, { openDeps, interactive: details });
 
   const NO_MILESTONE = null;
   const milestoneOf = (item: WorkItem): string | null =>
@@ -3074,6 +3286,19 @@ main.board[hidden], .tree[hidden] { display: none; }
 .tree-assignee { color: var(--fg-soft); font-size: 12px; }
 .tree-missing { color: var(--muted); font-size: 11px; }
 .tree-blocked { margin-left: auto; color: var(--blocked-fg); background: var(--blocked-bg); border-radius: 10px; padding: 0 8px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+/* Compact/extend (task-tree-rows-open-detail): the container disclosure is a
+   control on the row's leading edge, and leaf rows carry the same-width spacer
+   so ids stay aligned. A folded subtree is hidden by a pure display rule —
+   the terminal and lens verdicts above it are untouched. */
+.tree-toggle { flex: 0 0 auto; width: 18px; height: 18px; border: 1px solid var(--muted); background: var(--card); color: var(--fg-soft); border-radius: 4px; padding: 0; font-size: 12px; line-height: 1; font-family: inherit; cursor: pointer; }
+.tree-toggle-spacer { flex: 0 0 auto; width: 18px; height: 18px; }
+.tree-node.collapsed > .tree-children { display: none; }
+/* The folded branch's honest mark (lens active): N matches live inside; the
+   count is the lens verdict, never a rendered-row count. */
+.tree-matches { color: var(--meta); font-size: 10px; }
+/* Rows are only clickable where the drawer exists (details mode adds the body
+   attribute): a static export without --details offers no fake affordance. */
+body[data-detail-endpoint] .tree-row { cursor: pointer; }
 .tree-node.context > .tree-row, .tree-node.terminal-context > .tree-row { background: var(--card-dim); color: var(--meta); }
 .tree-node.filtered-out, .tree-node.terminal-hidden { display: none; }
 .status-chip { border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
@@ -3252,7 +3477,7 @@ ${details ? embeddedFunctionSource(wireBoardMoveMenu) : ""}
     var treeCount = document.getElementById("board-tree-count");
     if (treeCount) treeCount.textContent = String(shownCount);
   }
-  function refreshTree(visibleIds) {
+  function refreshTree(visibleIds, hasLens) {
     // Grouped-ancestry view (task-web-board-hierarchy-view): the matched rows
     // stay, plus the ancestor path to each match (marked as context); a row
     // with no match in its subtree hides WITH its subtree, because the display
@@ -3266,8 +3491,10 @@ ${details ? embeddedFunctionSource(wireBoardMoveMenu) : ""}
     // The terminal layout composes with the fresh lens verdict: an ancestor
     // the lens keeps can hold a terminal row visible (muted), and a terminal
     // row that just lost its last visible descendant hides with it
-    // (bug-tree-ignores-hide-terminal-toggle).
-    boardColumns.syncTree();
+    // (bug-tree-ignores-hide-terminal-toggle). The same call re-counts the
+    // matches inside each folded branch (task-tree-rows-open-detail); the
+    // count is only meaningful with a lens expression active.
+    boardColumns.syncTree(hasLens);
   }
   function setFilterState(expr) {
     var result = applyBoardFilter(BOARD_ITEMS, expr, BOARD_ME);
@@ -3294,7 +3521,7 @@ ${details ? embeddedFunctionSource(wireBoardMoveMenu) : ""}
       if (shown[card.getAttribute("data-id")]) card.classList.remove("filtered-out");
       else card.classList.add("filtered-out");
     });
-    refreshTree(visibleIds);
+    refreshTree(visibleIds, result.ok && expr !== "");
     lensChips.forEach(function (chip) {
       chip.className = chip.getAttribute("data-filter") === expr ? "lens active" : "lens";
     });
