@@ -32,3 +32,10 @@ PR #763 ships `adapters/capability-matrix.json` as a template-bundled `arggon in
 - [ ] no manual version bump; release flow otherwise untouched
 
 ## Notes
+
+### 2026-10-14 @Arggon
+### Lead closure — 2026-10-14 (delivery lead)
+The re-pin landed first (PR #808: ARGGON_VERSION 0.7.0 → 0.10.0 + seam regenerated + ledger refreshed; release.md §The re-pin). Verified against the **released binary** on this repo:
+- `npx arggon-manager@0.10.0 doctor --agents --json` → `matrix.present: true`, source `adapters/capability-matrix.json`, 15 rows, 2 gaps, invalid 0.
+- `npx arggon-manager@0.10.0 init --dry-run --json` → plan row `adapters/capability-matrix.json`: decision `updated` — "untouched since last generation — regenerated from the current template"; `reaped: 0`, `reapRefused: 0` — never orphaned, never reaped.
+- The class is covered generally by the existing routine: the re-pin regenerates the seam + records after each release, and the pin now names a released version that ships the template, so the mid-cycle orphan/reap window closes without a new step. No manual version bump; the release flow is untouched.
