@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adopt-compaction-three-questions
 title: "Adopt AutoCompact's three-question compaction diagnostic (when / what / how to continue) in the review bar"
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [methodology, context-budget]
 priority: p3
 created: "2026-10-05"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T10:58:32.984Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adopt-compaction-three-questions
 ---
 <!--
