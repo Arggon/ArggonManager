@@ -75,3 +75,7 @@ Branch `feat/task-claude-gate-polish`, commit `f23d8372`; pushed; PR https://git
 - `npx prettier --check` on the authored files → clean. The generated `.claude-marketplace/arggon/README.md` is flagged for the marker-line/heading adjacency, but it is flagged identically at `HEAD` (verified against `git show HEAD:…`) and reformatting it would break the template parity test — committed exactly as `init` wrote it.
 
 **Residual observed, not actioned (out of this item's scope):** the reviewer window's shell route (`MUTATING_ARGGON_WORDS`) still does not list `handoff` (nor `comment`, deliberately), so `npm run arggon -- handoff …` via Bash is not denied while the MCP tool now is. Same asymmetry exists on the ZCode seam. Flagged for the delivery lead rather than grown into this diff.
+
+### handoff 2026-10-14 @Arggon — next: Delivery lead: review PR #823 (merge is yours); if approved, route the two recorded follow-ups (ZCode gate handoff parity; shell-route handoff asymmetry) as their own items — none were filed by the m…
+- branch: feat/task-claude-gate-polish
+- open questions: ZCode seam gate leaves arggon_handoff unlisted — port the deny decision there? (candidate follow-up, not filed); shell route MUTATING_ARGGON_WORDS still allows 'arggon handoff' via Bash while the MCP…
