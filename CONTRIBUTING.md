@@ -229,7 +229,7 @@ job's browser step, so a local green run is the evidence CI will reproduce.
 #### Accessibility gate (axe)
 
 The `@smoke` lane runs [axe](https://github.com/dequelabs/axe-core)
-(`@axe-core/playwright`, version-pinned, dev-only) against six board states,
+(`@axe-core/playwright`, version-pinned, dev-only) against twelve board states,
 each gated on its own deterministic readiness signal (an `expect` on a settled
 element — never a sleep, never a `networkidle` guess): the **served ready
 page** (first test, before any interaction — including a fixture-rendered
@@ -242,9 +242,16 @@ the `.empty` placeholders the filter creates), the **static grouped-ancestry
 export** (`arggon board --group-by tree`, after the hard `h1`) and the
 **filtered ancestry tree** on the served board (after the `N of M` count, with
 the muted context rows the lens keeps). The last two are
-`task-web-board-hierarchy-view`'s scanned states; the list grows with every
-new surface, never widens into a blanket scan. It is a gate, not a report: a
-violation fails the test.
+`task-web-board-hierarchy-view`'s scanned states. `task-tree-rows-open-detail`
+adds six more: the **tree-row drawer** on the served board (after its title),
+the **tree keyboard state** (after the `Home` focus assertion), the **folded
+tree** (after the folded subtree is asserted hidden), the **folded branch
+holding a lens match** (after its `N matches inside` marker), the **offline
+tree-row drawer** on the static `--details` tree export (after its
+acceptance-row count) and the **terminal + fold composed tree** (after its
+counts, on the tree-terminal fixture). The list grows with every new surface,
+never widens into a blanket scan. It is a gate, not a report: a violation fails
+the test.
 
 **What is asserted.** Every WCAG A/AA level axe can check automatically, across
 all three WCAG versions it ships rules for:

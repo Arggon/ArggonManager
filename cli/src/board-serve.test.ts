@@ -99,6 +99,12 @@ describe("board --serve", () => {
     // wiring embedded from board.ts.
     expect(html).toContain('drawerEl.setAttribute("data-item-id", id)');
     expect(html).toContain('drawerEl.removeAttribute("data-item-id")');
+    // The restore re-opens through the SAME open paths the user has, choosing
+    // the opener of the RESTORED layout: a card, or a tree row in the
+    // grouped-ancestry layout (task-tree-rows-open-detail), whose id lives on
+    // the enclosing node.
+    expect(html).toContain('tree && !tree.hidden ? "#board-tree .tree-row" : ".card[data-id]"');
+    expect(html).toContain('closest(".tree-node")');
   });
 
   it("keeps the serve-only reload client out of the static render", () => {
