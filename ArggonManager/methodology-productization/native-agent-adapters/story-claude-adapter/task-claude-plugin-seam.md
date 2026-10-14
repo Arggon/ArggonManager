@@ -215,3 +215,21 @@ family drift guard now walking the vendored copy.
 ### handoff 2026-10-14 @Arggon — next: Review PR #821 (maker work complete, all gates green); verify the 14 acceptance boxes against the evidence comment, then run the standards reviewer and merge.
 - branch: feat/task-claude-plugin-seam
 - open questions: Capability-matrix claude row deltas + ADR 0020 stale amendments belong to task-claude-matrix-and-docs / a follow-up item (reported in the PR); live SubagentStart hook dispatch not probed (needs a mod…
+
+### 2026-10-14 @Arggon
+Review round 1 fixes (delivery lead) — applied, commit `abf9f9db` (pushed on `feat/task-claude-plugin-seam`, PR #821).
+
+1. `ArggonManager/docs/json-output.md` (`adapters.artifacts` row): cap updated to
+   `MAX_ADAPTER_ARTIFACTS` (96), with the 69-destination context. Sweep command run:
+   `grep -rn "MAX_ADAPTER_ARTIFACTS\|artifacts.*64" ArggonManager/docs README.md skills/arggon-cli`
+   → the only hit is the updated row; the `agents[].files` row's
+   `MAX_ADAPTER_AGENT_FILES` (64) is a different cap and was left untouched.
+2. `cli/src/adapters.ts` cap comment: arithmetic corrected — opencode (18) +
+   zcode (23) + claude (28) is **69** destinations (claude's 28 includes the two
+   floor surfaces); the reasoning (old 64 truncated the newest adapter's rows) stands.
+3. `cli/src/init-claude.test.ts`: test-title typo `argxon_show` → `arggon_show`.
+
+Checks (worktree, all green): `npx vitest run cli/src/init-claude.test.ts
+cli/src/adapter-selection.test.ts cli/src/mcp-doc-contract.test.ts` → 81 passed /
+0 failed; `npx prettier --check` on the three touched files → clean;
+`npm run arggon -- validate` → `ok:true`, 0 errors, 0 warnings.
