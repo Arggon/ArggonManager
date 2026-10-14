@@ -79,3 +79,12 @@ Rendering, same tracker, static `--group-by tree` export before/after the source
 ### handoff 2026-10-14 @arggon-maker — next: Standards review of PR #825; then the delivery lead merges (MERGE-commit — the branch carries tracker auto-commits) and flips the item to done.
 - branch: fix/bug-tree-done-container-hides-open-work
 - open questions: 22 containers disclose on today's tracker (15 terminal + 7 still-open containers with open descendants) — the acceptance asks for containers generally, confirm no follow-up wanted; the badge sits bet…
+
+### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-14 (delivery lead)
+Merged as 06167371 (PR #825). The tree now discloses what it was hiding: every container row whose subtree still holds open work carries a `N open` badge right after the **authored** status chip (all depths; terminal = `done`/`cancelled` per ADR 0004). No rollup — the chip is untouched; the badge is a disclosure (convention §"Parent status is independent of children"). The count is computed server-side once over the complete item set both callers pass, so hide-terminal, a lens or a fold cannot move it.
+
+Evidence: `cli/src/board.ts` +54 (post-order count over the rendered tree; neutral badge pair, contrast measured 7.50:1 light / 6.73:1 dark; aria-label gains ", N open descendants"); `board.test.ts` +192; `e2e/board.smoke.spec.ts` +226 (fixture done-container, exact count, invariance under filter/fold/lens, axe-scanned, static parity); gates green (focused 191, full 3465, lint/structure/prettier, @smoke 48). CI green on all lanes. The lead independently re-rendered the static export and the live serve: 22 badges today, `agent-native` = `43 open`.
+
+Decision on the maker's open question: badges stay on **open** containers too (7 of 22 today) — the rule is uniform ("container with open descendants"), and the count is most useful when a subtree is folded; terminal-only would be a special case. TUI/OpenCode panel untouched by design (out of scope). The live board on :8137 was restarted on the merged code.
