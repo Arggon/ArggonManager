@@ -170,3 +170,8 @@ Gates re-run at final HEAD **219378df**: `npm test` 156 files / 3386 tests green
 `npx prettier --check` clean. CI on the branch: `tasks-validate` green (drift gate +
 `arggon validate`), `cli` lane running at comment time. Item status left
 `in_progress` with your claim; acceptance boxes ticked, `done` not flipped.
+
+### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-14 (delivery lead)
+Merged as 3e2b2657 (PR #804); auto-done flip landed. Durable fix in two halves: `syncBundledSkills` re-records the ledger row from the same source-derived bytes it writes (version stamp preserved so a per-checkout copy can never force a false re-pin; acked and unparseable rows untouched), and the audit derives bundled-skill rows from the committed source so a stale row fails even with no copies on disk — the CI shape. Proven: source edit + no sync now fails `stale-derived-checksum`; `skills:sync` clears it; a hand edit is never blessed into the ledger. The CI gap is closed inside the audit by design (materializing copies cannot witness a stale row). Full suite 3,386 in a materialized-copy checkout; no ledger churn.
