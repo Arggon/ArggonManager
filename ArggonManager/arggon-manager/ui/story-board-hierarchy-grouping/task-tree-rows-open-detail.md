@@ -12,7 +12,6 @@ updated: "2026-10-14"
 claimed_at: "2026-10-14T15:42:36.289Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-tree-rows-open-detail
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-board-hierarchy-grouping/task-tree-rows-open-detail.md
   Leaves live only under a story. id is the filename stem: task-tree-rows-open-detail.
@@ -42,3 +41,23 @@ Both live in the same tree code (`cli/src/board.ts`: `renderBoardTree`, the embe
 - [x] `arggon validate`, affected suites, `npm test`, CI `ui-smoke` green; prettier clean on touched files
 
 ## Notes
+
+### 2026-10-14 @ses_ec4eaf180ffeataHU4UOHWtBdI
+### 2026-10-14 maker (arggon-maker) — implementation + evidence, PR #816
+
+**Mechanism (branch `feat/task-tree-rows-open-detail`)**
+- `renderBoardTree(..., { interactive })`: container rows lead with a `–`/`+` disclosure (`aria-expanded`, named `<id> subtree`), leaves carry an aligned spacer; `interactive` (set from `details` = `--serve` or static `--details`) makes rows focusable + named like cards. Drawer-free export keeps inert rows; the tree still has **no anchors**.
+- `wireBoardDetail`: delegated click/Enter/Space accept `.card, .tree-row`; the id comes from the enclosing `.tree-node` (one `data-id` per node); the row is the focus-restore target.
+- `wireBoardKeyboardNav`: rows are a second roving surface — one tab stop, `↑`/`↓` in reading order (lens-hidden / terminal-hidden / folded-away skipped), `Home`/`End`; `ensureAnchor` seats the anchor in the visible layout.
+- `wireBoardColumns`: fold state = `treeCollapsed` in the same `arggon-board-columns-v1` record (one key, one reset); fold is a display rule below the terminal verdict (a folded row the terminal rule keeps stays on screen); counters untouched.
+- **Recorded decision (AC 4): mark, never auto-expand.** With a lens active, a folded branch holding matches shows `N matches inside` on the row and in the disclosure's accessible name (count = matched rows only, never context); a folded branch with no match and the no-lens case show no marker.
+
+**Browser evidence — served fixture, same drive before/after (drive scripts in /tmp, not committed)**
+- Before (pre-change dist): rows 4, toggles 0, `tabindex`/`role`/`data-id` null; row click → drawer hidden; Enter on a row → nothing (unfocusable).
+- After: toggles 3 (containers); rows `role=group` roving; row click → drawer visible, title "Entries"; focused row + Enter/Space → drawer visible; Esc → row refocused; `entries` fold hides `task-evidence-task` and stores `{"collapsed":[],"terminalHidden":false,"treeCollapsed":["entries"]}`, survives reload; `filter=task-evidence-task` with the fold → marker "1 match inside", label "expand entries subtree — 1 match inside", counts stay "1 of 4" / "1"; expand reveals the match; `reset layout` + reload restores the default; `pageerror` list empty.
+
+**Gates (all green)**
+- `npm run build`; `npm test` 157 files / 3427 tests; `npm run lint`; `npm run test:structure`; `npm run arggon -- validate` (0 warnings, convention v5); `npx prettier --check` on every touched file.
+- `npx playwright test --grep @smoke` **46 passed** (alone; new cases: serve click→drawer, keyboard open + roving, fold+persistence+reset+view-toggle, lens-inside-fold, static `--details` row drawer offline, drawer-free static honesty, terminal+fold composition). One **one-off flake** observed on the pre-existing "column headers stick to the viewport top" case (documented reload-storm sensitivity; passes alone and on re-runs) — recorded, not fixed here.
+
+**Docs in the diff**: README (grouped-ancestry + column-controls + drawer + keyboard bullets, tree payload re-measured 662 items → ~565 B/item static), CONTRIBUTING § axe scanned states (six → twelve, this item's named), docs/json-output.md board section. Acceptance boxes ticked in this branch's copy of the item file.
