@@ -57,3 +57,21 @@ rollup.
   in the tree renderer + its styles.
 - If the renderer only receives the filtered tree, thread a full-set open-count map into
   it — the count must not depend on the active filter.
+
+### 2026-10-14 @arggon-maker
+### Evidence — PR #825 (gates + rendering)
+
+Gates (worktree, all green):
+- `npm run arggon -- validate`: ok (0 warnings, convention v5)
+- focused: `npx vitest run cli/src/board.test.ts cli/src/board-serve.test.ts cli/src/board-parity.test.ts cli/src/board-embed.test.ts` -> 191 passed
+- `npm test`: 3465 passed / 158 files
+- `npm run build` (tsc + e2e typecheck): ok
+- `npm run lint`: ok
+- `npm run test:structure`: 5 passed
+- `npx prettier --check cli/src/board.ts cli/src/board.test.ts e2e/board.smoke.spec.ts`: ok
+- `npx playwright test --grep @smoke`: 48 passed (2 new cases)
+
+Rendering, same tracker, static `--group-by tree` export before/after the source change:
+- `agent-native` (initiative, done): before `<span class="status-chip done">done</span> <span class="tree-title">Agent-native tooling: dependencies, leases, worktrees, ecosystem</span>` -> after `...<span class="status-chip done">done</span> <span class="tree-open">43 open</span> <span class="tree-title">Agent-native tooling: ...</span>`
+- `cli` (epic, done): `done` -> `done 26 open`; 22 containers disclose on the current tracker.
+- Served board (e2e fixture): initiative row `done 2 open`, aria-label `initiative tree-done-root: Tree done root (done, 2 open descendants)`; the count is unchanged with hide done/cancelled, a fold and a lens; a zero-open container and leaf rows carry no badge; the static export renders identically.
