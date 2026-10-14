@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-wave-smoke-retired-model-pin
 title: smoke/opencode-wave.ts still pins the retired opencode-go/deepseek-v4-flash model — same mass failure the full smoke just fixed
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-opencode-adapter
 labels: [opencode-seam, tests]
 created: "2026-10-14"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T10:58:26.051Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-wave-smoke-retired-model-pin
 ---
 <!--
