@@ -12,6 +12,7 @@ updated: "2026-10-14"
 claimed_at: "2026-10-14T10:58:36.462Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-skill-source-edit-leaves-ledger-stale
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-skill-source-edit-leaves-ledger-stale.md
   Leaves live only under a story. id is the filename stem: bug-skill-source-edit-leaves-ledger-stale.
@@ -54,19 +55,19 @@ again locally. This item is about the mechanism, not that one record.
 
 ## Acceptance
 
-- [ ] Decide and implement the durable fix, with reasoning: e.g. `skills:sync`
+- [x] Decide and implement the durable fix, with reasoning: e.g. `skills:sync`
       re-records the ledger entry it regenerates; or the audit treats a
       marker-carrying copy as generated and verifies it against the **source
       template's** checksum instead of the copy's; or `init` gains a
       "regenerate generated copies + refresh records" path that runs on the
       release/re-pin flow. State which and why it cannot mask a hand edit of a
       generated copy
-- [ ] A test pins the chosen mechanism (edit a source → sync → audit green
+- [x] A test pins the chosen mechanism (edit a source → sync → audit green
       without hand-editing the ledger)
-- [ ] The CI gap is named: either the audit's local-only blind spot is recorded
+- [x] The CI gap is named: either the audit's local-only blind spot is recorded
       as accepted (with the reason), or CI gains a step that materializes the
       copies before auditing
-- [ ] `arggon validate` green; no mass churn of unrelated ledger entries
+- [x] `arggon validate` green; no mass churn of unrelated ledger entries
 
 ## Notes
 
@@ -77,10 +78,13 @@ Re-recording the checksum alone was not the whole repair: setting the entry's `a
 Lesson for this item's fix: **whoever updates the ledger must respect the pin** — a version stamp newer than `ARGGON_VERSION` is a re-pin request, not a bookkeeping edit. Either the fix's mechanism keeps the stamp at the pin, or it (correctly) routes the re-pin flow. Record this in the acceptance's decision.
 
 ### 2026-10-13 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
 ### Recurrence — 2026-10-13 (delivery lead)
+
 Same class, new instance: PR #771 merged a source edit to `skills/arggon-cli/references/exploration.md` (the ADR 0017 stopping rule). In any local checkout where `arggon init` / `npm run skills:sync` has materialized `.agents/skills/arggon-cli/references/exploration.md`, the `x-generated` ledger record for that derived copy is now stale — `cli/src/provenance-audit.test.ts` fails locally (three separate wave-3 worktrees hit it this session; fresh checkouts and CI skip the absent destination at `docs.ts:1675`, so CI stays green). Third observed instance of sync-never-updates-the-ledger (`json-contract.md` after #751; `exploration.md` after #771). Reinforces the item's acceptance: the sync path should re-record the derived copy's checksum.
 
 ### 2026-10-14 @ses_ec5ee8017ffenAoLAgVVe7sCfF
+
 ### 2026-10-14 @ses_ec5ee8017ffenAoLAgVVe7sCfF (maker) — implemented: PR #804
 
 **Chosen mechanism (both halves, because either alone leaves the class reachable).**
@@ -104,18 +108,19 @@ Same class, new instance: PR #771 merged a source edit to `skills/arggon-cli/ref
    checkout/CI has.
 
 **Why it cannot mask a hand edit of a generated copy.** The refreshed checksum is computed
-from the *source template render*, never read back from the destination — a hand edit can
+from the _source template render_, never read back from the destination — a hand edit can
 never enter the ledger as "generated". The audit's copy rule is unchanged (bytes ≠ render stay
 silent) and `init`'s decision table is untouched: a marker stays evidence of origin, never
 permission to overwrite. Pinned by the "never blesses a hand edit" test (row keeps the source
 render while the edited copy's checksum differs).
 
 **CI gap: closed inside the audit, not accepted and no CI step added.** Materializing copies
-in CI cannot witness a stale committed row (the materializer would have to *not* record — the
+in CI cannot witness a stale committed row (the materializer would have to _not_ record — the
 defect itself). Verified: with `.agents/skills/**` removed (CI shape) + a source edit + no
 sync, the repo-self audit fails `stale-derived-checksum`; `npm run skills:sync` clears it.
 
 **Repeated end to end in this checkout (expected vs observed).**
+
 - `npm run skills:sync` (copies present, ledger current) → state file byte-identical (no churn).
 - Edit `skills/.../pitfalls.md` → `provenance-audit` RED, kind `stale-derived-checksum`, reason names both checksums + the remedy → `npm run skills:sync` → row diff = checksum + `generatedAt` only (`arggonVersion: 0.7.0` preserved) → audit GREEN.
 - `rm -rf .agents/skills` + source edit + no sync → audit RED (previously the absent-copy skip made this GREEN, which is why CI could not see it).
@@ -149,5 +154,6 @@ refresh path and corrects the "skill copies are tracked" claim (tracked in an ad
 gitignored in the seam repo's own checkout).
 
 ### handoff 2026-10-14 @ses_ec5ee8017ffenAoLAgVVe7sCfF (session: ses_ec5ee8017ffenAoLAgVVe7sCfF) — next: Review/merge PR #804; confirm the unit lane's provenance-audit run on the PR is green (it now checks the derived skill rows with no copies on disk).
+
 - branch: fix/bug-skill-source-edit-leaves-ledger-stale
 - open questions: Dropped-row case (merge deletes all seven skill rows) is invisible in CI by design — recreate-on-materialize, no stranded artifact; extend derivation to vendored plugin rows? (out of scope: check:plu…
