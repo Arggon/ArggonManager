@@ -12,6 +12,7 @@ updated: "2026-10-13"
 claimed_at: "2026-10-13T22:07:11.280Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-full-smoke-scenarios-precede-newer-gates
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/bug-full-smoke-scenarios-precede-newer-gates.md
   Leaves live only under a story. id is the filename stem: bug-full-smoke-scenarios-precede-newer-gates.
@@ -33,10 +34,10 @@ These are harness-vs-kernel drift, not product regressions: the smoke scenarios 
 
 ## Acceptance
 
-- [ ] `npm run smoke:opencode` on a quiet machine reaches 143/143, or every remaining failure is reclassified with evidence (model nondeterminism documented as such, never summarized as a pass)
-- [ ] the fresh-scaffold scenarios create items that satisfy the `PLACEHOLDER_BODY` gate (real context/acceptance prose) rather than tripping it
-- [ ] the lifecycle-close scenario's items carry acceptance criteria, or the scenario asserts the refusal as the expected path
-- [ ] the steal/reopen/`git push` probes distinguish "model declined" from "gate refused" and report the discrimination, or are made deterministic
-- [ ] the run's expected-vs-observed evidence recorded on the item; `arggon validate` green; PR opened
+- [x] `npm run smoke:opencode` on a quiet machine reaches 143/143, or every remaining failure is reclassified with evidence (model nondeterminism documented as such, never summarized as a pass) — final run on `36225d2d`: 158 ok / 0 FAIL (see evidence comment; 158 is the green run's executed-check count, up from the failing run's 143)
+- [x] the fresh-scaffold scenarios create items that satisfy the `PLACEHOLDER_BODY` gate (real context/acceptance prose) rather than tripping it
+- [x] the lifecycle-close scenario's items carry acceptance criteria, or the scenario asserts the refusal as the expected path
+- [x] the steal/reopen/`git push` probes distinguish "model declined" from "gate refused" and report the discrimination, or are made deterministic — the probes attempt the writes (readiness requires them) and the refusal checks passed non-vacuously; the decline branch is unit-pinned but was not needed on the final run
+- [x] the run's expected-vs-observed evidence recorded on the item; `arggon validate` green; PR opened
 
 ## Notes
