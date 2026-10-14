@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-web-board-hierarchy-view
 title: "Web board: grouped ancestry view (initiative → epic → story → leaf) in the served board"
+assignee: arggon-delivery-lead
+branch: feat/task-web-board-hierarchy-view
 parent: story-board-hierarchy-grouping
 labels: [ui, board]
 created: "2026-10-14"
 updated: "2026-10-14"
+claimed_at: "2026-10-14T13:37:49.834Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-web-board-hierarchy-view
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-board-hierarchy-grouping/task-web-board-hierarchy-view.md
