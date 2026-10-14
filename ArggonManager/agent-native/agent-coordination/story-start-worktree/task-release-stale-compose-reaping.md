@@ -32,3 +32,9 @@ Flagged while fixing `bug-cleanup-release-stale-record-wedge` (PR #813): for a S
 - [ ] `arggon validate` green; PR opened
 
 ## Notes
+
+### 2026-10-14 @Arggon
+### Evidence — completed by the lead after a host tool-runtime outage (maker work preserved)
+The maker's session died mid-flight with the work complete and uncommitted; the delivery lead regenerated the plugin bundle and finished from the same worktree. **Decision: parity with `--prune`** — `--release` now reaps the declared Compose project for a stale record first (the project name derives from the recorded path's basename, never from a live directory), because a released claim is never terminal so prune would never consider it again; skipping the reap is a permanent-residue failure mode. Release keeps its **own** failure discipline: a failed teardown aborts the release and keeps the worktree record (the retry's anchor), not prune's non-fatal continue.
+Files: `cli/src/cleanup.ts`, `opencode/plugins/arggon/index.ts` (+ regenerated `index.bundle.ts`), `cli/src/worktree.test.ts` (2 new tests: stale+services → `reaped compose project` → record pruned → branch deleted → cleared; and Compose failure on stale → `failed`, record+branch kept), `opencode/plugins/arggon/tools.test.ts` (native docker-shim case), `ArggonManager/docs/json-output.md` (x2) + `README.md`.
+Gates: `npm run build` ok (bundle regenerated); focused 235/235 (worktree + native + plugin-copy drift gate); validate + prettier green (lead). Full `npm test` runs in CI. PR #819.
