@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-tree-ignores-hide-terminal-toggle
 title: "Tree view ignores the filterbar 'hide done/cancelled' toggle (a columns-only control) — 574 terminal rows stay visible"
+assignee: arggon-delivery-lead
+branch: fix/bug-tree-ignores-hide-terminal-toggle
 parent: story-board-hierarchy-grouping
 labels: [ui, board]
 created: "2026-10-14"
 updated: "2026-10-14"
+claimed_at: "2026-10-14T14:43:42.066Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-tree-ignores-hide-terminal-toggle
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-board-hierarchy-grouping/bug-tree-ignores-hide-terminal-toggle.md
