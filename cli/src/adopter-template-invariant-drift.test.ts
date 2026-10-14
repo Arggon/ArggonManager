@@ -84,9 +84,16 @@ const CARRIERS = [
  * pre-rename "coordinator" at
  * `templates/docs/zcode/arggon/commands/arggon-goal.md` — out of the walk.
  * `REQUIRED_MEMBERS` names one file per subtree so the walk cannot silently
- * shrink back to the governing docs.
+ * shrink back to the governing docs. The Claude Code seam
+ * (spec-claude-code-adapter-024) joins on the same terms: it is a template
+ * subtree `arggon init` copies into an adopting tree, so a pre-rename word or
+ * a retired id inside it is exactly this guard's business.
  */
-const SEAM_SUBTREES = ["templates/docs/opencode/", "templates/docs/zcode/"];
+const SEAM_SUBTREES = [
+  "templates/docs/opencode/",
+  "templates/docs/zcode/",
+  "templates/docs/claude/",
+];
 
 /**
  * The members the guard leans on. Required to exist so the guard cannot be
@@ -106,6 +113,9 @@ const REQUIRED_MEMBERS = [
   "templates/docs/docs/convention.md",
   "templates/docs/opencode/agents/arggon-delivery-lead.md",
   "templates/docs/zcode/arggon/commands/arggon-goal.md",
+  // spec-claude-code-adapter-024 (task-claude-plugin-seam): one member from the
+  // Claude Code seam, so the walk cannot shrink back to the older seams.
+  "templates/docs/claude/arggon/README.md",
   // The non-Markdown member: a JSON template `arggon init` renders byte-for-byte
   // into an adopting tree (task-retired-role-words-product-text). Pinning it
   // here is what stops the walk from being narrowed back to `.md` — the filter

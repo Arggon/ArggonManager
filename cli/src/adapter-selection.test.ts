@@ -162,10 +162,18 @@ describe("adapter selection: registry", () => {
     // zcode: the whole vendored marketplace, nothing outside it.
     expect(BY_AGENT.zcode.some((d) => d.startsWith(".zcode-marketplace/"))).toBe(true);
     expect(BY_AGENT.zcode.some((d) => !d.startsWith(".zcode-marketplace/"))).toBe(false);
-    // claude: the CLAUDE.md pointer shim and the .mcp.json registration — the
-    // two surfaces an init'd tree hands that client today (spec §S6 is the
-    // follow-on that adds a bundle).
-    expect(BY_AGENT.claude).toEqual([".mcp.json", "CLAUDE.md"]);
+    // claude: the CLAUDE.md pointer shim and the .mcp.json registration (the
+    // floor an init'd tree always hands that client) PLUS the vendored plugin
+    // under .claude-marketplace/ (spec-claude-code-adapter-024) — and nothing
+    // outside those two surfaces.
+    expect(BY_AGENT.claude).toContain(".mcp.json");
+    expect(BY_AGENT.claude).toContain("CLAUDE.md");
+    expect(BY_AGENT.claude.some((d) => d.startsWith(".claude-marketplace/"))).toBe(true);
+    expect(
+      BY_AGENT.claude.filter(
+        (d) => !d.startsWith(".claude-marketplace/") && d !== ".mcp.json" && d !== "CLAUDE.md",
+      ),
+    ).toEqual([]);
     // A plain generated doc is nobody's adapter artifact.
     expect(agentForTemplate("docs/AGENTS.md")).toBeNull();
     expect(agentForTemplate("docs/docs/engineering.md")).toBeNull();
@@ -201,6 +209,15 @@ describe("adapter selection: registry", () => {
     expect(detectAgents(dir)).toEqual(["claude", "opencode"]);
     mkdirSync(join(dir, ".zcode-marketplace"), { recursive: true });
     expect(detectAgents(dir)).toEqual(["claude", "opencode", "zcode"]);
+  });
+
+  it("detects the claude bundle from its own marketplace marker alone", () => {
+    // spec-claude-code-adapter-024: `.claude-marketplace` is a claude marker in
+    // its own right — a tree that installed the bundle is a claude tree even
+    // without CLAUDE.md present.
+    const dir = tempDir();
+    mkdirSync(join(dir, ".claude-marketplace"), { recursive: true });
+    expect(detectAgents(dir)).toEqual(["claude"]);
   });
 
   it("refuses --agents together with --no-agents (two contradictory selections)", () => {
@@ -300,7 +317,7 @@ describe("adapter selection: init flag matrix", () => {
         0,
       );
       expect(result.adapters.counts.written).toBe(selectedTotal);
-      // The per-artifact detail is capped, but this bundle is far below the cap,
+      // The per-artifact detail is capped, but this bundle is under the cap,
       // so nothing is cut here — a cap regression must be visible.
       expect(result.adapters.truncated).toBe(false);
       expect(result.adapters.artifacts.length).toBe(total);
@@ -611,7 +628,7 @@ describe("doctor --agents: per-agent report", () => {
       .filter((line) => /^ {2}agent[s]?\b/.test(line) || /^ {4}gap:/.test(line));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "  agents: claude, opencode, zcode (adapter selection: init --agents / --no-agents; report-only)
-        agent claude: 2 file(s) — 2 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 2 capability gap(s)
+        agent claude: 28 file(s) — 28 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 2 capability gap(s)
           gap: discipline-enforceable x claude — no claude:plugin.hooks.PreToolUse gate and no permission DSL: the OpenCode deny rules and the ZCode PreToolUse gate have no Claude Code equivalent, so the kernel, pre-commit and CI carry it alone. (report-only)
           gap: docs-travel-with-code x claude — no session context hook injects the active work item (the OpenCode session.hook('context') block), so the agent must fetch it with \`arggon show\`; the playbook still travels via CLAUDE.md. (report-only)
         agent opencode: 18 file(s) — 18 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)

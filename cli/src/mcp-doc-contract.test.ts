@@ -167,6 +167,9 @@ const CORPUS_DIRS: readonly string[] = [
   "skills/arggon-cli",
   "templates/docs",
   ".zcode-marketplace",
+  // spec-claude-code-adapter-024: the repo's own materialized Claude seam is
+  // part of the shipped corpus, like `.zcode-marketplace` above.
+  ".claude-marketplace",
   ".opencode/agents",
   ".opencode/commands",
 ];
