@@ -8,6 +8,7 @@ labels: []
 created: "2026-10-14"
 updated: "2026-10-14"
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-container-rollup/task-container-status-vs-open-workstreams.md
   Leaves live only under a story. id is the filename stem: task-container-status-vs-open-workstreams.
@@ -73,22 +74,25 @@ npm run arggon -- update arggon-manager --status in_progress
 (If the tool prefers `--status todo`, that works identically — same confirmation.)
 
 ### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
 Correction to the brief's command block (delivery lead, 2026-10-14): the transition table allows `done → todo` only, so `--status in_progress` as the FIRST step is refused (`allowed: todo`). The owner ran the block; all five refused and nothing changed. The reopen is two passes:
 
 **Pass 1 — the human-only, TTY-gated reopen (answer `y` at each prompt):**
+
 ```bash
 npm run arggon -- update agent-native --status todo
 npm run arggon -- update agent-coordination --status todo
 npm run arggon -- update ecosystem-ops --status todo
 npm run arggon -- update ui --status todo
-npm run arggon -- update argson-manager --status todo
+npm run arggon -- update arggon-manager --status todo
 ```
 
 **Pass 2 — normal transition, no confirmation (containers may be `in_progress` without assignee):**
+
 ```bash
 npm run arggon -- update agent-native --status in_progress
 npm run arggon -- update agent-coordination --status in_progress
 npm run arggon -- update ecosystem-ops --status in_progress
 npm run arggon -- update ui --status in_progress
-npm run arggon -- update argson-manager --status in_progress
+npm run arggon -- update arggon-manager --status in_progress
 ```
