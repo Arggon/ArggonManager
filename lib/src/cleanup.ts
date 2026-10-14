@@ -1,4 +1,4 @@
-import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
+import { execFileSync, spawnSync, type ExecFileSyncOptions } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import type { GhExecutor } from "./import-issues.js";
@@ -32,10 +32,14 @@ import {
  * {@link CleanupGit.worktreeList}.
  *
  * The classifier is pure over the injected {@link CleanupGit} predicates, one
- * filesystem check (`existsSync`) and one porcelain probe of an existing
+ * filesystem check (`existsSync`), one optional liveness probe of an existing
+ * path (`worktreeIsLive`, default: git's own `prunable` verdict) and one
+ * porcelain probe of an existing
  * worktree (`git status --porcelain`, optional/injectable): a recorded path
- * that is gone clears the record, a path that exists but is not a worktree of
- * this repo is never touched, a branch that is not provably integrated
+ * that is gone as work — missing on disk, or existing yet no live worktree of
+ * this repo — clears the record, a path that exists and IS a live worktree but
+ * is not registered with this repo is never touched, a branch that is not
+ * provably integrated
  * (ancestry, or a merged PR through the optional gh fallback) is skipped with a
  * reason, and removal-blocking content is classified by kind — untracked
  * blockers need the caller's force opt-in, tracked modifications are refused
@@ -102,6 +106,36 @@ export type CleanupGit = {
   isRepo(cwd: string): boolean;
   /** Absolute paths of every worktree registered with this repo. */
   worktreeList(cwd: string): string[];
+  /**
+   * True when `path` is a LIVE working tree of this repo: git has a worktree
+   * record for it AND the worktree's gitdir link is intact (`git worktree list
+   * --porcelain` reports the path without a `prunable` marker). A record whose
+   * gitdir is gone — an interrupted `git worktree remove` leaves exactly that:
+   * files behind, `.git` deleted — is NOT live: `git worktree remove` refuses
+   * it forever ("validation failed, cannot remove working tree") and it keeps
+   * pinning the branch ("cannot delete branch … used by worktree"), so a reaper
+   * that trusted the record alone retried a removal that can never succeed
+   * (bug-cleanup-stuck-when-worktree-dir-gone).
+   *
+   * OPTIONAL: a runner that omits it is classified on {@link worktreeList}
+   * alone (the pre-existing rule). The default runner answers from a real
+   * `git worktree list --porcelain`, and a probe that cannot answer reports
+   * `true` — unknown is never read as "gone", so a failed probe never clears a
+   * live worktree's record.
+   */
+  worktreeIsLive?(cwd: string, path: string): boolean;
+  /**
+   * `git worktree prune --verbose`: drop worktree records whose worktree gitdir
+   * is missing, and report whether at least one was dropped. The dead record a
+   * stale worktree leaves behind pins its branch and keeps the path in `git
+   * worktree list`, so the reaper drops it itself — no manual `git worktree
+   * prune` step is ever needed. Idempotent, and it only ever drops records
+   * whose location is already gone: a live worktree is never touched.
+   *
+   * OPTIONAL: a runner that omits it keeps the pre-existing behavior (the dead
+   * record survives, but the entry still converges).
+   */
+  pruneWorktrees?(cwd: string): boolean;
   /**
    * The ref worktree removals must be merged into: origin/HEAD when set,
    * else the local main/master branch. Throws when none can be detected.
@@ -209,6 +243,50 @@ export function defaultCleanupGit(): CleanupGit {
         .filter((line) => line.startsWith("worktree "))
         .map((line) => line.slice("worktree ".length).trim())
         .filter((path) => path.length > 0);
+    },
+    worktreeIsLive(cwd: string, path: string): boolean {
+      let out: string;
+      try {
+        out = git(["worktree", "list", "--porcelain"], cwd);
+      } catch {
+        // A probe that cannot answer is never "gone": clearing a live
+        // worktree's record on a failed git read would orphan the worktree.
+        return true;
+      }
+      const target = resolve(path);
+      // Porcelain blocks are blank-line separated; a block is live exactly when
+      // git did not annotate it `prunable` (gitdir file points to a location
+      // that does not exist). That is git's own verdict on the record, and it
+      // is what `git worktree remove` validates before removing.
+      for (const block of out.split(/\n\s*\n/)) {
+        const lines = block.split("\n");
+        const head = lines.find((line) => line.startsWith("worktree "));
+        if (head === undefined) continue;
+        if (resolve(head.slice("worktree ".length).trim()) !== target) continue;
+        return !lines.some((line) => line.startsWith("prunable"));
+      }
+      return false;
+    },
+    pruneWorktrees(cwd: string): boolean {
+      // `--verbose` prints one "Removing worktrees/<name>: …" line per dropped
+      // record to STDERR (stdout stays empty — verified against git 2.47) and
+      // nothing at all when there is nothing to drop. The presence of that
+      // output — never its text — is the signal, so no git message is parsed
+      // and no locale is assumed.
+      const result = spawnSync("git", ["worktree", "prune", "--verbose"], {
+        cwd,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      if (result.error !== undefined || result.status !== 0) {
+        const stderr = String(result.stderr ?? "").trim();
+        const spawnMessage =
+          result.error !== undefined ? String(result.error.message ?? result.error) : "";
+        throw new Error(
+          `git worktree prune failed${stderr ? `: ${stderr}` : spawnMessage ? ` (${spawnMessage})` : ""}`,
+        );
+      }
+      return String(result.stderr ?? "").trim().length > 0;
     },
     defaultBranch(cwd: string): string {
       try {
@@ -346,10 +424,10 @@ export function findMergedPr(
  * Classify one item with a `worktree_path` record against the base ref. The
  * order is the contract: terminal status → recorded branch → integration
  * (ancestry, or a merged PR unless `noGh`) → remote-tip safety → filesystem
- * state (existence, registration) → ONE porcelain probe of its removal
- * blockers (untracked vs tracked, start-owned artifacts discounted). Every skip
- * carries a `reason`; every removable entry carries the `action` the surface
- * performs, and `forced: true` when that removal must pass `--force`.
+ * state (existence, liveness, registration) → ONE porcelain probe of its
+ * removal blockers (untracked vs tracked, start-owned artifacts discounted).
+ * Every skip carries a `reason`; every removable entry carries the `action` the
+ * surface performs, and `forced: true` when that removal must pass `--force`.
  */
 export function classifyCleanupEntry(
   item: WorkItem,
@@ -415,6 +493,23 @@ export function classifyCleanupEntry(
   }
   if (!existsSync(path)) {
     entry.action = "clear stale worktree_path record (path missing on disk)";
+  } else if (gitRunner.worktreeIsLive !== undefined && !gitRunner.worktreeIsLive(root, path)) {
+    // A registration is not a working tree (bug-cleanup-stuck-when-worktree-dir-gone).
+    // git keeps a worktree's record even when its gitdir link is gone — an
+    // interrupted `git worktree remove` leaves exactly that: files behind,
+    // `.git` deleted, the record `prunable` — and `git worktree remove` then
+    // refuses it forever ("validation failed, cannot remove working tree:
+    // '<path>/.git' does not exist", or "fatal: '<path>' is not a working
+    // tree" once the record was pruned by hand) while it keeps pinning the
+    // branch ("cannot delete branch … used by worktree"). The worktree is
+    // already gone as work, so the entry is a stale record: no removal is
+    // attempted, the dead git record is pruned ({@link CleanupGit.pruneWorktrees}),
+    // the merged branch is still deleted and the record is cleared. A leftover
+    // directory is never the reaper's to delete — it is not a worktree — and
+    // stays for the operator, which the action says.
+    entry.action =
+      "clear stale worktree_path record (path is not a live worktree of this repo; " +
+      "any leftover directory is left in place)";
   } else {
     const registered = gitRunner.worktreeList(root).map((p) => resolve(p));
     if (!registered.includes(path)) {

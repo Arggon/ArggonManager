@@ -13,6 +13,7 @@ import {
   mkdtempSync as _mkdtempSync,
   readFileSync,
   readlinkSync,
+  rmSync,
   symlinkSync,
   utimesSync,
   writeFileSync,
@@ -1177,6 +1178,98 @@ describe("arggon cleanup", () => {
     expect(existsSync(paths["task-bravo"])).toBe(true);
     expect(existsSync(paths["task-charlie"])).toBe(true);
     expect(refExists(dir, "refs/heads/feat/task-charlie")).toBe(true);
+  });
+
+  it("converges when the worktree directory was already removed by hand (stale record)", () => {
+    // bug-cleanup-stuck-when-worktree-dir-gone: an interrupted earlier removal
+    // leaves the item's worktree_path recorded while the directory is gone. The
+    // reaper may not need `git worktree prune` first — it prunes the dead record
+    // itself (the record pins the branch: `git branch -d` refuses with "used by
+    // worktree at <path>"), then deletes the merged branch and clears the record.
+    const { dir, paths } = initCleanupRepo();
+    const wt = paths["task-alpha"];
+    rmSync(wt, { recursive: true, force: true });
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true });
+
+    expect(result.failures).toEqual([]);
+    const entry = result.entries.find((e) => e.id === "task-alpha")!;
+    expect(entry.removable).toBe(true);
+    expect(entry.action).toBe("clear stale worktree_path record (path missing on disk)");
+    expect(result.pruned).toEqual([
+      { id: "task-alpha", action: "pruned stale git worktree record" },
+      { id: "task-alpha", action: "deleted branch feat/task-alpha" },
+      { id: "task-alpha", action: "cleared worktree_path" },
+    ]);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    expect(git(["worktree", "list", "--porcelain"], dir)).not.toContain(wt);
+    const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
+    expect(parseFrontmatter(raw).data.worktree_path).toBeUndefined();
+  });
+
+  it("converges when the directory survived but its gitdir was lost (interrupted removal)", () => {
+    // The exact wedge: `git worktree remove` died half-way, taking `.git` with
+    // it; git still lists the record as `prunable`, so the classifier reported
+    // `removable: true` and the removal failed forever ("validation failed,
+    // cannot remove working tree: '<path>/.git' does not exist"; after a manual
+    // prune, "fatal: '<path>' is not a working tree"). The entry is a stale
+    // record: no removal is attempted, the dead record is pruned, the merged
+    // branch is deleted and the record is cleared — debris untouched.
+    const { dir, paths } = initCleanupRepo();
+    const wt = paths["task-alpha"];
+    rmSync(join(wt, ".git"), { force: true });
+    expect(git(["worktree", "list", "--porcelain"], dir)).toContain("prunable");
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true });
+
+    expect(result.failures).toEqual([]);
+    const entry = result.entries.find((e) => e.id === "task-alpha")!;
+    expect(entry.removable).toBe(true);
+    expect(entry.action).toBe(
+      "clear stale worktree_path record (path is not a live worktree of this repo; " +
+        "any leftover directory is left in place)",
+    );
+    expect(result.pruned).toEqual([
+      { id: "task-alpha", action: "pruned stale git worktree record" },
+      { id: "task-alpha", action: "deleted branch feat/task-alpha" },
+      { id: "task-alpha", action: "cleared worktree_path" },
+    ]);
+    // The debris is never the reaper's to delete: the files stay in place.
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    expect(git(["worktree", "list", "--porcelain"], dir)).not.toContain(wt);
+    const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
+    expect(parseFrontmatter(raw).data.worktree_path).toBeUndefined();
+  });
+
+  it("converges when a manual `git worktree prune` already dropped the dead record", () => {
+    // The state the incident was hand-repaired from: the directory remains, git
+    // no longer knows the worktree. The old classifier skipped it forever
+    // ("path exists but is not a git worktree of this repo (remove it
+    // manually)"); the stale record is now cleared and the branch deleted.
+    const { dir, paths } = initCleanupRepo();
+    const wt = paths["task-alpha"];
+    rmSync(join(wt, ".git"), { force: true });
+    git(["worktree", "prune"], dir);
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true });
+
+    expect(result.failures).toEqual([]);
+    const entry = result.entries.find((e) => e.id === "task-alpha")!;
+    expect(entry.removable).toBe(true);
+    expect(entry.action).toBe(
+      "clear stale worktree_path record (path is not a live worktree of this repo; " +
+        "any leftover directory is left in place)",
+    );
+    // No prune step: git already dropped the record, so nothing was pruned.
+    expect(result.pruned).toEqual([
+      { id: "task-alpha", action: "deleted branch feat/task-alpha" },
+      { id: "task-alpha", action: "cleared worktree_path" },
+    ]);
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
+    expect(parseFrontmatter(raw).data.worktree_path).toBeUndefined();
   });
 
   it("prunes a worktree whose start-created node_modules link is untracked (review F2)", () => {

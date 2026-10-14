@@ -4232,6 +4232,50 @@ describe("worktree domain tools (W4)", () => {
     ]);
   });
 
+  it("cleanup prune converges on the next run when the worktree's gitdir is gone (reaper wedge)", async () => {
+    // bug-cleanup-stuck-when-worktree-dir-gone: the first run above leaves a
+    // PARTIAL removal — files behind, `.git` deleted, git's record `prunable`
+    // and still pinning the branch. Before the fix every later run reported the
+    // candidate removable and failed forever ("git worktree removal failed:
+    // fatal: … is not a working tree"). The stale record is now recognized as
+    // already-gone: no removal is attempted, the dead git record is pruned
+    // (which unpins the branch), the merged branch is deleted and the record is
+    // cleared.
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(
+      dir,
+      "task-rate-limit",
+      ({ domain, calls: seen }) => {
+        domain.remove = async (input) => {
+          seen.remove.push(input);
+          rmSync(join(input.directory, ".git"), { force: true });
+          throw new Error("worktree domain unavailable");
+        };
+      },
+    );
+
+    const first = await tool(defs, "cleanup").execute({ prune: true });
+    expect((first.output as Record<string, unknown>).failures).toHaveLength(1);
+
+    const second = await tool(defs, "cleanup").execute({ prune: true });
+    const envelope = second.output as Record<string, unknown>;
+    expect(envelope.failures).toEqual([]);
+    expect(envelope.pruned).toEqual([
+      { id: "task-rate-limit", action: "pruned stale git worktree record" },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    // The debris is left in place (it is not a worktree); the branch and the
+    // record are gone, and no removal was attempted through the domain again.
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: false },
+    ]);
+    expect(envelope.commit).toMatchObject({ message: "chore(tasks): pruned task-rate-limit" });
+  });
+
   it("cleanup prune skips a foreign node_modules install instead of force-removing it without force", async () => {
     const dir = seedGitTree();
     const { worktreePath, defs, calls } = await completedWorktree(dir);
