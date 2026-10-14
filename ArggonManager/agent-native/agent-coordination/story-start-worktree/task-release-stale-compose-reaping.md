@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-release-stale-compose-reaping
 title: cleanup --release skips Compose reaping for stale records while --prune reaps them — decide and align (or document the difference)
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-start-worktree
 labels: [worktree, cleanup]
 created: "2026-10-14"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T17:14:41.985Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-release-stale-compose-reaping
 ---
 <!--
