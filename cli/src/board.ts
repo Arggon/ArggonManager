@@ -23,6 +23,7 @@ import {
   sortById,
   statusCounts,
   toContractWorkItem,
+  treeEntries,
   type AcceptanceRow,
   type ContractWorkItem as WorkItem,
   type KernelWorkItem,
@@ -40,7 +41,13 @@ export type BoardOptions = {
   generatedAt?: string;
   /** When true, overlay live GitHub PR state on cards with a `branch` (read-only). */
   github?: boolean;
-  /** Prototype (ADR 0003) `milestone`, or `story` (task-board-dependency-visuals): group cards within each column. */
+  /**
+   * `milestone` (ADR 0003) or `story` (task-board-dependency-visuals): group
+   * cards within each column. `tree` (task-web-board-hierarchy-view) is not a
+   * within-column key: it renders the recorded ancestry
+   * (initiative → epic → story → leaf) as a nested layout and opens the board
+   * in it — the in-page `grouped ancestry` toggle switches back.
+   */
   groupBy?: string;
   /** Injectable GitHub reader (tests pass a fake; default shells out to `gh`). */
   gh?: BoardGithub;
@@ -68,8 +75,12 @@ export type BoardResult = {
   itemCount: number;
   /** PRs matched to card branches (0 unless `github` is on). */
   prCount: number;
-  /** Set when the board was rendered grouped ("milestone" prototype, or "story"). */
-  groupBy?: "milestone" | "story";
+  /**
+   * Set when `--group-by` was passed: `milestone`/`story` group cards within
+   * each column; `tree` (task-web-board-hierarchy-view) opens the board in the
+   * grouped-ancestry layout.
+   */
+  groupBy?: "milestone" | "story" | "tree";
   /** Embedded detail payload size in UTF-8 bytes (`--details` only). */
   detailBytes?: number;
 };
@@ -167,8 +178,10 @@ export function runBoard(opts: BoardOptions): BoardResult {
   const root = repoRootFromTasks(tasksDir);
   let groupBy: BoardResult["groupBy"];
   if (opts.groupBy !== undefined) {
-    if (opts.groupBy !== "milestone" && opts.groupBy !== "story") {
-      throw new Error(`unknown --group-by field '${opts.groupBy}' (supported: milestone, story)`);
+    if (opts.groupBy !== "milestone" && opts.groupBy !== "story" && opts.groupBy !== "tree") {
+      throw new Error(
+        `unknown --group-by field '${opts.groupBy}' (supported: milestone, story, tree)`,
+      );
     }
     groupBy = opts.groupBy;
   }
@@ -2126,6 +2139,203 @@ export function buildBoardSummary(items: KernelWorkItem[]): BoardSummary {
   };
 }
 
+/** One nested ancestry node: the item plus its id-sorted children (pure). */
+export type BoardTreeNode = { item: WorkItem; children: BoardTreeNode[] };
+
+/**
+ * Nest the recorded ancestry (task-web-board-hierarchy-view): the flat,
+ * cycle-safe, id-sorted pre-order from the shared view-model (`treeEntries`,
+ * task-ui-shared-viewmodel) rebuilt into a tree of roots. The kernel's
+ * recorded `parent` edges are the ONLY hierarchy source: a parent that is
+ * absent, blank or unknown makes the item a root (a malformed tree renders as
+ * roots instead of disappearing, and a parent cycle renders once, as a root),
+ * and siblings stay id-sorted exactly like the flat walk. Pure.
+ */
+export function boardTreeRoots(items: WorkItem[]): BoardTreeNode[] {
+  const entries = treeEntries(sortById(items));
+  const roots: BoardTreeNode[] = [];
+  const stack: BoardTreeNode[] = [];
+  for (const entry of entries) {
+    const node: BoardTreeNode = { item: entry.item, children: [] };
+    if (entry.depth <= 0 || stack.length === 0) {
+      roots.push(node);
+      stack.length = 0;
+      stack.push(node);
+      continue;
+    }
+    // Pre-order + depth: the parent of a depth-d entry is the node sitting at
+    // depth d-1, so truncating the stack to d puts it on top.
+    stack.length = Math.min(entry.depth, stack.length);
+    const parent = stack[stack.length - 1];
+    parent.children.push(node);
+    stack.push(node);
+  }
+  return roots;
+}
+
+/**
+ * Nested ancestry markup for the grouped-ancestry view
+ * (task-web-board-hierarchy-view): one list item per tracked item, nested
+ * through the recorded `parent` edges (`boardTreeRoots`), each row carrying
+ * its own type badge, id, status and priority — the web-board reading of the
+ * OpenCode panel's `boardTreeLines`. Read-only by design (no anchors at all,
+ * so a dangling parent can never become a dead link): the layout is for
+ * reading the tree, and the columns view stays one toggle away for moves, the
+ * drawer and drag-and-drop. Every repo-controlled byte goes through
+ * `escapeHtml`.
+ *
+ * Honest partial chains: an item with no parent edge, or a blank one, renders
+ * as a top-level row (that is the shape the tracker has); an item whose
+ * recorded parent is not in the snapshot renders as a top-level row WITH a
+ * `↳ recorded parent <id> (missing)` marker (and a `missing-parent` class), so
+ * a broken chain is visible instead of silently promoted. An empty tracker
+ * renders the same `—` placeholder the columns use.
+ *
+ * `openDeps` is the caller's open-dependency predicate (the kernel rule via
+ * `openDependencyIds`); without it rows carry no blocked badge.
+ */
+export function renderBoardTree(
+  items: WorkItem[],
+  opts: { openDeps?: (item: WorkItem) => string[] } = {},
+): string {
+  const esc = escapeHtml;
+  const openDeps = opts.openDeps ?? ((): string[] => []);
+  const known = new Set(items.map((item) => item.id));
+  const roots = boardTreeRoots(items);
+  if (roots.length === 0) return '<div class="empty">—</div>';
+  const rowOf = (item: WorkItem): string => {
+    const type = esc(item.type);
+    const priority = item.priority
+      ? `\n  <span class="priority ${esc(item.priority)}">${esc(item.priority)}</span>`
+      : "";
+    const title = item.title ? `\n  <span class="tree-title">${esc(item.title)}</span>` : "";
+    const assignee = item.assignee
+      ? `\n  <span class="tree-assignee">@${esc(item.assignee)}</span>`
+      : "";
+    const blocked = openDeps(item);
+    const blockedBadge = blocked.length
+      ? `\n  <span class="tree-blocked">blocked by ${blocked.length}</span>`
+      : "";
+    const parent = typeof item.parent === "string" && item.parent !== "" ? item.parent : "";
+    const missingMark =
+      parent !== "" && !known.has(parent)
+        ? `\n  <span class="tree-missing">↳ recorded parent ${esc(parent)} (missing)</span>`
+        : "";
+    return `<div class="tree-row">
+  <span class="type" data-type="${type}" style="--type-color: ${TYPE_COLORS[item.type]}">${type}</span>
+  <code>${esc(item.id)}</code>
+  <span class="status-chip ${esc(item.status)}">${esc(item.status)}</span>${priority}${title}${assignee}${blockedBadge}${missingMark}
+</div>`;
+  };
+  const nodeOf = (node: BoardTreeNode): string => {
+    const parent = typeof node.item.parent === "string" ? node.item.parent : "";
+    const classes = parent !== "" && !known.has(parent) ? "tree-node missing-parent" : "tree-node";
+    const children =
+      node.children.length > 0
+        ? `\n<ul class="tree-children">\n${node.children.map(nodeOf).join("\n")}\n</ul>`
+        : "";
+    return `<li class="${classes}" data-id="${esc(node.item.id)}" data-type="${esc(node.item.type)}" data-status="${esc(node.item.status)}">${rowOf(node.item)}${children}</li>`;
+  };
+  return `<ul class="tree-root">\n${roots.map(nodeOf).join("\n")}\n</ul>`;
+}
+
+/**
+ * Which ancestry rows the client-side lens shows (task-web-board-hierarchy-view):
+ * the matched items (the same verdict the columns view applies to cards) plus
+ * every ancestor on the path to a match. The ancestors are what keeps a
+ * filtered tree readable — a matching leaf whose story/epic/initiative were
+ * hidden would render as an orphan — and they are returned in their own
+ * `context` map so the page can mark them (muted) and the `N of M` counter can
+ * keep counting MATCHES, never context rows (the lens's honest number).
+ *
+ * Cycle-safe and total: the walk up the recorded `parent` chain stops at the
+ * first repeated id, and the matched item is never its own ancestor. Ids are
+ * read from the item list itself, so an id that is not in the snapshot can
+ * never contribute context. Prototype-less maps: an id like `constructor`
+ * must not read as matched. Pure, and embedded into the page with
+ * `toString()` — no module-scope references, no template literals.
+ */
+export function boardTreeDisplay(
+  items: Array<{ id: string; parent?: string | null }>,
+  visible: string[],
+): { shown: Record<string, true>; context: Record<string, true> } {
+  const parentOf: Record<string, string> = Object.create(null);
+  for (let i = 0; i < items.length; i++) {
+    const entry = items[i];
+    const parent = entry && entry.parent ? String(entry.parent) : "";
+    if (parent !== "") parentOf[entry.id] = parent;
+  }
+  const matched: Record<string, true> = Object.create(null);
+  for (let m = 0; m < visible.length; m++) matched[visible[m]] = true;
+  const shown: Record<string, true> = Object.create(null);
+  const context: Record<string, true> = Object.create(null);
+  for (let j = 0; j < items.length; j++) {
+    const id = items[j].id;
+    if (matched[id] !== true) continue;
+    shown[id] = true;
+    const visited: Record<string, true> = Object.create(null);
+    visited[id] = true;
+    let cur: string | undefined = parentOf[id];
+    while (cur !== undefined && visited[cur] !== true) {
+      visited[cur] = true;
+      shown[cur] = true;
+      context[cur] = true;
+      cur = parentOf[cur];
+    }
+  }
+  // A matched container that also sits on another match's path is a match,
+  // never context (the counter and the styling read the same verdict).
+  for (const id in matched) delete context[id];
+  return { shown: shown, context: context };
+}
+
+/**
+ * Grouped-ancestry layout toggle (task-web-board-hierarchy-view): shows one of
+ * the two views (the status columns or the nested ancestry) and marks the
+ * filterbar button's `aria-pressed` state. The generation-time default comes
+ * from `--group-by tree` (the server renders that view visible), the URL hash
+ * (`#view=tree` / `#view=columns`) overrides it on load so a reload or a shared
+ * link keeps the choice, and `onViewChange` is the caller's hook to write the
+ * hash — the page owns one hash writer for filter + view together.
+ *
+ * Embedded with `toString()` into EVERY board (static export and serve alike,
+ * like the column controls): no module-scope references, no template literals.
+ */
+export function wireBoardView(
+  defaultView: string,
+  onViewChange: (() => void) | null,
+  ensureAnchor?: (() => void) | null,
+): { current: () => string; set: (view: string) => void } {
+  const columns = document.querySelector("main.board") as HTMLElement | null;
+  const tree = document.getElementById("board-tree");
+  const toggle = document.getElementById("board-view-toggle");
+  let view = defaultView === "tree" ? "tree" : "columns";
+  function apply(): void {
+    if (columns) columns.hidden = view !== "columns";
+    if (tree) tree.hidden = view !== "tree";
+    if (toggle) toggle.setAttribute("aria-pressed", view === "tree" ? "true" : "false");
+    if (ensureAnchor) ensureAnchor();
+  }
+  function set(next: string): void {
+    view = next === "tree" ? "tree" : "columns";
+    apply();
+  }
+  document.addEventListener("click", function (event) {
+    const target = event.target as Element | null;
+    if (!target || typeof target.closest !== "function") return;
+    if (!target.closest("#board-view-toggle")) return;
+    set(view === "tree" ? "columns" : "tree");
+    if (onViewChange) onViewChange();
+  });
+  apply();
+  return {
+    current: function (): string {
+      return view;
+    },
+    set: set,
+  };
+}
+
 /**
  * Pure renderer for the static board. Columns are the v0 statuses in enum
  * order; every card shows its own status (no rollup). All dynamic text is
@@ -2140,6 +2350,17 @@ export function buildBoardSummary(items: KernelWorkItem[]): BoardSummary {
  * `summary` (task-board-progress-header) each story group head also carries
  * its completion fraction (done + cancelled over the group's cards, the
  * kernel report's rule via `completedOf`).
+ * With `groupBy: "tree"` (task-web-board-hierarchy-view) the board OPENS in the
+ * grouped-ancestry layout instead of the status columns: one nested list of
+ * every tracked item under the recorded `parent` edges (initiative → epic →
+ * story → leaf), each row carrying type, id, status and priority. Every board
+ * carries both layouts — the in-page `grouped ancestry` toggle in the
+ * filterbar switches between them (static export and serve alike, no server
+ * needed) and the choice round-trips through the URL hash (`#view=tree`, kept
+ * only when it differs from this default). The status columns, and with them
+ * drag-and-drop, the keyboard move menu and the detail drawer, are never
+ * removed: they are one toggle away. `milestone`/`story` keep grouping cards
+ * within each column, exactly as before.
  * With `live: true` (GitHub overlay) cards with a `branch` also render a PR
  * badge: state (open/draft/merged/closed) + checks summary; with
  * `diffLinks: true` (task-board-review-surface, --serve only) a second link
@@ -2208,7 +2429,7 @@ export function renderBoardHtml(
     live?: boolean;
     /** Serve-mode review surface (task-board-review-surface): add per-PR diff links. */
     diffLinks?: boolean;
-    groupBy?: "milestone" | "story";
+    groupBy?: "milestone" | "story" | "tree";
     /** Saved views (`x-views`) rendered as lens chips: view name -> filter expression. */
     lenses?: Record<string, string>;
     /** Resolved login for `@me` in an expression; null/absent = unresolved (loud error). */
@@ -2295,6 +2516,14 @@ export function renderBoardHtml(
   // (validate flags them as UNKNOWN_DEPENDENCY).
   const statusById = buildStatusIndex(sorted);
   const openDeps = (item: WorkItem): string[] => openDependencyIds(item.depends_on, statusById);
+
+  // Grouped-ancestry view (task-web-board-hierarchy-view): every board carries
+  // BOTH layouts, so the in-page toggle works in the static export with no
+  // server — `--group-by tree` decides which one the page OPENS in and the
+  // other stays one click away. The status columns (and with them drag/drop,
+  // the drawer and the keyboard move surface) are therefore never lost.
+  const viewDefault: "columns" | "tree" = opts.groupBy === "tree" ? "tree" : "columns";
+  const treeHtml = renderBoardTree(sorted, { openDeps });
 
   const NO_MILESTONE = null;
   const milestoneOf = (item: WorkItem): string | null =>
@@ -2543,6 +2772,20 @@ export function renderBoardHtml(
   --blocked-bg: #fff1e7;
   --scrim: rgb(0 0 0 / 0.35);
   --card-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
+  /* Grouped-ancestry status chips (task-web-board-hierarchy-view): a filled
+     chip per status, measured at >= 4.5:1 for its 10px bold text (6.11 todo,
+     7.59 in_progress, 6.61 blocked, 5.08 done, 6.04 cancelled — asserted in
+     board.test.ts). Values only: the dark block swaps them. */
+  --st-todo-bg: #59636e;
+  --st-todo-fg: #ffffff;
+  --st-in-progress-bg: #0550ae;
+  --st-in-progress-fg: #ffffff;
+  --st-blocked-bg: #fff1e7;
+  --st-blocked-fg: #9a3412;
+  --st-done-bg: #1a7f37;
+  --st-done-fg: #ffffff;
+  --st-cancelled-bg: #d0d4da;
+  --st-cancelled-fg: #424a53;
   --card-font: 13px;
   --card-code-font: 11px;
   --card-pad: 10px;
@@ -2575,6 +2818,18 @@ export function renderBoardHtml(
   --blocked-bg: #3a2b1d;
   --scrim: rgb(0 0 0 / 0.55);
   --card-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  /* Status chips, dark (values only — same geometry as light): 8.33 todo,
+     4.63 in_progress, 6.72 blocked, 7.45 done, 6.38 cancelled. */
+  --st-todo-bg: #3d444d;
+  --st-todo-fg: #e6edf3;
+  --st-in-progress-bg: #1f6feb;
+  --st-in-progress-fg: #ffffff;
+  --st-blocked-bg: #3a2b1d;
+  --st-blocked-fg: #f2a65a;
+  --st-done-bg: #3fb950;
+  --st-done-fg: #0d1117;
+  --st-cancelled-bg: #3d444d;
+  --st-cancelled-fg: #c9d1d9;
 }
 :root[data-density="compact"] {
   --card-font: 12px;
@@ -2717,6 +2972,36 @@ header .meta { color: var(--meta); font-size: 13px; }
 .lens { border: 1px solid var(--muted); background: var(--card); border-radius: 12px; padding: 3px 10px; font-size: 12px; font-family: inherit; color: inherit; cursor: pointer; }
 .lens.active { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
 .card.filtered-out, .mgroup-head.filtered-out { display: none; }
+/* Grouped-ancestry view (task-web-board-hierarchy-view). The two layouts
+   toggle with the hidden ATTRIBUTE, and an author display on the same
+   element would beat the UA sheet's [hidden] { display: none } — so this
+   rule is load-bearing (the same trap .move-prompt[hidden] documents).
+   Rows carry their own status chip: the layout has no status columns, so the
+   status has to live on the row. Chip pairs (measured, asserted in
+   board.test.ts against these exact values): light 6.11/7.59/6.61/5.08/6.04,
+   dark 8.33/4.63/6.72/7.45/6.38 — all >= 4.5:1 for the 10px bold chip text,
+   carried only through --st-* custom properties, so the dark block swaps
+   values, never rules. Context rows (the ancestor path a filtered view keeps)
+   sit on the dim surface with the muted grey: light 5.70:1, dark 5.14:1. */
+main.board[hidden], .tree[hidden] { display: none; }
+.tree { background: var(--col); border-radius: 8px; padding: var(--col-pad); }
+.tree h2 { display: flex; align-items: center; gap: 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-soft); margin: 0 0 10px; }
+.tree ul { list-style: none; margin: 0; padding: 0; }
+.tree .tree-children { margin: 2px 0 2px 8px; padding-left: 14px; border-left: 1px solid var(--pill); }
+.tree-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; background: var(--card); box-shadow: var(--card-shadow); border-radius: 4px; padding: 3px 8px; margin-bottom: 3px; font-size: var(--card-font); }
+.tree-row code { font-size: var(--card-code-font); color: var(--meta); }
+.tree-title { font-weight: 600; overflow-wrap: anywhere; }
+.tree-assignee { color: var(--fg-soft); font-size: 12px; }
+.tree-missing { color: var(--muted); font-size: 11px; }
+.tree-blocked { margin-left: auto; color: var(--blocked-fg); background: var(--blocked-bg); border-radius: 10px; padding: 0 8px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+.tree-node.context > .tree-row { background: var(--card-dim); color: var(--meta); }
+.tree-node.filtered-out { display: none; }
+.status-chip { border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
+.status-chip.todo { background: var(--st-todo-bg); color: var(--st-todo-fg); }
+.status-chip.in_progress { background: var(--st-in-progress-bg); color: var(--st-in-progress-fg); }
+.status-chip.blocked { background: var(--st-blocked-bg); color: var(--st-blocked-fg); }
+.status-chip.done { background: var(--st-done-bg); color: var(--st-done-fg); }
+.status-chip.cancelled { background: var(--st-cancelled-bg); color: var(--st-cancelled-fg); }
 ${details ? DETAIL_CSS : ""}
 </style>
 <script>
@@ -2741,14 +3026,19 @@ bootBoardTheme();
   <span id="board-filter-count" class="filter-count">${sorted.length} item(s)</span>
   <span id="board-filter-error" class="filter-error" role="alert"></span>
   ${lensChips}
+  <button type="button" id="board-view-toggle" class="layout-toggle" aria-pressed="${viewDefault === "tree" ? "true" : "false"}">grouped ancestry</button>
   <button type="button" id="board-theme-toggle" class="layout-toggle">theme: auto</button>
   <button type="button" id="board-density-toggle" class="layout-toggle" aria-pressed="false">compact density</button>
   <button type="button" id="board-terminal-toggle" class="layout-toggle" aria-pressed="false">hide done/cancelled</button>
   <button type="button" id="board-layout-reset" class="layout-toggle">reset layout</button>
 </div>
-<main class="board" aria-label="arggon board">
+<main class="board" aria-label="arggon board"${viewDefault === "tree" ? " hidden" : ""}>
 ${columns}
 </main>
+<section class="tree" id="board-tree" aria-labelledby="board-tree-heading"${viewDefault === "tree" ? "" : " hidden"}>
+  <h2 id="board-tree-heading">grouped ancestry <span class="count" id="board-tree-count">${sorted.length}</span></h2>
+${treeHtml}
+</section>
 <div id="board-toast" role="status" aria-live="polite"></div>
 ${details ? DRAWER_MARKUP : ""}
 ${details ? MOVE_MENU_MARKUP : ""}
@@ -2760,6 +3050,8 @@ ${embeddedFunctionSource(evaluateDrop)}
 ${embeddedFunctionSource(applyBoardFilter)}
 /* board-filter:end */
 ${embeddedFunctionSource(dropNeedsClaimPrompt)}
+${embeddedFunctionSource(boardTreeDisplay)}
+${embeddedFunctionSource(wireBoardView)}
 ${embeddedFunctionSource(wireBoardColumns)}
 ${embeddedFunctionSource(wireBoardTheme)}
 ${embeddedFunctionSource(trapBoardFocus)}
@@ -2772,6 +3064,11 @@ ${details ? embeddedFunctionSource(wireBoardMoveMenu) : ""}
   var ENDPOINT = document.body.getAttribute("data-update-endpoint") || "/api/update";
   var BOARD_ITEMS = ${embedJson(lensItems)};
   var BOARD_ME = ${embedJson(me)};${details ? `\n  var BOARD_DETAILS = ${embedJson(opts.staticDetails ?? null)};` : ""}
+  // View default (task-web-board-hierarchy-view): the layout the server
+  // rendered visible (--group-by tree opens in the ancestry tree, anything
+  // else in the status columns). The URL hash overrides it on load, and the
+  // hash only carries the view when it differs from this default.
+  var BOARD_VIEW_DEFAULT = ${embedJson(viewDefault)};
   // Roving focus anchor (serve mode): the filter re-seats the focusable card
   // when the current one gets hidden; null in the static export.
   var keyboardNav = ${details ? "wireBoardKeyboardNav()" : "null"};
@@ -2866,21 +3163,41 @@ ${details ? embeddedFunctionSource(wireBoardMoveMenu) : ""}
       });
     });
   }
-  function refreshFilterCount() {
+  function refreshFilterCount(shownCount) {
     if (!filterCount) return;
     var total = BOARD_ITEMS.length;
-    var shown = document.querySelectorAll(".board .card:not(.filtered-out)").length;
-    filterCount.textContent = shown === total ? total + " item(s)" : shown + " of " + total + " item(s)";
+    filterCount.textContent = shownCount === total ? total + " item(s)" : shownCount + " of " + total + " item(s)";
+    var treeCount = document.getElementById("board-tree-count");
+    if (treeCount) treeCount.textContent = String(shownCount);
+  }
+  function refreshTree(visibleIds) {
+    // Grouped-ancestry view (task-web-board-hierarchy-view): the matched rows
+    // stay, plus the ancestor path to each match (marked as context); a row
+    // with no match in its subtree hides WITH its subtree, because the display
+    // map already accounts for descendants — nothing visible is ever orphaned.
+    var display = boardTreeDisplay(BOARD_ITEMS, visibleIds);
+    document.querySelectorAll("#board-tree .tree-node").forEach(function (node) {
+      var id = node.getAttribute("data-id") || "";
+      node.classList.toggle("filtered-out", display.shown[id] !== true);
+      node.classList.toggle("context", display.context[id] === true);
+    });
   }
   function setFilterState(expr) {
     var result = applyBoardFilter(BOARD_ITEMS, expr, BOARD_ME);
     // Prototype-less: ids like "constructor" must not read as visible.
     var shown = Object.create(null);
+    var visibleIds = [];
     if (result.ok) {
-      for (var i = 0; i < result.visible.length; i++) shown[result.visible[i]] = true;
+      for (var i = 0; i < result.visible.length; i++) {
+        shown[result.visible[i]] = true;
+        visibleIds.push(result.visible[i]);
+      }
     } else {
       // Invalid expression: keep the whole board visible, surface the error.
-      for (var j = 0; j < BOARD_ITEMS.length; j++) shown[BOARD_ITEMS[j].id] = true;
+      for (var j = 0; j < BOARD_ITEMS.length; j++) {
+        shown[BOARD_ITEMS[j].id] = true;
+        visibleIds.push(BOARD_ITEMS[j].id);
+      }
     }
     if (filterError) {
       filterError.textContent = result.ok ? "" : result.error;
@@ -2890,17 +3207,21 @@ ${details ? embeddedFunctionSource(wireBoardMoveMenu) : ""}
       if (shown[card.getAttribute("data-id")]) card.classList.remove("filtered-out");
       else card.classList.add("filtered-out");
     });
+    refreshTree(visibleIds);
     lensChips.forEach(function (chip) {
       chip.className = chip.getAttribute("data-filter") === expr ? "lens active" : "lens";
     });
     refreshCounts();
     normalizeEmpties();
     refreshGroupHeads();
-    refreshFilterCount();
+    // The N of M counter and the ancestry heading both count the lens
+    // verdict (matches), never the rendered rows: the tree's context rows and
+    // the columns' cards are two renderings of the same verdict.
+    refreshFilterCount(visibleIds.length);
     if (keyboardNav) keyboardNav.ensureAnchor();
   }
-  function hashFilter() {
-    var match = /[#&]filter=([^&]*)/.exec(window.location.hash);
+  function hashParam(name) {
+    var match = new RegExp("[#&]" + name + "=([^&]*)").exec(window.location.hash);
     if (!match) return "";
     try {
       return decodeURIComponent(match[1]);
@@ -2908,8 +3229,18 @@ ${details ? embeddedFunctionSource(wireBoardMoveMenu) : ""}
       return match[1];
     }
   }
-  function writeHash(expr) {
-    var next = expr === "" ? "" : "#filter=" + encodeURIComponent(expr);
+  function hashFilter() {
+    return hashParam("filter");
+  }
+  function writeHash(expr, view) {
+    // One writer for both hash parameters: filter (the lens) and view (the
+    // layout). The view is written only when it differs from the generated
+    // default, so a plain board keeps a clean #filter= hash and a
+    // --group-by tree board still round-trips a switch back to the columns.
+    var parts = [];
+    if (expr !== "") parts.push("filter=" + encodeURIComponent(expr));
+    if (view !== BOARD_VIEW_DEFAULT) parts.push("view=" + view);
+    var next = parts.length === 0 ? "" : "#" + parts.join("&");
     if (window.location.hash === next) return;
     var base = window.location.pathname + window.location.search;
     if (window.history && window.history.replaceState) {
@@ -2918,9 +3249,19 @@ ${details ? embeddedFunctionSource(wireBoardMoveMenu) : ""}
       window.location.hash = next;
     }
   }
+  var viewState = wireBoardView(
+    BOARD_VIEW_DEFAULT,
+    function () { writeHash(currentExpr(), viewState.current()); },
+    keyboardNav ? keyboardNav.ensureAnchor : null,
+  );
+  function applyHashView() {
+    var wanted = hashParam("view");
+    if (wanted === "tree" || wanted === "columns") viewState.set(wanted);
+  }
+  applyHashView();
   function setFilter(expr, writeUrl) {
     if (filterInput) filterInput.value = expr;
-    if (writeUrl) writeHash(expr);
+    if (writeUrl) writeHash(expr, viewState.current());
     setFilterState(expr);
   }
   if (filterInput) {
@@ -2942,7 +3283,10 @@ ${details ? embeddedFunctionSource(wireBoardMoveMenu) : ""}
       setFilter(filterInput && filterInput.value === expr ? "" : expr, true);
     });
   });
-  window.addEventListener("hashchange", function () { setFilter(hashFilter(), false); });
+  window.addEventListener("hashchange", function () {
+    setFilter(hashFilter(), false);
+    applyHashView();
+  });
   setFilter(hashFilter(), false);
   var dragged = null;
   document.addEventListener("dragstart", function (e) {

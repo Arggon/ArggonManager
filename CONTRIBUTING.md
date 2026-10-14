@@ -229,7 +229,7 @@ job's browser step, so a local green run is the evidence CI will reproduce.
 #### Accessibility gate (axe)
 
 The `@smoke` lane runs [axe](https://github.com/dequelabs/axe-core)
-(`@axe-core/playwright`, version-pinned, dev-only) against four board states,
+(`@axe-core/playwright`, version-pinned, dev-only) against six board states,
 each gated on its own deterministic readiness signal (an `expect` on a settled
 element — never a sleep, never a `networkidle` guess): the **served ready
 page** (first test, before any interaction — including a fixture-rendered
@@ -237,8 +237,13 @@ page** (first test, before any interaction — including a fixture-rendered
 asserted), the **open detail drawer** (right after the acceptance-row count
 proves the async `/api/item` content has rendered), the **static `file://`
 export** (after its `h1`; a separate document, so an export-only regression is
-caught) and the **filtered/lens state** (after the narrowed-card count, with
-the `.empty` placeholders the filter creates). It is a gate, not a report: a
+caught), the **filtered/lens state** (after the narrowed-card count, with
+the `.empty` placeholders the filter creates), the **static grouped-ancestry
+export** (`arggon board --group-by tree`, after the hard `h1`) and the
+**filtered ancestry tree** on the served board (after the `N of M` count, with
+the muted context rows the lens keeps). The last two are
+`task-web-board-hierarchy-view`'s scanned states; the list grows with every
+new surface, never widens into a blanket scan. It is a gate, not a report: a
 violation fails the test.
 
 **What is asserted.** Every WCAG A/AA level axe can check automatically, across

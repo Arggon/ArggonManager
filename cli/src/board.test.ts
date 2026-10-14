@@ -13,12 +13,15 @@ import {
   displayPath,
   escapeHtml,
   applyBoardFilter,
+  boardTreeDisplay,
+  boardTreeRoots,
   bootBoardTheme,
   buildBoardDetailMap,
   dropNeedsClaimPrompt,
   evaluateDrop,
   renderBoardDetail,
   renderBoardHtml,
+  renderBoardTree,
   runBoard,
   summarizeChecks,
   trapBoardFocus,
@@ -28,6 +31,7 @@ import {
   wireBoardMoveMenu,
   wireBoardMovePrompt,
   wireBoardTheme,
+  wireBoardView,
   buildBoardSummary,
   MAX_DETAIL_PROSE_BYTES,
   type BoardLensItem,
@@ -2081,8 +2085,350 @@ describe("runBoard --group-by story (task-board-dependency-visuals)", () => {
     const html = readFileSync(result.outPath, "utf8");
     expect(html).toContain("⚑ story-x");
     expect(() => runBoard({ cwd: dir, groupBy: "priority" })).toThrow(
-      /unknown --group-by field 'priority' \(supported: milestone, story\)/,
+      /unknown --group-by field 'priority' \(supported: milestone, story, tree\)/,
     );
+  });
+});
+
+describe("renderBoardTree grouped ancestry (task-web-board-hierarchy-view)", () => {
+  const chain = (): WorkItem[] => [
+    item({ id: "ui", type: "epic", status: "todo", title: "UI" }),
+    item({
+      id: "story-board",
+      type: "story",
+      status: "in_progress",
+      parent: "ui",
+      title: "Board",
+    }),
+    item({
+      id: "task-leaf",
+      type: "task",
+      status: "todo",
+      parent: "story-board",
+      title: "Leaf",
+      priority: "p1",
+    }),
+    item({
+      id: "bug-leaf",
+      type: "bug",
+      status: "blocked",
+      parent: "story-board",
+      title: "Bug",
+      priority: "p0",
+      blocked_reason: "waiting",
+    }),
+    item({ id: "story-z", type: "story", status: "done", parent: "ui", title: "Z" }),
+  ];
+
+  /**
+   * The balanced `<li class="tree-node">…</li>` slice of one node, so nesting
+   * is asserted structurally (a child id inside its parent's subtree is
+   * nesting; a bare indexOf order would pass for a flat list too).
+   */
+  function treeNodeHtml(html: string, id: string): string {
+    const at = html.indexOf(`data-id="${id}"`);
+    expect(at, `tree node ${id} not rendered`).toBeGreaterThan(-1);
+    const start = html.lastIndexOf("<li", at);
+    expect(start).toBeGreaterThan(-1);
+    let depth = 0;
+    for (let i = start; i < html.length; i++) {
+      if (html.startsWith("<li", i)) {
+        depth++;
+        i += 2;
+        continue;
+      }
+      if (html.startsWith("</li>", i)) {
+        depth--;
+        i += 4;
+        if (depth === 0) return html.slice(start, i + 1);
+      }
+    }
+    throw new Error(`unbalanced tree node markup for ${id}`);
+  }
+
+  it("nests every leaf under its story and story under epic, each level carrying id + status", () => {
+    const html = renderBoardTree(chain());
+    const story = treeNodeHtml(html, "story-board");
+    expect(story).toContain('data-id="task-leaf"');
+    expect(story).toContain('data-id="bug-leaf"');
+    expect(story).not.toContain('data-id="story-z"');
+    // Each level names its own type badge, id and status.
+    expect(treeNodeHtml(html, "ui")).toContain(
+      '<span class="type" data-type="epic" style="--type-color: #8458ea">epic</span>',
+    );
+    expect(story).toContain('<span class="status-chip in_progress">in_progress</span>');
+    expect(treeNodeHtml(html, "bug-leaf")).toContain(
+      '<span class="status-chip blocked">blocked</span>',
+    );
+    // Depth-first, id-sorted siblings — the shared view-model's walk order.
+    assertOrder(
+      html,
+      'data-id="ui"',
+      'data-id="story-board"',
+      'data-id="bug-leaf"',
+      'data-id="task-leaf"',
+      'data-id="story-z"',
+    );
+  });
+
+  it("nests the shared view-model's walk: roots, id-sorted children, cycle-safe", () => {
+    const roots = boardTreeRoots(chain());
+    expect(roots.map((node) => node.item.id)).toEqual(["ui"]);
+    expect(roots[0].children.map((node) => node.item.id)).toEqual(["story-board", "story-z"]);
+    expect(roots[0].children[0].children.map((node) => node.item.id)).toEqual([
+      "bug-leaf",
+      "task-leaf",
+    ]);
+    // A parent cycle renders as one root subtree (never lost, never doubled).
+    const cyclic = boardTreeRoots([
+      item({ id: "task-a", type: "task", status: "todo", parent: "task-b" }),
+      item({ id: "task-b", type: "task", status: "todo", parent: "task-a" }),
+    ]);
+    expect(cyclic.map((node) => node.item.id)).toEqual(["task-a"]);
+    expect(cyclic[0].children.map((node) => node.item.id)).toEqual(["task-b"]);
+  });
+
+  it("carries the leaf fields the columns carry: priority, assignee and the open-deps badge", () => {
+    const html = renderBoardTree(
+      chain().map((entry) => (entry.id === "bug-leaf" ? { ...entry, assignee: "alice" } : entry)),
+      { openDeps: (entry) => (entry.id === "bug-leaf" ? ["task-leaf"] : []) },
+    );
+    const leaf = treeNodeHtml(html, "bug-leaf");
+    expect(leaf).toContain('<span class="priority p0">p0</span>');
+    expect(leaf).toContain('<span class="tree-assignee">@alice</span>');
+    expect(leaf).toContain('<span class="tree-blocked">blocked by 1</span>');
+    // The container has no open deps: no badge counter is invented. Its own
+    // row is the slice before its children list (the subtree holds the leaf's
+    // badge).
+    const uiNode = treeNodeHtml(html, "ui");
+    const uiRow = uiNode.slice(0, uiNode.indexOf('<ul class="tree-children">'));
+    expect(uiRow).not.toContain("tree-blocked");
+  });
+
+  it("renders parentless and unknown-parent items as honest top-level rows", () => {
+    const html = renderBoardTree([
+      item({ id: "task-root", type: "task", status: "todo" }),
+      item({ id: "task-orphan", type: "task", status: "todo", parent: "story-gone" }),
+    ]);
+    const orphan = treeNodeHtml(html, "task-orphan");
+    expect(orphan).toContain("tree-node missing-parent");
+    expect(orphan).toContain("↳ recorded parent story-gone (missing)");
+    const root = treeNodeHtml(html, "task-root");
+    expect(root).not.toContain("missing-parent");
+    expect(root).not.toContain("(missing)");
+    // No anchors anywhere: a dangling parent can never become a dead link.
+    expect(html).not.toContain("<a ");
+  });
+
+  it("terminates on a parent cycle and renders each item exactly once", () => {
+    const html = renderBoardTree([
+      item({ id: "task-a", type: "task", status: "todo", parent: "task-b" }),
+      item({ id: "task-b", type: "task", status: "todo", parent: "task-a" }),
+    ]);
+    expect(html.match(/data-id="task-a"/g)).toHaveLength(1);
+    expect(html.match(/data-id="task-b"/g)).toHaveLength(1);
+    expect(html).toContain('<ul class="tree-root">');
+  });
+
+  it("renders the columns' empty placeholder for an empty tracker", () => {
+    expect(renderBoardTree([])).toBe('<div class="empty">—</div>');
+  });
+
+  it("escapes hostile ids, titles and parent ids like every other surface", () => {
+    const html = renderBoardTree([
+      item({
+        id: "task-x",
+        type: "task",
+        status: "todo",
+        title: "</script><img src=x onerror=alert(1)>",
+        parent: '"><script>',
+      }),
+    ]);
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;/script&gt;");
+    expect(html).toContain("recorded parent &quot;&gt;&lt;script&gt; (missing)");
+  });
+});
+
+describe("boardTreeDisplay (the lens inside the grouped-ancestry view)", () => {
+  const items = [
+    { id: "ini", parent: null },
+    { id: "epic", parent: "ini" },
+    { id: "story", parent: "epic" },
+    { id: "task", parent: "story" },
+    { id: "other", parent: null },
+  ];
+
+  it("keeps the matched rows plus the ancestor path, marking ancestors as context", () => {
+    const display = boardTreeDisplay(items, ["task"]);
+    expect(Object.keys(display.shown).sort()).toEqual(["epic", "ini", "story", "task"]);
+    expect(Object.keys(display.context).sort()).toEqual(["epic", "ini", "story"]);
+    // A match is never context, even when it also sits on another match's path.
+    expect(display.context["task"]).toBeUndefined();
+    expect(display.shown["other"]).toBeUndefined();
+  });
+
+  it("never reveals a matched container's non-matching descendants", () => {
+    const display = boardTreeDisplay(items, ["story"]);
+    expect(Object.keys(display.shown).sort()).toEqual(["epic", "ini", "story"]);
+    expect(display.shown["task"]).toBeUndefined();
+  });
+
+  it("shows nothing when nothing matches", () => {
+    const display = boardTreeDisplay(items, []);
+    expect(Object.keys(display.shown)).toEqual([]);
+    expect(Object.keys(display.context)).toEqual([]);
+  });
+
+  it("is cycle-safe and prototype-safe", () => {
+    const display = boardTreeDisplay(
+      [
+        { id: "task-a", parent: "task-b" },
+        { id: "task-b", parent: "task-a" },
+        { id: "constructor", parent: null },
+      ],
+      ["task-a"],
+    );
+    expect(Object.keys(display.shown).sort()).toEqual(["task-a", "task-b"]);
+    // `constructor` is an id, not a prototype hit: it shows only when matched.
+    expect(display.shown["constructor"]).toBeUndefined();
+  });
+});
+
+describe("renderBoardHtml grouped-ancestry view (task-web-board-hierarchy-view)", () => {
+  const treeItems = (): WorkItem[] => [
+    item({ id: "ui", type: "epic", status: "todo", title: "UI" }),
+    item({ id: "story-a", type: "story", status: "todo", parent: "ui", title: "A" }),
+    item({ id: "task-a", type: "task", status: "todo", parent: "story-a", title: "Leaf" }),
+  ];
+
+  it("opens in the ancestry tree with --group-by tree, and in the columns by default", () => {
+    const tree = renderBoardHtml(treeItems(), { generatedAt: GENERATED_AT, groupBy: "tree" });
+    expect(tree).toContain('<main class="board" aria-label="arggon board" hidden>');
+    expect(tree).toContain(
+      '<section class="tree" id="board-tree" aria-labelledby="board-tree-heading">',
+    );
+    expect(tree).toContain('aria-pressed="true">grouped ancestry</button>');
+
+    const columns = renderBoardHtml(treeItems(), { generatedAt: GENERATED_AT });
+    expect(columns).toContain('<main class="board" aria-label="arggon board">');
+    expect(columns).toContain(
+      '<section class="tree" id="board-tree" aria-labelledby="board-tree-heading" hidden>',
+    );
+    expect(columns).toContain('aria-pressed="false">grouped ancestry</button>');
+  });
+
+  it("carries BOTH layouts on every board, so the in-page toggle needs no server", () => {
+    const boards = [
+      ["static", renderBoardHtml(treeItems(), { generatedAt: GENERATED_AT })],
+      [
+        "serve",
+        renderBoardHtml(treeItems(), { generatedAt: GENERATED_AT, details: true, live: true }),
+      ],
+    ] as const;
+    for (const [mode, html] of boards) {
+      expect(html, mode).toContain('<ul class="tree-root">');
+      expect(html, mode).toContain('id="board-tree-heading"');
+      expect(html, mode).toContain('id="board-tree-count"');
+      expect(html, mode).toContain(boardTreeDisplay.toString());
+      expect(html, mode).toContain(wireBoardView.toString());
+      expect(html, mode).toContain("wireBoardView(");
+      // The tree subsumes nothing: the status columns stay rendered.
+      expect(html, mode).toContain('data-status="todo"');
+    }
+  });
+
+  it("keeps milestone/story within-column grouping working alongside the tree", () => {
+    const html = renderBoardHtml(treeItems(), { generatedAt: GENERATED_AT, groupBy: "story" });
+    expect(html).toContain("⚑ story-a");
+    expect(html).toContain('<ul class="tree-root">');
+    expect(html).toContain('<main class="board" aria-label="arggon board">');
+  });
+
+  it("round-trips the view through the URL hash, beside the lens filter", () => {
+    const plain = renderBoardHtml([], { generatedAt: GENERATED_AT });
+    expect(plain).toContain('var BOARD_VIEW_DEFAULT = "columns";');
+    expect(plain).toContain('hashParam("view")');
+    expect(plain).toContain('parts.push("view=" + view)');
+    expect(plain).toContain("applyHashView()");
+    const treeDefault = renderBoardHtml([], { generatedAt: GENERATED_AT, groupBy: "tree" });
+    expect(treeDefault).toContain('var BOARD_VIEW_DEFAULT = "tree";');
+  });
+
+  it("counts the lens verdict, never the rendered rows (N of M stays honest)", () => {
+    const html = renderBoardHtml(treeItems(), { generatedAt: GENERATED_AT });
+    // The tree's context rows are display-only: the counter and the tree
+    // heading both read the match count the lens returned.
+    expect(html).toContain("refreshFilterCount(visibleIds.length)");
+    expect(html).toContain("boardTreeDisplay(BOARD_ITEMS, visibleIds)");
+  });
+
+  it("runBoard accepts and reports groupBy tree", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-group-tree-"));
+    mkdirSync(join(dir, "tasks"));
+    writeFileSync(join(dir, "tasks", ".convention.yml"), "version: 1\n", "utf8");
+    writeFileSync(
+      join(dir, "tasks", "task-a.md"),
+      '---\ntype: task\nid: task-a\ntitle: A\nstatus: todo\nparent: story-x\ncreated: "2026-09-15"\nupdated: "2026-09-15"\n---\n',
+      "utf8",
+    );
+    const result = runBoard({
+      cwd: dir,
+      out: join(dir, "board.html"),
+      generatedAt: GENERATED_AT,
+      groupBy: "tree",
+      me: null,
+    });
+    expect(result.groupBy).toBe("tree");
+    const html = readFileSync(result.outPath, "utf8");
+    expect(html).toContain('<main class="board" aria-label="arggon board" hidden>');
+    expect(html).toContain('<section class="tree" id="board-tree"');
+  });
+
+  it("keeps every status-chip pair at or above 4.5:1 in both themes (WCAG 1.4.3)", () => {
+    const html = renderBoardHtml([], { generatedAt: GENERATED_AT });
+    const css = (html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "").replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    /** Relative luminance per WCAG 2.x. */
+    function luminance(hex: string): number {
+      const [r, g, b] = [0, 2, 4].map((i) => {
+        const v = parseInt(hex.replace("#", "").slice(i, i + 2), 16) / 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+    function ratio(fg: string, bg: string): number {
+      const [l1, l2] = [luminance(fg), luminance(bg)].sort((a, b) => b - a);
+      return (l1 + 0.05) / (l2 + 0.05);
+    }
+    function block(selector: string): string {
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = css.match(new RegExp(`${escaped} \\{([^}]*)\\}`));
+      expect(match, `rule not found in rendered CSS: ${selector}`).toBeTruthy();
+      return match![1];
+    }
+    function declared(blockText: string, property: string): string {
+      const match = new RegExp(`${property}: (#[0-9a-f]{3,6})`).exec(blockText);
+      expect(match, `property not found: ${property}`).toBeTruthy();
+      return match![1];
+    }
+    const statuses = ["todo", "in_progress", "blocked", "done", "cancelled"];
+    for (const [theme, selector] of [
+      ["light", ":root"],
+      ["dark", ':root[data-theme="dark"]'],
+    ] as const) {
+      const declarations = block(selector);
+      for (const status of statuses) {
+        const fg = declared(declarations, `--st-${status.replace(/_/g, "-")}-fg`);
+        const bg = declared(declarations, `--st-${status.replace(/_/g, "-")}-bg`);
+        expect(ratio(fg, bg), `${theme} ${status} chip (${fg} on ${bg})`).toBeGreaterThanOrEqual(
+          4.5,
+        );
+      }
+    }
   });
 });
 

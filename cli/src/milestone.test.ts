@@ -209,7 +209,7 @@ describe("runBoard --group-by", () => {
   it("rejects unsupported group-by fields", () => {
     const { dir } = primedTree();
     expect(() => runBoard({ cwd: dir, generatedAt: GENERATED_AT, groupBy: "priority" })).toThrow(
-      /unknown --group-by field 'priority' \(supported: milestone, story\)/,
+      /unknown --group-by field 'priority' \(supported: milestone, story, tree\)/,
     );
   });
 
