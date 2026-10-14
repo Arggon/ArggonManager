@@ -2804,6 +2804,74 @@ describe("claim release — unclaim leaves nothing (bug-unclaim-leaves-worktree-
     expect(itemData(dir, "task-alpha").worktree_path).toBeUndefined();
   });
 
+  // task-release-stale-compose-reaping: the stale-record clause used to skip
+  // Compose reaping along with the removal — but the project name derives from
+  // the RECORDED path, never from a live directory, and a released claim is
+  // never terminal, so prune will never consider it again. A skipped reap here
+  // is the permanent Docker residue ADR 0019 layer 2 exists to prevent.
+  it("reaps the declared Compose project of a stale record, exactly as prune does", () => {
+    const dir = initRepo();
+    setServices(dir, "true");
+    const wt = claimedAndMerged(dir);
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    // Interrupted-removal debris: files behind, `.git` gone, git's record
+    // `prunable` — the worktree cannot be asked, but its project name is still
+    // derivable from the recorded path (the missing-path shape reaches the same
+    // stale clause).
+    rmSync(join(wt, ".git"), { force: true });
+    const compose = fakeCompose();
+
+    const released = runCleanup(
+      { cwd: dir, release: "task-alpha", releaseIdentity: "arggon" },
+      { compose: compose.down },
+    );
+
+    const project = basename(wt).toLowerCase();
+    // The ADR 0019 teardown for the recorded worktree id, from the repo root —
+    // prune's stale-entry call exactly (its "already-removed worktree" case).
+    expect(compose.calls).toEqual([{ project, cwd: dir }]);
+    expect(released.compose).toEqual({ declared: "true" });
+    expect(released.failures).toEqual([]);
+    // Compose FIRST (the stack may still be running), then the stale-record
+    // convergence in prune's order.
+    expect(released.release?.actions.map((action) => action.action)).toEqual([
+      `reaped compose project ${project}`,
+      "pruned stale git worktree record",
+      "deleted branch feat/task-alpha",
+      "cleared worktree_path",
+    ]);
+    // The debris is retained; the record and the branch are gone.
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    expect(itemData(dir, "task-alpha").worktree_path).toBeUndefined();
+  });
+
+  it("keeps the stale record when the Compose reap fails, so a retry can reach the stack", () => {
+    // The release arm's own failure discipline (not prune's non-fatal one): a
+    // failed teardown aborts the release. Clearing the record would drop the
+    // only anchor a retry has — the item is not terminal, so prune will never
+    // reap this project.
+    const dir = initRepo();
+    setServices(dir, "true");
+    const wt = claimedAndMerged(dir);
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    rmSync(join(wt, ".git"), { force: true });
+    const compose = fakeCompose("Cannot connect to the Docker daemon");
+
+    const released = runCleanup(
+      { cwd: dir, release: "task-alpha", releaseIdentity: "arggon" },
+      { compose: compose.down },
+    );
+
+    expect(released.failures).toEqual(["task-alpha: Cannot connect to the Docker daemon"]);
+    expect(released.release?.actions).toEqual([
+      { id: "task-alpha", action: "failed", error: "Cannot connect to the Docker daemon" },
+    ]);
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(true);
+    expect(itemData(dir, "task-alpha").worktree_path).toBe(wt);
+  });
+
   it("the human CLI releases the stale record instead of exiting at CLEANUP_FAILED", () => {
     // The user-visible shape of the wedge: `cleanup --release` used to die at
     // the top-level `CLEANUP_FAILED` (`git rev-parse --abbrev-ref HEAD failed:

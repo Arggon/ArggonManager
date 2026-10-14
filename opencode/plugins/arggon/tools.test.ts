@@ -5362,6 +5362,58 @@ describe("native cleanup reaps declared Compose projects (ADR 0019 layer 2, task
     expect(envelope.failures).toEqual([]);
   });
 
+  it("release reaps the declared project of a stale record too (task-release-stale-compose-reaping)", async () => {
+    const dir = seedGitTree();
+    declareServices(dir, "true");
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const started = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_a" },
+    );
+    const worktreePath = String((started.output as { worktreePath?: unknown }).worktreePath);
+    git(dir, ["merge", "--no-ff", "feat/task-rate-limit", "-m", "Merge claim (stubbed)"]);
+    await tool(defs, "update").execute(
+      { id: "task-rate-limit", status: "todo" },
+      { sessionID: "ses_a" },
+    );
+    // The interrupted removal: files behind, `.git` gone — the worktree can no
+    // longer be asked, but the project name still derives from the RECORDED
+    // path (the missing-path shape reaches the same stale clause).
+    rmSync(join(worktreePath, ".git"), { force: true });
+    const log = dockerLog();
+    const bin = fakeDocker();
+
+    const output = await withEnv(dockerEnv(bin, log, worktreePath), () =>
+      tool(defs, "cleanup").execute({ release: "task-rate-limit" }, { sessionID: "ses_a" }),
+    );
+    const envelope = output.output as Record<string, unknown>;
+    const project = basename(worktreePath).toLowerCase();
+
+    // Same ADR 0019 command shape as prune's stale entries, from the repo root.
+    expect(dockerCalls(log)).toEqual([
+      {
+        cwd: dir,
+        argv: ["compose", "-p", project, "down", "-v", "--remove-orphans"],
+        worktree: "present",
+      },
+    ]);
+    // Compose FIRST, then the stale-record convergence in prune's order — the
+    // release's own `released` family, never mixed into `pruned`.
+    expect(envelope.released).toEqual([
+      { id: "task-rate-limit", action: `reaped compose project ${project}` },
+      { id: "task-rate-limit", action: "pruned stale git worktree record" },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    expect(envelope.compose).toEqual({ declared: "true" });
+    expect(envelope.failures).toEqual([]);
+    expect(envelope.pruned).toEqual([]);
+    // The debris directory is retained; the record and the branch are gone.
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+  });
+
   it("never invokes Docker when the repo declares nothing (report-only path)", async () => {
     const dir = seedGitTree();
     addItems(dir, ["second"]);

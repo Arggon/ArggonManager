@@ -602,10 +602,15 @@ type ReleaseRun = {
  * prune` — is a stale record, never a removal candidate
  * (bug-cleanup-release-stale-record-wedge; the release half of the rule
  * `classifyCleanupEntry` learned in bug-cleanup-stuck-when-worktree-dir-gone).
- * The removal, the Compose reap and the stamp/env steps are skipped — there is
- * nothing to remove — while the dead git record is pruned (it PINS the branch),
- * the branch the record still names is deleted (force, like every release) and
- * the record is cleared. A leftover directory is never deleted.
+ * The removal and the stamp/env steps are skipped — there is nothing to remove —
+ * while the declared Compose project is STILL REAPED, first, exactly as prune
+ * reaps it for its own stale entries (task-release-stale-compose-reaping): the
+ * project name derives from the recorded path's basename, never from a live
+ * directory, and the item is not terminal, so prune will never consider it
+ * again — a skipped reap here is the permanent Docker residue ADR 0019 layer 2
+ * exists to prevent. The dead git record is pruned (it PINS the branch), the
+ * branch the record still names is deleted (force, like every release) and the
+ * record is cleared. A leftover directory is never deleted.
  */
 function releaseClaimedWorktree(run: ReleaseRun): CleanupRelease {
   const { id, root, byId, gitRunner, opts, failures } = run;
@@ -662,29 +667,40 @@ function releaseClaimedWorktree(run: ReleaseRun): CleanupRelease {
   const forceArmed = opts.releaseTakeOverWorktree === true;
   // Stale-record clause (bug-cleanup-release-stale-record-wedge): the worktree
   // is already gone — missing on disk, or a leftover directory whose gitdir
-  // link is gone (`prunable`) — so there is no removal to attempt, no Compose
-  // project to reap and no stamp/env to unlink. What is left is the dead git
-  // record (which PINS the branch: `git branch -D` refuses it with "cannot
-  // delete branch … used by worktree"), the branch and the item record.
+  // link is gone (`prunable`) — so there is no removal to attempt and no
+  // stamp/env to unlink. What is left is the declared Compose project (reaped
+  // below, exactly as prune reaps it for a stale entry), the dead git record
+  // (which PINS the branch: `git branch -D` refuses it with "cannot delete
+  // branch … used by worktree"), the branch and the item record.
   const stale = entry.action?.startsWith("clear stale worktree_path record") === true;
 
   try {
-    if (!stale) {
-      // Compose first, before the worktree removal (ADR 0019 layer 2,
-      // exploration 017 F8): the stack that lives only for the run dies with
-      // the worktree. Only a repo whose convention declares services ever
-      // reaches Docker, and an absent docker CLI degrades this run to the same
-      // report-only path prune uses.
-      if (run.compose !== undefined && !run.isComposeUnavailable()) {
-        const project = worktreeComposeProject(run.compose.declared, basename(entry.path));
-        try {
-          (run.deps.compose ?? defaultComposeDown)(project, root);
-          actions.push({ id, action: `reaped compose project ${project}` });
-        } catch (err) {
-          if ((err as NodeJS.ErrnoException | null)?.code !== "ENOENT") throw err;
-          run.compose.dockerUnavailable = true;
-        }
+    // Compose first, for EVERY releasable entry — live or stale (ADR 0019 layer
+    // 2, exploration 017 F8; parity with prune's stale entries,
+    // task-release-stale-compose-reaping). The teardown needs no live worktree:
+    // the project name derives from the RECORDED path's basename — the worktree
+    // id the adopter pattern built the project around — and an already-gone
+    // project is the exit-0 no-op prune relies on. Skipping it for a stale
+    // record would strand the stack for good: the item is not terminal, so
+    // prune never considers it again, and the cleared record would remove the
+    // last caller that could.
+    //
+    // The failure discipline is the release arm's own, not prune's: a failed
+    // teardown aborts the release (both surfaces report it, the worktree record
+    // stays), so a retry after the daemon recovers can still reach the stack.
+    // Following prune's non-fatal discipline here would clear the record that
+    // is the retry's only anchor.
+    if (run.compose !== undefined && !run.isComposeUnavailable()) {
+      const project = worktreeComposeProject(run.compose.declared, basename(entry.path));
+      try {
+        (run.deps.compose ?? defaultComposeDown)(project, root);
+        actions.push({ id, action: `reaped compose project ${project}` });
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException | null)?.code !== "ENOENT") throw err;
+        run.compose.dockerUnavailable = true;
       }
+    }
+    if (!stale) {
       // Ownership, not blanket deletion: only a start-created install link (a
       // symlink to the canonical checkout's install) and a start-shaped
       // `.arggon.env` are removed — an adopter's own file is left for git to

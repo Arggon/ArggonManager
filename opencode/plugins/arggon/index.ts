@@ -5250,10 +5250,13 @@ type CleanupGitShape = ReturnType<ArgonKernel["defaultCleanupGit"]>
  * same observed domain removal, same force branch delete, same record clear and
  * same both-surfaces failure reporting. A recorded path that is no longer a
  * LIVE worktree is a stale record (bug-cleanup-release-stale-record-wedge): the
- * domain removal is skipped entirely, the dead git record is pruned (it pins
- * the branch), the branch git's record still names is deleted and the record is
- * cleared. The identity is the calling session — what `start` stamped — with the
- * item's assignee as the fallback when the runtime supplies no session id.
+ * domain removal and the stamp/env steps are skipped, while the declared Compose
+ * project is still reaped FIRST, exactly as the CLI arm and prune's stale entries
+ * do it (task-release-stale-compose-reaping; the project name derives from the
+ * recorded path, never from a live directory); the dead git record is pruned (it
+ * pins the branch), the branch git's record still names is deleted and the record
+ * is cleared. The identity is the calling session — what `start` stamped — with
+ * the item's assignee as the fallback when the runtime supplies no session id.
  */
 async function nativeRelease(
   kernel: ArgonKernel,
@@ -5309,26 +5312,39 @@ async function nativeRelease(
   // Stale-record clause (bug-cleanup-release-stale-record-wedge): the worktree
   // is already gone — missing on disk, or a leftover directory whose gitdir
   // link is gone (`prunable`) — so there is no removal to attempt through the
-  // domain, no Compose project to reap and no stamp/env to unlink. What is left
-  // is the dead git record (which PINS the branch: `git branch -D` refuses it
-  // with "cannot delete branch … used by worktree"), the branch and the item
-  // record.
+  // domain and no stamp/env to unlink. What is left is the declared Compose
+  // project (reaped below, exactly as prune reaps it for a stale entry), the
+  // dead git record (which PINS the branch: `git branch -D` refuses it with
+  // "cannot delete branch … used by worktree"), the branch and the item record.
   const stale = classified.action?.startsWith("clear stale worktree_path record") === true
 
   try {
-    if (!stale) {
-      // Compose first (ADR 0019 layer 2, exploration 017 F8); an absent docker
-      // CLI degrades the run report-only, exactly as in the prune loop.
-      if (run.compose !== undefined && !run.isComposeUnavailable()) {
-        const project = kernel.worktreeComposeProject(run.compose.declared, basename(path))
-        try {
-          await nativeComposeDown(project, root)
-          actions.push({ id, action: `reaped compose project ${project}` })
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException | null)?.code !== "ENOENT") throw error
-          run.compose.dockerUnavailable = true
-        }
+    // Compose first, for EVERY releasable entry — live or stale (ADR 0019 layer
+    // 2, exploration 017 F8; CLI parity and prune's stale-entry parity,
+    // task-release-stale-compose-reaping). The teardown needs no live worktree:
+    // the project name derives from the RECORDED path's basename — the worktree
+    // id the adopter pattern built the project around — and an already-gone
+    // project is the exit-0 no-op prune relies on. Skipping it for a stale
+    // record would strand the stack for good: the item is not terminal, so prune
+    // never considers it again, and the cleared record would remove the last
+    // caller that could.
+    //
+    // The failure discipline is the release arm's own, not prune's: a failed
+    // teardown aborts the release (both surfaces report it, the worktree record
+    // stays), so a retry after the daemon recovers can still reach the stack.
+    // Following prune's non-fatal discipline here would clear the record that is
+    // the retry's only anchor.
+    if (run.compose !== undefined && !run.isComposeUnavailable()) {
+      const project = kernel.worktreeComposeProject(run.compose.declared, basename(path))
+      try {
+        await nativeComposeDown(project, root)
+        actions.push({ id, action: `reaped compose project ${project}` })
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException | null)?.code !== "ENOENT") throw error
+        run.compose.dockerUnavailable = true
       }
+    }
+    if (!stale) {
       // CLI parity: the start-created install link and the start-shaped env
       // file are untracked and block the removal; ownership-scoped removal only
       // (never a real directory, never an adopter's own file). The env contract
