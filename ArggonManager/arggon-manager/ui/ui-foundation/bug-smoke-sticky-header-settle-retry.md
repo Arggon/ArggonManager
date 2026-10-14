@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-smoke-sticky-header-settle-retry
 title: ui-smoke sticky-header test flakes locally under the SSE settle race (un-retried poll) — extend its bounded retry
+assignee: arggon-delivery-lead
+branch: fix/bug-smoke-sticky-header-settle-retry
 parent: ui-foundation
 labels: [ui, tests]
 created: "2026-10-14"
 updated: "2026-10-14"
+claimed_at: "2026-10-14T17:14:35.016Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-smoke-sticky-header-settle-retry
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/bug-smoke-sticky-header-settle-retry.md
