@@ -86,14 +86,15 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveWaveModel } from "./opencode-model.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(repoRoot, "cli/src/cli.ts");
 const tsx = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
-const MODEL =
-  process.env.OPENCODE_WAVE_MODEL ??
-  process.env.OPENCODE_SMOKE_MODEL ??
-  "opencode-go/deepseek-v4-flash";
+// Shared pin (smoke/opencode-model.ts): OPENCODE_WAVE_MODEL wins, then the
+// shared OPENCODE_SMOKE_MODEL, then the one default both harnesses resolve
+// (bug-wave-smoke-retired-model-pin).
+const MODEL = resolveWaveModel();
 const TIMEOUT_MS = Number(process.env.OPENCODE_WAVE_TIMEOUT_MS ?? 600_000);
 // Mirrors ITEM_BLOCK_MAX_BYTES in the plugin source; asserted here per call.
 const CONTEXT_BLOCK_MAX_BYTES = 1024;
