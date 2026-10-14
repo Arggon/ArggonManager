@@ -65,3 +65,12 @@ Both live in the same tree code (`cli/src/board.ts`: `renderBoardTree`, the embe
 ### handoff 2026-10-14 @ses_ec4eaf180ffeataHU4UOHWtBdI (session: ses_ec4eaf180ffeataHU4UOHWtBdI) — next: Standards review on PR #816 (base main), then merge; verifier may re-run `npx playwright test --grep @smoke` alone — expect 46 passed.
 - branch: feat/task-tree-rows-open-detail
 - open questions: None blocking; one recorded one-off flake on the pre-existing sticky-header test (see comment).
+
+### 2026-10-14 @ses_ec4eaf180ffeataHU4UOHWtBdI
+### 2026-10-14 maker addendum — live-reload completion + final gates
+
+While self-reviewing the composition, one gap surfaced that the acceptance list implies through the drawer's own contract ("a live reload preserves the open drawer"): the serve client's restore only re-clicked `.card[data-id]`, so a drawer opened from a **tree row** closed on the next tracker write (and this repo's served board reloads on every tracker change). Fixed in `cli/src/board-serve.ts` (commit `abb966c6`): the restore picks the opener of the **restored layout** — the visible layout's own path (tree row when the tree is shown, card otherwise) — and reads a row's id from its enclosing node. Pinned by `board-serve.test.ts` (selector pair) and by a new phase in the existing live-reload `@smoke` case (tree-opened drawer reopens through the row; Esc returns focus to the row).
+
+**Final gates after the addendum**: `npm run build`; `npm test` **157 files / 3427 tests green** (three consecutive full runs); `npm run lint`; `npm run test:structure`; `npm run arggon -- validate` (0 warnings); `npx prettier --check` on every touched file; `npx playwright test --grep @smoke` **46 passed** (alone). Honest flake note: one full-suite run showed a single unreproduced failure whose name was not captured (three later runs green), beside the earlier one-off on the pre-existing sticky-header `@smoke` case — both recorded for the verifier rather than hidden.
+
+The acceptance boxes stay ticked; PR #816 is the review surface.
