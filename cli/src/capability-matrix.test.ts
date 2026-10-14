@@ -169,13 +169,23 @@ describe("capability matrix: committed file matches its schema", () => {
       expect(row?.package).toBe("claude-code");
     }
     // What Claude Code genuinely lacks is client-native and agent-scoped: a
-    // hook gate and a session context hook. No `.claude/` config or hook
-    // template ships anywhere in `templates/`, so these stay gaps.
-    for (const invariant of ["discipline-enforceable", "docs-travel-with-code"]) {
-      expect(byInvariant.get(invariant)?.gap, `${invariant} has no client-native mechanism`).toBe(
-        true,
-      );
-    }
+    // session context hook. The hook gate is no longer in that set: the shipped
+    // bundle carries `hooks/gate.mjs` (spec-claude-code-adapter-024), the same
+    // PreToolUse shape as the ZCode gate, so `discipline-enforceable` is
+    // delivered from inside the client now.
+    const discipline = byInvariant.get("discipline-enforceable");
+    expect(
+      discipline?.gap,
+      "discipline-enforceable is delivered by the shipped claude hook gate",
+    ).toBe(false);
+    expect(discipline?.mechanism).toContain("claude:plugin.hooks.PreToolUse");
+    expect(discipline?.package).toBe("claude-code");
+    // A plugin still has no session-context hook: every client-native way to
+    // inject the active work item is absent, so this row must stay a gap.
+    expect(
+      byInvariant.get("docs-travel-with-code")?.gap,
+      "docs-travel-with-code has no session context hook on this client",
+    ).toBe(true);
   });
 
   it("never claims a gap on a surface `arggon init` ships to every client", () => {
