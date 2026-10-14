@@ -289,7 +289,7 @@ export type AdapterArtifact = {
  * Per-artifact rows cap; honest totals stay in `counts` when rows are cut.
  *
  * task-claude-plugin-seam: the cap must stay ABOVE the shipped inventory —
- * opencode (18) + zcode (23) + claude (28) is 67 destinations, so the old 64
+ * opencode (18) + zcode (23) + claude (28) is 69 destinations, so the old 64
  * silently truncated the newest adapter's rows (and the deselection rows the
  * `--agents` report exists to show). 96 keeps the whole inventory visible with
  * headroom for the next seam; `counts` stays the honest total either way.

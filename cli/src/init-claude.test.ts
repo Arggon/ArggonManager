@@ -730,7 +730,7 @@ describe("claude gate script (reviewer backstop + global git gates)", () => {
  * declared binary would run, and the registration Claude Code would perform.
  */
 describe("claude bundle MCP registration serves a live server", () => {
-  it("returns the documented argxon_show envelope over real stdio", async () => {
+  it("returns the documented arggon_show envelope over real stdio", async () => {
     const dir = initClaudeTree();
     const servers = manifestOf(dir).mcpServers as Record<string, { args: string[] }>;
     const child = spawnNodeCli(servers.arggon!.args, { cwd: dir, stdio: ["pipe", "pipe", "pipe"] });
