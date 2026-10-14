@@ -8,6 +8,7 @@ labels: []
 created: "2026-10-14"
 updated: "2026-10-14"
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-container-rollup/task-container-status-vs-open-workstreams.md
   Leaves live only under a story. id is the filename stem: task-container-status-vs-open-workstreams.
@@ -19,15 +20,26 @@ updated: "2026-10-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+Product-owner report (2026-10-14, twice): the board shows `done` on containers that still hold
+unfinished workstreams — the strongest case being a whole story in `todo` under a done epic.
+Measured: five containers hold an open story (`agent-native`, `agent-coordination`,
+`ecosystem-ops`, `ui`, `arggon-manager`); 15 of 84 containers are terminal with open
+descendants overall. The stored statuses are stale closures (work was added after the
+containers closed), and the tracker cannot self-correct: reopening a terminal item is one of
+the four human-only powers (`ArggonManager/docs/engineering.md` §Roles and authority). The
+`decide:` brief below carries the question, options, recommendation and default; this item is
+its canonical home (ADR 0026).
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] The product owner's answer is recorded as a `decided:` comment on this item
+- [ ] The chosen option is executed: option 1 → the five containers reopened by the owner (human-only) + a report-only "terminal container holding an open story" check filed/implemented; option 2 → the board's derived-label change merged; option 3 → both
+- [ ] After execution, the tracker's tree has no terminal container holding an open story (full traversal verified; `arggon validate` green)
 
 ## Notes
 
 ### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
 decide: Container `done` labels over unfinished workstreams — correct the stored statuses, or derive the board label?
 
 **The question.** Five containers are stored as `done` while a whole unfinished story sits inside them (`agent-native`, `agent-coordination`, `ecosystem-ops`, `ui`, `arggon-manager`; the open stories are `parallel-worktree-runtime-isolation-ports-state-services`, `story-ci-wall-clock`, `story-hierarchy-navigation`). Should the stored statuses be corrected — you reopen the five, a human-only power — or should the board show an effective state instead (which I can do alone)?
@@ -35,6 +47,7 @@ decide: Container `done` labels over unfinished workstreams — correct the stor
 **Why it matters.** You read the board as the project's state, and a `done` label above unfinished work makes it misleading. The tracker cannot fix itself: a closed item stays closed until a human reopens it (by design — one of the four irreversible powers), and work can be filed under closed containers, so the mismatch piles up (15 of 84 containers today; 5 of them hold open stories, the rest only stray follow-ups).
 
 **The options.**
+
 1. **Correct the stored statuses (recommended).** You reopen the five containers with the commands below — ~2 minutes, each asks you to confirm `y` (that confirmation is the human-only gate; agents structurally cannot do it, me included). Then `done` is true everywhere (board, CLI, reports). I add a report-only check that flags "closed container holding an open story" so it cannot silently recur. Leaf follow-ups under closed stories are unaffected — they keep `done` + the `N open` count badge.
    - Cost: needs your terminal; one-time cleanup, and new workstreams filed under closed containers can recreate the state (the check catches it).
 2. **Derive the board label (no action from you).** A container with an open story/epic inside stops displaying `done` on the board (it shows the effective state, e.g. `in progress`); the stored status stays as the closure record. The board reads truthfully forever, zero maintenance. If you want it stricter (any open bug/task also hides `done`), say so — one-line extension.
