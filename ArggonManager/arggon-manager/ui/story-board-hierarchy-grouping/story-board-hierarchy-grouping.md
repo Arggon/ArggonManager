@@ -8,6 +8,7 @@ labels: []
 created: "2026-10-14"
 updated: "2026-10-14"
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-board-hierarchy-grouping/story-board-hierarchy-grouping.md (story index; required).
   parent MUST be the epic id. Optional style prefixes (e.g. story-) are not type discriminators.
@@ -27,10 +28,10 @@ The requirement is the full recorded ancestry (initiative → epic → story →
 
 ## Acceptance
 
-- [ ] The web board renders the recorded ancestry (initiative → epic → story → leaf) as a grouped, readable layout the user can select; each level names its container and status, leaves keep id/status/priority
-- [ ] Partial chains (parentless leaves, orphans, containers with no children) render honestly; the kernel's `parent` edges are the only hierarchy source
-- [ ] The existing status-column view and the filter lens keep working (no regression); the layout works in the static export and `--serve` alike
-- [ ] Docs travel (README board section + `ArggonManager/docs/json-output.md` board contract); browser-drive evidence per ADR 0008 with expected-vs-observed
-- [ ] `arggon validate`, affected suites, `npm test` and CI `ui-smoke` green; prettier clean
+- [x] The web board renders the recorded ancestry (initiative → epic → story → leaf) as a grouped, readable layout the user can select; each level names its container and status, leaves keep id/status/priority
+- [x] Partial chains (parentless leaves, orphans, containers with no children) render honestly; the kernel's `parent` edges are the only hierarchy source
+- [x] The existing status-column view and the filter lens keep working (no regression); the layout works in the static export and `--serve` alike
+- [x] Docs travel (README board section + `ArggonManager/docs/json-output.md` board contract); browser-drive evidence per ADR 0008 with expected-vs-observed
+- [x] `arggon validate`, affected suites, `npm test` and CI `ui-smoke` green; prettier clean
 
 ## Notes
