@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-smoke-sticky-header-settle-retry
 title: ui-smoke sticky-header test flakes locally under the SSE settle race (un-retried poll) — extend its bounded retry
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: ui-foundation
 labels: [ui, tests]
 created: "2026-10-14"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T17:14:35.016Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-smoke-sticky-header-settle-retry
 ---
 <!--
