@@ -190,7 +190,7 @@ Failures use `error.code: "INIT_FAILED"` — including an unknown agent name in 
 | `adapters.truncated` | `boolean`  | A row was cut from `artifacts` (`counts` remains honest over all of them).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `adapters.counts`    | `object`   | `{ total, written, replaced, skipped }` over EVERY adapter destination, never the capped list; `total = written + replaced + skipped`, so an archived-and-regenerated file is never hidden inside `skipped`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
-Selection rules: `--agents` names exactly those adapters and leaves every other seam untouched; `--no-agents` suppresses adapter generation entirely; with no flag the selection is **every detected agent** (tree markers only: OpenCode's four config shapes or `.opencode/`, `.zcode-marketplace/`, `CLAUDE.md`/`.claude`), and on a tree carrying **no** agent marker at all — a fresh scaffold — every known agent is selected, so the pre-flag default init ships are not silently deleted from a brand-new tree (narrow an existing tree with `--agents`). `--agents` and `--no-agents` are mutually exclusive, and an unknown agent name is refused by name. Detection and classification read the examined tree only, so the payload is identical between the packed bin and the checkout CLI on the same tree (the pack-parity gate).
+Selection rules: `--agents` names exactly those adapters and leaves every other seam untouched; `--no-agents` suppresses adapter generation entirely; with no flag the selection is **every detected agent** (tree markers only: OpenCode's four config shapes or `.opencode/`, `.zcode-marketplace/`, `CLAUDE.md`/`.claude`/`.claude-marketplace`), and on a tree carrying **no** agent marker at all — a fresh scaffold — every known agent is selected, so the pre-flag default init ships are not silently deleted from a brand-new tree (narrow an existing tree with `--agents`). `--agents` and `--no-agents` are mutually exclusive, and an unknown agent name is refused by name. Detection and classification read the examined tree only, so the payload is identical between the packed bin and the checkout CLI on the same tree (the pack-parity gate).
 
 #### The reaping family (`reaped[]` / `reapRefused[]`)
 
@@ -808,18 +808,18 @@ Failures use `error.code: "IMPORT_FAILED"` (gh missing/unauthenticated or unpars
     "artifacts": [
       {
         "agent": "claude",
-        "path": ".mcp.json",
+        "path": ".claude-marketplace/.claude-plugin/marketplace.json",
         "outcome": "written",
         "reason": "missing on disk — generated from the current template"
       }
     ],
     "truncated": false,
-    "counts": { "total": 39, "written": 39, "skipped": 0 }
+    "counts": { "total": 69, "written": 69, "replaced": 0, "skipped": 0 }
   }
 }
 ```
 
-The example abridges `created[]` and `artifacts[]` (one row each, of 39). `artifacts[]` is emitted on every run; the sample shows the flagless **fresh-scaffold** default, where nothing is skipped and `counts.written` is every adapter destination. On an existing tree with a marker the same `mode: "detect"` reports `detected` and selects only those; with `--agents`/`--no-agents` the deselected seams carry `outcome: "skipped"` with the reason naming the agent and the selection label.
+The example abridges `created[]` and `artifacts[]` (one row each, of 69). `artifacts[]` is emitted on every run; the sample shows the flagless **fresh-scaffold** default, where nothing is skipped and `counts.written` is every adapter destination. On an existing tree with a marker the same `mode: "detect"` reports `detected` and selects only those; with `--agents`/`--no-agents` the deselected seams carry `outcome: "skipped"` with the reason naming the agent and the selection label.
 
 Init still **writes** the tracker `.convention.yml` (`ArggonManager/.convention.yml`, or legacy the tracker `.convention.yml`) (including the `x-generated` provenance section), `templates/`, and the governing docs (tier-1 by default; tier-2 with `--full`), then auto-commits exactly the files it wrote (tracker hygiene, bug-init-leaves-docs-untracked-start-blocks-on-clean-tree: a fresh init must leave a clean tree so `start`'s clean-tree precondition never blocks tool-generated state — non-git trees and git-absent machines skip the commit and init stays ok); `--json` only changes how the result is printed. Doc templates render `{{PROJECT_NAME}}` (target dir name) and `{{YEAR}}` at write time, and every generated file carries a `<!-- arggon:generated template="..." -->` marker as its first line. Re-run semantics are checksum-based (see [docs/convention.md](./convention.md) §Generated-doc provenance): entries flagged `acknowledged: true` (set by `adopt --ack`) are never regenerated — they land in `skipped[]` with their bytes untouched; untouched docs regenerate into `updated[]`, adopter-modified docs are skipped into `modified[]` + `skipped[]` (regenerated after `--backup`, with the old file archived to `backup/<YYYY-MM-DD>/<dest>` and listed in `backedUp[]`), so a second init on an untouched repo is `created: [], skipped: []` with every doc in `updated[]`.
 
@@ -911,7 +911,7 @@ With `--budget`, an additive `budget` section appears (values illustrative; re-m
 
 The additive `mcp` object (task-schema-budget) measures the LIVE MCP `tools/list` payload, fetched in-process against `runMcpServer` (the same surface `mcp-parity.test.ts` drives): `totalBytes` is checked against the advisory `MCP_TOOLS_BUDGET_BYTES` (12,288 B — ~36% headroom over the 9,040 B live baseline recorded 2026-09-15, commit `5d6c504`), `tokenEstimate` is ~chars/4 (the baseline method), and `largestTools` names the three heaviest tool definitions so schema bloat is attributable, not just visible.
 
-With `--agents`, an additive `agents` section appears. This is a real run against this repo's own tree, recorded 2026-10-13 (commit `fee7979b`); `files[]` and `gaps.rows[]` are abridged to one row per agent plus an elision marker, and every count is exact for that tree. Its one `adopter-edited` row is this repo's own `opencode.jsonc` — a recorded `x-generated` checksum that no longer matches the bytes on disk, the same mismatch that also lands it in the `docs` block's `modified` bucket. Re-running `arggon doctor --json --agents` reports a tree's own counts; each status is defined in the row above and names what `arggon init` would do with the file:
+With `--agents`, an additive `agents` section appears. This is a real run against this repo's own tree, recorded 2026-10-14 (`task-claude-matrix-and-docs`, after the shipped Claude Code bundle moved its `discipline-enforceable` row); `files[]` and `gaps.rows[]` are abridged to one row per agent plus an elision marker, and every count is exact for that tree. Its one `adopter-edited` row is this repo's own `opencode.jsonc` — a recorded `x-generated` checksum that no longer matches the bytes on disk, the same mismatch that also lands it in the `docs` block's `modified` bucket. Re-running `arggon doctor --json --agents` reports a tree's own counts; each status is defined in the row above and names what `arggon init` would do with the file:
 
 ```json
 {
@@ -931,13 +931,13 @@ With `--agents`, an additive `agents` section appears. This is a real run agains
             "status": "present"
           },
           {
-            "path": "… 1 more"
+            "path": "… 27 more"
           }
         ],
         "truncated": false,
         "counts": {
-          "total": 2,
-          "present": 1,
+          "total": 28,
+          "present": 27,
           "acknowledged": 1,
           "acknowledged-drifted": 0,
           "adopter-edited": 0,
@@ -949,17 +949,14 @@ With `--agents`, an additive `agents` section appears. This is a real run agains
         "gaps": {
           "rows": [
             {
-              "invariant": "discipline-enforceable",
+              "invariant": "docs-travel-with-code",
               "agent": "claude",
-              "mechanism": "docs + CLI floor: the generated pre-commit hook and CI run `arggon validate` and the kernel refuses what it owns; nothing is enforced inside the client",
+              "mechanism": "docs + CLI floor: CLAUDE.md -> @AGENTS.md loads the generated playbook and the bundle's commands carry it, but nothing injects the active work item; the agent fetches it with `arggon show`",
               "package": "none",
-              "note": "no claude:plugin.hooks.PreToolUse gate and no permission DSL: the OpenCode deny rules and the ZCode PreToolUse gate have no Claude Code equivalent, so the kernel, pre-commit and CI carry it alone."
-            },
-            {
-              "invariant": "… 1 more"
+              "note": "the bundle ships no session context hook: Claude Code has no plugin surface that injects the active work item, so the agent fetches it with `arggon show`."
             }
           ],
-          "total": 2,
+          "total": 1,
           "truncated": false,
           "matrixPresent": true
         }

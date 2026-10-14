@@ -17,6 +17,18 @@
   (still Accepted) — no decision here moves, the one-logic-path invariant is
   untouched, and the follow-on Claude Code adapter keeps the same bar
   ([spec-methodology-adapters-017 §S6](../specs/spec-methodology-adapters-017.md)).
+- Amendment (2026-10-14, PR #NNNN): the Claude Code adapter shipped, so the two
+  clauses the 2026-10-02 amendment left standing are superseded. `arggon init
+--agents claude` now materializes a vendored plugin bundle at
+  `.claude-marketplace/**` (source `templates/docs/claude/**`,
+  [spec-claude-code-adapter-024](../specs/spec-claude-code-adapter-024.md)), and the
+  claude seam owns **three** destinations — the `CLAUDE.md` → `@AGENTS.md` pointer,
+  the generated `.mcp.json` and the bundle — not "exactly those two". "Today it
+  remains docs + `CLAUDE.md`" no longer describes the shipped state. **Status
+  unchanged** (still Accepted): the follow-on commitment this record took is shipped,
+  not reversed, and the one-logic-path invariant is untouched — the bundle's
+  `PreToolUse` gate is defense-in-depth that fails open and delegates every rule to
+  the kernel.
 
 > Amendment (2026-10-04, [ADR 0021](./0021-agents-primary-workers-human-product-owner.md)
 > §1): **the invariants list in §Decision.1 is superseded — only its parity
@@ -72,6 +84,16 @@ exploration + ADR + spec + plan with tasks filed.
 > (`@arggondev/lib`), returning the documented `--json` envelopes
 > ([`ArggonManager/docs/json-output.md`](../json-output.md)). The pointer is one
 > of two claude-seam destinations, not the whole of it.
+
+> Amendment (2026-10-14, PR #NNNN): "genuinely missing" has shrunk again. The
+> client-side gate is no longer missing: the shipped bundle carries `hooks/gate.mjs`
+> with a `PreToolUse` gate (global force-push / `--no-verify` denies plus the
+> dispatch-scoped reviewer backstop), so `adapters/capability-matrix.json` moves
+> claude's `discipline-enforceable` row from gap to `claude:plugin.hooks.PreToolUse`
+> — with the fail-open posture stated on the row, because the kernel stays the
+> enforcement of record. The **session context hook remains genuinely missing**: a
+> plugin has no session-context entry point, so `docs-travel-with-code` stays a
+> claude gap and the agent still fetches the active item with `arggon show`.
 
 ## Decision
 
@@ -139,6 +161,19 @@ Claude Code gap perpetual).
   > [§S6](../specs/spec-methodology-adapters-017.md), under `adapters/claude/` —
   > stays a follow-on story with the same bar. The commitment is unchanged; only
   > the inventory was wrong.
+  >
+  > Amendment (2026-10-14, PR #NNNN): "exactly those two destinations" and "today
+  > it remains docs + `CLAUDE.md`" are both replaced by the shipped bundle. The
+  > `claude` seam now also owns `.claude-marketplace/**` — the marketplace catalog
+  > plus the plugin root (the manifest's `mcpServers` registration of `arggon mcp`,
+  > the thirteen `/arggon:<command>` commands, the `arggon:arggon-maker` /
+  > `arggon:arggon-standards-reviewer` subagents, the bundled `arggon-cli` skill and
+  > the hook gate) — materialized by `arggon init --agents claude` from
+  > `templates/docs/claude/**`. Its one manual step is the platform's marketplace
+  > install (`claude plugin marketplace add <repo>/.claude-marketplace` +
+  > `claude plugin install arggon@arggon-local`, probed on claude 2.1.289). The
+  > `.mcp.json` floor is unchanged for an adopter who skips the install, and the
+  > follow-on bar is met the same way: the bundle adds no second logic path.
 
 - Non-software applicability is a scope statement, not a new schema:
   branch/PR model stays, verified sane for docs/research/ops repos.
