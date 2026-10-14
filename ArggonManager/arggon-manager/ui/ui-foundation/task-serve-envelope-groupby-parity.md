@@ -27,9 +27,9 @@ Pre-existing parity gap surfaced by `task-web-board-hierarchy-view` (PR #814): t
 
 ## Acceptance
 
-- [ ] Decided and recorded: `--serve` echoes `groupBy` like the static envelope (with the parity test extended) or the omission is deliberate, documented in `json-output.md` and why
-- [ ] If changed, the envelope addition is additive; static/serve parity suite green
-- [ ] `arggon validate` green; affected suites green; PR opened
+- [x] Decided and recorded: `--serve` echoes `groupBy` like the static envelope (with the parity test extended) or the omission is deliberate, documented in `json-output.md` and why
+- [x] If changed, the envelope addition is additive; static/serve parity suite green
+- [x] `arggon validate` green; affected suites green; PR opened
 
 ## Notes
 

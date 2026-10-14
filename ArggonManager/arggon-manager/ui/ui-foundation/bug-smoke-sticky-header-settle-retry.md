@@ -27,9 +27,9 @@ Reported while landing `task-web-board-hierarchy-view` (PR #814): the `@smoke` "
 
 ## Acceptance
 
-- [ ] The sticky-header test's settle poll carries the same bounded retry its own comment describes (or the wait is re-based on a signal that cannot be destroyed by the reload)
-- [ ] Reproduced red under the flake harness (`E2E_THROTTLE=20 E2E_SPINNERS=16 npx playwright test --grep @smoke`) before, green after — or the failure mode is falsified with evidence
-- [ ] `npm run arggon -- validate` green; the `ui-smoke` lane stays green; PR opened
+- [x] The sticky-header test's settle poll carries the same bounded retry its own comment describes (or the wait is re-based on a signal that cannot be destroyed by the reload)
+- [x] Reproduced red under the flake harness (`E2E_THROTTLE=20 E2E_SPINNERS=16 npx playwright test --grep @smoke`) before, green after — or the failure mode is falsified with evidence
+- [x] `npm run arggon -- validate` green; the `ui-smoke` lane stays green; PR opened
 
 ## Notes
 

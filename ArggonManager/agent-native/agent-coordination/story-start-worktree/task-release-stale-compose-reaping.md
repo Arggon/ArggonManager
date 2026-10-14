@@ -27,9 +27,9 @@ Flagged while fixing `bug-cleanup-release-stale-record-wedge` (PR #813): for a S
 
 ## Acceptance
 
-- [ ] The difference is resolved one way and recorded: either `--release` reaps Compose for stale records like `--prune` does, or the divergence is deliberate and documented with its reason
-- [ ] A test pins the chosen behavior
-- [ ] `arggon validate` green; PR opened
+- [x] The difference is resolved one way and recorded: either `--release` reaps Compose for stale records like `--prune` does, or the divergence is deliberate and documented with its reason
+- [x] A test pins the chosen behavior
+- [x] `arggon validate` green; PR opened
 
 ## Notes
 
