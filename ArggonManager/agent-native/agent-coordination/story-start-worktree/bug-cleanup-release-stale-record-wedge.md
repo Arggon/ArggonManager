@@ -73,3 +73,7 @@ GATES (all green)
 OWN GATES NOT WEAKENED (checked): still-claimed refusal, foreign live-writer refusal and removal-blocking
 refusal are unchanged — a genuinely live worktree refuses exactly as before; only stale/dead records converge.
 Real failures stay loud on both `released` and `failures`.
+
+### handoff 2026-10-14 @ses_ec563ec36ffetHXjD4Hv24DyXX (session: ses_ec563ec36ffetHXjD4Hv24DyXX) — next: Review PR #813 (4 CLI + 1 native reproducer), merge, then tick the acceptance rows and flip the item done.
+- branch: fix/bug-cleanup-release-stale-record-wedge
+- open questions: Compose reaping is skipped for stale records (same as the missing-path release); a still-claimed item with a dead worktree still refuses unconditionally (unclaim first)
