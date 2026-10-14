@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: story-opencode-adapter
 title: OpenCode V2 adapter expansion (spec S4)
 assignee: arggon-delivery-lead
@@ -8,7 +8,6 @@ parent: native-agent-adapters
 labels: []
 created: "2026-10-02"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T12:42:49.141Z"
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/story-opencode-adapter.md (story index; required).
