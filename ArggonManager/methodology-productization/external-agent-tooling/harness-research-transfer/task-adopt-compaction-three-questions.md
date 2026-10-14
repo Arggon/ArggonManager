@@ -10,7 +10,6 @@ labels: [methodology, context-budget]
 priority: p3
 created: "2026-10-05"
 updated: "2026-10-14"
-worktree_path: /home/arggon/Projects/ArggonManager-task-adopt-compaction-three-questions
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/task-adopt-compaction-three-questions.md

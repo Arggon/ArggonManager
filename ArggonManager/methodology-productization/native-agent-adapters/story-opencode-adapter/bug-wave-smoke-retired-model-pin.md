@@ -9,7 +9,6 @@ parent: story-opencode-adapter
 labels: [opencode-seam, tests]
 created: "2026-10-14"
 updated: "2026-10-14"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-wave-smoke-retired-model-pin
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/bug-wave-smoke-retired-model-pin.md

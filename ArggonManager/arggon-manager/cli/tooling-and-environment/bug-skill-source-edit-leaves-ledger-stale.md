@@ -9,7 +9,6 @@ parent: tooling-and-environment
 labels: [seam, provenance, cli]
 created: "2026-10-13"
 updated: "2026-10-14"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-skill-source-edit-leaves-ledger-stale
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-skill-source-edit-leaves-ledger-stale.md

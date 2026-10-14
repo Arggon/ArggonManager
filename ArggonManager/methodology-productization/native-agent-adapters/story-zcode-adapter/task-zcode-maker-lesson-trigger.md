@@ -9,7 +9,6 @@ parent: story-zcode-adapter
 labels: [methodology, zcode-seam]
 created: "2026-10-13"
 updated: "2026-10-14"
-worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-maker-lesson-trigger
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-zcode-adapter/task-zcode-maker-lesson-trigger.md
