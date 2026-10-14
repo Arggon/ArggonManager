@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-skill-source-edit-leaves-ledger-stale
 title: "Editing a bundled-skill source leaves the provenance ledger stale: skills:sync writes the copy but never updates its x-generated checksum, and init classifies the regenerated copy as adopter-modified — the local provenance audit goes red and CI cannot see it"
+assignee: arggon-delivery-lead
+branch: fix/bug-skill-source-edit-leaves-ledger-stale
 parent: tooling-and-environment
 labels: [seam, provenance, cli]
 created: "2026-10-13"
-updated: "2026-10-13"
+updated: "2026-10-14"
+claimed_at: "2026-10-14T10:58:36.462Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-skill-source-edit-leaves-ledger-stale
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-skill-source-edit-leaves-ledger-stale.md
