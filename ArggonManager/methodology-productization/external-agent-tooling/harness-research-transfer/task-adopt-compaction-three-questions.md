@@ -143,3 +143,8 @@ Observations for the delivery lead (no items filed):
 ### handoff 2026-10-14 @ses_ec5ee8018ffd2NuzH1nxDyMjq7 (session: ses_ec5ee8018ffd2NuzH1nxDyMjq7) — next: Address review findings on PR #801; on approval the delivery lead merges and flips done — maker does not merge. Docs-only; no known blockers.
 - branch: feat/task-adopt-compaction-three-questions
 - open questions: Adopter template copy untouched (candidate follow-up?); native tools.arggon.show read the primary checkout (todo) while worktree CLI read in_progress — native root resolution worth checking.
+
+### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-14 (delivery lead)
+Merged as 5a3e3884 (PR #801); auto-done flip landed. The three-question session diagnostic now sits at the end of the review bar as advice-with-trigger (visible-degradation signal, ADR 0006-bounded surfaces to preserve, handoff fields to continue), with the honest limitation inline (length-triggered compaction by choice; the published alternative requires training) and explicitly not a gate/command/executor. Impact class Advisory stated; spec validate/analyze unchanged; `doctor --budget` before→after identical (nothing moves into always-loaded context).
