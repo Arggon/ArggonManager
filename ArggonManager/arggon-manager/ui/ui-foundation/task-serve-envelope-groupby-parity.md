@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-serve-envelope-groupby-parity
 title: board --serve --json omits `groupBy` while the static envelope echoes it — close or document the parity gap (now covers `tree`)
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: ui-foundation
 labels: [ui, board, json]
 created: "2026-10-14"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T17:14:38.468Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-serve-envelope-groupby-parity
 ---
 <!--
