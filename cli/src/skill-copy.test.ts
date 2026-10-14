@@ -18,6 +18,14 @@ import { BUNDLED_SKILLS, generatedMarker } from "./docs.js";
 // by V2 sessions) and the arggon-upgrade skill — and every file committed
 // under skills/arggon-cli/references/ must be in that list, so a reference
 // cannot ship unbundled.
+//
+// bug-skill-source-edit-leaves-ledger-stale: this test materializes the copies
+// but must NEVER re-record their `x-generated` rows — that is `skills:sync`'s
+// job (cli/src/sync-skills.ts). The provenance audit's CI surface is the
+// COMMITTED row against the COMMITTED source; a test that refreshed the row
+// here would repair the ledger before the audit ran (this suite materializes
+// the copies too) and the gate would go blind, which is exactly the defect the
+// audit rule exists for.
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 function sourceBytes(source: string): string {
