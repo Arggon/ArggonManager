@@ -66,3 +66,8 @@ PR: https://github.com/Arggon/ArggonManager/pull/809 — maker's work complete; 
 ### handoff 2026-10-14 @ses_ec5bbe5d7ffecjNObAb0WvEEZK (session: ses_ec5bbe5d7ffecjNObAb0WvEEZK) — next: Delivery lead: review PR #809; merge, then flip done — acceptance ticked, evidence in the comment above.
 - branch: fix/bug-zcode-agents-brace-elided-retired-ids
 - open questions: Retired role vocabulary still in touched live docs (opencode2/agents/playbooks): file a follow-up?; command elisions are out of this guard's scope.
+
+### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-14 (delivery lead)
+Merged as eddb0f7b (PR #809); auto-done flip landed. The id guard now expands every `arggon-{a,b}` brace group in live docs (part-local `.md` stripped) and runs each expansion through the retired-id predicate; §ZCode names `{maker,standards-reviewer}.md` and the same class was fixed in §OpenCode V2 / opencode2.md / playbooks/opencode.md (found by the new rule). The record-dirs exemption stays intact; the lesson was promoted to `pitfalls.md` per ADR 0027. Negative controls: the pre-fix corpus fails exactly 12 elision findings; reverting §ZCode fails naming the retired ids; restored → green. Full suite 3,393; CI green (branch merged with main — the ledger conflict resolved via the fixed sync tool + the re-pin's 0.10.0 stamps).
