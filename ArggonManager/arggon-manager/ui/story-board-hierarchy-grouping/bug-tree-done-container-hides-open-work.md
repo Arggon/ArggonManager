@@ -9,7 +9,6 @@ parent: story-board-hierarchy-grouping
 labels: []
 created: "2026-10-14"
 updated: "2026-10-14"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-tree-done-container-hides-open-work
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-board-hierarchy-grouping/bug-tree-done-container-hides-open-work.md
