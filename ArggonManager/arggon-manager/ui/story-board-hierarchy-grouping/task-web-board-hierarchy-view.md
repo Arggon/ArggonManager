@@ -65,3 +65,8 @@ observations (not defects of this change): (1) the `@smoke` "column headers stic
 ### handoff 2026-10-14 @ses_ec55cfa05ffeH351ZF7kM1XOT0 (session: ses_ec55cfa05ffeH351ZF7kM1XOT0) — next: Standards review + verifier probes on 676ce14e/49fb11f3, then merge (no squash; the branch carries a tracker commit) and flip done per the live checklist
 - branch: feat/task-web-board-hierarchy-view
 - open questions: SSE flake in the sticky-header @smoke settle poll (report-only); serve envelope still omits groupBy; tree markup always-on (+29% page) — flag-gating is the recorded lever if review prefers it
+
+### 2026-10-14 @ses_ec55cfa05ffeH351ZF7kM1XOT0
+### 2026-10-14 @arggon-maker — CI on PR #814 (addendum)
+
+CI run 38577687986 on feat/task-web-board-hierarchy-view: **cli success, ui-smoke success** (both jobs green on the pushed head). The local full-lane runs of `npx playwright test --grep @smoke` reported above: 36/36, 36/36, then 36/36 again in the final committed-state verification; the sticky-header test failed twice locally across five full-lane runs with the SSE-settle race its own comment describes ("Execution context was destroyed" in the un-retried settle poll; it is not one of this item's tests and CI's ui-smoke job is green on this head). Suggested follow-up if the lead wants it filed: extend that bounded retry to the settle poll — reported, not filed, per maker scope.
