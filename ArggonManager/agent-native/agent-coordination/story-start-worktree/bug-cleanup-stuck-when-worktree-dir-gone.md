@@ -64,3 +64,7 @@ Gates (all green)
 Docs in the PR: `ArggonManager/docs/json-output.md`, `ArggonManager/docs/opencode2.md`, `README.md`.
 
 Open question (out of scope, follow-up candidate): the `--release` arm (`classifyReleaseEntry`) keeps its own stale semantics — `!existsSync(path)` covers the removed directory, but a leftover directory whose gitdir is gone reaches the removal (its `worktreeBranch` probe throws -> CLI top-level `CLEANUP_FAILED`; a domain inventory listing the path attempts the removal). Same liveness rule would close it.
+
+### handoff 2026-10-14 @Arggon — next: Open PR #812, review the 3 CLI reproducers + the native retry, merge, then complete the acceptance checklist and flip the item done.
+- branch: fix/bug-cleanup-stuck-when-worktree-dir-gone
+- open questions: Release arm (classifyReleaseEntry) still throws/attempts removal for a leftover dir whose gitdir is gone — follow-up candidate; leftover debris dirs are never deleted by design.
