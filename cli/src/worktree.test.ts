@@ -2701,4 +2701,128 @@ describe("claim release — unclaim leaves nothing (bug-unclaim-leaves-worktree-
     expect(released.failures).toEqual([]);
     expect(existsSync(wt)).toBe(false);
   });
+
+  // --- the release arm's own stale-record shape
+  // (bug-cleanup-release-stale-record-wedge) -------------------------------
+  // The prune arm learned this rule in bug-cleanup-stuck-when-worktree-dir-gone;
+  // the release arm kept asking the dead worktree for its branch
+  // (`worktreeBranch` -> `git -C <dir> rev-parse` -> "not a git repository"),
+  // which threw the whole run to the top-level CLEANUP_FAILED. Same liveness
+  // rule, same convergence: the dead record is pruned (it PINS the branch, so
+  // `git branch -D` would refuse it), the branch is deleted and the record is
+  // cleared — the leftover directory is never deleted.
+  it("converges when the release target's gitdir is gone (interrupted-removal debris)", () => {
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    // The exact wedge: an interrupted `git worktree remove` took `.git` with
+    // it; git still lists the record as `prunable` (and still pins the branch).
+    rmSync(join(wt, ".git"), { force: true });
+    expect(git(["worktree", "list", "--porcelain"], dir)).toContain("prunable");
+
+    const released = runCleanup({ cwd: dir, release: "task-alpha", releaseIdentity: "arggon" });
+
+    expect(released.failures).toEqual([]);
+    expect(released.release?.entry).toMatchObject({
+      id: "task-alpha",
+      releasable: true,
+      // The worktree cannot be asked anymore: the branch comes from git's own
+      // record (the `branch` line survives the `prunable` marker).
+      branch: "feat/task-alpha",
+      action:
+        "clear stale worktree_path record (path is not a live worktree of this repo; " +
+        "any leftover directory is left in place)",
+    });
+    expect(released.release?.actions.map((action) => action.action)).toEqual([
+      "pruned stale git worktree record",
+      "deleted branch feat/task-alpha",
+      "cleared worktree_path",
+    ]);
+    // The debris is never the reaper's to delete: the files stay in place.
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    expect(git(["worktree", "list", "--porcelain"], dir)).not.toContain(wt);
+    expect(itemData(dir, "task-alpha").worktree_path).toBeUndefined();
+    expect(released.commit?.message).toBe("chore(tasks): released task-alpha");
+  });
+
+  it("converges when a manual `git worktree prune` already dropped the release target's record", () => {
+    // The hand-repaired state: the directory remains, git no longer knows the
+    // worktree. The record is all that is left to clear (and the branch name is
+    // gone with the record — the unclaim already cleared the item field), so a
+    // release must still converge rather than refusing the directory forever.
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    rmSync(join(wt, ".git"), { force: true });
+    git(["worktree", "prune"], dir);
+
+    const released = runCleanup({ cwd: dir, release: "task-alpha", releaseIdentity: "arggon" });
+
+    expect(released.failures).toEqual([]);
+    expect(released.release?.entry).toMatchObject({
+      id: "task-alpha",
+      releasable: true,
+      branch: null,
+      action:
+        "clear stale worktree_path record (path is not a live worktree of this repo; " +
+        "any leftover directory is left in place)",
+    });
+    // No prune step: git already dropped the record, so nothing was pruned.
+    expect(released.release?.actions.map((action) => action.action)).toEqual([
+      "cleared worktree_path",
+    ]);
+    expect(existsSync(wt)).toBe(true);
+    expect(itemData(dir, "task-alpha").worktree_path).toBeUndefined();
+  });
+
+  it("deletes the branch a stale record still names when the directory is gone", () => {
+    // A keeps the branch reachable: removing the directory by hand leaves git's
+    // record (and its `branch` line) in place, and the record pins the branch
+    // until the run prunes it. Without reading that record the release would
+    // clear the item and leave an abandoned claim's branch behind forever.
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    rmSync(wt, { recursive: true, force: true });
+
+    const released = runCleanup({ cwd: dir, release: "task-alpha", releaseIdentity: "arggon" });
+
+    expect(released.failures).toEqual([]);
+    expect(released.release?.entry).toMatchObject({
+      id: "task-alpha",
+      releasable: true,
+      branch: "feat/task-alpha",
+      action: "clear stale worktree_path record (path missing on disk)",
+    });
+    expect(released.release?.actions.map((action) => action.action)).toEqual([
+      "pruned stale git worktree record",
+      "deleted branch feat/task-alpha",
+      "cleared worktree_path",
+    ]);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    expect(itemData(dir, "task-alpha").worktree_path).toBeUndefined();
+  });
+
+  it("the human CLI releases the stale record instead of exiting at CLEANUP_FAILED", () => {
+    // The user-visible shape of the wedge: `cleanup --release` used to die at
+    // the top-level `CLEANUP_FAILED` (`git rev-parse --abbrev-ref HEAD failed:
+    // fatal: not a git repository`) with the record untouched, so every retry
+    // failed identically. Now the same command converges and says what it did.
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    rmSync(join(wt, ".git"), { force: true });
+
+    const human = runCli(["cleanup", "--release", "task-alpha"], dir);
+
+    expect(human.status).toBe(0);
+    expect(human.stdout + human.stderr).toContain("released task-alpha");
+    expect(human.stdout + human.stderr).toContain("pruned stale git worktree record");
+    expect(human.stdout + human.stderr).toContain("deleted branch feat/task-alpha");
+    expect(human.stdout + human.stderr).toContain("cleared worktree_path");
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    expect(itemData(dir, "task-alpha").worktree_path).toBeUndefined();
+  });
 });

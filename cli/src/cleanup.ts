@@ -596,6 +596,16 @@ type ReleaseRun = {
  *
  * All git calls run from the canonical (first) worktree, never from a directory
  * this run is about to delete.
+ *
+ * A recorded path that is not a LIVE worktree — missing on disk, a leftover
+ * directory whose gitdir link is gone, or the state after a manual `git worktree
+ * prune` — is a stale record, never a removal candidate
+ * (bug-cleanup-release-stale-record-wedge; the release half of the rule
+ * `classifyCleanupEntry` learned in bug-cleanup-stuck-when-worktree-dir-gone).
+ * The removal, the Compose reap and the stamp/env steps are skipped — there is
+ * nothing to remove — while the dead git record is pruned (it PINS the branch),
+ * the branch the record still names is deleted (force, like every release) and
+ * the record is cleared. A leftover directory is never deleted.
  */
 function releaseClaimedWorktree(run: ReleaseRun): CleanupRelease {
   const { id, root, byId, gitRunner, opts, failures } = run;
@@ -650,12 +660,16 @@ function releaseClaimedWorktree(run: ReleaseRun): CleanupRelease {
   // the caller's "that owner is dead and that work is disposable" — and it is
   // the only case in which the removal is forced.
   const forceArmed = opts.releaseTakeOverWorktree === true;
+  // Stale-record clause (bug-cleanup-release-stale-record-wedge): the worktree
+  // is already gone — missing on disk, or a leftover directory whose gitdir
+  // link is gone (`prunable`) — so there is no removal to attempt, no Compose
+  // project to reap and no stamp/env to unlink. What is left is the dead git
+  // record (which PINS the branch: `git branch -D` refuses it with "cannot
+  // delete branch … used by worktree"), the branch and the item record.
+  const stale = entry.action?.startsWith("clear stale worktree_path record") === true;
 
   try {
-    // Stale-record clause: the worktree is already gone, so the record is the
-    // only thing left. No Compose project, no stamp, no branch — nothing the
-    // removal does not already own.
-    if (entry.action !== "clear stale worktree_path record (path missing on disk)") {
+    if (!stale) {
       // Compose first, before the worktree removal (ADR 0019 layer 2,
       // exploration 017 F8): the stack that lives only for the run dies with
       // the worktree. Only a repo whose convention declares services ever
@@ -701,19 +715,30 @@ function releaseClaimedWorktree(run: ReleaseRun): CleanupRelease {
       } else if (hadStamp) {
         actions.push({ id, action: "arggon-claim.json stamp gone with the worktree" });
       }
-      if (entry.branch !== null && gitRunner.branchExists(gitRoot, entry.branch)) {
-        // Force, never the safe delete: an abandoned claim's branch is by
-        // definition NOT provably merged into the base (that is what prune's
-        // eligibility means), and the release is already an explicit,
-        // refusal-gated discard of that work.
-        gitRunner.deleteBranchForce(gitRoot, entry.branch);
-        actions.push({ id, action: `deleted branch ${entry.branch}` });
-      }
+    } else if (gitRunner.pruneWorktrees?.(gitRoot) === true) {
+      // The dead record PINS the branch, so it goes before the branch step —
+      // exactly like prune's stale entries (bug-cleanup-stuck-when-worktree-dir-gone).
+      // Reported only when a record was actually dropped (`--verbose` output is
+      // non-empty exactly then). Git calls run from the canonical worktree, like
+      // every other call in this release.
+      actions.push({ id, action: "pruned stale git worktree record" });
     }
-    if (recordHome) {
+    if (entry.branch !== null && gitRunner.branchExists(gitRoot, entry.branch)) {
+      // Force, never the safe delete: an abandoned claim's branch is by
+      // definition NOT provably merged into the base (that is what prune's
+      // eligibility means), and the release is already an explicit,
+      // refusal-gated discard of that work. Reached for a stale record too: the
+      // branch comes from the dead git record (the worktree cannot be asked).
+      gitRunner.deleteBranchForce(gitRoot, entry.branch);
+      actions.push({ id, action: `deleted branch ${entry.branch}` });
+    }
+    if (stale || recordHome) {
       // The record outlives the removal here, so it is cleared AFTER the
       // worktree is observably gone — prune's invariant (a surviving worktree
-      // keeps the record that makes it reapable) — and rides one commit.
+      // keeps the record that makes it reapable) — and rides one commit. A
+      // stale record was never disposed WITH anything (nothing was removed;
+      // the leftover directory survives), so it is always cleared, wherever
+      // the run's tracker copy is.
       runUpdate({ cwd: root, id, worktreePath: "" });
       actions.push({ id, action: "cleared worktree_path" });
       const cleared = commitTrackerMutation(root, [item.filePath], {

@@ -5066,6 +5066,55 @@ describe("native release of a dropped claim (bug-unclaim-leaves-worktree-record-
       normalize(JSON.parse(cliProc.stdout) as Record<string, unknown>, cliDir),
     );
   });
+
+  // The release arm's own stale-record shape
+  // (bug-cleanup-release-stale-record-wedge): the prune arm learned this in
+  // bug-cleanup-stuck-when-worktree-dir-gone, but the release arm still asked
+  // the dead worktree for its branch — the same throw that wedges the CLI at
+  // CLEANUP_FAILED — and a domain inventory listing the path attempted a
+  // removal that can never succeed. Same liveness rule, same convergence.
+  it("release converges when the worktree's gitdir is gone (interrupted-removal debris)", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await claimedAndMerged(dir);
+    await tool(defs, "update").execute(
+      { id: "task-rate-limit", status: "todo" },
+      { sessionID: "ses_a" },
+    );
+    // The interrupted removal: files behind, `.git` gone, git's record
+    // `prunable` and still pinning the branch.
+    rmSync(join(worktreePath, ".git"), { force: true });
+    expect(gitOut(dir, ["worktree", "list", "--porcelain"])).toContain("prunable");
+
+    const output = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    const envelope = output.output as Record<string, unknown>;
+    expect(envelope.failures).toEqual([]);
+    expect(envelope.release).toMatchObject({
+      id: "task-rate-limit",
+      releasable: true,
+      // The branch comes from git's own record: the dead worktree cannot be
+      // asked and the unclaim already cleared the item field.
+      branch: "feat/task-rate-limit",
+      action:
+        "clear stale worktree_path record (path is not a live worktree of this repo; " +
+        "any leftover directory is left in place)",
+    });
+    expect(envelope.released).toEqual([
+      { id: "task-rate-limit", action: "pruned stale git worktree record" },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    // No removal was attempted through the domain — there is no worktree to
+    // remove — and the debris directory is left in place.
+    expect(calls.remove).toEqual([]);
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(gitOut(dir, ["worktree", "list"]).includes("task-rate-limit")).toBe(false);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+    expect(envelope.commit).toMatchObject({ message: "chore(tasks): released task-rate-limit" });
+  });
 });
 
 /**

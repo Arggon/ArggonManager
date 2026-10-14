@@ -216,10 +216,16 @@ record`; the record pins the branch, so it goes before `deleted branch`),
   (**unconditional**), another identity's stamp shows a live writer, or the
   worktree has uncommitted/untracked content (refused before anything is
   reaped, so a failed release keeps the stamp and env file; the stamp is reaped
-  only after an observed removal). `take_over_worktree` is the audited hatch for
-  a presumed-dead stamped owner on an unclaimed item, the only thing that forces
-  the removal, and is refused without a `release`. The release owns its tracker
-  commit and reports it, exactly like the CLI.
+  only after an observed removal). A recorded path that is no longer a live
+  worktree — missing on disk, or a leftover directory whose gitdir link is gone
+  — is a stale record for the release too
+  (bug-cleanup-release-stale-record-wedge): the domain removal is skipped
+  (nothing to remove), the dead git record is pruned (it pins the branch), the
+  branch git's dead record still names is deleted and the record is cleared —
+  the leftover directory is left in place. `take_over_worktree` is the audited
+  hatch for a presumed-dead stamped owner on an unclaimed item, the only thing
+  that forces the removal, and is refused without a `release`. The release owns
+  its tracker commit and reports it, exactly like the CLI.
   `update` cannot release — it is frontmatter-only, and it is the same call that
   CLEARS a `worktree_path` record — so the native `update` payload carries the
   additive `claimFootprint` receipt naming this call instead. See
