@@ -178,6 +178,44 @@ describe("zcode plugin seam generation", () => {
     expect(zcodeIds.sort()).toEqual(["arggon-maker", "arggon-standards-reviewer"]);
   });
 
+  /**
+   * ADR 0027 point 3 (task-zcode-maker-lesson-trigger): the lesson-promotion
+   * trigger is the WRITE-PATH half of the rule, and ADR 0027 places it in the
+   * generated maker prompt — so BOTH seams ship it, or ZCode adopters never
+   * meet the rule. The seams word it in their own register, but the contract
+   * cannot differ: the bound, the mandatory citation and the carrier list.
+   * Tokens, not sentences — a reword that keeps the contract passes, a dropped
+   * carrier or bound fails. Before this item the ZCode prompt had no trigger
+   * text at all, so these assertions fail without the change.
+   */
+  it("both seams' maker prompts carry the ADR 0027 lesson-promotion trigger", () => {
+    const contract = [
+      "160 characters excluding the citation",
+      "citation is mandatory",
+      "`— <item-id>` or `— ADR NNNN`",
+      "references/pitfalls.md",
+      "playbooks/<tech>.md",
+      "## Context",
+      "Promoting lessons",
+    ];
+    const seams = {
+      zcode: join(shipped.agentsDir, "arggon-maker.md"),
+      opencode: join(repoRoot, "templates/docs/opencode/agents/arggon-maker.md"),
+    };
+    for (const [seam, file] of Object.entries(seams)) {
+      // Hard-wrapped markdown: compare the WORDS the prompt carries, not its
+      // line breaks.
+      const body = readFileSync(file, "utf8").replace(/\s+/g, " ");
+      for (const token of contract) {
+        expect(body, `${seam} maker prompt is missing: ${token}`).toContain(token);
+      }
+    }
+    // ...and in the seam's own vocabulary: the ZCode prompt must not borrow the
+    // OpenCode code-mode API spelling (the commands' rule, extended to the
+    // agent the trigger lands in — ZCode has no code-mode tool API).
+    expect(readFileSync(seams.zcode, "utf8")).not.toContain("tools.arggon.");
+  });
+
   it("the lead's contract reaches the main session: the README states the rule and no surface dispatches a lead", () => {
     // task-zcode-lead-role-belongs-to-the-main-session AC 2: with the lead
     // agent gone, the main session must still learn it IS the lead — through
@@ -186,7 +224,7 @@ describe("zcode plugin seam generation", () => {
     const dir = initTree();
     const readme = readFileSync(join(dir, PLUGIN_ROOT, "README.md"), "utf8");
     expect(readme).toContain("the main session IS the delivery lead");
-    expect(readme).toContain("Do not dispatch a \"lead\"");
+    expect(readme).toContain('Do not dispatch a "lead"');
 
     // No generated file carries the lead's agent id — the id is retired from
     // the seam, so a stale dispatch instruction cannot hide in any artifact.
@@ -697,9 +735,7 @@ describe("zcode automation templates (opt-in, spec S5)", () => {
     expect(contract(driftFiling)).toContain("never filed under a guessed parent");
     expect(contract(driftFiling)).toContain("`spec-<topic>-NNN` → `story-<topic>`");
     // The sweep pins its kernel primitive: `arggon list --stale`.
-    expect(shippedAutomation("automations/stale-claim-sweep.md")).toContain(
-      "arggon list --stale",
-    );
+    expect(shippedAutomation("automations/stale-claim-sweep.md")).toContain("arggon list --stale");
     // ... and never mutates the stale item it reports.
     const sweep = shippedAutomation("automations/stale-claim-sweep.md");
     expect(sweep).toContain("NEVER touch the stale item itself");

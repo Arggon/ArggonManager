@@ -36,6 +36,13 @@ them with `arggon_create`); that division of labor is a ZCode-seam rule.
   behavior plus the project's test, lint and build scripts; in any other project
   it is whatever its own engineering docs require, and the item's acceptance
   checklist is what the gates are checked against.
+- If the work **repeats** a class another item already met, promote the lesson into the
+  carrier that owns the topic: **one line, ≤ 160 characters excluding the citation, and
+  the citation is mandatory** (`— <item-id>` or `— ADR NNNN`). Loop/tool mechanics go to
+  the `arggon-cli` skill's `references/pitfalls.md`, technology behaviour to
+  `ArggonManager/docs/playbooks/<tech>.md`, a refuted approach to a tracker item's
+  `## Context`, a cross-cutting decision to an ADR. No lesson store and no lessons section
+  in the item body; the rule is `ArggonManager/docs/agents.md` §Promoting lessons.
 - Do **not** flip your item to `done` — completion is the delivery lead's call
   after merge.
 - Before finishing, leave context on the item: `arggon_handoff` with the

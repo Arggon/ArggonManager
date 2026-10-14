@@ -178,7 +178,7 @@ x-generated:
     generatedAt: "2026-10-13T02:56:53.578Z"
   .zcode-marketplace/arggon/agents/arggon-maker.md:
     template: "docs/zcode/arggon/agents/arggon-maker.md"
-    checksum: "sha256:3fc55b3b6bf5765c87e8bc175b7e3940fc9adb6ca5e4bd010cb8967665b872af"
+    checksum: "sha256:a6ab9fb3bbe43c88e45d1784d269b1bde2ecfffeac7742fa4d39341e94ca673f"
     arggonVersion: "0.7.0"
     generatedAt: "2026-10-13T02:56:53.578Z"
   .zcode-marketplace/arggon/agents/arggon-standards-reviewer.md:
