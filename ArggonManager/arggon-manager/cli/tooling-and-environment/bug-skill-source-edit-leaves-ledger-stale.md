@@ -12,7 +12,6 @@ updated: "2026-10-14"
 claimed_at: "2026-10-14T10:58:36.462Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-skill-source-edit-leaves-ledger-stale
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-skill-source-edit-leaves-ledger-stale.md
   Leaves live only under a story. id is the filename stem: bug-skill-source-edit-leaves-ledger-stale.
@@ -157,3 +156,18 @@ gitignored in the seam repo's own checkout).
 
 - branch: fix/bug-skill-source-edit-leaves-ledger-stale
 - open questions: Dropped-row case (merge deletes all seven skill rows) is invisible in CI by design — recreate-on-materialize, no stranded artifact; extend derivation to vendored plugin rows? (out of scope: check:plu…
+
+### 2026-10-14 @ses_ec5ee8017ffenAoLAgVVe7sCfF
+### Addendum @ses_ec5ee8017ffenAoLAgVVe7sCfF — final HEAD 219378df (comment-only delta)
+
+One commit after the evidence comment: a comment-only guard in
+`cli/src/skill-copy.test.ts` stating that the parity test must NOT re-record the
+rows (routing it through `syncBundledSkills` is the tempting simplification, and
+it would repair the ledger before the audit runs in the same suite — the gate
+would go blind, which is the defect itself).
+
+Gates re-run at final HEAD **219378df**: `npm test` 156 files / 3386 tests green
+(materialized-copy checkout), `npm run lint` clean, `npm run arggon -- validate` ok,
+`npx prettier --check` clean. CI on the branch: `tasks-validate` green (drift gate +
+`arggon validate`), `cli` lane running at comment time. Item status left
+`in_progress` with your claim; acceptance boxes ticked, `done` not flipped.
