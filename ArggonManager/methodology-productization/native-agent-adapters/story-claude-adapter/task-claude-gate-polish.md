@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-claude-gate-polish
 title: "Claude seam: gate wording for argon_handoff + narrower PreToolUse matcher (post-#821 standards nits)"
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: story-claude-adapter
 labels: []
 created: "2026-10-14"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T20:08:15.698Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-claude-gate-polish
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-claude-adapter/task-claude-gate-polish.md
   Leaves live only under a story. id is the filename stem: task-claude-gate-polish.
