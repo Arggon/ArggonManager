@@ -61,3 +61,7 @@ Both live in the same tree code (`cli/src/board.ts`: `renderBoardTree`, the embe
 - `npx playwright test --grep @smoke` **46 passed** (alone; new cases: serve click→drawer, keyboard open + roving, fold+persistence+reset+view-toggle, lens-inside-fold, static `--details` row drawer offline, drawer-free static honesty, terminal+fold composition). One **one-off flake** observed on the pre-existing "column headers stick to the viewport top" case (documented reload-storm sensitivity; passes alone and on re-runs) — recorded, not fixed here.
 
 **Docs in the diff**: README (grouped-ancestry + column-controls + drawer + keyboard bullets, tree payload re-measured 662 items → ~565 B/item static), CONTRIBUTING § axe scanned states (six → twelve, this item's named), docs/json-output.md board section. Acceptance boxes ticked in this branch's copy of the item file.
+
+### handoff 2026-10-14 @ses_ec4eaf180ffeataHU4UOHWtBdI (session: ses_ec4eaf180ffeataHU4UOHWtBdI) — next: Standards review on PR #816 (base main), then merge; verifier may re-run `npx playwright test --grep @smoke` alone — expect 46 passed.
+- branch: feat/task-tree-rows-open-detail
+- open questions: None blocking; one recorded one-off flake on the pre-existing sticky-header test (see comment).
