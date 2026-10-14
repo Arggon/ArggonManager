@@ -42,7 +42,11 @@
  *      doc contract). The list is the exact four ids of ADR 0021 §6.2a′, never
  *      a word search: `arggon-standards-reviewer` does not contain
  *      `arggon-reviewer`, and `arggon-maker` not `arggon-worker`, so this fires
- *      on the ids themselves and nothing else.
+ *      on the ids themselves and nothing else. A brace elision is expanded
+ *      before the check — `arggon-{worker,reviewer}` has to be read as the two
+ *      ids it hides — because the elided form is exactly how the third
+ *      instance of this class shipped green (`docs/agents.md` §ZCode,
+ *      `bug-zcode-agents-brace-elided-retired-ids`).
  *   2. A SAMPLE'S AGENT ENUMERATION IS THE SHIPPED SET. Every fenced `json`
  *      block in a live doc that parses is read; an `opencode.artifacts.agents`
  *      array must equal, id for id and in order, the `.md` stems `arggon init`
@@ -180,6 +184,33 @@ function shippedSeamAgentIds(): string[] {
     .sort();
 }
 
+/**
+ * The concrete ids a brace elision stands for, each with the elision that
+ * produced it: `arggon-{worker,reviewer}.md` → `arggon-worker`,
+ * `arggon-reviewer` (both retired).
+ *
+ * The literal substring rule cannot see them: neither `arggon-worker` nor
+ * `arggon-reviewer` appears in `arggon-{worker,reviewer}`. That is not
+ * hypothetical — `docs/agents.md` §ZCode described the two shipped ZCode
+ * agents as `agents/arggon-{worker,reviewer}.md`, two retired ids, and shipped
+ * green (`bug-zcode-agents-brace-elided-retired-ids`). Expanding the form
+ * before the check is what makes an elision unable to hide an id.
+ *
+ * The `arggon-{...}` prefix form is the elision style the docs use; a part
+ * carrying its own `.md` is normalized, so `arggon-{worker.md,reviewer.md}` is
+ * no hiding place either.
+ */
+function braceElidedIds(text: string): Array<{ form: string; id: string }> {
+  const found: Array<{ form: string; id: string }> = [];
+  for (const match of text.matchAll(/arggon-\{([^{}]*)\}/g)) {
+    for (const part of match[1]!.split(",")) {
+      const name = part.trim().replace(/\.md$/, "");
+      if (name !== "") found.push({ form: match[0], id: `arggon-${name}` });
+    }
+  }
+  return found;
+}
+
 /** The `opencode.artifacts.agents` enumerations of every live doc's json samples. */
 function agentEnumerations(): Array<{ path: string; line: number; ids: unknown[] }> {
   const found: Array<{ path: string; line: number; ids: unknown[] }> = [];
@@ -222,7 +253,7 @@ describe("live shipped docs name only shipped seam ids", () => {
     }
   });
 
-  it("no live doc names a retired seam id", () => {
+  it("no live doc names a retired seam id — literally or brace-elided", () => {
     const failures: string[] = [];
     for (const path of docs) {
       const text = readFileSync(join(repoRoot, path), "utf8");
@@ -231,6 +262,17 @@ describe("live shipped docs name only shipped seam ids", () => {
           failures.push(
             `${path}: names the retired agent id "${id}" (ADR 0021 §6.2a′) — ` +
               "restate it at the shipped id; the old → new mapping lives in the dated record",
+          );
+        }
+      }
+      // `arggon-{worker,reviewer}` names both retired ids without containing
+      // either literal, so the substring rule above alone would let it ship.
+      for (const { form, id } of braceElidedIds(text)) {
+        const retired = RETIRED_SEAM_IDS.find((candidate) => id.includes(candidate));
+        if (retired !== undefined) {
+          failures.push(
+            `${path}: brace-elides the retired agent id "${retired}" (via "${form}"; ` +
+              "ADR 0021 §6.2a′) — name the shipped ids; an elision must not hide a retired id",
           );
         }
       }
@@ -275,7 +317,7 @@ describe("live shipped docs name only shipped seam ids", () => {
     }
   });
 
-  it("the retired-id check fires on the exact pre-fix sample and collides with no shipped id", () => {
+  it("the retired-id check fires on the exact pre-fix samples and collides with no shipped id", () => {
     // The control is the pre-fix bytes from `json-output.md:857` (the PR #762
     // verdict's instance). A clean run must never mean "the scanner read
     // nothing": this exact text has to produce the three retired ids.
@@ -285,9 +327,33 @@ describe("live shipped docs name only shipped seam ids", () => {
       "arggon-worker",
       "arggon-reviewer",
     ]);
-    // The other direction: no shipped id contains a retired id as a substring,
-    // so the check cannot be satisfied by an id overlap. `arggon-standards-reviewer`
+
+    // The elided control is the pre-fix §ZCode text
+    // (`bug-zcode-agents-brace-elided-retired-ids`). The literal rule sees
+    // nothing in it — that IS the defect — so the expansion has to.
+    const elidedPreFix = "the two `agents/arggon-{worker,reviewer}.md` in ZCode frontmatter";
+    expect(RETIRED_SEAM_IDS.filter((id) => elidedPreFix.includes(id))).toEqual([]);
+    expect(
+      braceElidedIds(elidedPreFix)
+        .filter(({ id }) => RETIRED_SEAM_IDS.some((retired) => id.includes(retired)))
+        .map(({ id }) => id),
+    ).toEqual(["arggon-worker", "arggon-reviewer"]);
+
+    // A `.md` inside the group is normalized, not a hiding place.
+    expect(braceElidedIds("arggon-{worker.md,reviewer.md}").map(({ id }) => id)).toEqual([
+      "arggon-worker",
+      "arggon-reviewer",
+    ]);
+
+    // The other direction: the shipped elision (the fixed §ZCode form) must
+    // not fire, and no shipped id contains a retired id as a substring, so the
+    // check cannot be satisfied by an id overlap. `arggon-standards-reviewer`
     // ends in `-reviewer`, but never in `arggon-reviewer`.
+    expect(
+      braceElidedIds("agents/arggon-{maker,standards-reviewer}.md").filter(({ id }) =>
+        RETIRED_SEAM_IDS.some((retired) => id.includes(retired)),
+      ),
+    ).toEqual([]);
     for (const shippedId of shippedSeamAgentIds()) {
       for (const retiredId of RETIRED_SEAM_IDS) {
         expect(

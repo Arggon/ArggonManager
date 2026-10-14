@@ -34,7 +34,7 @@ docs or the V1 schema for V2 work.
   `.opencode/opencode.json(c)`) — a git-root-anchored prettier formatter
   override + compaction retention and **no MCP
   stanza** (W3, `task-native-commands-seam`; ADR 0011 §5/§6) — plus
-  `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` and the eleven
+  `.opencode/agents/arggon-{delivery-lead,maker,standards-reviewer,verifier}.md` and the eleven
   native `.opencode/commands/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook,adopt}.md`
   — never overwriting modified files (contract:
   [spec-opencode-seam-010](../specs/spec-opencode-seam-010.md)). The commands are

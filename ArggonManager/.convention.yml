@@ -39,9 +39,9 @@ x-generated:
     generatedAt: "2026-10-13T02:56:53.578Z"
   .agents/skills/arggon-cli/references/pitfalls.md:
     template: "skills/arggon-cli/references/pitfalls.md"
-    checksum: "sha256:55b884f3791c251b870863d76023bb88576d667358d01f13104db98f29a9f9ba"
+    checksum: "sha256:3478cfe42ea84984eae49e9e8f816cc49965cd59fc02d28623dc7010c53a4cc6"
     arggonVersion: "0.7.0"
-    generatedAt: "2026-10-13T02:56:53.578Z"
+    generatedAt: "2026-10-14T12:10:37.293Z"
   .agents/skills/arggon-upgrade/SKILL.md:
     template: "skills/arggon-upgrade/SKILL.md"
     checksum: "sha256:dfaefcd25f116aa7984edf3a7d4c8548918613c9d7a96c063070e6e4de579871"
