@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-tree-rows-open-detail
 title: "Tree interactions: open the detail drawer (click/keyboard) and compact/extend each subtree — the tree is read-only today"
+assignee: arggon-delivery-lead
+branch: feat/task-tree-rows-open-detail
 parent: story-board-hierarchy-grouping
 labels: [ui, board]
 created: "2026-10-14"
 updated: "2026-10-14"
+claimed_at: "2026-10-14T15:42:36.289Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-tree-rows-open-detail
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-board-hierarchy-grouping/task-tree-rows-open-detail.md
