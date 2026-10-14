@@ -697,6 +697,12 @@ describe("claude gate script (reviewer backstop + global git gates)", () => {
       },
       { tool_name: "Bash", tool_input: { command: "git commit -m wip" } },
       { tool_name: "Bash", tool_input: { command: "git push origin main" } },
+      // task-claude-gate-polish round 1: the shell route carries the same
+      // decision as the MCP set — `arggon handoff …` is a tracker append, so it
+      // is denied here too (bare, wrapped, and behind `npm run arggon --`).
+      { tool_name: "Bash", tool_input: { command: "arggon handoff task-x --next ship-it" } },
+      { tool_name: "Bash", tool_input: { command: 'sh -c "arggon handoff task-x"' } },
+      { tool_name: "Bash", tool_input: { command: "npm run arggon -- handoff task-x" } },
       { tool_name: "mcp__arggon__arggon_update", tool_input: { id: "task-x" } },
       { tool_name: "mcp__arggon__arggon_create", tool_input: { id: "task-x" } },
       { tool_name: "mcp__plugin_arggon_arggon__arggon_update", tool_input: { id: "task-x" } },
@@ -726,6 +732,16 @@ describe("claude gate script (reviewer backstop + global git gates)", () => {
           command:
             'npm run arggon -- comment task-x "the reviewer cannot run arggon update or git commit"',
         },
+      }).status,
+    ).toBe(0);
+    // task-claude-gate-polish round 1: `comment` stays OUT of the shell word
+    // list on purpose — the verdict channel is open on this route too, even
+    // when its payload documents the denied `handoff` word.
+    expect(
+      gate(dir, "pre", {
+        session_id: session,
+        tool_name: "Bash",
+        tool_input: { command: 'npm run arggon -- comment task-x "handoff context: not shipped"' },
       }).status,
     ).toBe(0);
     expect(

@@ -106,10 +106,11 @@ no shell, no exec bit) on four events:
   the standards-reviewer subagent is in flight, `Write`/`Edit` (and the other
   file-writing tools), mutating `arggon` shell invocations, git history commands
   and the mutating `mcp__arggon__*` / `mcp__plugin_arggon_arggon__*` tools are
-  denied for that session — `arggon_handoff` included, since a handoff is a
-  tracker append like any other mutation. `arggon_comment` stays open: it is the
-  verdict channel. Parallel dispatches are counted, so the window holds until
-  the last one returns.
+  denied for that session — `arggon_handoff` included on **both** routes (the
+  MCP tool under either registration, and the `arggon handoff …` shell words),
+  since a handoff is a tracker append like any other mutation. `arggon_comment`
+  stays open on both: it is the verdict channel. Parallel dispatches are
+  counted, so the window holds until the last one returns.
 - **`Stop`** clears the session's state — the belt-and-braces reset for a
   dispatch that never returned a `SubagentStop`.
 
@@ -158,9 +159,11 @@ decision is:
   2.1.289 (probe, this item); omitting it loads the shipped pair. The omission
   is pinned by `cli/src/init-claude.test.ts` so an edit cannot silently disarm
   agent loading.
-- **`arggon_handoff` is denied inside the reviewer window; the ZCode gate leaves
-  it unlisted.** Spec 024 §Hook gates denies "the mutating `mcp__arggon__*`
-  tools" and names `arggon_comment` as the one exception; a handoff appends a
-  tracker section, so this seam puts it on the denied side explicitly. The
-  ZCode gate's set predates that reading and is unchanged here — a candidate
-  follow-up on that seam (recorded on `task-claude-gate-polish`).
+- **`arggon_handoff` is denied inside the reviewer window on both routes; the
+  ZCode gate leaves it unlisted.** Spec 024 §Hook gates denies "the mutating
+  `mcp__arggon__*` tools" and names `arggon_comment` as the one exception; a
+  handoff appends a tracker section, so this seam denies it explicitly — as an
+  MCP tool under both registrations AND as the `arggon handoff …` shell words,
+  with `comment` open on both. The ZCode gate's MCP set and shell word list
+  predate that reading and are unchanged here — a candidate follow-up on that
+  seam (recorded on `task-claude-gate-polish`).

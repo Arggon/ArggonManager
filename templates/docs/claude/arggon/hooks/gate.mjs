@@ -30,10 +30,12 @@
  * registrations produce — the bare `mcp__arggon__*` of the generated
  * `.mcp.json` and the plugin-scoped `mcp__plugin_arggon_arggon__*` of the
  * plugin's own `mcpServers` entry (spec-claude-code-adapter-024 §MCP wiring).
- * `arggon_comment` stays open under both: it is the verdict channel.
- * `arggon_handoff` is DENIED with that set: a handoff appends a tracker section
- * to an item body, which is a mutation, not a verdict channel. This diverges
- * from the ZCode gate, which leaves `arggon_handoff` unlisted rather than
+ * `arggon_comment` stays open on BOTH routes: it is the verdict channel.
+ * `arggon_handoff` is DENIED on both too — the MCP tool with that set, and the
+ * `arggon handoff` / `npm run arggon -- handoff …` shell words via
+ * MUTATING_ARGGON_WORDS — because a handoff appends a tracker section to an
+ * item body, which is a mutation, not a verdict channel. This diverges from the
+ * ZCode gate, which leaves `arggon_handoff` unlisted on both routes rather than
  * denied — recorded on task-claude-gate-polish as a candidate ZCode follow-up,
  * deliberately not changed on that seam here.
  *
@@ -120,10 +122,12 @@ const FILE_WRITE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"])
 /**
  * Shell subcommands that mutate the tracker or the history, matched as words
  * anywhere in the command (covers `arggon update …`, `npm run arggon -- …`,
- * `npx arggon-manager update …`, and the dist bin directly).
+ * `npx arggon-manager update …`, and the dist bin directly). `handoff` is a
+ * member for the same reason as the MCP set above; `comment` stays OUT on this
+ * route too — it is the verdict channel.
  */
 const MUTATING_ARGGON_WORDS =
-  /\b(?:arggon|arggon-manager)\s+(?:--?[a-z-]+\s+)*(?:update|create|branch|start|cleanup|priority|sync|import-issues|migrate)\b/;
+  /\b(?:arggon|arggon-manager)\s+(?:--?[a-z-]+\s+)*(?:update|create|branch|start|cleanup|priority|sync|import-issues|migrate|handoff)\b/;
 
 /** Git history mutations the reviewer never runs. */
 const REVIEWER_SHELL_GATES = [
