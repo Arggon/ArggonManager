@@ -305,6 +305,76 @@ function createFixture(): string {
   return fixture;
 }
 
+/**
+ * Tree terminal-layout fixture (bug-tree-ignores-hide-terminal-toggle): the
+ * bug is about a LAYOUT preference applying to the ancestry tree, so the
+ * fixture needs the two shapes that rule distinguishes — a terminal row with a
+ * live descendant (hiding it would orphan the live row, so it must stay, muted)
+ * and terminal rows that must hide. Its own fixture, not the shared one: those
+ * extra terminal rows must not shift the card positions the column, drag and
+ * arrow tests measure.
+ */
+const TREE_STORY_ID = "tree-closed-story";
+const TREE_OPEN_CHILD_ID = "task-tree-open-child";
+const TREE_CLOSED_LEAF_ID = "task-tree-closed-leaf";
+const TREE_TERMINAL_ROOT_ID = "tree-terminal-root";
+
+function createTreeTerminalFixture(): string {
+  const fixture = mkdtempSync(join(tmpdir(), "arggon-e2e-tree-terminal-"));
+  const git = (args: string[]): void => {
+    const result = spawnSync("git", args, { cwd: fixture, encoding: "utf8" });
+    if (result.status !== 0) {
+      throw new Error(`git ${args.join(" ")} failed: ${result.stdout ?? ""}${result.stderr ?? ""}`);
+    }
+  };
+  git(["init", "-q"]);
+  git(["config", "user.email", "smoke@example.test"]);
+  git(["config", "user.name", "Board Smoke"]);
+  writeFileSync(join(fixture, "README.md"), "# tree terminal fixture\n", "utf8");
+  git(["add", "README.md"]);
+  git(["commit", "-qm", "chore: fixture"]);
+
+  cliJson(fixture, ["init", fixture]);
+  const chain: Array<[string, string, string | undefined]> = [
+    ["initiative", "Tree smoke", undefined],
+    ["epic", "Tree core", "tree-smoke"],
+    ["story", "Tree closed story", "tree-core"],
+    ["task", "Tree open child", "tree-closed-story"],
+    ["task", "Tree closed leaf", "tree-closed-story"],
+    // A parentless terminal root (tasks need a parent, an initiative does not):
+    // alone in the lens verdict, everything the lens keeps is terminal, so the
+    // composed tree has nothing visible at all.
+    ["initiative", "Tree terminal root", undefined],
+  ];
+  for (const [type, title, parent] of chain) {
+    runCli(fixture, [
+      "create",
+      type,
+      title,
+      ...(parent !== undefined ? ["--parent", parent] : []),
+      "--json",
+    ]);
+  }
+  // A terminal CONTAINER: cancelled directly, with the open child inside, so
+  // hiding it would orphan a visible task (the context case).
+  runCli(fixture, ["update", TREE_STORY_ID, "--status", "cancelled", "--json"]);
+  // A terminal LEAF: done has to pass the acceptance gate and the transition
+  // contract (todo -> in_progress -> done), so it carries a real criterion.
+  setBody(fixture, TREE_CLOSED_LEAF_ID, "# Tree closed leaf\n\n## Acceptance\n\n- [x] shipped\n");
+  runCli(fixture, [
+    "update",
+    TREE_CLOSED_LEAF_ID,
+    "--status",
+    "in_progress",
+    "--assignee",
+    "tree-bot",
+    "--json",
+  ]);
+  runCli(fixture, ["update", TREE_CLOSED_LEAF_ID, "--status", "done", "--json"]);
+  runCli(fixture, ["update", TREE_TERMINAL_ROOT_ID, "--status", "cancelled", "--json"]);
+  return fixture;
+}
+
 /** Start `board --serve` on a free port and resolve with the printed URL. */
 function startBoardServer(fixture: string): Promise<{ child: ChildProcess; url: string }> {
   const child = spawn(process.execPath, [cli, "board", "--serve", "--port", "0"], {
@@ -1690,6 +1760,202 @@ test.describe("@smoke board from source (tsx path, bug-tsx-board-dead-script)", 
     await expect(page.locator(`.card:not(.filtered-out)[data-id="${FILTER_ITEM_ID}"]`)).toHaveCount(
       1,
     );
+    expect(errors).toEqual([]);
+  });
+});
+
+/**
+ * bug-tree-ignores-hide-terminal-toggle: the filterbar's hide done/cancelled
+ * toggle is a LAYOUT preference (it must never move the lens verdict), and it
+ * covers the grouped-ancestry tree exactly like the status columns. In the tree
+ * it is subtree-aware: a terminal row hides unless hiding it would orphan a
+ * visible row below it (then it stays, muted, as terminal context), and a tree
+ * whose composed state has no visible row left renders the same `—` empty state
+ * the empty columns use. The same page script runs in the static export and on
+ * the served board, so both are asserted here.
+ */
+test.describe("@smoke board tree terminal layout", () => {
+  let fixture: string;
+  let server: { child: ChildProcess; url: string } | undefined;
+
+  test.beforeAll(async () => {
+    fixture = createTreeTerminalFixture();
+    server = await startBoardServer(fixture);
+    await waitForBoard(server.url);
+  });
+
+  test.afterAll(async () => {
+    if (server) await stopServer(server.child);
+    if (fixture) rmSync(fixture, { recursive: true, force: true });
+  });
+
+  test("hide done/cancelled composes with the tree, keeps context rows and persists", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    const tree = page.locator("#board-tree");
+    const toggle = page.locator("#board-terminal-toggle");
+    const filterCount = page.locator("#board-filter-count");
+    const treeCount = page.locator("#board-tree-count");
+    const leaf = tree.locator(`.tree-node[data-id="${TREE_CLOSED_LEAF_ID}"]`);
+    const story = tree.locator(`.tree-node[data-id="${TREE_STORY_ID}"]`);
+    const openChild = tree.locator(`.tree-node[data-id="${TREE_OPEN_CHILD_ID}"]`);
+
+    await page.locator("#board-view-toggle").click();
+    await expect(tree).toBeVisible();
+    // The reproducer, pinned: with the toggle OFF every terminal row renders.
+    await expect(tree.locator(".tree-node:not(.filtered-out):not(.terminal-hidden)")).toHaveCount(
+      6,
+    );
+    await expect(leaf).toBeVisible();
+    await expect(story).toBeVisible();
+    await expect(filterCount).toHaveText("6 item(s)");
+    await expect(treeCount).toHaveText("6");
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(toggle).toHaveText("show done/cancelled");
+    // The preference rides the EXISTING layout state (one key, one reset).
+    const stored = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("arggon-board-columns-v1") || "null"),
+    );
+    expect(stored?.terminalHidden).toBe(true);
+
+    // The done leaf hides; the cancelled story stays because hiding it would
+    // orphan the open task under it — dimmed, not part of the lens verdict.
+    await expect(leaf).toBeHidden();
+    await expect(leaf).toHaveClass(/terminal-hidden/);
+    await expect(story).toBeVisible();
+    await expect(story).toHaveClass(/terminal-context/);
+    await expect(openChild).toBeVisible();
+    const storyRow = story.locator("> .tree-row");
+    const openRow = openChild.locator("> .tree-row");
+    const backgrounds = await Promise.all([
+      storyRow.evaluate((el) => getComputedStyle(el).backgroundColor),
+      openRow.evaluate((el) => getComputedStyle(el).backgroundColor),
+    ]);
+    expect(backgrounds[0]).not.toBe(backgrounds[1]);
+
+    // A layout preference moves no counter: the `N of M` line and the tree
+    // heading keep the lens verdict (all 6 rows still match).
+    await expect(filterCount).toHaveText("6 item(s)");
+    await expect(treeCount).toHaveText("6");
+    // Same invariant in the columns layout: hiding both terminal columns
+    // leaves the counts and the `N of M` line untouched.
+    const columnCounts = await page.locator(".column .count").allTextContents();
+    await page.locator("#board-view-toggle").click();
+    await expect(page.locator('.column[data-status="done"]')).toBeHidden();
+    await expect(page.locator('.column[data-status="cancelled"]')).toBeHidden();
+    await expect(filterCount).toHaveText("6 item(s)");
+    expect(await page.locator(".column .count").allTextContents()).toEqual(columnCounts);
+    // The tree terminal state is a scanned surface of its own (the counts
+    // above are its deterministic readiness signal).
+    await page.locator("#board-view-toggle").click();
+    await expect(leaf).toBeHidden();
+    await axeScan(page);
+
+    // The preference persists in the shared layout state and comes back with
+    // the view: reload keeps the tree layout AND the terminal hiding.
+    await page.reload();
+    await expect(tree).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(leaf).toBeHidden();
+    await expect(story).toHaveClass(/terminal-context/);
+
+    // OFF restores every row live, and reset restores the default and keeps it.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await expect(leaf).toBeVisible();
+    await expect(story).not.toHaveClass(/terminal-context/);
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(leaf).toBeHidden();
+    await page.locator("#board-layout-reset").click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await expect(leaf).toBeVisible();
+    await expect(story).not.toHaveClass(/terminal-context/);
+    const reset = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("arggon-board-columns-v1") || "null"),
+    );
+    expect(reset?.terminalHidden).toBe(false);
+    await page.reload();
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await expect(leaf).toBeVisible();
+  });
+
+  test("the lens composes with the terminal rule and an all-hidden tree is honest", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+    const toggle = page.locator("#board-terminal-toggle");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+    // Lens match deep under the cancelled story: the match plus its ancestor
+    // path stay — the terminal ancestor is BOTH lens context and terminal
+    // context (muted), never orphaned and never counted as a match.
+    await page.locator("#board-filter-input").fill(TREE_OPEN_CHILD_ID);
+    await expect(tree.locator(".tree-node:not(.filtered-out):not(.terminal-hidden)")).toHaveCount(
+      4,
+    );
+    const story = tree.locator(`.tree-node[data-id="${TREE_STORY_ID}"]`);
+    await expect(story).toHaveClass(/context/);
+    await expect(story).toHaveClass(/terminal-context/);
+    await expect(page.locator("#board-filter-count")).toHaveText("1 of 6 item(s)");
+    await expect(page.locator("#board-tree-count")).toHaveText("1");
+
+    // The lens matches a terminal row whose whole lens path is terminal too
+    // (a parentless cancelled initiative): the layout hides it, nothing else
+    // is in the verdict, so the composed tree has no visible row left.
+    await page.locator("#board-filter-input").fill(TREE_TERMINAL_ROOT_ID);
+    await expect(tree.locator(".tree-node:not(.filtered-out):not(.terminal-hidden)")).toHaveCount(
+      0,
+    );
+    // The counts still report the lens verdict, not the rendered rows.
+    await expect(page.locator("#board-filter-count")).toHaveText("1 of 6 item(s)");
+    await expect(page.locator("#board-tree-count")).toHaveText("1");
+    // Nothing visible is a state, not a blank gap: the tree renders the same
+    // empty placeholder an empty column uses.
+    const empty = tree.locator(".tree-empty");
+    await expect(empty).toBeVisible();
+    await expect(empty).toHaveText("—");
+
+    // Clearing the lens brings the rows back under the same terminal rule:
+    // the leaf and the parentless terminal root stay hidden, the cancelled
+    // story stays as context for the open child (4 visible rows).
+    await page.locator("#board-filter-clear").click();
+    await expect(empty).toHaveCount(0);
+    await expect(tree.locator(".tree-node:not(.filtered-out):not(.terminal-hidden)")).toHaveCount(
+      4,
+    );
+    await expect(page.locator("#board-filter-count")).toHaveText("6 item(s)");
+  });
+
+  test("the static export hides terminal tree rows exactly like the served board", async ({
+    page,
+  }) => {
+    const boardFile = join(fixture, "tree-terminal-board.html");
+    runCli(fixture, ["board", "--group-by", "tree", "--out", boardFile]);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(String(error)));
+    await page.goto(`file://${boardFile}`);
+    await expect(page.locator("h1")).toContainText("arggon board");
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+    const leaf = tree.locator(`.tree-node[data-id="${TREE_CLOSED_LEAF_ID}"]`);
+    const story = tree.locator(`.tree-node[data-id="${TREE_STORY_ID}"]`);
+    await expect(leaf).toBeVisible();
+
+    await page.locator("#board-terminal-toggle").click();
+    await expect(leaf).toBeHidden();
+    await expect(leaf).toHaveClass(/terminal-hidden/);
+    await expect(story).toBeVisible();
+    await expect(story).toHaveClass(/terminal-context/);
+    await expect(page.locator("#board-filter-count")).toHaveText("6 item(s)");
+    await expect(page.locator("#board-tree-count")).toHaveText("6");
     expect(errors).toEqual([]);
   });
 });
