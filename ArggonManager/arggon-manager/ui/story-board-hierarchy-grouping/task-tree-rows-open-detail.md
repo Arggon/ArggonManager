@@ -12,6 +12,7 @@ updated: "2026-10-14"
 claimed_at: "2026-10-14T15:42:36.289Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-tree-rows-open-detail
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-board-hierarchy-grouping/task-tree-rows-open-detail.md
   Leaves live only under a story. id is the filename stem: task-tree-rows-open-detail.
@@ -32,12 +33,12 @@ Both live in the same tree code (`cli/src/board.ts`: `renderBoardTree`, the embe
 
 ## Acceptance
 
-- [ ] Clicking a tree row opens the same detail drawer the columns view opens, for that item; serve and static-with-`--details` behave the same; a static export without `--details` offers no fake affordance (it stays honestly drawer-free)
-- [ ] Keyboard: rows are reachable (roving focus or equivalent) and Enter/Space opens the drawer; the subtree disclosure is keyboard-operable; axe scan green in the tree states
-- [ ] Each container row carries a compact/extend (collapse/expand) control: collapsing hides its subtree, expanding restores it; the state persists per browser like the columns' layout preference, and the existing reset restores the default
-- [ ] Composition is honest with the other tree mechanics: with a filter/lens active, a match inside a collapsed subtree stays discoverable (reveal the path to a match, or mark the collapsed branch as containing matches — decide and record); counts stay the lens verdict; terminal-hiding and the view toggle keep composing
-- [ ] The "no dead links" property is kept (no `href` navigation on rows; a missing parent stays marker text)
-- [ ] The requests become pinned tests (e2e `@smoke`: click→drawer, keyboard open, collapse/expand + persistence, the filter-inside-collapsed case; both modes where applicable); README documents the interactions
-- [ ] `arggon validate`, affected suites, `npm test`, CI `ui-smoke` green; prettier clean on touched files
+- [x] Clicking a tree row opens the same detail drawer the columns view opens, for that item; serve and static-with-`--details` behave the same; a static export without `--details` offers no fake affordance (it stays honestly drawer-free)
+- [x] Keyboard: rows are reachable (roving focus or equivalent) and Enter/Space opens the drawer; the subtree disclosure is keyboard-operable; axe scan green in the tree states
+- [x] Each container row carries a compact/extend (collapse/expand) control: collapsing hides its subtree, expanding restores it; the state persists per browser like the columns' layout preference, and the existing reset restores the default
+- [x] Composition is honest with the other tree mechanics: with a filter/lens active, a match inside a collapsed subtree stays discoverable (reveal the path to a match, or mark the collapsed branch as containing matches — decide and record); counts stay the lens verdict; terminal-hiding and the view toggle keep composing
+- [x] The "no dead links" property is kept (no `href` navigation on rows; a missing parent stays marker text)
+- [x] The requests become pinned tests (e2e `@smoke`: click→drawer, keyboard open, collapse/expand + persistence, the filter-inside-collapsed case; both modes where applicable); README documents the interactions
+- [x] `arggon validate`, affected suites, `npm test`, CI `ui-smoke` green; prettier clean on touched files
 
 ## Notes
