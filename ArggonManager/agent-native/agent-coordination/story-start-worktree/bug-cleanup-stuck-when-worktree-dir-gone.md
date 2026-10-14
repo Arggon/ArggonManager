@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-cleanup-stuck-when-worktree-dir-gone
 title: "cleanup --prune wedges forever when a candidate's worktree directory was already removed: 'not a working tree', worktree_path never cleared"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-start-worktree
 labels: [worktree, cleanup]
 created: "2026-10-14"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T12:50:37.090Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-cleanup-stuck-when-worktree-dir-gone
 ---
 <!--
