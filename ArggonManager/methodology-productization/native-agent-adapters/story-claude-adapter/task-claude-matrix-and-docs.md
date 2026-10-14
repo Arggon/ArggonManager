@@ -110,3 +110,14 @@ the item comments):
 ### handoff 2026-10-14 @arggon-maker — next: Delivery lead: standards review on PR #822, verify the merge, then close story box 11 and flip this item; spot-check the merged matrix row deltas and the agents.md §Claude Code section.
 - branch: feat/task-claude-matrix-and-docs
 - open questions: None blocking; json-output init sample count refreshed 39->69 (pre-bundle stale) - confirm the sweep call; spec 024 acceptance boxes left unchecked (story/item hold the live contract)
+
+### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-14 (delivery lead)
+Merged as 16e3f979 (PR #822). Impact class: **Behavioral** — a new client surface agents must re-learn; stated in the PR, as the spec requires.
+
+**Matrix.** claude `discipline-enforceable` → non-gap `claude:plugin.hooks.PreToolUse (hooks/gate.mjs)` with the fail-open + kernel-enforcement-of-record clause riding the mechanism (a non-gap row must carry `note: null` — the lint-forced shape, mirroring the shipped zcode row); `docs-travel-with-code` stays a gap with its pre-bundle-language note rewritten; `claim-integrity` swept (its old note claimed no client-side backstop exists). Both matrix copies byte-equal; the ledger checksum refresh is the provenance-audit-required repair for an edited destination.
+
+**Evidence.** capability-matrix pins + the doctor inline snapshot (claude 28 files, 1 gap) updated; the lead re-ran 93 focused tests green on the branch head; CI green on all three lanes. Spec 024: open questions → recorded 2.1.289 resolutions, status `implemented`, the agents-omission correction carried; `arggon spec analyze` unchanged at 4 pre-existing findings, none naming the story/spec. Docs travel: `agents.md` §Claude Code beside §ZCode (install step, one-server rule, two-agent rule, namespaced names, gate contract, Behavioral) + the §ZCode S6 sentence updated; ADR 0020 dated amendments (the two clauses the 2026-10-02 amendment left standing are superseded; one-logic-path untouched); README + json-output doctor samples corrected.
+
+**Coordinates.** Story boxes 10/11 land here. The story itself closes after `task-claude-gate-polish` (the standards-pass nits — the last open leaf under the story).
