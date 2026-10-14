@@ -79,3 +79,15 @@ Branch `feat/task-claude-gate-polish`, commit `f23d8372`; pushed; PR https://git
 ### handoff 2026-10-14 @Arggon — next: Delivery lead: review PR #823 (merge is yours); if approved, route the two recorded follow-ups (ZCode gate handoff parity; shell-route handoff asymmetry) as their own items — none were filed by the m…
 - branch: feat/task-claude-gate-polish
 - open questions: ZCode seam gate leaves arggon_handoff unlisted — port the deny decision there? (candidate follow-up, not filed); shell route MUTATING_ARGGON_WORDS still allows 'arggon handoff' via Bash while the MCP…
+
+### 2026-10-14 @Arggon
+### task-claude-gate-polish — review round 1 applied (PR #823)
+
+**Must-fix taken: the shell route now matches the MCP decision.** Commit `b81aa04a`, pushed to `feat/task-claude-gate-polish`.
+
+- `MUTATING_ARGGON_WORDS` in `templates/docs/claude/arggon/hooks/gate.mjs` gains `handoff`; `comment` stays out on this route too (verdict channel open on both routes).
+- Gate header + README §Hook gates/port notes now state the shell route explicitly (denied words include `handoff`; `comment` open) and the ZCode divergence note covers **both** routes (ZCode leaves `arggon_handoff` unlisted on MCP and shell; that seam remains untouched).
+- `cli/src/init-claude.test.ts` reviewer-window shell test now pins `arggon handoff task-x --next ship-it`, `sh -c "arggon handoff task-x"` and `npm run arggon -- handoff task-x` as denied, and `npm run arggon -- comment task-x "handoff context: …"` as allowed — moving the word back out fails the suite.
+- Repo self refreshed again: `npm run arggon -- init . --agents claude --no-commit` → `.claude-marketplace/arggon/{hooks/gate.mjs,README.md}` + `ArggonManager/.convention.yml` (2 checksums moved).
+
+**Gates (worktree, all green):** `npm run arggon -- validate` ok (0 warnings); focused `npx vitest run cli/src/init-claude.test.ts cli/src/adapter-selection.test.ts` → 69 passed; `npm test` → 3459 passed; `npm run lint` clean; `npm run test:structure` 5 passed; `npx prettier --check` clean on the touched authored files (the generated repo-self README keeps its pre-existing marker-adjacency flag, unchanged from HEAD).
