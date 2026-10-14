@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: harness-research-transfer
 title: "Transfer research agent-harness results into the methodology: AutoHarness, AutoContext, AutoCompact"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ labels: [methodology, research, evaluation]
 priority: p2
 created: "2026-10-05"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T12:42:50.039Z"
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/harness-research-transfer/harness-research-transfer.md (story index; required).
