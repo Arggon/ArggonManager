@@ -147,3 +147,7 @@ init's re-vendor self-heal).
 Docs: `ArggonManager/docs/convention.md` §Generated-doc provenance now names this third, seam-side
 refresh path and corrects the "skill copies are tracked" claim (tracked in an adopter tree,
 gitignored in the seam repo's own checkout).
+
+### handoff 2026-10-14 @ses_ec5ee8017ffenAoLAgVVe7sCfF (session: ses_ec5ee8017ffenAoLAgVVe7sCfF) — next: Review/merge PR #804; confirm the unit lane's provenance-audit run on the PR is green (it now checks the derived skill rows with no copies on disk).
+- branch: fix/bug-skill-source-edit-leaves-ledger-stale
+- open questions: Dropped-row case (merge deletes all seven skill rows) is invisible in CI by design — recreate-on-materialize, no stranded artifact; extend derivation to vendored plugin rows? (out of scope: check:plu…
