@@ -4904,15 +4904,20 @@ function nativeComposeDown(project: string, cwd: string): Promise<void> {
  * (`classifyReleaseEntry`, the same one the CLI uses), removes the worktree
  * through the domain, deletes its branch, reaps the start-created env file and
  * the claim stamp, and clears the record — reported as its own `release` /
- * `released` action family, never mixed into `pruned`. Refused with the same
- * evidence and remedy order the CLI reports: unconditionally while the item is
- * still claimed (a re-claimed item has a live owner; the hatch does not bypass
- * it), and for a stamp held by another identity whose window shows a live writer
- * or for removal-blocking content. `take_over_worktree` is the audited hatch for
- * a presumed-dead stamped owner — the mirror of `start`'s, and the only thing
- * that forces the removal; without a `release` it is refused (m5). The identity
- * is the calling session — exactly what `start` stamped — so the ordinary path
- * is never refused.
+ * `released` action family, never mixed into `pruned`. A recorded path that is
+ * no longer a LIVE worktree (missing on disk, or a leftover directory whose
+ * gitdir link is gone) is a stale record for the release too
+ * (bug-cleanup-release-stale-record-wedge): the domain removal is skipped, the
+ * dead git record is pruned (it pins the branch), the branch the record still
+ * names is deleted and the record is cleared — a leftover directory is left in
+ * place. Refused with the same evidence and remedy order the CLI reports:
+ * unconditionally while the item is still claimed (a re-claimed item has a live
+ * owner; the hatch does not bypass it), and for a stamp held by another identity
+ * whose window shows a live writer or for removal-blocking content.
+ * `take_over_worktree` is the audited hatch for a presumed-dead stamped owner —
+ * the mirror of `start`'s, and the only thing that forces the removal; without a
+ * `release` it is refused (m5). The identity is the calling session — exactly
+ * what `start` stamped — so the ordinary path is never refused.
  */
 async function nativeCleanup(
   kernel: ArgonKernel,
@@ -5243,9 +5248,12 @@ type CleanupGitShape = ReturnType<ArgonKernel["defaultCleanupGit"]>
  * classification (`classifyReleaseEntry`), same Compose-first ordering, same
  * ownership-scoped reaping (install link, start-shaped env file, claim stamp),
  * same observed domain removal, same force branch delete, same record clear and
- * same both-surfaces failure reporting. The identity is the calling session —
- * what `start` stamped — with the item's assignee as the fallback when the
- * runtime supplies no session id.
+ * same both-surfaces failure reporting. A recorded path that is no longer a
+ * LIVE worktree is a stale record (bug-cleanup-release-stale-record-wedge): the
+ * domain removal is skipped entirely, the dead git record is pruned (it pins
+ * the branch), the branch git's record still names is deleted and the record is
+ * cleared. The identity is the calling session — what `start` stamped — with the
+ * item's assignee as the fallback when the runtime supplies no session id.
  */
 async function nativeRelease(
   kernel: ArgonKernel,
@@ -5298,9 +5306,17 @@ async function nativeRelease(
   // THAT worktree copy, so releasing it disposes the record with the directory —
   // nothing to write, and no commit could outlive the removal).
   const recordHome = resolve(root) !== resolve(path)
+  // Stale-record clause (bug-cleanup-release-stale-record-wedge): the worktree
+  // is already gone — missing on disk, or a leftover directory whose gitdir
+  // link is gone (`prunable`) — so there is no removal to attempt through the
+  // domain, no Compose project to reap and no stamp/env to unlink. What is left
+  // is the dead git record (which PINS the branch: `git branch -D` refuses it
+  // with "cannot delete branch … used by worktree"), the branch and the item
+  // record.
+  const stale = classified.action?.startsWith("clear stale worktree_path record") === true
 
   try {
-    if (classified.action !== "clear stale worktree_path record (path missing on disk)") {
+    if (!stale) {
       // Compose first (ADR 0019 layer 2, exploration 017 F8); an absent docker
       // CLI degrades the run report-only, exactly as in the prune loop.
       if (run.compose !== undefined && !run.isComposeUnavailable()) {
@@ -5329,10 +5345,6 @@ async function nativeRelease(
       // refused removal-blocking content unless the take-over hatch was armed
       // (the dirty gate, CLI parity), so forcing here is exactly the caller's
       // "that owner is dead and that work is disposable" — the only case.
-      // Uncommitted work is never discarded silently. The classification already
-      // refused removal-blocking content unless the take-over hatch was armed
-      // (the dirty gate, CLI parity), so forcing here is exactly the caller's
-      // "that owner is dead and that work is disposable" — the only case.
       const removal = await removeWorktreeObserved(options, path, gitRoot, {
         force: input.take_over_worktree === true,
       })
@@ -5356,31 +5368,42 @@ async function nativeRelease(
       } else if (hadStamp) {
         actions.push({ id, action: "arggon-claim.json stamp gone with the worktree" })
       }
-      if (classified.branch !== null && git.branchExists(gitRoot, classified.branch)) {
-        try {
-          // Force, never the safe delete: an abandoned claim's branch is by
-          // definition not provably merged (that is prune's eligibility), and
-          // the release is already an explicit, refusal-gated discard.
-          git.deleteBranchForce(gitRoot, classified.branch)
-          actions.push({ id, action: `deleted branch ${classified.branch}` })
-        } catch (error) {
-          const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)
-          failures.push(`${id}: ${message}`)
-          actions.push({
-            id,
-            action: "failed",
-            error: message,
-            leftoverBranch: classified.branch,
-          })
-        }
+    } else if (git.pruneWorktrees?.(gitRoot) === true) {
+      // The dead record PINS the branch, so it goes before the branch step —
+      // exactly like prune's stale entries (bug-cleanup-stuck-when-worktree-dir-gone).
+      // Reported only when a record was actually dropped (`--verbose` output is
+      // non-empty exactly then). Git calls run from the canonical worktree, like
+      // every other call in this release.
+      actions.push({ id, action: "pruned stale git worktree record" })
+    }
+    if (classified.branch !== null && git.branchExists(gitRoot, classified.branch)) {
+      try {
+        // Force, never the safe delete: an abandoned claim's branch is by
+        // definition not provably merged (that is prune's eligibility), and
+        // the release is already an explicit, refusal-gated discard. Reached
+        // for a stale record too: the branch comes from the dead git record
+        // (the worktree cannot be asked).
+        git.deleteBranchForce(gitRoot, classified.branch)
+        actions.push({ id, action: `deleted branch ${classified.branch}` })
+      } catch (error) {
+        const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)
+        failures.push(`${id}: ${message}`)
+        actions.push({
+          id,
+          action: "failed",
+          error: message,
+          leftoverBranch: classified.branch,
+        })
       }
     }
-    if (recordHome) {
+    if (stale || recordHome) {
       // The record outlives the removal here: cleared AFTER the worktree is
       // observably gone (prune's invariant), in ONE tracker commit — which this
       // run OWNS and RETURNS (review M3: committing here and then letting the
       // run-level commit stage the same path reported `skipped: "nothing to
-      // commit"` for a commit it had just made).
+      // commit"` for a commit it had just made). A stale record was never
+      // disposed WITH anything (nothing was removed; the leftover directory
+      // survives), so it is always cleared, wherever the run's tracker copy is.
       const cleared = kernel.updateOperation({
         cwd: root,
         id,
