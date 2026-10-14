@@ -63,3 +63,7 @@ ZCode verification (acceptance row 1): `templates/docs/zcode/arggon/agents/` hol
 - Command elisions (`arggon-{next,...}` in `docs/playbooks/opencode.md`, `skills/arggon-cli/SKILL.md`) are accurate today (11 OpenCode commands, 13 ZCode commands) and are command names, not agent ids — out of this guard's scope.
 
 PR: https://github.com/Arggon/ArggonManager/pull/809 — maker's work complete; review/merge and the `done` flip belong to the delivery lead.
+
+### handoff 2026-10-14 @ses_ec5bbe5d7ffecjNObAb0WvEEZK (session: ses_ec5bbe5d7ffecjNObAb0WvEEZK) — next: Delivery lead: review PR #809; merge, then flip done — acceptance ticked, evidence in the comment above.
+- branch: fix/bug-zcode-agents-brace-elided-retired-ids
+- open questions: Retired role vocabulary still in touched live docs (opencode2/agents/playbooks): file a follow-up?; command elisions are out of this guard's scope.
