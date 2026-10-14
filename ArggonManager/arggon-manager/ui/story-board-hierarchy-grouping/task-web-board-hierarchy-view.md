@@ -27,12 +27,12 @@ Parent story `story-board-hierarchy-grouping` (PO requirement 2026-10-14). Imple
 
 ## Acceptance
 
-- [ ] `arggon board --serve` (and the static export) can render the grouped ancestry view: every leaf under its story, story under epic, epic under initiative, each level carrying id + status; the selection mechanism (a `--group-by` value and/or an in-page control) is decided and recorded
-- [ ] The filter lens applies within the view and the `N of M` counts stay honest; the existing `milestone|story` grouping keeps working or is deliberately folded in (decision recorded); `--tui` combination rules stay honest
-- [ ] Orphans and partial chains render honestly (no dead links, no silently missing sections); XSS-safe through the existing escape path; axe WCAG A/AA scan green
-- [ ] Docs travel: README board section + `ArggonManager/docs/json-output.md` board contract updated additively
-- [ ] Browser-drive evidence per ADR 0008 (Playwright CLI or the repo's established UI-smoke path): the view renders, toggling round-trips, the lens filters within it — expected vs observed on the item; if browser tooling is unavailable, say so and use the strongest available gate, never claiming an unrun probe
-- [ ] `arggon validate`, affected suites, `npm test`, CI `ui-smoke` green; prettier clean on touched files
+- [x] `arggon board --serve` (and the static export) can render the grouped ancestry view: every leaf under its story, story under epic, epic under initiative, each level carrying id + status; the selection mechanism (a `--group-by` value and/or an in-page control) is decided and recorded
+- [x] The filter lens applies within the view and the `N of M` counts stay honest; the existing `milestone|story` grouping keeps working or is deliberately folded in (decision recorded); `--tui` combination rules stay honest
+- [x] Orphans and partial chains render honestly (no dead links, no silently missing sections); XSS-safe through the existing escape path; axe WCAG A/AA scan green
+- [x] Docs travel: README board section + `ArggonManager/docs/json-output.md` board contract updated additively
+- [x] Browser-drive evidence per ADR 0008 (Playwright CLI or the repo's established UI-smoke path): the view renders, toggling round-trips, the lens filters within it — expected vs observed on the item; if browser tooling is unavailable, say so and use the strongest available gate, never claiming an unrun probe
+- [x] `arggon validate`, affected suites, `npm test`, CI `ui-smoke` green; prettier clean on touched files
 
 ## Notes
 
