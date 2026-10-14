@@ -56,3 +56,7 @@ Same contract as the OpenCode seam (bound, mandatory citation, four carriers, ru
 **Impact class: Behavioral** — an agent contract change (`docs/agents.md` §Changing the methodology itself). Adopters meet it through the ADR 0016 propose channel: `templates/**` is never overwritten, so an adopter-modified ZCode prompt gets a `.proposed-<version>` side file to merge and re-ack.
 
 **Finding reported, not fixed (delivery lead's call):** `ArggonManager/docs/agents.md` §ZCode names the retired ids brace-elided — `agents/arggon-{worker,reviewer}.md` — and the live-doc guard in `cli/src/agent-id-doc-contract.test.ts` is substring-based (`arggon-worker` ≠ `arggon-{worker`), so the elision ships green. Third instance of the class two `done` items already met (`bug-retired-agent-ids-in-doc-samples`, `bug-adr-0021-s5-lists-retired-agent-ids`). No item filed (maker files nothing) and no lesson promoted — the mechanism's citation belongs to the item that fixes the guard.
+
+### handoff 2026-10-14 @ses_ec5ee8018ffe1WwukJV8sz0wW9 (session: ses_ec5ee8018ffe1WwukJV8sz0wW9) — next: Delivery lead: review PR #802 (2 files + ledger line + seam test), verify the falsifier and the drift gate on CI, then merge and flip done.
+- branch: feat/task-zcode-maker-lesson-trigger
+- open questions: File a bug for agents.md:683 brace-elided retired ids evading the substring guard?; drop the uncommitted ledger version/generatedAt churn or leave it (task-adopter-template-family-followups)?; run th…
