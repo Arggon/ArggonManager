@@ -140,3 +140,7 @@ Observations for the delivery lead (no items filed):
 
 - `tools.arggon.show` (native) resolved the tracker in the primary checkout and answered `todo`/unclaimed, while `npm run arggon -- show` from the worktree answered `in_progress`/`arggon-delivery-lead`; the claim itself is correct and committed on the branch (`ab9006d1`), so only the native root resolution needs a separate look.
 - `templates/docs/docs/engineering.md` (the adopter template copy) was deliberately left untouched — candidate follow-up if this advice should reach adopter trees.
+
+### handoff 2026-10-14 @ses_ec5ee8018ffd2NuzH1nxDyMjq7 (session: ses_ec5ee8018ffd2NuzH1nxDyMjq7) — next: Address review findings on PR #801; on approval the delivery lead merges and flips done — maker does not merge. Docs-only; no known blockers.
+- branch: feat/task-adopt-compaction-three-questions
+- open questions: Adopter template copy untouched (candidate follow-up?); native tools.arggon.show read the primary checkout (todo) while worktree CLI read in_progress — native root resolution worth checking.
