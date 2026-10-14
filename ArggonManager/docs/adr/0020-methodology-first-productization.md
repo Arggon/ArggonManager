@@ -17,7 +17,7 @@
   (still Accepted) — no decision here moves, the one-logic-path invariant is
   untouched, and the follow-on Claude Code adapter keeps the same bar
   ([spec-methodology-adapters-017 §S6](../specs/spec-methodology-adapters-017.md)).
-- Amendment (2026-10-14, PR #NNNN): the Claude Code adapter shipped, so the two
+- Amendment (2026-10-14, PR #822): the Claude Code adapter shipped, so the two
   clauses the 2026-10-02 amendment left standing are superseded. `arggon init
 --agents claude` now materializes a vendored plugin bundle at
   `.claude-marketplace/**` (source `templates/docs/claude/**`,
@@ -85,7 +85,7 @@ exploration + ADR + spec + plan with tasks filed.
 > ([`ArggonManager/docs/json-output.md`](../json-output.md)). The pointer is one
 > of two claude-seam destinations, not the whole of it.
 
-> Amendment (2026-10-14, PR #NNNN): "genuinely missing" has shrunk again. The
+> Amendment (2026-10-14, PR #822): "genuinely missing" has shrunk again. The
 > client-side gate is no longer missing: the shipped bundle carries `hooks/gate.mjs`
 > with a `PreToolUse` gate (global force-push / `--no-verify` denies plus the
 > dispatch-scoped reviewer backstop), so `adapters/capability-matrix.json` moves
@@ -162,7 +162,7 @@ Claude Code gap perpetual).
   > stays a follow-on story with the same bar. The commitment is unchanged; only
   > the inventory was wrong.
   >
-  > Amendment (2026-10-14, PR #NNNN): "exactly those two destinations" and "today
+  > Amendment (2026-10-14, PR #822): "exactly those two destinations" and "today
   > it remains docs + `CLAUDE.md`" are both replaced by the shipped bundle. The
   > `claude` seam now also owns `.claude-marketplace/**` — the marketplace catalog
   > plus the plugin root (the manifest's `mcpServers` registration of `arggon mcp`,
