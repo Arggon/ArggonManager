@@ -48,6 +48,7 @@ the item comments):
 - [ ] `ArggonManager/docs/agents.md` gains a Claude Code seam section beside §ZCode naming the marketplace install step, the one-server rule, the two-agent rule and the namespaced component names (`/arggon:<command>`, `arggon:<agent>`), with impact class stated as **Behavioral**; the §ZCode sentence about S6 updated to the shipped state
 - [ ] Spec 024: Open questions replaced by the recorded resolutions; `status: implemented`; no new `arggon spec analyze` finding naming the story/spec
 - [ ] Doc sweep: every statement the bundle makes false is updated (repo README/docs, seam README)
+- [ ] `ArggonManager/docs/adr/0020-*.md` gains a dated amendment under the repo's convention (the 2026-10-02 PR #610 amendments are the precedent): the claude seam is no longer "exactly those two destinations" / "today it remains docs + `CLAUDE.md`" — the shipped bundle, its PreToolUse gate and the marketplace install replace those clauses
 - [ ] `arggon validate`, full `npm test`, lint, structure, prettier, `arggon spec analyze` green
 - [ ] The PR states impact class **Behavioral**
 

@@ -12,6 +12,7 @@ updated: "2026-10-14"
 claimed_at: "2026-10-14T18:23:36.047Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-claude-plugin-seam
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-claude-adapter/task-claude-plugin-seam.md
   Leaves live only under a story. id is the filename stem: task-claude-plugin-seam.
@@ -67,20 +68,20 @@ arggon-maker`). So the bundle manifest **omits `agents`** and ships the agent fi
 
 ## Acceptance
 
-- [ ] `templates/docs/claude/**` exists: `.claude-plugin/marketplace.json`, `arggon/.claude-plugin/plugin.json`, the two agent files, the command set, `hooks/hooks.json` + `hooks/gate.mjs`, the seam `README.md`, the bundled `skills/arggon-cli/**` copy; nothing is written under `adapters/**`
-- [ ] `plugin.json` omits `agents` (probe-pinned, test comment names the 2.1.289 finding), declares `commands`/`skills`/`hooks`/`mcpServers` (+ `author`), and `marketplace.json` mirrors the ZCode catalog shape for plugin `arggon` / marketplace `arggon-local` (with `description`)
-- [ ] `cli/src/docs.ts`: `claude/` → `.claude-marketplace/` prefix mapping + `.claude-marketplace/**/*.md` frontmatter marker; `cli/src/adapters.ts`: claude classification extended to `docs/claude/` (the `docs/CLAUDE.md` + `docs/mcp-json` floor matches kept) and the `.claude-marketplace` detection marker added
-- [ ] `arggon init` materializes `.claude-marketplace/**` with provenance and honest `--json` `written`/`skipped` counts; `--agents opencode,zcode` and `--no-agents` generate no claude file; an unknown agent name is still refused by name with nothing written
-- [ ] The generated tree contains exactly `arggon-maker` and `arggon-standards-reviewer` agent files; no bundle file names a lead agent; every lead reference resolves to the generated `CLAUDE.md`/`AGENTS.md` carriers
-- [ ] Exactly one MCP server keyed `arggon`, byte-equal in `command`/`args` to the generated `.mcp.json` entry; the live stdio round-trip test spawns `arggon mcp` against a fixture tracker and returns the documented `arggon_show` envelope
-- [ ] The gate denies force-push + `--no-verify` for every session; denies `Write`/`Edit`, mutating `arggon` shell and mutating MCP tools for the reviewer window opened by `SubagentStart` and closed by `SubagentStop`; counts parallel dispatches; `Stop` clears; ordinary sessions unimpaired; the quoted-text semantics port the ZCode gate's (inert text exempt, executed text denied)
-- [ ] The gate's reviewer matcher is bound to the id read out of the shipped `agents/arggon-standards-reviewer.md`, the review command dispatches that same id, and the deny set covers the scoped `mcp__plugin_arggon_arggon__arggon_*` **and** bare `mcp__arggon__arggon_*` prefixes (a test pins both)
-- [ ] `skills/arggon-cli/**` in the bundle is byte-equal to `skills/arggon-cli/**` modulo the generated marker, with the sync mechanism decided and recorded (one skill, two destinations)
-- [ ] `cli/src/init-claude.test.ts` covers every box here and passes in CI with the `claude` binary absent (present-probes recorded as `skipped: claude not installed`, never as passes); any claude-invoking test uses a throwaway HOME/`CLAUDE_CONFIG_DIR`
-- [ ] Existing suites updated: `init.test.ts` (TIER1 set), `adapter-selection.test.ts`, `adopter-template-invariant-drift.test.ts` (claude member), `mcp-doc-contract.test.ts` (corpus), `pack-contents.test.ts` if needed
-- [ ] Repo-self: this repo's own `.claude-marketplace/**` is materialized and committed the way `.zcode-marketplace/**` is (scoped `--agents claude` init; `x-generated` rows recorded) — or the reason it is not is recorded
-- [ ] Probes re-run and recorded on the item (`marketplace add`/`install`, `claude plugin validate`, `claude plugin details` Agents(2), `claude mcp list`), and spec 024's contradicted client-facts line corrected
-- [ ] `arggon validate`, full `npm test`, lint, structure, prettier green
+- [x] `templates/docs/claude/**` exists: `.claude-plugin/marketplace.json`, `arggon/.claude-plugin/plugin.json`, the two agent files, the command set, `hooks/hooks.json` + `hooks/gate.mjs`, the seam `README.md`, the bundled `skills/arggon-cli/**` copy; nothing is written under `adapters/**`
+- [x] `plugin.json` omits `agents` (probe-pinned, test comment names the 2.1.289 finding), declares `commands`/`skills`/`hooks`/`mcpServers` (+ `author`), and `marketplace.json` mirrors the ZCode catalog shape for plugin `arggon` / marketplace `arggon-local` (with `description`)
+- [x] `cli/src/docs.ts`: `claude/` → `.claude-marketplace/` prefix mapping + `.claude-marketplace/**/*.md` frontmatter marker; `cli/src/adapters.ts`: claude classification extended to `docs/claude/` (the `docs/CLAUDE.md` + `docs/mcp-json` floor matches kept) and the `.claude-marketplace` detection marker added
+- [x] `arggon init` materializes `.claude-marketplace/**` with provenance and honest `--json` `written`/`skipped` counts; `--agents opencode,zcode` and `--no-agents` generate no claude file; an unknown agent name is still refused by name with nothing written
+- [x] The generated tree contains exactly `arggon-maker` and `arggon-standards-reviewer` agent files; no bundle file names a lead agent; every lead reference resolves to the generated `CLAUDE.md`/`AGENTS.md` carriers
+- [x] Exactly one MCP server keyed `arggon`, byte-equal in `command`/`args` to the generated `.mcp.json` entry; the live stdio round-trip test spawns `arggon mcp` against a fixture tracker and returns the documented `arggon_show` envelope
+- [x] The gate denies force-push + `--no-verify` for every session; denies `Write`/`Edit`, mutating `arggon` shell and mutating MCP tools for the reviewer window opened by `SubagentStart` and closed by `SubagentStop`; counts parallel dispatches; `Stop` clears; ordinary sessions unimpaired; the quoted-text semantics port the ZCode gate's (inert text exempt, executed text denied)
+- [x] The gate's reviewer matcher is bound to the id read out of the shipped `agents/arggon-standards-reviewer.md`, the review command dispatches that same id, and the deny set covers the scoped `mcp__plugin_arggon_arggon__arggon_*` **and** bare `mcp__arggon__arggon_*` prefixes (a test pins both)
+- [x] `skills/arggon-cli/**` in the bundle is byte-equal to `skills/arggon-cli/**` modulo the generated marker, with the sync mechanism decided and recorded (one skill, two destinations)
+- [x] `cli/src/init-claude.test.ts` covers every box here and passes in CI with the `claude` binary absent (present-probes recorded as `skipped: claude not installed`, never as passes); any claude-invoking test uses a throwaway HOME/`CLAUDE_CONFIG_DIR`
+- [x] Existing suites updated: `init.test.ts` (TIER1 set), `adapter-selection.test.ts`, `adopter-template-invariant-drift.test.ts` (claude member), `mcp-doc-contract.test.ts` (corpus), `pack-contents.test.ts` if needed
+- [x] Repo-self: this repo's own `.claude-marketplace/**` is materialized and committed the way `.zcode-marketplace/**` is (scoped `--agents claude` init; `x-generated` rows recorded) — or the reason it is not is recorded
+- [x] Probes re-run and recorded on the item (`marketplace add`/`install`, `claude plugin validate`, `claude plugin details` Agents(2), `claude mcp list`), and spec 024's contradicted client-facts line corrected
+- [x] `arggon validate`, full `npm test`, lint, structure, prettier green
 
 ## Notes
 
@@ -98,6 +99,7 @@ arggon-maker`). So the bundle manifest **omits `agents`** and ships the agent fi
   correct facts this task contradicts.
 
 ### 2026-10-14 @Arggon
+
 Evidence — maker pass (task-claude-plugin-seam, spec-claude-code-adapter-024)
 
 Branch `feat/task-claude-plugin-seam`, worktree
@@ -177,14 +179,14 @@ Branch `feat/task-claude-plugin-seam`, worktree
   marketplace root, and on the generated tree → `Validation passed`
 - `claude plugin marketplace add <generated .claude-marketplace>` →
   `Successfully added marketplace: arggon-local`; `claude plugin install
-  arggon@arggon-local` → `Successfully installed plugin (scope: user)`
+arggon@arggon-local` → `Successfully installed plugin (scope: user)`
 - `claude plugin details arggon` → `Agents (2) arggon-standards-reviewer,
-  arggon-maker`, `Hooks (4) PreToolUse, SubagentStart, SubagentStop, Stop`,
+arggon-maker`, `Hooks (4) PreToolUse, SubagentStart, SubagentStop, Stop`,
   `MCP servers (1) arggon`, `Skills (14)` incl. the 13 command names
 - agents-key variant: with `"agents": [...]` → validate PASSES, details
   `Agents (0)`; without the key → `Agents (2)`
 - `claude mcp list` (fixture tree) → `plugin:arggon:arggon: arggon mcp - ✔
-  Connected` + `arggon: arggon mcp - ⏸ Pending approval`
+Connected` + `arggon: arggon mcp - ⏸ Pending approval`
 - NOT probed live: a real `SubagentStart` hook dispatch (needs a model session);
   the gate's agent_type semantics are covered by the child-process probes, the
   payload shape by the hooks reference and the item's probes.
@@ -213,10 +215,12 @@ vocabulary fix (`coordinator` → `delivery-lead`, ADR 0021 §6.1) forced by the
 family drift guard now walking the vendored copy.
 
 ### handoff 2026-10-14 @Arggon — next: Review PR #821 (maker work complete, all gates green); verify the 14 acceptance boxes against the evidence comment, then run the standards reviewer and merge.
+
 - branch: feat/task-claude-plugin-seam
 - open questions: Capability-matrix claude row deltas + ADR 0020 stale amendments belong to task-claude-matrix-and-docs / a follow-up item (reported in the PR); live SubagentStart hook dispatch not probed (needs a mod…
 
 ### 2026-10-14 @Arggon
+
 Review round 1 fixes (delivery lead) — applied, commit `abf9f9db` (pushed on `feat/task-claude-plugin-seam`, PR #821).
 
 1. `ArggonManager/docs/json-output.md` (`adapters.artifacts` row): cap updated to
@@ -233,3 +237,17 @@ Checks (worktree, all green): `npx vitest run cli/src/init-claude.test.ts
 cli/src/adapter-selection.test.ts cli/src/mcp-doc-contract.test.ts` → 81 passed /
 0 failed; `npx prettier --check` on the three touched files → clean;
 `npm run arggon -- validate` → `ok:true`, 0 errors, 0 warnings.
+
+### 2026-10-14 @Arggon
+
+verdict: approve
+
+### Lead review + merge verification — 2026-10-14 (delivery lead)
+
+Merged as 3cc9587c (PR #821). Ships: templates/docs/claude/** (marketplace catalog + vendored plugin: 2 agents, 13 /arggon:<command> commands, hooks pair with the gate, bundled skill, seam README), the init/selection wiring, the repo-self .claude-marketplace/** with its x-generated rows, and the headless bar.
+
+**Review bar (ArggonManager/docs/engineering.md §Review bar).** Architecture & boundaries: one classification point extended (adapters.ts), the gate is a bounded port of the ZCode seam — independently diffed by argon-standards-reviewer with only the intended event-model and scoped-prefix deltas; nothing under adapters/**, no settings stanza, no second skill copy. Conventions: marker syntax per destination, post-rename vocabulary, commands drive mcp__arggon__*. Evidence travels: full suite 158/3457 + lint + structure + validate re-run read-only by argon-verifier; init-claude.test.ts 24/24 with the live claude 2.1.289 probes EXECUTED (not skipped); fixture init --agents claude = 28 written / truncated:false and --agents opencode,zcode writes nothing claude. Docs travel: spec 024 facts corrected with the probe (the 2.1.289 agents-omission finding, test-pinned); README + seam README updated; json-output.md cap 96. Scope stayed on the item.
+
+**Review rounds.** Round 1 (lead): three must-fix nits landed in abf9f9db (json-output cap number 64→96; adapters.ts destination arithmetic 67→69; a test-title typo). Independent standards pass: no blockers, no should-fix; its optional nits are filed as task-claude-gate-polish, with the weaker observations recorded there as context (marker-loss durability gap pre-existing across seams; two expectations derive from the same classifier; one historical comment's file count).
+
+**Residuals (recorded, not hidden).** A real SubagentStart/SubagentStop dispatch was not probed live — verifier probe 4 recorded `not feasible: no authenticated throwaway session`; the gate semantics are covered by child-process probes. Hooks stay fail-open per spec (kernel remains enforcement of record). The adapter-selection doctor snapshot still asserts the pre-wave discipline-enforceable gap text — task-claude-matrix-and-docs (depends_on this) flips it.
