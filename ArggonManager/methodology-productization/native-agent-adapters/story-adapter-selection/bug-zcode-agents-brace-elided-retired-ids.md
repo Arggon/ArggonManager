@@ -9,7 +9,6 @@ parent: story-adapter-selection
 labels: [docs, tests, roles]
 created: "2026-10-14"
 updated: "2026-10-14"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-zcode-agents-brace-elided-retired-ids
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-adapter-selection/bug-zcode-agents-brace-elided-retired-ids.md
