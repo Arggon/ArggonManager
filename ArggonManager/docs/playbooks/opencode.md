@@ -606,6 +606,7 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   `search({namespace:"arggon"})`. Compaction cannot be forced deterministically
   headless; the closest evidence is that the injection fires per model call (a
   later call in the same session gets the block again).
+- **One model pin for both harnesses:** `smoke/opencode-model.ts` is the only model id — a retirement is one change plus a canary, never two scripts. — bug-wave-smoke-retired-model-pin
 - Re-verified on 2.0.10 (2026-09-20, `opencode v2.0.10`): the plugin-import
   A/B re-probe recorded in task-playbook-opencode-2-0-10 (dependency-less
   fixture — no `node_modules` in the fixture or any ancestor: plugin A, the docs
