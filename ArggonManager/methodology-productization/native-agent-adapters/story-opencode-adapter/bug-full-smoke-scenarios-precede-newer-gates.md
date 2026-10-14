@@ -105,3 +105,7 @@ The decline/inconclusive discrimination (`attemptedCode` + retry + distinct chec
 - `npm run test:structure` → 5 passed
 - `npm run arggon -- validate` → ok (0 warnings, convention v5)
 - `npx prettier --check smoke/opencode-smoke.ts smoke/opencode-smoke.test.ts` → clean
+
+### handoff 2026-10-14 @ses_ec60f45b9ffe3ffeIyT88O1JN9 (session: ses_ec60f45b9ffe3ffeIyT88O1JN9) — next: Delivery lead: review PR #799 at head 36225d2d — full smoke 158/158 green, all gates green; merge and complete the item.
+- branch: fix/bug-full-smoke-scenarios-precede-newer-gates
+- open questions: smoke/opencode-wave.ts:96 pins the same retired opencode-go/deepseek-v4-flash — route a follow-up; executed-check denominator drift (143 failing run → 158 green) documented in the evidence comment
