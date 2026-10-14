@@ -488,6 +488,39 @@ function defaultCleanupGit() {
                 .map((line) => line.slice("worktree ".length).trim())
                 .filter((path) => path.length > 0);
         },
+        worktreeIsLive(cwd, path) {
+            let out;
+            try {
+                out = git(["worktree", "list", "--porcelain"], cwd);
+            }
+            catch {
+                return true;
+            }
+            const target = (0, node_path_1.resolve)(path);
+            for (const block of out.split(/\n\s*\n/)) {
+                const lines = block.split("\n");
+                const head = lines.find((line) => line.startsWith("worktree "));
+                if (head === undefined)
+                    continue;
+                if ((0, node_path_1.resolve)(head.slice("worktree ".length).trim()) !== target)
+                    continue;
+                return !lines.some((line) => line.startsWith("prunable"));
+            }
+            return false;
+        },
+        pruneWorktrees(cwd) {
+            const result = (0, node_child_process_1.spawnSync)("git", ["worktree", "prune", "--verbose"], {
+                cwd,
+                encoding: "utf8",
+                stdio: ["ignore", "pipe", "pipe"],
+            });
+            if (result.error !== undefined || result.status !== 0) {
+                const stderr = String(result.stderr ?? "").trim();
+                const spawnMessage = result.error !== undefined ? String(result.error.message ?? result.error) : "";
+                throw new Error(`git worktree prune failed${stderr ? `: ${stderr}` : spawnMessage ? ` (${spawnMessage})` : ""}`);
+            }
+            return String(result.stderr ?? "").trim().length > 0;
+        },
         defaultBranch(cwd) {
             try {
                 const ref = git(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], cwd);
@@ -647,6 +680,11 @@ function classifyCleanupEntry(item, root, base, gitRunner, deps = {}) {
     }
     if (!(0, node_fs_1.existsSync)(path)) {
         entry.action = "clear stale worktree_path record (path missing on disk)";
+    }
+    else if (gitRunner.worktreeIsLive !== undefined && !gitRunner.worktreeIsLive(root, path)) {
+        entry.action =
+            "clear stale worktree_path record (path is not a live worktree of this repo; " +
+                "any leftover directory is left in place)";
     }
     else {
         const registered = gitRunner.worktreeList(root).map((p) => (0, node_path_1.resolve)(p));
@@ -12432,6 +12470,11 @@ async function nativeCleanup(kernel, input, options, tool) {
                         ...(entry.forced === true ? { forced: true } : {}),
                         ...(entry.via !== undefined ? { via: entry.via } : {}),
                     });
+                }
+                else if (entry.action?.startsWith("clear stale worktree_path record")) {
+                    if (git.pruneWorktrees?.(root) === true) {
+                        pruned.push({ id: entry.id, action: "pruned stale git worktree record" });
+                    }
                 }
                 if (entry.branch !== null && git.branchExists(root, entry.branch)) {
                     try {

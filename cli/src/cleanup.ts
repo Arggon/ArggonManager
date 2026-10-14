@@ -268,6 +268,13 @@ export type CleanupDeps = {
  * conservative skip unless the caller armed `pruneForce`
  * (bug-cleanup-prune-untracked-artifacts-no-force — the skip names the flag and
  * the manual sequence), while tracked modifications are never force-discarded.
+ * A recorded path that is no longer a LIVE worktree (missing on disk, or a
+ * leftover directory whose gitdir link is gone — the `prunable` record an
+ * interrupted removal leaves) is a stale record, never a removal candidate
+ * (bug-cleanup-stuck-when-worktree-dir-gone): the removal is skipped, the dead
+ * git record is pruned by this run itself (it pins the branch, so
+ * `git branch -d` would refuse it), the merged branch is still deleted and the
+ * record is cleared — a leftover directory is left in place.
  * Before anything is removed, both the local branch AND its remote counterpart (when
  * `origin/<branch>` exists) must be merged into the base, so a lost push can
  * never leave a stranded remote tip (bug-cleanup-partial-failure). When the
@@ -428,6 +435,20 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
             ...(force ? { forced: true } : {}),
             ...(entry.via ? { via: entry.via } : {}),
           });
+        } else if (entry.action?.startsWith("clear stale worktree_path record")) {
+          // The worktree is already gone (missing on disk, or no longer a live
+          // worktree). Its git record may still be there — `prunable`, kept by
+          // git even when only the leftover directory survives — and that
+          // record PINS the branch: `git branch -d` refuses it with "cannot
+          // delete branch '<b>' used by worktree at '<path>'"
+          // (bug-cleanup-stuck-when-worktree-dir-gone). The reaper drops the
+          // dead record itself, so no manual `git worktree prune` step is ever
+          // needed before the branch step below. `--verbose` output is
+          // non-empty exactly when a record was dropped, so the action is only
+          // reported when something actually happened.
+          if (gitRunner.pruneWorktrees?.(root) === true) {
+            pruned.push({ id: entry.id, action: "pruned stale git worktree record" });
+          }
         }
         if (entry.branch && gitRunner.branchExists(root, entry.branch)) {
           try {

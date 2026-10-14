@@ -192,7 +192,15 @@ namespace:
   the rollback's blanket force, so git keeps refusing dirty worktrees unless
   the caller armed `force` for an entry whose blockers are ALL untracked
   (bug-cleanup-prune-untracked-artifacts-no-force; tracked modifications are
-  never force-discarded, and the skip names the blockers and the remedy).
+  never force-discarded, and the skip names the blockers and the remedy). A
+  recorded path that is no longer a **live** worktree — missing on disk, or a
+  leftover directory whose gitdir link is gone (git lists the record as
+  `prunable` after an interrupted removal) — is a stale record, never a removal
+  candidate (bug-cleanup-stuck-when-worktree-dir-gone): the run skips the
+  removal, prunes the dead git record itself (`pruned stale git worktree
+record`; the record pins the branch, so it goes before `deleted branch`),
+  still deletes the merged branch and clears the record — any leftover
+  directory is left in place.
   `removed worktree`, `deleted branch` and `cleared worktree_path`
   are reported only when the removal is observably complete; otherwise the
   candidate reports one bounded `failed` action plus a `failures[]` entry
