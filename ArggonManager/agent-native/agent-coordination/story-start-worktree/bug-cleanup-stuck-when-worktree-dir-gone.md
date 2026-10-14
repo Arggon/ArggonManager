@@ -29,10 +29,10 @@ The reaper insists on `git worktree remove <path>` and never reaches the "clear 
 
 ## Acceptance
 
-- [ ] a candidate whose worktree directory no longer exists (but is recorded on the item) is handled: the worktree domain removal is skipped as already-gone and `worktree_path` is cleared, or the refusal is self-describing with a working remedy — never a permanent failed-retry loop
-- [ ] `git worktree prune` is either unnecessary (the reaper prunes the stale record itself) or named in the failure's remedy
-- [ ] a test pins the shape: remove the directory by hand → `cleanup --prune` completes (clears `worktree_path`; branch deletion handled), or returns a remedy that actually works
-- [ ] `arggon validate` green; PR opened
+- [x] a candidate whose worktree directory no longer exists (but is recorded on the item) is handled: the worktree domain removal is skipped as already-gone and `worktree_path` is cleared, or the refusal is self-describing with a working remedy — never a permanent failed-retry loop
+- [x] `git worktree prune` is either unnecessary (the reaper prunes the stale record itself) or named in the failure's remedy
+- [x] a test pins the shape: remove the directory by hand → `cleanup --prune` completes (clears `worktree_path`; branch deletion handled), or returns a remedy that actually works
+- [x] `arggon validate` green; PR opened
 
 ## Notes
 
