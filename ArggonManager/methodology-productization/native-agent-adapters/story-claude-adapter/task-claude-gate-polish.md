@@ -9,7 +9,6 @@ parent: story-claude-adapter
 labels: []
 created: "2026-10-14"
 updated: "2026-10-14"
-worktree_path: /home/arggon/Projects/ArggonManager-task-claude-gate-polish
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-claude-adapter/task-claude-gate-polish.md
