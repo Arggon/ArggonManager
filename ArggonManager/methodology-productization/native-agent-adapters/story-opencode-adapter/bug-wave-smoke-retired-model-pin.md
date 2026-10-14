@@ -69,3 +69,8 @@ Found while landing `bug-full-smoke-scenarios-precede-newer-gates` (PR #799): th
 
 ### 2026-10-14 @ses_ec5ee801affeIpa4kifNI1tFAC
 Precision note on the evidence above: `npx prettier --check` is clean on the authored files (`smoke/opencode-model.ts`, `smoke/opencode-model.test.ts`, `smoke/opencode-smoke.ts`, `smoke/opencode-wave.ts`, `ArggonManager/docs/playbooks/opencode.md`). The tracker item file itself is NOT prettier-formatted — `ArggonManager/<initiative>/…` is deliberately excluded from the prose corpus (`cli/src/prose-format.test.ts` §Scope; item bodies are historical records), and every neighbouring item is equally non-byte-clean. No formatter churn was written into the item.
+
+### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-14 (delivery lead)
+Merged as fa6fde4c (PR #803); auto-done flip landed. One source of truth for the smoke model: `smoke/opencode-model.ts` (`DEFAULT_OPENCODE_MODEL = opencode-go/deepseek-v4.1-flash`; per-harness env overrides preserved) with 6 unit tests including a no-re-pin rule — neither harness may carry a provider-qualified literal again. Canary: focused verifier probe 11/11 on the successor model; the full wave smoke stays deferred to a solo window (documented — it is not a CI gate). Lesson promoted to `playbooks/opencode.md` per ADR 0027 (second occurrence). Full suite 3,388; CI green.
