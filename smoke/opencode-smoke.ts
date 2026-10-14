@@ -144,7 +144,11 @@ const PLUGIN_SOURCE = join(repoRoot, "opencode/plugins/arggon/index.bundle.ts");
 const PLUGIN_DEST = ".opencode/plugins/arggon/index.ts";
 const PLUGIN_MARKER = `// arggon:generated template="opencode/plugins/arggon/index.bundle.ts"`;
 const NATIVE_TOOL_CODE = "return await tools.arggon.next({})";
-const MODEL = process.env.OPENCODE_SMOKE_MODEL ?? "opencode-go/deepseek-v4-flash";
+// The pinned small model: `deepseek-v4-flash` was retired by the provider
+// (`provider.no-route: Model unavailable`, 2026-10-14) and every session after
+// the first died before any model output; the same-family successor keeps the
+// pinned-small-model shape (bug-full-smoke-scenarios-precede-newer-gates).
+const MODEL = process.env.OPENCODE_SMOKE_MODEL ?? "opencode-go/deepseek-v4.1-flash";
 const TIMEOUT_MS = Number(process.env.OPENCODE_SMOKE_TIMEOUT_MS ?? 240_000);
 // Mirrors ITEM_BLOCK_MAX_BYTES in the plugin source; asserted in unit tests.
 // The smoke measures the logged block text itself instead of trusting the
