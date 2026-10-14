@@ -415,6 +415,41 @@ describe("claude code plugin seam generation", () => {
     expect(readFileSync(shipped.reviewCommand, "utf8")).toContain(`arggon:${reviewer}`);
   });
 
+  // task-claude-gate-polish: the PreToolUse matcher is the client-side half of
+  // the gate's reach. It must select every tool the gate can decide on and
+  // NOTHING else: a bare `mcp__.*` arm spawned the gate on every unrelated MCP
+  // tool call in the session. Both arggon registration prefixes are pinned —
+  // dropping either one silently stops denying that route.
+  it("matches PreToolUse only on the tools the gate can decide on", () => {
+    const dir = initClaudeTree();
+    const hooks = JSON.parse(readFileSync(join(dir, PLUGIN_ROOT, "hooks/hooks.json"), "utf8")) as {
+      hooks: Record<string, Array<{ matcher?: string }>>;
+    };
+    const matcher = hooks.hooks.PreToolUse?.[0]?.matcher;
+    expect(matcher, "PreToolUse matcher").toBeTruthy();
+    const matches = new RegExp(matcher!);
+    for (const tool of [
+      "Bash",
+      "Write",
+      "Edit",
+      "MultiEdit",
+      "NotebookEdit",
+      "mcp__arggon__arggon_handoff",
+      "mcp__plugin_arggon_arggon__arggon_handoff",
+    ]) {
+      expect(matches.test(tool), tool).toBe(true);
+    }
+    for (const tool of [
+      "Read",
+      "WebFetch",
+      "mcp__other__tool",
+      "mcp__arggon_other__tool",
+      "mcp__plugin_arggon_other__tool",
+    ]) {
+      expect(matches.test(tool), tool).toBe(false);
+    }
+  });
+
   it("ships exactly the two subagent roles and no surface dispatches a lead", () => {
     const dir = initClaudeTree();
     const { all } = agentIdFromShippedAgents();
@@ -609,6 +644,36 @@ describe("claude gate script (reviewer backstop + global git gates)", () => {
     );
   });
 
+  // task-claude-gate-polish: `arggon_handoff` appends a handoff section to an
+  // item body — a tracker mutation, not a verdict channel — so it is denied
+  // with the rest of the mutating set (spec 024 §Hook gates: "the mutating
+  // `mcp__arggon__*` tools are denied for that session; `arggon_comment` stays
+  // open"). The ZCode gate leaves `arggon_handoff` unlisted; that divergence is
+  // deliberate and recorded on the item. This test fails if the tool moves to
+  // the allowed side under EITHER registration, or if the deny message stops
+  // naming it.
+  it("denies arggon_handoff with the mutating MCP set under both prefixes", () => {
+    const dir = initClaudeTree();
+    const session = "handoff-1";
+    const prefixes = ["mcp__arggon__", "mcp__plugin_arggon_arggon__"];
+    const call = (tool: string) =>
+      gate(dir, "pre", { session_id: session, tool_name: tool, tool_input: { id: "task-x" } });
+    // Outside the window the gate stays out of the way on both routes.
+    for (const prefix of prefixes) {
+      expect(call(`${prefix}arggon_handoff`).status, prefix).toBe(0);
+    }
+    expect(gate(dir, "subagent-start", reviewerEvent(session)).status).toBe(0);
+    for (const prefix of prefixes) {
+      const denied = call(`${prefix}arggon_handoff`);
+      expect(denied.status, prefix).toBe(2);
+      expect(denied.stderr, prefix).toContain("arggon_handoff");
+    }
+    // `arggon_comment` remains the one exception the mutating set keeps.
+    expect(call("mcp__arggon__arggon_comment").status, "the verdict channel must stay open").toBe(
+      0,
+    );
+  });
+
   it("marks the reviewer dispatch on SubagentStart and denies mutations until SubagentStop", () => {
     const dir = initClaudeTree();
     const session = "coord-1";
@@ -632,6 +697,12 @@ describe("claude gate script (reviewer backstop + global git gates)", () => {
       },
       { tool_name: "Bash", tool_input: { command: "git commit -m wip" } },
       { tool_name: "Bash", tool_input: { command: "git push origin main" } },
+      // task-claude-gate-polish round 1: the shell route carries the same
+      // decision as the MCP set — `arggon handoff …` is a tracker append, so it
+      // is denied here too (bare, wrapped, and behind `npm run arggon --`).
+      { tool_name: "Bash", tool_input: { command: "arggon handoff task-x --next ship-it" } },
+      { tool_name: "Bash", tool_input: { command: 'sh -c "arggon handoff task-x"' } },
+      { tool_name: "Bash", tool_input: { command: "npm run arggon -- handoff task-x" } },
       { tool_name: "mcp__arggon__arggon_update", tool_input: { id: "task-x" } },
       { tool_name: "mcp__arggon__arggon_create", tool_input: { id: "task-x" } },
       { tool_name: "mcp__plugin_arggon_arggon__arggon_update", tool_input: { id: "task-x" } },
@@ -661,6 +732,16 @@ describe("claude gate script (reviewer backstop + global git gates)", () => {
           command:
             'npm run arggon -- comment task-x "the reviewer cannot run arggon update or git commit"',
         },
+      }).status,
+    ).toBe(0);
+    // task-claude-gate-polish round 1: `comment` stays OUT of the shell word
+    // list on purpose — the verdict channel is open on this route too, even
+    // when its payload documents the denied `handoff` word.
+    expect(
+      gate(dir, "pre", {
+        session_id: session,
+        tool_name: "Bash",
+        tool_input: { command: 'npm run arggon -- comment task-x "handoff context: not shipped"' },
       }).status,
     ).toBe(0);
     expect(
