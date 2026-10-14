@@ -1630,6 +1630,37 @@ test.describe("@smoke board --serve", () => {
     await page.keyboard.press("Escape");
     await expect(page.locator("#board-drawer")).toBeHidden();
     await expect(page.locator(`.card[data-id="${DETAIL_ITEM_ID}"]`)).toBeFocused();
+
+    // The same preservation covers the tree's own open path
+    // (task-tree-rows-open-detail): a drawer opened from a grouped-ancestry row
+    // re-opens through that row after a live reload, and Esc returns focus to it.
+    await page.locator("#board-view-toggle").click();
+    await expect(page.locator("#board-tree")).toBeVisible();
+    const treeRow = page.locator(`#board-tree .tree-node[data-id="${DETAIL_ITEM_ID}"] > .tree-row`);
+    await treeRow.click();
+    await expect(page.locator("#board-drawer .drawer-title")).toHaveText("Board detail task");
+    await page.evaluate(() => {
+      document.documentElement.dataset.preserveMarker = "43";
+    });
+    // Another external write fires the reload (a create, like the first
+    // trigger; a status reopen is refused for non-interactive callers).
+    cliJson<{ item: { id: string } }>(fixture, [
+      "create",
+      "task",
+      "Board preserve task 2",
+      "--parent",
+      "entries",
+      "--json",
+    ]);
+    await expect(page.locator("html:not([data-preserve-marker])")).toHaveCount(1, {
+      timeout: 30_000,
+    });
+    await expect(page.locator("#board-conn.live")).toHaveText("live", { timeout: 15_000 });
+    await expect(page.locator("#board-tree")).toBeVisible();
+    await expect(page.locator("#board-drawer .drawer-title")).toHaveText("Board detail task");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#board-drawer")).toBeHidden();
+    await expect(treeRow).toBeFocused();
   });
 
   test("columns collapse, terminal columns hide, and the layout persists (task-board-column-controls)", async ({

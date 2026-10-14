@@ -124,10 +124,22 @@ const RELOAD_SCRIPT = `<script>
     }
     window.scrollTo(state.x || 0, state.y || 0);
     if (state.drawer) {
-      var cards = document.querySelectorAll(".card[data-id]");
-      for (var i = 0; i < cards.length; i++) {
-        if (cards[i].getAttribute("data-id") === state.drawer) {
-          cards[i].click(); /* the user's own open path: fetch + render */
+      /* Re-open through the user's own path IN THE RESTORED LAYOUT: a
+         grouped-ancestry row when the tree is the visible layout, a card
+         otherwise (task-tree-rows-open-detail). A row reads its id from the
+         node it belongs to. */
+      var tree = document.getElementById("board-tree");
+      var selector =
+        tree && !tree.hidden ? "#board-tree .tree-row" : ".card[data-id]";
+      var openers = document.querySelectorAll(selector);
+      for (var i = 0; i < openers.length; i++) {
+        var id = openers[i].getAttribute("data-id");
+        if (!id) {
+          var node = openers[i].closest(".tree-node");
+          id = node ? node.getAttribute("data-id") : "";
+        }
+        if (id === state.drawer) {
+          openers[i].click();
           break;
         }
       }
