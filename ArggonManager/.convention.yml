@@ -460,7 +460,7 @@ x-generated:
     acknowledged: true
   adapters/capability-matrix.json:
     template: "docs/adapters/capability-matrix.json"
-    checksum: "sha256:d95ed44a0502a4fc0ef42173591194cd872208e18aab2850564be687b5ce15b5"
+    checksum: "sha256:59bb30c963848c58cb6ea7687da9d8e94a1b46b8069e464e0b89c44ba47c1fa3"
     arggonVersion: "0.10.0"
     generatedAt: "2026-10-14T18:46:04.011Z"
   opencode.jsonc:

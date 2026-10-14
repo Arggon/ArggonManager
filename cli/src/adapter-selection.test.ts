@@ -615,10 +615,11 @@ describe("doctor --agents: per-agent report", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     // A full init with no markers narrowing it: every file is present, every
-    // agent is detected, and the init-generated matrix gives claude its two
-    // documented gaps (task-matrix-reaches-adopters). That is the deterministic
-    // shape, so the block's exact wording — the report an operator reads — is
-    // pinned rather than merely probed for substrings.
+    // agent is detected, and the init-generated matrix gives claude its one
+    // documented gap — the session-context hook no plugin surface can carry
+    // (task-matrix-reaches-adopters, task-claude-matrix-and-docs). That is the
+    // deterministic shape, so the block's exact wording — the report an operator
+    // reads — is pinned rather than merely probed for substrings.
     //
     // Only the per-agent lines are snapshotted: they carry counts and statuses,
     // never a path, so they do not move with a new template, while the file
@@ -628,9 +629,8 @@ describe("doctor --agents: per-agent report", () => {
       .filter((line) => /^ {2}agent[s]?\b/.test(line) || /^ {4}gap:/.test(line));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "  agents: claude, opencode, zcode (adapter selection: init --agents / --no-agents; report-only)
-        agent claude: 28 file(s) — 28 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 2 capability gap(s)
-          gap: discipline-enforceable x claude — no claude:plugin.hooks.PreToolUse gate and no permission DSL: the OpenCode deny rules and the ZCode PreToolUse gate have no Claude Code equivalent, so the kernel, pre-commit and CI carry it alone. (report-only)
-          gap: docs-travel-with-code x claude — no session context hook injects the active work item (the OpenCode session.hook('context') block), so the agent must fetch it with \`arggon show\`; the playbook still travels via CLAUDE.md. (report-only)
+        agent claude: 28 file(s) — 28 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 1 capability gap(s)
+          gap: docs-travel-with-code x claude — the bundle ships no session context hook: Claude Code has no plugin surface that injects the active work item, so the agent fetches it with \`arggon show\`. (report-only)
         agent opencode: 18 file(s) — 18 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)
         agent zcode: 23 file(s) — 23 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)"
     `);

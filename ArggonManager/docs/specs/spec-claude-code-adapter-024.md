@@ -1,7 +1,7 @@
 ---
 spec_id: claude-code-adapter-024
 title: Claude Code adapter (methodology-adapters-017 §S6)
-status: proposed
+status: implemented
 created: 2026-10-11
 adr: ArggonManager/docs/adr/0014-zcode-native-seam.md
 ---
@@ -116,8 +116,9 @@ flow to read". Every decision this bundle turns on is already taken:
    ([spec-zcode-native-seam-012](spec-zcode-native-seam-012.md)), as does the headless
    evidence shape it is gated by (`cli/src/init-zcode.test.ts`).
 4. The client surface is documented, shipped and versioned (the plugin manifest
-   reference and the hooks reference, cited above), so the residual unknowns are three
-   named questions in [Open questions](#open-questions) rather than an unknown shape.
+   reference and the hooks reference, cited above), so the residual unknowns were three
+   named questions — now [resolved by probe](#open-questions--resolved-2026-10-14-probes),
+   none by assumption — rather than an unknown shape.
 
 So **no exploration artifact is owed for this wave**, and the implementation wave may
 claim its tasks as soon as this spec passes `arggon spec analyze`. The ADR 0017
@@ -405,22 +406,32 @@ bar is in [Headless smoke parity bar](#headless-smoke-parity-bar).
 - No blocking CI gate on adapter freshness (report-only first, per ADR 0016's spirit).
 - No Cursor/Codex/Gemini adapter; those stay matrix `gap` rows.
 
-## Open questions
+## Open questions — resolved (2026-10-14 probes)
 
-Three named questions for the implementation wave, each resolved by a recorded probe
-rather than an assumption. None blocks claiming this spec's tasks; any one that fails
-its probe triggers the ADR 0017 ratchet.
+Three named questions for the implementation wave, each resolved by a recorded probe on
+claude 2.1.289 (throwaway HOME; transcripts on `task-claude-matrix-and-docs`), not by
+assumption. No probe failed, so the ADR 0017 ratchet was never triggered and the
+implementation wave claimed its tasks.
 
-1. Does `claude plugin marketplace add <path>` accept a repo-local directory whose
-   manifest is `<path>/.claude-plugin/marketplace.json` — i.e. is `.claude-marketplace/`
-   (the mirror of `.zcode-marketplace/`) a loadable marketplace root, or does the
-   platform require the manifest at the repo root?
-2. Under the plugin namespace, what is the dispatched name of a flat
-   `commands/arggon-next.md` file in the plugin `arggon`? The manifest reference states
-   components are namespaced under the plugin name; the smoke pins the emitted form
-   wherever that rule puts it, and the bundle's `README.md` must not name a command the
-   client cannot run.
-3. Does carrying the key `arggon` in both the plugin's `mcpServers` and the generated
-   `.mcp.json` pass `claude plugin validate`, given the replace-on-name rule? If it does
-   not, the bundle's manifest drops the key and the generated `.mcp.json` stays the one
-   registration — one server either way, decided by the probe rather than by taste.
+1. **Repo-local marketplace root: PASS.** `claude plugin marketplace add .claude-marketplace`
+   accepts a repo-local directory whose manifest is
+   `<path>/.claude-plugin/marketplace.json`, and `claude plugin install arggon@arggon-local`
+   installs the plugin from it. `.claude-marketplace/` is a loadable marketplace root —
+   the mirror of `.zcode-marketplace/` the synopsis assumes — and no platform requirement
+   moves the manifest to the repo root.
+2. **Namespaced names.** The plugin name is the namespace: the thirteen
+   `commands/<command>.md` files run as **`/arggon:<command>`** (the file stems drop the
+   ZCode seam's `arggon-` prefix, which the namespace would repeat), an agent is
+   dispatched as **`arggon:<agent>`** (`arggon:arggon-maker`,
+   `arggon:arggon-standards-reviewer`), and the plugin-bundled MCP tools are exposed as
+   **`mcp__plugin_arggon_arggon__<tool>`** (manifest-reference rule plus
+   `claude plugin details` evidence).
+3. **Both `arggon` registrations validate: PASS.** Keeping the inline manifest
+   `mcpServers.arggon` key passes `claude plugin validate`. At runtime `claude mcp list`
+   shows both `plugin:arggon:arggon` (the plugin bundle) and the project-scoped `arggon`
+   (the generated `.mcp.json`) — one server over one tracker, exactly the one-server rule.
+
+Every answer matched the shipped bundle. The one shape correction the probes forced —
+the `agents` manifest key, which validates but replaces the convention scan and surfaces
+zero agents — is recorded in the client-facts note above, and the shipped manifest omits
+the key.
