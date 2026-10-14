@@ -60,3 +60,7 @@ Counts identical in both runs (`661 item(s)`, tree heading `661`); columns view 
 **Pinned tests.** 3 e2e `@smoke` cases in `e2e/board.smoke.spec.ts` (dedicated fixture: cancelled story with an open child, done leaf, parentless cancelled initiative): hide/restore + context retention + localStorage persistence + reset + count invariance across both layouts; lens composition + all-hidden empty state; static export `file://` parity (axe-scanned). Unit pins in `cli/src/board.test.ts` (tree CSS, embed call site `var boardColumns = …`, embedded `syncTree`/return handle). README board section documents the toggle's tree behaviour.
 
 **Gates (all green locally).** `npm run build`; `npm test` 157 files / 3423 tests; `npm run lint`; `npm run test:structure`; `npm run arggon -- validate`; `npx prettier --check` on touched files; `npx playwright test --grep @smoke` 39 passed (run alone). CI `ui-smoke` on PR #815 still pending — the lead should verify that before ticking row 6.
+
+### handoff 2026-10-14 @ses_ec520aa7effeTzFI7Qxree2Q7l (session: ses_ec520aa7effeTzFI7Qxree2Q7l) — next: Review PR #815 (CI ui-smoke), verify acceptance rows, merge; no code work expected. Probe: /tmp/opencode/tree-terminal-probe-fix.mjs <served-url>.
+- branch: fix/bug-tree-ignores-hide-terminal-toggle
+- open questions: Non-terminal ancestors whose whole subtree is terminal still render (only terminal rows hide — matches the columns' promise); the lens-all-hidden case now also gets the empty state (same code path); …
