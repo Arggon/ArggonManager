@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-claude-plugin-seam
 title: "Claude Code adapter: the plugin bundle, init seam and hook gate with the headless bar (spec S6/024)"
+assignee: arggon-delivery-lead
+branch: feat/task-claude-plugin-seam
 parent: story-claude-adapter
 labels: []
 created: "2026-10-14"
 updated: "2026-10-14"
+claimed_at: "2026-10-14T18:23:36.047Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-claude-plugin-seam
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-claude-adapter/task-claude-plugin-seam.md
   Leaves live only under a story. id is the filename stem: task-claude-plugin-seam.
