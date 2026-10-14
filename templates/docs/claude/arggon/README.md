@@ -105,11 +105,17 @@ no shell, no exec bit) on four events:
   the standards-reviewer subagent is in flight, `Write`/`Edit` (and the other
   file-writing tools), mutating `arggon` shell invocations, git history commands
   and the mutating `mcp__arggon__*` / `mcp__plugin_arggon_arggon__*` tools are
-  denied for that session. `arggon_comment` stays open: it is the verdict
-  channel. Parallel dispatches are counted, so the window holds until the last
-  one returns.
+  denied for that session — `arggon_handoff` included, since a handoff is a
+  tracker append like any other mutation. `arggon_comment` stays open: it is the
+  verdict channel. Parallel dispatches are counted, so the window holds until
+  the last one returns.
 - **`Stop`** clears the session's state — the belt-and-braces reset for a
   dispatch that never returned a `SubagentStop`.
+
+The `PreToolUse` matcher selects exactly the tools this gate can decide on:
+`Bash`, the file-writing tools, and the arggon MCP tools under **both**
+registration prefixes (bare + plugin-scoped) — an unrelated MCP tool never
+spawns the gate.
 
 Hooks are **defense-in-depth, and they fail open**: a crashing gate script does
 not block the tool call it was watching. The kernel, the pre-commit
@@ -151,3 +157,9 @@ decision is:
   2.1.289 (probe, this item); omitting it loads the shipped pair. The omission
   is pinned by `cli/src/init-claude.test.ts` so an edit cannot silently disarm
   agent loading.
+- **`arggon_handoff` is denied inside the reviewer window; the ZCode gate leaves
+  it unlisted.** Spec 024 §Hook gates denies "the mutating `mcp__arggon__*`
+  tools" and names `arggon_comment` as the one exception; a handoff appends a
+  tracker section, so this seam puts it on the denied side explicitly. The
+  ZCode gate's set predates that reading and is unchanged here — a candidate
+  follow-up on that seam (recorded on `task-claude-gate-polish`).

@@ -3,7 +3,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "^(Bash|Write|Edit|MultiEdit|NotebookEdit|mcp__.*)$",
+        "matcher": "^(Bash|Write|Edit|MultiEdit|NotebookEdit|mcp__arggon__.*|mcp__plugin_arggon_arggon__.*)$",
         "hooks": [
           {
             "type": "command",

@@ -415,6 +415,41 @@ describe("claude code plugin seam generation", () => {
     expect(readFileSync(shipped.reviewCommand, "utf8")).toContain(`arggon:${reviewer}`);
   });
 
+  // task-claude-gate-polish: the PreToolUse matcher is the client-side half of
+  // the gate's reach. It must select every tool the gate can decide on and
+  // NOTHING else: a bare `mcp__.*` arm spawned the gate on every unrelated MCP
+  // tool call in the session. Both arggon registration prefixes are pinned —
+  // dropping either one silently stops denying that route.
+  it("matches PreToolUse only on the tools the gate can decide on", () => {
+    const dir = initClaudeTree();
+    const hooks = JSON.parse(readFileSync(join(dir, PLUGIN_ROOT, "hooks/hooks.json"), "utf8")) as {
+      hooks: Record<string, Array<{ matcher?: string }>>;
+    };
+    const matcher = hooks.hooks.PreToolUse?.[0]?.matcher;
+    expect(matcher, "PreToolUse matcher").toBeTruthy();
+    const matches = new RegExp(matcher!);
+    for (const tool of [
+      "Bash",
+      "Write",
+      "Edit",
+      "MultiEdit",
+      "NotebookEdit",
+      "mcp__arggon__arggon_handoff",
+      "mcp__plugin_arggon_arggon__arggon_handoff",
+    ]) {
+      expect(matches.test(tool), tool).toBe(true);
+    }
+    for (const tool of [
+      "Read",
+      "WebFetch",
+      "mcp__other__tool",
+      "mcp__arggon_other__tool",
+      "mcp__plugin_arggon_other__tool",
+    ]) {
+      expect(matches.test(tool), tool).toBe(false);
+    }
+  });
+
   it("ships exactly the two subagent roles and no surface dispatches a lead", () => {
     const dir = initClaudeTree();
     const { all } = agentIdFromShippedAgents();
@@ -605,6 +640,36 @@ describe("claude gate script (reviewer backstop + global git gates)", () => {
     // SubagentStart counts.
     expect(gate(dir, "subagent-start", reviewerEvent("w1", "arggon:arggon-maker")).status).toBe(0);
     expect(gate(dir, "pre", { session_id: "w1", tool_name: "Write", tool_input: {} }).status).toBe(
+      0,
+    );
+  });
+
+  // task-claude-gate-polish: `arggon_handoff` appends a handoff section to an
+  // item body — a tracker mutation, not a verdict channel — so it is denied
+  // with the rest of the mutating set (spec 024 §Hook gates: "the mutating
+  // `mcp__arggon__*` tools are denied for that session; `arggon_comment` stays
+  // open"). The ZCode gate leaves `arggon_handoff` unlisted; that divergence is
+  // deliberate and recorded on the item. This test fails if the tool moves to
+  // the allowed side under EITHER registration, or if the deny message stops
+  // naming it.
+  it("denies arggon_handoff with the mutating MCP set under both prefixes", () => {
+    const dir = initClaudeTree();
+    const session = "handoff-1";
+    const prefixes = ["mcp__arggon__", "mcp__plugin_arggon_arggon__"];
+    const call = (tool: string) =>
+      gate(dir, "pre", { session_id: session, tool_name: tool, tool_input: { id: "task-x" } });
+    // Outside the window the gate stays out of the way on both routes.
+    for (const prefix of prefixes) {
+      expect(call(`${prefix}arggon_handoff`).status, prefix).toBe(0);
+    }
+    expect(gate(dir, "subagent-start", reviewerEvent(session)).status).toBe(0);
+    for (const prefix of prefixes) {
+      const denied = call(`${prefix}arggon_handoff`);
+      expect(denied.status, prefix).toBe(2);
+      expect(denied.stderr, prefix).toContain("arggon_handoff");
+    }
+    // `arggon_comment` remains the one exception the mutating set keeps.
+    expect(call("mcp__arggon__arggon_comment").status, "the verdict channel must stay open").toBe(
       0,
     );
   });

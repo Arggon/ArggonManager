@@ -32,6 +32,11 @@
  * `.mcp.json` and the plugin-scoped `mcp__plugin_arggon_arggon__*` of the
  * plugin's own `mcpServers` entry (spec-claude-code-adapter-024 §MCP wiring).
  * `arggon_comment` stays open under both: it is the verdict channel.
+ * `arggon_handoff` is DENIED with that set: a handoff appends a tracker section
+ * to an item body, which is a mutation, not a verdict channel. This diverges
+ * from the ZCode gate, which leaves `arggon_handoff` unlisted rather than
+ * denied — recorded on task-claude-gate-polish as a candidate ZCode follow-up,
+ * deliberately not changed on that seam here.
  *
  * State is a small JSON counter under the OS temp dir keyed by a hash of the
  * project dir + session id — never inside the repo, never a tracker file.
@@ -82,7 +87,11 @@ const STATE_DIR = join(tmpdir(), "arggon-claude-hooks");
 /** A dispatch that never returned must not pin the session forever. */
 const MARKER_TTL_MS = 2 * 60 * 60 * 1000;
 
-/** The mutating MCP tool suffixes; `arggon_comment` stays allowed (verdict channel). */
+/**
+ * The mutating MCP tool suffixes. `arggon_comment` stays allowed (verdict
+ * channel); `arggon_handoff` is NOT an exception — it appends a handoff section
+ * to an item body, so it mutates the tracker like the rest of this set.
+ */
 const MUTATING_MCP_TOOLS = new Set([
   "arggon_create",
   "arggon_update",
@@ -92,6 +101,7 @@ const MUTATING_MCP_TOOLS = new Set([
   "arggon_priority",
   "arggon_sync",
   "arggon_import_issues",
+  "arggon_handoff",
 ]);
 
 /**
