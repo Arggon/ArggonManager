@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-tree-done-container-hides-open-work
 title: "Tree rows: a terminal container with open descendants shows only `done` — disclose `N open` on the row (15 of 84 containers today)"
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: story-board-hierarchy-grouping
 labels: []
 created: "2026-10-14"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T20:53:04.148Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-tree-done-container-hides-open-work
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-board-hierarchy-grouping/bug-tree-done-container-hides-open-work.md
   Leaves live only under a story. id is the filename stem: bug-tree-done-container-hides-open-work.
