@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-zcode-maker-lesson-trigger
 title: ZCode maker prompt does not carry the ADR 0027 lesson-promotion trigger (opencode seam got it; parity missing)
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-zcode-adapter
 labels: [methodology, zcode-seam]
 created: "2026-10-13"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T10:58:29.536Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-maker-lesson-trigger
 ---
 <!--
