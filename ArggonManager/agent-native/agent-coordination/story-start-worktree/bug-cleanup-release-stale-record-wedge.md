@@ -27,9 +27,9 @@ Residual shape found while fixing `bug-cleanup-stuck-when-worktree-dir-gone` (PR
 
 ## Acceptance
 
-- [ ] `cleanup --release` applies the same liveness rule: a recorded path that is not a live worktree is a stale record — prune the dead record, treat removal as already-gone, clear `worktree_path`, still handle the branch — never a wedge
-- [ ] a test pins the shape for the release arm (leftover dir with gitdir gone → release completes, or a self-describing refusal with a working remedy)
-- [ ] `arggon validate` green; PR opened
+- [x] `cleanup --release` applies the same liveness rule: a recorded path that is not a live worktree is a stale record — prune the dead record, treat removal as already-gone, clear `worktree_path`, still handle the branch — never a wedge
+- [x] a test pins the shape for the release arm (leftover dir with gitdir gone → release completes, or a self-describing refusal with a working remedy)
+- [x] `arggon validate` green; PR opened
 
 ## Notes
 
