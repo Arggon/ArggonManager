@@ -30,9 +30,9 @@ stream — demonstrated end to end. (Spec-methodology-adapters-017 §S4.)
 
 ## Acceptance
 
-- [ ] Admission stamps the active work-item block (branch and item metadata) onto the session and compaction preserves that block, so the helper never loses which item it is working
-- [ ] The board panel refreshes from the event stream rather than polling and stays fresh while the session runs
-- [ ] Permission rules for the roles stay generated from the same matrix row, with the irreversible calls person-only and the review window scoped to the review
-- [ ] The expansion is demonstrated end to end with expected-vs-observed evidence in the review verdict, and the project's verification gates and `arggon validate` stay green with no new finding naming this story
+- [x] Admission stamps the active work-item block (branch and item metadata) onto the session and compaction preserves that block, so the helper never loses which item it is working
+- [x] The board panel refreshes from the event stream rather than polling and stays fresh while the session runs
+- [x] Permission rules for the roles stay generated from the same matrix row, with the irreversible calls person-only and the review window scoped to the review
+- [x] The expansion is demonstrated end to end with expected-vs-observed evidence in the review verdict, and the project's verification gates and `arggon validate` stay green with no new finding naming this story
 
 ## Notes

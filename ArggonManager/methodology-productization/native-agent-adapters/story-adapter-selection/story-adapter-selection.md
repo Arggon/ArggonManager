@@ -32,9 +32,9 @@ rows from the shipped matrix — all in one shared vocabulary for file states.
 
 ## Acceptance
 
-- [ ] Setup materializes exactly the chosen seams (and none with the no-helpers option), never removes or overwrites a helper-edited file, and a fresh scaffold with no marker selects every known helper rather than silently shipping none (spec §S2)
-- [ ] The machine-readable selection report states which rule fired and per file what was written or skipped with honest counts; an unknown helper name is refused by name with nothing written
-- [ ] The status report lists every seam file by what setup would do with it and carries that helper's gap rows from the shipped matrix in one shared vocabulary for file states (spec §S2)
-- [ ] The project's verification gates and `arggon validate` stay green with no new finding naming this story
+- [x] Setup materializes exactly the chosen seams (and none with the no-helpers option), never removes or overwrites a helper-edited file, and a fresh scaffold with no marker selects every known helper rather than silently shipping none (spec §S2)
+- [x] The machine-readable selection report states which rule fired and per file what was written or skipped with honest counts; an unknown helper name is refused by name with nothing written
+- [x] The status report lists every seam file by what setup would do with it and carries that helper's gap rows from the shipped matrix in one shared vocabulary for file states (spec §S2)
+- [x] The project's verification gates and `arggon validate` stay green with no new finding naming this story
 
 ## Notes

@@ -35,10 +35,10 @@ file. (ADR 0021; ADR 0026.)
 
 ## Acceptance
 
-- [ ] The carriers state the two-axis rule — anyone or any helper may claim, work, review, comment and merge under the same rules and records, while a named set of calls belongs to the product owner with the irreversible ones person-only — and the role table defines each role by what it decides (ADR 0021 §§1–2, §6.1)
-- [ ] Helper contracts claim as their role id, never the product owner's login, and state their gates in the project's own terms with the familiar case as a worked example only (ADR 0021 §§5–6.2)
-- [ ] Product acceptance is a bounded author-attributed record on the container with tiered depth per class of work, report-only and never a gate; the decision-brief request side (question, why it matters, options, recommendation, case against, default with an absolute date) rides the same report-only surface (ADR 0021 §§3–4; ADR 0026)
-- [ ] Orphaned generated seams are reported and removed only when byte-identical to what was generated, so the rename lands without stranding a still-usable helper file (ADR 0021 §6.2a′)
-- [ ] The project's verification gates and `arggon validate` stay green with no new finding naming this story
+- [x] The carriers state the two-axis rule — anyone or any helper may claim, work, review, comment and merge under the same rules and records, while a named set of calls belongs to the product owner with the irreversible ones person-only — and the role table defines each role by what it decides (ADR 0021 §§1–2, §6.1)
+- [x] Helper contracts claim as their role id, never the product owner's login, and state their gates in the project's own terms with the familiar case as a worked example only (ADR 0021 §§5–6.2)
+- [x] Product acceptance is a bounded author-attributed record on the container with tiered depth per class of work, report-only and never a gate; the decision-brief request side (question, why it matters, options, recommendation, case against, default with an absolute date) rides the same report-only surface (ADR 0021 §§3–4; ADR 0026)
+- [x] Orphaned generated seams are reported and removed only when byte-identical to what was generated, so the rename lands without stranding a still-usable helper file (ADR 0021 §6.2a′)
+- [x] The project's verification gates and `arggon validate` stay green with no new finding naming this story
 
 ## Notes

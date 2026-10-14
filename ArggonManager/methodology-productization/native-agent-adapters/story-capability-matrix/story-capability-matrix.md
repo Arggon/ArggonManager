@@ -31,8 +31,8 @@ the gap rows, report-only, including in a real adopter tree. (ADR 0020
 
 ## Acceptance
 
-- [ ] A committed machine-readable matrix covers every methodology invariant by supported helper, naming the native mechanism used or carrying an explicit gap note for what the helper cannot express (ADR 0020 §Decision.3; spec §S3)
-- [ ] The status report prints the gap rows report-only, no gap row is reported closed that the seam does not close, and the matrix reaches the adopter tree through the packaged bundle so the report works outside this repo
-- [ ] The project's verification gates and `arggon validate` stay green with no new finding naming this story
+- [x] A committed machine-readable matrix covers every methodology invariant by supported helper, naming the native mechanism used or carrying an explicit gap note for what the helper cannot express (ADR 0020 §Decision.3; spec §S3)
+- [x] The status report prints the gap rows report-only, no gap row is reported closed that the seam does not close, and the matrix reaches the adopter tree through the packaged bundle so the report works outside this repo
+- [x] The project's verification gates and `arggon validate` stay green with no new finding naming this story
 
 ## Notes

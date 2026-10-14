@@ -32,8 +32,8 @@ a second loop. (ADR 0022 amendment; exploration-harness-research-transfer-021.)
 
 ## Acceptance
 
-- [ ] The transfer exploration records what the papers change for the method, correcting the earlier candidate set, with each transfer argued against the standing bars and none introducing a second executor or a generated moving part in the tree
-- [ ] The adopted transfers — the compaction diagnostic, the exploration stopping rule, and the refusal-rate measures — run inside the existing loop on the existing substrate
-- [ ] The project's verification gates and `arggon validate` stay green with no new finding naming this story
+- [x] The transfer exploration records what the papers change for the method, correcting the earlier candidate set, with each transfer argued against the standing bars and none introducing a second executor or a generated moving part in the tree
+- [x] The adopted transfers — the compaction diagnostic, the exploration stopping rule, and the refusal-rate measures — run inside the existing loop on the existing substrate
+- [x] The project's verification gates and `arggon validate` stay green with no new finding naming this story
 
 ## Notes

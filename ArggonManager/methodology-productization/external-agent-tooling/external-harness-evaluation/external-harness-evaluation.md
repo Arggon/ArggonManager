@@ -31,8 +31,8 @@ ends, on the existing substrate and inside the existing loop. (ADR 0022.)
 
 ## Acceptance
 
-- [ ] The exploration records what the named candidates actually are and judges each against the standing bars — closes a gap named in advance, runs inside the existing loop rather than beside it, keeps every actor inside the permission and review discipline (ADR 0022)
-- [ ] No candidate is adopted as a second executor or second loop; the lesson-store idea is carried forward as a spike on the existing substrate
-- [ ] The project's verification gates and `arggon validate` stay green with no new finding naming this story
+- [x] The exploration records what the named candidates actually are and judges each against the standing bars — closes a gap named in advance, runs inside the existing loop rather than beside it, keeps every actor inside the permission and review discipline (ADR 0022)
+- [x] No candidate is adopted as a second executor or second loop; the lesson-store idea is carried forward as a spike on the existing substrate
+- [x] The project's verification gates and `arggon validate` stay green with no new finding naming this story
 
 ## Notes
