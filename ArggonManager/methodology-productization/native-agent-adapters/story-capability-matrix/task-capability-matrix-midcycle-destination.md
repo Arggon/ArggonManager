@@ -27,9 +27,9 @@ PR #763 ships `adapters/capability-matrix.json` as a template-bundled `arggon in
 
 ## Acceptance
 
-- [ ] at the next release + re-pin, `arggon doctor --agents` / `arggon init --dry-run` on this repo classify the new destination as expected (present/generated, never orphaned/reaped) — evidence from the released binary
-- [ ] if the pinned-binary risk is real for arbitrary new destinations, the re-pin routine covers them generally (or a documented step names it)
-- [ ] no manual version bump; release flow otherwise untouched
+- [x] at the next release + re-pin, `arggon doctor --agents` / `arggon init --dry-run` on this repo classify the new destination as expected (present/generated, never orphaned/reaped) — evidence from the released binary
+- [x] if the pinned-binary risk is real for arbitrary new destinations, the re-pin routine covers them generally (or a documented step names it)
+- [x] no manual version bump; release flow otherwise untouched
 
 ## Notes
 
