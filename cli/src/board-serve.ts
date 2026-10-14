@@ -180,6 +180,13 @@ export type BoardServeHandle = {
   url: string;
   port: number;
   root: string;
+  /**
+   * Validated `--group-by` the board was started with; absent when the flag
+   * was not given. The CLI mirrors it into the one-shot `--serve --json`
+   * envelope so static and serve agree on the field
+   * (task-serve-envelope-groupby-parity).
+   */
+  groupBy?: "milestone" | "story" | "tree";
   /** Resolves once the server is accepting connections. */
   ready: Promise<void>;
   /** Stops the watcher, disconnects SSE clients, closes the server. */
@@ -495,6 +502,10 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
       return port();
     },
     root,
+    // Validated at the top of this function: the handle carries the resolved
+    // value (absent when the flag was absent) and the CLI echoes it into the
+    // serve envelope — the same conditional field the static envelope carries.
+    ...(groupBy ? { groupBy } : {}),
     ready,
     close: () => {
       watcher.close();
