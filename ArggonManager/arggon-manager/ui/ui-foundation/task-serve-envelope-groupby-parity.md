@@ -9,7 +9,6 @@ parent: ui-foundation
 labels: [ui, board, json]
 created: "2026-10-14"
 updated: "2026-10-14"
-worktree_path: /home/arggon/Projects/ArggonManager-task-serve-envelope-groupby-parity
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-serve-envelope-groupby-parity.md

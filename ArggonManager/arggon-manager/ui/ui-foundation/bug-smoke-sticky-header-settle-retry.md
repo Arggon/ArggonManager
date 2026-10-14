@@ -9,7 +9,6 @@ parent: ui-foundation
 labels: [ui, tests]
 created: "2026-10-14"
 updated: "2026-10-14"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-smoke-sticky-header-settle-retry
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/bug-smoke-sticky-header-settle-retry.md
