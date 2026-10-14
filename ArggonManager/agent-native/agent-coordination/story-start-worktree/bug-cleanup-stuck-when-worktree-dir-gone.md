@@ -67,3 +67,8 @@ Open question (out of scope, follow-up candidate): the `--release` arm (`classif
 ### handoff 2026-10-14 @Arggon — next: Open PR #812, review the 3 CLI reproducers + the native retry, merge, then complete the acceptance checklist and flip the item done.
 - branch: fix/bug-cleanup-stuck-when-worktree-dir-gone
 - open questions: Release arm (classifyReleaseEntry) still throws/attempts removal for a leftover dir whose gitdir is gone — follow-up candidate; leftover debris dirs are never deleted by design.
+
+### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-14 (delivery lead)
+Merged as 69cf2533 (PR #812); flipped by the lead after ticking the four rows. Root cause reproduced, not inferred: the classifier treated "registered with git" as a live worktree; an interrupted removal leaves a dead record that pins the branch (`git branch -d` refuses it), so the record never cleared and every retry failed identically. The fix adds a `worktreeIsLive` probe (git's own verdict; `prunable` ≠ live; a probe that cannot answer reads as live, so a failed read can never orphan a live worktree), prunes the dead record itself, clears the item record before deleting the branch — on both surfaces — with honest action strings and loud real failures; leftover directories are never deleted. Reproducers red→green in `cli/src/worktree.test.ts` and the native `tools.test.ts` (91 + 139 focused; full suite 3,397 green). Residual sibling arm filed: bug-cleanup-release-stale-record-wedge.
