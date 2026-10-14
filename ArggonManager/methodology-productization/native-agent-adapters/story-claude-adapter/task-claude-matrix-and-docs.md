@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-claude-matrix-and-docs
 title: "Claude Code adapter: capability-matrix rows, agents.md seam section, spec resolution (spec S6/024 §Impact)"
 assignee: arggon-delivery-lead
@@ -9,11 +9,9 @@ parent: story-claude-adapter
 labels: []
 created: "2026-10-14"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T19:36:51.123Z"
 depends_on: [task-claude-plugin-seam]
 worktree_path: /home/arggon/Projects/ArggonManager-task-claude-matrix-and-docs
 ---
-
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-claude-adapter/task-claude-matrix-and-docs.md
   Leaves live only under a story. id is the filename stem: task-claude-matrix-and-docs.
