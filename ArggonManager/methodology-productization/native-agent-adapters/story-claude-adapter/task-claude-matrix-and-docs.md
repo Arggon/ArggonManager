@@ -10,7 +10,6 @@ labels: []
 created: "2026-10-14"
 updated: "2026-10-14"
 depends_on: [task-claude-plugin-seam]
-worktree_path: /home/arggon/Projects/ArggonManager-task-claude-matrix-and-docs
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-claude-adapter/task-claude-matrix-and-docs.md
