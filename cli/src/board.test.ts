@@ -2475,6 +2475,16 @@ describe("column controls (task-board-column-controls)", () => {
       expect(html, mode).toContain("position: sticky; top: 0; z-index: 5;");
       expect(html, mode).toContain(".column.collapsed .card");
       expect(html, mode).toContain(".column.terminal-hidden { display: none; }");
+      // bug-tree-ignores-hide-terminal-toggle: the same layout preference
+      // hides terminal rows in the tree, mutes the terminal rows it must keep
+      // as context, and gives an all-hidden tree the columns' `—` placeholder.
+      expect(html, mode).toContain(
+        ".tree-node.filtered-out, .tree-node.terminal-hidden { display: none; }",
+      );
+      expect(html, mode).toContain(
+        ".tree-node.context > .tree-row, .tree-node.terminal-context > .tree-row",
+      );
+      expect(html, mode).toContain(".column .empty, .tree .empty");
     }
   });
 
@@ -2482,9 +2492,25 @@ describe("column controls (task-board-column-controls)", () => {
     for (const [mode, html] of renders()) {
       expect(html, mode).toContain(wireBoardColumns.toString());
       expect(html, mode).toContain(
-        "wireBoardColumns(keyboardNav ? keyboardNav.ensureAnchor : null);",
+        "var boardColumns = wireBoardColumns(keyboardNav ? keyboardNav.ensureAnchor : null);",
       );
     }
+  });
+
+  it("composes the terminal rule into the tree through the lens-refresh handle", () => {
+    // The columns are hidden by a class list the layout owns; the tree's rule
+    // needs the lens verdict (a `context` ancestor must survive) and must be
+    // recomputed after every lens refresh, hence the returned handle.
+    for (const [mode, html] of renders()) {
+      expect(html, mode).toContain("boardColumns.syncTree()");
+    }
+    const source = wireBoardColumns.toString();
+    expect(source).toContain('document.getElementById("board-tree")');
+    expect(source).toContain(":scope > ul.tree-children > li.tree-node");
+    expect(source).toContain("terminal-context");
+    expect(source).toContain('node.classList.toggle("terminal-hidden"');
+    expect(source).toContain('node.classList.contains("filtered-out")');
+    expect(source).toContain("return { syncTree");
   });
 
   it("pins the localStorage key and the corrupt-storage default fallback", () => {

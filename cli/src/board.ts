@@ -1580,12 +1580,28 @@ export function wireBoardKeyboardNav(): { ensureAnchor(): void } {
  * failure just means the state does not persist). The reset button restores
  * the default layout and writes it, so the reset itself persists.
  *
+ * `terminalHidden` is a LAYOUT preference and covers BOTH layouts
+ * (bug-tree-ignores-hide-terminal-toggle): the status columns hide whole, and
+ * the grouped-ancestry tree hides every terminal row that can go without
+ * orphaning anything — a terminal row with a layout-visible descendant stays
+ * as muted context (`terminal-context`), so "nothing visible is ever
+ * orphaned" holds in the tree too. The lens's own `.filtered-out`/`.context`
+ * classes compose: a row hidden by either rule stays hidden, and a terminal
+ * row the lens hides never keeps an ancestor visible. A tree with no visible
+ * row left renders the same `—` empty state the columns use, never a blank
+ * gap. The counters are NOT touched by any of this: `N of M`, the per-column
+ * counts and the tree heading stay the lens verdict in both layouts.
+ *
  * `ensureAnchor` is the roving-focus handle from `wireBoardKeyboardNav`
  * (serve mode; null in the static export): every layout application re-seats
  * the anchor, so collapsing the column that holds it never strands keyboard
  * entry into the board.
+ *
+ * Returns the tree handle the page's lens refresh calls after re-marking the
+ * lens classes, so the terminal rule is recomputed against the fresh lens
+ * verdict (a lens change moves which terminal rows are context).
  */
-export function wireBoardColumns(ensureAnchor?: (() => void) | null): void {
+export function wireBoardColumns(ensureAnchor?: (() => void) | null): { syncTree: () => void } {
   const KEY = "arggon-board-columns-v1";
   const TERMINAL = ["done", "cancelled"];
   type Layout = { collapsed: string[]; terminalHidden: boolean };
@@ -1608,6 +1624,64 @@ export function wireBoardColumns(ensureAnchor?: (() => void) | null): void {
       };
     } catch {
       return { collapsed: [], terminalHidden: false };
+    }
+  }
+  /**
+   * The terminal rule inside the grouped-ancestry tree
+   * (bug-tree-ignores-hide-terminal-toggle). Reverse document order is
+   * children-before-ancestors — the renderer emits a pre-order walk — so one
+   * pass decides every subtree bottom-up: with the toggle on, a terminal row
+   * stays only when some direct child row is itself layout-visible, and hides
+   * with its subtree otherwise. A row the lens already hid (`filtered-out`)
+   * never counts as visible and never keeps an ancestor visible; a kept
+   * terminal row is muted through `terminal-context` because it is structure,
+   * not part of the lens verdict. A tree with nothing visible at all gets the
+   * same `—` placeholder the empty columns use (the heading keeps counting the
+   * lens verdict). No tree, or a tracker whose placeholder was rendered
+   * server-side (no nodes at all), is a no-op.
+   */
+  function syncTree(): void {
+    const section = document.getElementById("board-tree");
+    if (!section) return;
+    const nodes = section.querySelectorAll(".tree-node");
+    if (nodes.length === 0) return;
+    const hidden = new Map<Element, boolean>();
+    let visible = 0;
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const node = nodes[i];
+      const terminal = TERMINAL.indexOf(node.getAttribute("data-status") || "") !== -1;
+      const lensShown = !node.classList.contains("filtered-out");
+      let layoutShown = lensShown;
+      if (lensShown && state.terminalHidden && terminal) {
+        layoutShown = false;
+        const children = node.querySelectorAll(":scope > ul.tree-children > li.tree-node");
+        for (let c = 0; c < children.length; c++) {
+          if (hidden.get(children[c]) !== true) {
+            layoutShown = true;
+            break;
+          }
+        }
+      }
+      hidden.set(node, !layoutShown);
+      if (layoutShown) visible += 1;
+      // The two rules stay separately observable: a lens-hidden row carries
+      // only `filtered-out`, and only the layout rule marks a row terminal.
+      node.classList.toggle("terminal-hidden", lensShown && !layoutShown);
+      node.classList.toggle("terminal-context", layoutShown && state.terminalHidden && terminal);
+    }
+    const root = section.querySelector(".tree-root");
+    const empty = section.querySelector(".tree-empty");
+    if (visible === 0) {
+      if (!empty) {
+        const placeholder = document.createElement("div");
+        placeholder.className = "empty tree-empty";
+        placeholder.textContent = "\u2014";
+        if (root && root.parentNode === section)
+          section.insertBefore(placeholder, root.nextSibling);
+        else section.appendChild(placeholder);
+      }
+    } else if (empty) {
+      empty.remove();
     }
   }
   function apply(state: Layout): void {
@@ -1635,6 +1709,7 @@ export function wireBoardColumns(ensureAnchor?: (() => void) | null): void {
       toggle.setAttribute("aria-pressed", state.terminalHidden ? "true" : "false");
       toggle.textContent = state.terminalHidden ? "show done/cancelled" : "hide done/cancelled";
     }
+    syncTree();
     if (ensureAnchor) ensureAnchor();
   }
   let state = load();
@@ -1664,6 +1739,7 @@ export function wireBoardColumns(ensureAnchor?: (() => void) | null): void {
       store(state);
     }
   });
+  return { syncTree: syncTree };
 }
 
 /**
@@ -2861,7 +2937,7 @@ header .meta { color: var(--meta); font-size: 13px; }
    Grid and responsive rules above are untouched. */
 .column h2 { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 6px; background: var(--col); border-radius: 8px 8px 0 0; margin: calc(var(--col-pad) * -1) calc(var(--col-pad) * -1) 10px; padding: var(--col-pad); font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-soft); }
 .column .count { background: var(--pill); border: 1px solid var(--muted); border-radius: 10px; padding: 1px 8px; font-size: 11px; }
-.column .empty { color: var(--muted); text-align: center; padding: 12px 0; }
+.column .empty, .tree .empty { color: var(--muted); text-align: center; padding: 12px 0; }
 /* Column collapse (task-board-column-controls): a collapsed column keeps only
    its header — the count badge stays visible, cards and group heads hide. */
 .column.collapsed .card, .column.collapsed .mgroup-head, .column.collapsed .empty { display: none; }
@@ -2981,8 +3057,12 @@ header .meta { color: var(--meta); font-size: 13px; }
    board.test.ts against these exact values): light 6.11/7.59/6.61/5.08/6.04,
    dark 8.33/4.63/6.72/7.45/6.38 — all >= 4.5:1 for the 10px bold chip text,
    carried only through --st-* custom properties, so the dark block swaps
-   values, never rules. Context rows (the ancestor path a filtered view keeps)
-   sit on the dim surface with the muted grey: light 5.70:1, dark 5.14:1. */
+   values, never rules. Context rows (the ancestor path a filtered view keeps,
+   and — with hide done/cancelled on — a terminal row kept only because a
+   visible row hangs under it, bug-tree-ignores-hide-terminal-toggle) sit on
+   the dim surface with the muted grey: light 5.70:1, dark 5.14:1. Covering
+   the kept-context class is load-bearing: without it the terminal toggle
+   would silently keep rows at full strength. */
 main.board[hidden], .tree[hidden] { display: none; }
 .tree { background: var(--col); border-radius: 8px; padding: var(--col-pad); }
 .tree h2 { display: flex; align-items: center; gap: 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-soft); margin: 0 0 10px; }
@@ -2994,8 +3074,8 @@ main.board[hidden], .tree[hidden] { display: none; }
 .tree-assignee { color: var(--fg-soft); font-size: 12px; }
 .tree-missing { color: var(--muted); font-size: 11px; }
 .tree-blocked { margin-left: auto; color: var(--blocked-fg); background: var(--blocked-bg); border-radius: 10px; padding: 0 8px; font-size: 10px; font-weight: 600; white-space: nowrap; }
-.tree-node.context > .tree-row { background: var(--card-dim); color: var(--meta); }
-.tree-node.filtered-out { display: none; }
+.tree-node.context > .tree-row, .tree-node.terminal-context > .tree-row { background: var(--card-dim); color: var(--meta); }
+.tree-node.filtered-out, .tree-node.terminal-hidden { display: none; }
 .status-chip { border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
 .status-chip.todo { background: var(--st-todo-bg); color: var(--st-todo-fg); }
 .status-chip.in_progress { background: var(--st-in-progress-bg); color: var(--st-in-progress-fg); }
@@ -3074,8 +3154,10 @@ ${details ? embeddedFunctionSource(wireBoardMoveMenu) : ""}
   var keyboardNav = ${details ? "wireBoardKeyboardNav()" : "null"};
   // Column collapse/terminal-hide/reset (task-board-column-controls): every
   // board — static and serve — restores the persisted layout at boot; in serve
-  // mode the roving anchor is re-seated after every layout change.
-  wireBoardColumns(keyboardNav ? keyboardNav.ensureAnchor : null);
+  // mode the roving anchor is re-seated after every layout change. The handle
+  // lets the lens refresh re-apply the tree's terminal rule against the fresh
+  // lens verdict (bug-tree-ignores-hide-terminal-toggle).
+  var boardColumns = wireBoardColumns(keyboardNav ? keyboardNav.ensureAnchor : null);
   // Theme/density (task-board-theme-density): the <head> boot script already
   // applied the persisted state before first paint; this owns the buttons.
   wireBoardTheme();
@@ -3181,6 +3263,11 @@ ${details ? embeddedFunctionSource(wireBoardMoveMenu) : ""}
       node.classList.toggle("filtered-out", display.shown[id] !== true);
       node.classList.toggle("context", display.context[id] === true);
     });
+    // The terminal layout composes with the fresh lens verdict: an ancestor
+    // the lens keeps can hold a terminal row visible (muted), and a terminal
+    // row that just lost its last visible descendant hides with it
+    // (bug-tree-ignores-hide-terminal-toggle).
+    boardColumns.syncTree();
   }
   function setFilterState(expr) {
     var result = applyBoardFilter(BOARD_ITEMS, expr, BOARD_ME);
