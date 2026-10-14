@@ -12,6 +12,7 @@ updated: "2026-10-14"
 claimed_at: "2026-10-14T10:58:26.051Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-wave-smoke-retired-model-pin
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/bug-wave-smoke-retired-model-pin.md
   Leaves live only under a story. id is the filename stem: bug-wave-smoke-retired-model-pin.
@@ -27,8 +28,8 @@ Found while landing `bug-full-smoke-scenarios-precede-newer-gates` (PR #799): th
 
 ## Acceptance
 
-- [ ] `smoke/opencode-wave.ts` no longer pins the retired model; the replacement is canaried (a focused run, or the full wave run alone) or the reason it cannot be is documented
-- [ ] the model pin has one source or a documented reason to differ between `opencode-smoke.ts` and `opencode-wave.ts`
-- [ ] evidence recorded on the item (command/expected/observed); `arggon validate` green; prettier clean on touched files
+- [x] `smoke/opencode-wave.ts` no longer pins the retired model; the replacement is canaried (a focused run, or the full wave run alone) or the reason it cannot be is documented
+- [x] the model pin has one source or a documented reason to differ between `opencode-smoke.ts` and `opencode-wave.ts`
+- [x] evidence recorded on the item (command/expected/observed); `arggon validate` green; prettier clean on touched files
 
 ## Notes
