@@ -1,12 +1,12 @@
 ---
 type: epic
-status: done
+status: todo
 id: agent-coordination
 title: agent-coordination
 parent: agent-native
 labels: []
 created: "2026-09-11"
-updated: "2026-09-12"
+updated: "2026-10-14"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/agent-coordination.md (epic index; required).
