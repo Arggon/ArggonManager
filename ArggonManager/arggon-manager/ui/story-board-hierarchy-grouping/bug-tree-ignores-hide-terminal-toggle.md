@@ -29,12 +29,12 @@ Cause: \`wireBoardColumns\` (\`cli/src/board.ts\` ~L1588) applies \`terminal-hid
 
 ## Acceptance
 
-- [ ] With **hide done/cancelled** ON, the tree hides terminal-status rows live (no reload), and the toggle state stays consistent; OFF restores them
-- [ ] A terminal row that is the ancestor path (context) of a visible match stays visible (muted) — the "nothing visible is ever orphaned" rule holds in the tree; a tree with everything hidden renders honestly (empty state), not a blank gap
-- [ ] Counts (\`N of M\`, the tree heading) remain the lens verdict, unchanged by the layout toggle (consistent with the columns view)
-- [ ] The preference persists/round-trips with the existing localStorage state and the reset control restores it; static export and \`--serve\` behave the same
-- [ ] The reproducer becomes a pinned test (e2e \`@smoke\` case and/or unit); the README board section documents the toggle's tree behavior
-- [ ] \`arggon validate\`, affected suites, \`npm test\`, CI \`ui-smoke\` green; prettier clean on touched files
+- [x] With **hide done/cancelled** ON, the tree hides terminal-status rows live (no reload), and the toggle state stays consistent; OFF restores them
+- [x] A terminal row that is the ancestor path (context) of a visible match stays visible (muted) — the "nothing visible is ever orphaned" rule holds in the tree; a tree with everything hidden renders honestly (empty state), not a blank gap
+- [x] Counts (\`N of M\`, the tree heading) remain the lens verdict, unchanged by the layout toggle (consistent with the columns view)
+- [x] The preference persists/round-trips with the existing localStorage state and the reset control restores it; static export and \`--serve\` behave the same
+- [x] The reproducer becomes a pinned test (e2e \`@smoke\` case and/or unit); the README board section documents the toggle's tree behavior
+- [x] \`arggon validate\`, affected suites, \`npm test\`, CI \`ui-smoke\` green; prettier clean on touched files
 
 ## Notes
 
