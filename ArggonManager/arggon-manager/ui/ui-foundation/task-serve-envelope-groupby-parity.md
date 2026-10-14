@@ -40,3 +40,8 @@ Gates: focused board-parity + board-serve 47/47 (lead re-ran); full suite 157 fi
 
 ### handoff 2026-10-14 @Arggon — next: Review + merge PR #818; tick the three acceptance rows at merge verification (rows 1-2 true, row 3 true once the PR lands).
 - branch: feat/task-serve-envelope-groupby-parity
+
+### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-14 (delivery lead)
+Merged as 0b467e57 (PR #818); flipped by the lead after ticking the three rows. The serve envelope now echoes the validated `groupBy` conditionally — exactly like the static envelope (absent when the flag is absent) — with the parity test extended over `[undefined, "tree"]` and both duplicated doc copies updated. Completed by the lead from the maker's worktree after its session died to the host tool-runtime outage (the work was complete and uncommitted; focused 47/47 re-run plus validate/prettier green here; the maker's pre-outage full suite 3,429 recorded on the item; CI `cli` + `ui-smoke` green).
