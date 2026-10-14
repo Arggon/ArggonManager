@@ -61,3 +61,7 @@ CLI surface observed: `board --group-by tree --json` → `{"groupBy":"tree",...}
 ZCode `/arggon-board` (verified, not assumed): `.zcode-marketplace/arggon/commands/arggon-board.md` runs `arggon board --serve`, and the seam contains no board renderer (grep for renderBoardHtml/renderBoardTree → none), so that path serves the same page and inherits the toggle and `--group-by tree` with no change.
 
 observations (not defects of this change): (1) the `@smoke` "column headers stick to the viewport top" test failed once in a full-lane run with `Execution context was destroyed` — the SSE reload landing in its un-retried settle poll, the exact flake its own comment describes; it passed in isolation and on two subsequent full-lane runs. Report-only, not filed. (2) pre-existing: the `--serve` JSON envelope does not echo `groupBy` while the static envelope does; left unchanged.
+
+### handoff 2026-10-14 @ses_ec55cfa05ffeH351ZF7kM1XOT0 (session: ses_ec55cfa05ffeH351ZF7kM1XOT0) — next: Standards review + verifier probes on 676ce14e/49fb11f3, then merge (no squash; the branch carries a tracker commit) and flip done per the live checklist
+- branch: feat/task-web-board-hierarchy-view
+- open questions: SSE flake in the sticky-header @smoke settle poll (report-only); serve envelope still omits groupBy; tree markup always-on (+29% page) — flag-gating is the recorded lever if review prefers it
