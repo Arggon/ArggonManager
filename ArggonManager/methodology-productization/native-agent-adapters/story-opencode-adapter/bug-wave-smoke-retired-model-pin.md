@@ -63,3 +63,7 @@ Found while landing `bug-full-smoke-scenarios-precede-newer-gates` (PR #799): th
 ### Does not prove
 - No full wave run on this head (see above); the wave's T12/T13 checks are not exercised by this canary — the pin resolution and provider reachability are.
 - One green focused run is one sample of a model-driven system.
+
+### handoff 2026-10-14 @ses_ec5ee801affeIpa4kifNI1tFAC (session: ses_ec5ee801affeIpa4kifNI1tFAC) — next: Review PR #803 (head with evidence commits): wave off the retired pin, one shared source in smoke/opencode-model.ts, focused canary 11/11; merge-commit, no squash; full wave smoke deferred to a solo …
+- branch: fix/bug-wave-smoke-retired-model-pin
+- open questions: full smoke:opencode:wave not run (model-driven, must run alone, others active) — solo window still owed; CI never runs the model-driven harnesses
