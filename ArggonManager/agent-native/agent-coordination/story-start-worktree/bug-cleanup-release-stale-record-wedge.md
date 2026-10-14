@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-cleanup-release-stale-record-wedge
 title: "cleanup --release has the same stale-record shape: a leftover dir whose gitdir is gone reaches removal and wedges (top-level CLEANUP_FAILED)"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-start-worktree
 labels: [worktree, cleanup]
 created: "2026-10-14"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T13:30:18.993Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-cleanup-release-stale-record-wedge
 ---
 <!--
