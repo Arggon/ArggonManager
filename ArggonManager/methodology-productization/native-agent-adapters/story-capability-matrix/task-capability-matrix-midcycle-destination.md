@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-capability-matrix-midcycle-destination
 title: "Capability matrix mid-cycle destination: ledger pin and the pinned binary's orphan/reap behavior until the next re-pin"
+assignee: arggon-delivery-lead
+branch: feat/task-capability-matrix-midcycle-destination
 parent: story-capability-matrix
 labels: [adopters, packaging, release]
 created: "2026-10-13"
-updated: "2026-10-13"
+updated: "2026-10-14"
+claimed_at: "2026-10-14T12:19:28.179Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-capability-matrix-midcycle-destination
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-capability-matrix/task-capability-matrix-midcycle-destination.md
