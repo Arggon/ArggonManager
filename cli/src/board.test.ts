@@ -2279,15 +2279,181 @@ describe("renderBoardTree grouped ancestry (task-web-board-hierarchy-view)", () 
     // Exactly one roving anchor, like the cards; every row is named.
     expect(interactive.match(/tabindex="0"/g)).toHaveLength(1);
     expect(interactive.match(/role="group"/g)).toHaveLength(5);
-    expect(interactive).toContain('role="group" aria-label="epic ui: UI (todo)" tabindex="0"');
     expect(interactive).toContain(
-      'role="group" aria-label="story story-board: Board (in_progress)" tabindex="-1"',
+      'role="group" aria-label="epic ui: UI (todo, 3 open descendants)" tabindex="0"',
+    );
+    expect(interactive).toContain(
+      'role="group" aria-label="story story-board: Board (in_progress, 2 open descendants)" tabindex="-1"',
     );
     // The first row in the pre-order walk is the anchor.
     const first = interactive.indexOf('data-id="ui"');
     const anchor = interactive.indexOf('tabindex="0"');
     expect(anchor).toBeGreaterThan(first);
     expect(anchor).toBeLessThan(interactive.indexOf('data-id="story-board"'));
+  });
+});
+
+describe("renderBoardTree open-descendant disclosure (bug-tree-done-container-hides-open-work)", () => {
+  /**
+   * The measured shape the report described: a DONE container whose subtree
+   * still holds open work, at every depth. `init` → `epic-a` → `story-a` are
+   * all terminal, while the open items sit three levels down; `task-done` and
+   * `bug-cancelled` are terminal and must not count. `epic-b` is the other
+   * direction: a done container whose whole subtree is terminal (no badge).
+   */
+  const tree = (): WorkItem[] => [
+    item({ id: "init", type: "initiative", status: "done", title: "Init" }),
+    item({ id: "epic-a", type: "epic", status: "done", parent: "init", title: "A" }),
+    item({ id: "story-a", type: "story", status: "done", parent: "epic-a", title: "S" }),
+    item({ id: "task-open", type: "task", status: "todo", parent: "story-a", title: "Open" }),
+    item({
+      id: "task-wip",
+      type: "task",
+      status: "in_progress",
+      parent: "story-a",
+      assignee: "alice",
+      title: "Wip",
+    }),
+    item({
+      id: "bug-blocked",
+      type: "bug",
+      status: "blocked",
+      parent: "story-a",
+      title: "Blocked",
+    }),
+    item({ id: "task-done", type: "task", status: "done", parent: "story-a", title: "Done" }),
+    item({
+      id: "bug-cancelled",
+      type: "bug",
+      status: "cancelled",
+      parent: "story-a",
+      title: "Cancelled",
+    }),
+    item({ id: "epic-b", type: "epic", status: "done", parent: "init", title: "B" }),
+    item({ id: "task-b-done", type: "task", status: "done", parent: "epic-b", title: "B done" }),
+  ];
+
+  /**
+   * The node's OWN `<div class="tree-row">…</div>` slice: the badge on a
+   * container must not be confused with a descendant's badge, and a leaf's
+   * absence assertion must not read a sibling's. The row holds no nested div,
+   * so the first `</div>` after the row's opening tag closes it.
+   */
+  function rowHtml(html: string, id: string): string {
+    const at = html.indexOf(`data-id="${id}"`);
+    expect(at, `tree node ${id} not rendered`).toBeGreaterThan(-1);
+    const start = html.indexOf('<div class="tree-row"', at);
+    expect(start, `tree row ${id} not rendered`).toBeGreaterThan(-1);
+    return html.slice(start, html.indexOf("</div>", start));
+  }
+
+  it("discloses the open descendants of a terminal container at every depth, after the status chip", () => {
+    const html = renderBoardTree(tree());
+    for (const id of ["init", "epic-a", "story-a"]) {
+      const row = rowHtml(html, id);
+      // Three open descendants: the todo task, the in_progress task and the
+      // blocked bug. The done task and the cancelled bug are terminal.
+      expect(row, id).toContain('<span class="tree-open">3 open</span>');
+      // The chip keeps the AUTHORED status — the disclosure never rolls up.
+      expect(row, id).toContain('<span class="status-chip done">done</span>');
+      // The badge sits right after the chip, before priority/title/assignee.
+      assertOrder(
+        row,
+        '<span class="status-chip done">done</span>',
+        '<span class="tree-open">3 open</span>',
+        { text: '<span class="tree-title">', optional: true },
+      );
+    }
+    // The open work is three levels below the initiative: a direct-children
+    // count would have answered 0 here, so this pins "all depths".
+    expect(rowHtml(html, "epic-a")).toContain("3 open");
+  });
+
+  it("renders no badge for a zero-open container or for any leaf row", () => {
+    const html = renderBoardTree(tree());
+    // A done epic whose whole subtree is terminal: nothing to disclose.
+    expect(rowHtml(html, "epic-b")).not.toContain("tree-open");
+    expect(rowHtml(html, "task-b-done")).not.toContain("tree-open");
+    // Leaves never carry it, open or not.
+    expect(rowHtml(html, "task-open")).not.toContain("tree-open");
+    expect(rowHtml(html, "bug-blocked")).not.toContain("tree-open");
+    // A container that is ITSELF open but whose descendants are all terminal
+    // gets no badge either: the badge counts descendants, never the row.
+    const openContainer = renderBoardTree([
+      item({ id: "story-x", type: "story", status: "in_progress", title: "X" }),
+      item({ id: "task-x", type: "task", status: "done", parent: "story-x", title: "X done" }),
+    ]);
+    expect(rowHtml(openContainer, "story-x")).not.toContain("tree-open");
+  });
+
+  it("counts only open descendants: a cancelled subtree discloses nothing", () => {
+    const html = renderBoardTree([
+      item({ id: "story-c", type: "story", status: "done", title: "C" }),
+      item({ id: "task-c", type: "task", status: "cancelled", parent: "story-c", title: "C task" }),
+      item({ id: "bug-c", type: "bug", status: "cancelled", parent: "story-c", title: "C bug" }),
+    ]);
+    expect(rowHtml(html, "story-c")).toContain('<span class="status-chip done">done</span>');
+    expect(rowHtml(html, "story-c")).not.toContain("tree-open");
+  });
+
+  it("announces the disclosure in the row's accessible name (interactive), inert otherwise", () => {
+    const inert = renderBoardTree(tree());
+    expect(inert).toContain('<span class="tree-open">3 open</span>');
+    expect(inert).not.toContain('role="group"');
+
+    const interactive = renderBoardTree(tree(), { interactive: true });
+    expect(interactive).toContain(
+      'role="group" aria-label="initiative init: Init (done, 3 open descendants)" tabindex="0"',
+    );
+    // A zero-open container's name is byte-identical to the pre-disclosure one.
+    expect(interactive).toContain('role="group" aria-label="epic epic-b: B (done)" tabindex="-1"');
+  });
+
+  it("renders the same disclosure in the static export and the served board, from the complete set", () => {
+    const items = tree();
+    const boards = [
+      ["static", renderBoardHtml(items, { generatedAt: GENERATED_AT, groupBy: "tree" })],
+      [
+        "serve",
+        renderBoardHtml(items, {
+          generatedAt: GENERATED_AT,
+          groupBy: "tree",
+          details: true,
+          live: true,
+        }),
+      ],
+    ] as const;
+    for (const [mode, html] of boards) {
+      expect(html, mode).toContain('<span class="tree-open">3 open</span>');
+    }
+    // The accessible name rides the interactive (details-mode) rows, which the
+    // served board renders; the drawer-free static export stays inert. Scope
+    // both to the tree section: the status columns' CARDS carry their own
+    // `role="group"` labels on every board.
+    const treeOf = (html: string): string => html.slice(html.indexOf('<section class="tree"'));
+    expect(treeOf(boards[1][1])).toContain(
+      'aria-label="initiative init: Init (done, 3 open descendants)"',
+    );
+    expect(treeOf(boards[0][1])).not.toContain('aria-label="initiative init:');
+    // The count is baked into the markup at render: no client controller ever
+    // writes the badge, so hiding terminal rows, a lens or a fold cannot move
+    // it (the composition itself is pinned by the @smoke lane).
+    for (const controller of [wireBoardColumns, wireBoardView, applyBoardFilter]) {
+      expect(controller.toString()).not.toContain("tree-open");
+    }
+  });
+
+  it("stays total on a parent cycle and counts the rendered subtree exactly once", () => {
+    const html = renderBoardTree([
+      item({ id: "task-a", type: "task", status: "todo", parent: "task-b" }),
+      item({ id: "task-b", type: "task", status: "todo", parent: "task-a" }),
+    ]);
+    expect(html.match(/data-id="task-a"/g)).toHaveLength(1);
+    expect(html.match(/data-id="task-b"/g)).toHaveLength(1);
+    // Rendered as task-a → task-b (the shared walk's shape): one open
+    // descendant below task-a, none below the last node of the cycle.
+    expect(rowHtml(html, "task-a")).toContain('<span class="tree-open">1 open</span>');
+    expect(rowHtml(html, "task-b")).not.toContain("tree-open");
   });
 });
 
@@ -2375,7 +2541,9 @@ describe("renderBoardHtml grouped-ancestry view (task-web-board-hierarchy-view)"
       live: true,
     });
     expect(serve).toContain('data-detail-endpoint="/api/item"');
-    expect(serve).toContain('role="group" aria-label="epic ui: UI (todo)" tabindex="0"');
+    expect(serve).toContain(
+      'role="group" aria-label="epic ui: UI (todo, 2 open descendants)" tabindex="0"',
+    );
     // The drawer's delegated handlers accept rows beside cards; the id comes
     // from the node, so the row markup keeps exactly one data-id per item.
     expect(wireBoardDetail.toString()).toContain('.closest(".card, .tree-row")');
@@ -2449,7 +2617,7 @@ describe("renderBoardHtml grouped-ancestry view (task-web-board-hierarchy-view)"
     expect(html).toContain('<section class="tree" id="board-tree"');
   });
 
-  it("keeps every status-chip pair at or above 4.5:1 in both themes (WCAG 1.4.3)", () => {
+  it("keeps every status-chip pair and the open-descendant badge at or above 4.5:1 in both themes (WCAG 1.4.3)", () => {
     const html = renderBoardHtml([], { generatedAt: GENERATED_AT });
     const css = (html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "").replace(
       /\/\*[\s\S]*?\*\//g,
@@ -2491,6 +2659,22 @@ describe("renderBoardHtml grouped-ancestry view (task-web-board-hierarchy-view)"
           4.5,
         );
       }
+      // The open-descendant badge (bug-tree-done-container-hides-open-work)
+      // reuses the badge geometry on the neutral chip pair — resolve both
+      // custom properties per theme and measure the same 10px bold bar. The
+      // geometry is a grouped rule (`.tree-blocked, .tree-open`), so collect
+      // every `.tree-open` rule and read the colors one.
+      const badgeRules = [...css.matchAll(/\.tree-open \{([^}]*)\}/g)].map((match) => match[1]);
+      expect(badgeRules, `${theme} .tree-open rules`).toHaveLength(2);
+      const badge = badgeRules.find((rule) => rule.includes("color:")) ?? "";
+      expect(badge, theme).toContain("color: var(--fg-soft)");
+      expect(badge, theme).toContain("background: var(--chip)");
+      const badgeFg = declared(declarations, "--fg-soft");
+      const badgeBg = declared(declarations, "--chip");
+      expect(
+        ratio(badgeFg, badgeBg),
+        `${theme} tree-open badge (${badgeFg} on ${badgeBg})`,
+      ).toBeGreaterThanOrEqual(4.5);
     }
   });
 });
