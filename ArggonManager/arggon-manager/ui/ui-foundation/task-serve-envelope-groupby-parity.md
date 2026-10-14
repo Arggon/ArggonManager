@@ -38,3 +38,6 @@ Pre-existing parity gap surfaced by `task-web-board-hierarchy-view` (PR #814): t
 The maker's session died mid-flight with the work complete and uncommitted; the delivery lead verified and finished from the same worktree. **Decision: additive echo** — `startBoardServer` returns the validated `groupBy`, and the CLI serve envelope echoes it conditionally, exactly like static (absent when the flag is absent). Rationale: `json-output.md`'s board table declares `groupBy` present with `--group-by` and carves out no `--serve` exception (unlike `path`, which explicitly says "absent with `--serve`"), so the omission was a hole against the documented contract.
 Files: `cli/src/board-serve.ts`, `cli/src/cli.ts`, `cli/src/board-parity.test.ts` (new end-to-end parity describe over `[undefined, "tree"]`), `cli/src/board-serve.test.ts`, `ArggonManager/docs/json-output.md` (both duplicated copies kept consistent).
 Gates: focused board-parity + board-serve 47/47 (lead re-ran); full suite 157 files / 3,429 (maker, pre-outage); build/lint/structure (maker); validate + prettier green (lead). PR #818.
+
+### handoff 2026-10-14 @Arggon — next: Review + merge PR #818; tick the three acceptance rows at merge verification (rows 1-2 true, row 3 true once the PR lands).
+- branch: feat/task-serve-envelope-groupby-parity
