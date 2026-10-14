@@ -1,8 +1,9 @@
 ---
 type: story
-status: todo
+status: done
 id: story-board-hierarchy-grouping
 title: "Board reads as a hierarchy: tasks and bugs grouped under stories, epics and initiatives"
+assignee: arggon-delivery-lead
 parent: ui
 labels: []
 created: "2026-10-14"
