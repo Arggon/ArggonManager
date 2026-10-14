@@ -96,3 +96,118 @@ arggon-maker`). So the bundle manifest **omits `agents`** and ships the agent fi
   network/directory submission; hooks stay fail-open per spec.
 - The sibling task owns matrix/docs/spec-status; do not flip spec 024's `status` here — only
   correct facts this task contradicts.
+
+### 2026-10-14 @Arggon
+Evidence — maker pass (task-claude-plugin-seam, spec-claude-code-adapter-024)
+
+Branch `feat/task-claude-plugin-seam`, worktree
+`/home/arggon/Projects/ArggonManager-task-claude-plugin-seam`. PR: #821 (open against main).
+
+## What shipped (acceptance box by box)
+
+- **`templates/docs/claude/**`** — `.claude-plugin/marketplace.json` (marketplace
+  `arggon-local`, entry `arggon`), `arggon/.claude-plugin/plugin.json`,
+  `arggon/agents/arggon-maker.md` + `arggon-standards-reviewer.md`,
+  `arggon/commands/<command>.md` (13), `arggon/hooks/hooks.json` +
+  `arggon/hooks/gate.mjs`, `arggon/README.md`, `arggon/skills/arggon-cli/**` (7
+  files). Nothing under `adapters/**`.
+- **Manifest** omits `agents` (2.1.289 finding, pinned by test); declares
+  `author`, `license`, `commands`/`skills`/`hooks` (path strings) and one inline
+  `mcpServers.arggon`; the marketplace carries a top-level `description` (the
+  validator warns without it — probe) plus the entry `description`/`displayName`.
+- **init wiring** — `cli/src/docs.ts` `claude/` → `.claude-marketplace/` prefix
+  map + `.claude-marketplace/**/*.md` frontmatter marker; `cli/src/adapters.ts`
+  `docs/claude/` classification + `.claude-marketplace` detection marker.
+- **Selection** — `--agents claude` (and the default) materializes the bundle;
+  `--agents opencode,zcode` / `--no-agents` write no claude file; an unknown name
+  is still refused by name with nothing written (tests + repo-self dry run).
+- **Roles** — exactly `arggon-maker` + `arggon-standards-reviewer`; the lead is
+  the main session (README states it; the id appears only in the README's
+  prohibition, and the vendored skill's shared role table is exempted with its
+  reason recorded).
+- **One MCP server** keyed `arggon`, byte-equal to the generated `.mcp.json`
+  entry; live stdio round-trip (`arggon_show`) returns the documented envelope.
+- **Gate** — global force-push/`--no-verify` denies with the ported quoted-text
+  semantics (inert text exempt, executed text denied, variable-indirection
+  residual recorded); reviewer window on `SubagentStart` `^arggon:arggon-standards-reviewer$`,
+  closed by `SubagentStop`, parallel dispatches counted, `Stop` clears; denies
+  the mutating arggon tools under BOTH `mcp__arggon__` and
+  `mcp__plugin_arggon_arggon__` prefixes (and keeps `arggon_comment` open under
+  both); ordinary sessions unimpaired; fail-open on a bad payload.
+- **Matcher binding** — the reviewer id is read out of the shipped agent file by
+  the test and asserted against the gate's regex, the hooks.json
+  SubagentStart/SubagentStop matchers AND the review command's dispatch string.
+- **Skill parity** — `skills/arggon-cli/**` stays the single committed source;
+  `npm run skills:sync` writes the marker-less staging copy under
+  `templates/docs/claude/arggon/skills/arggon-cli/**`; the tests pin
+  staging == source and generated == marker + source, and the file set.
+- **Existing suites** — `init.test.ts` (TIER1 set), `adapter-selection.test.ts`
+  (claude classification, the new detection marker, cap/snapshot),
+  `adopter-template-invariant-drift.test.ts` (claude member + subtree),
+  `mcp-doc-contract.test.ts` (corpus dir).
+- **Repo self** — `.claude-marketplace/**` (26 files) materialized with
+  `arggon init . --agents claude --no-commit` and committed like
+  `.zcode-marketplace/**`; 26 `x-generated` rows in `ArggonManager/.convention.yml`
+  (plus the refreshed skills row). A dry run confirmed nothing else churns (all
+  other seams `agent-not-selected`); a test now keeps the committed copy in step
+  with the templates.
+- **Spec 024** — the client-facts bullet that said the manifest "declares …
+  agents" is corrected to the probed reality (probe recorded in the text) and the
+  synopsis now matches the shipped command file/event names. Open questions and
+  `status: proposed` untouched (sibling task).
+
+## Gates (worktree, branch `feat/task-claude-plugin-seam`)
+
+- `npm run arggon -- validate` → `{"ok":true, errors:[], warnings:[]}`
+- `npm test` → 158 files / 3457 tests passed, 0 failed
+- `npm run lint` → green
+- `npm run test:structure` → 5 rules, 5 passed; fixture scan clean
+- `npm run check:plugin` → green (bundle byte-identical, nothing to commit)
+- `npx prettier --check` on every touched/added file → all clean; the generated
+  `.claude-marketplace` copies inherit the pre-existing marker-stamp formatting
+  class (same as `.zcode-marketplace/arggon/README.md` and `CLAUDE.md` on main)
+- `npm run arggon -- spec validate` → ok; `spec analyze` → 4 pre-existing
+  findings, none naming spec-024
+- CI-without-claude shape verified locally: `PATH` without the binary →
+  `23 passed | 1 skipped`, and the log records `skipped: claude not installed`
+
+## Probes (claude 2.1.289, throwaway HOME + CLAUDE_CONFIG_DIR; full transcripts in the PR body)
+
+- `claude plugin validate --strict` on the template plugin root and the
+  marketplace root, and on the generated tree → `Validation passed`
+- `claude plugin marketplace add <generated .claude-marketplace>` →
+  `Successfully added marketplace: arggon-local`; `claude plugin install
+  arggon@arggon-local` → `Successfully installed plugin (scope: user)`
+- `claude plugin details arggon` → `Agents (2) arggon-standards-reviewer,
+  arggon-maker`, `Hooks (4) PreToolUse, SubagentStart, SubagentStop, Stop`,
+  `MCP servers (1) arggon`, `Skills (14)` incl. the 13 command names
+- agents-key variant: with `"agents": [...]` → validate PASSES, details
+  `Agents (0)`; without the key → `Agents (2)`
+- `claude mcp list` (fixture tree) → `plugin:arggon:arggon: arggon mcp - ✔
+  Connected` + `arggon: arggon mcp - ⏸ Pending approval`
+- NOT probed live: a real `SubagentStart` hook dispatch (needs a model session);
+  the gate's agent_type semantics are covered by the child-process probes, the
+  payload shape by the hooks reference and the item's probes.
+
+## Coordination (not fixed here, by design)
+
+The committed capability matrix (`templates/docs/adapters/capability-matrix.json`,
+owned by sibling `task-claude-matrix-and-docs`) still reports claude's
+`discipline-enforceable` as a gap and its `claim-integrity` note as "no
+client-side backstop"; both are stale now that the PreToolUse gate ships
+(`docs-travel-with-code` legitimately stays a gap). Row deltas observed:
+`discipline-enforceable` → delivered by `claude:plugin.hooks.PreToolUse`
+(fail-open, kernel still enforcement of record); `claim-integrity` note → the
+reviewer backstop denies the mutating tool set while a review is in flight. The
+matrix is not hand-edited here, per spec §"The honest starting floor".
+
+## Port decisions (also recorded in the bundle README §Port notes + the PR)
+
+command file stems drop the ZCode `arggon-` prefix (Claude emits
+`<plugin>:<stem>` → `/arggon:<command>`); `/arggon:goal` renders the contract and
+the session holds the loop (no Goal Mode); no goal-mode/automation templates
+vendored; agent files keep `arggon-*.md` (wire id, ADR 0021 §6.2a′);
+`MAX_ADAPTER_ARTIFACTS` 64 → 96 (three seams are 67 destinations, the old cap
+truncated the newest adapter's rows); `skills/arggon-cli/SKILL.md` one-word
+vocabulary fix (`coordinator` → `delivery-lead`, ADR 0021 §6.1) forced by the
+family drift guard now walking the vendored copy.
