@@ -139,6 +139,10 @@ function screenshotPath(name: string): string {
  *    lens match (after its `N matches inside` marker), the offline tree-row
  *    drawer on the static `--details` tree export (after its acceptance-row
  *    count) and the terminal + fold composed tree (after its counts).
+ *    bug-tree-done-container-hides-open-work adds the open-descendant
+ *    disclosure's scanned state: the served tree under a lens with the
+ *    terminal rule and a fold applied (after the badge and the `N of M`
+ *    counts).
  */
 const AXE_WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] as const;
 
