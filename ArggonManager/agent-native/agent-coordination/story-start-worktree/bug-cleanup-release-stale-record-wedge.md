@@ -76,3 +76,9 @@ Real failures stay loud on both `released` and `failures`.
 ### handoff 2026-10-14 @ses_ec563ec36ffetHXjD4Hv24DyXX (session: ses_ec563ec36ffetHXjD4Hv24DyXX) — next: Review PR #813 (4 CLI + 1 native reproducer), merge, then tick the acceptance rows and flip the item done.
 - branch: fix/bug-cleanup-release-stale-record-wedge
 - open questions: Compose reaping is skipped for stale records (same as the missing-path release); a still-claimed item with a dead worktree still refuses unconditionally (unclaim first)
+
+### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-14 (delivery lead)
+Merged as 8fc9a4ef (PR #813); flipped by the lead after ticking the three rows. The release arm now shares the prune arm's liveness rule: `classifyReleaseEntry` probes `worktreeIsLive` (git's `prunable` verdict; an unanswerable probe reads as live) so a stale record is treated as already-gone — dead record pruned first (it pins the branch), branch deleted, `worktree_path` cleared — with removal/Compose/stamp/env skipped and debris retained. A new `worktreeRecordBranch` recovers the branch from the worktree record when the dir cannot answer. Release's own gates are untouched (still-claimed refuses; live worktrees refuse on foreign writer/content exactly as before). Red→green reproducers on both surfaces; focused 234 + full suite 3,402 green.
+Follow-up filed: task-release-stale-compose-reaping (the stale-release/Compose divergence, flagged by the maker).
