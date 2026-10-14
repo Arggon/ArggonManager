@@ -106,3 +106,7 @@ the item comments):
 - `ArggonManager/.convention.yml` checksum refresh is required by `cli/src/provenance-audit.test.ts` for a hand-edited matrix destination (same repair as PR #611).
 - The PR was created first, then the ADR number was stamped (`PR #822`) in `802d9ba6` — the repo's amendment convention.
 - Live `claude` probes (Q1/Q3) were recorded from the dependency item's run on 2.1.289, per this item's Context; they were not re-run here (`claude` binary not required by the gates).
+
+### handoff 2026-10-14 @arggon-maker — next: Delivery lead: standards review on PR #822, verify the merge, then close story box 11 and flip this item; spot-check the merged matrix row deltas and the agents.md §Claude Code section.
+- branch: feat/task-claude-matrix-and-docs
+- open questions: None blocking; json-output init sample count refreshed 39->69 (pre-bundle stale) - confirm the sweep call; spec 024 acceptance boxes left unchecked (story/item hold the live contract)
