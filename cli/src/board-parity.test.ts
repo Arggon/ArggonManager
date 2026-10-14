@@ -26,6 +26,8 @@ import {
   renderBoardHtml,
   type BoardLensItem,
 } from "./board.js";
+import { runCli, spawnNodeCli } from "./test-spawn.js";
+import { removeFixtureTree } from "./test-tmp.js";
 import {
   applyViewLens,
   findTasksDir,
@@ -658,4 +660,95 @@ describe("parity: serve detail vs static detail map (task-web-board-hierarchy-li
     expect(map["orphan"].detail.parent).toEqual({ id: "ghost", status: null });
     expect(map["top"].detail.parent).toBeNull();
   });
+});
+
+// ---------- board envelope parity (task-serve-envelope-groupby-parity) ----------
+
+/**
+ * The static `board --json` envelope and the one-shot `board --serve --json`
+ * envelope are two surfaces of the same command, and they used to disagree:
+ * the static side echoed `groupBy` while the serve side omitted it. These
+ * tests pin the parity property end-to-end — both sides echo the SAME value,
+ * conditional the same way — by running the real CLI for both.
+ */
+describe("parity: static vs serve board envelopes (task-serve-envelope-groupby-parity)", () => {
+  const serveDirs: string[] = [];
+  afterEach(() => {
+    for (const dir of serveDirs.splice(0)) removeFixtureTree(dir);
+  });
+
+  /** Minimal tracker (legacy tasks/ layout) with one item for both envelopes. */
+  function newEnvelopeTree(): string {
+    const root = mkdtempSync(join(tmpdir(), "arggon-envelope-parity-"));
+    serveDirs.push(root);
+    mkdirSync(join(root, "tasks/launch"), { recursive: true });
+    writeFileSync(join(root, "tasks/.convention.yml"), "version: 1\n", "utf8");
+    writeFileSync(
+      join(root, "tasks/launch/launch.md"),
+      `---\ntype: initiative\nstatus: todo\nid: launch\ntitle: Launch\nlabels: []\ncreated: "2026-09-11"\nupdated: "2026-09-11"\n---\n\n# Launch\n`,
+      "utf8",
+    );
+    return root;
+  }
+
+  /**
+   * The one-shot serve envelope of a real `board --serve --json` child: the
+   * FIRST envelope line, with the server stopped right after (it keeps serving
+   * by design, so the child must be killed by the test).
+   */
+  function serveEnvelope(root: string, args: string[]): Promise<Record<string, unknown>> {
+    const child = spawnNodeCli(["--json", "board", "--serve", ...args], {
+      cwd: root,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const envelope = new Promise<Record<string, unknown>>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("no JSON output within 15s")), 15_000);
+      child.stdout.on("data", (chunk: Buffer) => {
+        const text = chunk.toString("utf8").trim();
+        if (!text) return;
+        clearTimeout(timer);
+        try {
+          resolve(JSON.parse(text) as Record<string, unknown>);
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error(String(err)));
+        }
+      });
+    });
+    return envelope.finally(() => child.kill("SIGTERM"));
+  }
+
+  it("echoes the same groupBy in the static and serve envelopes, or neither", async () => {
+    const root = newEnvelopeTree();
+    for (const groupBy of [undefined, "tree"] as const) {
+      const flag = groupBy ? ["--group-by", groupBy] : [];
+      const staticProc = runCli(["board", ...flag, "--json"], root);
+      expect(staticProc.status).toBe(0);
+      const staticEnvelope = JSON.parse(staticProc.stdout) as Record<string, unknown>;
+      const served = await serveEnvelope(root, flag);
+
+      // The shared header and the echoed --group-by agree between surfaces...
+      expect(served).toMatchObject({
+        ok: staticEnvelope.ok,
+        schemaVersion: staticEnvelope.schemaVersion,
+        conventionVersion: staticEnvelope.conventionVersion,
+        command: "board",
+      });
+      expect(served.groupBy).toEqual(staticEnvelope.groupBy);
+      // ...and the echo stays CONDITIONAL on both sides: no --group-by, no field.
+      expect("groupBy" in served).toBe(groupBy !== undefined);
+      if (groupBy) {
+        expect(served.groupBy).toBe(groupBy);
+        expect(staticEnvelope.groupBy).toBe(groupBy);
+      }
+
+      // The serve envelope is the startup signal, not the static payload.
+      expect(served).toMatchObject({ serving: true });
+      expect(String(served.url)).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+      expect(typeof served.port).toBe("number");
+      expect("path" in served).toBe(false);
+      expect("itemCount" in served).toBe(false);
+      expect(typeof staticEnvelope.path).toBe("string");
+      expect(typeof staticEnvelope.itemCount).toBe("number");
+    }
+  }, 60_000);
 });

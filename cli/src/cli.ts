@@ -3173,6 +3173,10 @@ program
                   serving: true,
                   url: handle.url,
                   port: handle.port,
+                  // Parity with the static envelope (task-serve-envelope-groupby-parity):
+                  // the validated --group-by is echoed when it was given, and
+                  // the field is absent (never null) when it was not.
+                  ...(handle.groupBy ? { groupBy: handle.groupBy } : {}),
                   ...(opts.open ? { open: true } : {}),
                 },
                 readConventionVersion(handle.root),

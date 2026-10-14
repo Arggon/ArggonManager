@@ -291,6 +291,9 @@ describe("board --serve grouped-ancestry view (task-web-board-hierarchy-view)", 
   it("opens the served board in the ancestry tree with --group-by tree", async () => {
     const treeHandle = startBoardServer({ cwd: dir, groupBy: "tree" });
     await treeHandle.ready;
+    // The handle carries the validated value (the CLI mirrors it into the
+    // one-shot --serve --json envelope, task-serve-envelope-groupby-parity).
+    expect(treeHandle.groupBy).toBe("tree");
     try {
       const html = await (await fetch(`${treeHandle.url}/`)).text();
       expect(html).toContain('<main class="board" aria-label="arggon board" hidden>');
@@ -502,28 +505,47 @@ describe("arggon board --serve (CLI)", () => {
     });
   }
 
+  /** Parse the first non-empty stdout line of a spawned `--json` child. */
+  function readFirstEnvelope(child: ReturnType<typeof spawnCli>): Promise<Record<string, unknown>> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("no JSON output within 15s")), 15000);
+      child.stdout.on("data", (chunk: Buffer) => {
+        const text = chunk.toString("utf8").trim();
+        if (!text) return;
+        clearTimeout(timer);
+        try {
+          resolve(JSON.parse(text) as Record<string, unknown>);
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error(String(err)));
+        }
+      });
+    });
+  }
+
   it("--serve --json emits one envelope with url/port and keeps serving", async () => {
     const child = spawnCli(["--json", "board", "--serve"], dir);
     try {
-      const line = await new Promise<string>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("no JSON output within 15s")), 15000);
-        child.stdout!.on("data", (chunk: Buffer) => {
-          const text = chunk.toString("utf8").trim();
-          if (text) {
-            clearTimeout(timer);
-            resolve(text);
-          }
-        });
-      });
-      const envelope = JSON.parse(line) as {
-        ok: boolean;
-        command: string;
-        serving: boolean;
-        url: string;
-        port: number;
-      };
+      const envelope = await readFirstEnvelope(child);
       expect(envelope).toMatchObject({ ok: true, command: "board", serving: true });
-      expect(envelope.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+      expect(String(envelope.url)).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+      // task-serve-envelope-groupby-parity: the conditional groupBy echo stays
+      // conditional on both surfaces — no --group-by, no field.
+      expect("groupBy" in envelope).toBe(false);
+    } finally {
+      child.kill("SIGTERM");
+    }
+  }, 20_000);
+
+  it("--serve --json echoes the validated --group-by like the static envelope (task-serve-envelope-groupby-parity)", async () => {
+    const child = spawnCli(["--json", "board", "--serve", "--group-by", "tree"], dir);
+    try {
+      const envelope = await readFirstEnvelope(child);
+      expect(envelope).toMatchObject({
+        ok: true,
+        command: "board",
+        serving: true,
+        groupBy: "tree",
+      });
     } finally {
       child.kill("SIGTERM");
     }
