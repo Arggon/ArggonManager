@@ -27,9 +27,9 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-maker-lesson-trigg
 
 ## Acceptance
 
-- [ ] the ZCode maker prompt carries the ADR 0027 trigger (bound ≤160 chars + mandatory citation, the same carrier list), in the seam's own wording
-- [ ] the template and the generated `.zcode-marketplace/arggon/agents/arggon-maker.md` stay byte-consistent; provenance/checksums refreshed; any seam test updated
-- [ ] impact class stated (Behavioral — agent contract change; ADR 0016 channel noted); `arggon validate` + affected suites green; prettier clean
+- [x] the ZCode maker prompt carries the ADR 0027 trigger (bound ≤160 chars + mandatory citation, the same carrier list), in the seam's own wording
+- [x] the template and the generated `.zcode-marketplace/arggon/agents/arggon-maker.md` stay byte-consistent; provenance/checksums refreshed; any seam test updated
+- [x] impact class stated (Behavioral — agent contract change; ADR 0016 channel noted); `arggon validate` + affected suites green; prettier clean
 
 ## Notes
 
