@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-zcode-agents-brace-elided-retired-ids
 title: "docs/agents.md §ZCode brace-elides retired agent ids (arggon-{worker,reviewer}.md) and the id guard is substring-based, so it ships green"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-adapter-selection
 labels: [docs, tests, roles]
 created: "2026-10-14"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T11:54:17.362Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-zcode-agents-brace-elided-retired-ids
 ---
 <!--
