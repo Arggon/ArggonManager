@@ -247,6 +247,16 @@ verdict: request-changes (smoke evidence missing)
 - ADRs for stack, identity, and cross-cutting schema decisions (see below).
 - PRs touching the methodology carriers state their **methodology impact class** (advisory / behavioral, with an ADR 0016 reference when behavioral) — reviewers check it like any bar above; see `ArggonManager/docs/agents.md` §Changing the methodology itself.
 
+### Session context (advice, never a gate)
+
+**Not a bar — nothing here blocks a merge, and no command implements it.** When the session's context is visibly degrading — you re-read the same files, restart exploration you already finished, or pay for long tool output twice — ask the three questions [exploration-021](./explorations/exploration-harness-research-transfer-021.md) F8 takes from AutoCompact (arXiv:2610.02163v1):
+
+- **When to compact** — in this loop, when to stop and carry over. The signal is visible behaviour (repetition, restarted exploration, output paid twice), never a token count.
+- **What to preserve** — the bounded surfaces this project already measures ([ADR 0006](./adr/0006-token-context-efficiency.md)): the item's frontmatter (branch, `worktree_path`), its acceptance checklist and latest verdict, and the injected item block.
+- **How to continue** — the handoff fields (`branch`, `next`, `open_questions`): the working state a fresh session resumes from.
+
+**What this is not.** Compaction stays length-triggered by choice — `compaction.keep` in `templates/docs/opencode.jsonc` is untouched — and the published alternative requires training we do not run; the paper itself leaves harnesses like ours to future work. This is a diagnostic, never a compaction fix: no `compact()` action, no compaction tool, no executor.
+
 ---
 
 ## Testing expectations
