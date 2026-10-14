@@ -1737,15 +1737,25 @@ test.describe("@smoke board --serve", () => {
     // (100ms); its trailing broadcast can navigate while this test measures
     // and destroy the execution context. Two timeOrigin samples one debounce
     // window apart prove the reload storm has settled — re-armed debounces
-    // (the auto-commit writes) are covered by the poll retry.
+    // (the auto-commit writes) are covered by the poll retry, and the probe
+    // itself catches the destroyed-context throw so a navigation in flight
+    // reads as "not settled yet" instead of aborting the poll (bug-smoke-
+    // sticky-header-settle-retry: expect.poll does not retry a throwing
+    // probe). The raised ceiling covers contended machines (#521 saw >15s).
     await expect
       .poll(
         async () => {
-          const before = await page.evaluate(() => performance.timeOrigin);
-          await page.waitForTimeout(120);
-          return (await page.evaluate(() => performance.timeOrigin)) === before;
+          try {
+            const before = await page.evaluate(() => performance.timeOrigin);
+            await page.waitForTimeout(120);
+            return (await page.evaluate(() => performance.timeOrigin)) === before;
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            if (message.includes("Execution context was destroyed")) return false;
+            throw err;
+          }
         },
-        { intervals: [50], timeout: 10_000 },
+        { intervals: [50], timeout: 30_000 },
       )
       .toBe(true);
     const measure = async (): Promise<void> => {
