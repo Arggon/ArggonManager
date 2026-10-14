@@ -91,3 +91,10 @@ Branch `feat/task-claude-gate-polish`, commit `f23d8372`; pushed; PR https://git
 - Repo self refreshed again: `npm run arggon -- init . --agents claude --no-commit` → `.claude-marketplace/arggon/{hooks/gate.mjs,README.md}` + `ArggonManager/.convention.yml` (2 checksums moved).
 
 **Gates (worktree, all green):** `npm run arggon -- validate` ok (0 warnings); focused `npx vitest run cli/src/init-claude.test.ts cli/src/adapter-selection.test.ts` → 69 passed; `npm test` → 3459 passed; `npm run lint` clean; `npm run test:structure` 5 passed; `npx prettier --check` clean on the touched authored files (the generated repo-self README keeps its pre-existing marker-adjacency flag, unchanged from HEAD).
+
+### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-14 (delivery lead)
+Merged as b92f3ff1 (PR #823). Decision: `arggon_handoff` is denied in the reviewer window on BOTH routes — the MCP tool set under both spellings and the shell words (`arggon handoff …`, wrapped forms included) — because a handoff appends a tracker section, not a verdict; `arggon_comment` stays the one open channel. The ZCode divergence (handoff unlisted there on both routes) is recorded in the gate header, the seam README and the item, and routed as `task-zcode-gate-handoff-parity`.
+
+Also shipped: the PreToolUse matcher narrowed to the tools the gate can decide on (`^(Bash|Write|Edit|MultiEdit|NotebookEdit|mcp__arggon__.*|mcp__plugin_arggon_arggon__.*)$`), pinned both ways (accepts both arggon prefixes; rejects unrelated MCP servers and read tools); the repo-self `.claude-marketplace/**` copy refreshed with its x-generated rows. Review round 1 closed the shell-route asymmetry the first push left. Evidence: 69 focused tests + full suite 3459 green (maker), CI green on all three lanes, lead read the diff. Residual recorded: the generated README's marker/heading adjacency is prettier-flagged identically at HEAD (pre-existing, template-parity-bound) — unchanged.
