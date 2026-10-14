@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: external-harness-evaluation
 title: "Evaluate and adopt-or-decline external harness / context / compaction tooling against the methodology's own bars"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ labels: [methodology, evaluation]
 priority: p2
 created: "2026-10-05"
 updated: "2026-10-14"
-claimed_at: "2026-10-14T12:42:50.891Z"
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/external-agent-tooling/external-harness-evaluation/external-harness-evaluation.md (story index; required).
