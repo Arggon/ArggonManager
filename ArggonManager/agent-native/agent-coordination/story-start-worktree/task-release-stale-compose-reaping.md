@@ -40,3 +40,8 @@ Gates: `npm run build` ok (bundle regenerated); focused 235/235 (worktree + nati
 
 ### handoff 2026-10-14 @Arggon — next: Review + merge PR #819; tick the three acceptance rows at merge verification.
 - branch: feat/task-release-stale-compose-reaping
+
+### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-14 (delivery lead)
+Merged as c54f7e58 (PR #819); flipped by the lead (three rows ticked). Decision: `--release` reaps the declared Compose project for stale records like `--prune`, with release's own failure discipline kept (a failed teardown aborts and keeps the worktree record); both surfaces restructured identically, the plugin bundle regenerated, docs updated; focused 235/235 + validate/prettier green; CI green. Lead-finished from the maker's worktree after the host tool-runtime outage (work was complete and uncommitted).
