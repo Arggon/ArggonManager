@@ -108,3 +108,9 @@ The decline/inconclusive discrimination (`attemptedCode` + retry + distinct chec
 ### handoff 2026-10-14 @ses_ec60f45b9ffe3ffeIyT88O1JN9 (session: ses_ec60f45b9ffe3ffeIyT88O1JN9) — next: Delivery lead: review PR #799 at head 36225d2d — full smoke 158/158 green, all gates green; merge and complete the item.
 - branch: fix/bug-full-smoke-scenarios-precede-newer-gates
 - open questions: smoke/opencode-wave.ts:96 pins the same retired opencode-go/deepseek-v4-flash — route a follow-up; executed-check denominator drift (143 failing run → 158 green) documented in the evidence comment
+
+### 2026-10-14 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead merge verification — 2026-10-14 (delivery lead)
+Merged as 59d61d94 (PR #799); auto-done flip landed (all five rows ticked by the maker against its evidence). The five harness-vs-kernel failures are fixed scenario-side with no product gate weakened: fixtures carry real live Context/Acceptance prose (scaffold markers replaced), the lifecycle close ticks the criterion the fixture publishes, and `probeWithRetry` + `attemptedCode` distinguish "model declined" (INCONCLUSIVE, a distinct check) from a gate refusal. Final full `npm run smoke:opencode` run alone on the head: **158 checks, 0 failures** (27 scenarios; the 143→158 delta is committed denominator drift — the green run executes conditional/loop checks, documented in the evidence comment). The run also caught and fixed a second blocker: the provider retired `opencode-go/deepseek-v4-flash`; the smokes now pin the canaried successor `opencode-go/deepseek-v4.1-flash`. Gates green: full suite 3,382, native-start-cold, focused 31/31, lint/structure/validate/prettier.
+Follow-up filed: bug-wave-smoke-retired-model-pin (the wave script still pins the retired model — same class, next occurrence).
