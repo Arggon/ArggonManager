@@ -67,3 +67,6 @@ Found while landing `bug-full-smoke-scenarios-precede-newer-gates` (PR #799): th
 ### handoff 2026-10-14 @ses_ec5ee801affeIpa4kifNI1tFAC (session: ses_ec5ee801affeIpa4kifNI1tFAC) — next: Review PR #803 (head with evidence commits): wave off the retired pin, one shared source in smoke/opencode-model.ts, focused canary 11/11; merge-commit, no squash; full wave smoke deferred to a solo …
 - branch: fix/bug-wave-smoke-retired-model-pin
 - open questions: full smoke:opencode:wave not run (model-driven, must run alone, others active) — solo window still owed; CI never runs the model-driven harnesses
+
+### 2026-10-14 @ses_ec5ee801affeIpa4kifNI1tFAC
+Precision note on the evidence above: `npx prettier --check` is clean on the authored files (`smoke/opencode-model.ts`, `smoke/opencode-model.test.ts`, `smoke/opencode-smoke.ts`, `smoke/opencode-wave.ts`, `ArggonManager/docs/playbooks/opencode.md`). The tracker item file itself is NOT prettier-formatted — `ArggonManager/<initiative>/…` is deliberately excluded from the prose corpus (`cli/src/prose-format.test.ts` §Scope; item bodies are historical records), and every neighbouring item is equally non-byte-clean. No formatter churn was written into the item.
