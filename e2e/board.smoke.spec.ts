@@ -381,6 +381,107 @@ function createTreeTerminalFixture(): string {
   return fixture;
 }
 
+/**
+ * Open-descendant disclosure fixture (bug-tree-done-container-hides-open-work):
+ * the measured shape the report describes — a DONE container whose subtree
+ * still holds open work three levels down (two open descendants, plus a done
+ * task and a cancelled bug that must NOT count), and a second done container
+ * whose whole subtree is terminal (no badge). Its own fixture, not the shared
+ * one: the extra terminal containers must not shift the counts and card
+ * positions the other cases measure.
+ */
+const OPEN_ROOT_ID = "tree-done-root";
+const OPEN_EPIC_ID = "tree-done-epic";
+const OPEN_STORY_ID = "tree-done-story";
+const OPEN_TASK_ID = "task-tree-open-descendant";
+const OPEN_WIP_TASK_ID = "task-tree-wip-descendant";
+const OPEN_DONE_TASK_ID = "task-tree-done-descendant";
+const OPEN_CANCELLED_BUG_ID = "bug-tree-cancelled-descendant";
+const CLEAN_EPIC_ID = "tree-done-clean-epic";
+const CLEAN_STORY_ID = "tree-done-clean-story";
+const CLEAN_TASK_ID = "task-tree-clean-descendant";
+
+function createOpenDescendantFixture(): string {
+  const fixture = mkdtempSync(join(tmpdir(), "arggon-e2e-tree-open-"));
+  const git = (args: string[]): void => {
+    const result = spawnSync("git", args, { cwd: fixture, encoding: "utf8" });
+    if (result.status !== 0) {
+      throw new Error(`git ${args.join(" ")} failed: ${result.stdout ?? ""}${result.stderr ?? ""}`);
+    }
+  };
+  git(["init", "-q"]);
+  git(["config", "user.email", "smoke@example.test"]);
+  git(["config", "user.name", "Board Smoke"]);
+  writeFileSync(join(fixture, "README.md"), "# tree open-descendant fixture\n", "utf8");
+  git(["add", "README.md"]);
+  git(["commit", "-qm", "chore: fixture"]);
+
+  cliJson(fixture, ["init", fixture]);
+  const chain: Array<[string, string, string | undefined]> = [
+    ["initiative", "Tree done root", undefined],
+    ["epic", "Tree done epic", OPEN_ROOT_ID],
+    ["story", "Tree done story", OPEN_EPIC_ID],
+    ["task", "Tree open descendant", OPEN_STORY_ID],
+    ["task", "Tree wip descendant", OPEN_STORY_ID],
+    ["task", "Tree done descendant", OPEN_STORY_ID],
+    ["bug", "Tree cancelled descendant", OPEN_STORY_ID],
+    // The all-terminal container: a done story whose only child is done.
+    ["epic", "Tree done clean epic", OPEN_ROOT_ID],
+    ["story", "Tree done clean story", CLEAN_EPIC_ID],
+    ["task", "Tree clean descendant", CLEAN_STORY_ID],
+  ];
+  for (const [type, title, parent] of chain) {
+    runCli(fixture, [
+      "create",
+      type,
+      title,
+      ...(parent !== undefined ? ["--parent", parent] : []),
+      "--json",
+    ]);
+  }
+  // Terminal leaf flips carry `--no-cascade`: the cascade would auto-complete
+  // an ancestor whose whole subtree just went terminal, and this fixture needs
+  // every container's status to stay AUTHORED.
+  for (const id of [OPEN_DONE_TASK_ID, CLEAN_TASK_ID]) {
+    setBody(fixture, id, `# ${id}\n\n## Acceptance\n\n- [x] shipped\n`);
+    runCli(fixture, ["update", id, "--status", "in_progress", "--assignee", "tree-bot", "--json"]);
+    runCli(fixture, ["update", id, "--status", "done", "--no-cascade", "--json"]);
+  }
+  runCli(fixture, [
+    "update",
+    OPEN_CANCELLED_BUG_ID,
+    "--status",
+    "cancelled",
+    "--no-cascade",
+    "--json",
+  ]);
+  // One open descendant is claimed, so both non-terminal statuses count.
+  runCli(fixture, [
+    "update",
+    OPEN_WIP_TASK_ID,
+    "--status",
+    "in_progress",
+    "--assignee",
+    "tree-bot",
+    "--json",
+  ]);
+  // The containers: authored terminal status with open work below (containers
+  // are not acceptance-gated, and the claim step is the legal todo → done path).
+  for (const id of [OPEN_STORY_ID, CLEAN_STORY_ID, OPEN_EPIC_ID, CLEAN_EPIC_ID, OPEN_ROOT_ID]) {
+    const claimable = id === OPEN_STORY_ID || id === CLEAN_STORY_ID;
+    runCli(fixture, [
+      "update",
+      id,
+      "--status",
+      "in_progress",
+      ...(claimable ? ["--assignee", "tree-bot"] : []),
+      "--json",
+    ]);
+    runCli(fixture, ["update", id, "--status", "done", "--no-cascade", "--json"]);
+  }
+  return fixture;
+}
+
 /** Start `board --serve` on a free port and resolve with the printed URL. */
 function startBoardServer(fixture: string): Promise<{ child: ChildProcess; url: string }> {
   const child = spawn(process.execPath, [cli, "board", "--serve", "--port", "0"], {
@@ -2319,6 +2420,127 @@ test.describe("@smoke board tree terminal layout", () => {
     await expect(story).toHaveClass(/terminal-context/);
     await expect(page.locator("#board-filter-count")).toHaveText("6 item(s)");
     await expect(page.locator("#board-tree-count")).toHaveText("6");
+    expect(errors).toEqual([]);
+  });
+});
+
+/**
+ * bug-tree-done-container-hides-open-work: the tree rendered a container's
+ * AUTHORED status chip only, so a terminal container with open work below read
+ * as a bare `done` (15 of the tracker's 84 containers are in that state). The
+ * row now discloses `N open` — the count of `todo`/`in_progress`/`blocked`
+ * descendants at every depth — beside that chip; the chip itself never rolls
+ * up. The count is static markup computed from the complete item set, so the
+ * client-side layout preferences (hide done/cancelled, a lens, a fold) can
+ * never move it, and the static export renders it exactly like the served
+ * board. Both are asserted here.
+ */
+test.describe("@smoke board tree open-descendant disclosure", () => {
+  let fixture: string;
+  let server: { child: ChildProcess; url: string } | undefined;
+
+  test.beforeAll(async () => {
+    fixture = createOpenDescendantFixture();
+    server = await startBoardServer(fixture);
+    await waitForBoard(server.url);
+  });
+
+  test.afterAll(async () => {
+    if (server) await stopServer(server.child);
+    if (fixture) rmSync(fixture, { recursive: true, force: true });
+  });
+
+  test("a done container discloses its open descendants and no filter moves the count", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+    const row = (id: string) => tree.locator(`.tree-node[data-id="${id}"] > .tree-row`);
+    const node = (id: string) => tree.locator(`.tree-node[data-id="${id}"]`);
+    const badge = (id: string) => row(id).locator("> .tree-open");
+
+    // The reproducer, pinned: the initiative reads `done 2 open` — the authored
+    // chip stays, the disclosure sits right after it.
+    await expect(row(OPEN_ROOT_ID).locator("> .status-chip")).toHaveText("done");
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    // The whole path discloses the same subtree count, three levels down from
+    // the initiative — a direct-children count would have answered 0 there.
+    await expect(badge(OPEN_EPIC_ID)).toHaveText("2 open");
+    await expect(badge(OPEN_STORY_ID)).toHaveText("2 open");
+    // The accessible name carries the disclosure on the interactive row.
+    await expect(row(OPEN_ROOT_ID)).toHaveAttribute("aria-label", /2 open descendants/);
+    // A done container whose whole subtree is terminal discloses nothing, and
+    // neither do the leaves — open, done or cancelled.
+    await expect(row(CLEAN_EPIC_ID).locator("> .tree-open")).toHaveCount(0);
+    await expect(row(CLEAN_STORY_ID).locator("> .tree-open")).toHaveCount(0);
+    await expect(row(OPEN_TASK_ID).locator("> .tree-open")).toHaveCount(0);
+    await expect(row(OPEN_DONE_TASK_ID).locator("> .tree-open")).toHaveCount(0);
+    await expect(row(OPEN_CANCELLED_BUG_ID).locator("> .tree-open")).toHaveCount(0);
+
+    // Hide done/cancelled: the terminal containers stay as muted context for
+    // their open descendants, and the disclosure does not move.
+    await page.locator("#board-terminal-toggle").click();
+    await expect(node(OPEN_STORY_ID)).toHaveClass(/terminal-context/);
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await expect(badge(OPEN_STORY_ID)).toHaveText("2 open");
+    // The all-terminal container hides (nothing visible hangs below it).
+    await expect(row(CLEAN_EPIC_ID)).toBeHidden();
+    await page.locator("#board-terminal-toggle").click();
+    await expect(row(CLEAN_EPIC_ID)).toBeVisible();
+
+    // A fold hides the subtree, never the disclosure on the folded row.
+    const rootToggle = row(OPEN_ROOT_ID).locator("> .tree-toggle");
+    await rootToggle.click();
+    await expect(tree.locator(`.tree-node[data-id="${OPEN_STORY_ID}"]`)).toBeHidden();
+    await expect(rootToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await rootToggle.click();
+    await expect(tree.locator(`.tree-node[data-id="${OPEN_STORY_ID}"]`)).toBeVisible();
+
+    // A lens narrows the rows to one match plus its context path; the
+    // disclosure is the subtree's truth, not the lens verdict (the `N of M`
+    // counter stays the verdict).
+    await page.locator("#board-filter-input").fill(OPEN_TASK_ID);
+    await expect(node(OPEN_STORY_ID)).toHaveClass(/context/);
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await expect(badge(OPEN_STORY_ID)).toHaveText("2 open");
+    await expect(page.locator("#board-filter-count")).toHaveText("1 of 10 item(s)");
+    await expect(page.locator("#board-tree-count")).toHaveText("1");
+    // The composed state (lens + terminal + fold) is a scanned surface of its
+    // own; the assertions above are its deterministic readiness signal.
+    await axeScan(page);
+    await page.locator("#board-filter-clear").click();
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+  });
+
+  test("the static export carries the same disclosure (bug-tree-done-container-hides-open-work)", async ({
+    page,
+  }) => {
+    const boardFile = join(fixture, "tree-open-board.html");
+    runCli(fixture, ["board", "--group-by", "tree", "--out", boardFile]);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(String(error)));
+    await page.goto(`file://${boardFile}`);
+    await expect(page.locator("h1")).toContainText("arggon board");
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+    const row = (id: string) => tree.locator(`.tree-node[data-id="${id}"] > .tree-row`);
+    const badge = (id: string) => row(id).locator("> .tree-open");
+
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await expect(badge(OPEN_STORY_ID)).toHaveText("2 open");
+    await expect(row(CLEAN_EPIC_ID).locator("> .tree-open")).toHaveCount(0);
+
+    // The same layout preferences, offline: folding and hiding terminal rows
+    // leave the disclosure untouched.
+    await row(OPEN_ROOT_ID).locator("> .tree-toggle").click();
+    await expect(tree.locator(`.tree-node[data-id="${OPEN_STORY_ID}"]`)).toBeHidden();
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await page.locator("#board-terminal-toggle").click();
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await expect(row(CLEAN_EPIC_ID)).toBeHidden();
     expect(errors).toEqual([]);
   });
 });

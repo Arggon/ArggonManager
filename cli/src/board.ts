@@ -2425,6 +2425,11 @@ export function boardTreeRoots(items: WorkItem[]): BoardTreeNode[] {
   return roots;
 }
 
+/** Terminal statuses (ADR 0004): a terminal item is not open work. */
+function isTerminalStatus(status: string): boolean {
+  return status === "done" || status === "cancelled";
+}
+
 /**
  * Nested ancestry markup for the grouped-ancestry view
  * (task-web-board-hierarchy-view): one list item per tracked item, nested
@@ -2451,6 +2456,17 @@ export function boardTreeRoots(items: WorkItem[]): BoardTreeNode[] {
  * a broken chain is visible instead of silently promoted. An empty tracker
  * renders the same `—` placeholder the columns use.
  *
+ * Open-descendant disclosure (bug-tree-done-container-hides-open-work): a
+ * container row whose subtree still holds open work carries a `N open` badge
+ * right after its status chip — the number of `todo`/`in_progress`/`blocked`
+ * descendants at EVERY depth (terminal is `done`/`cancelled`, ADR 0004). The
+ * count comes from the complete item set this renderer is handed (both callers
+ * pass the whole tracker), and it is baked into the markup once, so no
+ * client-side lens, fold or terminal-hide can move it. The status chip stays
+ * the item's AUTHORED status: the badge discloses, it never rolls up
+ * (convention: container status is authored, not derived). A container with no
+ * open descendant — and every leaf row — renders exactly as before.
+ *
  * `openDeps` is the caller's open-dependency predicate (the kernel rule via
  * `openDependencyIds`); without it rows carry no blocked badge.
  */
@@ -2464,6 +2480,21 @@ export function renderBoardTree(
   const known = new Set(items.map((item) => item.id));
   const roots = boardTreeRoots(items);
   if (roots.length === 0) return '<div class="empty">—</div>';
+  // Open descendants per node (bug-tree-done-container-hides-open-work): one
+  // post-order pass over the SAME tree the rows are built from, so a count is
+  // always its rendered subtree's own truth — all depths, cycle-safe by
+  // construction (`treeEntries` visits each item once) — and never the visible
+  // rows' count (the client's lens/fold/terminal-hide act after this render).
+  const openDescendants = new Map<string, number>();
+  const countOpenDescendants = (node: BoardTreeNode): number => {
+    let open = 0;
+    for (const child of node.children) {
+      open += countOpenDescendants(child) + (isTerminalStatus(child.item.status) ? 0 : 1);
+    }
+    openDescendants.set(node.item.id, open);
+    return open;
+  };
+  for (const root of roots) countOpenDescendants(root);
   let rovingRow = false;
   const rowOf = (item: WorkItem, isContainer: boolean): string => {
     const type = esc(item.type);
@@ -2478,6 +2509,10 @@ export function renderBoardTree(
     const blockedBadge = blocked.length
       ? `\n  <span class="tree-blocked">blocked by ${blocked.length}</span>`
       : "";
+    // The disclosure rides the row the same way the blocked badge does: a
+    // static span beside the AUTHORED status chip, never a second status.
+    const open = openDescendants.get(item.id) ?? 0;
+    const openBadge = open > 0 ? `\n  <span class="tree-open">${open} open</span>` : "";
     const parent = typeof item.parent === "string" && item.parent !== "" ? item.parent : "";
     const missingMark =
       parent !== "" && !known.has(parent)
@@ -2498,8 +2533,10 @@ export function renderBoardTree(
     // Interactive rows (details mode only): focusable + named like a card, so
     // Enter/Space opens the same drawer. Without the drawer payload the row
     // stays inert — a static export offers no fake affordance — and only the
-    // disclosure control (which folds, not opens) is wired.
-    const cardLabel = `${item.type} ${item.id}: ${item.title ?? item.id} (${item.status}${item.assignee ? `, @${item.assignee}` : ""})`;
+    // disclosure control (which folds, not opens) is wired. The name carries
+    // the open-descendant disclosure, spelled out, so it is announced and not
+    // only seen.
+    const cardLabel = `${item.type} ${item.id}: ${item.title ?? item.id} (${item.status}${open > 0 ? `, ${open} open descendants` : ""}${item.assignee ? `, @${item.assignee}` : ""})`;
     const interactiveAttrs = interactive
       ? ` role="group" aria-label="${esc(cardLabel)}" tabindex="${rovingRow ? "-1" : "0"}"`
       : "";
@@ -2508,7 +2545,7 @@ export function renderBoardTree(
   ${toggle}${matches}
   <span class="type" data-type="${type}" style="--type-color: ${TYPE_COLORS[item.type]}">${type}</span>
   <code>${esc(item.id)}</code>
-  <span class="status-chip ${esc(item.status)}">${esc(item.status)}</span>${priority}${title}${assignee}${blockedBadge}${missingMark}
+  <span class="status-chip ${esc(item.status)}">${esc(item.status)}</span>${openBadge}${priority}${title}${assignee}${blockedBadge}${missingMark}
 </div>`;
   };
   const nodeOf = (node: BoardTreeNode): string => {
@@ -3285,7 +3322,16 @@ main.board[hidden], .tree[hidden] { display: none; }
 .tree-title { font-weight: 600; overflow-wrap: anywhere; }
 .tree-assignee { color: var(--fg-soft); font-size: 12px; }
 .tree-missing { color: var(--muted); font-size: 11px; }
-.tree-blocked { margin-left: auto; color: var(--blocked-fg); background: var(--blocked-bg); border-radius: 10px; padding: 0 8px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+.tree-blocked, .tree-open { border-radius: 10px; padding: 0 8px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+.tree-blocked { margin-left: auto; color: var(--blocked-fg); background: var(--blocked-bg); }
+/* Open-descendant disclosure (bug-tree-done-container-hides-open-work): the
+   count of open work below a container, sitting right after its authored
+   status chip — same badge geometry as .tree-blocked, but the neutral chip
+   pair, never the blocked alarm fill. Measured for the same 10px bold text:
+   light #424a53 on #e7ebef 7.50:1, dark #c9d1d9 on #37414b 6.73:1 (asserted
+   in board.test.ts). The badge paints its own fill, so a muted
+   terminal-context row keeps the pair unchanged. */
+.tree-open { color: var(--fg-soft); background: var(--chip); }
 /* Compact/extend (task-tree-rows-open-detail): the container disclosure is a
    control on the row's leading edge, and leaf rows carry the same-width spacer
    so ids stay aligned. A folded subtree is hidden by a pure display rule —
