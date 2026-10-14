@@ -335,8 +335,9 @@ const BUNDLED_SOURCES = [...BUNDLED_SKILLS, ...BUNDLED_PLUGINS];
  * (bug-stale-vendored-plugin-copy)? They are gitignored, derived per-checkout
  * copies of the committed bundle — never adopter-owned content — so a
  * provenance mismatch re-vendors instead of modified-skip. Skill copies are
- * excluded: `.agents/skills/**` is tracked and follows the normal provenance
- * decisions.
+ * excluded: `.agents/skills/**` follows the normal provenance decisions —
+ * adopter-tracked in an adopter tree, and a gitignored per-checkout copy in
+ * the seam repo's own checkout (see {@link isBundledSkillDest}).
  *
  * Exported for `doctor --agents` (task-adapter-selection-flags), which must
  * classify the SAME destinations as derived artifacts rather than as
@@ -345,6 +346,24 @@ const BUNDLED_SOURCES = [...BUNDLED_SKILLS, ...BUNDLED_PLUGINS];
  */
 export function isBundledPluginDest(dest: string): boolean {
   return BUNDLED_PLUGINS.some((p) => p.dest === dest);
+}
+
+/**
+ * Is this destination one of the bundled skill copies
+ * (`.agents/skills/arggon-cli/**`, `.agents/skills/arggon-upgrade/**`)?
+ *
+ * The copies are a PURE function of a committed source
+ * (`generatedMarker(source) + source`, no placeholders in `skills/**`), which
+ * makes their `x-generated` row derivable without the copy: the row must
+ * describe the current source render. That derivation is what
+ * `auditGeneratedProvenance` checks for these destinations — the seam repo
+ * gitignores its own copies (`.gitignore`: "single committed source"), so a
+ * fresh checkout/CI has no copy to compare the row against and the byte
+ * rule alone cannot see a stale row
+ * (bug-skill-source-edit-leaves-ledger-stale).
+ */
+export function isBundledSkillDest(dest: string): boolean {
+  return BUNDLED_SKILLS.some((s) => s.dest === dest);
 }
 
 /** Is this template id one of the bundled (package-root source) artifacts? */
@@ -1612,8 +1631,12 @@ export type ProvenanceRecordViolation = {
    * all (init reads it as a pre-provenance adopter file); `stale-checksum` —
    * an entry exists but its checksum no longer matches the committed bytes
    * (init reads it as an adopter edit). Same consequence either way.
+   * `stale-derived-checksum` — a bundled-skill row whose checksum no longer
+   * matches the current source render: the row is checkable without the copy,
+   * because a skill copy is a pure function of its committed source
+   * (bug-skill-source-edit-leaves-ledger-stale).
    */
-  kind: "missing-record" | "stale-checksum";
+  kind: "missing-record" | "stale-checksum" | "stale-derived-checksum";
   /** One-line explanation naming the bytes and the record that disagree. */
   reason: string;
 };
@@ -1638,6 +1661,18 @@ export type ProvenanceRecordViolation = {
  *    (bug-stale-vendored-plugin-copy);
  *  - renders that cannot be produced (template absent, project name
  *    unrecoverable) — "cannot decide", the doctor `unverified` semantics.
+ *
+ * Bundled-skill rows (`isBundledSkillDest`) are the one destination class whose
+ * row is DERIVABLE, so it is checked even where the copy is absent — the seam
+ * repo gitignores its own copies, which is exactly how a stale row stayed
+ * invisible to CI (bug-skill-source-edit-leaves-ledger-stale):
+ * `checksumOf(render)` is a pure function of the committed source, and the row
+ * must describe it. The remedy is `npm run skills:sync` (which regenerates the
+ * copies AND re-records the rows), never a hand-edited ledger. This does NOT
+ * weaken the adopter-edit doctrine: the row is compared against the SOURCE
+ * render, never read back from the destination, so a hand edit can never be
+ * blessed as generated — and a hand-edited copy (bytes ≠ render) still keeps
+ * its row silent exactly as before.
  *
  * Pure read: no writes, never throws on unreadable files. The repo's own test
  * suite runs this against the arggon checkout itself on every CI run, so a
@@ -1671,6 +1706,35 @@ export function auditGeneratedProvenance(opts: {
     if (state[dest]?.acknowledged) continue;
     // Derived vendored artifact: per-checkout bytes, re-vendored on mismatch.
     if (isBundledPluginDest(dest)) continue;
+    const render = renderGeneratedDoc({
+      templatesDir,
+      root: opts.root,
+      template,
+      dest,
+      projectName,
+    });
+    // Render refused: "cannot decide" — no row of the ledger is decidable.
+    if (render === null) continue;
+    const entry = state[dest];
+    // Derived skill row (bug-skill-source-edit-leaves-ledger-stale): the copy
+    // is a pure function of the committed source, so the ROW is checkable
+    // without the copy — the check that CI (a fresh checkout, no copies) can
+    // always run. A hand-edited copy never reaches this verdict: the row is
+    // compared against the source render, never read back from the dest.
+    if (isBundledSkillDest(dest) && entry?.checksum && !checksumMatches(entry.checksum, render)) {
+      violations.push({
+        dest,
+        template,
+        kind: "stale-derived-checksum",
+        reason:
+          "the x-generated checksum (" +
+          entry.checksum +
+          ") does not match the render of the committed source template (" +
+          checksumOf(render) +
+          ") — the copy is a pure function of that source, so the row is stale; " +
+          "run `npm run skills:sync` and commit the refreshed row",
+      });
+    }
     const destAbs = join(opts.root, ...dest.split("/"));
     if (!existsSync(destAbs)) continue;
     let disk: string;
@@ -1679,18 +1743,9 @@ export function auditGeneratedProvenance(opts: {
     } catch {
       continue; // unreadable: nothing can be decided about its bytes
     }
-    const render = renderGeneratedDoc({
-      templatesDir,
-      root: opts.root,
-      template,
-      dest,
-      projectName,
-    });
-    // Render refused, or the bytes are adopter content (differ from the
-    // render): no row of the ledger is broken — init skipping those files is
-    // init behaving correctly.
-    if (render === null || !checksumMatches(checksumOf(render), disk)) continue;
-    const entry = state[dest];
+    // The bytes are adopter content (differ from the render): no row of the
+    // ledger is broken — init skipping those files is init behaving correctly.
+    if (!checksumMatches(checksumOf(render), disk)) continue;
     if (!entry?.checksum) {
       violations.push({
         dest,
