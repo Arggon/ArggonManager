@@ -3052,7 +3052,7 @@ program
   .option("--github", "overlay live GitHub PR state on cards with a branch (read-only)", false)
   .option(
     "--group-by <field>",
-    "group cards within each column by milestone (ADR 0003) or parent story (story)",
+    "group cards by milestone (ADR 0003) or parent story (story) within each column, or open the grouped-ancestry layout (tree: initiative → epic → story → leaf)",
   )
   .option(
     "--details",
@@ -3218,8 +3218,13 @@ program
           );
           return;
         }
+        const grouping = result.groupBy
+          ? result.groupBy === "tree"
+            ? ", grouped ancestry view"
+            : `, grouped by ${result.groupBy}`
+          : "";
         console.log(
-          `arggon board: wrote ${sanitizeHumanError(displayPath(result.outPath, process.cwd()))} (${result.itemCount} item(s)${result.groupBy ? `, grouped by ${result.groupBy}` : ""}${opts.github ? `, ${result.prCount} PR(s) linked` : ""}${result.detailBytes !== undefined ? `, details embedded (${result.detailBytes} bytes)` : ""})`,
+          `arggon board: wrote ${sanitizeHumanError(displayPath(result.outPath, process.cwd()))} (${result.itemCount} item(s)${grouping}${opts.github ? `, ${result.prCount} PR(s) linked` : ""}${result.detailBytes !== undefined ? `, details embedded (${result.detailBytes} bytes)` : ""})`,
         );
         console.log(
           "  Open it in a browser. Re-run after tree changes — the tracker remains the source of truth.",

@@ -126,10 +126,13 @@ function screenshotPath(name: string): string {
  * 3. **Every scanned state gets its own deterministic readiness signal before
  *    its scan** (task-axe-board-drawer-and-lens-coverage): the ready page
  *    (first test), the open detail drawer (after an `expect` on its async
- *    `/api/item` content), the static `file://` export (after its h1) and the
- *    filtered/lens states (after the narrowed-card count) are each scanned at
- *    a settled point — never a sleep, never a `networkidle` guess, never a
- *    scan smuggled in after unrelated assertions have moved the page on.
+ *    `/api/item` content), the static `file://` export (after its h1), the
+ *    filtered/lens states (after the narrowed-card count), the static
+ *    grouped-ancestry export (`--group-by tree`, after its h1) and the
+ *    filtered ancestry tree on the served board (after the `N of M` count) are
+ *    each scanned at a settled point — never a sleep, never a `networkidle`
+ *    guess, never a scan smuggled in after unrelated assertions have moved
+ *    the page on.
  */
 const AXE_WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] as const;
 
@@ -636,6 +639,121 @@ test.describe("@smoke board --serve", () => {
     // its cards; the "no story" head (if rendered) carries none.
     const head = page.locator(".mgroup-head", { hasText: "entries" }).first();
     await expect(head).toContainText(/⚑ entries \d+\/\d+/);
+  });
+
+  test("the static export renders the grouped-ancestry view (--group-by tree)", async ({
+    page,
+  }) => {
+    // task-web-board-hierarchy-view: `--group-by tree` opens the board in the
+    // nested ancestry layout (initiative → epic → story → leaf) instead of the
+    // status columns, and each level carries its own id + status chip.
+    const boardFile = join(fixture, "tree-board.html");
+    runCli(fixture, ["board", "--group-by", "tree", "--out", boardFile]);
+    await page.goto(`file://${boardFile}`);
+    await expect(page.locator("h1")).toContainText("arggon board");
+
+    // The board opens in the tree; the columns layout is present but hidden.
+    await expect(page.locator("main.board")).toBeHidden();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+    await expect(page.locator("#board-view-toggle")).toHaveAttribute("aria-pressed", "true");
+    // Every tracked item renders exactly one ancestry row.
+    await expect(tree.locator(".tree-node")).toHaveCount(listItems.length);
+
+    // Nesting is structural: story under epic under initiative, task under story.
+    await expect(
+      page.locator(
+        '#board-tree .tree-node[data-id="board-smoke"] .tree-node[data-id="core"] .tree-node[data-id="entries"]',
+      ),
+    ).toHaveCount(1);
+    await expect(
+      tree.locator('.tree-node[data-id="entries"] .tree-node[data-id="task-board-task"]'),
+    ).toHaveCount(1);
+    // Each level names its id and status; the leaf keeps its priority chip slot.
+    await expect(tree.locator('.tree-node[data-id="core"] > .tree-row > .status-chip')).toHaveText(
+      "todo",
+    );
+    await expect(
+      tree.locator('.tree-node[data-id="task-board-task"] > .tree-row > code'),
+    ).toHaveText("task-board-task");
+    // The h1 above is the readiness signal; this state is scanned on its own.
+    await axeScan(page);
+  });
+
+  test("the filterbar toggle switches layouts and round-trips through the URL", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    const columns = page.locator("main.board");
+    const tree = page.locator("#board-tree");
+    const toggle = page.locator("#board-view-toggle");
+    await expect(columns).toBeVisible();
+    await expect(tree).toBeHidden();
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    await toggle.click();
+    await expect(columns).toBeHidden();
+    await expect(tree).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(new URL(page.url()).hash).toBe("#view=tree");
+
+    // Reload/copy/share: the hash restores the layout.
+    await page.reload();
+    await expect(tree).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    // ... and the columns stay one toggle away, with their cards intact.
+    await toggle.click();
+    await expect(columns).toBeVisible();
+    await expect(tree).toBeHidden();
+    await expect(page.locator(".board .card")).toHaveCount(listItems.length);
+    expect(new URL(page.url()).hash).toBe("");
+  });
+
+  test("the lens filters inside the ancestry view and keeps the path as context", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    await expect(page.locator("#board-tree")).toBeVisible();
+
+    // `label:detail` matches exactly one fixture task: it stays, its recorded
+    // ancestor chain stays as context, and nothing else does.
+    await page.locator("#board-filter-input").fill("label:detail");
+    const visibleNodes = page.locator("#board-tree .tree-node:not(.filtered-out)");
+    await expect(visibleNodes).toHaveCount(4);
+    await expect(
+      page.locator(`#board-tree .tree-node:not(.filtered-out)[data-id="${DETAIL_ITEM_ID}"]`),
+    ).toHaveCount(1);
+    // The ancestors render as context, the match never does.
+    for (const ancestor of ["board-smoke", "core", "entries"]) {
+      await expect(
+        page.locator(`#board-tree .tree-node.context[data-id="${ancestor}"]`),
+      ).toHaveCount(1);
+    }
+    await expect(
+      page.locator(`#board-tree .tree-node.context[data-id="${DETAIL_ITEM_ID}"]`),
+    ).toHaveCount(0);
+    // Unrelated rows (including sibling tasks of the matched story) are gone.
+    await expect(
+      page.locator('#board-tree .tree-node:not(.filtered-out)[data-id="task-board-task"]'),
+    ).toHaveCount(0);
+    // The counts stay honest: N of M counts the match, and the tree heading
+    // reports the same verdict rather than the rendered (context) rows.
+    await expect(page.locator("#board-filter-count")).toHaveText(
+      `1 of ${listItems.length} item(s)`,
+    );
+    await expect(page.locator("#board-tree-count")).toHaveText("1");
+    expect(filterFromUrl(page.url())).toBe("label:detail");
+    // The filtered tree state is a scanned surface of its own (the count
+    // assertion above is its deterministic readiness signal).
+    await axeScan(page);
+
+    // A filter matching nothing empties the tree honestly.
+    await page.locator("#board-filter-input").fill("label:does-not-exist");
+    await expect(page.locator("#board-tree .tree-node:not(.filtered-out)")).toHaveCount(0);
+    await expect(page.locator("#board-filter-count")).toHaveText(
+      `0 of ${listItems.length} item(s)`,
+    );
   });
 
   test("the static export with --details opens the drawer offline from the embedded snapshot", async ({

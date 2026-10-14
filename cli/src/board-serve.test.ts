@@ -281,6 +281,40 @@ describe("board --serve", () => {
   });
 });
 
+describe("board --serve grouped-ancestry view (task-web-board-hierarchy-view)", () => {
+  it("opens the served board in the ancestry tree with --group-by tree", async () => {
+    const treeHandle = startBoardServer({ cwd: dir, groupBy: "tree" });
+    await treeHandle.ready;
+    try {
+      const html = await (await fetch(`${treeHandle.url}/`)).text();
+      expect(html).toContain('<main class="board" aria-label="arggon board" hidden>');
+      expect(html).toContain(
+        '<section class="tree" id="board-tree" aria-labelledby="board-tree-heading">',
+      );
+      expect(html).toContain('aria-pressed="true">grouped ancestry</button>');
+      // The fixture chain nests: the task's row sits inside the story's
+      // subtree, the story's inside the epic's (recorded parent edges only).
+      const epicAt = html.indexOf('data-id="auth"');
+      const storyAt = html.indexOf('data-id="story-login"');
+      const taskAt = html.indexOf('data-id="task-a"');
+      expect(epicAt).toBeGreaterThan(-1);
+      expect(storyAt).toBeGreaterThan(epicAt);
+      expect(taskAt).toBeGreaterThan(storyAt);
+      // The default view's opposite layout still ships (one toggle away).
+      expect(html).toContain('aria-pressed="false"');
+      expect(html).toContain("<main");
+    } finally {
+      await treeHandle.close();
+    }
+  });
+
+  it("rejects unknown --group-by fields naming all three modes", () => {
+    expect(() => startBoardServer({ cwd: dir, groupBy: "priority" })).toThrow(
+      /unknown --group-by field 'priority' \(supported: milestone, story, tree\)/,
+    );
+  });
+});
+
 describe("isAllowedMutatingOrigin (task-board-serve-hardening)", () => {
   const port = 4173;
   const allowed = (headers: Parameters<typeof isAllowedMutatingOrigin>[0]): boolean =>

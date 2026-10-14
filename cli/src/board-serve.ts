@@ -149,7 +149,7 @@ export type BoardServeOptions = {
   cwd: string;
   /** Port to bind on 127.0.0.1; 0 (default) picks a free ephemeral port. */
   port?: number;
-  /** Group cards within each column: `milestone` (ADR 0003) or `story`. */
+  /** Group cards within each column: `milestone` (ADR 0003) or `story`; `tree` opens the grouped-ancestry layout (task-web-board-hierarchy-view). */
   groupBy?: string;
   /** Injectable GitHub reader (tests pass a fake; default shells out to `gh`). */
   gh?: BoardGithub;
@@ -246,10 +246,12 @@ export const FAVICON_SVG =
 export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
-  let groupBy: "milestone" | "story" | undefined;
+  let groupBy: "milestone" | "story" | "tree" | undefined;
   if (opts.groupBy !== undefined) {
-    if (opts.groupBy !== "milestone" && opts.groupBy !== "story") {
-      throw new Error(`unknown --group-by field '${opts.groupBy}' (supported: milestone, story)`);
+    if (opts.groupBy !== "milestone" && opts.groupBy !== "story" && opts.groupBy !== "tree") {
+      throw new Error(
+        `unknown --group-by field '${opts.groupBy}' (supported: milestone, story, tree)`,
+      );
     }
     groupBy = opts.groupBy;
   }
