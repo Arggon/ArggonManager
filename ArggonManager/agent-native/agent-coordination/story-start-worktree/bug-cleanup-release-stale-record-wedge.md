@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-cleanup-release-stale-record-wedge
 title: "cleanup --release has the same stale-record shape: a leftover dir whose gitdir is gone reaches removal and wedges (top-level CLEANUP_FAILED)"
+assignee: arggon-delivery-lead
+branch: fix/bug-cleanup-release-stale-record-wedge
 parent: story-start-worktree
 labels: [worktree, cleanup]
 created: "2026-10-14"
 updated: "2026-10-14"
+claimed_at: "2026-10-14T13:30:18.993Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-cleanup-release-stale-record-wedge
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/story-start-worktree/bug-cleanup-release-stale-record-wedge.md
@@ -28,3 +32,48 @@ Residual shape found while fixing `bug-cleanup-stuck-when-worktree-dir-gone` (PR
 - [ ] `arggon validate` green; PR opened
 
 ## Notes
+
+### 2026-10-14 @ses_ec563ec36ffetHXjD4Hv24DyXX
+## Evidence — PR #813
+
+Reproduced red-first, then fixed; 5 new tests (4 CLI, 1 native).
+
+RED (before the fix)
+- CLI `runCleanup({ release })`, dead-gitdir state: the run threw out of the classifier —
+  `Error: git rev-parse --abbrev-ref HEAD failed: fatal: not a git repository` at `worktreeBranch`
+  (lib/src/cleanup.ts) -> `classifyReleaseEntry` -> `releaseClaimedWorktree` (cli/src/cleanup.ts) ->
+  `runCleanup`; on the CLI surface that is the top-level `CLEANUP_FAILED` envelope, identical on every retry.
+- Native `cleanup({ release })` in the same state: typed `CLEANUP_FAILED: git rev-parse --abbrev-ref HEAD
+  failed: fatal: not a git repository` (ArgonToolError), record untouched.
+
+EXPECTED/NOW (green)
+- `failures: []`; `released` = [`pruned stale git worktree record`, `deleted branch feat/task-alpha`,
+  `cleared worktree_path`]; `release.branch = "feat/task-alpha"` read from git's dead record (the unclaim
+  cleared the item field, the dead worktree cannot be asked); the debris directory is retained (asserted);
+  `git worktree list` no longer contains the path; `worktree_path` undefined; commit `chore(tasks): released task-alpha`.
+- Manual-`git worktree prune` state: [`cleared worktree_path`] (nothing left to drop; the branch name went
+  with the record) — previously a permanent refusal.
+- Removed-directory state with the record still naming the branch: dead record pruned, branch deleted,
+  record cleared — previously the branch was left behind forever.
+- Human CLI: exit 0, `released task-alpha` + the three steps printed.
+- Native: same three actions; no domain removal attempted (`calls.remove` empty).
+
+GIT BEHAVIOUR PROBED (not assumed), git 2.47
+- `git worktree list --porcelain` keeps the `branch refs/heads/<name>` line on a `prunable` record.
+- `git branch -D <b>` refuses while the prunable record exists ("cannot delete branch '<b>' used by worktree
+  at '<path>'"); after `git worktree prune` it succeeds.
+- `git -C <dead dir> rev-parse --abbrev-ref HEAD` -> exit 128 `fatal: not a git repository` (the throw).
+
+GATES (all green)
+`npm run build`; `npm run check:plugin`; `npm test` 3402 passed / 157 files; focused (cli/src/worktree.test.ts
++ opencode/plugins/arggon/tools.test.ts + lib/src/cleanup.test.ts + lib/src/worktree.property.test.ts) 234 passed;
+`npm run lint`; `npm run test:structure` 5 passed; `npx prettier --check` on every touched file;
+`npm run arggon -- validate` -> ok (0 warnings, convention v5).
+
+OWN GATES NOT WEAKENED (checked): still-claimed refusal, foreign live-writer refusal and removal-blocking
+refusal are unchanged — a genuinely live worktree refuses exactly as before; only stale/dead records converge.
+Real failures stay loud on both `released` and `failures`.
+
+### handoff 2026-10-14 @ses_ec563ec36ffetHXjD4Hv24DyXX (session: ses_ec563ec36ffetHXjD4Hv24DyXX) — next: Review PR #813 (4 CLI + 1 native reproducer), merge, then tick the acceptance rows and flip the item done.
+- branch: fix/bug-cleanup-release-stale-record-wedge
+- open questions: Compose reaping is skipped for stale records (same as the missing-path release); a still-claimed item with a dead worktree still refuses unconditionally (unclaim first)

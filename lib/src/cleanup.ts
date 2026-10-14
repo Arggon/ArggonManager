@@ -125,6 +125,23 @@ export type CleanupGit = {
    */
   worktreeIsLive?(cwd: string, path: string): boolean;
   /**
+   * The branch git's own worktree record carries for `path` — live or dead —
+   * or null when no record names one. `git worktree list --porcelain` keeps
+   * printing the record and its `branch refs/heads/<name>` line for a worktree
+   * whose gitdir link is gone, and that line is the ONLY surviving source of a
+   * stale worktree's branch: the worktree itself cannot be asked anymore, and
+   * the item's recorded `branch` is cleared by the very unclaim that asks for
+   * the release (bug-cleanup-release-stale-record-wedge). Reading it here is
+   * what lets a release of an already-gone worktree still delete its branch
+   * instead of leaving an abandoned claim's branch behind.
+   *
+   * OPTIONAL: a runner that omits it falls back to the item's recorded branch.
+   * The default runner parses a real `git worktree list --porcelain`, and a
+   * probe that cannot answer reports null — unknown never names a branch to
+   * delete.
+   */
+  worktreeRecordBranch?(cwd: string, path: string): string | null;
+  /**
    * `git worktree prune --verbose`: drop worktree records whose worktree gitdir
    * is missing, and report whether at least one was dropped. The dead record a
    * stale worktree leaves behind pins its branch and keeps the path in `git
@@ -266,6 +283,32 @@ export function defaultCleanupGit(): CleanupGit {
         return !lines.some((line) => line.startsWith("prunable"));
       }
       return false;
+    },
+    worktreeRecordBranch(cwd: string, path: string): string | null {
+      let out: string;
+      try {
+        out = git(["worktree", "list", "--porcelain"], cwd);
+      } catch {
+        // A probe that cannot answer names no branch: the classifier falls
+        // back to the item's recorded branch, and a failed read never invents
+        // a branch to force-delete.
+        return null;
+      }
+      const target = resolve(path);
+      // The `branch` line survives the `prunable` marker (git keeps the
+      // record's branch even when the gitdir link is gone — verified against
+      // git 2.47), which is exactly the case this probe exists for.
+      for (const block of out.split(/\n\s*\n/)) {
+        const lines = block.split("\n");
+        const head = lines.find((line) => line.startsWith("worktree "));
+        if (head === undefined) continue;
+        if (resolve(head.slice("worktree ".length).trim()) !== target) continue;
+        const branchLine = lines.find((line) => line.startsWith("branch refs/heads/"));
+        if (branchLine === undefined) return null;
+        const name = branchLine.slice("branch refs/heads/".length).trim();
+        return name.length > 0 ? name : null;
+      }
+      return null;
     },
     pruneWorktrees(cwd: string): boolean {
       // `--verbose` prints one "Removing worktrees/<name>: …" line per dropped
@@ -622,7 +665,11 @@ export type ReleaseRequest = {
 export type ReleaseEntry = {
   id: string;
   status: string;
-  /** Branch the release deletes (the worktree's own HEAD, else the recorded one). */
+  /**
+   * Branch the release deletes: the worktree's own HEAD when it is live, else
+   * the branch git's dead record still carries, else the item's recorded
+   * branch (bug-cleanup-release-stale-record-wedge).
+   */
   branch: string | null;
   /** Absolute worktree path as recorded on the item ("" when none is). */
   path: string;
@@ -833,10 +880,43 @@ export function worktreeDirtyRefusal(item: WorkItem, paths: string[]): string {
 }
 
 /**
+ * The branch a STALE record still names (bug-cleanup-release-stale-record-wedge):
+ * the worktree cannot be asked anymore (`git -C <path> rev-parse` fails — the
+ * throw that used to wedge the whole release run), so the surviving sources are
+ * git's own dead record ({@link CleanupGit.worktreeRecordBranch}: the porcelain
+ * `branch` line survives the `prunable` marker) and the item's recorded branch
+ * (a runner without the probe; or a manual `git worktree prune` that already
+ * dropped the record). Null when neither names one — the release then clears
+ * the record alone, which is all that is left.
+ */
+function staleRecordBranch(
+  gitRunner: CleanupGit,
+  root: string,
+  path: string,
+  item: WorkItem,
+): string | null {
+  const recorded = gitRunner.worktreeRecordBranch?.(root, path);
+  if (recorded !== undefined && recorded !== null) return recorded;
+  return item.branch ?? null;
+}
+
+/**
  * Classify ONE item for release. The order is the contract: recorded path →
- * still claimed → filesystem state → branch → ONE porcelain probe feeding the
- * live-writer gate and the removal-blocking gate. Every refusal carries a
- * `reason`; every releasable entry carries the `action` the surface performs.
+ * still claimed → filesystem state (existence, liveness) → branch → ONE
+ * porcelain probe feeding the live-writer gate and the removal-blocking gate.
+ * Every refusal carries a `reason`; every releasable entry carries the `action`
+ * the surface performs.
+ *
+ * A recorded path that is not a LIVE worktree of this repo is a stale record,
+ * never a release target (bug-cleanup-release-stale-record-wedge — the release
+ * half of the rule prune learned in bug-cleanup-stuck-when-worktree-dir-gone):
+ * missing on disk, a leftover directory whose gitdir link is gone (git lists
+ * the record `prunable` and refuses its removal forever), or the state after a
+ * manual `git worktree prune`. The release skips the removal, prunes the dead
+ * record itself (which is what pins the branch for `git branch -D`), still
+ * deletes the branch — named by the dead record, since the worktree can no
+ * longer answer and the unclaim cleared the item's field — and clears the
+ * record. A leftover directory is left in place.
  *
  * Two refusals are UNCONDITIONAL, by decision (m6, coordinator ruling):
  *
@@ -891,8 +971,32 @@ export function classifyReleaseEntry(
   }
   if (!existsSync(path)) {
     // Same stale-record clause as prune: the worktree is already gone, so the
-    // record is the only thing left to clear.
+    // record is the only thing left to clear — and the dead record's branch
+    // line is the only branch still nameable.
     entry.action = "clear stale worktree_path record (path missing on disk)";
+    entry.branch = staleRecordBranch(gitRunner, root, path, item);
+    entry.releasable = true;
+    return entry;
+  }
+  if (gitRunner.worktreeIsLive !== undefined && !gitRunner.worktreeIsLive(root, path)) {
+    // A registration is not a working tree (bug-cleanup-release-stale-record-wedge;
+    // the prune arm learned this in bug-cleanup-stuck-when-worktree-dir-gone).
+    // The interrupted `git worktree remove` leaves files behind with `.git`
+    // deleted and the record `prunable`; asking that path for its branch
+    // (`worktreeBranch` -> `git rev-parse` with cwd = the dead directory)
+    // throws, which used to wedge every release run at the surface's
+    // top-level failure instead of converging. The worktree is already gone as
+    // work, so the entry is a stale record: no removal is attempted (git
+    // refuses it forever, and a domain inventory listing the path must not lure
+    // this run into one), the dead record is pruned by the surface
+    // ({@link CleanupGit.pruneWorktrees}, BEFORE the branch step — the record
+    // pins the branch), the branch is still deleted and the record is cleared.
+    // A leftover directory is never the release's to delete — it is not a
+    // worktree — and stays for the operator, which the action says.
+    entry.action =
+      "clear stale worktree_path record (path is not a live worktree of this repo; " +
+      "any leftover directory is left in place)";
+    entry.branch = staleRecordBranch(gitRunner, root, path, item);
     entry.releasable = true;
     return entry;
   }

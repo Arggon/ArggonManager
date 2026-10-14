@@ -508,6 +508,30 @@ function defaultCleanupGit() {
             }
             return false;
         },
+        worktreeRecordBranch(cwd, path) {
+            let out;
+            try {
+                out = git(["worktree", "list", "--porcelain"], cwd);
+            }
+            catch {
+                return null;
+            }
+            const target = (0, node_path_1.resolve)(path);
+            for (const block of out.split(/\n\s*\n/)) {
+                const lines = block.split("\n");
+                const head = lines.find((line) => line.startsWith("worktree "));
+                if (head === undefined)
+                    continue;
+                if ((0, node_path_1.resolve)(head.slice("worktree ".length).trim()) !== target)
+                    continue;
+                const branchLine = lines.find((line) => line.startsWith("branch refs/heads/"));
+                if (branchLine === undefined)
+                    return null;
+                const name = branchLine.slice("branch refs/heads/".length).trim();
+                return name.length > 0 ? name : null;
+            }
+            return null;
+        },
         pruneWorktrees(cwd) {
             const result = (0, node_child_process_1.spawnSync)("git", ["worktree", "prune", "--verbose"], {
                 cwd,
@@ -810,6 +834,12 @@ function worktreeDirtyRefusal(item, paths) {
         `cleanup({ release, take_over_worktree })). Blocking paths: ${named.join(", ")}` +
         `${extra > 0 ? ` (and ${extra} more)` : ""}.`);
 }
+function staleRecordBranch(gitRunner, root, path, item) {
+    const recorded = gitRunner.worktreeRecordBranch?.(root, path);
+    if (recorded !== undefined && recorded !== null)
+        return recorded;
+    return item.branch ?? null;
+}
 function classifyReleaseEntry(item, root, gitRunner, request) {
     const path = item.worktreePath ? (0, node_path_1.resolve)(item.worktreePath) : "";
     const entry = {
@@ -835,6 +865,15 @@ function classifyReleaseEntry(item, root, gitRunner, request) {
     }
     if (!(0, node_fs_1.existsSync)(path)) {
         entry.action = "clear stale worktree_path record (path missing on disk)";
+        entry.branch = staleRecordBranch(gitRunner, root, path, item);
+        entry.releasable = true;
+        return entry;
+    }
+    if (gitRunner.worktreeIsLive !== undefined && !gitRunner.worktreeIsLive(root, path)) {
+        entry.action =
+            "clear stale worktree_path record (path is not a live worktree of this repo; " +
+                "any leftover directory is left in place)";
+        entry.branch = staleRecordBranch(gitRunner, root, path, item);
         entry.releasable = true;
         return entry;
     }
@@ -12588,8 +12627,9 @@ async function nativeRelease(kernel, run) {
     const path = classified.path;
     const gitRoot = (0, node_path_1.resolve)(git.worktreeList(root)[0] ?? root);
     const recordHome = (0, node_path_1.resolve)(root) !== (0, node_path_1.resolve)(path);
+    const stale = classified.action?.startsWith("clear stale worktree_path record") === true;
     try {
-        if (classified.action !== "clear stale worktree_path record (path missing on disk)") {
+        if (!stale) {
             if (run.compose !== undefined && !run.isComposeUnavailable()) {
                 const project = kernel.worktreeComposeProject(run.compose.declared, (0, node_path_1.basename)(path));
                 try {
@@ -12623,24 +12663,27 @@ async function nativeRelease(kernel, run) {
             else if (hadStamp) {
                 actions.push({ id, action: "arggon-claim.json stamp gone with the worktree" });
             }
-            if (classified.branch !== null && git.branchExists(gitRoot, classified.branch)) {
-                try {
-                    git.deleteBranchForce(gitRoot, classified.branch);
-                    actions.push({ id, action: `deleted branch ${classified.branch}` });
-                }
-                catch (error) {
-                    const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS);
-                    failures.push(`${id}: ${message}`);
-                    actions.push({
-                        id,
-                        action: "failed",
-                        error: message,
-                        leftoverBranch: classified.branch,
-                    });
-                }
+        }
+        else if (git.pruneWorktrees?.(gitRoot) === true) {
+            actions.push({ id, action: "pruned stale git worktree record" });
+        }
+        if (classified.branch !== null && git.branchExists(gitRoot, classified.branch)) {
+            try {
+                git.deleteBranchForce(gitRoot, classified.branch);
+                actions.push({ id, action: `deleted branch ${classified.branch}` });
+            }
+            catch (error) {
+                const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS);
+                failures.push(`${id}: ${message}`);
+                actions.push({
+                    id,
+                    action: "failed",
+                    error: message,
+                    leftoverBranch: classified.branch,
+                });
             }
         }
-        if (recordHome) {
+        if (stale || recordHome) {
             const cleared = kernel.updateOperation({
                 cwd: root,
                 id,
