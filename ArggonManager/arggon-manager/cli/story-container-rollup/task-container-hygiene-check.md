@@ -73,3 +73,7 @@ Fixture sample (positive cases live in `cli/src/report.test.ts`):
 Files: `lib/src/report.ts` (`containerHygiene`, `formatReportHygiene`, markdown `## Hygiene`), `lib/src/operations.ts` (`ReportPayload.hygiene`), `lib/src/index.ts`, `cli/src/cli.ts` (table append), `cli/src/mcp-server.ts` + `opencode/plugins/arggon/index.ts` (descriptions/schema, trimmed to stay inside the ADR 0006 budgets), `cli/src/report.test.ts` (fixture matrix + parity + caps), `ArggonManager/docs/json-output.md` §report, plus the regenerated plugin bundle and re-synced skill copies.
 
 Remaining: standards review, then merge + the `done` flip (delivery lead).
+
+### handoff 2026-10-15 @Arggon — next: Standards review of PR #826; then merge (branch carries tracker auto-commits) and the lead's done flip.
+- branch: feat/task-container-hygiene-check
+- open questions: Promoting the check into a gate/CI is a later decision (out of scope); caps 10 offenders / 5 open containers per offender follow the MAX_* receipt discipline — revisit if a real tree ever exceeds the…
