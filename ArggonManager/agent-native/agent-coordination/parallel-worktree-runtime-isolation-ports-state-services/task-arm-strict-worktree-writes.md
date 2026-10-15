@@ -142,3 +142,10 @@ Evidence — compensating rule shipped (acceptance box 4), docs-only.
 
 ### 2026-10-15 @arggon-maker
 Follow-up (post-rebase) — the branch was rebased onto `origin/main` (`39a6d3da`) to drop one inherited unpushed tracker commit (`2b9b6f94`, the `bug-prover-agent-has-no-x-generated-entry` prune — an unrelated item riding the claim branch's cut point), then force-pushed with lease. The docs commit is now `2ece8559` (was `89d5dc17` before the rebase; the tree is byte-identical apart from the dropped unrelated file). PR #842 now carries only the two in-scope files: `ArggonManager/docs/agents.md` and this item file. No gate results changed; `validate` re-run green after the rebase.
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-15 (delivery lead)
+Merged as 69de168d (PR #842). Box 4 delivered as decided: `agents.md` gains §Orchestration → **"Worktree ownership and collisions"** — owner (the session the stamp names; the lead owns the item, the maker owns the worktree while the claim lives; no writes into another live session's worktree), notice (the attach-time `claim.foreignWrites` observation + the stamp; `doctor` reports repo/tracker state, NOT per-worktree stamps — verified against `doctor --json` keys rather than implied), resolution (stamped owner first; dead owner → `start --worktree --take-over-worktree` or the documented `rm <git-dir>/arggon-claim.json` escape hatch; recovery/merge-prep writes after the session ended remain the lead's call), plus the standing decision sentence (the strict refusal stays unarmed by deliberate choice). Echoed in §4 Single-writer ownership; `.convention.yml` untouched — boxes 2-3 are conditional on arming and the condition is false, so they are satisfied vacuously; recorded here.
+
+Evidence: docs-only diff (`agents.md` + the item record); full suite 3541 green; validate/lint/structure/prettier green; CI green. Branch hygiene: the maker rebased off an inherited unpushed tracker commit and force-pushed **with lease** — the first in-repo use of the path unblocked by #836; the PR carries only in-scope files.
