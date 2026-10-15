@@ -1,16 +1,19 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-friction-trigger-carrier
 title: "Friction trigger in generated agents, doctor visibility, skill reference"
+assignee: arggon-delivery-lead
+branch: feat/task-friction-trigger-carrier
 parent: story-adopter-feedback
 labels: [method, adopters]
 priority: p1
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-15"
+claimed_at: "2026-10-15T21:36:41.708Z"
 depends_on: [task-friction-surface-parity-and-docs]
+worktree_path: /home/arggon/Projects/ArggonManager-task-friction-trigger-carrier
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-trigger-carrier.md
   Leaves live only under a story. id is the filename stem: task-friction-trigger-carrier.
