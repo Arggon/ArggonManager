@@ -84,3 +84,7 @@ until the PR is open and its diff is read.
 **Docs:** README §`start`, `docs/json-output.md` §`start` (row + prose), `docs/opencode2.md` (worktree lifecycle), `skills/arggon-cli/references/pitfalls.md` (tracker-merge) + derived copies/ledger via `skills:sync` / `init . --agents claude`.
 
 **Known gap (follow-up for the delivery lead):** the native `tools.arggon.start` creates the worktree through the host `ctx.worktree.create` domain and its `preparation` receipt carries no equivalent report yet (stated in `opencode2.md`); native parity is a separate item.
+
+### handoff 2026-10-15 @Arggon — next: Delivery lead: review PR #834 (route (c) report, tests, docs); on merge use MERGE-merge (tracker commits). No maker steps left.
+- branch: fix/bug-start-claim-branch-inherits-unpushed-tracker-commits
+- open questions: Native tools.arggon.start parity (no report yet) — follow-up item; strict-mode refusal could be armed later if reporting proves insufficient; rebase --onto remedy relies on branchPoint at cut time.
