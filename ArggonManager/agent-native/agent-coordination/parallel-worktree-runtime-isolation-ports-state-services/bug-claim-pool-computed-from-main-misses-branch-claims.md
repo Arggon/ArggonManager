@@ -59,21 +59,21 @@ This is the mirror image of `bug-native-arggon-tools-resolve-tracker-root-to-ses
 
 ## Acceptance
 
-- [ ] The claimable pool does not advertise an item whose claim lives on an unmerged branch — the
+- [x] The claimable pool does not advertise an item whose claim lives on an unmerged branch — the
       refusal is not the first place the truth surfaces
-- [ ] The honest options are **considered and recorded**, not assumed: reconcile claims from
+- [x] The honest options are **considered and recorded**, not assumed: reconcile claims from
       open branches (e.g. via `arggon sync`, which already reads open PRs); OR make the claim
       commit land somewhere shared; OR make the ranking surface declare the branch it ranked from.
       Whichever is chosen, `next` must not silently rank from `main` alone
-- [ ] `arggon sync --json` (or the chosen surface) surfaces branch-resident claims explicitly —
+- [x] `arggon sync --json` (or the chosen surface) surfaces branch-resident claims explicitly —
       an agent can tell "unclaimed" from "claimed on a branch I have not merged"
-- [ ] A regression test: an item claimed on a branch, with `main` untouched, is not reported
+- [x] A regression test: an item claimed on a branch, with `main` untouched, is not reported
       claimable — and the test is hermetic (no network, no real `gh`)
-- [ ] `docs/agents.md` §Claim states which copy is authoritative while a claim is in flight, so
+- [x] `docs/agents.md` §Claim states which copy is authoritative while a claim is in flight, so
       an agent knows that `show` from the primary can legitimately disagree with the branch
-- [ ] The four held items above are re-read through the fixed surface and confirmed held; no
+- [x] The four held items above are re-read through the fixed surface and confirmed held; no
       claim is stolen to make the pool look clean
-- [ ] Decided whether a stale claim on a **never-merged** branch is reclaimable at all — today
+- [x] Decided whether a stale claim on a **never-merged** branch is reclaimable at all — today
       it is invisible to `--stale`, so a crashed writer's claim can outlive the branch
 
 ## Notes
