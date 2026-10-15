@@ -9,7 +9,6 @@ priority: p3
 created: "2026-10-02"
 updated: "2026-10-02"
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-arm-strict-worktree-writes.md
   Leaves live only under a story. id is the filename stem: task-arm-strict-worktree-writes.
@@ -99,3 +98,13 @@ Recorded from `task-wire-decision-brief-carriers` row 8, which asked the three l
 This one turns a safety observation into an enforcement refusal, which reads like a harder-to-reverse call. It still does not owe a brief: the flag is one line of config, reverting it restores the report-only default immediately, and ADR 0026 §5's second limb is about _cost paid later exceeding the time to undo_ — which a config flip does not meet. It is a lead decision recorded on the item. If the lead decides to arm it, the contract's own requirement (the refusal shape documented and a real refused attach as evidence) still applies.
 
 So no `decide:` brief is written for it. Recording the classification matters more than it looks: ADR 0026 §5 exists precisely so that not every open question becomes a brief, and these three were the evidence that questions without a home pile up looking like pending product-owner decisions. Two of them never were one.
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+**Decision (2026-10-15, delivery lead — recorded on the item per box 1): KEEP report-only; do not arm `x-tracker.strict-worktree-writes`.**
+
+Rationale:
+1. The observed collisions are the ones the flag cannot see: the item's own F12 case (three worktrees, two items `todo`/unclaimed on main with no `worktree_path`) had **no stamp at all** — the strict refusal only fires on a stamped owner mismatch, so arming would not have caught it. The real fix for that class was the claim discipline (`task-coordinator-claims-through-native-start`, done).
+2. Arming would refuse the delivery lead's legitimate recovery and merge-prep writes into a maker's worktree (finishing work after a maker session dies — several occurrences this week alone) unless each goes through the takeover ceremony. The refusal is coordination-shaped and reversible, but the friction lands on the flow that keeps waves moving.
+3. The default is explicitly "working as designed" (the item's own framing); arming stays available later — one config line — if a stamped collision ever actually bites.
+
+**Compensating rule (box 4), queued for wave 4 (docs-only):** the coordinator contract (`ArggonManager/docs/agents.md` §Orchestration + the worktree rules) states: who owns a worktree (the session its claim stamp carries; the lead owns the item, the maker owns the worktree while the claim lives); how a collision is noticed (the single-writer observation + the `arggon-claim.json` stamp; `arggon doctor` where it reports); and who may resolve it (the stamped owner, or the lead through `start --worktree --take-over-worktree` / the manual `rm <git-dir>/arggon-claim.json` recovery — never a hand-write into another live session's worktree).
