@@ -9,7 +9,6 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [tracker-schema, cli]
 created: "2026-10-06"
 updated: "2026-10-15"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-self-decided-false-positive-owner-assigned
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-self-decided-false-positive-owner-assigned.md
