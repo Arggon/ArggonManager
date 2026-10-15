@@ -10,7 +10,6 @@ labels: [cli, native-seam, json-contract]
 created: "2026-10-03"
 updated: "2026-10-15"
 depends_on: [bug-native-steps-truncated-flag-dropped]
-worktree_path: /home/arggon/Projects/ArggonManager-task-cli-surface-never-carries-steps-truncated
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-cli-surface-never-carries-steps-truncated.md
