@@ -12,6 +12,7 @@ updated: "2026-10-15"
 claimed_at: "2026-10-15T01:21:16.370Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-publish-auth-hint-review-observations
 ---
+
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-publish-auth-hint-review-observations.md
   Leaves live only under a story. id is the filename stem: task-publish-auth-hint-review-observations.
@@ -42,14 +43,14 @@ wrapper), recorded so they outlive the parent item:
 
 ## Acceptance
 
-- [ ] Either gate the message fallback on `codes.length === 0` (match the
+- [x] Either gate the message fallback on `codes.length === 0` (match the
       docstring) or amend the docstring to state the real contract — pick one
       and pin it with a test (a log with a non-auth code AND an auth-phrase
       substring must classify as `other`)
-- [ ] Decide the maxBuffer edge: raise the buffer, or on `spawnSync` failure
+- [x] Decide the maxBuffer edge: raise the buffer, or on `spawnSync` failure
       still re-emit whatever npm output was captured before exiting — a hidden
       npm error must not become a hidden wrapper error
-- [ ] Existing behaviour pinned by `cli/publish-auth-hint.test.ts` stays green;
+- [x] Existing behaviour pinned by `cli/publish-auth-hint.test.ts` stays green;
       `npm run test` green
 
 ## Notes
@@ -58,6 +59,7 @@ Filed 2026-10-12 by the delivery lead from the PR #741 standards review; the
 parent item merged with these recorded as non-blocking.
 
 ### 2026-10-15 @arggon-maker
+
 **Review observations resolved — decisions, evidence, gates (PR #829).**
 
 **1. Message-fallback ordering — gated on `codes.length === 0`; the code now matches the docstring.** `classifyPublishFailure` no longer consults `AUTH_MESSAGES` when any `npm error code` line is present: the code line is authoritative, auth or not. Header bullet tightened to "the matching message text ONLY when the log carries no `code` line at all … any code line — auth or not — is authoritative".
@@ -88,12 +90,16 @@ Test: wrapper-mode ENOBUFS test — fixture writes ~1.5 MiB synchronously with a
 - `npx prettier --check` on the three touched files → clean
 
 ### handoff 2026-10-15 @arggon-maker — next: Standards review of PR #829 (both observations resolved, gates green); then merge and flip done.
+
 - branch: feat/task-publish-auth-hint-review-observations
 - open questions: None blocking; the one judgement call is usage() returning with process.exitCode = 2 instead of process.exit (rationale: the pipe-write drop probe, PR body).
 
 ### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
 verdict: approve
+
 ### Lead review + merge verification — 2026-10-14 (delivery lead)
+
 Merged as eb9ebe6f (PR #829). Both observations resolved, each with a recorded decision and non-vacuous pins.
 
 **Decision 1 — a code line is authoritative.** `classifyPublishFailure` now consults the message patterns only when the log carries no `code` line at all (`codes.length === 0`), matching the docstring (tightened to state the rule exactly). Pinned matrix: `E404` + auth phrase → `other` (was `auth`); no code + phrase → `auth`; no code + no phrase → `other`; `ENEEDAUTH`/`E401` unchanged. The maker ran the three new tests against the pre-change module — 3 failed — so they pin rather than pass vacuously.
