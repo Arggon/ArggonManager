@@ -1,15 +1,18 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use
 title: Force-push gate blocks the rebase path the lead must use
+assignee: arggon-delivery-lead
+branch: fix/bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [permissions, worktree, delivery-lead]
 priority: p2
 created: "2026-10-11"
-updated: "2026-10-11"
+updated: "2026-10-15"
+claimed_at: "2026-10-15T10:14:55.642Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use.md
   Leaves live only under a story. id is the filename stem: bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use.
