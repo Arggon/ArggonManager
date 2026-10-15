@@ -9,9 +9,7 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [worktree, claims, tracker-merge]
 created: "2026-10-11"
 updated: "2026-10-15"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-start-claim-branch-inherits-unpushed-tracker-commits
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-start-claim-branch-inherits-unpushed-tracker-commits.md
   Leaves live only under a story. id is the filename stem: bug-start-claim-branch-inherits-unpushed-tracker-commits.
