@@ -8,7 +8,6 @@ labels: []
 created: "2026-10-14"
 updated: "2026-10-14"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-container-rollup/task-container-status-vs-open-workstreams.md
   Leaves live only under a story. id is the filename stem: task-container-status-vs-open-workstreams.
@@ -96,3 +95,10 @@ npm run arggon -- update ecosystem-ops --status in_progress
 npm run arggon -- update ui --status in_progress
 npm run arggon -- update arggon-manager --status in_progress
 ```
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+**Owner decision (2026-10-14): option 1 — correct the stored statuses.** Recorded by the delivery lead from the owner's executed choice: the owner ran the reopen at their terminal (three commits landed on the spot: a3e4032d agent-native, 49fe60f0 agent-coordination, c34ef44a ecosystem-ops; `ui` and `arggon-manager` were gated on their scaffold bodies and completed by the lead in 19a0153e — five containers now `in_progress`).
+
+The reopen hit the intended gates, in order: (1) the transition table allows `done → todo` only, so the first command block was refused — corrected in the comment above; (2) an open container may not keep the scaffold placeholder in its live `## Context` — `ui` and `arggon-manager` had one (exempt only while closed), so their live bodies were authored from their own dated records. `arggon validate` green; all five containers `in_progress`.
+
+Remaining under option 1: the report-only guard (a terminal container holding an open container must be flagged, not silently accumulated) — filed as `task-container-hygiene-check` and in flight. The decision item closes when that lands.
