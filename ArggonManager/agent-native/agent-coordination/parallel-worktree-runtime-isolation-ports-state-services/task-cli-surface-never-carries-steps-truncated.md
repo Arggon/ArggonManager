@@ -13,6 +13,7 @@ claimed_at: "2026-10-15T10:14:51.729Z"
 depends_on: [bug-native-steps-truncated-flag-dropped]
 worktree_path: /home/arggon/Projects/ArggonManager-task-cli-surface-never-carries-steps-truncated
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-cli-surface-never-carries-steps-truncated.md
   Leaves live only under a story. id is the filename stem: task-cli-surface-never-carries-steps-truncated.
@@ -74,9 +75,11 @@ Acceptance:
 - [ ] Depends on PR #617 landing first (it owns the native projection and the regenerated bundle; editing the plugin concurrently would collide)
 
 ### 2026-10-15 @Arggon
+
 Routed from the #833 sweep (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation): the kernel now emits stepsDropped and the refusal prose quotes it, but the two call sites still omit the count — cli/src/start.ts:1166 and the native projection (boundedPreparation). This item owns threading both, per the new acceptance box.
 
 ### 2026-10-15 @arggon-maker
+
 Implemented on `feat/task-cli-surface-never-carries-steps-truncated` (worktree `/home/arggon/Projects/ArggonManager-task-cli-surface-never-carries-steps-truncated`), commit `5a36b92b`, PR #835 against `main`.
 
 What each surface now carries — MIRRORED from the kernel receipt (`lib/src/worktree.ts` sets `stepsTruncated` + `stepsDropped` together in the one `record()` branch that drops), never re-derived from a cap:
@@ -98,5 +101,16 @@ Evidence (commands run; expected vs observed):
 No blockers; no out-of-scope work found.
 
 ### handoff 2026-10-15 @arggon-maker — next: Review/merge PR #835 (all gates green: 3515 tests, validate, lint, structure, plugin drift-free); then close the item per the acceptance checklist.
+
 - branch: feat/task-cli-surface-never-carries-steps-truncated
 - open questions: none; item depends_on bug-native-steps-truncated-flag-dropped is terminal and its native mirror is intact
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
+verdict: approve
+
+### Lead review + merge verification — 2026-10-15 (delivery lead)
+
+Merged as 3bf00557 (PR #835). The kernel's truncation decision now reaches every surface: `start`'s result carries `stepsTruncated` + `stepsDropped` (mirrored from the receipt, never re-derived), `cli.ts` forwards the pair in `--json` and the human `note: dependency prep` leads with the dropped count, and the native projection's `boundedPreparation` mirrors the count with the refusal call site threading it (the #833 follow-through). Docs: `json-output.md` + `opencode2.md` document the pair on both surfaces; the opencode2 doc-contract suite gained the CLI twin scenario (deep-equal per-entry log + flag/count parity). Bundle regenerated (`check:plugin` green).
+
+Evidence: focused start 71, tools 142, doc-contract 6; full suite green on the refreshed head; CI green on all lanes. Merge note: main updated cleanly into the branch (7eba1aa4).
