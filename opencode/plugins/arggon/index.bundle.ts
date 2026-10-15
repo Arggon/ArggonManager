@@ -717,27 +717,29 @@ function classifyCleanupEntry(item, root, base, gitRunner, deps = {}) {
             return entry;
         }
         const porcelain = (deps.status ?? worktree_js_1.defaultWorktreeStatus)(path);
-        if (porcelain !== undefined) {
-            const primaryRoots = (deps.primaryRoots ?? [registered[0] ?? (0, node_path_1.resolve)(root), (0, node_path_1.resolve)(root)]).map((primary) => (0, node_path_1.resolve)(primary));
-            const blockers = parseRemovalBlockers(porcelain);
-            const untracked = blockers.untracked.filter((rel) => !isSelfReapedArtifact(path, rel, primaryRoots));
-            if (blockers.tracked.length > 0) {
-                entry.reason = worktreeTrackedRefusal(item, path, blockers.tracked);
-                entry.blockingPaths = [...untracked, ...blockers.tracked].slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
-                entry.blockingTotal = untracked.length + blockers.tracked.length;
-                entry.blockingTracked = blockers.tracked.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
-                entry.blockingTrackedTotal = blockers.tracked.length;
+        if (porcelain === undefined) {
+            entry.reason = worktreeProbeFailureRefusal(item, path);
+            return entry;
+        }
+        const primaryRoots = (deps.primaryRoots ?? [registered[0] ?? (0, node_path_1.resolve)(root), (0, node_path_1.resolve)(root)]).map((primary) => (0, node_path_1.resolve)(primary));
+        const blockers = parseRemovalBlockers(porcelain);
+        const untracked = blockers.untracked.filter((rel) => !isSelfReapedArtifact(path, rel, primaryRoots));
+        if (blockers.tracked.length > 0) {
+            entry.reason = worktreeTrackedRefusal(item, path, blockers.tracked);
+            entry.blockingPaths = [...untracked, ...blockers.tracked].slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
+            entry.blockingTotal = untracked.length + blockers.tracked.length;
+            entry.blockingTracked = blockers.tracked.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
+            entry.blockingTrackedTotal = blockers.tracked.length;
+            return entry;
+        }
+        if (untracked.length > 0) {
+            entry.blockingPaths = untracked.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
+            entry.blockingTotal = untracked.length;
+            if (deps.force !== true) {
+                entry.reason = worktreeUntrackedRefusal(item, path, untracked);
                 return entry;
             }
-            if (untracked.length > 0) {
-                entry.blockingPaths = untracked.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
-                entry.blockingTotal = untracked.length;
-                if (deps.force !== true) {
-                    entry.reason = worktreeUntrackedRefusal(item, path, untracked);
-                    return entry;
-                }
-                entry.forced = true;
-            }
+            entry.forced = true;
         }
         entry.action =
             entry.forced === true
@@ -813,6 +815,15 @@ function worktreeTrackedRefusal(item, path, paths) {
         "opt-in never discards tracked work. Commit or discard that work first, then re-run prune — or " +
         `reap the worktree by hand: git worktree remove --force ${path}${branchStep}, then ` +
         "arggon cleanup --prune to clear the record.");
+}
+function worktreeProbeFailureRefusal(item, path) {
+    const branchStep = item.branch ? `, then git branch -D ${item.branch}` : "";
+    return (`skipping the worktree of '${item.id}': the removal-blocker probe ` +
+        `('git status --porcelain' in ${path}) did not answer, so it is unknown whether ` +
+        "'git worktree remove' would succeed. Nothing was removed. Inspect it by hand " +
+        `(git -C ${path} status --porcelain), then re-run prune — or reap the worktree by ` +
+        `hand: git worktree remove ${path} (add --force only for content you inspected and ` +
+        `chose to discard)${branchStep}, then arggon cleanup --prune to clear the record.`);
 }
 function isSelfReapedArtifact(worktreePath, relPath, primaryRoots) {
     const rel = relPath.replace(/\/+$/, "");

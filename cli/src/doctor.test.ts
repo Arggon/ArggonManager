@@ -1148,3 +1148,72 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(body.opencode.mcp.hint).toBeNull();
   });
 });
+
+// task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters: doctor is
+// the standing surface for the `.arggon.env` gitignore probe (spec
+// worktree-env-contract-016) — a tree that adopted before the template shipped
+// keeps its own `.gitignore` and never gains the entry on its own.
+describe("doctor: .arggon.env gitignore hint (spec worktree-env-contract-016)", () => {
+  it("reports a missing entry report-only, and stays silent once present", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    // The generated `.gitignore` carries the entry: no hint.
+    expect(runDoctor({ cwd: dir }).envGitignore).toEqual({
+      path: ".gitignore",
+      present: true,
+      ignores: true,
+      hint: null,
+    });
+
+    // The pre-template adopter file: kept by init, so doctor reports it.
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf8");
+    const before = readFileSync(join(dir, ".gitignore"), "utf8");
+    const result = runDoctor({ cwd: dir });
+    expect(result.envGitignore.present).toBe(true);
+    expect(result.envGitignore.ignores).toBe(false);
+    expect(result.envGitignore.hint).toContain(".arggon.env");
+    expect(result.envGitignore.hint).toContain("worktree-env-contract-016");
+    expect(formatDoctorReport(result)).toContain("worktree-env-contract-016");
+    // Strictly report-only: the bytes survive the probe.
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(before);
+
+    // Appending the documented line silences the hint.
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n.arggon.env\n", "utf8");
+    expect(runDoctor({ cwd: dir }).envGitignore.hint).toBeNull();
+  });
+
+  it("reports no hint when there is no .gitignore, and probes the cwd when uninitialized", () => {
+    const bare = tempDir();
+    expect(runDoctor({ cwd: bare }).envGitignore).toEqual({
+      path: ".gitignore",
+      present: false,
+      ignores: false,
+      hint: null,
+    });
+
+    // An uninitialized tree with a pre-existing adopter `.gitignore` still
+    // reports: `init` will keep that file, so the entry stays missing.
+    writeFileSync(join(bare, ".gitignore"), "node_modules/\n", "utf8");
+    const result = runDoctor({ cwd: bare });
+    expect(result.initialized).toBe(false);
+    expect(result.envGitignore.hint).toContain("worktree-env-contract-016");
+    expect(formatDoctorReport(result)).toContain("worktree-env-contract-016");
+  });
+
+  it("carries the probe in the doctor --json envelope", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf8");
+    const proc = runCli(["doctor", "--json"], dir);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      envGitignore: { path: string; present: boolean; ignores: boolean; hint: string | null };
+    };
+    expect(body.envGitignore).toMatchObject({
+      path: ".gitignore",
+      present: true,
+      ignores: false,
+    });
+    expect(body.envGitignore.hint).toContain("worktree-env-contract-016");
+  });
+});

@@ -226,6 +226,53 @@ describe("init", () => {
     expect(readFileSync(join(adopter, ".gitignore"), "utf8")).toBe("node_modules/\n");
   });
 
+  // task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters: an
+  // adopter `.gitignore` that predates the template is kept, so init must
+  // REPORT the missing `.arggon.env` entry instead of silently leaving the hole.
+  it("reports a missing .arggon.env gitignore entry, strictly report-only", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-envhint-"));
+    gitInit(dir);
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf8");
+    git(dir, ["add", ".gitignore"]);
+    git(dir, ["commit", "--quiet", "-m", "adopter gitignore"]);
+
+    const result = runInit({ dir, force: false });
+    expect(result.envGitignore.present).toBe(true);
+    expect(result.envGitignore.ignores).toBe(false);
+    expect(result.envGitignore.hint).toContain(".arggon.env");
+    expect(result.envGitignore.hint).toContain("worktree-env-contract-016");
+    // Strictly report-only: the adopter's bytes survive, nothing is staged and
+    // the auto-commit leaves a clean tree.
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe("node_modules/\n");
+    expect(git(dir, ["status", "--porcelain"])).toBe("");
+    expect(git(dir, ["diff", "HEAD", "--", ".gitignore"])).toBe("");
+
+    // A fresh scaffold generates its own `.gitignore` WITH the entry: no hint.
+    const fresh = mkdtempSync(join(tmpdir(), "arggon-init-envhint-"));
+    expect(runInit({ dir: fresh, force: false }).envGitignore.hint).toBeNull();
+
+    // The entry (appended by hand, exactly as documented) silences the hint.
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n.arggon.env\n", "utf8");
+    expect(runInit({ dir, force: false }).envGitignore.hint).toBeNull();
+  });
+
+  it("surfaces the gitignore hint on init stdout and in the --json envelope", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-envhint-cli-"));
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf8");
+    const proc = runCli(["init", "--json"], dir);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      envGitignore: { path: string; present: boolean; ignores: boolean; hint: string | null };
+    };
+    expect(body.envGitignore.present).toBe(true);
+    expect(body.envGitignore.ignores).toBe(false);
+    expect(body.envGitignore.hint).toContain("worktree-env-contract-016");
+    const human = runCli(["init"], dir);
+    expect(human.status).toBe(0);
+    expect(human.stdout).toContain("worktree-env-contract-016");
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe("node_modules/\n");
+  });
+
   it("generates the tier-2 doc set only with full", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
     const result = runInit({ dir, force: false, full: true });
