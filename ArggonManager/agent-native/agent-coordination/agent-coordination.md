@@ -3,10 +3,11 @@ type: epic
 status: in_progress
 id: agent-coordination
 title: agent-coordination
+assignee: arggon-delivery-lead
 parent: agent-native
 labels: []
 created: "2026-09-11"
-updated: "2026-10-14"
+updated: "2026-10-15"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/agent-coordination.md (epic index; required).
