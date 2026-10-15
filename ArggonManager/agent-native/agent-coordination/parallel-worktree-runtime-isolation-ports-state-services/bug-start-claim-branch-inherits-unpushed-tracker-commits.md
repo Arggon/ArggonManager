@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-start-claim-branch-inherits-unpushed-tracker-commits
 title: "`start --worktree` cuts the claim branch from the primary checkout's LOCAL HEAD, so a PR inherits every unpushed tracker auto-commit as unrelated diff churn — and the contamination is invisible until the PR is open"
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [worktree, claims, tracker-merge]
 created: "2026-10-11"
 updated: "2026-10-15"
-claimed_at: "2026-10-15T01:53:28.340Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-start-claim-branch-inherits-unpushed-tracker-commits
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-start-claim-branch-inherits-unpushed-tracker-commits.md
   Leaves live only under a story. id is the filename stem: bug-start-claim-branch-inherits-unpushed-tracker-commits.
