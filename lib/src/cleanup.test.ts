@@ -18,9 +18,11 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  classifyCleanupEntry,
   parseRemovalBlockers,
   worktreeTrackedRefusal,
   worktreeUntrackedRefusal,
+  type CleanupGit,
 } from "./cleanup.js";
 import type { WorkItem } from "./items.js";
 import { MAX_CLAIM_WRITE_NAMES } from "./worktree.js";
@@ -136,5 +138,79 @@ describe("cleanup skip reasons name the exact remedy (bug-cleanup-prune-untracke
 
     expect(reason).not.toContain("git branch -D");
     expect(reason).toContain("arggon cleanup --prune to clear the record");
+  });
+});
+
+/**
+ * The probe-degradation fallback (review N1 on PR #751). `git status
+ * --porcelain` is the ONLY evidence that `git worktree remove` will succeed, so
+ * a probe that does not answer must not be classified `removable: true` with a
+ * null reason and then fail on a raw git error: the entry is an honest skip
+ * naming the failed probe and the manual sequence, and the force opt-in does
+ * not bypass it. The control case pins that an ANSWERING probe keeps the clean
+ * path removable exactly as before.
+ */
+describe("cleanup's probe-degradation fallback (review N1 on PR #751)", () => {
+  // The probe is only reached for an existing, registered worktree: cwd always
+  // exists on disk and the runner below claims it as this repo's only worktree.
+  const worktree = process.cwd();
+
+  function gitRunner(): CleanupGit {
+    return {
+      isRepo: () => true,
+      worktreeList: () => [worktree],
+      defaultBranch: () => "main",
+      isAncestor: () => true,
+      remoteBranchExists: () => false,
+      removeWorktree: () => {
+        throw new Error("the classifier must never remove anything itself");
+      },
+      deleteBranch: () => {
+        throw new Error("the classifier must never delete branches itself");
+      },
+      deleteBranchForce: () => {
+        throw new Error("the classifier must never delete branches itself");
+      },
+      branchExists: () => true,
+    };
+  }
+
+  function targetItem(): WorkItem {
+    return { ...item(), worktreePath: worktree };
+  }
+
+  it("classifies removable: false, naming the failed probe and the manual sequence", () => {
+    const entry = classifyCleanupEntry(targetItem(), "/repo", "main", gitRunner(), {
+      status: () => undefined,
+    });
+
+    expect(entry.removable).toBe(false);
+    expect(entry.action).toBeNull();
+    expect(entry.reason).toContain("'git status --porcelain'");
+    expect(entry.reason).toContain(worktree);
+    expect(entry.reason).toContain("Nothing was removed");
+    expect(entry.reason).toContain("git worktree remove");
+    expect(entry.reason).toContain("git branch -D fix/task-alpha");
+    expect(entry.reason).toContain("arggon cleanup --prune");
+  });
+
+  it("does not let the force opt-in bypass an unanswered probe", () => {
+    const entry = classifyCleanupEntry(targetItem(), "/repo", "main", gitRunner(), {
+      status: () => undefined,
+      force: true,
+    });
+
+    expect(entry.removable).toBe(false);
+    expect(entry.reason).toContain("did not answer");
+  });
+
+  it("keeps the clean path removable when the probe answers (control)", () => {
+    const entry = classifyCleanupEntry(targetItem(), "/repo", "main", gitRunner(), {
+      status: () => "",
+    });
+
+    expect(entry.removable).toBe(true);
+    expect(entry.reason).toBeNull();
+    expect(entry.action).toBe("remove worktree and delete the merged branch");
   });
 });
