@@ -1,6 +1,6 @@
 ---
 type: epic
-status: todo
+status: in_progress
 id: ecosystem-ops
 title: ecosystem-ops
 parent: agent-native

@@ -1,6 +1,6 @@
 ---
 type: epic
-status: todo
+status: in_progress
 id: agent-coordination
 title: agent-coordination
 parent: agent-native

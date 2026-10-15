@@ -1,6 +1,6 @@
 ---
 type: initiative
-status: todo
+status: in_progress
 id: agent-native
 title: "Agent-native tooling: dependencies, leases, worktrees, ecosystem"
 labels: []
