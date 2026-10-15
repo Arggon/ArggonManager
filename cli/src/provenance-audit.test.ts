@@ -47,7 +47,10 @@ import {
   BUNDLED_SKILLS,
   auditGeneratedProvenance,
   checksumOf,
+  currentGeneratedTemplates,
   generatedMarker,
+  generatedYamlMarker,
+  readGeneratedMarker,
   renderGeneratedDoc,
 } from "./docs.js";
 import { runInit } from "./init.js";
@@ -174,6 +177,133 @@ describe("provenance audit: records vs committed seam bytes", () => {
     // `.opencode/commands/arggon-explore.md` record were exactly these rows.
     const violations = auditGeneratedProvenance({ root: repoRoot, templatesDir, full: true });
     expect(violations).toEqual([]);
+  });
+});
+
+/**
+ * The marker reader the class check is built on: anchored exactly like
+ * `stampGeneratedContent` writes the marker, so provenance is read from the
+ * file head only and a phrase in a body is never a claim.
+ */
+describe("provenance marker reader", () => {
+  it("reads each shape stampGeneratedContent writes", () => {
+    expect(readGeneratedMarker(`${generatedMarker("AGENTS.md")}\n# x\n`)).toBe("AGENTS.md");
+    expect(
+      readGeneratedMarker(`${generatedYamlMarker("github/workflows/arggon.yml")}\nname: x\n`),
+    ).toBe("github/workflows/arggon.yml");
+    expect(
+      readGeneratedMarker(`// arggon:generated template="opencode/plugins/arggon/index.ts"\n`),
+    ).toBe("opencode/plugins/arggon/index.ts");
+    // Frontmatter destinations take the marker INSIDE the frontmatter.
+    expect(
+      readGeneratedMarker(
+        `---\n# arggon:generated template="opencode/agents/x.md"\nmode: subagent\n`,
+      ),
+    ).toBe("opencode/agents/x.md");
+  });
+
+  it("tolerates CRLF and a BOM, and never trusts the phrase below the head", () => {
+    expect(readGeneratedMarker(`\uFEFF${generatedMarker("AGENTS.md")}\r\n# x\r\n`)).toBe(
+      "AGENTS.md",
+    );
+    expect(
+      readGeneratedMarker('---\r\n# arggon:generated template="opencode/agents/x.md"\r\n'),
+    ).toBe("opencode/agents/x.md");
+    expect(
+      readGeneratedMarker("description: mine\ndocs say <!-- arggon:generated -->\n"),
+    ).toBeNull();
+    expect(readGeneratedMarker("# ordinary markdown\n")).toBeNull();
+    expect(readGeneratedMarker("")).toBeNull();
+  });
+});
+
+/**
+ * The false-absence class (bug-prover-agent-has-no-x-generated-entry).
+ *
+ * The defect this pins: `.opencode/agents/arggon-prover.md` was committed with
+ * the visible generated marker but with NO `x-generated` entry, so init
+ * classified it adopter-modified and skipped it — and a walk over the CURRENT
+ * destinations could not see it either once its template left the install.
+ * Both enforcement layers were blind to a file that self-declares as generated
+ * content. The class fix reports the SHAPE, not this instance: any file under a
+ * managed path whose own marker claims arggon provenance but which has no row.
+ *
+ * The deliberate non-findings pin the boundary: an adopter-owned file with no
+ * marker and no row is init behaving correctly (the pre-provenance adopter
+ * file), and a marker-bearing file WITH a row is ordinary adopter content, not
+ * a false absence.
+ */
+describe("provenance audit: unprovenanced managed files", () => {
+  /** The stranded shape: marker + no row + a template the install no longer ships. */
+  function strand(dir: string, dest: string, marker: string, body: string): void {
+    const abs = join(dir, ...dest.split("/"));
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, `${marker}\n${body}`, "utf8");
+  }
+
+  it("reports a stranded marker file under a managed path with no row", () => {
+    const dir = scaffold();
+    const dest = ".opencode/agents/arggon-prover.md";
+    const template = "opencode/agents/arggon-prover.md";
+    // Precondition, asserted rather than assumed: the byte rule cannot see this
+    // file — the current template walk no longer owns its destination, and no
+    // ledger row exists. It is exactly the shape the item was filed for.
+    expect(currentGeneratedTemplates().some((d) => d.dest === dest)).toBe(false);
+    expect(stateEntries(dir)[dest]).toBeUndefined();
+    strand(dir, dest, generatedYamlMarker(template), "description: stranded\n");
+
+    const hit = auditGeneratedProvenance({ root: dir, templatesDir, full: true }).find(
+      (v) => v.dest === dest,
+    );
+    expect(hit).toBeDefined();
+    expect(hit!.kind).toBe("unprovenanced");
+    expect(hit!.template).toBe(template);
+    expect(hit!.reason).toContain("no x-generated entry");
+  });
+
+  it("reports a marker file in a nested managed namespace (frontmatter and HTML shapes)", () => {
+    const dir = scaffold();
+    const nested = "ArggonManager/docs/runbooks/stranded-runbook.md";
+    strand(dir, nested, generatedMarker("docs/runbooks/stranded-runbook.md"), "# Stranded\n");
+    const hits = auditGeneratedProvenance({ root: dir, templatesDir, full: true });
+    expect(hits.map((v) => [v.kind, v.dest])).toEqual([["unprovenanced", nested]]);
+  });
+
+  it("never reports an adopter-owned managed file (no marker, no row)", () => {
+    const dir = scaffold();
+    // The sanctioned pre-provenance adopter file: init is RIGHT to skip it, and
+    // a path-only check would false-positive here.
+    strand(dir, ".opencode/agents/my-own-agent.md", "", "description: mine\n");
+    // The marker phrase in a BODY is not provenance: the anchored read only
+    // trusts the file head.
+    strand(
+      dir,
+      ".opencode/agents/mentions-marker.md",
+      "description: mine",
+      "docs say <!-- arggon:generated -->",
+    );
+    expect(auditGeneratedProvenance({ root: dir, templatesDir, full: true })).toEqual([]);
+  });
+
+  it("never reports a marker file that has a row, even when its bytes diverge", () => {
+    const dir = scaffold();
+    // AGENTS.md carries a row and a marker; a hand edit keeps the marker and
+    // diverges from the render. It has a row, so it is not a false absence —
+    // and the byte rule stays silent because the bytes are adopter content.
+    appendFileSync(join(dir, "AGENTS.md"), "\nMY ADOPTER EDIT\n", "utf8");
+    expect(auditGeneratedProvenance({ root: dir, templatesDir, full: true })).toEqual([]);
+  });
+
+  it("reports a marker file whose row was dropped, independent of the byte rule", () => {
+    const dir = scaffold();
+    const generated = stateEntries(dir);
+    delete generated["CONTRIBUTING.md"];
+    writeState(dir, generated);
+    // Keep the marker, diverge the bytes: the byte rule stays silent (adopter
+    // content, and no row to compare), so only the class check can name it.
+    appendFileSync(join(dir, "CONTRIBUTING.md"), "\nMY EDIT\n", "utf8");
+    const violations = auditGeneratedProvenance({ root: dir, templatesDir, full: true });
+    expect(violations.map((v) => [v.kind, v.dest])).toEqual([["unprovenanced", "CONTRIBUTING.md"]]);
   });
 });
 
