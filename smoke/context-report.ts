@@ -80,8 +80,13 @@ export const W3_ITEM_BLOCK_RANGE_BYTES = { min: 181, max: 204 } as const;
  * a one-line-per-tool catalog and caps the whole catalog at its own ~2000-token
  * budget (omitted tools stay reachable through `search`), so this payload is the
  * stable, runtime-free measure of what the wave adds.
+ *
+ * Raised from 12,288 to 13,312 by task-friction-surface-parity-and-docs, which
+ * added one tool to the namespace because `ArggonManager/docs/agents.md` §MCP
+ * makes a one-surface-only command a convention violation. Mirrored by
+ * `opencode/plugins/arggon/tools.test.ts`'s own constant.
  */
-export const NATIVE_TOOLS_BUDGET_BYTES = 12_288;
+export const NATIVE_TOOLS_BUDGET_BYTES = 13_312;
 
 /** Compaction retention the generated config ships (V2 default, see template). */
 export const GENERATED_KEEP_TOKENS = 15_000;

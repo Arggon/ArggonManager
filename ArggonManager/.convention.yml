@@ -24,9 +24,9 @@ x-generated:
     generatedAt: "2026-10-11T03:26:00.000Z"
   .agents/skills/arggon-cli/references/json-contract.md:
     template: "skills/arggon-cli/references/json-contract.md"
-    checksum: "sha256:964c9ece51a8669df2d50d33bf97e0f286c1e648700fa0daa4e35593a069cd0b"
+    checksum: "sha256:8552bbd59c6b9a7577fa45f3996800a3075a456b8c55807336604d558833add0"
     arggonVersion: "0.6.0"
-    generatedAt: "2026-10-10T00:41:12.326Z"
+    generatedAt: "2026-10-15T17:35:00.000Z"
   .agents/skills/arggon-cli/references/methodology.md:
     template: "skills/arggon-cli/references/methodology.md"
     checksum: "sha256:3b71b3a122b67ee452512d5517da0c958adea7a6d72237c0fe8735285097920b"

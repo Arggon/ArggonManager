@@ -22,8 +22,9 @@ import { BUNDLE_EXPORTS, PLUGIN_BUNDLE } from "../../../cli/src/plugin-bundle.js
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 /**
- * The twelve spec tools (spec-native-first-011 §Tools) plus the three W4
- * worktree-domain tools (task-native-permissions-worktrees).
+ * The spec-native kernel tools (spec-native-first-011 §Tools), the
+ * CLI-re-entering `friction` tool (task-friction-surface-parity-and-docs) and
+ * the three W4 worktree-domain tools (task-native-permissions-worktrees).
  */
 const TOOL_NAMES = [
   "list",
@@ -38,6 +39,7 @@ const TOOL_NAMES = [
   "priority",
   "sync",
   "import_issues",
+  "friction",
   "start",
   "branch",
   "cleanup",
@@ -147,7 +149,7 @@ describe("vendored plugin bundle: dependency-less load (W3)", () => {
     ).toEqual([...BUNDLE_EXPORTS].sort());
   });
 
-  it("registers the fifteen native tools and exercises them against a real tracker", async () => {
+  it("registers the sixteen native tools and exercises them against a real tracker", async () => {
     const mod = await importDependencyLess();
     const definition = mod.default as ArgonPlugin;
     const { ctx, tools } = fakeContext(repoRoot);
