@@ -109,3 +109,6 @@ Yes, but only through the human-only takeover gate and only where the claim live
 ### handoff 2026-10-15 @arggon-maker (session: maker-claim-pool) — next: Standards review of the recorded route (declare + sync) against boxes 1/4; then merge the PR with a merge commit (tracker auto-commits ride the branch).
 - branch: fix/bug-claim-pool-computed-from-main-misses-branch-claims
 - open questions: Follow-up option: exclude locally-visible branch claims from next's pool? Rejected here (incomplete without a fetch; hides the boundary). Box 6: the four items merged 2026-10-06 — recorded as observe…
+
+### 2026-10-15 @arggon-maker
+PR opened: https://github.com/Arggon/ArggonManager/pull/841 — branch pushed, acceptance boxes ticked against the evidence comment above. Gates green in the final run: npm test 161 files / 3543 tests, lint, test:structure 5/5, check:plugin, prettier, validate.
