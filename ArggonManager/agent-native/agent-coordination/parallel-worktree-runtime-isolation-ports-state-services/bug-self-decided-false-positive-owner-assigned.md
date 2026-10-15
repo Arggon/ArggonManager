@@ -67,3 +67,7 @@ Pinned in `cli/src/decision-brief-convention.test.ts` at both layers: classifier
 **Gates (box 5)**: `arggon validate` ok (0 warnings); `vitest run cli/src/decision-brief-convention.test.ts` 36 passed; `npm run build` + `npm test` 159 files / 3509 tests passed; `npm run lint` clean; `npm run test:structure` 5 passed + ast-grep scan exit 0; `prettier --check` clean on the 5 touched files; `arggon spec validate` ok (38 docs); `arggon spec analyze` 4 pre-existing findings, none for spec 021, exit 0 (report-only).
 
 Note: the lead's decision comment (56aa4f02, local main unpushed) was cherry-picked onto the branch so the item body is complete; expect a trivial item-file union at merge.
+
+### handoff 2026-10-15 @arggon-maker — next: Standards review of PR #837; merge with a merge commit (tracker-carrying). Lead ticks the 5 acceptance boxes and flips to done.
+- branch: fix/bug-self-decided-false-positive-owner-assigned
+- open questions: Boxes left unticked for the lead's completion call; decision comment cherry-picked from local main onto the branch (trivial item-file union at merge)
