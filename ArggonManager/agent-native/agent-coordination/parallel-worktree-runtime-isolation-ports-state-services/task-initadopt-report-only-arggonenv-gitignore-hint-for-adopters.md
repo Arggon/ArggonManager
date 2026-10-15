@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters
 title: "init/adopt: report-only .arggon.env gitignore hint for adopters"
+assignee: arggon-delivery-lead
+branch: feat/task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: []
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-15"
+claimed_at: "2026-10-15T01:53:35.919Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters.md
