@@ -10,7 +10,6 @@ labels: [native-seam, bounded-output]
 created: "2026-10-03"
 updated: "2026-10-15"
 depends_on: [bug-native-steps-truncated-flag-dropped]
-worktree_path: /home/arggon/Projects/ArggonManager-bug-fresh-worktree-refusal-prose-drops-prep-step-truncation
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-fresh-worktree-refusal-prose-drops-prep-step-truncation.md
