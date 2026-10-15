@@ -1,14 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-gatebin-budget-reserved-block-can-exceed-clip
 title: "Gate-bin budget: the `≥1 name` override stops being safe when the reserved mandatory block alone exceeds MAX_HUMAN_ERROR_CHARS (~700+ char paths) — needs a defined behaviour, not silent loss"
+assignee: arggon-delivery-lead
+branch: fix/bug-gatebin-budget-reserved-block-can-exceed-clip
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [cli, bounded-output]
 created: "2026-10-03"
-updated: "2026-10-03"
+updated: "2026-10-15"
+claimed_at: "2026-10-15T13:21:35.949Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-gatebin-budget-reserved-block-can-exceed-clip
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-gatebin-budget-reserved-block-can-exceed-clip.md
   Leaves live only under a story. id is the filename stem: bug-gatebin-budget-reserved-block-can-exceed-clip.
