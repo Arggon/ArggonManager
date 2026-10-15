@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-friction-surface-parity-and-docs
 title: "Friction surface parity (native tool, MCP) and JSON contract docs"
 assignee: arggon-delivery-lead
@@ -46,7 +46,6 @@ acceptance criteria are T6's — one owner, one claim.
 - [x] No `schemaVersion` bump is introduced by either surface (asserted in both tasks).
 - [x] Every error path carries a typed `error.code` (`FRICTION_FAILED`) with the documented `reason` values: `no-observation`, `log-unwritable`, and the report/clear conflict.
 
-<<<<<<< HEAD
 ### 2026-10-15 @Arggon
 # Evidence — T5 friction surface parity (PR #849)
 
@@ -136,7 +135,7 @@ stays green.
 ### handoff 2026-10-15 @Arggon — next: Delivery lead: review PR #849 (three-surface friction parity + the doctor.friction doc row) and merge; T6 (task-friction-trigger-carrier) is unblocked and owns the block's code, fields and tests.
 - branch: feat/task-friction-surface-parity-and-docs
 - open questions: Should the two raised ADR-0006 advisory schema bounds (MCP 20 KiB, native catalog 13,312 B) be re-tightened once the surface stops growing, or is 20 KiB the standing bound?; Keep the CLI re-entry for…
-=======
+
 ### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
 verdict: approve
 ### Lead review + merge verification — 2026-10-15 (delivery lead)
