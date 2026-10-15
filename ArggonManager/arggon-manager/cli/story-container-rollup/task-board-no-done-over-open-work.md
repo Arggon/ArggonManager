@@ -72,3 +72,6 @@ Decisions recorded: `cancelled` never masked (abandoned, not finished); TUI/Open
 ### handoff 2026-10-15 @Arggon — next: Delivery lead: review PR #827, then merge; after merge tick the acceptance and close the item (stored statuses untouched).
 - branch: feat/task-board-no-done-over-open-work
 - open questions: lens predicate reads the stored status by design — flag if the owner wants a status:open value; a kept done column still shows the lens-verdict count (layout never moves counters)
+
+### 2026-10-15 @Arggon
+**Finding for the delivery lead (out of this item's scope):** this change adds an additive `open_descendants: number` to the board detail payload (`GET /api/item` and the static `--details` snapshot). `ArggonManager/docs/json-output.md` documents that payload field-by-field (line ~691) and is owned by `task-container-hygiene-check` — I did not touch it. Either that item adds the one field line, or a follow-up is filed; the README board section carries the user-facing rule in the meantime.
