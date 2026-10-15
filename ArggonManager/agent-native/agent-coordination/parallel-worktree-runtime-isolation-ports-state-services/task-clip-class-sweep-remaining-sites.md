@@ -10,7 +10,6 @@ labels: [cli, native-seam]
 created: "2026-10-03"
 updated: "2026-10-15"
 depends_on: [task-cli-start-remediation-tail-clipped-on-human-channel, bug-three-acceptance-parsers-diverging]
-worktree_path: /home/arggon/Projects/ArggonManager-task-clip-class-sweep-remaining-sites
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-clip-class-sweep-remaining-sites.md
