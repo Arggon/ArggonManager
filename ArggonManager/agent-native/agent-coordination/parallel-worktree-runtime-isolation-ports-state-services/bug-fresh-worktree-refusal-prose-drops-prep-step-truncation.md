@@ -1,19 +1,17 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-fresh-worktree-refusal-prose-drops-prep-step-truncation
-title: '`freshWorktreeInstallRefusal` composes "Preparation ran: …" from the capped log without saying entries were dropped — a prose instance of the stepsTruncated defect both surfaces inherit'
+title: "`freshWorktreeInstallRefusal` composes \"Preparation ran: …\" from the capped log without saying entries were dropped — a prose instance of the stepsTruncated defect both surfaces inherit"
 assignee: arggon-delivery-lead
 branch: fix/bug-fresh-worktree-refusal-prose-drops-prep-step-truncation
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [native-seam, bounded-output]
 created: "2026-10-03"
 updated: "2026-10-15"
-claimed_at: "2026-10-15T01:53:32.221Z"
 depends_on: [bug-native-steps-truncated-flag-dropped]
 worktree_path: /home/arggon/Projects/ArggonManager-bug-fresh-worktree-refusal-prose-drops-prep-step-truncation
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-fresh-worktree-refusal-prose-drops-prep-step-truncation.md
   Leaves live only under a story. id is the filename stem: bug-fresh-worktree-refusal-prose-drops-prep-step-truncation.
