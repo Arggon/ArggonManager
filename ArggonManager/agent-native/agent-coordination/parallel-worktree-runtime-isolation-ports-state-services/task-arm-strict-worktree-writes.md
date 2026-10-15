@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-arm-strict-worktree-writes
 title: "Arm `x-tracker.strict-worktree-writes` for the coordinator's parallel waves (or record why the report-only default is kept)"
+assignee: arggon-delivery-lead
+branch: feat/task-arm-strict-worktree-writes
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [worktree, methodology]
 priority: p3
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-15"
+claimed_at: "2026-10-15T13:21:32.409Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-arm-strict-worktree-writes
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-arm-strict-worktree-writes.md
