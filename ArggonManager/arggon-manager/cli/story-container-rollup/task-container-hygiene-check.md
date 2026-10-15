@@ -12,7 +12,6 @@ updated: "2026-10-15"
 claimed_at: "2026-10-15T00:03:28.353Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-container-hygiene-check
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-container-rollup/task-container-hygiene-check.md
   Leaves live only under a story. id is the filename stem: task-container-hygiene-check.
@@ -48,3 +47,29 @@ the product owner on the board.
   positive cases.
 
 ## Notes
+
+### 2026-10-15 @Arggon
+### Evidence — PR #826 (report-only container hygiene)
+
+Gates (worktree `/home/arggon/Projects/ArggonManager-task-container-hygiene-check`, branch `feat/task-container-hygiene-check`, after `npm run build`):
+
+- `npm run arggon -- validate`: ok (0 warning(s), convention v5)
+- focused: `npx vitest run cli/src/report.test.ts` -> 21 passed (7 new hygiene tests + fixture matrix)
+- adjacent: `npx vitest run cli/src/mcp-parity.test.ts cli/src/mcp-server.test.ts cli/src/plugin-copy.test.ts cli/src/skill-generated-commands.test.ts` -> 70 passed
+- `npm test`: 158 files, 3471 passed
+- `npm run lint`: clean
+- `npm run test:structure`: 5 passed
+- `npx prettier --check` on touched files: all clean
+
+Surface decision: `arggon report` (the preferred home) — the check is a pure derived view of tracker state and the command already runs at wave ends; `doctor` was not needed. Caps: the report had no caps today, so the hygiene lists follow the kernel's bounded-receipt discipline (`MAX_HYGIENE_OFFENDERS` = 10, `MAX_HYGIENE_OPEN_CONTAINERS` = 5) with `offendersTotal`/`openContainersTotal` carrying the full counts; human output shares the caps and overflow markers.
+
+Semantics delivered: offender = terminal container (`done`/`cancelled`) whose subtree holds a non-terminal container (story/epic) at any depth — every terminal container on the open item's chain, not just the deepest; leaves-only follow-ups are NOT flagged; open containers are never offenders; report-only (exit 0 with offenders, no `validate` change, no CI wiring).
+
+Today's tree: `hygiene: clean — no terminal container holds an open container (84 containers checked)`; `--json`: `"hygiene":{"checked":84,"offenders":[],"offendersTotal":0}`.
+
+Fixture sample (positive cases live in `cli/src/report.test.ts`):
+`hygiene: 4 offenders (12 containers checked)` with `epic-cancelled (cancelled) -> story-cancelled-open (in_progress)`, `epic-flagged (done) -> story-open (todo)`, `epic-ok (done) -> story-deep-open (todo)`, `init-closed (done) -> story-deep-open (todo)`.
+
+Files: `lib/src/report.ts` (`containerHygiene`, `formatReportHygiene`, markdown `## Hygiene`), `lib/src/operations.ts` (`ReportPayload.hygiene`), `lib/src/index.ts`, `cli/src/cli.ts` (table append), `cli/src/mcp-server.ts` + `opencode/plugins/arggon/index.ts` (descriptions/schema, trimmed to stay inside the ADR 0006 budgets), `cli/src/report.test.ts` (fixture matrix + parity + caps), `ArggonManager/docs/json-output.md` §report, plus the regenerated plugin bundle and re-synced skill copies.
+
+Remaining: standards review, then merge + the `done` flip (delivery lead).
