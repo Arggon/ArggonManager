@@ -271,3 +271,7 @@ Does NOT prove: that the layer is enforced in every client runtime (it is enforc
 **Diff note:** two tracker files in the PR are not this item's — `bug-prover-agent-has-no-x-generated-entry.md` and `bug-start-claim-branch-inherits-unpushed-tracker-commits.md` rode in from the claim's base (the `inheritedCommits` shape); the lead's own commits, untouched by this branch, and they leave the diff once main is pushed. Flagged on the PR too.
 
 **Acceptance:** all 7 boxes ticked; the one judgement call to review is the refname question (see the handoff), pinned as an assertion in the test so it cannot change silently.
+
+### handoff 2026-10-15 @arggon-maker — next: PR #836 is open with all CI green: hand it to the standards reviewer; the one judgement call to review is that the refname is NOT the discriminator (--force-with-lease origin main:other is allowed, l…
+- branch: fix/bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use
+- open questions: Refuse the lease-with-named-ref form (origin main:other) after all? one deny rule + one test case if the lead wants it; Close the residual (a second bare --force next to an allowed lease flag) or kee…
