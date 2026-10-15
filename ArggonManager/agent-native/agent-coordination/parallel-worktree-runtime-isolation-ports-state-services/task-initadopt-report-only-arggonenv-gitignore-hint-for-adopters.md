@@ -81,3 +81,10 @@ Maker evidence — PR [#831](https://github.com/Arggon/ArggonManager/pull/831), 
 ### handoff 2026-10-15 @arggon-maker — next: Standards review + merge PR #831 (all gates green); then verify the 4 acceptance boxes and flip done — completion is the delivery lead's call.
 - branch: feat/task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters
 - open questions: none — surface decision (all three, one shared probe) and report-only evidence are in the PR body and the evidence comment
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-14 (delivery lead)
+Merged as 08e1447d (PR #831). The hint ships report-only on all three surfaces from ONE shared probe (`cli/src/env-gitignore.ts`): doctor (standing), adopt (the adoption moment, reusing the pre-flight doctor read), init (after its writes, so a generated `.gitignore` is clean). The probe reads the repo's OWN `.gitignore` bytes — deliberately not `git check-ignore`, so a machine-local exclude cannot hide the missing entry from other clones; file order handles a later `!.arggon.env` un-ignore; no `.gitignore` at all → no hint (fresh init generates one that carries the entry).
+
+Report-only verified: unchanged bytes and clean `git status`/`git diff` after init/doctor/adopt; the additive `envGitignore:{path,present,ignores,hint}` rides all three `--json` envelopes; spec-016 documents the exact hand-step line; `json-output.md` documents the field on the three commands. Evidence: `env-gitignore.test.ts` + init/adopt/doctor test additions (maker's focused 160, full 3494); CI green on all lanes on the refreshed head. Recorded limitation: patterns that cover the file indirectly (e.g. `*.env`) are not detected — the probe is scoped to the canonical anchored forms (module docstring); the hint only ever asks for the canonical line.
