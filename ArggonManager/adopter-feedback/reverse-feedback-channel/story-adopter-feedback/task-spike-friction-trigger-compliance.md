@@ -14,6 +14,7 @@ claimed_at: "2026-10-15T23:18:37.313Z"
 depends_on: [task-friction-trigger-carrier]
 worktree_path: /home/arggon/Projects/ArggonManager-task-spike-friction-trigger-compliance
 ---
+
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-spike-friction-trigger-compliance.md
   Leaves live only under a story. id is the filename stem: task-spike-friction-trigger-compliance.
@@ -43,6 +44,65 @@ which is exactly the change ADR 0024 makes and exactly what stage 1 ships.
 So the spike measures the thing stage 1 actually changed.
 
 Two real adopters exist on this machine: `../ArggonStores` and this repo.
+
+## Pre-registered criterion (2026-10-15, before the sweep)
+
+**The question.** Do adopters run `arggon friction` once the command is embedded
+in the agent files they already load — the carrier `task-friction-trigger-carrier`
+(PR #850) shipped — rather than only referenced from a skill?
+
+**Population.** Every git work tree on this machine carrying an ArggonManager
+tracker (`ArggonManager/.convention.yml` or `tasks/.convention.yml`), observed
+read-only on 2026-10-15. `../ArggonStores` is the non-maintainer adopter; this
+repo's own checkouts are the maintainer comparator, recorded separately and never
+counted as adopter evidence.
+
+**Primary pass/fail — fixed before the numbers are read.**
+
+- **PASS** — at least one observed **non-maintainer adopter** repo yields ≥1 record
+  of an actual invocation: a line in its friction log whose `reporterId` matches
+  that repo's absolute path, or an invocation recorded in the repo's own history
+  (commit message, diff or comment).
+- **NULL (fail)** — zero adopter-attributable records across N observed adopter
+  repos.
+- Anything else — records present but unattributable to any observed path — is
+  recorded as `INCONCLUSIVE` with the reason, never folded into either arm.
+
+**Covariates recorded per repo.** They decide what a NULL _means_; they do not
+move the bar.
+
+1. `arggon doctor --json`'s `friction.triggerPresent`, per managed agent file,
+   with `triggerVersion`. "Never seen" ≠ "seen and ignored".
+2. Reachability of the command at that repo: the generated-commands inventory in
+   `.agents/skills/arggon-cli/SKILL.md`, `references/friction.md`, and the vendored
+   plugin's native tool set. A NULL is only meaningful where the command was
+   reachable.
+3. Provenance of the generated files (`x-generated` `generatedAt` /
+   `arggonVersion`): an adopter whose files predate PR #850 cannot have seen the
+   trigger.
+
+**Decision rule for stage 2.**
+
+- **PASS** → tier C (`gh` upstream dedupe) may proceed as stage 2.
+- **NULL + `triggerPresent` false everywhere (never seen)** → the trigger has
+  never been observable at an adopter on this machine. Record `NOT-YET-MEASURABLE`,
+  defer stage 2, and re-measure after the adopter's next `arggon init` (a
+  re-measurement trigger, not a win and not a loss).
+- **NULL + `triggerPresent` true (seen and ignored)** → the trigger is not
+  sufficient; tier B (the prefilled URL a human opens) becomes the whole channel.
+  **No added instruction pressure.**
+- A NULL is recorded explicitly as the input to that choice — never as a failed
+  spike.
+
+**What this measurement can and cannot establish.** It CAN establish, at one
+instant, whether any record exists that is attributable to an observed repo, and
+whether the trigger bytes were on disk at that instant. It CANNOT establish
+longitudinal behaviour: this is a point-in-time observation, on one machine, with
+N adopters in the low single digits, where the maintainer and the adopter share a
+human. It cannot separate "no agent ever hit friction" from "an agent hit friction
+and did not record it" — only the log and the repos' own history speak, which is
+the exact silence/absence ambiguity the `deftai` post-mortem failed on, and the
+reason this criterion is committed before the sweep rather than written after it.
 
 ## Acceptance
 
