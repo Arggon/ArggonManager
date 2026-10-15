@@ -174,6 +174,10 @@ const ALLOWED = [
   "git push --force-with-lease",
   "git push --force-with-lease=origin/main:abc123 origin fix/bug-x",
   "git push --force-with-lease=origin/main:abc123 -u origin fix/bug-x",
+  // The judgement call above, pinned: the lease is the discriminator, the
+  // refname is not.
+  "git push --force-with-lease origin main:other",
+  "git push --force-with-lease origin main",
   "git push --force-if-includes origin fix/bug-x",
   "git push --force-if-includes --force-with-lease origin fix/bug-x",
   // The rest of the loop this gate sits on: never blocked.
