@@ -73,3 +73,12 @@ GATES (worktree, expected → observed): `arggon validate` ok → ok (0 warnings
 ### handoff 2026-10-15 @Arggon — next: Review PR #846 (fix/bug-mcp-server-binds-session-cwd-tracker-root): the MCP item-addressed cwd routing; on merge, flip the item done once the PR fully finishes it.
 - branch: fix/bug-mcp-server-binds-session-cwd-tracker-root
 - open questions: None from the maker. Reviewer watch-points: the claim-footprint scan's per-worktree item-copy read (bounded 64) and the read/show routing asymmetry (reads never refuse).
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-15 (delivery lead)
+Merged as 9be5559c (PR #846). Repair (steered, chosen): item-addressed MCP calls resolve their cwd from the item's own claim — the launch copy's `worktree_path` first, then the repo's worktrees through their claim footprints (bounded: 64 roots, 5s `git worktree list` timeout, 8 KiB env file); the one unsafe state (recorded tree gone or no tracker there) REFUSES the write with the shared named code `TRACKER_ROOT_MISMATCH` naming both trees and the remedies — reads never refuse (a stale read is detectable, a wrong write is not). The CLI stays unrouted (single-checkout flow); pool calls and the worktree lifecycle tools untouched.
+
+Reproduced before/after over real stdio JSON-RPC: before — comment+handoff landed in the launch tree (primary, `branch: master` recorded, two local-only commits, worktree untouched); after — both land in the worktree copy, commits ride the claim branch, the primary stays byte-clean.
+
+Evidence: `cli/src/mcp-routing.ts` + 10 unit + 6 end-to-end MCP cases; full suite 3581 green; `check:plugin` green (bundle byte-unchanged — the native surface needed no edit; parity stated); validate/lint/structure/prettier green. Docs travel: `agents.md` §MCP server, `json-output.md`, README, the skill's json-contract + its Claude-seam copy (the two-destination rule working in practice). Impact class **Behavioral** stated. The `prose-format.test.ts` timeout in two intermediate runs is recorded as a load-average artifact, not the change.
