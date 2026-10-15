@@ -8,7 +8,7 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, type Dirent } from "node:fs";
-import { stampGeneratedContent } from "./docs.js";
+import { stampGeneratedContent, arggonVersion } from "./docs.js";
 import { PLUGIN_BUNDLE } from "./plugin-paths.js";
 import { join, relative, sep } from "node:path";
 import {
@@ -23,6 +23,9 @@ import {
   type GeneratedEntry,
   type TrackerLayout,
 } from "@arggondev/lib";
+// The marked trigger block reader (ADR 0024 §2): one marker, read both ways —
+// which TEMPLATES ship the block, and which generated files carry it.
+import { carriesFrictionTrigger, isManagedAgentDest, readFrictionTrigger } from "@arggondev/lib";
 import { bundledTemplatesDir } from "./package-assets.js";
 import {
   checksumMatches,
@@ -33,6 +36,7 @@ import {
   planOrphanReaps,
   renderGeneratedDoc,
   resolveProjectName,
+  templateSourcePath,
   unprovenancedManagedFiles,
 } from "./docs.js";
 import { agentForTemplate, AGENT_IDS, detectAgents, type AgentId } from "./adapters.js";
@@ -616,6 +620,61 @@ export type AdapterAgentReport = {
 /** Per-agent file cap; `counts` totals every file so a cut stays visible. */
 export const MAX_ADAPTER_AGENT_FILES = 64;
 
+/** One managed agent file's friction-trigger state (ADR 0024 §2). */
+export type DoctorFrictionFile = {
+  /** Destination path (posix, relative to the probed root). */
+  path: string;
+  /** The marked `arggon:friction-trigger` block is in the file on disk. */
+  triggerPresent: boolean;
+  /**
+   * The `triggerVersion` the block on disk carries; `null` when the block is
+   * absent (ADR 0024 §2: "absent trigger is reported, never hidden").
+   */
+  triggerVersion: string | null;
+};
+
+/**
+ * The additive `friction` block (ADR 0024 §2,
+ * spec-friction-capture-020 §The trigger and its visibility): per managed agent
+ * file, whether the file on disk carries the marked `arggon:friction-trigger`
+ * block and at which version.
+ *
+ * What it is FOR, narrowly, because it is easy to oversell: it is NOT the only
+ * visibility the trigger has, and it does not fix an invisible channel.
+ * `doctor`'s own `docs` block re-renders the current template for every
+ * `config.generated` entry in every local state — untouched, modified, acked and
+ * acked-drifted alike — and the generated agent files are in that map, so a
+ * template that adds the trigger already surfaces as an outdated managed doc.
+ * What THIS block adds is the two things `outdated` structurally cannot say:
+ *
+ *  1. a **per-file `triggerVersion`**, so "the trigger is present at 0.10.0" stays
+ *     distinguishable from "the current template renders 0.11.0" — one boolean
+ *     against a template that also moves for unrelated reasons cannot tell those
+ *     apart; and
+ *  2. **_trigger absent_ separated from _generic template drift_**, which is the
+ *     observable `task-spike-friction-trigger-compliance` needs to tell "never
+ *     seen" from "seen and ignored" — the distinction that decides whether stage 2
+ *     is worth building.
+ *
+ * Report-only and bounded: nothing is written, the exit code stays 0, and the
+ * block is present whether the trigger is there, stale, or absent entirely.
+ */
+export type DoctorFriction = {
+  /** Every reported file carries the block (and at least one is reported). */
+  triggerPresent: boolean;
+  /**
+   * The version the files that carry the block agree on; `null` when no reported
+   * file carries one, or when they disagree (the per-file rows then say which).
+   * A consensus version is the only one that answers "is my trigger stale"
+   * without also answering it wrongly.
+   */
+  triggerVersion: string | null;
+  /** This build's arggon version — what a fresh render would stamp. */
+  current: string;
+  /** One entry per managed agent file whose template ships the block. */
+  files: DoctorFrictionFile[];
+};
+
 /** `doctor --agents` report (additive; only present with the flag). */
 export type DoctorAdapters = {
   /** Per-agent entries, in {@link AGENT_IDS} order. */
@@ -843,6 +902,76 @@ export function runAdapterReport(opts: {
   };
 }
 
+/**
+ * The additive `friction` block (ADR 0024 §2): per managed agent file, whether
+ * the file on disk carries the marked `arggon:friction-trigger` block and at
+ * which `triggerVersion`.
+ *
+ * The population is derived, never listed: every managed destination that is an
+ * agent file (`isManagedAgentDest`) whose CURRENT template ships the marked block
+ * (`carriesFrictionTrigger`) is a carrier. So the block a seam ships decides its
+ * own reporting — a seam that adds the trigger to its agent template joins this
+ * report with no code change, and a seam that never ships it is not nagged about
+ * a file it does not generate.
+ *
+ * A carrier whose seam DIRECTORY is absent from the tree is skipped rather than
+ * reported absent: a claude-only adopter has no `.opencode/agents/`, and calling
+ * its missing opencode files "trigger absent" would be a false alarm about a seam
+ * the tree never asked for. What is reported is a carrier whose seam the tree
+ * carries, and every row reads the bytes actually on disk — never the render, so
+ * a file an adopter edited or never refreshed reports its own truth.
+ *
+ * Report-only: never writes, never throws, and the exit code is not this
+ * function's business.
+ */
+export function runFrictionReport(opts: {
+  root: string;
+  /** Templates dir to read the carrier set from (bundled, or a test fixture). */
+  templatesDir: string;
+  /** Layout only matters to the destination walk, which agent paths ignore. */
+  layout?: TrackerLayout;
+}): DoctorFriction {
+  const files: DoctorFrictionFile[] = [];
+  for (const { dest, template } of currentGeneratedTemplatesFrom(
+    opts.templatesDir,
+    opts.layout ?? "arggon-manager",
+  )) {
+    if (!isManagedAgentDest(dest)) continue;
+    let templateText: string;
+    try {
+      templateText = readFileSync(templateSourcePath(opts.templatesDir, template), "utf8");
+    } catch {
+      continue; // source absent: not this version's carrier
+    }
+    if (!carriesFrictionTrigger(templateText)) continue;
+    const abs = join(opts.root, ...dest.split("/"));
+    // The seam is not materialized here — see the docstring.
+    if (!existsSync(join(opts.root, ...dest.split("/").slice(0, -1)))) continue;
+    let disk = "";
+    try {
+      disk = readFileSync(abs, "utf8");
+    } catch {
+      files.push({ path: dest, triggerPresent: false, triggerVersion: null });
+      continue;
+    }
+    const state = readFrictionTrigger(disk);
+    files.push({ path: dest, triggerPresent: state.present, triggerVersion: state.triggerVersion });
+  }
+  files.sort((a, b) => a.path.localeCompare(b.path));
+  const versions = new Set(
+    files.flatMap((file) => (file.triggerVersion === null ? [] : [file.triggerVersion])),
+  );
+  return {
+    triggerPresent: files.length > 0 && files.every((file) => file.triggerPresent),
+    // One version only when every file agrees; mixed (or none) reads as null and
+    // the per-file rows say which. A consensus version is the only one that
+    // answers "is my trigger stale" without also answering it wrongly.
+    triggerVersion: versions.size === 1 ? [...versions][0]! : null,
+    current: arggonVersion(),
+    files,
+  };
+}
+
 export type DoctorResult = {
   /** Repo root, or null when no tasks/.convention.yml was found. */
   root: string | null;
@@ -897,6 +1026,15 @@ export type DoctorResult = {
    * reason rather than dropping the field.
    */
   matrix: CapabilityMatrix;
+  /**
+   * Per-file friction-trigger visibility (additive, ADR 0024 §2,
+   * task-friction-trigger-carrier): which managed agent files carry the marked
+   * `arggon:friction-trigger` block and at which `triggerVersion`. Present on
+   * initialized and non-initialized reports alike — the carrier set comes from
+   * the templates, the truth comes from the bytes on disk. Report-only and
+   * bounded; the exit code is unchanged by anything in it.
+   */
+  friction: DoctorFriction;
   /**
    * Context-budget measurement (additive, task-adr0006-remeasure): present
    * only when `doctor --budget` is passed. Measures the ADR 0006 agent-facing
@@ -1031,6 +1169,14 @@ export function runDoctor(opts: {
       // reader is tree-only and reports the absence instead of reaching for a
       // package copy (that fallback broke pack/checkout envelope parity).
       matrix,
+      // The trigger carrier's population comes from the templates and its truth
+      // from the bytes on disk, so it is reported here too: an uninitialized tree
+      // that still carries a seam directory shows the trigger state of the agent
+      // files in it, and a tree with none reports no files rather than a lie.
+      friction: runFrictionReport({
+        root: opts.cwd,
+        templatesDir: opts.templatesRoot ?? bundledTemplatesDir(),
+      }),
       ...(opts.agents === true
         ? {
             agents: runAdapterReport({
@@ -1186,6 +1332,11 @@ export function runDoctor(opts: {
     // fallback: an additive field must depend only on the examined tree. Read
     // once and reused by the per-agent report below.
     matrix,
+    // Trigger visibility per managed agent file (ADR 0024 §2): the carrier set is
+    // this arggon's templates, and each row reads the bytes THIS tree carries — so
+    // an adopter who never re-ran init reports the old version, not the one this
+    // build would stamp.
+    friction: runFrictionReport({ root, templatesDir, layout }),
     ...(opts.agents === true
       ? {
           agents: runAdapterReport({
@@ -1352,6 +1503,46 @@ export function formatAdapterLines(adapters: DoctorAdapters): string[] {
   return lines;
 }
 
+/**
+ * Human lines for the `friction` block (ADR 0024 §2): one summary line saying how
+ * many managed agent files carry the marked trigger and at which version against
+ * this build's, then one line per file that does NOT carry it (or carries an older
+ * one) — because a report of a missing rule that does not name the file is a dead
+ * end, and `arggon init` is what refreshes it.
+ *
+ * Wording is deliberately not a failure: this is report-only, the exit code does
+ * not move, and an adopter who never adopts the trigger is a legitimate state
+ * (ADR 0024 §3 keeps the channel discoverable either way).
+ */
+function formatFrictionLines(friction: DoctorFriction): string[] {
+  if (friction.files.length === 0) {
+    return [
+      "  friction: no managed agent file carries the arggon:friction-trigger block " +
+        "(no seam shipped with one, or none is materialized here) — report-only",
+    ];
+  }
+  const present = friction.files.filter((file) => file.triggerPresent).length;
+  const version =
+    friction.triggerVersion !== null
+      ? ` at ${friction.triggerVersion}` +
+        (friction.triggerVersion === friction.current ? "" : ` (current ${friction.current})`)
+      : present > 0
+        ? " at mixed triggerVersions (see below)"
+        : "";
+  const lines = [
+    `  friction: trigger present in ${present}/${friction.files.length} managed agent file(s)` +
+      `${version} — report-only`,
+  ];
+  for (const file of friction.files) {
+    if (file.triggerPresent && file.triggerVersion === friction.current) continue;
+    const why = file.triggerPresent
+      ? `carries ${file.triggerVersion ?? "no version"}`
+      : "does not carry the block";
+    lines.push(`    ${sanitizeHumanText(file.path)}: ${why} — run \`arggon init\` to refresh it`);
+  }
+  return lines;
+}
+
 /** Human-readable report (never writes; pairs with the doctor --json payload). */
 export function formatDoctorReport(result: DoctorResult): string {
   if (!result.initialized) {
@@ -1365,6 +1556,9 @@ export function formatDoctorReport(result: DoctorResult): string {
     // The matrix describes the examined tree, so it prints on both report
     // shapes — whenever it is readable, or why it is not.
     lines.push(...formatMatrixLines(result.matrix));
+    // Trigger visibility is a tree fact too (ADR 0024 §2): a tree carrying a seam
+    // directory but no tracker still shows whether its agent files carry it.
+    lines.push(...formatFrictionLines(result.friction));
     // The per-agent block prints on both shapes too (report-only), so a
     // non-initialized tree can still show which seams are missing.
     if (result.agents) lines.push(...formatAdapterLines(result.agents));
@@ -1389,6 +1583,10 @@ export function formatDoctorReport(result: DoctorResult): string {
     ...formatOpenCodeLines(result.opencode),
     // Gap rows are advisory (spec S3, ADR 0020): printed, never blocking.
     ...formatMatrixLines(result.matrix),
+    // Trigger visibility per managed agent file (ADR 0024 §2): printed on both
+    // report shapes, because the question "does the trigger live where the agent
+    // reads it" is answerable on an uninitialized tree too.
+    ...formatFrictionLines(result.friction),
     // Per-agent adapter state (spec S2), only with `--agents`; also report-only.
     ...(result.agents ? formatAdapterLines(result.agents) : []),
   ];
