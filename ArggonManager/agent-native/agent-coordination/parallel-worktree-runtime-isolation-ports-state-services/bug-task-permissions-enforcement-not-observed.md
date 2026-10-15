@@ -97,3 +97,12 @@ PR: https://github.com/Arggon/ArggonManager/pull/848
 ### handoff 2026-10-15 @ses_ebf689266ffe1lF4ZC4yVUAxny (session: ses_ebf689266ffe1lF4ZC4yVUAxny) — next: Review PR #848 (per-runtime probe table + carrier decision + harness); after merge, tick the three acceptance boxes and flip the item to done.
 - branch: fix/bug-task-permissions-enforcement-not-observed
 - open questions: Acceptance boxes are intentionally left unticked for the lead at merge; the 2026-10-02 observation is recorded as not reproducible, not explained; shared smoke model pin is provider-quota-blocked tod…
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-15 (delivery lead)
+Merged as 0799b940 (PR #848). The per-runtime answer is recorded, not assumed: the OpenCode V2 runtime's own permission layer honors the project block (a fresh run, an edit picked up mid-session, and a long-lived service — the three legs refute the "frozen surface" mechanism), while the ZCode/Claude seams enforce their OWN gate rather than this file. The original 2026-10-02 allowance is recorded as a different-config-state probe with its cause not claimed — the honest reading of a non-reproducing observation.
+
+Carrier (box 2): documented client setup + the existing kernel gates, **no new enforcement layer** — the per-runtime table now lives in `agents.md`, `opencode2.md`, `engineering.md` §Smoke test and the playbook, and both `opencode.jsonc` carriers state which layer honors the block. Harness (box 3): `smoke/opencode-permissions-probe.ts` — one denied + one allowed per runtime, hermetic, a skip recorded as a skip with its reason and never counted as a pass — plus 30 tests.
+
+Evidence: 14 probes with 0 skips on the local model pin; full suite 164 files / 3618; validate / lint / structure / prettier green; CI green on all lanes. Wave note: the shared smoke model pin's provider is quota-blocked today — the skip path is exercised and recorded, nothing faked.
