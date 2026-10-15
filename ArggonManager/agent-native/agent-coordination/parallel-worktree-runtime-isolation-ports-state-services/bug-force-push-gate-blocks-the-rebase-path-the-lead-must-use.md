@@ -10,7 +10,6 @@ labels: [permissions, worktree, delivery-lead]
 priority: p2
 created: "2026-10-11"
 updated: "2026-10-15"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use.md
