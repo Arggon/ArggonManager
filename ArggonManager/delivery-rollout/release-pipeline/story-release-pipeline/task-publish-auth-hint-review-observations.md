@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-publish-auth-hint-review-observations
 title: "publish-auth-hint (PR #741) review observations: message fallback is consulted when a non-auth code exists (docstring says otherwise); spawnSync maxBuffer edge exits 2 without re-emitting npm stderr"
+assignee: arggon-delivery-lead
+branch: feat/task-publish-auth-hint-review-observations
 parent: story-release-pipeline
 labels: [release, failure-mode, review-followup]
 created: "2026-10-12"
-updated: "2026-10-12"
+updated: "2026-10-15"
+claimed_at: "2026-10-15T01:21:16.370Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-publish-auth-hint-review-observations
 ---
-
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-publish-auth-hint-review-observations.md
   Leaves live only under a story. id is the filename stem: task-publish-auth-hint-review-observations.
