@@ -139,3 +139,6 @@ Evidence — compensating rule shipped (acceptance box 4), docs-only.
 ### handoff 2026-10-15 @arggon-maker — next: Delivery lead: review PR #842 (docs-only, one file, all gates green), merge it, then flip the item to done per the recorded keep-report-only decision.
 - branch: feat/task-arm-strict-worktree-writes
 - open questions: none; the sibling branch edits agents.md §Claim, so a trivial merge is expected
+
+### 2026-10-15 @arggon-maker
+Follow-up (post-rebase) — the branch was rebased onto `origin/main` (`39a6d3da`) to drop one inherited unpushed tracker commit (`2b9b6f94`, the `bug-prover-agent-has-no-x-generated-entry` prune — an unrelated item riding the claim branch's cut point), then force-pushed with lease. The docs commit is now `2ece8559` (was `89d5dc17` before the rebase; the tree is byte-identical apart from the dropped unrelated file). PR #842 now carries only the two in-scope files: `ArggonManager/docs/agents.md` and this item file. No gate results changed; `validate` re-run green after the rebase.
