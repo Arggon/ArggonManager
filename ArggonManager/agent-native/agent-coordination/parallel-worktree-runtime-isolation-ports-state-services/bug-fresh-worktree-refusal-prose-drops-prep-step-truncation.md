@@ -84,3 +84,7 @@ Uncapped log: byte-identical to before (no count invented); singular: `1 entry w
 Kernel sweep: `freshWorktreeInstallRefusal` is the only prose consumer of `steps` in `lib/src` (grep for `entry.step`/`steps.map`), so no fifth surface exists there.
 
 **Open question.** The two refusal call sites are not wired to the kernel count (explicitly out of scope per the dispatch), so the human-visible refusal on the CLI/native surfaces still omits the count until they pass it. Decide: extend this item, route to the sibling item, or file a follow-up.
+
+### handoff 2026-10-15 @ses_ec2bb8c73ffeBOeT0vbCObokPz (session: ses_ec2bb8c73ffeBOeT0vbCObokPz) — next: Review + merge PR #833 (kernel fix green); then decide the two refusal call sites (cli/src/start.ts:1166, opencode/plugins/arggon/index.ts:4594) that do not yet pass the kernel's stepsDropped.
+- branch: fix/bug-fresh-worktree-refusal-prose-drops-prep-step-truncation
+- open questions: Call sites out of scope per dispatch — extend this item, route to task-cli-surface-never-carries-steps-truncated, or file a follow-up; regenerated index.bundle.ts included because CI check:plugin dri…
