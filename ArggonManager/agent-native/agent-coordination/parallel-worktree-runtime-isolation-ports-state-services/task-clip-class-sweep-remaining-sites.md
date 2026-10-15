@@ -181,3 +181,10 @@ npm run build ok (bundle byte-identical — comment-only lib edits) · npm run c
 ### handoff 2026-10-15 @ses_ebfe1a5c0ffe0yJ7qSezc99RW7 (session: ses_ebfe1a5c0ffe0yJ7qSezc99RW7) — next: Review + merge PR #847: all six acceptance boxes evidenced on the item; gates green in the worktree.
 - branch: feat/task-clip-class-sweep-remaining-sites
 - open questions: None blocking; reviewer to confirm the four compliant records are the durable form wanted (comment + bounded-message test per site) and that leaving worktree.test.ts/cli.test.ts in the 61449604 varia…
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-15 (delivery lead)
+Merged as bbf5daeb (PR #847). The class sweep closes honestly: the four deferred sites are recorded compliant with MEASURED bounds (gh runs with stderr IGNORED → a bounded argv echo, worst case 341 chars — git's 255-char refname component limit; board / cleanup / import-issues the same shape), so nobody re-audits them on a clip pretext; the `committing the claim` branch's shape is verified at HEAD with measured arithmetic on the deterministic fixture (pathological 1795 chars, fix @584, 2-of-8 named; typical 1980, fix @565, 7-of-8), and the non-reproducing `459 < 355` numbers are corrected — they were `$TMPDIR`-dependent pre-fix strict-gate measurements — with the qualitative claim kept by construction (the exact-fix index invariant + the ordering pin); the over-budget shape (PR #845) is now documented in BOTH carriers; every ordering assertion uses presence-checked needles, and the intermediate-variable contract is pinned so a bare compare can't pass vacuously; the enumeration reconciled with no duplicate "swept" claim.
+
+Evidence: 8 focused suites 417 passed; full suite 162 files / 3572; build / `check:plugin` (bundle byte-identical — comment-only lib edits) / validate / lint / structure / prettier green; CI green. The `bug-headless-ci-twin-init-nondeterministic` flake mid-run is recorded as a pre-existing environment flake (red on clean main; 7/7 standalone).
