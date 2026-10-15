@@ -99,6 +99,11 @@ const SECTIONS: readonly Section[] = [
   { key: "x-import", type: "ImportConfig", read: (config) => config.import },
   { key: "x-worktree", type: "WorktreeConfig", read: (config) => config.worktree },
   { key: "x-github", type: "GitHubConfig", read: (config) => config.github },
+  // ADR 0024 §3: the adopter friction channel's capture opt-out. Its documented
+  // spelling is the SCALAR `x-friction: false` (the parser reads the scalar
+  // directly); the section's `capture` option is the same switch, spelled as a
+  // mapping like its `x-*` siblings.
+  { key: "x-friction", type: "FrictionConfig", read: (config) => config.friction },
 ];
 
 /**
