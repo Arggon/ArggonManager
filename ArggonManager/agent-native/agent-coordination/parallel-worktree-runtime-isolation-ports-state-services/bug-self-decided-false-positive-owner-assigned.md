@@ -36,3 +36,10 @@ The false positive follows from the role shape in `ArggonManager/docs/engineerin
 - [ ] `arggon validate` green, `decision-brief-convention.test.ts` green, prettier clean
 
 ## Notes
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+**Decision (2026-10-15, delivery lead — recorded with authority per the item's box 2): the semantics STAY "the `decided:` author equals the item's own assignee".**
+
+Rationale: the tracker has no identity layer, so "an agent role answered its own brief" is not determinable — any implementation would be a new id-shape taxonomy asserting a certainty the tracker deliberately does not have (the same limit ADR 0021 §4 already states for `self-accepted`). The owner-assigned case is not an anomaly to suppress but the NORMAL owner answer: `self-decided` is a same-name hint, and on an owner-assigned item the same name IS the owner. The state is report-only; the honest resolution is to state the case where readers meet it (spec §States, `json-output.md` §`decision_brief`, the engineering brief convention) and pin the behaviour with the repro test, so it is intentional rather than accidental.
+
+Implementation routed to a maker on `fix/bug-self-decided-false-positive-owner-assigned`: the repro pin, an ADR 0026 dated amendment, the three doc statements, report-only preservation, gates.
