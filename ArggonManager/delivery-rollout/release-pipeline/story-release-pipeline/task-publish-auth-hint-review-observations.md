@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-publish-auth-hint-review-observations
 title: "publish-auth-hint (PR #741) review observations: message fallback is consulted when a non-auth code exists (docstring says otherwise); spawnSync maxBuffer edge exits 2 without re-emitting npm stderr"
+assignee: arggon-delivery-lead
+branch: feat/task-publish-auth-hint-review-observations
 parent: story-release-pipeline
 labels: [release, failure-mode, review-followup]
 created: "2026-10-12"
-updated: "2026-10-12"
+updated: "2026-10-15"
+claimed_at: "2026-10-15T01:21:16.370Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-publish-auth-hint-review-observations
 ---
-
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-publish-auth-hint-review-observations.md
   Leaves live only under a story. id is the filename stem: task-publish-auth-hint-review-observations.
@@ -53,3 +56,37 @@ wrapper), recorded so they outlive the parent item:
 
 Filed 2026-10-12 by the delivery lead from the PR #741 standards review; the
 parent item merged with these recorded as non-blocking.
+
+### 2026-10-15 @arggon-maker
+**Review observations resolved — decisions, evidence, gates (PR #829).**
+
+**1. Message-fallback ordering — gated on `codes.length === 0`; the code now matches the docstring.** `classifyPublishFailure` no longer consults `AUTH_MESSAGES` when any `npm error code` line is present: the code line is authoritative, auth or not. Header bullet tightened to "the matching message text ONLY when the log carries no `code` line at all … any code line — auth or not — is authoritative".
+
+Classify matrix (exit 1) before → after:
+
+- `E404` + "requires you to be logged in" → `auth` (wrong hint) → `other`, evidence `npm error code E404`
+- auth phrase, no code line → `auth` → `auth` (unchanged)
+- no code line, no phrase → `other` → `other` (unchanged)
+- `ENEEDAUTH` / `E401` → `auth` → `auth` (unchanged)
+
+Tests: unit `classifyPublishFailure — a code line is authoritative over message text` (all three orderings) + wrapper-mode E404+phrase test (no `AUTHENTICATION` / `npm trust list` output). Adversarial check: the 3 new tests run against the pre-change module → `3 failed | 39 skipped`; with the change → `42 passed`.
+
+**2. `spawnSync` maxBuffer edge — decision: re-emit the captured output; do not raise the buffer.** Probe (node v26.7.0, child writing 2 MiB synchronously to stderr, `stdio: ["ignore","inherit","pipe"]`, `encoding: "utf8"`): `error.code=ENOBUFS`, `status=null`, `signal=SIGTERM`, **`child.stderr` = 1085504 chars with the prefix intact** (`npm error code ENEEDAUTH\nxxx…`). So on `child.error` the wrapper now re-emits `child.stderr` (when non-empty) before the usage line and still exits 2. Rationale for not raising: the threshold only moves and the lossy path stays; re-emit is testable and preserves the head of npm's output.
+
+Flush note: a second probe showed `process.exit` after a large pipe write drops the tail (146176 of 2 MiB arrived), so `usage()` sets `process.exitCode = 2` and its callers return (release-guard precedent) — the re-emit is flushed. Publish semantics unchanged: the non-error path is untouched (`process.exitCode = status`), the child's exit status is preserved and a passing publish prints nothing extra.
+
+Test: wrapper-mode ENOBUFS test — fixture writes ~1.5 MiB synchronously with a marker past one 64 KiB pipe buffer; asserts exit 2, the captured prefix + marker present and ordered before `cannot run`, and `ENOBUFS` named. The parent buffer is raised (8 MiB) only to observe the full re-emit.
+
+**Files:** `cli/publish-auth-hint.mjs`, `cli/publish-auth-hint.test.ts`, `ArggonManager/docs/playbooks/node.md` (lesson line). Commit `00f86426`; PR https://github.com/Arggon/ArggonManager/pull/829.
+
+**Gates (worktree, all green):**
+
+- `npm run arggon -- validate` → ok (0 warnings, convention v5)
+- `npx vitest run cli/publish-auth-hint.test.ts` → 42 passed
+- `npm test` (after `npm run build`) → 158 files / 3481 tests passed
+- `npm run lint` → clean; `npm run test:structure` → 5 passed
+- `npx prettier --check` on the three touched files → clean
+
+### handoff 2026-10-15 @arggon-maker — next: Standards review of PR #829 (both observations resolved, gates green); then merge and flip done.
+- branch: feat/task-publish-auth-hint-review-observations
+- open questions: None blocking; the one judgement call is usage() returning with process.exitCode = 2 instead of process.exit (rationale: the pipe-write drop probe, PR body).
