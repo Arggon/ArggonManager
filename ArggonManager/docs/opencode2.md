@@ -482,7 +482,11 @@ claiming the item, NOTHING sourced — and pins that the WRITE reports `trackerR
   suite; the survivors pin deliberately unchanged behavior.
 
 * **Permissions (W4)** — the generated seam adds minimal shell gates (deny
-  `git commit --no-verify*`, `git push --force*`, `git push -f*`) that
+  `git commit --no-verify*`, `git push --force*`, `git push -f*`,
+  `git push *+*`, with the lease-checked `--force-with-lease` /
+  `--force-with-lease=*` / `--force-if-includes` spellings re-allowed after the
+  force deny — the last matching rule wins, so the discriminator is the lease,
+  not the spelling; `agents.md` §Force-push spellings) that
   complement — never replace — the kernel invariants; the shipped agents add
   role gates (reviewer `edit`/subagent denied plus read-only shell gates;
   worker `arggon.create` denied; coordinator subagent allow-list; verifier
