@@ -13,7 +13,6 @@ updated: "2026-10-15"
 claimed_at: "2026-10-15T12:11:33.930Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-foreign-writes-char-clip-truncated
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-foreign-writes-char-clip-truncated.md
   Leaves live only under a story. id is the filename stem: task-foreign-writes-char-clip-truncated.
@@ -77,3 +76,6 @@ Delivered on `feat/task-foreign-writes-char-clip-truncated`, PR #838 (ready, not
 
 - branch: feat/task-foreign-writes-char-clip-truncated
 - open questions: None blocking. The CLI's own claim receipt is not re-bounded, so the fold is native-only and documented as such.
+
+### 2026-10-15 @Arggon
+CI green on the pushed head `44ffd9a9`: cli pass (7m24s), tasks-validate pass (27s), ui-smoke pass (2m22s). PR #838 is ready, not draft; item left `in_progress` — review + merge is the delivery lead's call. Scope note: acceptance box 3 is implemented in `claimTakeoverTruncated` (chain-entry strings), so the diff touches the claim-receipt fold, not only the `foreignWrites` branch.
