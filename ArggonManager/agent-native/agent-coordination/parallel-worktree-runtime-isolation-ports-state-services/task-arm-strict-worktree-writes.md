@@ -112,3 +112,26 @@ Rationale:
 3. The default is explicitly "working as designed" (the item's own framing); arming stays available later — one config line — if a stamped collision ever actually bites.
 
 **Compensating rule (box 4), queued for wave 4 (docs-only):** the coordinator contract (`ArggonManager/docs/agents.md` §Orchestration + the worktree rules) states: who owns a worktree (the session its claim stamp carries; the lead owns the item, the maker owns the worktree while the claim lives); how a collision is noticed (the single-writer observation + the `arggon-claim.json` stamp; `arggon doctor` where it reports); and who may resolve it (the stamped owner, or the lead through `start --worktree --take-over-worktree` / the manual `rm <git-dir>/arggon-claim.json` recovery — never a hand-write into another live session's worktree).
+
+### 2026-10-15 @arggon-maker
+Evidence — compensating rule shipped (acceptance box 4), docs-only.
+
+**Change:** `ArggonManager/docs/agents.md` — new §Orchestration subsection "Worktree ownership and collisions" (owner / notice / resolution + the standing report-only decision), echoed in §4 → Single-writer ownership. `.convention.yml` untouched (flag stays unarmed). Commit `89d5dc17`; PR #842.
+
+**What the rule states**
+
+- Owner: the worktree belongs to the session its claim stamp (`arggon-claim.json` in the worktree's git dir) names — the delivery lead owns the item, the maker owns the worktree while the claim lives; no session writes in a worktree another live session holds.
+- Notice: the attach-time single-writer observation the start receipt carries (`claim.foreignWrites`: stamped owner, claim time, newer files) plus the stamp itself; `arggon doctor` reports the surrounding repo/tracker state, not per-worktree stamps (verified against `doctor --json`: docs/tracker/git/envGitignore/opencode/matrix — no stamp enumeration).
+- Resolution: the stamped owner first (re-attach refreshes the stamp); dead owner → the lead via `start --worktree --take-over-worktree` (audited) or the manual `rm <git-dir>/arggon-claim.json` escape hatch — never a hand-write into another live session's worktree; recovery and merge-prep writes after that session has ended stay the lead's call.
+- Standing decision: the strict refusal remains unarmed by deliberate choice (decision comment 2026-10-15); this rule is the coordination discipline in its place.
+
+**Gates — expected vs observed (run in the worktree, final bytes)**
+
+- `npm run arggon -- validate` → expected ok; observed `ok (0 warning(s), convention v5)`.
+- `npm run build` → needed for the fresh worktree (`dist/cli.js` absent; `headless-ci.test.ts` requires it); observed clean build, `git status` afterwards showed only `ArggonManager/docs/agents.md`.
+- `npm test` → observed `160 passed (160)` files, `3541 passed (3541)` tests.
+- `npm run lint` → observed exit 0.
+- `npm run test:structure` → observed `5 passed; 0 failed`.
+- `npx prettier --check ArggonManager/docs/agents.md` → observed clean.
+
+**Not done / not applicable:** boxes 2–3 (the "if armed" branch: config line + refused-attach evidence) do not apply under the recorded keep-report-only decision; box 1 is the lead's recorded decision comment. No acceptance ticks changed in the item body — completion is the delivery lead's call.
