@@ -28,9 +28,9 @@ Found while fixing bug-opencode-jsonc-malformed-permissions: after the file was 
 
 ## Acceptance
 
-- [ ] Determine per client runtime (OpenCode V2 session, ZCode plugin, headless/agent seams) whether the project `permissions` block is read at all, and record which layer honors it.
-- [ ] If it is not honored, decide the carrier: an enforceable gate in the methodology (kernel/plugin-side refusal the way steals/reopens are gated) or documented client setup; do not leave the file claiming enforcement it does not deliver.
-- [ ] A probe harness that runs one denied and one allowed command per supported runtime, wired into the gates where practical.
+- [x] Determine per client runtime (OpenCode V2 session, ZCode plugin, headless/agent seams) whether the project `permissions` block is read at all, and record which layer honors it.
+- [x] If it is not honored, decide the carrier: an enforceable gate in the methodology (kernel/plugin-side refusal the way steals/reopens are gated) or documented client setup; do not leave the file claiming enforcement it does not deliver.
+- [x] A probe harness that runs one denied and one allowed command per supported runtime, wired into the gates where practical.
 
 ## Notes
 
