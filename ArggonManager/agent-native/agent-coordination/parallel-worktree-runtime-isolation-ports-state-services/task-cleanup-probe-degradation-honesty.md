@@ -45,3 +45,19 @@ was not blocking; recorded so the rule does not have a silent exception.
 - [ ] The normal paths and their tests are untouched
 
 ## Notes
+
+### 2026-10-15 @arggon-maker
+Decision: classify `removable: false` with a reason naming the failed probe and the manual remedy — NOT the `action: "failed"` receipt shape.
+
+- Rationale: the porcelain probe is the only evidence that `git worktree remove` will succeed, so an unanswered probe must not print `removable: true` with a null reason; the failed-receipt shape would need CLI/native surface changes (outside this item's kernel scope) and would still leave the candidates list promising a removal the tool cannot verify. The path is reachable only for an already-broken worktree (git's own removal check runs the same probe), so refusing loses nothing — the old shape ended in a raw error and an identical retry. `--force` does not bypass: force discards untracked content a WORKING probe observed; an unanswered probe observed nothing.
+- After: `removable: false`, `action: null`, reason names the probe (`'git status --porcelain' in <path> did not answer`), the inspection command (`git -C <path> status --porcelain`) and the manual sequence (`git worktree remove <path>` — `--force` only for inspected, disposable content; `git branch -D <branch>`; re-run `arggon cleanup --prune` to clear the record).
+
+Evidence (worktree, all green):
+- `npm run arggon -- validate` → ok (0 warnings).
+- `npx vitest run lib/src/cleanup.test.ts` → 11 passed (3 new: injected failing probe ⇒ removable:false + reason + action null; force does not bypass; answering probe ⇒ clean path unchanged).
+- `npm test` (after `npm run build`) → 158 files / 3484 tests passed.
+- `npm run lint`, `npm run test:structure` (5 passed), `npx prettier --check` on touched files → green.
+
+Files: `lib/src/cleanup.ts`, `lib/src/cleanup.test.ts`, `lib/src/worktree.property.test.ts` (1-line probe injection, delivery-lead-approved: its tmp worktree is not a git repo, so the real probe never answered and the harness silently depended on the pre-fix degradation), `opencode/plugins/arggon/index.bundle.ts` (regenerated; plugin-copy drift gate requires it).
+
+PR #832 (branch pushed). Acceptance: (1) decided + recorded here and in the PR body; (2) pinned by an injected failing probe; (3) normal-path behavior unchanged — the only existing-test edit is the disclosed 1-line probe injection. Boxes left for the lead's completion call.
