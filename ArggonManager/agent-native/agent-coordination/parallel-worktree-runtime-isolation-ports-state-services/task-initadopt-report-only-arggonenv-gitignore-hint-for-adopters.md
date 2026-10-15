@@ -9,7 +9,6 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: []
 created: "2026-10-02"
 updated: "2026-10-15"
-worktree_path: /home/arggon/Projects/ArggonManager-task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters.md
