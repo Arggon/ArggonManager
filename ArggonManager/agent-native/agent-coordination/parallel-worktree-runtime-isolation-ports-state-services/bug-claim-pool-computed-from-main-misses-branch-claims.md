@@ -112,3 +112,18 @@ Yes, but only through the human-only takeover gate and only where the claim live
 
 ### 2026-10-15 @arggon-maker
 PR opened: https://github.com/Arggon/ArggonManager/pull/841 — branch pushed, acceptance boxes ticked against the evidence comment above. Gates green in the final run: npm test 161 files / 3543 tests, lint, test:structure 5/5, check:plugin, prettier, validate.
+
+### 2026-10-15 @arggon-maker
+Review round 1 — CI `cli` lane fix: the smoke fixture no longer assumes a git identity (or an auto-commit) exists.
+
+**Failure.** `cli/src/sync-smoke.test.ts` ("surfaces a branch-resident claim…"): `git rev-parse --abbrev-ref HEAD` exited 128 (`ambiguous argument 'HEAD': unknown revision`). Cause: with no git identity (CI), the fixture CLI's auto-commit during `initSyncTree` is skipped, the repo is UNBORN, and there is no HEAD yet; locally a global identity let an auto-commit create HEAD first.
+
+**Repro, before the fix (global/system git config disabled).**
+`GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null npx vitest run cli/src/sync-smoke.test.ts cli/src/sync-command.test.ts lib/src/branch-claims.test.ts`
+→ `1 failed | 36 passed`; the failure is exactly the CI one: `git rev-parse --abbrev-ref HEAD: fatal: ambiguous argument 'HEAD': unknown revision … expected 128 to be +0`.
+
+**Fix (both suggested forms, recorded).** In `sync-smoke.test.ts`: identity → `add -A` → `commit --allow-empty -m seed` → read the branch with `git symbolic-ref --short HEAD` (works on an unborn HEAD and for any `init.defaultBranch`); the `--allow-empty` seed also covers the opposite machine where auto-commits already staged everything. The claim is now landed with an explicit `add -A` + `commit --allow-empty -m "claim: task-set"` on the branch instead of relying on the CLI's tracker auto-commit (an optimization, never the fixture). No HEAD read before a commit remains.
+
+**Audit of the other new tests.** `cli/src/sync-command.test.ts` and `lib/src/branch-claims.test.ts` already configure identity before their own explicit commits and never read HEAD early; `lib/src/next.test.ts` / `lib/src/list.test.ts` read `rev-parse --short HEAD` only AFTER their seed commit. Re-ran with the config disabled, adding those two files to the repro command: **5 files / 101 tests passed**.
+
+**Gates after the fix.** Full `npm test` — **161 files / 3543 tests passed** (clean run after the fix); `npm run arggon -- validate --json` ok; `npx prettier --check` on the touched file clean. Fix commit: `3872c480`.
