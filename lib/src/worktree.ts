@@ -997,6 +997,17 @@ export function strictGateBinFailure(
  * leads; the bin list is evidence to scroll back for, never the instruction.
  * Same ordering #573's round 2 landed for strictWorktreeWriteFailure.
  *
+ * TRUNCATION is stated, never inferred
+ * (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation): `steps` is the
+ * kernel's BOUNDED log, so on its own it cannot say whether it is the whole log
+ * — the old text presented a capped list as complete, which reads as "these are
+ * all the steps that ran". `stepsDropped` is the kernel's own count of the
+ * entries its cap dropped (set with `stepsTruncated` in the one branch that
+ * drops) and is quoted verbatim beside the list; a length-vs-`MAX_PREP_STEPS`
+ * comparison here could not see a kernel-side drop and would re-derive a
+ * decision the kernel already made. An uncapped log (`stepsDropped` 0/absent)
+ * states no count, so no truncation is ever invented.
+ *
  * Default-on for fresh worktrees — no flag required: a start that created the
  * worktree vouches for its install, and must not hand the worker a broken one.
  * Attach re-runs are NOT covered here (their report-only receipt — or the
@@ -1009,6 +1020,7 @@ export function freshWorktreeInstallRefusal(
   gateBins: GateBinResolution[],
   worktreePath: string,
   steps: WorktreePrepStep[] = [],
+  stepsDropped = 0,
 ): string | null {
   const broken = strictGateBinViolations(gateBins);
   if (broken.length === 0) return null;
@@ -1021,12 +1033,22 @@ export function freshWorktreeInstallRefusal(
       return `${bin.name}: resolves from ${bin.path}, above the worktree`;
     })
     .join("; ");
-  const prep =
+  const logged =
     steps.length > 0
       ? ` Preparation ran: ${steps
           .map((entry) => `${entry.step}:${entry.outcome}${entry.pkg ? ` (${entry.pkg})` : ""}`)
           .join(", ")}.`
       : "";
+  // The kernel's count, mirrored — never re-derived from `steps.length` against
+  // the cap. A hand-built pair with an empty log still states the count on its
+  // own: the kernel never emits that pair (an entry is dropped only once the log
+  // is full), but the prose never silently shortens evidence.
+  const dropped =
+    stepsDropped > 0
+      ? ` ${stepsDropped} ${stepsDropped === 1 ? "entry was" : "entries were"} dropped ` +
+        `(the preparation log is capped at ${MAX_PREP_STEPS}).`
+      : "";
+  const prep = `${logged}${dropped}`;
   return (
     `refusing the claim commit — a fresh worktree must leave a gate-usable install.${prep} ` +
     `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install ` +
@@ -1379,6 +1401,17 @@ export type WorktreeDependencyPreparation = {
    * the exact silent decision that used to produce it.
    */
   steps: WorktreePrepStep[];
+  /**
+   * How many entries the cap dropped — the kernel's own count, incremented in
+   * the one `record()` branch that also sets `stepsTruncated`, so the two can
+   * never disagree. Present only when entries were dropped (an uncapped receipt
+   * keeps its shape). Prose that renders `steps`
+   * (`freshWorktreeInstallRefusal`) mirrors this count, never a
+   * length-vs-`MAX_PREP_STEPS` comparison: the list alone cannot say whether it
+   * is the whole log, and the refusal used to read a capped log as complete
+   * (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation).
+   */
+  stepsDropped?: number;
   /** Present only when the log hit `MAX_PREP_STEPS` and entries were dropped. */
   stepsTruncated?: true;
   /**
@@ -2114,9 +2147,15 @@ export function prepareWorktreeDependencies(
   // and the probe verdict. A skip states WHY in its outcome token.
   const steps: WorktreePrepStep[] = [];
   let stepsTruncated = false;
+  // The kernel's own count of the entries the cap dropped — the number the
+  // refusal prose mirrors (bug-fresh-worktree-refusal-prose-drops-prep-step-
+  // truncation). Incremented in the same branch as the flag, so a receipt can
+  // never carry one without the other.
+  let stepsDropped = 0;
   const record = (step: WorktreePrepStep["step"], outcome: string, pkg?: string): void => {
     if (steps.length >= MAX_PREP_STEPS) {
       stepsTruncated = true;
+      stepsDropped += 1;
       return;
     }
     steps.push(pkg === undefined ? { step, outcome } : { step, outcome, pkg });
@@ -2171,7 +2210,9 @@ export function prepareWorktreeDependencies(
     missingDependenciesTotal: declared.missingTotal,
     gateBins,
     steps,
-    ...(stepsTruncated ? { stepsTruncated: true as const } : {}),
+    // The flag and its count are emitted together or not at all: one decision,
+    // two projections, so no consumer can see them disagree.
+    ...(stepsTruncated ? { stepsTruncated: true as const, stepsDropped } : {}),
     ...(envReceipt !== undefined ? { env: envReceipt } : {}),
     ...(claimReceipt !== undefined ? { claim: claimReceipt } : {}),
   };
