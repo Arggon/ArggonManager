@@ -4,6 +4,7 @@ import { basename, join, relative, resolve, sep } from "node:path";
 import {
   LEGACY_TRACKER_DIR_NAME,
   MAX_HUMAN_ERROR_CHARS,
+  MAX_PREP_STEPS,
   TRACKER_DIR_NAME,
   findTasksDir,
   freshWorktreeInstallRefusal,
@@ -179,6 +180,22 @@ export type StartResult = {
    * Empty without `--worktree`.
    */
   prepSteps: WorktreePrepStep[];
+  /**
+   * The kernel's own count of the entries its `MAX_PREP_STEPS` cap dropped
+   * (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation): MIRRORED
+   * from the receipt, never re-derived from `prepSteps.length` — the list
+   * alone cannot say whether it is the whole log. Present exactly when the
+   * kernel dropped entries (it sets the count and `stepsTruncated` together in
+   * the one branch that drops), so an uncapped log keeps its shape.
+   */
+  stepsDropped?: number;
+  /**
+   * The kernel's own "the log was capped" decision, MIRRORED verbatim
+   * (bug-native-steps-truncated-flag-dropped): present only when the kernel's
+   * cap dropped entries. A flag derived here from a cap of this surface's own
+   * would be a second, disagreeing account of the same event.
+   */
+  stepsTruncated?: true;
   /**
    * The worktree env contract receipt (spec worktree-env-contract-016):
    * `.arggon.env` written with the six identity keys, the `.env` seeded
@@ -1127,6 +1144,65 @@ export function startTakeoverNotes(claim: WorktreeClaimReceipt | undefined): str
   return notes;
 }
 
+/**
+ * Outcomes of the bounded preparation log that earn a human note
+ * (bug-start-install-ordering): every skip or failure in the prep path is
+ * named, so a broken worktree can be correlated with the silent decision that
+ * produced it.
+ */
+const NOTEWORTHY_PREP_OUTCOMES: ReadonlySet<string> = new Set([
+  "primary-install-missing",
+  "worktree-install-present",
+  "farm-failed-symlink-fallback",
+  "failed",
+  "install-cannot-consume",
+  "build-failed",
+  "build-no-entry",
+  "flip-failed",
+  "errored",
+  "foreign-resolution",
+]);
+
+/**
+ * The `note: dependency prep — …` payload for the human channel, or null when
+ * there is nothing to say. Kept here rather than inline in the CLI action so
+ * the human channel is unit-testable, the same reason `startTakeoverNotes`
+ * lives here.
+ *
+ * TRUNCATION leads and is MIRRORED, never re-derived from `prepSteps.length`
+ * (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation,
+ * bug-native-steps-truncated-flag-dropped): the kernel's own dropped-entry
+ * count is stated BEFORE the capped log, so the line never presents a
+ * shortened list as the whole log — and a bounded line's head-clip can never
+ * eat the count. An uncapped log states no count, so no truncation is ever
+ * invented.
+ */
+export function dependencyPrepNote(input: {
+  prepSteps: WorktreePrepStep[];
+  stepsTruncated?: true;
+  stepsDropped?: number;
+}): string | null {
+  const parts: string[] = [];
+  if (input.stepsTruncated === true) {
+    const dropped = input.stepsDropped;
+    parts.push(
+      dropped === undefined
+        ? `entries were dropped (the preparation log is capped at ${MAX_PREP_STEPS})`
+        : `${dropped} ${dropped === 1 ? "entry was" : "entries were"} dropped ` +
+            `(the preparation log is capped at ${MAX_PREP_STEPS})`,
+    );
+  }
+  for (const entry of input.prepSteps) {
+    if (!NOTEWORTHY_PREP_OUTCOMES.has(entry.outcome)) continue;
+    parts.push(
+      entry.pkg === undefined
+        ? `${entry.step}: ${entry.outcome}`
+        : `${entry.step}: ${entry.outcome} (${entry.pkg})`,
+    );
+  }
+  return parts.length === 0 ? null : parts.join("; ");
+}
+
 /** The readiness observation a worktree failure reports, in full (never bounded). */
 export type StartFailureReadiness = {
   hasInstall: boolean;
@@ -1311,6 +1387,11 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
   let linkedWorkspaces: string[] = [];
   let builtWorkspaces: string[] = [];
   let prepSteps: WorktreePrepStep[] = [];
+  // The kernel's truncation decision and dropped-entry count, mirrored beside
+  // the log they qualify (bug-native-steps-truncated-flag-dropped,
+  // bug-fresh-worktree-refusal-prose-drops-prep-step-truncation).
+  let stepsTruncated: true | undefined;
+  let stepsDropped: number | undefined;
   let manifestCoverage: ManifestCoverage = "unknown";
   let missingDependencies: string[] = [];
   let missingDependenciesTotal = 0;
@@ -1386,6 +1467,12 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     // build decisions, the gate-bin verdict — carried on the result so a
     // broken worktree can be correlated with the decision that produced it.
     prepSteps = prepared.steps;
+    // The kernel's own truncation decision + dropped-entry count, mirrored
+    // verbatim (never re-derived from `prepSteps.length`): the list alone
+    // cannot say whether it is the whole log, and this surface used to forward
+    // it as if it were (bug-native-steps-truncated-flag-dropped).
+    stepsTruncated = prepared.stepsTruncated;
+    stepsDropped = prepared.stepsDropped;
     // A mirrored install is only as current as the primary's; the receipt names
     // what the worktree cannot resolve (bug-worktree-readiness-misses-stale-primary-install).
     manifestCoverage = prepared.manifestCoverage;
@@ -1420,7 +1507,16 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     // (or the armed strict gate above), so the `npm ci` then attach remedy
     // stays possible.
     if (worktreeCreated) {
-      const refusal = freshWorktreeInstallRefusal(gateBins, worktreePath, prepSteps);
+      // The kernel's own dropped-entry count rides the refusal prose
+      // (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation): the
+      // log is bounded, so the message must say how much of it is missing
+      // instead of presenting a capped list as complete.
+      const refusal = freshWorktreeInstallRefusal(
+        gateBins,
+        worktreePath,
+        prepSteps,
+        prepared.stepsDropped ?? 0,
+      );
       if (refusal !== null) {
         step = "enforcing the fresh-worktree install gate";
         throw new Error(refusal);
@@ -1566,6 +1662,11 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       missingDependenciesTotal,
       gateBins,
       prepSteps,
+      // The kernel's truncation decision, mirrored as the exact pair its
+      // receipt carries: present together only when entries were dropped, so
+      // an uncapped log keeps its shape on this surface too.
+      ...(stepsTruncated !== undefined ? { stepsTruncated } : {}),
+      ...(stepsDropped !== undefined ? { stepsDropped } : {}),
       env,
       ...(prepared.claim !== undefined ? { claim: prepared.claim } : {}),
       ...(inherited !== null ? { inheritedCommits: inherited } : {}),

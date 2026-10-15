@@ -2495,11 +2495,11 @@ describe("worktree domain tools (W4)", () => {
    *
    * The mirror is asserted against the kernel, not against this seam's own
    * arithmetic, and the log is compared with the CLI on a twin fixture carrying
-   * the same packages — the same kernel event on both surfaces. The CLI's
-   * envelope forwards `prepSteps` but not the kernel's flag (`cli/src/start.ts`
-   * assigns `prepSteps = prepared.steps`; `cli/src/cli.ts` forwards only
-   * `prepSteps`), so the CLI-side mirror is a reported follow-up, not asserted
-   * here as either present or absent.
+   * the same packages — the same kernel event on both surfaces, now including
+   * the kernel's dropped-entry COUNT and the CLI's mirrored pair
+   * (task-cli-surface-never-carries-steps-truncated): the CLI envelope carries
+   * `stepsTruncated` and `stepsDropped` beside `prepSteps`, so the deep-equal
+   * per-entry assertion extends to the truncation decision itself.
    */
   it("mirrors the kernel's capped preparation log instead of re-deriving it (CLI parity on the same kernel event)", async () => {
     const nativeDir = seedGitTree("arggon-preplog-a-");
@@ -2535,11 +2535,12 @@ describe("worktree domain tools (W4)", () => {
     expect(steps.some((entry) => entry.step === "gate-bins")).toBe(false);
 
     // The kernel is the authority the mirror reads: a second receipt for the
-    // same worktree agrees on the cap AND the flag, so the projection reports
-    // the kernel's decision rather than a coincidence.
+    // same worktree agrees on the cap, the flag AND the count, so the
+    // projection reports the kernel's decision rather than a coincidence.
     const kernelReceipt = prepareWorktreeDependencies(nativeDir, worktreePath);
     expect(kernelReceipt.steps).toHaveLength(MAX_PREP_STEPS);
     expect(kernelReceipt.stepsTruncated).toBe(true);
+    expect(kernelReceipt.stepsDropped).toBe(preparation.stepsDropped);
 
     // CLI parity on the same kernel event: the twin fixture carries the same
     // packages, and the same shortened log comes back — entry for entry. The
@@ -2553,6 +2554,24 @@ describe("worktree domain tools (W4)", () => {
     const cli = JSON.parse(cliProc.stdout) as Record<string, unknown>;
     expect(cli.prepSteps).toHaveLength(MAX_PREP_STEPS);
     expect(cli.prepSteps).toEqual(preparation.steps);
+    // The kernel's decision, mirrored on the CLI surface too
+    // (task-cli-surface-never-carries-steps-truncated): the deep-equal
+    // per-entry assertion extends to the flag and the dropped-entry count.
+    expect(cli.stepsTruncated).toBe(true);
+    expect(cli.stepsDropped).toBe(preparation.stepsDropped);
+
+    // The human channel states the same count (the note leads with it, before
+    // the capped log): an attach re-run on the claimed fixture still records
+    // more preparation decisions than the kernel's cap, so the truncation
+    // state renders without `--json` too.
+    const humanProc = runCli(["start", "task-rate-limit", "--worktree", "--assignee", "smoke"], cliDir);
+    expect(humanProc.status, humanProc.stderr || humanProc.stdout).toBe(0);
+    const dropped = Number(preparation.stepsDropped);
+    expect(dropped).toBeGreaterThan(0);
+    expect(humanProc.stdout).toContain(
+      `${dropped} ${dropped === 1 ? "entry was" : "entries were"} dropped ` +
+        `(the preparation log is capped at ${MAX_PREP_STEPS})`,
+    );
   });
 
   it("keeps an uncapped preparation log unflagged (the mirror reports the kernel, not a cap of its own)", async () => {
@@ -2576,7 +2595,24 @@ describe("worktree domain tools (W4)", () => {
       { step: "gate-bins", outcome: "all-worktree" },
     ]);
     expect(preparation.stepsTruncated).toBeUndefined();
+    expect(preparation.stepsDropped).toBeUndefined();
     expect(preparation.truncated).toBeUndefined();
+
+    // The same uncapped log on the CLI surface stays unflagged too: the mirror
+    // never invents a truncation the kernel did not decide
+    // (task-cli-surface-never-carries-steps-truncated).
+    const cliDir = seedGitTree("arggon-preplog-d-");
+    addPrepLogWorkspacePackages(cliDir, 1);
+    const cliRemote = join(dirname(cliDir), `${basename(cliDir)}-remote.git`);
+    git(dirname(cliRemote), ["init", "--bare", "-q", cliRemote]);
+    git(cliRemote, ["config", "maintenance.auto", "false"]);
+    git(cliDir, ["remote", "add", "origin", cliRemote]);
+    const cliProc = runCliJson(["start", "task-rate-limit", "--worktree", "--assignee", "smoke"], cliDir);
+    expect(cliProc.status, cliProc.stderr || cliProc.stdout).toBe(0);
+    const cli = JSON.parse(cliProc.stdout) as Record<string, unknown>;
+    expect(cli.prepSteps).toEqual(preparation.steps);
+    expect(cli.stepsTruncated).toBeUndefined();
+    expect(cli.stepsDropped).toBeUndefined();
   });
 
   it("keeps the worktree and reports a skipped claim commit when the gate fails, then retries on attach", async () => {
@@ -2699,6 +2735,50 @@ describe("worktree domain tools (W4)", () => {
     const worktreePath = String(payload.worktreePath);
     expect(existsSync(worktreePath)).toBe(true);
     expect(itemData(dir, "task-rate-limit", worktreePath)).toMatchObject({ status: "todo" });
+  });
+
+  it("states the kernel's dropped-entry count in the fresh-worktree refusal when the prep log is capped (task-cli-surface-never-carries-steps-truncated)", async () => {
+    // The refusal renders the preparation log, and the kernel caps that log at
+    // MAX_PREP_STEPS: with more decisions than the cap, the refusal used to
+    // present the capped list as if it were the whole log. The kernel now
+    // counts what it dropped; the native projection mirrors the count through
+    // `boundedPreparation` and the refusal quotes it
+    // (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation).
+    const dir = seedGitTree("arggon-preplog-refusal-");
+    addNativeManifest(dir, { name: "fixture", devDependencies: { "native-gate-dep": "1.0.0" } });
+    addPrepLogWorkspacePackages(dir, MAX_PREP_STEPS);
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    const payload = typed.envelope;
+    const preparation = payload.preparation as Record<string, unknown>;
+    expect(preparation.steps).toHaveLength(MAX_PREP_STEPS);
+    expect(preparation.stepsTruncated).toBe(true);
+    const dropped = Number(preparation.stepsDropped);
+    expect(dropped).toBeGreaterThan(0);
+
+    const claimCommit = payload.claimCommit as Record<string, unknown>;
+    expect(claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+      reason: "fresh-worktree install gate refused",
+    });
+    const message = String((payload.error as Record<string, unknown>).message);
+    expect(message).toContain("fresh worktree must leave a gate-usable install");
+    expect(message).toContain("Preparation ran:");
+    // The kernel's own count, quoted — not a length-vs-cap guess.
+    expect(message).toContain(
+      `${dropped} ${dropped === 1 ? "entry was" : "entries were"} dropped ` +
+        `(the preparation log is capped at ${MAX_PREP_STEPS})`,
+    );
   });
 
   it("refuses a fresh worktree whose gate bin resolves only via PATH, by default (bug-start-install-ordering masking flavor)", async () => {

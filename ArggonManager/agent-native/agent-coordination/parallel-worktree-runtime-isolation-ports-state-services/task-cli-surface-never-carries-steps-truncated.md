@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-cli-surface-never-carries-steps-truncated
 title: "Neither surface carries `stepsTruncated`: the CLI assigns `prepSteps` and forwards only that, so #617 fixed the native mirror but the human/CLI surface still drops the kernel flag"
+assignee: arggon-delivery-lead
+branch: feat/task-cli-surface-never-carries-steps-truncated
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [cli, native-seam, json-contract]
 created: "2026-10-03"
-updated: "2026-10-03"
+updated: "2026-10-15"
+claimed_at: "2026-10-15T10:14:51.729Z"
 depends_on: [bug-native-steps-truncated-flag-dropped]
+worktree_path: /home/arggon/Projects/ArggonManager-task-cli-surface-never-carries-steps-truncated
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-cli-surface-never-carries-steps-truncated.md
@@ -71,3 +75,28 @@ Acceptance:
 
 ### 2026-10-15 @Arggon
 Routed from the #833 sweep (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation): the kernel now emits stepsDropped and the refusal prose quotes it, but the two call sites still omit the count — cli/src/start.ts:1166 and the native projection (boundedPreparation). This item owns threading both, per the new acceptance box.
+
+### 2026-10-15 @arggon-maker
+Implemented on `feat/task-cli-surface-never-carries-steps-truncated` (worktree `/home/arggon/Projects/ArggonManager-task-cli-surface-never-carries-steps-truncated`), commit `5a36b92b`, PR #835 against `main`.
+
+What each surface now carries — MIRRORED from the kernel receipt (`lib/src/worktree.ts` sets `stepsTruncated` + `stepsDropped` together in the one `record()` branch that drops), never re-derived from a cap:
+
+- CLI: `StartResult.stepsTruncated`/`stepsDropped` (`cli/src/start.ts`) → `--json` envelope beside `prepSteps` (`cli/src/cli.ts`); `prepared.stepsDropped` threaded into `freshWorktreeInstallRefusal`; human `note: dependency prep — …` leads with `N entries were dropped (the preparation log is capped at 16)` (extracted as the unit-tested `dependencyPrepNote`, so a head-clip can never eat the count).
+- Native: `boundedPreparation` mirrors `stepsDropped` beside `stepsTruncated`; the fresh-worktree refusal call site passes `progress.preparation?.stepsDropped ?? 0`; `index.bundle.ts` regenerated.
+- Docs: `docs/json-output.md` §start gains `stepsTruncated`/`stepsDropped` rows + the refusal-prose clause; `docs/opencode2.md` gains the `preparation.stepsDropped?` row + the mirrored-pair prose; the opencode2 doc-contract suite gained the CLI twin as a scenario (deep-equal `prepSteps` vs native `steps`, flag/count parity, and the `json-output.md` §start rows checked so the CLI shape cannot be dropped again).
+
+Evidence (commands run; expected vs observed):
+
+- `npx vitest run cli/src/start.test.ts` → 71 passed. New: capped log carries `stepsTruncated: true` + `stepsDropped: 2`; fresh-worktree refusal message contains `2 entries were dropped (the preparation log is capped at 16)`; uncapped log has neither field; 4 `dependencyPrepNote` cases.
+- `npx vitest run opencode/plugins/arggon/tools.test.ts` → 142 passed. Extended W4 parity test: on twin over-cap fixtures `cli.prepSteps` deep-equals native `preparation.steps`, `cli.stepsTruncated === true`, `cli.stepsDropped === preparation.stepsDropped === kernelReceipt.stepsDropped`; a human (no `--json`) re-run prints the same count. Uncapped twin: neither surface carries the pair. New native refusal test: message quotes the mirrored count.
+- `npx vitest run opencode/plugins/arggon/opencode2-doc-contract.test.ts` → 6 passed (incl. the new CLI scenario; native over-cap receipt observed `stepsDropped: 2`).
+- `npm run build` → bundle rebuilt (572654 bytes); `npm run check:plugin` → clean (no drift).
+- `npm run arggon -- validate` → ok (0 warnings, convention v5).
+- `npm run lint` → clean; `npm run test:structure` → 5 passed; `npx prettier --check` on all 9 touched files → clean.
+- `npm test` → 159 files / 3515 tests passed.
+
+No blockers; no out-of-scope work found.
+
+### handoff 2026-10-15 @arggon-maker — next: Review/merge PR #835 (all gates green: 3515 tests, validate, lint, structure, plugin drift-free); then close the item per the acceptance checklist.
+- branch: feat/task-cli-surface-never-carries-steps-truncated
+- open questions: none; item depends_on bug-native-steps-truncated-flag-dropped is terminal and its native mirror is intact
