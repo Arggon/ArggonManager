@@ -3784,10 +3784,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.liveContextRegion = exports.liveAcceptanceUnchecked = exports.liveAcceptanceRows = exports.liveAcceptanceRegion = exports.liveAcceptanceCriteria = exports.itemsById = exports.acceptanceUnchecked = exports.acceptanceRows = exports.acceptanceGate = exports.acceptanceCriteria = exports.acceptanceComplete = exports.acceptanceBody = void 0;
 exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = void 0;
 exports.FRICTION_REPORT_MAX_ROWS = exports.resolveRepoAbsPath = exports.redactFrictionText = exports.readOrCreateMachineSalt = exports.readFrictionLog = exports.readFrictionDropped = exports.normalizeCommandShape = exports.frictionStateDir = exports.frictionStateBase = exports.frictionSaltPath = exports.frictionReporterId = exports.frictionMajorVersion = exports.frictionLogPath = exports.frictionFingerprintMaterial = exports.frictionFingerprint = exports.frictionDroppedPath = exports.clearFrictionLog = exports.buildFrictionRecord = exports.appendFrictionRecord = exports.FrictionError = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SECRET_PLACEHOLDER = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_REDACTION_MAX_SUBSTITUTIONS = exports.FRICTION_REDACTED_FIELD = exports.FRICTION_PATH_PLACEHOLDER = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_MAX_LINES = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_HARNESS_CAP = exports.FRICTION_FORMAT_VERSION = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_DROPPED_FILE_NAME = exports.FRICTION_DEFAULT_HARNESS = exports.FRICTION_COMMAND_SHAPE_CAP = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = void 0;
-exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.stripInlineCodeSpans = exports.regionHasScaffoldMarker = exports.placeholderSections = exports.bodyHasScaffoldPlaceholder = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.isFrictionPublishTier = exports.buildFrictionPublishUrl = exports.buildFrictionPublishTitle = exports.buildFrictionPublishDoc = exports.buildFrictionPublishBody = exports.FRICTION_PUBLISH_URL_BASE = exports.FRICTION_PUBLISH_TITLE_PREFIX = exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = exports.FRICTION_PUBLISH_TIERS = exports.FRICTION_PUBLISH_NARRATIVE_CAP = exports.FRICTION_PUBLISH_MAX_URL_CHARS = exports.FRICTION_PUBLISH_MAX_CLASSES = exports.FRICTION_PUBLISH_LABEL = exports.FRICTION_PUBLISH_FENCE_INFO = exports.resolveFrictionOptOut = exports.readFrictionOptOut = exports.FRICTION_OPT_OUT_ENV = exports.summarizeFrictionLog = exports.renderFrictionReport = exports.readFrictionReport = exports.frictionFenceFor = void 0;
-exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.isStartOwnedWorktreeEnv = exports.isStartOwnedNodeModulesInstall = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeUntrackedRefusal = exports.worktreeTrackedRefusal = exports.worktreeReleaseRefusal = exports.parseRemovalBlockingPaths = exports.parseRemovalBlockers = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = void 0;
-exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.frictionClearOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_NODE_MODULES_ENTRY = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = void 0;
+exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.stripInlineCodeSpans = exports.regionHasScaffoldMarker = exports.placeholderSections = exports.bodyHasScaffoldPlaceholder = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.MAX_HYGIENE_OPEN_CONTAINERS = exports.MAX_HYGIENE_OFFENDERS = exports.runReport = exports.containerHygiene = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.isFrictionPublishTier = exports.buildFrictionPublishUrl = exports.buildFrictionPublishTitle = exports.buildFrictionPublishDoc = exports.buildFrictionPublishBody = exports.FRICTION_PUBLISH_URL_BASE = exports.FRICTION_PUBLISH_TITLE_PREFIX = exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = exports.FRICTION_PUBLISH_TIERS = exports.FRICTION_PUBLISH_NARRATIVE_CAP = exports.FRICTION_PUBLISH_MAX_URL_CHARS = exports.FRICTION_PUBLISH_MAX_CLASSES = exports.FRICTION_PUBLISH_LABEL = exports.FRICTION_PUBLISH_FENCE_INFO = exports.resolveFrictionOptOut = exports.readFrictionOptOut = exports.FRICTION_OPT_OUT_ENV = exports.summarizeFrictionLog = exports.renderFrictionReport = exports.readFrictionReport = exports.frictionFenceFor = void 0;
+exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.isStartOwnedWorktreeEnv = exports.isStartOwnedNodeModulesInstall = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeUntrackedRefusal = exports.worktreeTrackedRefusal = exports.worktreeReleaseRefusal = exports.parseRemovalBlockingPaths = exports.parseRemovalBlockers = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = void 0;
+exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.frictionClearOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_NODE_MODULES_ENTRY = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.formatReportHygiene = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceBody", { enumerable: true, get: function () { return items_js_1.acceptanceBody; } });
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
@@ -3991,7 +3991,11 @@ Object.defineProperty(exports, "showBoundedParts", { enumerable: true, get: func
 var report_js_1 = require("./report.js");
 Object.defineProperty(exports, "aggregateReport", { enumerable: true, get: function () { return report_js_1.aggregateReport; } });
 Object.defineProperty(exports, "completedOf", { enumerable: true, get: function () { return report_js_1.completedOf; } });
+Object.defineProperty(exports, "containerHygiene", { enumerable: true, get: function () { return report_js_1.containerHygiene; } });
 Object.defineProperty(exports, "runReport", { enumerable: true, get: function () { return report_js_1.runReport; } });
+var report_js_2 = require("./report.js");
+Object.defineProperty(exports, "MAX_HYGIENE_OFFENDERS", { enumerable: true, get: function () { return report_js_2.MAX_HYGIENE_OFFENDERS; } });
+Object.defineProperty(exports, "MAX_HYGIENE_OPEN_CONTAINERS", { enumerable: true, get: function () { return report_js_2.MAX_HYGIENE_OPEN_CONTAINERS; } });
 var trend_js_1 = require("./trend.js");
 Object.defineProperty(exports, "runTrend", { enumerable: true, get: function () { return trend_js_1.runTrend; } });
 var trend_js_2 = require("./trend.js");
@@ -4136,9 +4140,10 @@ Object.defineProperty(exports, "resolveCurrentLogin", { enumerable: true, get: f
 var show_js_2 = require("./show.js");
 Object.defineProperty(exports, "DEFAULT_TAIL_COMMENTS", { enumerable: true, get: function () { return show_js_2.DEFAULT_TAIL_COMMENTS; } });
 Object.defineProperty(exports, "renderShowText", { enumerable: true, get: function () { return show_js_2.renderShowText; } });
-var report_js_2 = require("./report.js");
-Object.defineProperty(exports, "formatReportMarkdown", { enumerable: true, get: function () { return report_js_2.formatReportMarkdown; } });
-Object.defineProperty(exports, "formatReportTable", { enumerable: true, get: function () { return report_js_2.formatReportTable; } });
+var report_js_3 = require("./report.js");
+Object.defineProperty(exports, "formatReportHygiene", { enumerable: true, get: function () { return report_js_3.formatReportHygiene; } });
+Object.defineProperty(exports, "formatReportMarkdown", { enumerable: true, get: function () { return report_js_3.formatReportMarkdown; } });
+Object.defineProperty(exports, "formatReportTable", { enumerable: true, get: function () { return report_js_3.formatReportTable; } });
 var trend_js_3 = require("./trend.js");
 Object.defineProperty(exports, "formatTrendMarkdown", { enumerable: true, get: function () { return trend_js_3.formatTrendMarkdown; } });
 Object.defineProperty(exports, "formatTrendTable", { enumerable: true, get: function () { return trend_js_3.formatTrendTable; } });
@@ -5165,7 +5170,7 @@ function reportOperation(opts) {
             }
         }
         const result = (0, report_js_1.runReport)({ cwd: opts.cwd });
-        const payload = { groups: result.groups };
+        const payload = { groups: result.groups, hygiene: result.hygiene };
         if (trend)
             payload.trend = trend;
         return succeed("report", payload, (0, convention_js_1.readConventionVersion)(result.root));
@@ -5668,11 +5673,14 @@ function assertParentEdge(childType, parentType) {
 __arggonModules.set("lib/src/report.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MAX_HYGIENE_OPEN_CONTAINERS = exports.MAX_HYGIENE_OFFENDERS = void 0;
 exports.emptyCounts = emptyCounts;
 exports.aggregateReport = aggregateReport;
+exports.containerHygiene = containerHygiene;
 exports.runReport = runReport;
 exports.completedOf = completedOf;
 exports.formatReportTable = formatReportTable;
+exports.formatReportHygiene = formatReportHygiene;
 exports.formatReportMarkdown = formatReportMarkdown;
 const acceptance_js_1 = require("./acceptance.js");
 const items_js_1 = require("./items.js");
@@ -5682,6 +5690,11 @@ const status_js_1 = require("./status.js");
 function emptyCounts() {
     return { todo: 0, in_progress: 0, blocked: 0, done: 0, cancelled: 0, total: 0 };
 }
+exports.MAX_HYGIENE_OFFENDERS = 10;
+exports.MAX_HYGIENE_OPEN_CONTAINERS = 5;
+const CONTAINER_TYPES = new Set(["initiative", "epic", "story"]);
+const OPEN_CONTAINER_TYPES = new Set(["story", "epic"]);
+const TERMINAL_STATUSES = new Set(["done", "cancelled"]);
 function titleOf(item) {
     return item.title ?? item.id;
 }
@@ -5750,13 +5763,55 @@ function aggregateReport(items) {
             blockedReason: leaf.blockedReason,
         };
     });
-    return { groups, blocked };
+    return { groups, blocked, hygiene: containerHygiene(items) };
+}
+function containerHygiene(items) {
+    const byId = (0, items_js_1.itemsById)(items);
+    const openByOffender = new Map();
+    for (const item of items) {
+        if (!OPEN_CONTAINER_TYPES.has(item.type) || TERMINAL_STATUSES.has(item.status))
+            continue;
+        let parentId = item.parent;
+        while (parentId) {
+            const parent = byId.get(parentId);
+            if (!parent)
+                break;
+            if (CONTAINER_TYPES.has(parent.type) && TERMINAL_STATUSES.has(parent.status)) {
+                const list = openByOffender.get(parent.id) ?? [];
+                list.push(item);
+                openByOffender.set(parent.id, list);
+            }
+            parentId = parent.parent;
+        }
+    }
+    const offenders = [...openByOffender.entries()]
+        .map(([id, open]) => {
+        const container = byId.get(id);
+        const sorted = [...open].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+        return {
+            id,
+            type: container.type,
+            status: container.status,
+            openContainers: sorted.slice(0, exports.MAX_HYGIENE_OPEN_CONTAINERS).map((c) => ({
+                id: c.id,
+                type: c.type,
+                status: c.status,
+            })),
+            openContainersTotal: sorted.length,
+        };
+    })
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    return {
+        checked: items.filter((item) => CONTAINER_TYPES.has(item.type)).length,
+        offenders: offenders.slice(0, exports.MAX_HYGIENE_OFFENDERS),
+        offendersTotal: offenders.length,
+    };
 }
 function runReport(opts) {
     const tasksDir = (0, paths_js_1.findTasksDir)(opts.cwd);
     const root = (0, paths_js_1.repoRootFromTasks)(tasksDir);
-    const { groups, blocked } = aggregateReport((0, items_js_1.loadItems)(tasksDir));
-    return { root, groups, blocked };
+    const { groups, blocked, hygiene } = aggregateReport((0, items_js_1.loadItems)(tasksDir));
+    return { root, groups, blocked, hygiene };
 }
 function completedOf(counts) {
     return counts.done + counts.cancelled;
@@ -5779,6 +5834,28 @@ function formatReportTable(groups) {
 function formatCounts(counts) {
     const parts = status_js_1.STATUSES.map((status) => `${status}=${counts[status]}`);
     return `${parts.join(" ")} (total ${counts.total})`;
+}
+function formatHygieneOpenContainers(offender) {
+    const open = offender.openContainers
+        .map((c) => `${(0, sanitize_js_1.sanitizeHumanTextUncapped)(c.id)} (${c.status})`)
+        .join(", ");
+    const dropped = offender.openContainersTotal - offender.openContainers.length;
+    return dropped > 0 ? `${open} (+${dropped} more)` : open;
+}
+function formatReportHygiene(hygiene) {
+    const checked = `${hygiene.checked} containers checked`;
+    if (hygiene.offendersTotal === 0) {
+        return `hygiene: clean — no terminal container holds an open container (${checked})\n`;
+    }
+    const noun = hygiene.offendersTotal === 1 ? "offender" : "offenders";
+    const lines = [`hygiene: ${hygiene.offendersTotal} ${noun} (${checked})`];
+    for (const offender of hygiene.offenders) {
+        lines.push(`  ${(0, sanitize_js_1.sanitizeHumanTextUncapped)(offender.id)} (${offender.status}) — open containers: ${formatHygieneOpenContainers(offender)}`);
+    }
+    const dropped = hygiene.offendersTotal - hygiene.offenders.length;
+    if (dropped > 0)
+        lines.push(`  … and ${dropped} more`);
+    return `${lines.join("\n")}\n`;
 }
 function formatReportMarkdown(result, opts = {}) {
     const date = opts.date ?? new Date().toISOString().slice(0, 10);
@@ -5815,6 +5892,22 @@ function formatReportMarkdown(result, opts = {}) {
             const scope = where ? ` (${where})` : "";
             lines.push(`- **${(0, sanitize_js_1.sanitizeHumanTextUncapped)(b.id)}**${scope} — ${(0, sanitize_js_1.sanitizeHumanTextUncapped)(b.blockedReason)}`);
         }
+        lines.push("");
+    }
+    lines.push("## Hygiene", "");
+    const checked = `${result.hygiene.checked} containers checked`;
+    if (result.hygiene.offendersTotal === 0) {
+        lines.push(`_No terminal container holds an open container (${checked})._`, "");
+    }
+    else {
+        const noun = result.hygiene.offendersTotal === 1 ? "offender" : "offenders";
+        lines.push(`- ${result.hygiene.offendersTotal} ${noun} (${checked})`);
+        for (const offender of result.hygiene.offenders) {
+            lines.push(`- **${(0, sanitize_js_1.sanitizeHumanTextUncapped)(offender.id)}** (${offender.status}) — open containers: ${formatHygieneOpenContainers(offender)}`);
+        }
+        const dropped = result.hygiene.offendersTotal - result.hygiene.offenders.length;
+        if (dropped > 0)
+            lines.push(`- … and ${dropped} more`);
         lines.push("");
     }
     return `${lines.join("\n")}\n`;
@@ -11191,7 +11284,7 @@ const TOOL_SPECS = [
     },
     {
         name: "report",
-        description: "Aggregate leaf statuses per story, grouped by epic; `trend: true` mines git history. Pure read — never writes.",
+        description: "Aggregate leaf statuses per story, grouped by epic, plus report-only container hygiene; `trend: true` mines git history. Pure read — never writes.",
         input: {
             type: "object",
             properties: {
@@ -11200,7 +11293,7 @@ const TOOL_SPECS = [
             },
             additionalProperties: false,
         },
-        output: envelopeSchema({ groups: { type: "array" }, trend: OBJECT }),
+        output: envelopeSchema({ groups: { type: "array" }, hygiene: OBJECT, trend: OBJECT }),
         run: (kernel, input, options) => kernel.reportOperation({
             cwd: options.cwd,
             trend: input.trend === true,

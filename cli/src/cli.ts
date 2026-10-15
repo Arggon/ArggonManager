@@ -17,6 +17,7 @@ import {
   failJson,
   formatCommitLine,
   formatListTable,
+  formatReportHygiene,
   formatReportMarkdown,
   formatReportTable,
   formatTrendMarkdown,
@@ -954,7 +955,9 @@ program
 
 program
   .command("report")
-  .description("Aggregate leaf statuses per container, grouped by epic (display only)")
+  .description(
+    "Aggregate leaf statuses per container, grouped by epic, plus a report-only terminal-container hygiene check (display only)",
+  )
   .option(
     "--format <format>",
     "output format: table (default) or markdown (standup summary)",
@@ -1029,6 +1032,8 @@ program
         return;
       }
       process.stdout.write(formatReportTable(result.groups));
+      // Additive, report-only hygiene block (task-container-hygiene-check).
+      process.stdout.write(formatReportHygiene(result.hygiene));
       if (trend) process.stdout.write(formatTrendTable(trend));
     } catch (err) {
       printHumanError("arggon report", err instanceof Error ? err.message : String(err));

@@ -14,9 +14,9 @@ x-generated:
   projectName: "ArggonManager"
   .agents/skills/arggon-cli/SKILL.md:
     template: "skills/arggon-cli/SKILL.md"
-    checksum: "sha256:b61a0ec863c0ce9f2493277abaf23f0c439a5e36a3ec3f17f5871e3e7687e679"
+    checksum: "sha256:c8c1d65cd90b59e20c28e538b5e7680ef20e550c531b9f3d775086ec13899bc7"
     arggonVersion: "0.10.0"
-    generatedAt: "2026-10-14T20:24:14.426Z"
+    generatedAt: "2026-10-15T00:25:49.330Z"
   .agents/skills/arggon-cli/references/exploration.md:
     template: "skills/arggon-cli/references/exploration.md"
     checksum: "sha256:3553e0c6084ca5c138cf2a9a1ddd4f157728bc0917928c00f1d9f4a7fb75a6f1"
@@ -149,9 +149,9 @@ x-generated:
     generatedAt: "2026-10-14T20:24:14.426Z"
   .claude-marketplace/arggon/skills/arggon-cli/SKILL.md:
     template: "docs/claude/arggon/skills/arggon-cli/SKILL.md"
-    checksum: "sha256:33f6c0faf02d0830804dae9a3dd1707fc8467a0297b6df1771d925ac4ecf8ac2"
+    checksum: "sha256:a13f4c944bcfc8f1c9c0dbf1889ecf5a547cd6bd37bc1d70cd74b946da19fd9f"
     arggonVersion: "0.10.0"
-    generatedAt: "2026-10-14T20:24:14.426Z"
+    generatedAt: "2026-10-15T00:25:49.330Z"
   .claude-marketplace/arggon/skills/arggon-cli/references/exploration.md:
     template: "docs/claude/arggon/skills/arggon-cli/references/exploration.md"
     checksum: "sha256:e077beb6b5a4d1007a9ae2e9632ef78ae949b23d07a88038b244a11dab68f7ed"
