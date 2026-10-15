@@ -1,4 +1,5 @@
 import {
+  appendFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync as _mkdtempSync,
@@ -11,7 +12,12 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { findOpenCodeConfig, generatedYamlMarker, stampGeneratedContent } from "./docs.js";
+import {
+  arggonVersion,
+  findOpenCodeConfig,
+  generatedYamlMarker,
+  stampGeneratedContent,
+} from "./docs.js";
 // Ordering assertions go through assertOrder, never a bare `indexOf`
 // comparison: `-1 < n` makes a renamed clause pass as if it were still
 // ordered (bug-vacuous-substring-ordering-assertions).
@@ -59,8 +65,12 @@ const MUTATING_TRACKER_TOOLS = [
  */
 const READ_ONLY_TRACKER_TOOLS = ["list", "next", "report", "show", "validate"];
 
-function runCli(args: string[], cwd: string = repoRoot) {
-  return runCliBase(args, cwd);
+function runCli(
+  args: string[],
+  cwd: string = repoRoot,
+  options: Parameters<typeof runCliBase>[2] = {},
+) {
+  return runCliBase(args, cwd, options);
 }
 
 function tempDir(): string {
@@ -1232,5 +1242,82 @@ describe("opencode seam: methodology commands and skill references (W5)", () => 
     const date = new Date().toISOString().slice(0, 10);
     expect(readFileSync(join(dir, "backup", date, ...rel.split("/")), "utf8")).toBe(edited);
     expect(readFileSync(dest, "utf8")).toBe(original);
+  });
+});
+
+/**
+ * The behavioral carrier change (ADR 0024 §2, spec-friction-capture-020
+ * §The trigger and its visibility, plan task T6 / task-friction-trigger-carrier).
+ *
+ * The trigger lives in the GENERATED AGENT FILES, not only in a skill reference:
+ * `deftai/directive#3633` shipped a sanctioned escalation skill and an agent that
+ * was actively escalating and following the rule that pointed at it still missed
+ * it — the friction was "absorbed into the session", which is silent loss and
+ * looks like success. A capability in the wrong place is absent.
+ *
+ * Note on the file names: the ADR and the spec were written against the
+ * pre-rename ids (`arggon-worker` → `arggon-maker`, `arggon-coordinator` →
+ * `arggon-delivery-lead`, ADR 0021 §6.2a′). The seam ships the renamed files, and
+ * the family drift guard (cli/src/adopter-template-invariant-drift.test.ts) fails
+ * on a retired id, so these two are the ADR's two files at their current ids.
+ */
+describe("friction trigger in the generated agent files (ADR 0024 §2)", () => {
+  const MAKER = ".opencode/agents/arggon-maker.md";
+  const LEAD = ".opencode/agents/arggon-delivery-lead.md";
+
+  it("stamps the marked block with the running arggon version in both agent files", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    for (const rel of [MAKER, LEAD]) {
+      const text = readFileSync(join(dir, ...rel.split("/")), "utf8");
+      expect(text, rel).toContain(
+        `<!-- arggon:friction-trigger begin triggerVersion=${arggonVersion()} -->`,
+      );
+      expect(text, rel).toContain("<!-- arggon:friction-trigger end -->");
+      // The carve-out itself: friction in ArggonManager itself is not adoptable
+      // work, so an agent must neither work around it nor file it locally.
+      expect(text, rel).toContain("not adoptable work");
+      expect(text, rel).toContain("do not file it in this repo's tracker");
+      // Both modes the trigger names, so the workflow is derivable from this file
+      // alone (the EVALS.md E19 case: the `deftai` lesson as a regression test).
+      expect(text, rel).toContain('arggon friction "<one line>" --command "<argv shape>"');
+      expect(text, rel).toContain("arggon friction --report");
+    }
+  });
+
+  it("x-friction: false does not strip the trigger from the generated agent file", () => {
+    // ADR 0024 §3: opt-out gates CAPTURE, never discoverability. An adopter who
+    // turned capture off must still be able to find the channel again, and an
+    // agent that cannot see the rule cannot tell the user it exists.
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const statePath = join(dir, "ArggonManager/.convention.yml");
+    appendFileSync(statePath, "\nx-friction: false\n", "utf8");
+    // Fresh generation with the opt-out in force: the files are deleted so the
+    // next init writes them from the current template, exactly as an adopter's
+    // first post-opt-out run would.
+    rmSync(join(dir, ...MAKER.split("/")), { force: true });
+    rmSync(join(dir, ...LEAD.split("/")), { force: true });
+    const second = runCli(["init", dir, "--json"]);
+    expect(second.status).toBe(0);
+    for (const rel of [MAKER, LEAD]) {
+      const text = readFileSync(join(dir, ...rel.split("/")), "utf8");
+      expect(text, rel).toContain("arggon:friction-trigger begin");
+      expect(text, rel).toContain("arggon friction --report");
+    }
+    // The opt-out is genuinely in effect — the rule survives it anyway.
+    const env = { ARGGON_STATE_DIR: join(dir, "state") };
+    const report = runCli(["friction", "--report", "--json"], dir, { env });
+    expect(report.status).toBe(0);
+    expect(JSON.parse(report.stdout)).toMatchObject({ report: true, optedOut: true });
+    const capture = runCli(
+      ["friction", "a probe", "--command", "friction --report", "--json"],
+      dir,
+      {
+        env,
+      },
+    );
+    expect(capture.status).toBe(0);
+    expect(JSON.parse(capture.stdout)).toMatchObject({ optedOut: true });
   });
 });
