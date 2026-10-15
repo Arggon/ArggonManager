@@ -13,6 +13,7 @@ claimed_at: "2026-10-15T15:08:55.703Z"
 depends_on: [task-cli-start-remediation-tail-clipped-on-human-channel, bug-three-acceptance-parsers-diverging]
 worktree_path: /home/arggon/Projects/ArggonManager-task-clip-class-sweep-remaining-sites
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-clip-class-sweep-remaining-sites.md
   Leaves live only under a story. id is the filename stem: task-clip-class-sweep-remaining-sites.
@@ -90,12 +91,12 @@ record, not re-claim a second "swept".
 
 ## Acceptance
 
-- [ ] The `committing the claim` branch leads with the exact `npm ci` fix and bounds ONLY the readiness evidence by budget (verify the `1446ca08` / `bffe586f` / `6e8995c2` shape at HEAD, or re-fix if regressed); the worst-case arithmetic re-run on the current fixture, with the non-reproducing `459 < 355` numbers corrected to measured values and the qualitative claim kept by construction
-- [ ] The four deferred sites (`cli/src/board.ts:141`, `lib/src/get-open-prs.ts:67`, `lib/src/import-issues.ts:187`, `lib/src/cleanup.ts:259`) recorded NOT clip-reachable (stderr ignored, bounded argv echo) — recorded compliant, not fixed, so nobody re-audits them
-- [ ] The doc drift travels with the fix: the post-start error wording in `ArggonManager/docs/convention.md` and `ArggonManager/docs/json-output.md` states the hint LEADING (verify the `readiness`-row wording at HEAD, or fix the drift)
-- [ ] Every ordering assertion pins with presence-checked needles on both sides (the `61449604` idiom: each needle asserted present before any index comparison) — the same idiom on any site this sweep touches, never a bare `-1 < n` comparison
-- [ ] An ordering assertion or grep-able rule pins the ORDER convention (remedies lead, evidence trails) on every human-facing surface, so a future site cannot reintroduce it silently (extend the `e1381a40` / `assert-order.test.ts` coverage to each site touched)
-- [ ] Reconciled with `task-cli-start-remediation-tail-clipped-on-human-channel` (done, rounds 1–3): no duplicate "swept" claim — every remedy-after-detail site on every human-facing surface enumerated and either fixed or recorded compliant
+- [x] The `committing the claim` branch leads with the exact `npm ci` fix and bounds ONLY the readiness evidence by budget (verify the `1446ca08` / `bffe586f` / `6e8995c2` shape at HEAD, or re-fix if regressed); the worst-case arithmetic re-run on the current fixture, with the non-reproducing `459 < 355` numbers corrected to measured values and the qualitative claim kept by construction
+- [x] The four deferred sites (`cli/src/board.ts:141`, `lib/src/get-open-prs.ts:67`, `lib/src/import-issues.ts:187`, `lib/src/cleanup.ts:259`) recorded NOT clip-reachable (stderr ignored, bounded argv echo) — recorded compliant, not fixed, so nobody re-audits them
+- [x] The doc drift travels with the fix: the post-start error wording in `ArggonManager/docs/convention.md` and `ArggonManager/docs/json-output.md` states the hint LEADING (verify the `readiness`-row wording at HEAD, or fix the drift)
+- [x] Every ordering assertion pins with presence-checked needles on both sides (the `61449604` idiom: each needle asserted present before any index comparison) — the same idiom on any site this sweep touches, never a bare `-1 < n` comparison
+- [x] An ordering assertion or grep-able rule pins the ORDER convention (remedies lead, evidence trails) on every human-facing surface, so a future site cannot reintroduce it silently (extend the `e1381a40` / `assert-order.test.ts` coverage to each site touched)
+- [x] Reconciled with `task-cli-start-remediation-tail-clipped-on-human-channel` (done, rounds 1–3): no duplicate "swept" claim — every remedy-after-detail site on every human-facing surface enumerated and either fixed or recorded compliant
 
 ## Notes
 
@@ -139,6 +140,7 @@ That is the sharpest evidence yet for why this item is a class sweep rather than
 - The pre-fix numbers quoted in the item (`459 < 355`) do not reproduce (~537 vs ~355). The qualitative claim holds by construction; the recorded evidence should say so rather than keep a number that does not reproduce.
 
 ### 2026-10-15 @ses_ebfe1a5c0ffe0yJ7qSezc99RW7
+
 ## Evidence — PR #847 (feat/task-clip-class-sweep-remaining-sites)
 
 Class sweep closed without re-fixing the sibling item's sites. Per-box evidence:
@@ -147,12 +149,12 @@ Class sweep closed without re-fixing the sibling item's sites. Per-box evidence:
 
 Verified, not assumed: `cli/src/start.ts` `worktreeRemediation` splits the committing-claim remedy into generic + exactFix, and `worktreeFailureMessage` composes the exact fix LEADING (fitting shape: remedy + exact fix ahead of the budget-filled readiness clause; over-budget shape: notice → exact fix → lead → remedy → discard → detail, readiness refused). Measured through the real `worktreeFailureMessage` + real `sanitizeHumanError` on the deterministic worst-case fixture:
 
-| composition | length (cap 2000) | exact fix idx | readiness idx | names | elided |
-| --- | --- | --- | --- | --- | --- |
-| committing-claim pathological | 1795 | 584 | 834 | 2 of 8 + count | no |
-| committing-claim typical | 1980 | 565 | 796 | 7 of 8 + count | no |
-| strict-gate-bin pathological | 3199 | — | — | remedy @221, discard @343, first bin @648 | evidence tail only |
-| over-budget ~700-char path | 3219 | 189 | refused | fill refused | notice named |
+| composition                   | length (cap 2000) | exact fix idx | readiness idx | names                                     | elided             |
+| ----------------------------- | ----------------- | ------------- | ------------- | ----------------------------------------- | ------------------ |
+| committing-claim pathological | 1795              | 584           | 834           | 2 of 8 + count                            | no                 |
+| committing-claim typical      | 1980              | 565           | 796           | 7 of 8 + count                            | no                 |
+| strict-gate-bin pathological  | 3199              | —             | —             | remedy @221, discard @343, first bin @648 | evidence tail only |
+| over-budget ~700-char path    | 3219              | 189           | refused       | fill refused                              | notice named       |
 
 Fix index invariant across list lengths: 584 at 1/3/8 bins (pinned by the existing structural test). Red proof the pin bites: reintroducing the pre-fix order fails with "needles #2 and #3 are out of order. #2 'Exact fix…' at 1329; #3 'Readiness:…' at 584".
 
@@ -179,12 +181,16 @@ Enumeration: sibling-fixed sites (worktreeFailureMessage, gh(), commitFile(), ru
 npm run build ok (bundle byte-identical — comment-only lib edits) · npm run check:plugin no drift · npm run arggon -- validate ok (0 warnings) · 8 focused suites 417 passed · npm test 162 files / 3572 tests (final run green; one mid-sequence run hit the filed bug-headless-ci-twin-init-nondeterministic flake — the file passes standalone 7/7 and main is red there too) · npm run lint clean · npm run test:structure 5 passed · npm run lint:structure clean · npx prettier --check clean on all 12 touched files. Behavior change: none (doc comments, contract tests, docs); no smoke probe required — the composition contracts are driven end-to-end through the real runStart strict-gate path and the real-git pre-commit gate in the existing suites.
 
 ### handoff 2026-10-15 @ses_ebfe1a5c0ffe0yJ7qSezc99RW7 (session: ses_ebfe1a5c0ffe0yJ7qSezc99RW7) — next: Review + merge PR #847: all six acceptance boxes evidenced on the item; gates green in the worktree.
+
 - branch: feat/task-clip-class-sweep-remaining-sites
 - open questions: None blocking; reviewer to confirm the four compliant records are the durable form wanted (comment + bounded-message test per site) and that leaving worktree.test.ts/cli.test.ts in the 61449604 varia…
 
 ### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
 verdict: approve
+
 ### Lead review + merge verification — 2026-10-15 (delivery lead)
+
 Merged as bbf5daeb (PR #847). The class sweep closes honestly: the four deferred sites are recorded compliant with MEASURED bounds (gh runs with stderr IGNORED → a bounded argv echo, worst case 341 chars — git's 255-char refname component limit; board / cleanup / import-issues the same shape), so nobody re-audits them on a clip pretext; the `committing the claim` branch's shape is verified at HEAD with measured arithmetic on the deterministic fixture (pathological 1795 chars, fix @584, 2-of-8 named; typical 1980, fix @565, 7-of-8), and the non-reproducing `459 < 355` numbers are corrected — they were `$TMPDIR`-dependent pre-fix strict-gate measurements — with the qualitative claim kept by construction (the exact-fix index invariant + the ordering pin); the over-budget shape (PR #845) is now documented in BOTH carriers; every ordering assertion uses presence-checked needles, and the intermediate-variable contract is pinned so a bare compare can't pass vacuously; the enumeration reconciled with no duplicate "swept" claim.
 
 Evidence: 8 focused suites 417 passed; full suite 162 files / 3572; build / `check:plugin` (bundle byte-identical — comment-only lib edits) / validate / lint / structure / prettier green; CI green. The `bug-headless-ci-twin-init-nondeterministic` flake mid-run is recorded as a pre-existing environment flake (red on clean main; 7/7 standalone).
