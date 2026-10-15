@@ -13,6 +13,7 @@ updated: "2026-10-15"
 claimed_at: "2026-10-15T10:14:55.642Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use.md
   Leaves live only under a story. id is the filename stem: bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use.
@@ -209,6 +210,7 @@ lead's merge step. It should land before the next wave that needs a rebase, whic
 any wave whose branches outlive a `main` commit.
 
 ### 2026-10-15 @Arggon
+
 ### 2026-10-15 @arggon-maker
 
 **Red first (TDD, box 2).** `cli/src/opencode-force-push.test.ts` was written before the fix and run against the unchanged rules in both carriers (tree `b95edfa5`):
@@ -240,12 +242,12 @@ deny   git push *+*                            ← last: +refspec stays refused 
 
 **Lead-role probe, end-to-end (boxes 4-5)** — scratch repo + local bare remote under `/tmp/opencode/fp-probe`, seam scaffolded by this branch's CLI, so the session's `opencode.jsonc` is the fixed template. `opencode run --standalone --agent arggon-delivery-lead --model opencode-go/deepseek-v4.1-flash --auto --format json`; `session export` confirms `"agent": "arggon-delivery-lead"` (`ses_ec0e2e434ffeIWJv8UxJbmnLRG`):
 
-| probe | command | expected | observed | exit |
-| --- | --- | --- | --- | --- |
-| red twin (pre-fix config) | `git push --force-with-lease -u origin fix/probe` (branch rebased, remote at `1e859c71`) | refused | `status: "error"`, `"Permission denied: shell"`, agent answered `PERMISSION_REFUSED`, remote stayed `1e859c71` while local was `b6dfda28` | 0 (session) |
-| green (fixed config) | same command (remote at `a503040f`, rebased head `45989dbe`) | allowed | `status: "completed"`, `+ a503040...45989db fix/probe -> fix/probe (forced update)`, remote moved to `45989dbe` | 0 |
-| negative control | `git push --force origin main` | refused | `status: "error"`, `"Permission denied: shell"`, `PERMISSION_REFUSED`, remote `main` unchanged (`7f3c63de`) | 0 (session) |
-| control | `git push origin main` (ordinary) | allowed | remote `main` moved to `80ae08c4` | 0 |
+| probe                     | command                                                                                  | expected | observed                                                                                                                                  | exit        |
+| ------------------------- | ---------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| red twin (pre-fix config) | `git push --force-with-lease -u origin fix/probe` (branch rebased, remote at `1e859c71`) | refused  | `status: "error"`, `"Permission denied: shell"`, agent answered `PERMISSION_REFUSED`, remote stayed `1e859c71` while local was `b6dfda28` | 0 (session) |
+| green (fixed config)      | same command (remote at `a503040f`, rebased head `45989dbe`)                             | allowed  | `status: "completed"`, `+ a503040...45989db fix/probe -> fix/probe (forced update)`, remote moved to `45989dbe`                           | 0           |
+| negative control          | `git push --force origin main`                                                           | refused  | `status: "error"`, `"Permission denied: shell"`, `PERMISSION_REFUSED`, remote `main` unchanged (`7f3c63de`)                               | 0 (session) |
+| control                   | `git push origin main` (ordinary)                                                        | allowed  | remote `main` moved to `80ae08c4`                                                                                                         | 0           |
 
 Does NOT prove: that the layer is enforced in every client runtime (it is enforced in this OpenCode v2.0.29 session — `bug-task-permissions-enforcement-not-observed` is the other half), that a determined spelling (`bash -c …`) is stopped, or that the ZCode/Claude seams behave the same.
 
@@ -256,10 +258,12 @@ Does NOT prove: that the layer is enforced in every client runtime (it is enforc
 **Doctor (box 3):** the template carries the rules (fresh `arggon init` renders them; the byte-equality + never-overwrite pins in `cli/src/init-opencode.test.ts` pass), this repo's own `opencode.jsonc` carries the same rules, `arggon doctor --agents` reports it `adopter-edited` (hand-edited generated file, never regenerated — the pre-existing status, unchanged by this change) and `arggon doctor` lists it in `outdated` (its bytes differ from the current render, which is true: it is the adopter-owned variant). `cli/src/provenance-audit.test.ts` (the repo-self ledger gate) passes.
 
 ### handoff 2026-10-15 @arggon-maker — next: Open the PR against main and hand it to the standards reviewer; the one judgement call to review is that the refname is NOT the discriminator (--force-with-lease origin main:other is allowed, like th…
+
 - branch: fix/bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use
 - open questions: Should the lease-with-named-ref form (origin main:other) be refused after all? It is one deny rule + one test case if the lead wants it; Does the residual (a second bare --force next to an allowed le…
 
 ### 2026-10-15 @Arggon
+
 ### 2026-10-15 @arggon-maker
 
 **PR:** https://github.com/Arggon/ArggonManager/pull/836 — `fix(config): force-push gate discriminates on the lease, not the spelling`, open and MERGEABLE, branch `fix/bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use` (5 commits: claim, fix `2dd5dd8b`, evidence comment, handoff, judgement-call pin `f43f81c9`).
@@ -273,12 +277,16 @@ Does NOT prove: that the layer is enforced in every client runtime (it is enforc
 **Acceptance:** all 7 boxes ticked; the one judgement call to review is the refname question (see the handoff), pinned as an assertion in the test so it cannot change silently.
 
 ### handoff 2026-10-15 @arggon-maker — next: PR #836 is open with all CI green: hand it to the standards reviewer; the one judgement call to review is that the refname is NOT the discriminator (--force-with-lease origin main:other is allowed, l…
+
 - branch: fix/bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use
 - open questions: Refuse the lease-with-named-ref form (origin main:other) after all? one deny rule + one test case if the lead wants it; Close the residual (a second bare --force next to an allowed lease flag) or kee…
 
 ### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
 verdict: approve
+
 ### Lead review + merge verification — 2026-10-15 (delivery lead)
+
 Merged as 3eff9a1a (PR #836). The discriminator lands in both carriers (`templates/docs/opencode.jsonc` + this repo's `opencode.jsonc`), deny-first with the lease spellings re-allowed after and `git push *+*` last: `--force-with-lease`, `--force-with-lease=<ref>:<expect>` and `--force-if-includes` allowed; bare `--force`, `-f` and refspec-`+` still denied. Red-first honoured: the new test failed against the unchanged rules in BOTH files before the fix. `cli/src/opencode-force-push.test.ts` evaluates the rules with the runtime's own matcher (ported from the installed opencode v2.0.29: escaping, trailing `" .*"` → `"( .*)?"`, last-match-wins) — a stronger pin than a spelling list. The old four-rule pins were updated, not deleted.
 
 Probe (boxes 4-5), real and end-to-end: the pre-fix config reproduces the incident (`Permission denied: shell`, remote unchanged), the fixed config completes the `--force-with-lease` push (remote = rebased head), and the negative control (`git push --force origin main`) is still refused; ordinary pushes unaffected. Judgement call accepted: `--force-with-lease origin main:other` is allowed (the colon-free form is allowed too; denying the colon form would refuse nothing it means to refuse). Docs: `agents.md` §Force-push spellings states permitted/refused/limit + **Behavioral** impact class; `opencode2.md` W4 bullet updated. Disclosed deviation: `templates/docs/opencode.jsonc`'s pre-existing trailing commas (identical at HEAD; load-bearing for three strict-JSON tests) left as authored. Full suite 3515 green; CI green on the refreshed head.
