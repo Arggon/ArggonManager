@@ -40,12 +40,13 @@ acceptance criteria are T6's — one owner, one claim.
 
 ## Acceptance
 
-- [ ] `tools.arggon.friction` and the `arggon_friction` MCP tool take the same arguments and emit the same envelope fields as CLI `--json`.
-- [ ] `cli/src/mcp-parity.test.ts` green.
-- [ ] `ArggonManager/docs/json-output.md` documents the `friction` command surface **and** the additive `doctor.friction` block in this same PR (the block's code and tests are T6's; the doc row is this task's, so the two land together).
-- [ ] No `schemaVersion` bump is introduced by either surface (asserted in both tasks).
-- [ ] Every error path carries a typed `error.code` (`FRICTION_FAILED`) with the documented `reason` values: `no-observation`, `log-unwritable`, and the report/clear conflict.
+- [x] `tools.arggon.friction` and the `arggon_friction` MCP tool take the same arguments and emit the same envelope fields as CLI `--json`.
+- [x] `cli/src/mcp-parity.test.ts` green.
+- [x] `ArggonManager/docs/json-output.md` documents the `friction` command surface **and** the additive `doctor.friction` block in this same PR (the block's code and tests are T6's; the doc row is this task's, so the two land together).
+- [x] No `schemaVersion` bump is introduced by either surface (asserted in both tasks).
+- [x] Every error path carries a typed `error.code` (`FRICTION_FAILED`) with the documented `reason` values: `no-observation`, `log-unwritable`, and the report/clear conflict.
 
+<<<<<<< HEAD
 ### 2026-10-15 @Arggon
 # Evidence — T5 friction surface parity (PR #849)
 
@@ -135,3 +136,13 @@ stays green.
 ### handoff 2026-10-15 @Arggon — next: Delivery lead: review PR #849 (three-surface friction parity + the doctor.friction doc row) and merge; T6 (task-friction-trigger-carrier) is unblocked and owns the block's code, fields and tests.
 - branch: feat/task-friction-surface-parity-and-docs
 - open questions: Should the two raised ADR-0006 advisory schema bounds (MCP 20 KiB, native catalog 13,312 B) be re-tightened once the surface stops growing, or is 20 KiB the standing bound?; Keep the CLI re-entry for…
+=======
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-15 (delivery lead)
+Merged as 9c39dee1 (PR #849). Parity verified on all three surfaces — same arguments, same envelope fields — with both non-CLI surfaces deliberately RE-ENTERING the CLI (`arggon_friction` spawns with an argv array; the native tool via `execFile`; never a shell): the whole `friction --json` contract (the mode conflicts, the tier validation, the opt-out resolution, the record's `arggonVersion`) lives CLI-side, and the native plugin has no manifest to read a version from — an in-process capture would fingerprint `majorVersion` `"unknown"` vs `"0"` and split one dedupe row in two. Stated cost: the `arggon` binary on `PATH`, with the native tool naming the CLI path in its typed `FRICTION_FAILED` error rather than degrading silently. The ownership boundary held — the `doctor --json` `friction` block is DOCUMENTED here and left for `task-friction-trigger-carrier` alone.
+
+Advisory schema bounds raised with the delta named, never silently: MCP `tools/list` 16,384 → 20,480 B (live 18,054 B / 16 tools — the mandated sixteenth tool could not fit in the 126 B that remained), native catalog 12,288 → 13,312 B. The standing-bound question stays open on the item — recorded, not decided away.
+
+Merge verification round 1 caught a REAL gate hit: the `init-claude` seam byte-equality lane — the friction skill template's committed `.claude-marketplace` copy and its `x-generated` ledger row had not been refreshed, so a stale skill would have shipped to this repo's own Claude sessions. Fixed in the merge resolution (copy + row re-synced; seam, provenance, skill-copy, mcp-parity, doctor and init suites 188 green; validate ok), and the merge carries a clean 16-file delta against main.
+>>>>>>> a834ebff (chore(tasks): commented task-friction-surface-parity-and-docs)
