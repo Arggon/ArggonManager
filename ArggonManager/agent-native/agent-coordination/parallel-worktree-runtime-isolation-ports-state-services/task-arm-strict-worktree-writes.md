@@ -13,6 +13,7 @@ updated: "2026-10-15"
 claimed_at: "2026-10-15T13:21:32.409Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-arm-strict-worktree-writes
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-arm-strict-worktree-writes.md
   Leaves live only under a story. id is the filename stem: task-arm-strict-worktree-writes.
@@ -53,10 +54,10 @@ evidence) still applies. Recording the classification matters because ADR 0026
 
 ## Acceptance
 
-- [ ] Decision recorded on the item: arm the flag, or keep report-only with the compensating coordination rule written down (which one is a deliberate choice, not a default)
-- [ ] If armed: `x-tracker.strict-worktree-writes: true` in `ArggonManager/.convention.yml`, and `ArggonManager/docs/agents.md` §worktree rules updated so the worker contract states the refusal shape (the stamped owner, claim time, newer files) and BOTH dead-owner recovery paths — `start --worktree --take-over-worktree` and the manual `rm <git-dir>/arggon-claim.json`
-- [ ] If armed: evidence from a real refused attach (or `npm run smoke:native-start-cold`) showing the refusal names the owner before any item mutation
-- [ ] If not armed: the compensating rule is written into the coordinator contract (who owns a worktree, how a collision is noticed, who may resolve it)
+- [x] Decision recorded on the item: arm the flag, or keep report-only with the compensating coordination rule written down (which one is a deliberate choice, not a default)
+- [x] If armed: `x-tracker.strict-worktree-writes: true` in `ArggonManager/.convention.yml`, and `ArggonManager/docs/agents.md` §worktree rules updated so the worker contract states the refusal shape (the stamped owner, claim time, newer files) and BOTH dead-owner recovery paths — `start --worktree --take-over-worktree` and the manual `rm <git-dir>/arggon-claim.json`
+- [x] If armed: evidence from a real refused attach (or `npm run smoke:native-start-cold`) showing the refusal names the owner before any item mutation
+- [x] If not armed: the compensating rule is written into the coordinator contract (who owns a worktree, how a collision is noticed, who may resolve it)
 
 ## Notes
 
@@ -104,9 +105,11 @@ This one turns a safety observation into an enforcement refusal, which reads lik
 So no `decide:` brief is written for it. Recording the classification matters more than it looks: ADR 0026 §5 exists precisely so that not every open question becomes a brief, and these three were the evidence that questions without a home pile up looking like pending product-owner decisions. Two of them never were one.
 
 ### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
 **Decision (2026-10-15, delivery lead — recorded on the item per box 1): KEEP report-only; do not arm `x-tracker.strict-worktree-writes`.**
 
 Rationale:
+
 1. The observed collisions are the ones the flag cannot see: the item's own F12 case (three worktrees, two items `todo`/unclaimed on main with no `worktree_path`) had **no stamp at all** — the strict refusal only fires on a stamped owner mismatch, so arming would not have caught it. The real fix for that class was the claim discipline (`task-coordinator-claims-through-native-start`, done).
 2. Arming would refuse the delivery lead's legitimate recovery and merge-prep writes into a maker's worktree (finishing work after a maker session dies — several occurrences this week alone) unless each goes through the takeover ceremony. The refusal is coordination-shaped and reversible, but the friction lands on the flow that keeps waves moving.
 3. The default is explicitly "working as designed" (the item's own framing); arming stays available later — one config line — if a stamped collision ever actually bites.
@@ -114,6 +117,7 @@ Rationale:
 **Compensating rule (box 4), queued for wave 4 (docs-only):** the coordinator contract (`ArggonManager/docs/agents.md` §Orchestration + the worktree rules) states: who owns a worktree (the session its claim stamp carries; the lead owns the item, the maker owns the worktree while the claim lives); how a collision is noticed (the single-writer observation + the `arggon-claim.json` stamp; `arggon doctor` where it reports); and who may resolve it (the stamped owner, or the lead through `start --worktree --take-over-worktree` / the manual `rm <git-dir>/arggon-claim.json` recovery — never a hand-write into another live session's worktree).
 
 ### 2026-10-15 @arggon-maker
+
 Evidence — compensating rule shipped (acceptance box 4), docs-only.
 
 **Change:** `ArggonManager/docs/agents.md` — new §Orchestration subsection "Worktree ownership and collisions" (owner / notice / resolution + the standing report-only decision), echoed in §4 → Single-writer ownership. `.convention.yml` untouched (flag stays unarmed). Commit `89d5dc17`; PR #842.
@@ -137,15 +141,20 @@ Evidence — compensating rule shipped (acceptance box 4), docs-only.
 **Not done / not applicable:** boxes 2–3 (the "if armed" branch: config line + refused-attach evidence) do not apply under the recorded keep-report-only decision; box 1 is the lead's recorded decision comment. No acceptance ticks changed in the item body — completion is the delivery lead's call.
 
 ### handoff 2026-10-15 @arggon-maker — next: Delivery lead: review PR #842 (docs-only, one file, all gates green), merge it, then flip the item to done per the recorded keep-report-only decision.
+
 - branch: feat/task-arm-strict-worktree-writes
 - open questions: none; the sibling branch edits agents.md §Claim, so a trivial merge is expected
 
 ### 2026-10-15 @arggon-maker
+
 Follow-up (post-rebase) — the branch was rebased onto `origin/main` (`39a6d3da`) to drop one inherited unpushed tracker commit (`2b9b6f94`, the `bug-prover-agent-has-no-x-generated-entry` prune — an unrelated item riding the claim branch's cut point), then force-pushed with lease. The docs commit is now `2ece8559` (was `89d5dc17` before the rebase; the tree is byte-identical apart from the dropped unrelated file). PR #842 now carries only the two in-scope files: `ArggonManager/docs/agents.md` and this item file. No gate results changed; `validate` re-run green after the rebase.
 
 ### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
 verdict: approve
+
 ### Lead review + merge verification — 2026-10-15 (delivery lead)
+
 Merged as 69de168d (PR #842). Box 4 delivered as decided: `agents.md` gains §Orchestration → **"Worktree ownership and collisions"** — owner (the session the stamp names; the lead owns the item, the maker owns the worktree while the claim lives; no writes into another live session's worktree), notice (the attach-time `claim.foreignWrites` observation + the stamp; `doctor` reports repo/tracker state, NOT per-worktree stamps — verified against `doctor --json` keys rather than implied), resolution (stamped owner first; dead owner → `start --worktree --take-over-worktree` or the documented `rm <git-dir>/arggon-claim.json` escape hatch; recovery/merge-prep writes after the session ended remain the lead's call), plus the standing decision sentence (the strict refusal stays unarmed by deliberate choice). Echoed in §4 Single-writer ownership; `.convention.yml` untouched — boxes 2-3 are conditional on arming and the condition is false, so they are satisfied vacuously; recorded here.
 
 Evidence: docs-only diff (`agents.md` + the item record); full suite 3541 green; validate/lint/structure/prettier green; CI green. Branch hygiene: the maker rebased off an inherited unpushed tracker commit and force-pushed **with lease** — the first in-repo use of the path unblocked by #836; the PR carries only in-scope files.
