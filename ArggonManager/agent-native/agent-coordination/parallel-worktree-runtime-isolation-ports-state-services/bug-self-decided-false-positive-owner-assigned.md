@@ -12,6 +12,7 @@ updated: "2026-10-15"
 claimed_at: "2026-10-15T10:32:34.161Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-self-decided-false-positive-owner-assigned
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-self-decided-false-positive-owner-assigned.md
   Leaves live only under a story. id is the filename stem: bug-self-decided-false-positive-owner-assigned.
@@ -38,6 +39,7 @@ The false positive follows from the role shape in `ArggonManager/docs/engineerin
 ## Notes
 
 ### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
 **Decision (2026-10-15, delivery lead — recorded with authority per the item's box 2): the semantics STAY "the `decided:` author equals the item's own assignee".**
 
 Rationale: the tracker has no identity layer, so "an agent role answered its own brief" is not determinable — any implementation would be a new id-shape taxonomy asserting a certainty the tracker deliberately does not have (the same limit ADR 0021 §4 already states for `self-accepted`). The owner-assigned case is not an anomaly to suppress but the NORMAL owner answer: `self-decided` is a same-name hint, and on an owner-assigned item the same name IS the owner. The state is report-only; the honest resolution is to state the case where readers meet it (spec §States, `json-output.md` §`decision_brief`, the engineering brief convention) and pin the behaviour with the repro test, so it is intentional rather than accidental.
@@ -45,6 +47,7 @@ Rationale: the tracker has no identity layer, so "an agent role answered its own
 Implementation routed to a maker on `fix/bug-self-decided-false-positive-owner-assigned`: the repro pin, an ADR 0026 dated amendment, the three doc statements, report-only preservation, gates.
 
 ### 2026-10-15 @arggon-maker
+
 **Evidence (maker) — PR [#837](https://github.com/Arggon/ArggonManager/pull/837), branch `fix/bug-self-decided-false-positive-owner-assigned`.**
 
 Decision implemented as recorded (semantics STAY "the `decided:` author equals the item's own `assignee`"); `lib/src/brief.ts` is untouched.
@@ -69,5 +72,16 @@ Pinned in `cli/src/decision-brief-convention.test.ts` at both layers: classifier
 Note: the lead's decision comment (56aa4f02, local main unpushed) was cherry-picked onto the branch so the item body is complete; expect a trivial item-file union at merge.
 
 ### handoff 2026-10-15 @arggon-maker — next: Standards review of PR #837; merge with a merge commit (tracker-carrying). Lead ticks the 5 acceptance boxes and flips to done.
+
 - branch: fix/bug-self-decided-false-positive-owner-assigned
 - open questions: Boxes left unticked for the lead's completion call; decision comment cherry-picked from local main onto the branch (trivial item-file union at merge)
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
+verdict: approve
+
+### Lead review + merge verification — 2026-10-15 (delivery lead)
+
+Merged as 843c6c02 (PR #837). The decision is implemented as decided: the semantics STAY "the `decided:` author equals the item's own assignee"; the owner-assigned case is the normal owner answer and reads `self-decided` by design — now stated where readers meet it (`spec-owner-decision-brief-021.md` §States, `json-output.md` §`decision_brief`, `engineering.md`'s brief convention), with an ADR 0026 dated amendment recording the call and its limit (attribution is not authentication; the tracker has no identity layer). The classifier is untouched; the repro is pinned at both levels (classifier + CLI), including the `spec analyze` silence; report-only preserved.
+
+Evidence: +2 convention tests (36 passed), full suite 3509 green, lint/structure/prettier/`spec validate` clean, `spec analyze` 4 pre-existing findings (none for spec 021). Merge note: the branch carried the decision comment (cherry-picked by the maker) and main carried the same comment — resolved as the branch's superset (decision + evidence + handoff); merge commit 91b503fe.
