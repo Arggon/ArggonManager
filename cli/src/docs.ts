@@ -1,9 +1,12 @@
 import {
+  closeSync,
   existsSync,
   lstatSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
+  readSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -1648,6 +1651,176 @@ export function generateDocs(opts: GenerateDocsOptions): DocsResult {
 }
 
 /**
+ * The template id a file's OWN bytes claim, or `null` when the file carries no
+ * visible provenance marker (bug-prover-agent-has-no-x-generated-entry).
+ *
+ * Anchored exactly like {@link stampGeneratedContent} writes the marker — the
+ * first line, or the first line INSIDE frontmatter — so the phrase appearing in
+ * a body, or a file that merely documents the marker, is never read as
+ * provenance (the same anchoring lesson as `isArggonGeneratedConfig`). CRLF and
+ * a BOM are tolerated; the returned value is the raw template id from the
+ * marker, not a resolved path.
+ */
+export function readGeneratedMarker(text: string): string | null {
+  const [first = "", second = ""] = text.replace(/^\uFEFF/, "").split(/\r?\n/, 3);
+  const match =
+    /^<!-- arggon:generated template="([^"]+)" -->$/.exec(first) ??
+    /^\/\/ arggon:generated template="([^"]+)"$/.exec(first) ??
+    /^# arggon:generated template="([^"]+)"$/.exec(first) ??
+    (first.trim() === "---" ? /^# arggon:generated template="([^"]+)"$/.exec(second) : null);
+  return match?.[1] ?? null;
+}
+
+/**
+ * One file whose own bytes claim arggon provenance but which has NO
+ * `x-generated` entry (bug-prover-agent-has-no-x-generated-entry): the
+ * false-absence shape.
+ *
+ * A file that carries the visible marker declares "arggon generated me from
+ * `<template>`" — but with no ledger row, init classifies it adopter-modified
+ * and silently stops propagating template edits to it, and a walk over the
+ * CURRENT destinations cannot see it at all once its template leaves the
+ * install (the exact shape of the stranded `.opencode/agents/arggon-prover.md`:
+ * a marker-bearing file, no row, template gone). The marker is what separates
+ * this from the sanctioned pre-provenance adopter file: an adopter-owned file
+ * with no marker and no row is init behaving correctly, and is never reported
+ * here.
+ */
+export type UnprovenancedManagedFile = {
+  /** Destination path (posix, relative to the probed root). */
+  dest: string;
+  /** The template id the file's own visible marker claims. */
+  template: string;
+  /** One-line explanation naming the marker and the missing row. */
+  reason: string;
+};
+
+/** Safety valves for the managed-path walk: the seam is far below either. */
+const MAX_UNPROVENANCED_SCAN_FILES = 5000;
+const MAX_UNPROVENANCED_HEAD_BYTES = 8192;
+
+/** Directories the managed-path walk never descends into. */
+const UNPROVENANCED_SKIP_DIRS = new Set([".git", "node_modules", "dist", "backup"]);
+
+/** Read just enough of a file to decide whether it carries the marker. */
+function readGeneratedMarkerAt(abs: string): string | null {
+  let fd: number | undefined;
+  try {
+    fd = openSync(abs, "r");
+    const buffer = Buffer.alloc(MAX_UNPROVENANCED_HEAD_BYTES);
+    const read = readSync(fd, buffer, 0, buffer.length, 0);
+    return readGeneratedMarker(buffer.subarray(0, read).toString("utf8"));
+  } catch {
+    return null; // unreadable or vanished: nothing can be claimed about it
+  } finally {
+    if (fd !== undefined) {
+      try {
+        closeSync(fd);
+      } catch {
+        // closing a read-only fd cannot lose data
+      }
+    }
+  }
+}
+
+/** The shared reason text for one unprovenanced managed file. */
+function unprovenancedReason(dest: string, template: string): string {
+  return (
+    `carries the visible provenance marker for template "${template}" but has no ` +
+    `x-generated entry for ${dest} — init classifies it adopter-modified and silently ` +
+    "stops propagating template edits to it; regenerate it with the generator that owns " +
+    "the template (which records the row), remove the stranded file, or drop the marker " +
+    "if the content is adopter-owned"
+  );
+}
+
+/**
+ * Every file under a managed path whose own marker claims arggon provenance but
+ * which has no `x-generated` entry (bug-prover-agent-has-no-x-generated-entry).
+ *
+ * The managed paths are the ones the generator owns: every current destination
+ * (the SAME walk init plans from, tier-2 included) plus every destination the
+ * ledger has ever recorded — and, for destinations in a directory, the whole
+ * namespace directory (so a stranded sibling whose template left the install is
+ * still covered: `.opencode/agents/` is managed whether or not a given file in
+ * it still has a template). A row-bearing file is never a finding; a
+ * marker-less file is never a finding (that is the sanctioned pre-provenance
+ * adopter file init is RIGHT to skip). Pure read, bounded, never throws.
+ */
+export function unprovenancedManagedFiles(opts: {
+  root: string;
+  /** Defaults to the bundle (`bundledTemplatesDir()`), like every caller. */
+  templatesDir?: string;
+  /** Overrides the detected tracker layout (defaults to detection at root). */
+  layout?: TrackerLayout;
+  /** Ledger rows to test against; defaults to the tree's own. */
+  state?: Record<string, GeneratedEntry>;
+}): UnprovenancedManagedFile[] {
+  const templatesDir = opts.templatesDir ?? bundledTemplatesDir();
+  const layout: TrackerLayout = opts.layout ?? trackerAt(opts.root)?.layout ?? "arggon-manager";
+  const state = opts.state ?? readGeneratedState(opts.root);
+
+  const managed = new Set<string>();
+  for (const { dest } of currentGeneratedTemplatesFrom(templatesDir, layout)) managed.add(dest);
+  for (const dest of Object.keys(state)) managed.add(dest);
+
+  const rootDests: string[] = [];
+  const dirs: string[] = [];
+  for (const dest of managed) {
+    const segments = dest.split("/");
+    if (segments.length === 1) rootDests.push(dest);
+    else dirs.push(segments.slice(0, -1).join("/"));
+  }
+  // Minimal covering set: an ancestor covers its descendants, so each managed
+  // namespace is walked exactly once.
+  const covering: string[] = [];
+  for (const dir of [...new Set(dirs)].sort()) {
+    if (covering.some((kept) => dir === kept || dir.startsWith(`${kept}/`))) continue;
+    covering.push(dir);
+  }
+
+  const findings: UnprovenancedManagedFile[] = [];
+  const considered = new Set<string>();
+  const consider = (dest: string): void => {
+    if (considered.has(dest)) return;
+    considered.add(dest);
+    if (state[dest] !== undefined) return; // a row exists: not a false absence
+    const template = readGeneratedMarkerAt(join(opts.root, ...dest.split("/")));
+    if (template === null) return; // no marker: sanctioned adopter content
+    findings.push({ dest, template, reason: unprovenancedReason(dest, template) });
+  };
+
+  // Root-level destinations are checked as exact paths only: the repo root is
+  // not a managed namespace, so it is never walked.
+  for (const dest of rootDests.sort()) consider(dest);
+
+  let scanned = 0;
+  const walk = (dir: string): void => {
+    let entries;
+    try {
+      entries = readdirSync(join(opts.root, ...dir.split("/")), { withFileTypes: true });
+    } catch {
+      return; // absent or unreadable namespace: nothing to report
+    }
+    for (const entry of entries) {
+      if (scanned >= MAX_UNPROVENANCED_SCAN_FILES) return;
+      if (UNPROVENANCED_SKIP_DIRS.has(entry.name)) continue;
+      const child = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        walk(child);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      scanned++;
+      consider(child);
+    }
+  };
+  for (const dir of covering) walk(dir);
+
+  return findings.sort((a, b) => a.dest.localeCompare(b.dest));
+}
+
+/**
  * One broken row of the provenance ledger (bug-stale-x-generated-records-
  * goal-mode-seam-pair): a committed generated file whose bytes are EXACTLY
  * what the current generator produces, but whose `x-generated` record is
@@ -1672,8 +1845,13 @@ export type ProvenanceRecordViolation = {
    * matches the current source render: the row is checkable without the copy,
    * because a skill copy is a pure function of its committed source
    * (bug-skill-source-edit-leaves-ledger-stale).
+   * `unprovenanced` — a file under a managed path whose own visible marker
+   * claims arggon provenance but which has no `x-generated` entry at all: the
+   * false absence (bug-prover-agent-has-no-x-generated-entry). Independent of
+   * the current template walk, so a stranded file whose template left the
+   * install is still reported.
    */
-  kind: "missing-record" | "stale-checksum" | "stale-derived-checksum";
+  kind: "missing-record" | "stale-checksum" | "stale-derived-checksum" | "unprovenanced";
   /** One-line explanation naming the bytes and the record that disagree. */
   reason: string;
 };
@@ -1698,6 +1876,18 @@ export type ProvenanceRecordViolation = {
  *    (bug-stale-vendored-plugin-copy);
  *  - renders that cannot be produced (template absent, project name
  *    unrecoverable) — "cannot decide", the doctor `unverified` semantics.
+ *
+ * The false-absence class (bug-prover-agent-has-no-x-generated-entry) is
+ * checked SEPARATELY from the byte rule above, because the byte rule can only
+ * see destinations the CURRENT generator walk still owns: a file under a
+ * managed path whose own visible marker claims arggon provenance but which has
+ * no `x-generated` entry at all is a finding whatever its bytes are and whether
+ * or not its template still exists — the stranded `.opencode/agents/
+ * arggon-prover.md` (marker, no row, template gone) is exactly this shape. The
+ * marker is what separates it from the sanctioned pre-provenance adopter file,
+ * which has no marker and no row and is init behaving correctly (see
+ * `unprovenancedManagedFiles`). Findings already reported by the byte rule are
+ * not repeated.
  *
  * Bundled-skill rows (`isBundledSkillDest`) are the one destination class whose
  * row is DERIVABLE, so it is checked even where the copy is absent — the seam
@@ -1806,6 +1996,26 @@ export function auditGeneratedProvenance(opts: {
           "and silently stops propagating template edits to it",
       });
     }
+  }
+  // The false-absence class (bug-prover-agent-has-no-x-generated-entry): files
+  // under a managed path whose own marker claims provenance but which have no
+  // row. Independent of the walk above — the stranded prover file was in
+  // neither the current destination set nor the ledger. A destination the byte
+  // rule already reported is not repeated here.
+  const reported = new Set(violations.map((v) => v.dest));
+  for (const file of unprovenancedManagedFiles({
+    root: opts.root,
+    templatesDir,
+    layout,
+    state,
+  })) {
+    if (reported.has(file.dest)) continue;
+    violations.push({
+      dest: file.dest,
+      template: file.template,
+      kind: "unprovenanced",
+      reason: file.reason,
+    });
   }
   return violations.sort((a, b) => a.dest.localeCompare(b.dest));
 }

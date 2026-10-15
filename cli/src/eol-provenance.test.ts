@@ -171,6 +171,8 @@ describe("bug-crlf-provenance-breakage: CRLF working tree vs LF checkout", () =>
       missing: 0,
       outdated: 0,
       outdatedDocs: [],
+      unprovenanced: 0,
+      unprovenancedDocs: [],
     });
     expect(docCrlf.docs).toEqual(docLf.docs);
 
@@ -261,6 +263,8 @@ describe("bug-crlf-provenance-breakage: reversed direction (CRLF-recorded state,
       missing: 0,
       outdated: 0,
       outdatedDocs: [],
+      unprovenanced: 0,
+      unprovenancedDocs: [],
     });
     // Untouched docs still regenerate (not degraded to adopter-modified) and
     // plan identically to the pristine LF fixture.

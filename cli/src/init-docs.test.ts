@@ -26,7 +26,7 @@ import {
   updateGeneratedSection,
   type GeneratedEntry,
 } from "@arggondev/lib";
-import { runInit } from "./init.js";
+import { runInit, dryRunInit } from "./init.js";
 import { runCli as runCliBase } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -339,6 +339,77 @@ describe("init docs: --json payload", () => {
     expect(body.created).toContain("ArggonManager/docs/convention.md");
     expect(body.created).toContain("ArggonManager/docs/runbooks/README.md");
     expect(existsSync(join(dir, "ArggonManager/docs/engineering.md"))).toBe(true);
+  });
+});
+
+/**
+ * Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+ * a file under a managed path whose own visible marker claims arggon
+ * provenance but which has no `x-generated` entry is REPORTED by init (JSON and
+ * human) and by `--dry-run` — never silently kept as an anonymous
+ * adopter-modified edit. The file itself is never touched: init cannot know
+ * whether the content is the adopter's, and reporting is the whole remedy.
+ */
+describe("init docs: unprovenanced managed files", () => {
+  const DEST = ".opencode/agents/arggon-prover.md";
+  const TEMPLATE = "opencode/agents/arggon-prover.md";
+
+  /** The stranded shape: marker + no row + a template the install no longer ships. */
+  function strand(dir: string): string {
+    const abs = join(dir, ...DEST.split("/"));
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, `${generatedYamlMarker(TEMPLATE)}\ndescription: stranded\n`, "utf8");
+    return abs;
+  }
+
+  it("reports the file in the run and the dry run, and leaves it untouched", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const abs = strand(dir);
+    const before = readFileSync(abs, "utf8");
+
+    const result = runInit({ dir, force: false, full: true });
+    expect(result.unprovenanced).toEqual([
+      { dest: DEST, template: TEMPLATE, reason: expect.stringContaining("no x-generated entry") },
+    ]);
+    expect(readFileSync(abs, "utf8")).toBe(before); // kept, never regenerated
+
+    const dry = dryRunInit({ dir, force: false, full: true });
+    expect(dry.unprovenanced.map((file) => file.dest)).toEqual([DEST]);
+  });
+
+  it("carries the class on the CLI --json envelope and the human report", () => {
+    const dir = tempDir();
+    runCli(["init", dir, "--full", "--json"]);
+    strand(dir);
+
+    const proc = runCli(["init", dir, "--full", "--json"]);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      unprovenanced: { dest: string; template: string }[];
+    };
+    expect(body.unprovenanced).toEqual([
+      { dest: DEST, template: TEMPLATE, reason: expect.any(String) },
+    ]);
+
+    const human = runCli(["init", dir, "--full"]);
+    expect(human.status).toBe(0);
+    expect(human.stdout).toContain("unprovenanced managed file");
+    expect(human.stdout).toContain(DEST);
+    expect(human.stdout).toContain(TEMPLATE);
+  });
+
+  it("reports nothing on a clean scaffold (adopter-owned managed files stay silent)", () => {
+    const dir = tempDir();
+    expect(runInit({ dir, force: false, full: true }).unprovenanced).toEqual([]);
+    // A managed path with no marker and no row is the sanctioned
+    // pre-provenance adopter file: init skipping it is correct, and nothing is
+    // reported.
+    const mine = join(dir, ".opencode/agents/my-own-agent.md");
+    mkdirSync(dirname(mine), { recursive: true });
+    writeFileSync(mine, "---\ndescription: mine\n---\n", "utf8");
+    expect(runInit({ dir, force: false, full: true }).unprovenanced).toEqual([]);
+    expect(dryRunInit({ dir, force: false, full: true }).unprovenanced).toEqual([]);
   });
 });
 
