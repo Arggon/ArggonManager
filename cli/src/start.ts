@@ -1032,14 +1032,23 @@ export function hasReadinessEvidence(
  * over: on deep-sibling-path entries it is generous enough to let the discard
  * hint get cut, and in an ordinary checkout it silently hides names that would
  * have fitted (measured: 6 of 8 at ~124 chars an entry, 2 of 8 at the ~330-char
- * pathological shape). One name is always included when there is evidence —
- * the whole point of the sentence is to name a bin — and the budget can never
- * reach a mandatory clause, because they are reserved first and never measured
- * against it.
+ * pathological shape).
+ *
+ * The `≥1 name` override is bounded by `overrideLimit`
+ * (bug-gatebin-budget-reserved-block-can-exceed-clip): one name is still
+ * forced in when `budget` held none — an evidence sentence that names nothing
+ * answers no question — but never past the room that keeps every ACTIONABLE
+ * clause (kept note, remedy, discard hint) whole inside the head-kept clip.
+ * When even one entry does not fit that ceiling the override YIELDS (`null`):
+ * a name the human channel would clip is not named, and forcing it in is
+ * exactly the regression this bounds. The observation is never lost — the
+ * caller still carries it to the `--json` payload via
+ * {@link startFailureReadiness}.
  */
 export function gateBinFailureReport(
   input: { hasInstall: boolean; gateBins: GateBinResolution[] },
   budget: number,
+  overrideLimit = budget,
 ): string | null {
   const broken = foreignGateBins(input.gateBins);
   if (broken.length === 0) {
@@ -1054,11 +1063,20 @@ export function gateBinFailureReport(
   const shown: string[] = [];
   for (const bin of broken) {
     const entry = gateBinEntry(bin);
-    // At least one name, whatever the budget: an evidence sentence that names
-    // nothing answers no question.
-    if (shown.length > 0 && used + entry.length > budget) break;
+    // The `; ` separator is part of what the clause grows by, so it is measured
+    // too (≤2 chars that used to land in the trailing detail unstated).
+    const separator = shown.length === 0 ? 0 : "; ".length;
+    if (used + separator + entry.length > budget) break;
     shown.push(entry);
-    used += entry.length + (shown.length > 1 ? "; ".length : 0);
+    used += separator + entry.length;
+  }
+  // At least one name when the budget held none, up to the ceiling that leaves
+  // the actionable clauses whole — past it the override yields.
+  if (shown.length === 0) {
+    const first = gateBinEntry(broken[0]!);
+    if (used + first.length > overrideLimit) return null;
+    shown.push(first);
+    used += first.length;
   }
   const extra = broken.length - shown.length;
   return `${READINESS_LEAD}${shown.join("; ")}${readinessOverflow(extra)}`;
@@ -1073,12 +1091,18 @@ export function gateBinFailureReport(
  * push is NOT retried by attach (attach only lands a pending claim commit —
  * review F3), so the branch must be pushed manually there.
  *
+ * The `committing the claim` branch also carries an EXACT fix (the observed
+ * resolution, `npm ci` + attach), split out as its own clause so the
+ * over-budget composition can lead with it
+ * (bug-gatebin-budget-reserved-block-can-exceed-clip); the fitting
+ * composition joins the two back into the one remedy clause it always was.
+ *
  * ORDERING is load-bearing (task-cli-start-remediation-tail-clipped-on-human-channel):
- * the `committing the claim` branch's EXACT fix leads, for the same head-kept
- * `MAX_HUMAN_ERROR_CHARS` contract every other remedy on this channel keeps. It
- * used to append the exact fix AFTER the readiness bin list, so at the
- * reachable worst case the clip ate the only clause that named the command to
- * run. This branch is the MOST COMMON start failure — the one that actually
+ * the `committing the claim` branch's EXACT fix leads the mandatory clauses, for
+ * the same head-kept `MAX_HUMAN_ERROR_CHARS` contract every other remedy on this
+ * channel keeps. It used to append the exact fix AFTER the readiness bin list, so
+ * at the reachable worst case the clip ate the only clause that named the command
+ * to run. This branch is the MOST COMMON start failure — the one that actually
  * creates the worktree — so it is the worst place to leave the class open.
  */
 function worktreeRemediation(input: {
@@ -1087,36 +1111,40 @@ function worktreeRemediation(input: {
   branch: string;
   worktreePath?: string;
   readiness?: { hasInstall: boolean; gateBins: GateBinResolution[] };
-}): string {
+}): { remedy: string; exactFix?: string } {
   const attach = `re-run \`arggon start ${input.id} --worktree\` — it attaches to the existing worktree`;
   if (input.step.startsWith("committing the claim")) {
-    const installFix = hasReadinessEvidence(input.readiness)
-      ? ` Exact fix for the observed resolution: run \`npm ci\` in ${input.worktreePath ?? "the worktree"}, then ${attach}.`
-      : "";
-    return (
+    const remedy =
       "The pre-commit gate (or the git commit itself) failed inside the worktree — fix the " +
       "reported cause there (install dependencies, or link the primary checkout's node_modules: " +
       "`ln -s <primary>/node_modules <worktree>/node_modules`; start does this itself when the " +
-      `primary has one), then ${attach}.${installFix}`
-    );
+      `primary has one), then ${attach}.`;
+    return hasReadinessEvidence(input.readiness)
+      ? {
+          remedy,
+          exactFix: `Exact fix for the observed resolution: run \`npm ci\` in ${input.worktreePath ?? "the worktree"}, then ${attach}.`,
+        }
+      : { remedy };
   }
   if (input.step.startsWith("pushing")) {
-    return (
-      "Fix remote access (`git fetch origin`, credentials), then push the kept branch manually: " +
-      `\`git push -u origin ${input.branch}\` — a re-run of ` +
-      `\`arggon start ${input.id} --worktree\` attaches to the worktree but does not retry the push.`
-    );
+    return {
+      remedy:
+        "Fix remote access (`git fetch origin`, credentials), then push the kept branch manually: " +
+        `\`git push -u origin ${input.branch}\` — a re-run of ` +
+        `\`arggon start ${input.id} --worktree\` attaches to the worktree but does not retry the push.`,
+    };
   }
   if (input.step.startsWith("opening the draft PR")) {
-    return `Check \`gh auth status\` (and the remote), then ${attach}.`;
+    return { remedy: `Check \`gh auth status\` (and the remote), then ${attach}.` };
   }
   if (input.step.startsWith("recording the claim")) {
-    return (
-      "Resolve the reported tracker error in the worktree (claim conflict or branch mismatch); " +
-      `no claim commit was made. Then ${attach}.`
-    );
+    return {
+      remedy:
+        "Resolve the reported tracker error in the worktree (claim conflict or branch mismatch); " +
+        `no claim commit was made. Then ${attach}.`,
+    };
   }
-  return `Fix the reported cause in the worktree, then ${attach}.`;
+  return { remedy: `Fix the reported cause in the worktree, then ${attach}.` };
 }
 
 /**
@@ -1231,6 +1259,23 @@ export function startFailureReadiness(err: unknown): StartFailureReadiness | und
 }
 
 /**
+ * The named truncation for the over-budget composition
+ * (bug-gatebin-budget-reserved-block-can-exceed-clip): when the actionable
+ * block alone exceeds the clip, the human channel WILL cut the message, so the
+ * message says so FIRST — ahead of every clause the clip can eat — instead of
+ * leaving a silent `…` at the cut. Kept here (not inline in the composer) so
+ * the wording is unit-testable.
+ */
+function humanClipNotice(hasEvidence: boolean): string {
+  return (
+    "[truncated: the worktree path leaves no room for the whole message inside the " +
+    "2000-char human clip; the tail is clipped there — the full message" +
+    (hasEvidence ? " and the bin evidence" : "") +
+    " ride the --json error]"
+  );
+}
+
+/**
  * Failure report for a start that already created (or attached) the worktree.
  * The worktree is NEVER rolled back (bug-start-worktree-node-modules): the
  * diagnostic context survives, and the message names the failing step, the
@@ -1255,6 +1300,30 @@ export function startFailureReadiness(err: unknown): StartFailureReadiness | und
  * the rest (`task-cli-start-remediation-tail-clipped-on-human-channel`). The full
  * uncapped observation is still enumerable from a machine surface — see
  * {@link startFailureReadiness}.
+ *
+ * THE RESERVED BLOCK CAN ITSELF EXCEED THE CLIP
+ * (bug-gatebin-budget-reserved-block-can-exceed-clip): with a ~700+ char
+ * worktree path the actionable clauses alone — the path is named in the kept
+ * note, in the exact fix and in the discard hint — pass 2000, so no evidence
+ * ordering can keep them whole, and the old `≥1 name` override only pushed a
+ * name the clip could not show past the remedy. That window has a DEFINED
+ * behaviour, the OVER-BUDGET SHAPE, taken when the actionable block alone
+ * exceeds the clip: the truncation notice is composed first (so the naming can
+ * never be the thing that is eaten), then the exact fix, then the kept-worktree
+ * note, the generic remedy, the discard hint and the raw detail — all verbatim,
+ * so the composed message stays COMPLETE for `--json` (the notice states the
+ * human-channel cut; the tail lives on the machine surface). The readiness fill
+ * is REFUSED in this shape: the `≥1 name` override never fires here, and the
+ * observation rides the `--json` payload ({@link startFailureReadiness}).
+ *
+ * THE CLAUSE GUARANTEED TO SURVIVE THE HUMAN HEAD-CLIP IS THE EXACT FIX: it is
+ * the first mandatory clause of the over-budget composition (the kept note
+ * takes its place for a step without one), and the only thing composed ahead of
+ * it is the bounded notice — so no readiness list, no generic remedy, no
+ * discard hint and no raw detail can push it past the clip. Only the path
+ * length itself can still cut it, and the notice names that cut instead of
+ * leaving it silent. The invariant is enforced HERE, at the one place that
+ * decides the order.
  */
 export function worktreeFailureMessage(input: {
   id: string;
@@ -1273,13 +1342,51 @@ export function worktreeFailureMessage(input: {
     `start failed while ${input.step}; the worktree was kept at ${input.worktreePath} ` +
     `(nothing was rolled back).`;
   const discardClause = `To discard it instead: \`${discard}\`.`;
-  const remedy = worktreeRemediation({
+  const { remedy, exactFix } = worktreeRemediation({
     step: input.step,
     id: input.id,
     branch: input.branch,
     worktreePath: input.worktreePath,
     readiness: input.readiness,
   });
+  // The readiness evidence belongs to the claim-commit step only: on a push or
+  // draft-PR failure "gate binaries do not resolve" is noise, and this wrapper
+  // takes a readiness snapshot for EVERY step (bug-start-worktree-npm-ci-claim
+  // wants it reported wherever the gate ran). Same condition the exact fix hangs
+  // off — a smoke probe caught the leak when a push failure grew a bin list.
+  const readinessObservation = input.readiness;
+  const readinessEligible =
+    input.step.startsWith("committing the claim") &&
+    readinessObservation !== undefined &&
+    hasReadinessEvidence(readinessObservation);
+  // The fitting composition joins generic fix + exact fix into the ONE remedy
+  // clause it always was (byte-identical); the over-budget shape leads with the
+  // exact fix alone.
+  const fullRemedy = exactFix === undefined ? remedy : `${remedy} ${exactFix}`;
+  // The actionable block: the clauses the head-kept clip must show WHOLE. When
+  // it alone exceeds the clip, the over-budget shape below takes over.
+  const actionables = lead.length + 1 + fullRemedy.length + 1 + discardClause.length;
+  if (actionables > MAX_HUMAN_ERROR_CHARS) {
+    // Which clause is GUARANTEED (bug-gatebin-budget-reserved-block-can-exceed-clip,
+    // acceptance box 4): the **exact fix** when the step produced one — the only
+    // clause that names the worktree- and package-specific command and therefore
+    // the only one the operator can act on without re-deriving, which is why the
+    // over-budget shape leads with it (only the one-line notice precedes) instead
+    // of reserving the generic fix or the discard hint ahead of it. Without an
+    // exact fix the lead clause — the failing step and the KEPT PATH — leads,
+    // because a discarded worktree cannot be recovered. Everything above the
+    // notice fits or the composed message keeps it for `--json` regardless: the
+    // human clip removes the tail, never the head.
+    const notice = humanClipNotice(readinessEligible);
+    return [
+      notice,
+      ...(exactFix === undefined ? [] : [exactFix]),
+      lead,
+      remedy,
+      discardClause,
+      detail,
+    ].join("\n");
+  }
   // Reserve EVERY mandatory clause first — the step, the kept path, the generic
   // fix, the exact fix, the attach re-run, the discard hint and the raw detail —
   // and hand only what is left to the readiness evidence. They are never
@@ -1288,21 +1395,25 @@ export function worktreeFailureMessage(input: {
   // space between remedy and evidence is reserved too, so the clause can never
   // push the following discard clause over the line.
   const mandatory =
-    lead.length + 1 + remedy.length + 1 + discardClause.length + 1 + detail.length + 1;
-  // The readiness evidence belongs to the claim-commit step only: on a push or
-  // draft-PR failure "gate binaries do not resolve" is noise, and this wrapper
-  // takes a readiness snapshot for EVERY step (bug-start-worktree-npm-ci-claim
-  // wants it reported wherever the gate ran). Same condition the exact fix hangs
-  // off — a smoke probe caught the leak when a push failure grew a bin list.
+    lead.length + 1 + fullRemedy.length + 1 + discardClause.length + 1 + detail.length + 1;
+  // The room that keeps every actionable clause whole. The fill — and the `≥1`
+  // override in particular — may not cross it, so the evidence can never push
+  // the discard hint past the clip (bug-gatebin-budget-reserved-block-can-exceed-clip).
+  const overrideLimit = MAX_HUMAN_ERROR_CHARS - actionables - 1;
   const readiness =
-    input.step.startsWith("committing the claim") &&
-    input.readiness !== undefined &&
-    hasReadinessEvidence(input.readiness)
-      ? (gateBinFailureReport(input.readiness, MAX_HUMAN_ERROR_CHARS - mandatory) ?? "")
+    readinessEligible && readinessObservation !== undefined
+      ? (gateBinFailureReport(
+          readinessObservation,
+          MAX_HUMAN_ERROR_CHARS - mandatory,
+          overrideLimit,
+        ) ?? "")
       : "";
-  return [lead, `${remedy}${readiness === "" ? "" : ` ${readiness}`}`, discardClause, detail].join(
-    "\n",
-  );
+  return [
+    lead,
+    `${fullRemedy}${readiness === "" ? "" : ` ${readiness}`}`,
+    discardClause,
+    detail,
+  ].join("\n");
 }
 
 type WorktreeStartInput = {
