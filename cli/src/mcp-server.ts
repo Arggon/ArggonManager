@@ -354,7 +354,7 @@ const TOOLS: ToolDefinition[] = [
   {
     name: "arggon_report",
     description:
-      "Aggregate leaf (task/bug) statuses per story, grouped by epic — display only, never writes. Returns the arggon `report --json` envelope: {ok, schemaVersion, conventionVersion, command, groups[, trend]}.",
+      "Aggregate leaf (task/bug) statuses per story, grouped by epic, plus a report-only container-hygiene check — display only, never writes. Returns the arggon `report --json` envelope: {ok, schemaVersion, conventionVersion, command, groups, hygiene[, trend]}.",
     inputSchema: {
       type: "object",
       properties: {

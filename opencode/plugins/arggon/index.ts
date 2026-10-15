@@ -2631,7 +2631,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
   {
     name: "report",
     description:
-      "Aggregate leaf statuses per story, grouped by epic; `trend: true` mines git history. Pure read — never writes.",
+      "Aggregate leaf statuses per story, grouped by epic, plus report-only container hygiene; `trend: true` mines git history. Pure read — never writes.",
     input: {
       type: "object",
       properties: {
@@ -2640,7 +2640,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
       },
       additionalProperties: false,
     },
-    output: envelopeSchema({ groups: { type: "array" }, trend: OBJECT }),
+    output: envelopeSchema({ groups: { type: "array" }, hygiene: OBJECT, trend: OBJECT }),
     run: (kernel, input, options) =>
       kernel.reportOperation({
         cwd: options.cwd,
