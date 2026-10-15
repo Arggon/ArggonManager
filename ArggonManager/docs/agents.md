@@ -176,7 +176,11 @@ field and the native `preparation.env`.
 
 One claimed item → one worktree → one writer session: ownership is a
 convention every agent must hold, and start now carries the detection layer
-underneath it. Every `start --worktree` writes a claim stamp (`arggon-claim.json`
+underneath it. **The worktree belongs to the session the stamp names** — the
+delivery lead owns the item, the maker owns the worktree while the claim lives
+(§Orchestration → Worktree ownership and collisions) — and no session writes in
+a worktree another live session holds.
+Every `start --worktree` writes a claim stamp (`arggon-claim.json`
 inside the worktree's **git dir** — never in the work tree, so it cannot dirty
 `git status`, block `git worktree remove`, or need cleanup) recording the owning
 identity (calling session id on the native tools, assignee on the CLI), the
@@ -372,6 +376,34 @@ Non-trivial items are **orchestrated by default**: the delivery lead delegates t
 - **Tracker ownership:** the delivery lead owns tracker state — claim conflicts, blocked items, follow-up filing, and final wave verification (0 open items, `arggon validate` ok, `arggon doctor` clean).
 - **Sequencing ≠ priority:** the delivery lead decides **what is built next and in what order**, who is dispatched, and the tracker state; the `priority` field is the **product owner's** ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §2/§6.1). Recommend a priority change — never present your ordering as the priority call, and never let a wave plan read as one.
 - **Bringing a decision to the product owner (the decision brief):** when a decision owes the owner's answer, the lead writes a bounded, plain-language brief **on the item** rather than asking in a session — the six fields, the `decide:`/`decided:` grammar and the routing rule are in the subsection below. Phrased in role language: the brief is **what the lead brings to the product owner**. It does not move any authority — the map lives in [`ArggonManager/docs/engineering.md`](./engineering.md) §Roles and authority and is unchanged (the lead still recommends, the owner still decides).
+
+### Worktree ownership and collisions
+
+One claimed item → one worktree → one writer: the worktree belongs to the
+session its claim stamp names (`arggon-claim.json` in the worktree's git dir —
+§Single-writer ownership). The delivery lead owns the **item**; the maker owns
+the **worktree** while the claim lives, and no session writes in a worktree
+another **live** session holds.
+
+A collision is noticed through the attach-time single-writer observation the
+start receipt carries (`claim.foreignWrites` — the stamped owner, the claim
+time, and the newer files) and through the stamp itself; `arggon doctor` reports
+the surrounding repo/tracker state, not per-worktree stamps.
+
+Resolution belongs to the stamped owner first: the owner re-attaches (the stamp
+is refreshed with its identity), and coordinating with that owner is always the
+cheaper remedy. When the owner is gone, the lead resolves it through
+`start --worktree --take-over-worktree` (audited — it re-stamps the worktree
+and records the take-over) or the manual
+`rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"`
+escape hatch — never by hand-writing into another live session's worktree.
+Recovery and merge-prep writes after that session has ended are the lead's
+call.
+
+The strict refusal (`x-tracker.strict-worktree-writes`) remains **unarmed by
+deliberate choice** in this repo (decision recorded 2026-10-15,
+`task-arm-strict-worktree-writes`): the default stays report-only, and this
+rule is the compensating coordination discipline in its place.
 
 ### Decision briefs and the answer grammar
 
