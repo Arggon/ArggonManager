@@ -167,4 +167,51 @@ describe("assertOrder (bug-vacuous-substring-ordering-assertions)", () => {
       ).not.toThrow();
     });
   });
+
+  // The intermediate-variable form — the structural rule's documented blind
+  // spot. The ast-grep rule `ordering-assertions-use-assert-order` matches
+  // `expect(text.indexOf(needle))` at the comparison site, so
+  // `const at = msg.indexOf(needle)` followed by `expect(at).toBeLessThan(...)`
+  // carries no `indexOf` there and the rule does not fire; the rule's own note
+  // names this suite and review as the coverage for that shape
+  // (tools/ast-grep/README.md). A site that keeps the variable must therefore
+  // presence-check with `toBeGreaterThanOrEqual(0)` — and a NAMED failure
+  // message — before any comparison: the `61449604` idiom the clip-order work
+  // uses. Both halves are proved here so the requirement lives in the suite
+  // rather than only in the rule's note, which is what lets a future site rely
+  // on it. (This file is the rule's documented exemption: it demonstrates the
+  // bare idiom so the defect stays visible in green.)
+  describe("the intermediate-variable form (the structural rule's blind spot)", () => {
+    // The exact reworded-message shape from bug-vacuous-substring-ordering-assertions:
+    // the capitalized needle is present, the lowercase one is not.
+    const subject =
+      "If this is an identity error, set `git config user.name`. gate: deliberate failure";
+
+    it("presence-check + compare FAILS on an absent needle (the sanctioned idiom)", () => {
+      const hint = subject.indexOf("if this is an identity error"); // lowercase: absent
+      const gateOutput = subject.indexOf("gate: deliberate failure");
+      expect(() => {
+        expect(hint, "identity hint needle must be present").toBeGreaterThanOrEqual(0);
+        expect(hint).toBeLessThan(gateOutput);
+      }).toThrow(/identity hint needle must be present/);
+    });
+
+    it("the bare compare PASSES vacuously on the same absent needle (the defect)", () => {
+      const hint = subject.indexOf("if this is an identity error");
+      const gateOutput = subject.indexOf("gate: deliberate failure");
+      // The unguarded form the presence check replaces: `-1 < 58` is true, so
+      // the assertion is green while asserting nothing. Kept green ON PURPOSE,
+      // beside the failing half above, so the two are never confused.
+      expect(hint).toBe(-1);
+      expect(hint).toBeLessThan(gateOutput);
+    });
+
+    it("the sanctioned idiom still passes when every needle is present", () => {
+      const hint = subject.indexOf("If this is an identity error");
+      const gateOutput = subject.indexOf("gate: deliberate failure");
+      expect(hint, "identity hint needle must be present").toBeGreaterThanOrEqual(0);
+      expect(gateOutput, "gate output needle must be present").toBeGreaterThanOrEqual(0);
+      expect(hint).toBeLessThan(gateOutput);
+    });
+  });
 });
