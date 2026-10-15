@@ -637,6 +637,25 @@ describe("parity: serve detail vs static detail map (task-web-board-hierarchy-li
     }
   });
 
+  it("serves and embeds the same open-descendant count (task-board-no-done-over-open-work)", () => {
+    const root = writeHierarchyTree();
+    const items = loadItems(findTasksDir(root));
+    const map = buildBoardDetailMap({ root, items });
+    for (const item of items) {
+      const served = buildBoardDetail({ cwd: root, id: item.id });
+      expect(served.detail.open_descendants, `${item.id} open_descendants`).toEqual(
+        map[item.id].detail.open_descendants,
+      );
+    }
+    // top (todo) → mid (in_progress) → leaf-a (todo): mid holds one open leaf;
+    // mid is itself open work under top, so top counts two. leaf-b is done and
+    // the orphan hangs off a ghost parent, so neither counts anywhere.
+    expect(map["mid"].detail.open_descendants).toBe(1);
+    expect(map["top"].detail.open_descendants).toBe(2);
+    expect(map["leaf-a"].detail.open_descendants).toBe(0);
+    expect(map["leaf-b"].detail.open_descendants).toBe(0);
+  });
+
   it("resolves edges through the kernel parent frontmatter only (no parallel hierarchy)", () => {
     const root = writeHierarchyTree();
     const items = loadItems(findTasksDir(root));

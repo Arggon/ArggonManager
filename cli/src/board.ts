@@ -732,6 +732,13 @@ export type BoardDetailPayload = {
      */
     parent: { id: string; status: string | null } | null;
     children: Array<{ id: string; status: string }>;
+    /**
+     * Open descendants at EVERY depth (task-board-no-done-over-open-work): the
+     * same server-side count the tree row's `N open` badge and the derived
+     * displayed status read, so the drawer can explain a stored `done` that
+     * reads `open` on the board. Additive within `schemaVersion: 1`.
+     */
+    open_descendants: number;
     pr: PrInfo | null;
   };
 };
@@ -840,6 +847,7 @@ function detailPayloadOf(
   bounded: BoundedParts,
   statusById: ReturnType<typeof buildStatusIndex>,
   childrenByParent: Map<string, Array<{ id: string; status: string }>>,
+  openDescendants: Map<string, number>,
   prs?: Map<string, PrInfo>,
 ): BoardDetailPayload {
   const prose = clipDetailText(bounded.prose, MAX_DETAIL_PROSE_BYTES);
@@ -874,6 +882,9 @@ function detailPayloadOf(
       dependencies,
       parent: parentId ? { id: parentId, status: parentEntry ? parentEntry.status : null } : null,
       children: childrenByParent.get(kernelItem.id) ?? [],
+      // The same server-side count the board renders (task-board-no-done-over-open-work):
+      // the drawer explains a stored `done` that reads `open` on the board.
+      open_descendants: openDescendants.get(kernelItem.id) ?? 0,
       pr: contractItem.branch ? (prs?.get(contractItem.branch) ?? null) : null,
     },
   };
@@ -904,6 +915,7 @@ export function buildBoardDetail(opts: {
     shown,
     statusById,
     buildChildrenIndex(items),
+    openDescendantCounts(items),
     opts.prs,
   );
 }
@@ -927,6 +939,7 @@ export function buildBoardDetailMap(opts: {
 }): Record<string, BoardDetailPayload> {
   const statusById = buildStatusIndex(opts.items);
   const childrenByParent = buildChildrenIndex(opts.items);
+  const openDescendants = openDescendantCounts(opts.items);
   const map: Record<string, BoardDetailPayload> = {};
   for (const kernelItem of opts.items) {
     map[kernelItem.id] = detailPayloadOf(
@@ -935,6 +948,7 @@ export function buildBoardDetailMap(opts: {
       showBoundedParts(kernelItem),
       statusById,
       childrenByParent,
+      openDescendants,
       opts.prs,
     );
   }
@@ -967,6 +981,11 @@ body.drawer-open { overflow: hidden; }
 .drawer-title { margin: 0 34px 6px 0; font-size: 16px; overflow-wrap: anywhere; }
 .drawer-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
 .drawer-meta code { font-size: 11px; color: var(--meta); }
+/* The derived-display explanation (task-board-no-done-over-open-work): a stored
+   done container with open work below reads open on the board; the drawer
+   keeps the stored chip and explains the effective state in the muted grey
+   (light 5.45:1, dark 4.88:1 on the card fill — the same pair .drawer-k uses). */
+.drawer-reads-open { color: var(--meta); font-size: 11px; }
 .drawer-row { display: flex; gap: 8px; font-size: 12px; margin-top: 3px; }
 .drawer-k { color: var(--meta); min-width: 84px; }
 .drawer-v { overflow-wrap: anywhere; }
@@ -1081,7 +1100,22 @@ export function renderBoardDetail(container: HTMLElement, payload: BoardDetailPa
   if (item.priority) {
     meta.appendChild(el("span", "priority " + String(item.priority), String(item.priority)));
   }
-  meta.appendChild(el("span", "status", String(item.status || "?")));
+  // Stored status plus the effective one when the board masks it
+  // (task-board-no-done-over-open-work): the drawer keeps the closure record
+  // (the stored status is what the file says) and EXPLAINS the derived display
+  // — a `done` container with open work reads `open` on the board, with the
+  // same server-side count. An unmasked item renders exactly as before.
+  const storedStatus = String(item.status || "?");
+  const openBelow =
+    typeof detail.open_descendants === "number" && detail.open_descendants > 0
+      ? detail.open_descendants
+      : 0;
+  meta.appendChild(el("span", "status", storedStatus));
+  if (storedStatus === "done" && openBelow > 0) {
+    meta.appendChild(
+      el("span", "drawer-reads-open", "reads open \u00b7 " + openBelow + " open below"),
+    );
+  }
   meta.appendChild(el("code", "", String(item.id || "")));
   container.appendChild(meta);
 
@@ -1513,10 +1547,13 @@ export function wireBoardKeyboardNav(): { ensureAnchor(): void } {
   ) as HTMLElement[];
   function visibleCards(column: HTMLElement): HTMLElement[] {
     // A collapsed column hides its cards (task-board-column-controls): the
-    // arrow keys must skip it exactly like an empty one.
+    // arrow keys must skip it exactly like an empty one. A card the hide
+    // done/cancelled rule hid (task-board-no-done-over-open-work: card-level
+    // terminal hiding keeps a masked container's column visible) is skipped
+    // the same way — the roving anchor never lands on a display:none card.
     if (column.classList.contains("collapsed")) return [];
     return Array.prototype.slice.call(
-      column.querySelectorAll(".card:not(.filtered-out)"),
+      column.querySelectorAll(".card:not(.filtered-out):not(.terminal-hidden)"),
     ) as HTMLElement[];
   }
   function setRoving(card: HTMLElement): void {
@@ -1575,10 +1612,17 @@ export function wireBoardKeyboardNav(): { ensureAnchor(): void } {
       return;
     }
     const anchor = document.querySelector('.board .card[tabindex="0"]');
-    if (anchor && !anchor.classList.contains("filtered-out") && !inCollapsedColumn(anchor)) {
+    if (
+      anchor &&
+      !anchor.classList.contains("filtered-out") &&
+      !anchor.classList.contains("terminal-hidden") &&
+      !inCollapsedColumn(anchor)
+    ) {
       return;
     }
-    const candidates = document.querySelectorAll(".board .card:not(.filtered-out)");
+    const candidates = document.querySelectorAll(
+      ".board .card:not(.filtered-out):not(.terminal-hidden)",
+    );
     for (let i = 0; i < candidates.length; i++) {
       if (!inCollapsedColumn(candidates[i])) {
         setRoving(candidates[i] as HTMLElement);
@@ -1676,6 +1720,18 @@ export function wireBoardKeyboardNav(): { ensureAnchor(): void } {
  * gap. The counters are NOT touched by any of this: `N of M`, the per-column
  * counts and the tree heading stay the lens verdict in both layouts.
  *
+ * Both layouts read the DISPLAYED status, never the stored one
+ * (task-board-no-done-over-open-work): the renderer stamps
+ * `data-display-status` on a masked container (authored `done`, open work
+ * below — it reads `open`), and this controller prefers it over `data-status`
+ * everywhere the terminal rule runs. So the hide done/cancelled toggle can
+ * never hide a masked container: in the tree it is not a terminal row (no
+ * `terminal-hidden`, no `terminal-context`), and in the columns its card stays
+ * visible while only the genuinely terminal cards of that column hide — the
+ * column itself hides whole only when no non-terminal card remains in it.
+ * A lens that keeps a masked container as the path to a match composes the
+ * same way: it stays visible (as context) at full strength.
+ *
  * `ensureAnchor` is the roving-focus handle from `wireBoardKeyboardNav`
  * (details mode; null in the drawer-free export): every layout application
  * re-seats the anchor, so collapsing the column that holds it never strands
@@ -1704,6 +1760,15 @@ export function wireBoardColumns(ensureAnchor?: (() => void) | null): {
   const KEY = "arggon-board-columns-v1";
   const TERMINAL = ["done", "cancelled"];
   type Layout = { collapsed: string[]; terminalHidden: boolean; treeCollapsed: string[] };
+  /**
+   * The status a node READS: the renderer's derived display wins when present
+   * (`data-display-status`), otherwise the stored `data-status`. The one
+   * reader both layouts share, so the terminal rule cannot drift between the
+   * tree and the columns.
+   */
+  function displayedStatusOf(node: Element): string {
+    return node.getAttribute("data-display-status") || node.getAttribute("data-status") || "";
+  }
   function store(state: Layout): void {
     try {
       localStorage.setItem(KEY, JSON.stringify(state));
@@ -1767,7 +1832,10 @@ export function wireBoardColumns(ensureAnchor?: (() => void) | null): {
     let visible = 0;
     for (let i = nodes.length - 1; i >= 0; i--) {
       const node = nodes[i];
-      const terminal = TERMINAL.indexOf(node.getAttribute("data-status") || "") !== -1;
+      // The DISPLAYED status (task-board-no-done-over-open-work): a masked
+      // container reads `open` through `data-display-status`, so it is not a
+      // terminal row here and the toggle below can never hide it.
+      const terminal = TERMINAL.indexOf(displayedStatusOf(node)) !== -1;
       const lensShown = !node.classList.contains("filtered-out");
       let layoutShown = lensShown;
       if (lensShown && state.terminalHidden && terminal) {
@@ -1850,10 +1918,19 @@ export function wireBoardColumns(ensureAnchor?: (() => void) | null): {
       const status = col.getAttribute("data-status") || "";
       const collapsed = state.collapsed.indexOf(status) !== -1;
       col.classList.toggle("collapsed", collapsed);
-      col.classList.toggle(
-        "terminal-hidden",
-        state.terminalHidden && TERMINAL.indexOf(status) !== -1,
-      );
+      // Terminal-hide reads the DISPLAYED status of every card
+      // (task-board-no-done-over-open-work): a masked container reads `open`,
+      // so its card never hides, and the column hides whole only when no
+      // non-terminal card is left in it. Counters are untouched — the count
+      // badge keeps the lens verdict in every state, exactly as before.
+      const terminalColumn = state.terminalHidden && TERMINAL.indexOf(status) !== -1;
+      let kept = 0;
+      col.querySelectorAll(".card").forEach(function (card) {
+        const hide = terminalColumn && TERMINAL.indexOf(displayedStatusOf(card)) !== -1;
+        card.classList.toggle("terminal-hidden", hide);
+        if (!hide) kept += 1;
+      });
+      col.classList.toggle("terminal-hidden", terminalColumn && kept === 0);
       const button = col.querySelector(".col-toggle");
       if (button) {
         button.setAttribute("aria-expanded", collapsed ? "false" : "true");
@@ -2392,7 +2469,7 @@ export function buildBoardSummary(items: KernelWorkItem[]): BoardSummary {
 }
 
 /** One nested ancestry node: the item plus its id-sorted children (pure). */
-export type BoardTreeNode = { item: WorkItem; children: BoardTreeNode[] };
+export type BoardTreeNode<T = WorkItem> = { item: T; children: BoardTreeNode<T>[] };
 
 /**
  * Nest the recorded ancestry (task-web-board-hierarchy-view): the flat,
@@ -2403,12 +2480,14 @@ export type BoardTreeNode = { item: WorkItem; children: BoardTreeNode[] };
  * roots instead of disappearing, and a parent cycle renders once, as a root),
  * and siblings stay id-sorted exactly like the flat walk. Pure.
  */
-export function boardTreeRoots(items: WorkItem[]): BoardTreeNode[] {
+export function boardTreeRoots<T extends { id: string; parent?: string | null }>(
+  items: readonly T[],
+): BoardTreeNode<T>[] {
   const entries = treeEntries(sortById(items));
-  const roots: BoardTreeNode[] = [];
-  const stack: BoardTreeNode[] = [];
+  const roots: BoardTreeNode<T>[] = [];
+  const stack: BoardTreeNode<T>[] = [];
   for (const entry of entries) {
-    const node: BoardTreeNode = { item: entry.item, children: [] };
+    const node: BoardTreeNode<T> = { item: entry.item, children: [] };
     if (entry.depth <= 0 || stack.length === 0) {
       roots.push(node);
       stack.length = 0;
@@ -2428,6 +2507,54 @@ export function boardTreeRoots(items: WorkItem[]): BoardTreeNode[] {
 /** Terminal statuses (ADR 0004): a terminal item is not open work. */
 function isTerminalStatus(status: string): boolean {
   return status === "done" || status === "cancelled";
+}
+
+/**
+ * Open descendants per item id: `todo`/`in_progress`/`blocked` at EVERY depth
+ * below the item, over the SAME nested tree the board rows are built from
+ * (`boardTreeRoots`, cycle-safe by construction). This is the one count behind
+ * both the tree row's `N open` disclosure and the derived displayed status
+ * below, so the two can never disagree; it is computed server-side from the
+ * complete item set the renderer is handed (never the filtered view). A leaf
+ * and a container with a fully terminal subtree both answer 0. Pure.
+ */
+export function openDescendantCounts<
+  T extends { id: string; status: string; parent?: string | null },
+>(items: readonly T[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  const count = (node: BoardTreeNode<T>): number => {
+    let open = 0;
+    for (const child of node.children) {
+      open += count(child) + (isTerminalStatus(child.item.status) ? 0 : 1);
+    }
+    counts.set(node.item.id, open);
+    return open;
+  };
+  for (const root of boardTreeRoots(items)) count(root);
+  return counts;
+}
+
+/**
+ * The board's DISPLAYED status (task-board-no-done-over-open-work): stored
+ * statuses are the closure record, but a `done` container whose subtree still
+ * holds open work must never READ `done` — it reads `open`, the tracker's own
+ * antonym of terminal, with the `N open` disclosure beside it. The mask is
+ * exactly `authored === "done" && open descendants > 0`:
+ *
+ * - `cancelled` is deliberately NOT masked. The misleading case is `done` over
+ *   open work ("finished" while unfinished work sits inside); a cancelled
+ *   scope reads as abandoned, not finished, so it cannot mislead the same way.
+ * - A leaf (no descendants) and a container with a fully terminal subtree
+ *   render their authored status unchanged.
+ * - Stored statuses are untouched everywhere: only the rendered chip, the
+ *   accessible name and the terminal layout rule read this value; the drawer
+ *   keeps the stored status and explains the effective one.
+ * - TUI and the OpenCode panel are deliberately out of scope (recorded on the
+ *   item): the derivation lives in the shared board view-model, so a later
+ *   item can reuse it without a second rule.
+ */
+function displayedStatus(status: string, openDescendants: number): string {
+  return status === "done" && openDescendants > 0 ? "open" : status;
 }
 
 /**
@@ -2456,23 +2583,35 @@ function isTerminalStatus(status: string): boolean {
  * a broken chain is visible instead of silently promoted. An empty tracker
  * renders the same `—` placeholder the columns use.
  *
- * Open-descendant disclosure (bug-tree-done-container-hides-open-work): a
- * container row whose subtree still holds open work carries a `N open` badge
+ * Open-descendant disclosure and derived display
+ * (bug-tree-done-container-hides-open-work, task-board-no-done-over-open-work):
+ * a container row whose subtree still holds open work carries a `N open` badge
  * right after its status chip — the number of `todo`/`in_progress`/`blocked`
  * descendants at EVERY depth (terminal is `done`/`cancelled`, ADR 0004). The
  * count comes from the complete item set this renderer is handed (both callers
  * pass the whole tracker), and it is baked into the markup once, so no
- * client-side lens, fold or terminal-hide can move it. The status chip stays
- * the item's AUTHORED status: the badge discloses, it never rolls up
- * (convention: container status is authored, not derived). A container with no
- * open descendant — and every leaf row — renders exactly as before.
+ * client-side lens, fold or terminal-hide can move it. The chip no longer stays
+ * the AUTHORED status: a `done` container with open work DISPLAYS `open`
+ * (`displayedStatus`) — the owner decision that `done` must never sit over open
+ * work — while its stored status stays the closure record. The row also carries
+ * `data-display-status` (only when it differs from the authored `data-status`,
+ * which stays put for every existing reader) so the client's terminal rule
+ * reads the displayed state: a masked container is NOT terminal and the
+ * hide done/cancelled toggle can never hide it. A container with no open
+ * descendant — and every leaf row — renders exactly as before.
  *
- * `openDeps` is the caller's open-dependency predicate (the kernel rule via
- * `openDependencyIds`); without it rows carry no blocked badge.
+ * `openDescendants` is the caller's precomputed count map (the columns renderer
+ * shares one walk with this renderer); without it the map is computed here over
+ * the same tree. `openDeps` is the caller's open-dependency predicate (the
+ * kernel rule via `openDependencyIds`); without it rows carry no blocked badge.
  */
 export function renderBoardTree(
   items: WorkItem[],
-  opts: { openDeps?: (item: WorkItem) => string[]; interactive?: boolean } = {},
+  opts: {
+    openDeps?: (item: WorkItem) => string[];
+    interactive?: boolean;
+    openDescendants?: Map<string, number>;
+  } = {},
 ): string {
   const esc = escapeHtml;
   const openDeps = opts.openDeps ?? ((): string[] => []);
@@ -2485,16 +2624,9 @@ export function renderBoardTree(
   // always its rendered subtree's own truth — all depths, cycle-safe by
   // construction (`treeEntries` visits each item once) — and never the visible
   // rows' count (the client's lens/fold/terminal-hide act after this render).
-  const openDescendants = new Map<string, number>();
-  const countOpenDescendants = (node: BoardTreeNode): number => {
-    let open = 0;
-    for (const child of node.children) {
-      open += countOpenDescendants(child) + (isTerminalStatus(child.item.status) ? 0 : 1);
-    }
-    openDescendants.set(node.item.id, open);
-    return open;
-  };
-  for (const root of roots) countOpenDescendants(root);
+  // `openDescendantCounts` is the one walk; the columns renderer passes the
+  // same map in, so a row and its card can never disagree.
+  const openDescendants = opts.openDescendants ?? openDescendantCounts(items);
   let rovingRow = false;
   const rowOf = (item: WorkItem, isContainer: boolean): string => {
     const type = esc(item.type);
@@ -2510,8 +2642,9 @@ export function renderBoardTree(
       ? `\n  <span class="tree-blocked">blocked by ${blocked.length}</span>`
       : "";
     // The disclosure rides the row the same way the blocked badge does: a
-    // static span beside the AUTHORED status chip, never a second status.
+    // static span beside the DISPLAYED status chip (never a second status).
     const open = openDescendants.get(item.id) ?? 0;
+    const display = displayedStatus(item.status, open);
     const openBadge = open > 0 ? `\n  <span class="tree-open">${open} open</span>` : "";
     const parent = typeof item.parent === "string" && item.parent !== "" ? item.parent : "";
     const missingMark =
@@ -2534,9 +2667,10 @@ export function renderBoardTree(
     // Enter/Space opens the same drawer. Without the drawer payload the row
     // stays inert — a static export offers no fake affordance — and only the
     // disclosure control (which folds, not opens) is wired. The name carries
-    // the open-descendant disclosure, spelled out, so it is announced and not
-    // only seen.
-    const cardLabel = `${item.type} ${item.id}: ${item.title ?? item.id} (${item.status}${open > 0 ? `, ${open} open descendants` : ""}${item.assignee ? `, @${item.assignee}` : ""})`;
+    // the DISPLAYED status (a masked container is announced as `open`, never
+    // `done`) and the open-descendant disclosure, spelled out, so it is
+    // announced and not only seen.
+    const cardLabel = `${item.type} ${item.id}: ${item.title ?? item.id} (${display}${open > 0 ? `, ${open} open descendants` : ""}${item.assignee ? `, @${item.assignee}` : ""})`;
     const interactiveAttrs = interactive
       ? ` role="group" aria-label="${esc(cardLabel)}" tabindex="${rovingRow ? "-1" : "0"}"`
       : "";
@@ -2545,7 +2679,7 @@ export function renderBoardTree(
   ${toggle}${matches}
   <span class="type" data-type="${type}" style="--type-color: ${TYPE_COLORS[item.type]}">${type}</span>
   <code>${esc(item.id)}</code>
-  <span class="status-chip ${esc(item.status)}">${esc(item.status)}</span>${openBadge}${priority}${title}${assignee}${blockedBadge}${missingMark}
+  <span class="status-chip ${esc(display)}">${esc(display)}</span>${openBadge}${priority}${title}${assignee}${blockedBadge}${missingMark}
 </div>`;
   };
   const nodeOf = (node: BoardTreeNode): string => {
@@ -2559,7 +2693,13 @@ export function renderBoardTree(
       node.children.length > 0
         ? `\n<ul class="tree-children">\n${node.children.map(nodeOf).join("\n")}\n</ul>`
         : "";
-    return `<li class="${classes}" data-id="${esc(node.item.id)}" data-type="${esc(node.item.type)}" data-status="${esc(node.item.status)}">${row}${children}</li>`;
+    // `data-status` stays the AUTHORED status (the stored record every existing
+    // reader and test sees); `data-display-status` is rendered only when the
+    // displayed state differs, and the client's terminal rule prefers it.
+    const display = displayedStatus(node.item.status, openDescendants.get(node.item.id) ?? 0);
+    const displayAttr =
+      display === node.item.status ? "" : ` data-display-status="${esc(display)}"`;
+    return `<li class="${classes}" data-id="${esc(node.item.id)}" data-type="${esc(node.item.type)}" data-status="${esc(node.item.status)}"${displayAttr}>${row}${children}</li>`;
   };
   return `<ul class="tree-root">\n${roots.map(nodeOf).join("\n")}\n</ul>`;
 }
@@ -2678,8 +2818,10 @@ export function wireBoardView(
  * With `groupBy: "tree"` (task-web-board-hierarchy-view) the board OPENS in the
  * grouped-ancestry layout instead of the status columns: one nested list of
  * every tracked item under the recorded `parent` edges (initiative → epic →
- * story → leaf), each row carrying type, id, status and priority. Every board
- * carries both layouts — the in-page `grouped ancestry` toggle in the
+ * story → leaf), each row carrying type, id, status and priority (a `done`
+ * container with open work displays `open` + `N open`, see the derived-status
+ * paragraph below). Every board carries both layouts — the in-page
+ * `grouped ancestry` toggle in the
  * filterbar switches between them (static export and serve alike, no server
  * needed) and the choice round-trips through the URL hash (`#view=tree`, kept
  * only when it differs from this default). The status columns, and with them
@@ -2744,6 +2886,19 @@ export function wireBoardView(
  * `blocked` asks the reason; Esc/cancel aborts, focus is trapped and restored,
  * and a successful move offers an Undo toast action when the reverse
  * transition is legal under the same drop rules. There is no `window.prompt`.
+ *
+ * Derived displayed status (task-board-no-done-over-open-work): stored statuses
+ * are the closure record, but a `done` container with open work in its subtree
+ * never READS `done` on the board — its tree row and its column card render the
+ * `open` chip plus the `N open` disclosure, and the card's accessible name
+ * carries the displayed state. `cancelled` is deliberately not masked (a
+ * cancelled scope reads abandoned, not finished); leaves and containers with a
+ * fully terminal subtree are byte-identical to before. One server-side walk
+ * (`openDescendantCounts` over the complete item set) feeds both layouts, so
+ * the row and the card can never disagree, and the terminal-hide rule reads the
+ * displayed state — a masked container is never hidden by `hide done/cancelled`
+ * or by a lens that keeps it as the path to a match. The drawer keeps the
+ * stored status and explains the effective one (`reads open · N open below`).
  */
 export function renderBoardHtml(
   items: WorkItem[],
@@ -2848,7 +3003,12 @@ export function renderBoardHtml(
   // other stays one click away. The status columns (and with them drag/drop,
   // the drawer and the keyboard move surface) are therefore never lost.
   const viewDefault: "columns" | "tree" = opts.groupBy === "tree" ? "tree" : "columns";
-  const treeHtml = renderBoardTree(sorted, { openDeps, interactive: details });
+  // Open descendants (task-board-no-done-over-open-work): ONE walk over the
+  // complete item set, shared by the tree rows and the column cards, so the
+  // displayed status and the `N open` disclosure can never disagree between
+  // the two layouts. Computed at render, never from the filtered view.
+  const openDescendants = openDescendantCounts(sorted);
+  const treeHtml = renderBoardTree(sorted, { openDeps, interactive: details, openDescendants });
 
   const NO_MILESTONE = null;
   const milestoneOf = (item: WorkItem): string | null =>
@@ -2926,10 +3086,24 @@ export function renderBoardHtml(
       const priorityChip = item.priority
         ? `<span class="priority ${esc(item.priority)}">${esc(item.priority)}</span>`
         : "";
+      // Derived display (task-board-no-done-over-open-work): the SAME mask the
+      // tree rows apply — a `done` container with open work below reads `open`,
+      // with the `N open` disclosure right beside the chip. Every other card
+      // (leaves, open containers, all-terminal subtrees, cancelled) renders
+      // byte-identical to before, `data-status` included: the stored status is
+      // the record, and `data-display-status` (rendered only when it differs)
+      // is what the client's hide done/cancelled rule reads.
+      const open = openDescendants.get(item.id) ?? 0;
+      const display = displayedStatus(item.status, open);
+      const displayChip =
+        display === item.status
+          ? ""
+          : `<span class="status-chip ${esc(display)}">${esc(display)}</span><span class="tree-open">${open} open</span>`;
       // Accessible name (task-board-keyboard-a11y): a card is announced as
       // "type id: title (status, @assignee)" — the same fields the eye gets,
-      // bounded to what is already on the card. Hostile values go through esc.
-      const cardLabel = `${item.type} ${item.id}: ${item.title ?? item.id} (${item.status}${item.assignee ? `, @${item.assignee}` : ""})`;
+      // bounded to what is already on the card; a masked container announces
+      // the DISPLAYED state (never `done`) plus its open-descendant count.
+      const cardLabel = `${item.type} ${item.id}: ${item.title ?? item.id} (${display}${open > 0 ? `, ${open} open descendants` : ""}${item.assignee ? `, @${item.assignee}` : ""})`;
       // Serve-only roving tabindex (see rovingAssigned above) and the tap/click
       // affordance for the move menu: the static export stays lean (no
       // tabindex, no button) and byte-identical apart from the ARIA labels.
@@ -2938,8 +3112,9 @@ export function renderBoardHtml(
       const moveButton = details
         ? `<button type="button" class="card-move" aria-label="move ${esc(item.id)}">move</button>`
         : "";
-      return `<div class="card${blocked.length ? " dep-blocked" : ""}" role="group" aria-label="${esc(cardLabel)}" draggable="true"${rovingTabindex} data-id="${esc(item.id)}" data-type="${esc(item.type)}" data-status="${esc(item.status)}"${item.assignee ? ` data-assignee="${esc(item.assignee)}"` : ""}${milestoneOf(item) ? ` data-milestone="${esc(milestoneOf(item)!)}"` : ""}>
-  <div class="card-head"><span class="type" data-type="${esc(item.type)}" style="--type-color: ${TYPE_COLORS[item.type]}">${esc(item.type)}</span>${priorityChip}<code>${esc(item.id)}</code>${blockedBadge}${moveButton}</div>
+      const displayAttr = display === item.status ? "" : ` data-display-status="${esc(display)}"`;
+      return `<div class="card${blocked.length ? " dep-blocked" : ""}" role="group" aria-label="${esc(cardLabel)}" draggable="true"${rovingTabindex} data-id="${esc(item.id)}" data-type="${esc(item.type)}" data-status="${esc(item.status)}"${displayAttr}${item.assignee ? ` data-assignee="${esc(item.assignee)}"` : ""}${milestoneOf(item) ? ` data-milestone="${esc(milestoneOf(item)!)}"` : ""}>
+  <div class="card-head"><span class="type" data-type="${esc(item.type)}" style="--type-color: ${TYPE_COLORS[item.type]}">${esc(item.type)}</span>${displayChip}${priorityChip}<code>${esc(item.id)}</code>${blockedBadge}${moveButton}</div>
   <div class="title">${title}</div>
   ${breadcrumb}
   ${assignee}
@@ -3100,7 +3275,10 @@ export function renderBoardHtml(
   /* Grouped-ancestry status chips (task-web-board-hierarchy-view): a filled
      chip per status, measured at >= 4.5:1 for its 10px bold text (6.11 todo,
      7.59 in_progress, 6.61 blocked, 5.08 done, 6.04 cancelled — asserted in
-     board.test.ts). Values only: the dark block swaps them. */
+     board.test.ts). Values only: the dark block swaps them. open is the
+     DERIVED displayed state (task-board-no-done-over-open-work): the same
+     neutral pair as todo (a container whose subtree still holds open work
+     reads unfinished, not finished). */
   --st-todo-bg: #59636e;
   --st-todo-fg: #ffffff;
   --st-in-progress-bg: #0550ae;
@@ -3111,6 +3289,8 @@ export function renderBoardHtml(
   --st-done-fg: #ffffff;
   --st-cancelled-bg: #d0d4da;
   --st-cancelled-fg: #424a53;
+  --st-open-bg: #59636e;
+  --st-open-fg: #ffffff;
   --card-font: 13px;
   --card-code-font: 11px;
   --card-pad: 10px;
@@ -3144,7 +3324,8 @@ export function renderBoardHtml(
   --scrim: rgb(0 0 0 / 0.55);
   --card-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
   /* Status chips, dark (values only — same geometry as light): 8.33 todo,
-     4.63 in_progress, 6.72 blocked, 7.45 done, 6.38 cancelled. */
+     4.63 in_progress, 6.72 blocked, 7.45 done, 6.38 cancelled; open mirrors
+     todo like the light block. */
   --st-todo-bg: #3d444d;
   --st-todo-fg: #e6edf3;
   --st-in-progress-bg: #1f6feb;
@@ -3155,6 +3336,8 @@ export function renderBoardHtml(
   --st-done-fg: #0d1117;
   --st-cancelled-bg: #3d444d;
   --st-cancelled-fg: #c9d1d9;
+  --st-open-bg: #3d444d;
+  --st-open-fg: #e6edf3;
 }
 :root[data-density="compact"] {
   --card-font: 12px;
@@ -3190,7 +3373,12 @@ header .meta { color: var(--meta); font-size: 13px; }
 /* Column collapse (task-board-column-controls): a collapsed column keeps only
    its header — the count badge stays visible, cards and group heads hide. */
 .column.collapsed .card, .column.collapsed .mgroup-head, .column.collapsed .empty { display: none; }
+/* Hide done/cancelled (task-board-column-controls, task-board-no-done-over-open-work):
+   a terminal column hides whole when no non-terminal card is left in it; a card
+   whose DISPLAYED status is terminal hides on its own, so a masked container
+   (authored done + open work below, reads open) keeps its column visible. */
 .column.terminal-hidden { display: none; }
+.card.terminal-hidden { display: none; }
 .col-toggle { margin-left: auto; flex: 0 0 auto; border: 1px solid var(--muted); background: var(--card); color: var(--fg-soft); border-radius: 4px; width: 20px; height: 20px; font-size: 13px; line-height: 1; cursor: pointer; font-family: inherit; }
 .layout-toggle { border: 1px solid var(--muted); background: var(--card); border-radius: 12px; padding: 3px 10px; font-size: 12px; font-family: inherit; color: inherit; cursor: pointer; }
 .layout-toggle[aria-pressed="true"] { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
@@ -3353,6 +3541,10 @@ body[data-detail-endpoint] .tree-row { cursor: pointer; }
 .status-chip.blocked { background: var(--st-blocked-bg); color: var(--st-blocked-fg); }
 .status-chip.done { background: var(--st-done-bg); color: var(--st-done-fg); }
 .status-chip.cancelled { background: var(--st-cancelled-bg); color: var(--st-cancelled-fg); }
+/* The derived displayed status (task-board-no-done-over-open-work): a done
+   container with open work below reads open on its row AND on its column
+   card — same chip geometry, the neutral pair (see --st-open-*). */
+.status-chip.open { background: var(--st-open-bg); color: var(--st-open-fg); }
 ${details ? DETAIL_CSS : ""}
 </style>
 <script>

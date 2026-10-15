@@ -1206,6 +1206,7 @@ describe("static export --details (task-board-static-details)", () => {
         dependencies: [],
         parent: null,
         children: [],
+        open_descendants: 0,
         pr: null,
         ...overrides,
       },
@@ -1518,6 +1519,7 @@ describe("detail drawer hierarchy (task-web-board-hierarchy-links)", () => {
         dependencies: [],
         parent: null,
         children: [],
+        open_descendants: 0,
         pr: null,
         ...detailOverrides,
       },
@@ -2347,32 +2349,50 @@ describe("renderBoardTree open-descendant disclosure (bug-tree-done-container-hi
     return html.slice(start, html.indexOf("</div>", start));
   }
 
-  it("discloses the open descendants of a terminal container at every depth, after the status chip", () => {
+  /** The node's own `<li …>` opening tag (attributes only). */
+  function nodeTag(html: string, id: string): string {
+    const at = html.indexOf(`data-id="${id}"`);
+    expect(at, `tree node ${id} not rendered`).toBeGreaterThan(-1);
+    return html.slice(html.lastIndexOf("<li", at), html.indexOf(">", at));
+  }
+
+  it("discloses the open descendants of a terminal container at every depth, after the displayed status chip", () => {
     const html = renderBoardTree(tree());
     for (const id of ["init", "epic-a", "story-a"]) {
       const row = rowHtml(html, id);
       // Three open descendants: the todo task, the in_progress task and the
       // blocked bug. The done task and the cancelled bug are terminal.
       expect(row, id).toContain('<span class="tree-open">3 open</span>');
-      // The chip keeps the AUTHORED status — the disclosure never rolls up.
-      expect(row, id).toContain('<span class="status-chip done">done</span>');
+      // The chip carries the DISPLAYED status (task-board-no-done-over-open-work):
+      // authored `done` + open work below reads `open`, never `done`.
+      expect(row, id).toContain('<span class="status-chip open">open</span>');
+      expect(row, id).not.toContain("status-chip done");
       // The badge sits right after the chip, before priority/title/assignee.
       assertOrder(
         row,
-        '<span class="status-chip done">done</span>',
+        '<span class="status-chip open">open</span>',
         '<span class="tree-open">3 open</span>',
-        { text: '<span class="tree-title">', optional: true },
+        {
+          text: '<span class="tree-title">',
+          optional: true,
+        },
       );
     }
+    // The stored status stays on the node (the closure record every existing
+    // reader sees); the derived one rides `data-display-status` beside it.
+    expect(nodeTag(html, "init")).toContain('data-status="done" data-display-status="open"');
     // The open work is three levels below the initiative: a direct-children
     // count would have answered 0 here, so this pins "all depths".
     expect(rowHtml(html, "epic-a")).toContain("3 open");
   });
 
-  it("renders no badge for a zero-open container or for any leaf row", () => {
+  it("renders no badge and the authored chip for a zero-open container or for any leaf row", () => {
     const html = renderBoardTree(tree());
-    // A done epic whose whole subtree is terminal: nothing to disclose.
+    // A done epic whose whole subtree is terminal: nothing to disclose, and the
+    // authored chip stays (the mask needs open work below).
     expect(rowHtml(html, "epic-b")).not.toContain("tree-open");
+    expect(rowHtml(html, "epic-b")).toContain('<span class="status-chip done">done</span>');
+    expect(nodeTag(html, "epic-b")).not.toContain("data-display-status");
     expect(rowHtml(html, "task-b-done")).not.toContain("tree-open");
     // Leaves never carry it, open or not.
     expect(rowHtml(html, "task-open")).not.toContain("tree-open");
@@ -2384,6 +2404,10 @@ describe("renderBoardTree open-descendant disclosure (bug-tree-done-container-hi
       item({ id: "task-x", type: "task", status: "done", parent: "story-x", title: "X done" }),
     ]);
     expect(rowHtml(openContainer, "story-x")).not.toContain("tree-open");
+    expect(rowHtml(openContainer, "story-x")).toContain(
+      '<span class="status-chip in_progress">in_progress</span>',
+    );
+    expect(nodeTag(openContainer, "story-x")).not.toContain("data-display-status");
   });
 
   it("counts only open descendants: a cancelled subtree discloses nothing", () => {
@@ -2394,22 +2418,23 @@ describe("renderBoardTree open-descendant disclosure (bug-tree-done-container-hi
     ]);
     expect(rowHtml(html, "story-c")).toContain('<span class="status-chip done">done</span>');
     expect(rowHtml(html, "story-c")).not.toContain("tree-open");
+    expect(nodeTag(html, "story-c")).not.toContain("data-display-status");
   });
 
-  it("announces the disclosure in the row's accessible name (interactive), inert otherwise", () => {
+  it("announces the displayed state and the disclosure in the row's accessible name (interactive), inert otherwise", () => {
     const inert = renderBoardTree(tree());
     expect(inert).toContain('<span class="tree-open">3 open</span>');
     expect(inert).not.toContain('role="group"');
 
     const interactive = renderBoardTree(tree(), { interactive: true });
     expect(interactive).toContain(
-      'role="group" aria-label="initiative init: Init (done, 3 open descendants)" tabindex="0"',
+      'role="group" aria-label="initiative init: Init (open, 3 open descendants)" tabindex="0"',
     );
     // A zero-open container's name is byte-identical to the pre-disclosure one.
     expect(interactive).toContain('role="group" aria-label="epic epic-b: B (done)" tabindex="-1"');
   });
 
-  it("renders the same disclosure in the static export and the served board, from the complete set", () => {
+  it("renders the same disclosure and display in the static export and the served board, from the complete set", () => {
     const items = tree();
     const boards = [
       ["static", renderBoardHtml(items, { generatedAt: GENERATED_AT, groupBy: "tree" })],
@@ -2425,6 +2450,7 @@ describe("renderBoardTree open-descendant disclosure (bug-tree-done-container-hi
     ] as const;
     for (const [mode, html] of boards) {
       expect(html, mode).toContain('<span class="tree-open">3 open</span>');
+      expect(html, mode).toContain('<span class="status-chip open">open</span>');
     }
     // The accessible name rides the interactive (details-mode) rows, which the
     // served board renders; the drawer-free static export stays inert. Scope
@@ -2432,7 +2458,7 @@ describe("renderBoardTree open-descendant disclosure (bug-tree-done-container-hi
     // `role="group"` labels on every board.
     const treeOf = (html: string): string => html.slice(html.indexOf('<section class="tree"'));
     expect(treeOf(boards[1][1])).toContain(
-      'aria-label="initiative init: Init (done, 3 open descendants)"',
+      'aria-label="initiative init: Init (open, 3 open descendants)"',
     );
     expect(treeOf(boards[0][1])).not.toContain('aria-label="initiative init:');
     // The count is baked into the markup at render: no client controller ever
@@ -2454,6 +2480,221 @@ describe("renderBoardTree open-descendant disclosure (bug-tree-done-container-hi
     // descendant below task-a, none below the last node of the cycle.
     expect(rowHtml(html, "task-a")).toContain('<span class="tree-open">1 open</span>');
     expect(rowHtml(html, "task-b")).not.toContain("tree-open");
+  });
+});
+
+describe("derived displayed status (task-board-no-done-over-open-work)", () => {
+  /**
+   * The mask matrix in one tree: a `done` container over open work (masked), a
+   * `done` container whose subtree is fully terminal (unmasked), an open
+   * container (unmasked, authored), a `cancelled` container over open work
+   * (deliberately unmasked) and leaf rows of every status.
+   */
+  const tree = (): WorkItem[] => [
+    item({ id: "init", type: "initiative", status: "done", title: "Init" }),
+    item({ id: "story-open", type: "story", status: "done", parent: "init", title: "Open work" }),
+    item({ id: "task-open", type: "task", status: "todo", parent: "story-open", title: "Todo" }),
+    item({
+      id: "task-wip",
+      type: "task",
+      status: "in_progress",
+      parent: "story-open",
+      title: "Wip",
+    }),
+    item({
+      id: "bug-blocked",
+      type: "bug",
+      status: "blocked",
+      parent: "story-open",
+      title: "Blocked",
+    }),
+    item({ id: "task-done", type: "task", status: "done", parent: "story-open", title: "Done" }),
+    item({ id: "story-clean", type: "story", status: "done", parent: "init", title: "Clean" }),
+    item({ id: "task-clean-done", type: "task", status: "done", parent: "story-clean" }),
+    item({ id: "story-wip", type: "story", status: "in_progress", parent: "init", title: "Wip" }),
+    item({ id: "task-wip-child", type: "task", status: "todo", parent: "story-wip" }),
+    item({
+      id: "story-cancelled",
+      type: "story",
+      status: "cancelled",
+      parent: "init",
+      title: "Canc",
+    }),
+    item({ id: "task-cancelled-child", type: "task", status: "todo", parent: "story-cancelled" }),
+    item({
+      id: "task-done-leaf",
+      type: "task",
+      status: "done",
+      parent: "init",
+      title: "Done leaf",
+    }),
+  ];
+
+  function rowOf(html: string, id: string): string {
+    const treeStart = html.indexOf('<section class="tree"');
+    const tree = treeStart === -1 ? html : html.slice(treeStart);
+    const at = tree.indexOf(`data-id="${id}"`);
+    expect(at, `tree node ${id} not rendered`).toBeGreaterThan(-1);
+    const start = tree.indexOf('<div class="tree-row"', at);
+    expect(start, `tree row ${id} not rendered`).toBeGreaterThan(-1);
+    return tree.slice(start, tree.indexOf("</div>", start));
+  }
+
+  function cardOf(html: string, id: string): string {
+    const boardStart = html.indexOf('<main class="board"');
+    const board = boardStart === -1 ? html : html.slice(boardStart);
+    const at = board.indexOf(`data-id="${id}"`);
+    expect(at, `card ${id} not rendered`).toBeGreaterThan(-1);
+    const start = board.lastIndexOf("<div", at);
+    return board.slice(start, board.indexOf("</div>", start));
+  }
+
+  function nodeTagOf(html: string, id: string): string {
+    const at = html.indexOf(`data-id="${id}"`);
+    expect(at, `tree node ${id} not rendered`).toBeGreaterThan(-1);
+    return html.slice(html.lastIndexOf("<li", at), html.indexOf(">", at));
+  }
+
+  it("renders `open` for a done container with open work and `done` for a terminal subtree", () => {
+    const html = renderBoardTree(tree());
+    // Masked: the container itself and every done container above it. `init`
+    // holds six open items across its subtree (three under `story-open`, the
+    // wip story itself plus its child, and the cancelled story's open child);
+    // `story-open` holds its own three.
+    expect(rowOf(html, "init")).toContain('<span class="status-chip open">open</span>');
+    expect(rowOf(html, "init")).toContain('<span class="tree-open">6 open</span>');
+    expect(rowOf(html, "init")).not.toContain("status-chip done");
+    expect(rowOf(html, "story-open")).toContain('<span class="status-chip open">open</span>');
+    expect(rowOf(html, "story-open")).toContain('<span class="tree-open">3 open</span>');
+    // Unmasked: a done container whose whole subtree is terminal keeps `done`.
+    expect(rowOf(html, "story-clean")).toContain('<span class="status-chip done">done</span>');
+    expect(rowOf(html, "story-clean")).not.toContain("tree-open");
+    // Open containers keep their authored status (the mask is only `done`).
+    expect(rowOf(html, "story-wip")).toContain(
+      '<span class="status-chip in_progress">in_progress</span>',
+    );
+    // Cancelled is deliberately NOT masked: a cancelled scope reads abandoned,
+    // not finished — even with open work inside it still discloses the count.
+    expect(rowOf(html, "story-cancelled")).toContain(
+      '<span class="status-chip cancelled">cancelled</span>',
+    );
+    expect(rowOf(html, "story-cancelled")).not.toContain("status-chip open");
+    expect(rowOf(html, "story-cancelled")).toContain('<span class="tree-open">1 open</span>');
+    // Leaves render their authored status, done and open alike.
+    expect(rowOf(html, "task-done-leaf")).toContain('<span class="status-chip done">done</span>');
+    expect(rowOf(html, "task-open")).toContain('<span class="status-chip todo">todo</span>');
+    expect(rowOf(html, "task-wip")).toContain(
+      '<span class="status-chip in_progress">in_progress</span>',
+    );
+    expect(rowOf(html, "bug-blocked")).toContain(
+      '<span class="status-chip blocked">blocked</span>',
+    );
+  });
+
+  it("keeps the stored status on data-status and only adds data-display-status when masked", () => {
+    const html = renderBoardTree(tree());
+    expect(html).toContain('data-status="done" data-display-status="open"');
+    // Unmasked nodes carry no display attribute at all: their markup is the
+    // pre-change shape, so no existing reader or test sees a new attribute.
+    for (const id of ["story-clean", "story-wip", "story-cancelled", "task-done-leaf"]) {
+      expect(nodeTagOf(html, id), id).not.toContain("data-display-status");
+    }
+  });
+
+  it("applies the same mask to the column cards, with the chip, the count and the card name", () => {
+    const html = renderBoardHtml(tree(), { generatedAt: GENERATED_AT, details: true });
+    // The masked container's CARD (done column) reads open, carries the same
+    // disclosure and announces the displayed state plus the count.
+    const card = cardOf(html, "story-open");
+    expect(card).toContain('<span class="status-chip open">open</span>');
+    expect(card).toContain('<span class="tree-open">3 open</span>');
+    expect(card).toContain('data-display-status="open"');
+    expect(card).toContain('data-status="done"');
+    expect(html).toContain('aria-label="story story-open: Open work (open, 3 open descendants)"');
+    // Every other card is byte-identical to the pre-change shape: authored
+    // chip-less markup, no display attribute.
+    for (const id of ["story-clean", "story-cancelled", "task-done-leaf", "task-open"]) {
+      const other = cardOf(html, id);
+      expect(other, id).not.toContain("data-display-status");
+      expect(other, id).not.toContain("status-chip");
+    }
+    // The tree and the columns read the SAME count from the same walk.
+    expect(rowOf(html, "story-open")).toContain('<span class="tree-open">3 open</span>');
+  });
+
+  it("reads the displayed status in the terminal rule of both layouts", () => {
+    // The controller is embedded verbatim; the pins below are its two reads:
+    // the tree node's terminal verdict and the per-card hide in the columns.
+    const source = wireBoardColumns.toString();
+    expect(source).toContain(
+      'node.getAttribute("data-display-status") || node.getAttribute("data-status")',
+    );
+    expect(source).toContain('card.classList.toggle("terminal-hidden", hide)');
+    expect(source).toContain(
+      'col.classList.toggle("terminal-hidden", terminalColumn && kept === 0)',
+    );
+    // The keyboard roving anchor never lands on a hidden card.
+    expect(wireBoardKeyboardNav.toString()).toContain(
+      ".card:not(.filtered-out):not(.terminal-hidden)",
+    );
+  });
+
+  it("explains the effective status in the drawer payload while keeping the stored one", () => {
+    // The payload carries the same server-side count (additive field), and the
+    // renderer keeps the stored chip plus the explanation.
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-display-"));
+    mkdirSync(join(dir, "tasks"));
+    writeFileSync(join(dir, "tasks", ".convention.yml"), "version: 1\n", "utf8");
+    writeFileSync(
+      join(dir, "tasks", "story-a.md"),
+      '---\ntype: story\nid: story-a\ntitle: A\nstatus: done\ncreated: "2026-09-15"\nupdated: "2026-09-15"\n---\n',
+      "utf8",
+    );
+    writeFileSync(
+      join(dir, "tasks", "task-a.md"),
+      '---\ntype: task\nid: task-a\ntitle: A task\nstatus: todo\nparent: story-a\ncreated: "2026-09-15"\nupdated: "2026-09-15"\n---\n',
+      "utf8",
+    );
+    const items = loadItems(findTasksDir(dir));
+    const map = buildBoardDetailMap({ root: dir, items });
+    expect(map["story-a"].detail.open_descendants).toBe(1);
+    expect(map["task-a"].detail.open_descendants).toBe(0);
+
+    const masked = makeFakeTree();
+    renderBoardDetail(masked.container as unknown as HTMLElement, map["story-a"]);
+    const maskedNodes = fakeDescendants(masked.container);
+    expect(maskedNodes.find((node) => node.className === "status")?.textContent).toBe("done");
+    expect(maskedNodes.find((node) => node.className === "drawer-reads-open")?.textContent).toBe(
+      "reads open \u00b7 1 open below",
+    );
+
+    // An unmasked item renders no explanation at all.
+    const plain = makeFakeTree();
+    renderBoardDetail(plain.container as unknown as HTMLElement, map["task-a"]);
+    expect(
+      fakeDescendants(plain.container).some((node) => node.className === "drawer-reads-open"),
+    ).toBe(false);
+  });
+
+  it("renders identically in the static export and the served board (shared renderer)", () => {
+    const items = tree();
+    const staticHtml = renderBoardHtml(items, { generatedAt: GENERATED_AT });
+    const serveHtml = renderBoardHtml(items, {
+      generatedAt: GENERATED_AT,
+      details: true,
+      live: true,
+    });
+    // Same mask, same counts in both modes: only the details chrome differs.
+    for (const html of [staticHtml, serveHtml]) {
+      expect(html).toContain('<span class="status-chip open">open</span>');
+      expect(html).toContain('<span class="tree-open">3 open</span>');
+    }
+    expect(staticHtml).toContain(
+      'aria-label="story story-open: Open work (open, 3 open descendants)"',
+    );
+    expect(serveHtml).toContain(
+      'aria-label="story story-open: Open work (open, 3 open descendants)"',
+    );
   });
 });
 
@@ -2646,7 +2887,10 @@ describe("renderBoardHtml grouped-ancestry view (task-web-board-hierarchy-view)"
       expect(match, `property not found: ${property}`).toBeTruthy();
       return match![1];
     }
-    const statuses = ["todo", "in_progress", "blocked", "done", "cancelled"];
+    // The derived displayed chip (task-board-no-done-over-open-work) is a real
+    // status-chip modifier (`.status-chip.open`), so it is measured with the
+    // same bar as the authored statuses.
+    const statuses = ["todo", "in_progress", "blocked", "done", "cancelled", "open"];
     for (const [theme, selector] of [
       ["light", ":root"],
       ["dark", ':root[data-theme="dark"]'],
@@ -2722,6 +2966,10 @@ describe("column controls (task-board-column-controls)", () => {
       expect(html, mode).toContain("position: sticky; top: 0; z-index: 5;");
       expect(html, mode).toContain(".column.collapsed .card");
       expect(html, mode).toContain(".column.terminal-hidden { display: none; }");
+      // task-board-no-done-over-open-work: a card reads its own displayed
+      // status, so the toggle hides it individually and keeps the column when
+      // a masked container is inside it.
+      expect(html, mode).toContain(".card.terminal-hidden { display: none; }");
       // bug-tree-ignores-hide-terminal-toggle: the same layout preference
       // hides terminal rows in the tree, mutes the terminal rows it must keep
       // as context, and gives an all-hidden tree the columns' `—` placeholder.
