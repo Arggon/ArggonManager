@@ -126,3 +126,14 @@ Review round 1 — CI `cli` lane fix: the smoke fixture no longer assumes a git 
 **Audit of the other new tests.** `cli/src/sync-command.test.ts` and `lib/src/branch-claims.test.ts` already configure identity before their own explicit commits and never read HEAD early; `lib/src/next.test.ts` / `lib/src/list.test.ts` read `rev-parse --short HEAD` only AFTER their seed commit. Re-ran with the config disabled, adding those two files to the repro command: **5 files / 101 tests passed**.
 
 **Gates after the fix.** Full `npm test` — **161 files / 3543 tests passed** (clean run after the fix); `npm run arggon -- validate --json` ok; `npx prettier --check` on the touched file clean. Fix commit: `3872c480`.
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-15 (delivery lead)
+Merged as 022ef23c (PR #841). Route chosen and recorded: `next`/`list` declare the checkout they ranked from (`rankedFrom` + the note that claims on unmerged branches are not visible from this tree; run `arggon sync`), and `sync` reconciles branch-resident claims (`branchClaims`/`branchClaimErrors`, local git reads only, report-only — never gates matching or exit code). Rejected with reasoning: the ranking read reconciling branches itself (hot path, incomplete without a fetch, a hidden second pool input) and the shared claim commit (a second store duplicating the frontmatter the kernel refuses on). `next` does not filter locally-visible branch claims — a filter would be incomplete and would hide the boundary instead of declaring it.
+
+Box 7 recorded: a stale claim on a never-merged branch is reclaimable, but only through the human-only takeover gate (`update --steal --reason … --assignee <you>` on the branch's worktree copy); agents never steal; `--stale` legitimately cannot see it (it reads one tree). Live evidence recorded: 5 branch-resident claims surfaced; the four original held items found merged 2026-10-06 — recorded as observed, no claim stolen, `main`'s copies byte-identical.
+
+Review round 1 caught a real environment leak (the new fixture read HEAD before any commit — green locally, red on CI without a git identity); fixed and re-verified with git config disabled (repro 1 failed → fix → 5 files / 101 tests green; full suite 3543).
+
+Evidence: `lib/src/branch-claims.ts` + the list/next/sync surfaces + four test layers (unit 11, sync-command, sync-smoke, cli); docs §Claim + `json-output.md` §sync/§list/§next; `check:plugin` green; full suite 3543; CI green on the refreshed head.
