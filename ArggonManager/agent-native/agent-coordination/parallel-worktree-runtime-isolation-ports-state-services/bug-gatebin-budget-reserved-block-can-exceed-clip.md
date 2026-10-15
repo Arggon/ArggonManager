@@ -62,3 +62,12 @@ Acceptance:
 - [ ] The ≥1 override respects that decision (it must not reintroduce the clip by force)
 - [ ] A test with `~700+` char paths asserting the chosen behaviour, so the window is covered rather than documented
 - [ ] Note in the implementation comment which clause is guaranteed to survive and why, so the invariant is stated once at the place that enforces it
+
+### 2026-10-15 @Arggon
+### Evidence — completed by the delivery lead after the maker session died to a provider usage limit (work complete and green, uncommitted)
+
+Decision (box 1): prioritise the exact fix with the truncation named — over-budget composition = notice → exact fix → kept-path lead → generic fix → discard hint → detail; the human clip eats the tail only, and every clause still rides the --json error. The ≥1 name override takes an overrideLimit and yields (null) past the room that keeps the actionable clauses whole; the observation rides startFailureReadiness instead. The fill measures its '; ' separator.
+
+Box 4: the guaranteed clause is stated in the implementation comment at the enforcing point — the exact fix (the only clause the operator can act on without re-deriving; it leads, only the notice precedes), else the kept-path lead.
+
+Gates: focused start 73/73; full suite 160 files / 3543; validate/lint/structure/prettier green. Lead review + merge pending.
