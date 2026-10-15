@@ -9,7 +9,6 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [tracker-schema, worktree, hygiene, claims]
 created: "2026-10-05"
 updated: "2026-10-15"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-claim-pool-computed-from-main-misses-branch-claims
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-claim-pool-computed-from-main-misses-branch-claims.md

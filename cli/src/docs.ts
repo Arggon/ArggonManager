@@ -738,14 +738,41 @@ function walkTemplates(dir: string, base = dir): string[] {
   return found.sort();
 }
 
+/**
+ * The literal `ARGGON_VERSION: "<x>"` pin in the generated CI workflow
+ * (templates/docs/github/workflows/arggon.yml). Only the first such line, at
+ * any indentation, is matched.
+ */
+const WORKFLOW_PIN_LINE = /^([ \t]*ARGGON_VERSION:[ \t]*)"[^"\n]*"/m;
+const PIN_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+
+/**
+ * Rewrite the generated workflow's literal `ARGGON_VERSION` pin to `version`
+ * (bug-init-writes-stale-workflow-pin). The template's own literal is only a
+ * placeholder value: the release flow bumps package.json before the template
+ * is re-pinned, so a published tarball could carry an older pin than itself
+ * (0.5.0 shipped "0.4.0", 0.10.0 shipped "0.7.0") and every adopter's first
+ * `tasks-validate` installed the wrong generator. The output stays a LITERAL
+ * pin (task-ci-seam-pin-tracks-release); only its value now comes from the
+ * running CLI. Content without a pin line, or a non-semver version, is
+ * returned unchanged.
+ */
+export function renderWorkflowPin(content: string, version: string): string {
+  if (!PIN_VERSION.test(version)) return content;
+  return content.replace(WORKFLOW_PIN_LINE, (_, prefix: string) => `${prefix}"${version}"`);
+}
+
 /** Render the known placeholders; unknown ones are left untouched. */
 export function renderDocPlaceholders(
   content: string,
-  vars: { projectName: string; year: number },
+  vars: { projectName: string; year: number; arggonVersion?: string },
 ): string {
-  return content
-    .replaceAll("{{PROJECT_NAME}}", vars.projectName)
-    .replaceAll("{{YEAR}}", String(vars.year));
+  return renderWorkflowPin(
+    content
+      .replaceAll("{{PROJECT_NAME}}", vars.projectName)
+      .replaceAll("{{YEAR}}", String(vars.year)),
+    vars.arggonVersion ?? arggonVersion(),
+  );
 }
 
 /**
