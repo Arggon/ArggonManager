@@ -364,3 +364,7 @@ Boxes 5, 6 and 7 are the **finding**; they are answered in this comment (§2, §
 §4 respectively) and deliberately left unticked, because a spike's acceptance is the
 recorded answer rather than a tick. No code ships in this spike — the only commits on
 `feat/task-spike-friction-trigger-compliance` are the item's own bookkeeping.
+
+### handoff 2026-10-15 @arggon-maker — next: Stage 2 verdict is DEFER (NULL, trigger never observable at an adopter). Re-run the sweep once ../ArggonStores runs arggon init and the trigger has been present for the window the lead sets; criterio…
+- branch: feat/task-spike-friction-trigger-compliance
+- open questions: Confirm the re-measurement window (14 days proposed) and decide who files the two ArggonManager defects the maker recorded as local friction: TEST_NOT_HERMETIC in cli/src/friction.test.ts and DOCTOR_…
