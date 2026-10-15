@@ -98,6 +98,28 @@ function addWorkspacePackage(primary: string, worktree: string): void {
   symlinkSync(join(primary, "lib"), join(scope, "lib"), "dir");
 }
 
+/**
+ * `count` workspace packages, each linked into the primary's install and
+ * mirrored in the worktree — one build decision per package in the preparation
+ * log, so `count > MAX_PREP_STEPS` overflows the kernel's cap.
+ */
+function addWorkspacePackages(primary: string, worktree: string, count: number): void {
+  for (let index = 0; index < count; index++) {
+    const name = `@scope/pkg-${index}`;
+    for (const root of [primary, worktree]) {
+      const pkg = join(root, `pkg-${index}`);
+      mkdirSync(pkg, { recursive: true });
+      writeFileSync(
+        join(pkg, "package.json"),
+        JSON.stringify({ name, version: "1.0.0", main: "dist/index.js" }),
+      );
+    }
+    const scope = join(primary, "node_modules", "@scope");
+    mkdirSync(scope, { recursive: true });
+    symlinkSync(join(primary, `pkg-${index}`), join(scope, `pkg-${index}`), "dir");
+  }
+}
+
 /** One installed package directory in the primary's `node_modules`. */
 function addInstalledPackage(primary: string, name: string, version = "1.0.0"): void {
   const dir = join(primary, "node_modules", ...name.split("/"));
@@ -269,26 +291,14 @@ describe("prepareWorktreeDependencies", () => {
     }
   });
 
-  it("caps the preparation log and flags the truncation", () => {
+  it("caps the preparation log, flags the truncation and counts what it dropped", () => {
     const { primary, worktree } = fixture();
     mkdirSync(join(primary, "node_modules"), { recursive: true });
-    // MAX_PREP_STEPS + 1 workspace packages: every build decision is recorded
-    // until the cap, then `stepsTruncated` is set — the log stays bounded
-    // without pretending it saw everything.
-    for (let index = 0; index < MAX_PREP_STEPS; index++) {
-      const name = `@scope/pkg-${index}`;
-      for (const root of [primary, worktree]) {
-        const pkg = join(root, `pkg-${index}`);
-        mkdirSync(pkg, { recursive: true });
-        writeFileSync(
-          join(pkg, "package.json"),
-          JSON.stringify({ name, version: "1.0.0", main: "dist/index.js" }),
-        );
-      }
-      const scope = join(primary, "node_modules", "@scope");
-      mkdirSync(scope, { recursive: true });
-      symlinkSync(join(primary, `pkg-${index}`), join(scope, `pkg-${index}`), "dir");
-    }
+    // MAX_PREP_STEPS workspace packages: one link record + one build decision
+    // per package + the gate-bin verdict = MAX_PREP_STEPS + 2 attempts, so the
+    // log fills and the last two decisions are dropped — bounded without
+    // pretending it saw everything.
+    addWorkspacePackages(primary, worktree, MAX_PREP_STEPS);
 
     const receipt = prepareWorktreeDependencies(primary, worktree, {
       runBuild: (pkgDir) => {
@@ -300,6 +310,10 @@ describe("prepareWorktreeDependencies", () => {
 
     expect(receipt.steps.length).toBe(MAX_PREP_STEPS);
     expect(receipt.stepsTruncated).toBe(true);
+    // The kernel's own count of the dropped tail — the 16th build decision and
+    // the gate-bin verdict. Prose mirrors this number, never a length-vs-cap
+    // guess (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation).
+    expect(receipt.stepsDropped).toBe(2);
   });
 });
 
@@ -347,6 +361,53 @@ describe("freshWorktreeInstallRefusal (bug-start-install-ordering)", () => {
     // The documented carve-out: a project with no dependency-needing gate may
     // still have no install and commit the claim.
     expect(freshWorktreeInstallRefusal([], "/wt")).toBeNull();
+  });
+
+  it("states the kernel's dropped count when the preparation log is capped (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation)", () => {
+    const { primary, worktree } = fixture();
+    mkdirSync(join(primary, "node_modules"), { recursive: true });
+    // The log overflows the kernel's own cap, so `steps` below is genuinely
+    // SHORTER than what ran: the human-readable list is the evidence for the
+    // refusal, and it must not read as the whole log.
+    addWorkspacePackages(primary, worktree, MAX_PREP_STEPS);
+    const receipt = prepareWorktreeDependencies(primary, worktree);
+    // The kernel decides (and counts) the drop; the refusal only mirrors it.
+    expect(receipt.stepsTruncated).toBe(true);
+    expect(receipt.stepsDropped).toBe(2);
+
+    const refusal = freshWorktreeInstallRefusal(
+      [{ name: "tsx", source: "missing" }],
+      worktree,
+      receipt.steps,
+      receipt.stepsDropped ?? 0,
+    );
+    expect(refusal).toContain("Preparation ran:");
+    // The explicit count — never a silently shortened evidence list.
+    expect(refusal).toContain("2 entries were dropped");
+    expect(refusal).toContain(`the preparation log is capped at ${MAX_PREP_STEPS}`);
+    // The count rides with the list it qualifies, ahead of the remedy and the
+    // named-bin evidence (the clip ordering this function documents).
+    assertOrder(refusal ?? "", "Preparation ran:", "2 entries were dropped", "npm ci");
+  });
+
+  it("names a single dropped entry in the singular", () => {
+    const refusal = freshWorktreeInstallRefusal(
+      [{ name: "tsx", source: "missing" }],
+      "/repo-worktree",
+      [{ step: "link", outcome: "primary-install-missing" }],
+      1,
+    );
+    expect(refusal).toContain("1 entry was dropped");
+  });
+
+  it("states no dropped count for an uncapped log (no truncation is invented)", () => {
+    const refusal = freshWorktreeInstallRefusal(
+      [{ name: "tsx", source: "missing" }],
+      "/repo-worktree",
+      [{ step: "link", outcome: "primary-install-missing" }],
+    );
+    expect(refusal).toContain("Preparation ran: link:primary-install-missing.");
+    expect(refusal).not.toContain("dropped");
   });
 });
 

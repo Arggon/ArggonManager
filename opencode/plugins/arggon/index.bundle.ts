@@ -8708,7 +8708,7 @@ function strictGateBinFailure(gateBins, worktreePath) {
         `x-tracker.strict-gate-bins is set: refusing the claim commit — gate binaries do not ` +
         `resolve inside the worktree: ${named}.`);
 }
-function freshWorktreeInstallRefusal(gateBins, worktreePath, steps = []) {
+function freshWorktreeInstallRefusal(gateBins, worktreePath, steps = [], stepsDropped = 0) {
     const broken = strictGateBinViolations(gateBins);
     if (broken.length === 0)
         return null;
@@ -8722,11 +8722,16 @@ function freshWorktreeInstallRefusal(gateBins, worktreePath, steps = []) {
         return `${bin.name}: resolves from ${bin.path}, above the worktree`;
     })
         .join("; ");
-    const prep = steps.length > 0
+    const logged = steps.length > 0
         ? ` Preparation ran: ${steps
             .map((entry) => `${entry.step}:${entry.outcome}${entry.pkg ? ` (${entry.pkg})` : ""}`)
             .join(", ")}.`
         : "";
+    const dropped = stepsDropped > 0
+        ? ` ${stepsDropped} ${stepsDropped === 1 ? "entry was" : "entries were"} dropped ` +
+            `(the preparation log is capped at ${exports.MAX_PREP_STEPS}).`
+        : "";
+    const prep = `${logged}${dropped}`;
     return (`refusing the claim commit — a fresh worktree must leave a gate-usable install.${prep} ` +
         `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install ` +
         `(or \`npm install\` in the primary checkout if its install is stale or missing), ` +
@@ -9200,9 +9205,11 @@ function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
     const worktreeModules = (0, node_path_1.join)(worktreePath, "node_modules");
     const steps = [];
     let stepsTruncated = false;
+    let stepsDropped = 0;
     const record = (step, outcome, pkg) => {
         if (steps.length >= exports.MAX_PREP_STEPS) {
             stepsTruncated = true;
+            stepsDropped += 1;
             return;
         }
         steps.push(pkg === undefined ? { step, outcome } : { step, outcome, pkg });
@@ -9243,7 +9250,7 @@ function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
         missingDependenciesTotal: declared.missingTotal,
         gateBins,
         steps,
-        ...(stepsTruncated ? { stepsTruncated: true } : {}),
+        ...(stepsTruncated ? { stepsTruncated: true, stepsDropped } : {}),
         ...(envReceipt !== undefined ? { env: envReceipt } : {}),
         ...(claimReceipt !== undefined ? { claim: claimReceipt } : {}),
     };
