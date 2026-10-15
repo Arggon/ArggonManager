@@ -80,3 +80,7 @@ Evidence — remedy (b), PR #839 (`fix/bug-prover-agent-has-no-x-generated-entry
 **Gates (worktree, all green):** `npm run arggon -- validate` ok; focused provenance-audit + init + doctor + eol tests pass; `npm test` 160 files / 3537 passed; `npm run lint` clean; `npm run test:structure` 5/5; `npx prettier --check` on every touched file clean. One load-induced flake observed once in `cli/src/prose-format.test.ts` (prettier spawn timeout under parallel load — passes in isolation and in the green full run; unrelated to this diff).
 
 **Files:** `cli/src/docs.ts` (reader + class scan + audit kind), `cli/src/init.ts`, `cli/src/doctor.ts`, `cli/src/cli.ts` (JSON envelope + human print; kept minimal — sibling branch edits this file), tests in `provenance-audit` / `init-docs` / `doctor` / `eol-provenance`.
+
+### handoff 2026-10-15 @Arggon — next: Standards review of PR #839, then merge; completion is the delivery lead's call (item not flipped to done)
+- branch: fix/bug-prover-agent-has-no-x-generated-entry
+- open questions: Marker-vs-path boundary: a marker-less generated file (JSON destinations carry no marker) under a managed path with no row is still invisible — out of scope here; cli.ts carries a small additive edit…
