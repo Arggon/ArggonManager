@@ -170,6 +170,17 @@ than exceptional, and attribution is the only honest signal). ADR 0026 §2:125 k
 attribution and never authentication: _"Attribution only, never authentication: the
 same line ADR 0021 §4 draws."_
 
+**The owner-assigned case is the normal owner answer, and the state says so.** Nothing
+forbids an item claimed by (assigned to) the product owner's own login. When that
+happens and the owner answers the brief on their own item, the answer's author equals
+the item's `assignee`, so the state is `self-decided` — which is the **normal owner
+answer**, not an agent answering its own brief. The tracker cannot tell the two apart
+because it has no identity layer, so `self-decided` is a **same-name hint** and the
+semantics stay "the `decided:` author equals the item's own `assignee`" (ADR 0026's
+dated amendment of 2026-10-15 records the decision; the repro is pinned in
+`cli/src/decision-brief-convention.test.ts`). It stays report-only: the state is
+reported on `show`, `spec analyze` never fires on it, and nothing refuses or gates.
+
 ### The read-only surface — `show`, and one named correction
 
 ADR 0026 leaves this open, and the answer is not free: **`sync` cannot carry it.**
