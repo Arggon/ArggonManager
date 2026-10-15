@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-board-no-done-over-open-work
 title: "Board: never display `done` on a container with open work inside — derive the displayed status (stored statuses unchanged)"
+assignee: arggon-delivery-lead
+branch: feat/task-board-no-done-over-open-work
 parent: story-container-rollup
 labels: []
 created: "2026-10-15"
 updated: "2026-10-15"
+claimed_at: "2026-10-15T00:14:47.921Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-board-no-done-over-open-work
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-container-rollup/task-board-no-done-over-open-work.md
   Leaves live only under a story. id is the filename stem: task-board-no-done-over-open-work.
