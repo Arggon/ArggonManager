@@ -103,3 +103,7 @@ The item and the ADR/spec say `arggon-worker.md` / `arggon-coordinator.md`; the 
 - The spec's illustrative snippet shows `"files": 2` while the committed `docs/json-output.md` row (written by T5) says `friction.files` is an `object[]`; I followed the committed contract doc and the `friction.files[]` table in it now records the real shape. The spec snippet is unchanged.
 - `skills/arggon-cli/evals/run.mjs` needed two pre-existing-staleness repairs to run at all (the fixture's hardcoded `tasks/` path after ADR 0012 moved the tree, and `PLACEHOLDER_BODY` making E9 fail on bare `create`s). Both are harness fixes, called out in the PR body.
 - Locally, `test/kernel-artifacts.ts`'s freeze left `lib/dist` mode 555 after a full `npm test`; `chmod -R u+w lib/dist dist` restored it and `npm run build` then succeeded. Not caused by this change, worth knowing when a rebuild fails with EACCES.
+
+### handoff 2026-10-15 @Arggon — next: Review PR #850 against the standards-reviewer bar, then merge; the compliance spike task-spike-friction-trigger-compliance is now claimable and should record friction.triggerPresent per observed repo.
+- branch: feat/task-friction-trigger-carrier
+- open questions: Does the delivery lead want boxes 7-9 of the item body (docs/carriers, impact-class comment, gates) ticked from this PR? They are landed here; the spec snippet for files stays a count while json-outp…
