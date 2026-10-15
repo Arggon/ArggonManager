@@ -12,6 +12,7 @@ updated: "2026-10-15"
 claimed_at: "2026-10-15T01:53:28.340Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-start-claim-branch-inherits-unpushed-tracker-commits
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-start-claim-branch-inherits-unpushed-tracker-commits.md
   Leaves live only under a story. id is the filename stem: bug-start-claim-branch-inherits-unpushed-tracker-commits.
@@ -41,39 +42,45 @@ until the PR is open and its diff is read.
 
 ## Acceptance
 
-- [ ] Reproduce on a fixture: a primary checkout with one unpushed tracker auto-commit, then
+- [x] Reproduce on a fixture: a primary checkout with one unpushed tracker auto-commit, then
       `start --worktree` — the claim branch demonstrably contains that local commit
-- [ ] `start` never cuts a claim branch from a base carrying unpushed tracker auto-commits:
+- [x] `start` never cuts a claim branch from a base carrying unpushed tracker auto-commits:
       it branches from a clean base, or it refuses with a named cause **before** creating the
       branch, or it reports the inherited commits in the `--json` envelope so the lead sees the
       contamination before opening a PR (pick one, say why)
-- [ ] A regression test pins the outcome: `git diff <base>...HEAD` on a freshly claimed branch
+- [x] A regression test pins the outcome: `git diff <base>...HEAD` on a freshly claimed branch
       contains **only** the item file
-- [ ] The refusal or the report names the remedy (push main / drop the inherited commits) and
+- [x] The refusal or the report names the remedy (push main / drop the inherited commits) and
       distinguishes tracker auto-commits from the lead's own deliberate work
-- [ ] The chosen route is documented where `start` is described (README,
+- [x] The chosen route is documented where `start` is described (README,
       `ArggonManager/docs/json-output.md`, `ArggonManager/docs/opencode2.md`) and the
       tracker-merge pitfalls reference it
-- [ ] `npm test` green, `npm run build` ok, `arggon validate` ok, prettier clean on files touched
+- [x] `npm test` green, `npm run build` ok, `arggon validate` ok, prettier clean on files touched
 
 ## Notes
 
+<<<<<<< HEAD
+
 ### 2026-10-15 @Arggon
+
 ### Evidence — route (c): report inherited unpushed commits (maker session, 2026-10-15)
 
 **PR:** https://github.com/Arggon/ArggonManager/pull/834 (`fix/bug-start-claim-branch-inherits-unpushed-tracker-commits`, base `main`).
 
 **Route decision: (c) report, not (a) branch-from-clean-base / (b) refuse.**
+
 - (a) rejected: the claimed item file often exists ONLY on the local HEAD — its creation is itself an unpushed `chore(tasks): created <id>` auto-commit (measured on THIS item's own claim: the item file was absent at `origin/main`). Cutting from a clean base would leave the worktree without the item (`loading the item in the worktree` fails) and re-add an item local main already holds. A clean base also needs a fetch or a possibly-stale `origin/*` ref.
 - (b) rejected: it fires on the NORMAL flow — item creation auto-commits locally, so the next `start` would be refused until main is pushed; the documented "push main after every mutation" discipline would become a hard precondition on the most common path, and `start` cannot repair it itself (a push is a network mutation).
 - (c) chosen: additive, non-breaking, offline-safe, preserves claim semantics, and surfaces the evidence where the decision happens (before the PR is opened). Full rationale in the PR body.
 
 **Repro (fixture, real git + real CLI):** bare `origin` + checkout tracking it, one unpushed tracker auto-commit, then `start --worktree --json`:
+
 - envelope `inheritedCommits`: `{ base: "origin/main", branchPoint: b2a9339…, total: 1, trackerTotal: 1, workTotal: 0, commits: [{ sha, subject: "chore(tasks): created unrelated", tracker: true }], itemOnBase: true, remedy: "push … (git push origin main) … or drop them (git rebase --onto origin/main b2a9339… feat/task-rate-limit)" }`
 - claim branch demonstrably contains the local commit: `git -C <worktree> log --oneline origin/main..HEAD` → `b9ddccb claim: task-rate-limit`, `b2a9339 chore(tasks): created unrelated`; `git diff --name-only origin/main...HEAD` → the claimed item file **and** `ArggonManager/unrelated/unrelated.md` (the churn).
 - second item (item file itself unpushed): `itemOnBase: false` → remedy drops the rebase arm and says the item file rides one of the inherited commits; human output prints both `note:` lines.
 
 **Regression tests (`cli/src/start.test.ts`, real-git fixtures, 7 new tests):**
+
 - contaminated primary (1 tracker auto-commit + 1 deliberate commit) → report classified; `git diff origin/main...HEAD` asserted to carry `deliberate.ts` + the unrelated item file + the claimed item file.
 - clean primary → no report, and `git diff origin/main...HEAD` is ONLY the item file (acceptance box 3).
 - plain `start` reports too.
@@ -86,5 +93,19 @@ until the PR is open and its diff is read.
 **Known gap (follow-up for the delivery lead):** the native `tools.arggon.start` creates the worktree through the host `ctx.worktree.create` domain and its `preparation` receipt carries no equivalent report yet (stated in `opencode2.md`); native parity is a separate item.
 
 ### handoff 2026-10-15 @Arggon — next: Delivery lead: review PR #834 (route (c) report, tests, docs); on merge use MERGE-merge (tracker commits). No maker steps left.
+
 - branch: fix/bug-start-claim-branch-inherits-unpushed-tracker-commits
 - open questions: Native tools.arggon.start parity (no report yet) — follow-up item; strict-mode refusal could be armed later if reporting proves insufficient; rebase --onto remedy relies on branchPoint at cut time.
+  \=======
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
+verdict: approve
+
+### Lead review + merge verification — 2026-10-15 (delivery lead)
+
+Merged as f4553a0a (PR #834). Route (c) — report, not prevent — accepted, with the maker's reasoning on the record: (a) branch-from-clean-base would leave the worktree without the item file (its creation commit is often itself unpushed) and needs a fetch; (b) refusing fires on the normal flow (item-creation auto-commits are local by nature) and `start` cannot repair it (a push is a network mutation); (c) is additive, offline-safe, and surfaces the evidence before the PR opens. The report rides both start paths when THIS run cuts the branch: `inheritedCommits` in `--json` (base, branchPoint, exact totals, capped list, tracker-vs-work classification, `itemOnBase`, remedy) plus human notes with the remedy leading; attach re-runs and clean bases stay report-free. `itemOnBase` correctly drops the rebase arm when dropping the inherited commits would take the item off the branch.
+
+Evidence: real-git repro (contaminated primary → the branch carries the auto-commit and the envelope names it; clean primary → only the item file), 7 new tests including the drift pin against the kernel's own commit-message builder, the cap/totals, the remedy split and the human formatter; full suite 3488 green; CI green on the refreshed head. Docs: README §start, `json-output.md` §start, `opencode2.md`, and the tracker-merge pitfalls line (skill source + derived copies + ledger). Note: acceptance box 3 is pinned in its clean-base reading ("only the item file") with the contaminated case covered by the report tests — that is the chosen route's contract; recorded.
+
+> > > > > > > 6b3b15c0 (chore(tasks): commented bug-start-claim-branch-inherits-unpushed-tracker-commits)
