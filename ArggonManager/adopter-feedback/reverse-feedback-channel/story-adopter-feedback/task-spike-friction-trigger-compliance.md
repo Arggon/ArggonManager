@@ -104,6 +104,84 @@ and did not record it" — only the log and the repos' own history speak, which 
 the exact silence/absence ambiguity the `deftai` post-mortem failed on, and the
 reason this criterion is committed before the sweep rather than written after it.
 
+## Observation evidence (2026-10-15, one point in time)
+
+**Window.** The trigger block landed on `main` at 2026-10-15 19:57:12 -0300
+(`b178c0f1`, PR #850). Tooling check 20:28:17, sweep 20:29:05–20:29:17, log audit
+to 20:33, the two self-written records at 20:34:12 / 20:34:24 — all -0300. The
+trigger was **32 minutes old on `main`** when the sweep ran.
+
+**Method.** One `arggon doctor --json` per checkout, run with the post-#850 build
+(0.10.0, `cef717f8`) from that checkout's own directory. A before/after snapshot
+(`git status --porcelain` plus a SHA-256 per managed agent file) was compared for
+every checkout: `wrote=no` on **27/27**, so the observation itself wrote nothing
+in any observed repo — no `init`, no tracker write, no seam refresh. Transcripts
+live in `/tmp/opencode/spike-transcripts/` (`00-tooling-check-*doctor.json`,
+`01..27-*-doctor.json`, `sweep.json`, `reachability.json`).
+
+**Table** — grouped into distinct git repositories by `--git-common-dir`:
+
+| Repository                                                                                                  | Class      | Checkouts | Carrier files            | `friction.triggerPresent` | `triggerVersion` | Command in the generated skill inventory | Records |
+| ----------------------------------------------------------------------------------------------------------- | ---------- | --------- | ------------------------ | ------------------------- | ---------------- | ---------------------------------------- | ------- |
+| `ArggonManager` (primary + my branch)                                                                       | maintainer | 8         | 2/2                      | **true** on 2, false on 6 | `0.10.0`         | yes                                      | 0       |
+| `ArggonStores` (5 worktrees)                                                                                | adopter    | 5         | 2/2                      | false                     | `null`           | yes (since 2026-10-14 08:25 -0300)       | 0       |
+| `EPC`, `RealMMORPG`, `dotnet-batchyard`, `evajoyas`, `opencode-scheduled-tasks`, `zcode-seam-live-verify`   | adopter    | 6         | 2/2                      | false                     | `null`           | no                                       | 0       |
+| `arggon-cv`, `casa-pendiente`, `cuentas-claras`, `estanteria`, `guardian`, `racha`, `suizo`, `vencimientos` | adopter    | 8         | 0 — no seam materialized | false                     | `null`           | no                                       | 0       |
+
+**Numbers (with denominators).**
+
+- **N = 16** distinct repositories carrying a tracker observed, in **27
+  checkouts**: 1 maintainer repo, **15 adopter repos**.
+- **27/27** checkouts: the observation wrote nothing (`wrote=no`).
+- **2/27** checkouts (**1/16** repos, **0/15** adopter repos) reported
+  `friction.triggerPresent: true`, both at `triggerVersion 0.10.0`; **17/27**
+  carried the two carrier files with the trigger absent; **8/27** had no seam
+  materialized at all, so no carrier file exists to be absent.
+- **0/27** checkouts (**0/16** repos) had any friction record attributable to
+  their absolute path at window close — checked in the machine's only `arggon`
+  friction log **and** in the per-worktree state dir that
+  `../ArggonStores/.arggon.env` names.
+- The machine's friction log held **200** lines: **200 distinct `reporterId`s**,
+  one argv (`--command validate`), one narrative (`no override`), **2**
+  fingerprints — the pre/post length-prefix split, exactly the degradation the
+  spec documents. So **200/200 records (100%)** are the one non-hermetic line in
+  `cli/src/friction.test.ts:145-152`, and **0/200** come from any observed repo.
+- The spike then wrote **2** records itself (20:34:12 / 20:34:24 -0300,
+  `reporterId 21a4d8edc71c` = this worktree). They are the maker's own ArggonManager
+  friction, disclosed separately and **not** counted as adopter evidence.
+- Every other `friction.jsonl` on the machine (**14** files, including
+  `../ArggonStores/.zcode/harness/friction.jsonl`) is the **AutoHarness
+  exec-failure log** — a different artifact with a different schema
+  (`plugin` / `kind` / `tool` / `sessionHash` / `project`), **not** an
+  `arggon friction` record. They are not counted here and must not be counted as
+  channel output.
+
+**ArggonStores, end to end (the non-maintainer adopter).**
+
+- `arggon doctor --json` → `friction.triggerPresent: false`,
+  `triggerVersion: null`, `files: 2`, both rows false. The human-readable verdict
+  and the machine-readable one agree.
+- Carrier set actually on disk (tracked): `.agents/skills/arggon-cli/SKILL.md`
+  (one generated-commands inventory line) and `.opencode/plugins/arggon/index.ts`
+  (the inlined kernel; it registers **no** native `friction` tool, and 0.10.0's
+  MCP server exposes no `arggon_friction`). **No file anywhere in the tree carries
+  the `arggon:friction-trigger` marker**, `AGENTS.md` has no friction mention,
+  `references/friction.md` is not bundled, and no `x-friction` opt-out is set.
+- Provenance: `.opencode/agents/arggon-maker.md` is recorded
+  `arggonVersion 0.10.0`, `generatedAt 2026-10-14T11:21:31.256Z` — one day and
+  eight hours **before** the trigger landed on `main`. Its history shows the
+  string entering through `7cfee718` (2026-10-14 08:25:59 -0300) and no
+  invocation since.
+- Records written: **0**.
+
+**Verdict against the pre-registered criterion.** **NULL** — zero
+adopter-attributable records across 15 observed adopter repos / 19 adopter
+checkouts. The covariate `triggerPresent` was false at all 19, so by the
+registered decision rule this is **NOT-YET-MEASURABLE** for the embedded trigger.
+The negative evidence about the skill-reference route is recorded as it stands:
+at ArggonStores the command has been in the generated skill inventory for ~39
+hours (2026-10-14 08:25 → 2026-10-15 20:29 -0300) with zero records.
+
 ## Acceptance
 
 - [ ] `depends_on: [task-friction-trigger-carrier]` is present, so this spike is not
