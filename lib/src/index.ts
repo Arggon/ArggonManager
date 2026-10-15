@@ -283,6 +283,13 @@ export {
   isFrictionPublishTier,
 } from "./friction-publish.js";
 export type { FrictionPublishDoc, FrictionPublishTier } from "./friction-publish.js";
+// The marked trigger block reader (ADR 0024 §2): the templates that ship the
+// block and the generated files that carry it are read through one marker.
+export {
+  carriesFrictionTrigger,
+  isManagedAgentDest,
+  readFrictionTrigger,
+} from "./friction-trigger.js";
 export type {
   FrictionAppendResult,
   FrictionClearResult,
