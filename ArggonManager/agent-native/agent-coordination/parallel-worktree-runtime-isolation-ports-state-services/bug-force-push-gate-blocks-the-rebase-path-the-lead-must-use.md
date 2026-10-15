@@ -65,13 +65,13 @@ So the gate sits directly on the path the lead is required to take, and the only
 
 ## Acceptance
 
-- [ ] The `git push --force*` pattern no longer denies `--force-with-lease`, while bare `--force`, `-f`, and refspec-with-`+` stays denied. The safe spellings that must keep working: `--force-with-lease`, `--force-with-lease=<ref>:<expect>`, and `--force-if-includes`
-- [ ] A test pins the discriminator, with a negative control: the pattern BLOCKS `git push --force origin main`, `git push -f`, `git push origin +main`, and `git push --force-with-lease origin main:other` if that is judged unsafe, and ALLOWS `git push --force-with-lease origin <branch>`. The test must fail today (this is a TDD-shaped fix — write the red first and cite it)
-- [ ] The change lands in the **template** the adopter tree renders (`templates/docs/opencode.jsonc`, or wherever `opencode.jsonc`'s content is generated from) AND in this repo's own `opencode.jsonc`, with the `x-generated` provenance and never-overwrite semantics intact and `arggon doctor` honest about both
-- [ ] A lead-role probe proves the unblock end-to-end: a session holding the delivery-lead role rebases a scratch branch and pushes it with `--force-with-lease` successfully, reported as command / expected / observed / exit / does-NOT-prove
-- [ ] A negative control proves the protection survived: the same session attempting `git push --force` is still refused
-- [ ] `ArggonManager/docs/agents.md` states which force-push spellings the seam permits and which it refuses, so an agent reading the playbook knows before it attempts one (this is a methodology carrier → impact class stated; Behavioral if the permitted set changes, with the ADR 0016 upgrade-channel reference)
-- [ ] `arggon validate` green, `npm test` green, prettier clean, and any permission-block test that currently pins the old four-rule list is updated rather than deleted
+- [x] The `git push --force*` pattern no longer denies `--force-with-lease`, while bare `--force`, `-f`, and refspec-with-`+` stays denied. The safe spellings that must keep working: `--force-with-lease`, `--force-with-lease=<ref>:<expect>`, and `--force-if-includes`
+- [x] A test pins the discriminator, with a negative control: the pattern BLOCKS `git push --force origin main`, `git push -f`, `git push origin +main`, and `git push --force-with-lease origin main:other` if that is judged unsafe, and ALLOWS `git push --force-with-lease origin <branch>`. The test must fail today (this is a TDD-shaped fix — write the red first and cite it)
+- [x] The change lands in the **template** the adopter tree renders (`templates/docs/opencode.jsonc`, or wherever `opencode.jsonc`'s content is generated from) AND in this repo's own `opencode.jsonc`, with the `x-generated` provenance and never-overwrite semantics intact and `arggon doctor` honest about both
+- [x] A lead-role probe proves the unblock end-to-end: a session holding the delivery-lead role rebases a scratch branch and pushes it with `--force-with-lease` successfully, reported as command / expected / observed / exit / does-NOT-prove
+- [x] A negative control proves the protection survived: the same session attempting `git push --force` is still refused
+- [x] `ArggonManager/docs/agents.md` states which force-push spellings the seam permits and which it refuses, so an agent reading the playbook knows before it attempts one (this is a methodology carrier → impact class stated; Behavioral if the permitted set changes, with the ADR 0016 upgrade-channel reference)
+- [x] `arggon validate` green, `npm test` green, prettier clean, and any permission-block test that currently pins the old four-rule list is updated rather than deleted
 
 ## Notes
 
@@ -207,3 +207,50 @@ explicitly. Recommend denying it and stating why.
 **Sequencing note.** This does not block the initiative's product work; it blocks the
 lead's merge step. It should land before the next wave that needs a rebase, which is
 any wave whose branches outlive a `main` commit.
+
+### 2026-10-15 @Arggon
+### 2026-10-15 @arggon-maker
+
+**Red first (TDD, box 2).** `cli/src/opencode-force-push.test.ts` was written before the fix and run against the unchanged rules in both carriers (tree `b95edfa5`):
+
+```
+FAIL  cli/src/opencode-force-push.test.ts > force-push discriminator in opencode.jsonc > permits the lease-checked spellings the rebase path needs
+FAIL  cli/src/opencode-force-push.test.ts > force-push discriminator in templates/docs/opencode.jsonc > permits the lease-checked spellings the rebase path needs
+AssertionError: must be allowed: git push --force-with-lease origin fix/bug-x: expected 'deny' to be 'allow'
+ Test Files  1 failed (1) | Tests  2 failed | 6 passed (8)
+```
+
+Both carriers failed on the first allowed spelling; the full run is kept at `/tmp/opencode/red-discriminator.txt`. The test reads the rules out of `opencode.jsonc` AND `templates/docs/opencode.jsonc` and evaluates them with the runtime's own matcher, ported from the installed `opencode` v2.0.29 binary (embedded `Q_` + `yC`): escape regex metacharacters — `[`/`]` included, so a rule has only `*` (`→ .*`) and `?` (`→ .`) — then `^…$` with the `s` flag, a trailing `" .*"` relaxed to `"( .*)?"`, rules selected with `findLast` over the flattened list (the project `permissions` array is appended after every agent's own rules), default allow.
+
+**The fix (box 1, 3).** The broad deny stays byte-identical — that is what keeps `;` / `&&` / quoted forms refused, and narrowing it to `--force` + a delimiter is not expressible without character classes anyway — and the lease-checked spellings are re-allowed AFTER it (last match wins):
+
+```
+deny   git commit --no-verify*
+deny   git push --force*
+deny   git push -f*
+allow  git push --force-with-lease *          ← the rebase path
+allow  git push --force-with-lease=*
+allow  git push --force-if-includes *
+deny   git push *+*                            ← last: +refspec stays refused even next to a lease flag
+```
+
+**Judgement call (box 2's conditional control): the refname is not the discriminator.** `git push --force-with-lease origin main:other` is ALLOWED, and so is the colon-free `git push --force-with-lease origin main` — a colon deny would refuse legitimate spellings (`HEAD:<branch>`) while refusing nothing it means to refuse, which is this bug's own defect class. Pinned as an assertion in the test with that reasoning; if the lead wants it refused, it is one `deny` rule plus one case.
+
+**Known limit, stated in the config comment and in `agents.md`.** An allowed lease flag is permitted with any tail, so `git push --force-with-lease --force …` (a second, bare force flag) is no longer caught, and neither is a form hidden behind `bash -c`/`&&`. The gate stops the accidental spelling; the kernel, the pre-commit gate and CI stay the enforcement of record.
+
+**Lead-role probe, end-to-end (boxes 4-5)** — scratch repo + local bare remote under `/tmp/opencode/fp-probe`, seam scaffolded by this branch's CLI, so the session's `opencode.jsonc` is the fixed template. `opencode run --standalone --agent arggon-delivery-lead --model opencode-go/deepseek-v4.1-flash --auto --format json`; `session export` confirms `"agent": "arggon-delivery-lead"` (`ses_ec0e2e434ffeIWJv8UxJbmnLRG`):
+
+| probe | command | expected | observed | exit |
+| --- | --- | --- | --- | --- |
+| red twin (pre-fix config) | `git push --force-with-lease -u origin fix/probe` (branch rebased, remote at `1e859c71`) | refused | `status: "error"`, `"Permission denied: shell"`, agent answered `PERMISSION_REFUSED`, remote stayed `1e859c71` while local was `b6dfda28` | 0 (session) |
+| green (fixed config) | same command (remote at `a503040f`, rebased head `45989dbe`) | allowed | `status: "completed"`, `+ a503040...45989db fix/probe -> fix/probe (forced update)`, remote moved to `45989dbe` | 0 |
+| negative control | `git push --force origin main` | refused | `status: "error"`, `"Permission denied: shell"`, `PERMISSION_REFUSED`, remote `main` unchanged (`7f3c63de`) | 0 (session) |
+| control | `git push origin main` (ordinary) | allowed | remote `main` moved to `80ae08c4` | 0 |
+
+Does NOT prove: that the layer is enforced in every client runtime (it is enforced in this OpenCode v2.0.29 session — `bug-task-permissions-enforcement-not-observed` is the other half), that a determined spelling (`bash -c …`) is stopped, or that the ZCode/Claude seams behave the same.
+
+**Out of scope, for the lead to route (not touched):** the same over-match exists in `templates/docs/zcode/arggon/hooks/gate.mjs:108` and `templates/docs/claude/arggon/hooks/gate.mjs:143` — `re: /\bgit\b[^;&|]*\spush\b(?=[^;&|]*\s(?:--force\b|-f[a-z]*|\+\S))/`; `\b` matches between `e` and `-`, so `--force-with-lease` is denied there too. Stated as current behaviour in the new `agents.md` subsection; the fix is a separate item.
+
+**Gates (worktree, all run after the change):** `npm run arggon -- validate` ok; focused `vitest run cli/src/opencode-force-push.test.ts cli/src/opencode-permissions.test.ts cli/src/init-opencode.test.ts` 63 passed; `npm run build` green; `npm test` 160 files / 3515 tests passed; `npm run lint` clean; `npm run test:structure` 5 passed; `npx prettier --check` clean on every touched file EXCEPT `templates/docs/opencode.jsonc`, whose only deviation is the pre-existing comma-less style (three trailing commas, identical complaint at HEAD, proven by diffing prettier's output on HEAD's bytes) — and that style is load-bearing: three tests in `cli/src/init-opencode.test.ts` parse the generated config as strict JSON after stripping comments, so adding the commas would redden them. Not touched.
+
+**Doctor (box 3):** the template carries the rules (fresh `arggon init` renders them; the byte-equality + never-overwrite pins in `cli/src/init-opencode.test.ts` pass), this repo's own `opencode.jsonc` carries the same rules, `arggon doctor --agents` reports it `adopter-edited` (hand-edited generated file, never regenerated — the pre-existing status, unchanged by this change) and `arggon doctor` lists it in `outdated` (its bytes differ from the current render, which is true: it is the adopter-owned variant). `cli/src/provenance-audit.test.ts` (the repo-self ledger gate) passes.
