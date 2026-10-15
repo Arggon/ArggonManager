@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-prover-agent-has-no-x-generated-entry
 title: "`.opencode/agents/arggon-prover.md` is committed with NO `x-generated` entry, so `init` classifies it adopter-modified and skips it — invisible to both seam gates"
+assignee: arggon-delivery-lead
+branch: fix/bug-prover-agent-has-no-x-generated-entry
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [seam, hygiene]
 created: "2026-10-03"
-updated: "2026-10-03"
+updated: "2026-10-15"
+claimed_at: "2026-10-15T12:11:30.190Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-prover-agent-has-no-x-generated-entry
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-prover-agent-has-no-x-generated-entry.md
