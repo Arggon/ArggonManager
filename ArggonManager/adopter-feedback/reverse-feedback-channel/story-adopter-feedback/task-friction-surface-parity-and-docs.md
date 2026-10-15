@@ -144,4 +144,3 @@ Merged as 9c39dee1 (PR #849). Parity verified on all three surfaces — same arg
 Advisory schema bounds raised with the delta named, never silently: MCP `tools/list` 16,384 → 20,480 B (live 18,054 B / 16 tools — the mandated sixteenth tool could not fit in the 126 B that remained), native catalog 12,288 → 13,312 B. The standing-bound question stays open on the item — recorded, not decided away.
 
 Merge verification round 1 caught a REAL gate hit: the `init-claude` seam byte-equality lane — the friction skill template's committed `.claude-marketplace` copy and its `x-generated` ledger row had not been refreshed, so a stale skill would have shipped to this repo's own Claude sessions. Fixed in the merge resolution (copy + row re-synced; seam, provenance, skill-copy, mcp-parity, doctor and init suites 188 green; validate ok), and the merge carries a clean 16-file delta against main.
->>>>>>> a834ebff (chore(tasks): commented task-friction-surface-parity-and-docs)
