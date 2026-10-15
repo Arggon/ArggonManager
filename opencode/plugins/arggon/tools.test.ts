@@ -3635,6 +3635,141 @@ describe("worktree domain tools (W4)", () => {
     expect(preparation.truncated).toBe(true);
   });
 
+  it("folds CHARACTER clipping of the foreign-write report into `truncated` (task-foreign-writes-char-clip-truncated)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    // Exactly ONE dirty path, and it is over `MAX_NATIVE_PREPARATION_VALUE_CHARS`
+    // (200): the list cap and `total > files.length` cannot fire here, so the
+    // only honest signal that the value was shortened is `truncated` itself —
+    // the same shape the take-over fold is pinned with, one receipt over.
+    const longPath = `deep/${"segment-".repeat(28)}end.md`;
+    expect(longPath.length).toBeGreaterThan(200);
+    const longFile = join(worktreePath, longPath);
+    mkdirSync(dirname(longFile), { recursive: true });
+    writeFileSync(longFile, "dirty\n", "utf8");
+    git(worktreePath, ["add", longPath]);
+    const when = new Date(Date.now() + 60_000);
+    utimesSync(longFile, when, when);
+
+    const attached = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_b" },
+    );
+    const preparation = (attached.output as Record<string, unknown>).preparation as {
+      claim?: {
+        foreignWrites?: { owner: string; claimedAt: string; files: string[]; total: number };
+      };
+      truncated?: boolean;
+    };
+    const report = preparation.claim?.foreignWrites;
+    // Nothing was DROPPED here: one path named, the count honest. Only the
+    // characters were clipped.
+    expect(report?.total).toBe(1);
+    expect(report?.files).toHaveLength(1);
+    expect(String(report?.files[0]).length).toBeLessThanOrEqual(200);
+    // …and that is exactly why the receipt must SAY so.
+    expect(preparation.truncated).toBe(true);
+  });
+
+  it("folds a clipped `foreignWrites.owner` identity into `truncated` too (task-foreign-writes-char-clip-truncated)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    // The path stays SHORT and the count honest, so the owner comparison is
+    // the only fold term in play: an attacker-shaped stamp identity over the
+    // per-value cap must not read as the whole identity.
+    foreignWrite(worktreePath);
+    const stampPath = join(worktreeGitDir(dir, worktreePath), "arggon-claim.json");
+    const hostile = JSON.parse(readFileSync(stampPath, "utf8")) as Record<string, unknown>;
+    hostile.identity = "x".repeat(600);
+    writeFileSync(stampPath, `${JSON.stringify(hostile)}\n`, "utf8");
+
+    const attached = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_b" },
+    );
+    const preparation = (attached.output as Record<string, unknown>).preparation as {
+      claim?: { foreignWrites?: { owner: string; files: string[]; total: number } };
+      truncated?: boolean;
+    };
+    const report = preparation.claim?.foreignWrites;
+    expect(report?.total).toBe(1);
+    expect(report?.files).toHaveLength(1);
+    expect(String(report?.owner).length).toBeLessThanOrEqual(200);
+    expect(preparation.truncated).toBe(true);
+  });
+
+  it("keeps the common-case foreign-write report silent: an under-cap path leaves `truncated` unset (task-foreign-writes-char-clip-truncated)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    // The ordinary case the fold must not disturb: a short repo-relative path
+    // is reported whole, so nothing was shortened and the flag stays absent —
+    // the default receipt keeps its pre-fold bytes.
+    foreignWrite(worktreePath);
+
+    const attached = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_b" },
+    );
+    const preparation = (attached.output as Record<string, unknown>).preparation as {
+      claim?: { foreignWrites?: { files: string[]; total: number } };
+      truncated?: boolean;
+    };
+    const report = preparation.claim?.foreignWrites;
+    expect(report?.total).toBe(1);
+    expect(report?.files).toEqual([
+      "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md",
+    ]);
+    expect(preparation.truncated).toBeUndefined();
+  });
+
+  it("folds a clipped string inside a `replaced.takeovers[]` chain entry into `truncated` (task-foreign-writes-char-clip-truncated)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    foreignWrite(worktreePath);
+    // A chain the kernel's reader accepts (5 entries) with ONE hostile string
+    // and every other value under the per-value cap: the chain LENGTH and the
+    // top-level strings cannot fire the fold, so `truncated` can only come
+    // from the clipped chain entry. Neither receipt folded this before.
+    const stampPath = join(worktreeGitDir(dir, worktreePath), "arggon-claim.json");
+    const hostile = JSON.parse(readFileSync(stampPath, "utf8")) as Record<string, unknown>;
+    hostile.takeovers = [
+      {
+        at: "2020-01-01T00:00:00.000Z",
+        by: "t".repeat(600),
+        replacedIdentity: "owner-0",
+        replacedClaimedAt: "2019-01-01T00:00:00.000Z",
+      },
+      ...Array.from({ length: 4 }, (_unused, index) => ({
+        at: `2020-01-0${index + 2}T00:00:00.000Z`,
+        by: `taker-${index}`,
+        replacedIdentity: `owner-${index + 1}`,
+        replacedClaimedAt: "2019-01-01T00:00:00.000Z",
+      })),
+    ];
+    writeFileSync(stampPath, `${JSON.stringify(hostile)}\n`, "utf8");
+
+    const taken = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke", takeOverWorktree: true },
+      { sessionID: "ses_b" },
+    );
+    const preparation = (taken.output as Record<string, unknown>).preparation as {
+      claim?: { takeOver?: { replaced: { takeovers?: Array<{ by: string }> } } };
+      truncated?: boolean;
+    };
+    const chain = preparation.claim?.takeOver?.replaced.takeovers;
+    expect(chain).toHaveLength(5);
+    expect(String(chain?.[0]?.by).length).toBeLessThanOrEqual(200);
+    expect(preparation.truncated).toBe(true);
+  });
+
   it("start refuses to steal a claim and removes the worktree it just created", async () => {
     const dir = seedGitTree();
     const { domain, calls } = fakeDomain(dir);
