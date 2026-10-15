@@ -1,16 +1,19 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-spike-friction-trigger-compliance
 title: "Spike: does an embedded trigger fire more reliably than a skill reference?"
+assignee: arggon-delivery-lead
+branch: feat/task-spike-friction-trigger-compliance
 parent: story-adopter-feedback
 labels: [method, research]
 priority: p2
 created: "2026-10-02"
-updated: "2026-10-03"
+updated: "2026-10-15"
+claimed_at: "2026-10-15T23:18:37.313Z"
 depends_on: [task-friction-trigger-carrier]
+worktree_path: /home/arggon/Projects/ArggonManager-task-spike-friction-trigger-compliance
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-spike-friction-trigger-compliance.md
   Leaves live only under a story. id is the filename stem: task-spike-friction-trigger-compliance.
