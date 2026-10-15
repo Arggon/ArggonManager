@@ -20,6 +20,7 @@ import {
   buildLocalWorkspaces,
   MAX_GATE_BINS,
   MAX_HUMAN_ERROR_CHARS,
+  MAX_PREP_STEPS,
   pointWorkspaceAtLocal,
   runCreate,
   runUpdate,
@@ -32,6 +33,7 @@ import {
 import { assertOrder } from "../../test/assert-order.js";
 import { runInit } from "./init.js";
 import {
+  dependencyPrepNote,
   inheritedCommitReport,
   inheritedCommitsNotes,
   isTrackerAutoCommit,
@@ -822,9 +824,38 @@ describe("start --worktree fresh-worktree install gate (bug-start-install-orderi
         mkdirSync(path, { recursive: true });
         writeFileSync(join(path, "package.json"), JSON.stringify(manifest));
         cpSync(join(dir, "ArggonManager"), join(path, "ArggonManager"), { recursive: true });
+        // Workspace packages the primary's install links are discovered
+        // through matching relative paths in the worktree, so a fixture that
+        // seeded `packages/` carries it into the fresh worktree too.
+        if (existsSync(join(dir, "packages"))) {
+          cpSync(join(dir, "packages"), join(path, "packages"), { recursive: true });
+        }
       },
     });
     return { dir, id, worktreePath, git };
+  }
+
+  /**
+   * Link `count` workspace packages into the primary's install (the same
+   * shape the plugin suite's `addPrepLogWorkspacePackages` builds), so the
+   * kernel's preparation log records one build decision per package and can
+   * overflow its `MAX_PREP_STEPS` cap. Each package declares no entry file and
+   * no `build` script: the decision is still recorded (`no-build-script`)
+   * without a build ever running, so the log overflows on the package COUNT.
+   */
+  function addWorkspacePackages(dir: string, count: number): void {
+    const scope = join(dir, "node_modules", "@scope");
+    mkdirSync(scope, { recursive: true });
+    for (let index = 0; index < count; index += 1) {
+      const pkgDir = join(dir, "packages", `pkg-${index}`);
+      mkdirSync(pkgDir, { recursive: true });
+      writeFileSync(
+        join(pkgDir, "package.json"),
+        `${JSON.stringify({ name: `@scope/pkg-${index}`, version: "1.0.0", private: true }, null, 2)}\n`,
+        "utf8",
+      );
+      symlinkSync(pkgDir, join(scope, `pkg-${index}`), "dir");
+    }
   }
 
   it("refuses a fresh worktree whose gate bin resolves nowhere, before any claim (flag unset)", () => {
@@ -903,7 +934,58 @@ describe("start --worktree fresh-worktree install gate (bug-start-install-orderi
       { step: "link", outcome: "primary-install-missing" },
       { step: "gate-bins", outcome: "all-worktree" },
     ]);
+    // An uncapped log keeps its shape: the kernel decided no truncation, so
+    // neither the flag nor the count may appear — a mirror that invents one is
+    // the defect's other half (bug-native-steps-truncated-flag-dropped).
+    expect(result.stepsTruncated).toBeUndefined();
+    expect(result.stepsDropped).toBeUndefined();
     expect(worktreePath).toContain(id);
+  });
+
+  it("carries the kernel's truncation flag and dropped count when the prep log is capped (task-cli-surface-never-carries-steps-truncated)", () => {
+    const { dir, id, git } = primedFreshTask({ name: "fixture", private: true });
+    // More preparation decisions than the kernel's cap: the link, one step per
+    // workspace package, and the gate-bin verdict.
+    addWorkspacePackages(dir, MAX_PREP_STEPS);
+    const result = runStart(
+      { cwd: dir, id, assignee: "arggon", worktree: true, now: NOW },
+      { git },
+    );
+    expect(result.committed).toBe(true);
+    // The shortened list AND the kernel's own decision about it, mirrored
+    // verbatim: the CLI half #617 left out
+    // (bug-native-steps-truncated-flag-dropped).
+    expect(result.prepSteps).toHaveLength(MAX_PREP_STEPS);
+    expect(result.stepsTruncated).toBe(true);
+    // The kernel's count, never `MAX_PREP_STEPS - prepSteps.length` arithmetic:
+    // 16 packages + the link + the gate-bin verdict = 18 attempts against the
+    // 16-entry cap.
+    expect(result.stepsDropped).toBe(2);
+  });
+
+  it("states the kernel's dropped-entry count in the fresh-worktree refusal (task-cli-surface-never-carries-steps-truncated)", () => {
+    const { dir, id, git } = primedFreshTask({
+      name: "fixture",
+      private: true,
+      devDependencies: { "native-gate-dep": "1.0.0" },
+    });
+    addWorkspacePackages(dir, MAX_PREP_STEPS);
+    let message = "";
+    try {
+      runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    // The refusal fires (the declared gate dep resolves nowhere) AND the log it
+    // renders is capped: the kernel's dropped count rides the prose
+    // (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation), so the
+    // human-visible refusal never presents the capped list as the whole log.
+    expect(message).toContain("fresh worktree must leave a gate-usable install");
+    expect(message).toContain("native-gate-dep: not resolvable from the worktree");
+    expect(message).toContain("Preparation ran:");
+    expect(message).toContain("2 entries were dropped");
+    expect(message).toContain(`the preparation log is capped at ${MAX_PREP_STEPS}`);
+    expect(git.calls.some((c) => c.op === "commit")).toBe(false);
   });
 
   it("lands a fresh worktree whose stale install misses only bin-less dependencies (stale stays informational)", () => {
@@ -1798,6 +1880,58 @@ describe("start --worktree claim stamp: single-writer detection (task-single-wri
     expect(result.committed).toBe(true);
     expect(JSON.parse(readFileSync(stampPath, "utf8"))).toMatchObject({ identity: "arggon" });
     expect(readFileSync(stampPath, "utf8")).not.toContain("takeovers");
+  });
+});
+
+describe("dependencyPrepNote (task-cli-surface-never-carries-steps-truncated)", () => {
+  it("leads with the kernel's dropped count when the log is capped", () => {
+    // The kernel's pair is mirrored and the count is stated BEFORE the capped
+    // log, so the note never presents a shortened list as the whole log — and
+    // the bounded line's head-clip can never eat the count.
+    expect(
+      dependencyPrepNote({
+        prepSteps: [{ step: "link", outcome: "primary-install-missing" }],
+        stepsTruncated: true,
+        stepsDropped: 2,
+      }),
+    ).toBe(
+      `2 entries were dropped (the preparation log is capped at ${MAX_PREP_STEPS}); ` +
+        "link: primary-install-missing",
+    );
+  });
+
+  it("names a single dropped entry in the singular", () => {
+    expect(
+      dependencyPrepNote({
+        prepSteps: [{ step: "link", outcome: "farm-created" }],
+        stepsTruncated: true,
+        stepsDropped: 1,
+      }),
+    ).toContain("1 entry was dropped");
+  });
+
+  it("states the truncation even when the count is absent (never invents one)", () => {
+    // The kernel emits the pair together, so this shape only reaches here from
+    // a hand-built result — the note still says the log is not whole rather
+    // than printing an invented count.
+    expect(dependencyPrepNote({ prepSteps: [], stepsTruncated: true })).toBe(
+      `entries were dropped (the preparation log is capped at ${MAX_PREP_STEPS})`,
+    );
+  });
+
+  it("keeps the uncapped note to the noteworthy entries only", () => {
+    expect(
+      dependencyPrepNote({
+        prepSteps: [
+          { step: "link", outcome: "farm-created" },
+          { step: "build", outcome: "no-build-script", pkg: "@scope/pkg-0" },
+          { step: "gate-bins", outcome: "foreign-resolution" },
+        ],
+      }),
+    ).toBe("gate-bins: foreign-resolution");
+    expect(
+      dependencyPrepNote({ prepSteps: [{ step: "link", outcome: "farm-created" }] }),
+    ).toBeNull();
   });
 });
 

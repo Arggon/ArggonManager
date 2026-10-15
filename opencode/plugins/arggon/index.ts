@@ -3009,6 +3009,15 @@ type NativePreparationReceipt = {
    */
   stepsTruncated?: true
   /**
+   * The kernel's own count of the entries its cap dropped, MIRRORED verbatim
+   * beside `stepsTruncated` (bug-fresh-worktree-refusal-prose-drops-prep-step-
+   * truncation): the kernel sets the flag and the count together in the one
+   * branch that drops, so the two can never disagree — and the refusal prose
+   * quotes this count instead of re-deriving truncation from the list length.
+   * Present exactly when entries were dropped.
+   */
+  stepsDropped?: number
+  /**
    * Worktree env contract receipt (spec worktree-env-contract-016), forwarded
    * from the kernel when the caller requested env preparation (every
    * `start --worktree` run does).
@@ -3165,6 +3174,8 @@ function boundedPreparation(input: {
   steps?: NativePrepStep[]
   /** The kernel's own log-truncation decision; mirrored, never re-derived. */
   stepsTruncated?: true
+  /** The kernel's own count of the entries that decision dropped; mirrored. */
+  stepsDropped?: number
   env?: NativeEnvReceipt
   claim?: NativeClaimReceipt
 }): NativePreparationReceipt {
@@ -3212,7 +3223,9 @@ function boundedPreparation(input: {
   })
   // The kernel's own "the log was capped" decision (bug-native-steps-truncated-flag-dropped).
   // Mirrored verbatim, and only ever true when the kernel set it: a flag invented
-  // here would be a second, disagreeing account of the same event.
+  // here would be a second, disagreeing account of the same event. The dropped
+  // count below is forwarded from the same receipt, never recomputed from the
+  // bounded list's length.
   const kernelDroppedSteps = input.stepsTruncated === true
   // Env contract fragment (spec worktree-env-contract-016): projected, not
   // re-derived — the kernel owns the check and the six-key shape.
@@ -3258,6 +3271,12 @@ function boundedPreparation(input: {
     gateBins,
     ...(steps.length > 0 ? { steps } : {}),
     ...(kernelDroppedSteps ? { stepsTruncated: true as const } : {}),
+    // The kernel's own dropped-entry count, forwarded verbatim beside the flag
+    // (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation): the kernel
+    // emits the pair together in the one branch that drops, so the refusal
+    // prose that renders `steps` can state how much of the log is missing
+    // without re-deriving it from the list length.
+    ...(input.stepsDropped !== undefined ? { stepsDropped: input.stepsDropped } : {}),
     ...(env !== undefined ? { env } : {}),
     ...(claim !== undefined ? { claim } : {}),
     ...(truncated ? { truncated: true } : {}),
@@ -4595,6 +4614,12 @@ async function nativeStartBody(
       progress.preparation?.gateBins ?? [],
       worktreePath,
       progress.preparation?.steps ?? [],
+      // The kernel's own dropped-entry count, mirrored through
+      // `boundedPreparation` (bug-fresh-worktree-refusal-prose-drops-prep-step-
+      // truncation): the bounded log cannot say how much is missing, so the
+      // refusal prose quotes the count instead of reading a capped list as
+      // complete.
+      progress.preparation?.stepsDropped ?? 0,
     )
     if (refusal !== null) {
       // ORDER IS LOAD-BEARING, same contract the strict worktree-write gate

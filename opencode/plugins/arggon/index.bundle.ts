@@ -11606,6 +11606,7 @@ function boundedPreparation(input) {
         gateBins,
         ...(steps.length > 0 ? { steps } : {}),
         ...(kernelDroppedSteps ? { stepsTruncated: true } : {}),
+        ...(input.stepsDropped !== undefined ? { stepsDropped: input.stepsDropped } : {}),
         ...(env !== undefined ? { env } : {}),
         ...(claim !== undefined ? { claim } : {}),
         ...(truncated ? { truncated: true } : {}),
@@ -12337,7 +12338,7 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
         }
     }
     if (worktreePath !== undefined && progress.worktreeCreated) {
-        const refusal = kernel.freshWorktreeInstallRefusal(progress.preparation?.gateBins ?? [], worktreePath, progress.preparation?.steps ?? []);
+        const refusal = kernel.freshWorktreeInstallRefusal(progress.preparation?.gateBins ?? [], worktreePath, progress.preparation?.steps ?? [], progress.preparation?.stepsDropped ?? 0);
         if (refusal !== null) {
             return failBeforeClaim(`The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
                 "Then re-run " +

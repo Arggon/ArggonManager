@@ -72,6 +72,7 @@ import {
 } from "@arggondev/lib";
 
 import {
+  dependencyPrepNote,
   inheritedCommitsNotes,
   runStart,
   startFailureReadiness,
@@ -2727,6 +2728,14 @@ program
               missingDependenciesTotal: result.missingDependenciesTotal,
               gateBins: result.gateBins,
               prepSteps: result.prepSteps,
+              // The kernel's truncation decision + dropped-entry count, mirrored
+              // beside the log they qualify (bug-native-steps-truncated-flag-dropped,
+              // bug-fresh-worktree-refusal-prose-drops-prep-step-truncation):
+              // omitted together on an uncapped log, exactly like the receipt.
+              ...(result.stepsTruncated !== undefined
+                ? { stepsTruncated: result.stepsTruncated }
+                : {}),
+              ...(result.stepsDropped !== undefined ? { stepsDropped: result.stepsDropped } : {}),
               env: result.env,
               ...(result.claim !== undefined ? { claim: result.claim } : {}),
               ...(result.inheritedCommits !== undefined
@@ -2783,30 +2792,14 @@ program
           {
             // Bounded preparation log (bug-start-install-ordering): a skip or
             // a failure in the prep path is never silent — name the decisions
-            // that left the worktree in its state.
-            const noteworthy = result.prepSteps.filter((entry) =>
-              [
-                "primary-install-missing",
-                "worktree-install-present",
-                "farm-failed-symlink-fallback",
-                "failed",
-                "install-cannot-consume",
-                "build-failed",
-                "build-no-entry",
-                "flip-failed",
-                "errored",
-                "foreign-resolution",
-              ].includes(entry.outcome),
-            );
-            if (noteworthy.length > 0) {
-              const named = noteworthy
-                .map((entry) =>
-                  entry.pkg === undefined
-                    ? `${entry.step}: ${entry.outcome}`
-                    : `${entry.step}: ${entry.outcome} (${sanitizeHumanError(entry.pkg)})`,
-                )
-                .join("; ");
-              console.log(`  note: dependency prep — ${sanitizeHumanError(named)}`);
+            // that left the worktree in its state. The kernel's truncation
+            // decision leads the note when its cap dropped entries
+            // (bug-native-steps-truncated-flag-dropped,
+            // bug-fresh-worktree-refusal-prose-drops-prep-step-truncation), so
+            // the capped log is never read as the whole log.
+            const prepNote = dependencyPrepNote(result);
+            if (prepNote !== null) {
+              console.log(`  note: dependency prep — ${sanitizeHumanError(prepNote)}`);
             }
           }
           if (result.claim?.foreignWrites !== undefined) {

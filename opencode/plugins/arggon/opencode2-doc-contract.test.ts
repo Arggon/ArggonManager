@@ -59,7 +59,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -71,6 +71,7 @@ import {
   runCreate,
 } from "@arggondev/lib";
 import { runInit } from "../../../cli/src/init.js";
+import { runCliJson } from "../../../cli/src/test-spawn.js";
 import {
   argonToolDefinitions,
   loadArgonKernel,
@@ -81,6 +82,7 @@ import {
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const docPath = join(repoRoot, "ArggonManager/docs/opencode2.md");
+const cliDocPath = join(repoRoot, "ArggonManager/docs/json-output.md");
 const kernelSourcePath = join(repoRoot, "lib/src/worktree.ts");
 
 /** One observed path: every runtime kind and every string value seen there. */
@@ -92,6 +94,10 @@ type Row = { path: string; declared: string; values: string[]; bound: string; no
 const observed = new Map<string, PathObservation>();
 /** The over-cap detection's `preparation` receipt, kept for the bound assertions. */
 let overCap: Record<string, unknown> = {};
+/** The over-cap preparation-log receipt the CLI scenario is compared against. */
+let nativeLogPreparation: Record<string, unknown> = {};
+/** The CLI `start --json` envelope of the twin over-cap fixture. */
+let cliStart: Record<string, unknown> = {};
 /** Absorbs the per-worktree state/cache dirs the env contract creates. */
 const tmpDirs: string[] = [];
 
@@ -347,8 +353,29 @@ beforeAll(async () => {
   const logSteps = Array.isArray(logPreparation.steps) ? logPreparation.steps : [];
   expect(logSteps, "the kernel's own cap bounds the log").toHaveLength(MAX_PREP_STEPS);
   expect(logPreparation.stepsTruncated, "the kernel's decision is mirrored").toBe(true);
+  expect(logPreparation.stepsDropped, "the kernel's dropped-entry count is mirrored").toBe(2);
   expect(logPreparation.truncated, "the mirrored flag also folds into `truncated`").toBe(true);
   observe("preparation", logPreparation);
+  nativeLogPreparation = logPreparation;
+  // 9. The CLI SHAPE on the same kernel event
+  //    (task-cli-surface-never-carries-steps-truncated): a twin fixture whose
+  //    primary install links the same MAX_PREP_STEPS packages, driven through
+  //    the real `arggon start --json --worktree` envelope. The CLI half of the
+  //    parity used to be absent entirely (no `stepsTruncated` anywhere under
+  //    `cli/`), so this scenario pins it as a scenario of this suite.
+  const cliDir = seed();
+  addWorkspacePackages(cliDir, MAX_PREP_STEPS);
+  // A fresh-worktree CLI start always pushes; the twin needs a push target.
+  const cliRemote = join(dirname(cliDir), `${basename(cliDir)}-remote.git`);
+  git(dirname(cliRemote), ["init", "--bare", "-q", cliRemote]);
+  git(cliRemote, ["config", "maintenance.auto", "false"]);
+  git(cliDir, ["remote", "add", "origin", cliRemote]);
+  const cliProc = runCliJson(
+    ["start", "task-rate-limit", "--worktree", "--assignee", "smoke"],
+    cliDir,
+  );
+  expect(cliProc.status, cliProc.stderr || cliProc.stdout).toBe(0);
+  cliStart = JSON.parse(cliProc.stdout) as Record<string, unknown>;
 }, 300_000);
 
 // ---------------------------------------------------------------------------
@@ -367,6 +394,28 @@ function tableCells(line: string): string[] | null {
 
 const isDelimiterRow = (cells: string[]): boolean =>
   cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+
+/**
+ * The field names of the CLI `start` table in `json-output.md`, read from that
+ * section's own rows — not a name-only grep, so a mention elsewhere in the doc
+ * cannot stand in for a documented field
+ * (task-cli-surface-never-carries-steps-truncated).
+ */
+function cliStartFields(): Set<string> {
+  const lines = readFileSync(cliDocPath, "utf8").split("\n");
+  const start = lines.findIndex((line) => line.trim() === "### `start`");
+  expect(start, "json-output.md still has the `start` section").toBeGreaterThan(-1);
+  const fields = new Set<string>();
+  for (let at = start + 1; at < lines.length; at += 1) {
+    const line = lines[at] ?? "";
+    if (line.startsWith("### ")) break;
+    const cells = tableCells(line);
+    if (cells === null || cells.length !== 3) continue;
+    const match = /^`([A-Za-z0-9_]+)`$/.exec(cells[0] ?? "");
+    if (match?.[1] !== undefined) fields.add(match[1]);
+  }
+  return fields;
+}
 
 /** `` `preparation.claim.takeOver.by` `` / `…?` → the bare payload path. */
 function parseFieldPath(cell: string): string | null {
@@ -657,6 +706,33 @@ describe("docs/opencode2.md payload contract vs the shipped native start payload
     const invisible = [...rows.keys()].filter((path) => !anchors(path)).sort();
     expect(invisible, "these rows are named neither in the `start` row nor in the intro").toEqual(
       [],
+    );
+  });
+
+  it("carries the kernel's truncation decision on the CLI shape too, and documents it on both surfaces", () => {
+    // The CLI envelope on the twin fixture mirrors the SAME kernel event the
+    // native receipt above reports — the deep-equal per-entry log assertion
+    // #617 established extends to the flag and the dropped-entry count
+    // (task-cli-surface-never-carries-steps-truncated). Before the CLI half
+    // landed, no `stepsTruncated` existed anywhere under `cli/`.
+    expect(cliStart.prepSteps).toEqual(nativeLogPreparation.steps);
+    expect(cliStart.stepsTruncated).toBe(true);
+    expect(cliStart.stepsDropped).toBe(nativeLogPreparation.stepsDropped);
+
+    // The CLI doc contract names both fields beside `prepSteps`, so the shape
+    // cannot be dropped from `json-output.md` again. The native side is
+    // enforced by the row walker above: `preparation.stepsTruncated?` and
+    // `preparation.stepsDropped?` must be rows AND must be observed on a real
+    // run, or the coverage test fails.
+    const cliFields = cliStartFields();
+    for (const field of ["prepSteps", "stepsTruncated", "stepsDropped"]) {
+      expect(cliFields.has(field), `json-output.md §start documents \`${field}\``).toBe(true);
+    }
+    expect(rows.has("preparation.stepsTruncated"), "opencode2.md documents the native flag").toBe(
+      true,
+    );
+    expect(rows.has("preparation.stepsDropped"), "opencode2.md documents the native count").toBe(
+      true,
     );
   });
 });
