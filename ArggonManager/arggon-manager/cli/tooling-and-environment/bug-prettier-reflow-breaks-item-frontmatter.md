@@ -1,6 +1,6 @@
 ---
 type: bug
-status: todo
+status: cancelled
 id: bug-prettier-reflow-breaks-item-frontmatter
 title: prettier reflows a long inline frontmatter list into a form the arggon parser rejects — an item file becomes valid-to-prettier and invalid-to-validate
 parent: tooling-and-environment
