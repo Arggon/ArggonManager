@@ -96,3 +96,7 @@ Evidence (commands run; expected vs observed):
 - `npm test` → 159 files / 3515 tests passed.
 
 No blockers; no out-of-scope work found.
+
+### handoff 2026-10-15 @arggon-maker — next: Review/merge PR #835 (all gates green: 3515 tests, validate, lint, structure, plugin drift-free); then close the item per the acceptance checklist.
+- branch: feat/task-cli-surface-never-carries-steps-truncated
+- open questions: none; item depends_on bug-native-steps-truncated-flag-dropped is terminal and its native mirror is intact
