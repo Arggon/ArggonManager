@@ -258,3 +258,16 @@ Does NOT prove: that the layer is enforced in every client runtime (it is enforc
 ### handoff 2026-10-15 @arggon-maker — next: Open the PR against main and hand it to the standards reviewer; the one judgement call to review is that the refname is NOT the discriminator (--force-with-lease origin main:other is allowed, like th…
 - branch: fix/bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use
 - open questions: Should the lease-with-named-ref form (origin main:other) be refused after all? It is one deny rule + one test case if the lead wants it; Does the residual (a second bare --force next to an allowed le…
+
+### 2026-10-15 @Arggon
+### 2026-10-15 @arggon-maker
+
+**PR:** https://github.com/Arggon/ArggonManager/pull/836 — `fix(config): force-push gate discriminates on the lease, not the spelling`, open and MERGEABLE, branch `fix/bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use` (5 commits: claim, fix `2dd5dd8b`, evidence comment, handoff, judgement-call pin `f43f81c9`).
+
+**CI on the head:** `cli` pass (6m43s), `tasks-validate` pass, `ui-smoke` pass.
+
+**Final worktree gates (re-run on the head):** `arggon validate` ok · focused vitest 63 passed · `npm run build` green · `npm test` 160 files / 3515 tests passed · `npm run lint` clean · `npm run test:structure` 5 passed · prettier clean on every touched file except the pre-existing, load-bearing comma-less `templates/docs/opencode.jsonc` (documented above).
+
+**Diff note:** two tracker files in the PR are not this item's — `bug-prover-agent-has-no-x-generated-entry.md` and `bug-start-claim-branch-inherits-unpushed-tracker-commits.md` rode in from the claim's base (the `inheritedCommits` shape); the lead's own commits, untouched by this branch, and they leave the diff once main is pushed. Flagged on the PR too.
+
+**Acceptance:** all 7 boxes ticked; the one judgement call to review is the refname question (see the handoff), pinned as an assertion in the test so it cannot change silently.
