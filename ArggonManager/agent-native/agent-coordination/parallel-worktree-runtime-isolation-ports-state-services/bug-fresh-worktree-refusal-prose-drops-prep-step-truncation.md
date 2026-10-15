@@ -59,3 +59,28 @@ Acceptance:
 - [ ] A test at > `MAX_PREP_STEPS` asserting the refusal names the dropped count
 - [ ] Swept: any other user-facing text that renders the preparation log without its truncation state
 - [ ] Depends on PR #617 landing, so the native-side precedent is settled first
+
+### 2026-10-15 @ses_ec2bb8c73ffeBOeT0vbCObokPz
+PR #833 (`fix/bug-fresh-worktree-refusal-prose-drops-prep-step-truncation`, head 89ef011f). Kernel-side fix complete, gates green.
+
+**What shipped.** `prepareWorktreeDependencies` now counts the entries its `MAX_PREP_STEPS` cap drops (`stepsDropped`, incremented in the same `record()` branch that sets `stepsTruncated`; the receipt emits both together or not at all). `freshWorktreeInstallRefusal(gateBins, worktreePath, steps, stepsDropped = 0)` quotes that count verbatim beside the list — never a length-vs-cap comparison (a 16-entry log can be complete, and a length comparison cannot see a kernel-side drop; the class #617 fixed in the native projection).
+
+**Before/after at the cap** (over-cap fixture: 16 shown, 2 dropped — the 16th build decision and the gate-bin verdict):
+- before: `… Preparation ran: build:no-build-script (@scope/pkg-0), … (@scope/pkg-15). Fix: run `npm ci` …`
+- after: `… Preparation ran: … (@scope/pkg-15). 2 entries were dropped (the preparation log is capped at 16). Fix: run `npm ci` …`
+Uncapped log: byte-identical to before (no count invented); singular: `1 entry was dropped`.
+
+**Evidence (commands run, expected vs observed).**
+- `npx vitest run lib/src/worktree.test.ts` → 72 passed. The over-cap kernel test now asserts `stepsDropped === 2`; the new refusal test drives a real over-cap `prepareWorktreeDependencies` receipt and asserts `2 entries were dropped` + the cap, with `assertOrder` pinning the count beside the list and ahead of the remedy; plus singular and uncapped (no `dropped`) controls.
+- `npm test` → 158 files / 3484 passed.
+- `npm run arggon -- validate` → ok, 0 warnings; `npm run lint` → clean; `npm run test:structure` → 5 passed; `npx prettier --check lib/src/worktree.ts lib/src/worktree.test.ts` → clean.
+- `npm run build` regenerates the committed plugin bundle byte-exact (CI `check:plugin`); the PR carries 3 files: `lib/src/worktree.ts`, `lib/src/worktree.test.ts`, `opencode/plugins/arggon/index.bundle.ts` (generated, comments stripped — no plugin source edited).
+
+**Sweep — surfaces rendering the preparation log without its truncation state (reported, not fixed: out of this item's file scope).**
+1. `cli/src/start.ts:1166` — refusal called without `stepsDropped` (`prepared.stepsDropped` is in scope at that line).
+2. `opencode/plugins/arggon/index.ts:4594` — same for the native seam; `boundedPreparation` must mirror the count first (whitelist projection carries only `stepsTruncated`). Owned by `task-cli-surface-never-carries-steps-truncated`.
+3. `cli/src/cli.ts:2763-2785` — the human note `dependency prep — <outcomes>` renders the filtered capped log with no truncation state.
+4. Docs tables (`docs/opencode2.md`, `docs/json-output.md`) document no log-truncation count; same sibling item.
+Kernel sweep: `freshWorktreeInstallRefusal` is the only prose consumer of `steps` in `lib/src` (grep for `entry.step`/`steps.map`), so no fifth surface exists there.
+
+**Open question.** The two refusal call sites are not wired to the kernel count (explicitly out of scope per the dispatch), so the human-visible refusal on the CLI/native surfaces still omits the count until they pass it. Decide: extend this item, route to the sibling item, or file a follow-up.
