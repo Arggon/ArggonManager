@@ -35,11 +35,11 @@ It is also the third distinct surface for the same fact: the kernel decides, the
 
 ## Acceptance
 
-- [ ] The refusal text says how many preparation entries were dropped when the log is capped — an explicit count, never a silent truncation
-- [ ] Consistent with the kernel's own decision (mirror it; do not re-derive from a cap)
-- [ ] A test at > `MAX_PREP_STEPS` asserting the refusal names the dropped count
-- [ ] Swept: any other user-facing text that renders the preparation log without its truncation state
-- [ ] Depends on PR #617 landing, so the native-side precedent is settled first
+- [x] The refusal text says how many preparation entries were dropped when the log is capped — an explicit count, never a silent truncation
+- [x] Consistent with the kernel's own decision (mirror it; do not re-derive from a cap)
+- [x] A test at > `MAX_PREP_STEPS` asserting the refusal names the dropped count
+- [x] Swept: any other user-facing text that renders the preparation log without its truncation state
+- [x] Depends on PR #617 landing, so the native-side precedent is settled first
 
 ## Notes
 
