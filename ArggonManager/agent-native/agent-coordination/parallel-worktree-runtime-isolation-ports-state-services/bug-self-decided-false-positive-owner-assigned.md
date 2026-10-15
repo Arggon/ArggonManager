@@ -30,11 +30,11 @@ The false positive follows from the role shape in `ArggonManager/docs/engineerin
 
 ## Acceptance
 
-- [ ] The false positive is pinned: an item assigned to the owner's login with a lead-written `decide:` and a same-login `decided:` reads `self-decided` today (repro as command / expected / observed via `arggon show <id> --json` or `classifyDecisionBrief(body, assignee)`)
-- [ ] The intended semantics are decided and recorded with authority (ADR 0021/0026 amendment, not a code tweak): whether `self-decided` means "answer author == assignee" (current) or "an agent role answered its own brief" (which the tracker cannot authenticate — `engineering.md:138`)
-- [ ] If the semantics stay author == assignee, the owner-assigned false positive is stated explicitly where readers will find it (`spec-owner-decision-brief-021.md` §States, `ArggonManager/docs/json-output.md` §`decision_brief`, and the engineering brief convention); if they change, the classifier, its tests, and the spec change together
-- [ ] Report-only preserved: no transition consults the state, no command refuses, CI never fails (ADR 0026 §6); `decided` and `self-decided` stay silent in `spec analyze` (only `open` fires `UNANSWERED-DECISION-BRIEF`)
-- [ ] `arggon validate` green, `decision-brief-convention.test.ts` green, prettier clean
+- [x] The false positive is pinned: an item assigned to the owner's login with a lead-written `decide:` and a same-login `decided:` reads `self-decided` today (repro as command / expected / observed via `arggon show <id> --json` or `classifyDecisionBrief(body, assignee)`)
+- [x] The intended semantics are decided and recorded with authority (ADR 0021/0026 amendment, not a code tweak): whether `self-decided` means "answer author == assignee" (current) or "an agent role answered its own brief" (which the tracker cannot authenticate — `engineering.md:138`)
+- [x] If the semantics stay author == assignee, the owner-assigned false positive is stated explicitly where readers will find it (`spec-owner-decision-brief-021.md` §States, `ArggonManager/docs/json-output.md` §`decision_brief`, and the engineering brief convention); if they change, the classifier, its tests, and the spec change together
+- [x] Report-only preserved: no transition consults the state, no command refuses, CI never fails (ADR 0026 §6); `decided` and `self-decided` stay silent in `spec analyze` (only `open` fires `UNANSWERED-DECISION-BRIEF`)
+- [x] `arggon validate` green, `decision-brief-convention.test.ts` green, prettier clean
 
 ## Notes
 
