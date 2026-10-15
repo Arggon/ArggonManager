@@ -49,3 +49,22 @@ computes what the owner needs to read.
 - TUI and OpenCode panel are out of scope (record the decision); the shared view-model may make the derivation reusable later.
 
 ## Notes
+
+### 2026-10-15 @Arggon
+**Evidence (maker, `task-board-no-done-over-open-work`) — PR https://github.com/Arggon/ArggonManager/pull/827**
+
+Rule delivered: stored statuses untouched; the board derives the displayed status server-side from the complete item set — a container with any open descendant (todo/in_progress/blocked, any depth) renders `open` + the existing `N open` disclosure instead of `done`, on the tree row AND the column card, aria included. `cancelled` deliberately not masked; leaves and all-terminal subtrees byte-identical. The `hide done/cancelled` toggle and the lens read the displayed state (tree row not terminal; columns hide only genuinely terminal cards and keep the column). Drawer keeps the stored status and explains the effective one via additive `detail.open_descendants`.
+
+Files: `cli/src/board.ts`, `cli/src/board.test.ts`, `cli/src/board-parity.test.ts`, `e2e/board.smoke.spec.ts`, `README.md`.
+
+Gates (worktree, all green):
+- `npm run arggon -- validate` → ok (0 warning(s), convention v5)
+- `npx vitest run cli/src/board.test.ts cli/src/board-parity.test.ts` → 159 passed
+- `npm test` (after `npm run build`) → 158 files / 3472 tests passed
+- `npm run lint` → clean; `npm run test:structure` → 5 passed
+- `npx prettier --check` touched files → clean
+- `npx playwright test --grep @smoke` → 48 passed
+
+Before/after (real render, `arggon board --group-by tree` over this tracker): `methodology-improvements` stored `done` with 18 open — before `<span class="status-chip done">done</span><span class="tree-open">18 open</span>`, after `<span class="status-chip open">open</span><span class="tree-open">18 open</span>`.
+
+Decisions recorded: `cancelled` never masked (abandoned, not finished); TUI/OpenCode panel out of scope; the lens keeps the stored-status grammar (the mask changes the rendered state and the layout rule that could hide it, not the filter predicate).
