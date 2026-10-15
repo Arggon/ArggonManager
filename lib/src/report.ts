@@ -52,6 +52,8 @@ export type ReportResult = {
   groups: ReportGroup[];
   /** Blocked leaves across the tree, with their story and epic chain (for the standup markdown). */
   blocked: ReportBlocked[];
+  /** Report-only container hygiene (task-container-hygiene-check); see `containerHygiene`. */
+  hygiene: ReportHygiene;
 };
 
 /** A blocked leaf: reason is never empty (convention requires blocked_reason). */
@@ -63,6 +65,53 @@ export type ReportBlocked = {
   epicId: string | null;
   blockedReason: string;
 };
+
+/**
+ * A non-terminal container found in an offender's subtree — an unfinished
+ * workstream (story/epic; initiatives are roots and can never nest).
+ */
+export type ReportHygieneOpenContainer = {
+  id: string;
+  type: "story" | "epic";
+  status: "todo" | "in_progress" | "blocked";
+};
+
+/** A terminal container holding at least one non-terminal container below it. */
+export type ReportHygieneOffender = {
+  id: string;
+  type: "initiative" | "epic" | "story";
+  status: "done" | "cancelled";
+  /** Non-terminal containers in the subtree, sorted by id, capped at `MAX_HYGIENE_OPEN_CONTAINERS`. */
+  openContainers: ReportHygieneOpenContainer[];
+  /** Full open-container count before the cap (equals `openContainers.length` when nothing was dropped). */
+  openContainersTotal: number;
+};
+
+/** The `report` command's additive hygiene section (schemaVersion 1, display only). */
+export type ReportHygiene = {
+  /** Containers examined (initiative/epic/story), terminal or not. */
+  checked: number;
+  /** Offenders, sorted by id, capped at `MAX_HYGIENE_OFFENDERS`. */
+  offenders: ReportHygieneOffender[];
+  /** Full offender count before the cap (equals `offenders.length` when nothing was dropped). */
+  offendersTotal: number;
+};
+
+/**
+ * Caps for the bounded hygiene section — the same bounded-report discipline as
+ * `MAX_MISSING_DEPENDENCIES` / `MAX_DETAIL_ACCEPTANCE_ROWS` (the report itself
+ * had no caps): enough rows to name the offenders, with the totals carrying
+ * the full counts so nothing is silently lost.
+ */
+export const MAX_HYGIENE_OFFENDERS = 10;
+export const MAX_HYGIENE_OPEN_CONTAINERS = 5;
+
+/** Container types (the items that can hold work); leaves are excluded. */
+const CONTAINER_TYPES: ReadonlySet<string> = new Set(["initiative", "epic", "story"]);
+/** Container types an open workstream can have: initiatives are roots, so only story/epic nest. */
+const OPEN_CONTAINER_TYPES: ReadonlySet<string> = new Set(["story", "epic"]);
+/** Terminal statuses (ADR 0004): the same done/cancelled rule the rest of the tracker uses. */
+const TERMINAL_STATUSES: ReadonlySet<string> = new Set(["done", "cancelled"]);
 
 function titleOf(item: WorkItem): string {
   return item.title ?? item.id;
@@ -80,6 +129,7 @@ function titleOf(item: WorkItem): string {
 export function aggregateReport(items: WorkItem[]): {
   groups: ReportGroup[];
   blocked: ReportBlocked[];
+  hygiene: ReportHygiene;
 } {
   const byId = itemsById(items);
 
@@ -156,7 +206,70 @@ export function aggregateReport(items: WorkItem[]): {
       };
     });
 
-  return { groups, blocked };
+  return { groups, blocked, hygiene: containerHygiene(items) };
+}
+
+/**
+ * Report-only container hygiene (task-container-hygiene-check, the 2026-10-14
+ * reopen decision): a terminal container (`done`/`cancelled`) whose subtree
+ * still holds a non-terminal CONTAINER (story/epic at any depth) is flagged —
+ * the mismatch that used to accumulate silently until the product owner saw it
+ * on the board.
+ *
+ * Leaves are deliberately NOT flagged: an open task/bug under a closed story is
+ * the documented follow-up pattern (the container stays closed, the board shows
+ * its `N open` disclosure). Only an open _container_ makes a terminal container
+ * an offender, and every terminal container on the open item's ancestor chain
+ * is one (the flag is per-container, not only the deepest one).
+ *
+ * Pure: reads already-loaded items, never writes, and never gates anything —
+ * `report` stays exit 0 and `validate` is unchanged. The walk is O(items ×
+ * depth) over the fixed four-level tree (initiative > epic > story > leaf).
+ */
+export function containerHygiene(items: WorkItem[]): ReportHygiene {
+  const byId = itemsById(items);
+  const openByOffender = new Map<string, WorkItem[]>();
+
+  for (const item of items) {
+    if (!OPEN_CONTAINER_TYPES.has(item.type) || TERMINAL_STATUSES.has(item.status)) continue;
+    // Walk the open container's ancestor chain once: every terminal container
+    // above it holds this open workstream, at any depth.
+    let parentId = item.parent;
+    while (parentId) {
+      const parent = byId.get(parentId);
+      if (!parent) break;
+      if (CONTAINER_TYPES.has(parent.type) && TERMINAL_STATUSES.has(parent.status)) {
+        const list = openByOffender.get(parent.id) ?? [];
+        list.push(item);
+        openByOffender.set(parent.id, list);
+      }
+      parentId = parent.parent;
+    }
+  }
+
+  const offenders: ReportHygieneOffender[] = [...openByOffender.entries()]
+    .map(([id, open]) => {
+      const container = byId.get(id)!;
+      const sorted = [...open].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      return {
+        id,
+        type: container.type as ReportHygieneOffender["type"],
+        status: container.status as ReportHygieneOffender["status"],
+        openContainers: sorted.slice(0, MAX_HYGIENE_OPEN_CONTAINERS).map((c) => ({
+          id: c.id,
+          type: c.type as ReportHygieneOpenContainer["type"],
+          status: c.status as ReportHygieneOpenContainer["status"],
+        })),
+        openContainersTotal: sorted.length,
+      };
+    })
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+  return {
+    checked: items.filter((item) => CONTAINER_TYPES.has(item.type)).length,
+    offenders: offenders.slice(0, MAX_HYGIENE_OFFENDERS),
+    offendersTotal: offenders.length,
+  };
 }
 
 /**
@@ -167,8 +280,8 @@ export function aggregateReport(items: WorkItem[]): {
 export function runReport(opts: { cwd: string }): ReportResult {
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
-  const { groups, blocked } = aggregateReport(loadItems(tasksDir));
-  return { root, groups, blocked };
+  const { groups, blocked, hygiene } = aggregateReport(loadItems(tasksDir));
+  return { root, groups, blocked, hygiene };
 }
 
 /**
@@ -208,6 +321,38 @@ export function formatReportTable(groups: ReportGroup[]): string {
 function formatCounts(counts: StatusCounts): string {
   const parts = STATUSES.map((status) => `${status}=${counts[status]}`);
   return `${parts.join(" ")} (total ${counts.total})`;
+}
+
+/** The open-container list of one offender, bounded with an explicit overflow marker. */
+function formatHygieneOpenContainers(offender: ReportHygieneOffender): string {
+  const open = offender.openContainers
+    .map((c) => `${sanitizeHumanTextUncapped(c.id)} (${c.status})`)
+    .join(", ");
+  const dropped = offender.openContainersTotal - offender.openContainers.length;
+  return dropped > 0 ? `${open} (+${dropped} more)` : open;
+}
+
+/**
+ * The table's additive hygiene block (task-container-hygiene-check): one
+ * summary line, one line per offender, bounded at `MAX_HYGIENE_OFFENDERS` /
+ * `MAX_HYGIENE_OPEN_CONTAINERS`. Report-only display — the block never gates
+ * and the command still exits 0. Appended after the groups table by the CLI.
+ */
+export function formatReportHygiene(hygiene: ReportHygiene): string {
+  const checked = `${hygiene.checked} containers checked`;
+  if (hygiene.offendersTotal === 0) {
+    return `hygiene: clean — no terminal container holds an open container (${checked})\n`;
+  }
+  const noun = hygiene.offendersTotal === 1 ? "offender" : "offenders";
+  const lines = [`hygiene: ${hygiene.offendersTotal} ${noun} (${checked})`];
+  for (const offender of hygiene.offenders) {
+    lines.push(
+      `  ${sanitizeHumanTextUncapped(offender.id)} (${offender.status}) — open containers: ${formatHygieneOpenContainers(offender)}`,
+    );
+  }
+  const dropped = hygiene.offendersTotal - hygiene.offenders.length;
+  if (dropped > 0) lines.push(`  … and ${dropped} more`);
+  return `${lines.join("\n")}\n`;
 }
 
 /**
@@ -259,6 +404,25 @@ export function formatReportMarkdown(result: ReportResult, opts: { date?: string
         `- **${sanitizeHumanTextUncapped(b.id)}**${scope} — ${sanitizeHumanTextUncapped(b.blockedReason)}`,
       );
     }
+    lines.push("");
+  }
+
+  // Additive hygiene section (task-container-hygiene-check): the same bounded
+  // offenders the `--json` payload carries, in the standup export.
+  lines.push("## Hygiene", "");
+  const checked = `${result.hygiene.checked} containers checked`;
+  if (result.hygiene.offendersTotal === 0) {
+    lines.push(`_No terminal container holds an open container (${checked})._`, "");
+  } else {
+    const noun = result.hygiene.offendersTotal === 1 ? "offender" : "offenders";
+    lines.push(`- ${result.hygiene.offendersTotal} ${noun} (${checked})`);
+    for (const offender of result.hygiene.offenders) {
+      lines.push(
+        `- **${sanitizeHumanTextUncapped(offender.id)}** (${offender.status}) — open containers: ${formatHygieneOpenContainers(offender)}`,
+      );
+    }
+    const dropped = result.hygiene.offendersTotal - result.hygiene.offenders.length;
+    if (dropped > 0) lines.push(`- … and ${dropped} more`);
     lines.push("");
   }
 
