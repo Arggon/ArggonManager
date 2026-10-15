@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-container-hygiene-check
 title: "Report-only check: a terminal container holding an open container (the 2026-10-14 reopen guard)"
 assignee: arggon-delivery-lead
@@ -9,8 +9,6 @@ parent: story-container-rollup
 labels: []
 created: "2026-10-15"
 updated: "2026-10-15"
-claimed_at: "2026-10-15T00:03:28.353Z"
-worktree_path: /home/arggon/Projects/ArggonManager-task-container-hygiene-check
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-container-rollup/task-container-hygiene-check.md
@@ -77,3 +75,10 @@ Remaining: standards review, then merge + the `done` flip (delivery lead).
 ### handoff 2026-10-15 @Arggon — next: Standards review of PR #826; then merge (branch carries tracker auto-commits) and the lead's done flip.
 - branch: feat/task-container-hygiene-check
 - open questions: Promoting the check into a gate/CI is a later decision (out of scope); caps 10 offenders / 5 open containers per offender follow the MAX_* receipt discipline — revisit if a real tree ever exceeds the…
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-14 (delivery lead)
+Merged as 859e4bdf (PR #826). The guard promised by the reopen decision ships as the report's additive `hygiene` section: a terminal container (`done`/`cancelled`) holding a non-terminal container (story/epic, any depth) is an offender — every terminal container on the open item's chain; leaves are deliberately excluded (the follow-up pattern stays unflagged). Report-only: exit 0 with offenders, no `validate` change, no CI wiring; bounded like the kernel's receipts (`MAX_HYGIENE_OFFENDERS` 10 / `MAX_HYGIENE_OPEN_CONTAINERS` 5, with totals carrying the full counts). Surface decision: `arggon report` (the preferred home) — accepted.
+
+Evidence: pure kernel walk `lib/src/report.ts` (+170), CLI human block, MCP/native schema + descriptions trimmed inside the ADR 0006 budgets (bundle regenerated), skill copies re-synced, `json-output.md` §report documents the field. Tests: `report.test.ts` +286 (fixture matrix incl. the deep chain, caps, human/JSON parity, the markdown section); full suite 3471 green; CI green on the refreshed head. Today's tree reports `hygiene: clean — 84 containers checked` (matches the lead's own traversal). Plumbing note: the branch needed a head refresh after a server-side update fired no push event — an empty commit only; no content change.
