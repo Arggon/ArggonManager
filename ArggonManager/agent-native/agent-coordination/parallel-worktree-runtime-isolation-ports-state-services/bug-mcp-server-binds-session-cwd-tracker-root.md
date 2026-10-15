@@ -69,3 +69,7 @@ REPRO (after the fix) — same script: comment + handoff land in the worktree co
 REGRESSION — cli/src/mcp-routing.test.ts (10) + the mcp-server.test.ts block end-to-end over the in-process stdio server: comment/handoff/`update --status done` land in the claim worktree, launching tree byte-unchanged; `show` reads the claim copy; a gone worktree fails named with nothing written; a plain tree keeps the old behavior.
 
 GATES (worktree, expected → observed): `arggon validate` ok → ok (0 warnings) · MCP suites 90/90 → passed · `npm test` → 3581/3581 passed · `npm run lint` → clean · `npm run test:structure` → exit 0 · `prettier --check` on touched files → clean · `npm run check:plugin` → exit 0 (bundle byte-unchanged; the native surface needed no edit). Note: two intermediate full-suite runs hit a 30s timeout in prose-format.test.ts under this box's load average ~20 (pristine main isolation baseline for that file: 45s); the final full run is green.
+
+### handoff 2026-10-15 @Arggon — next: Review PR #846 (fix/bug-mcp-server-binds-session-cwd-tracker-root): the MCP item-addressed cwd routing; on merge, flip the item done once the PR fully finishes it.
+- branch: fix/bug-mcp-server-binds-session-cwd-tracker-root
+- open questions: None from the maker. Reviewer watch-points: the claim-footprint scan's per-worktree item-copy read (bounded 64) and the read/show routing asymmetry (reads never refuse).
