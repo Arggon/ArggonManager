@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-gatebin-budget-reserved-block-can-exceed-clip
 title: "Gate-bin budget: the `≥1 name` override stops being safe when the reserved mandatory block alone exceeds MAX_HUMAN_ERROR_CHARS (~700+ char paths) — needs a defined behaviour, not silent loss"
 assignee: arggon-delivery-lead
@@ -64,8 +64,6 @@ Acceptance:
 - [ ] A test with `~700+` char paths asserting the chosen behaviour, so the window is covered rather than documented
 - [ ] Note in the implementation comment which clause is guaranteed to survive and why, so the invariant is stated once at the place that enforces it
 
-<<<<<<< HEAD
-
 ### 2026-10-15 @Arggon
 
 ### Evidence — completed by the delivery lead after the maker session died to a provider usage limit (work complete and green, uncommitted)
@@ -79,7 +77,6 @@ Gates: focused start 73/73; full suite 160 files / 3543; validate/lint/structure
 ### handoff 2026-10-15 @Arggon — next: Delivery lead: review + merge the PR when CI is green; then tick the four boxes and flip done.
 
 - branch: fix/bug-gatebin-budget-reserved-block-can-exceed-clip
-  \=======
 
 ### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
 
@@ -90,5 +87,3 @@ verdict: approve
 Merged as 7d68d2a4 (PR #845). Decision (box 1): prioritise the exact fix with the truncation named — over budget, the message leads notice → exact fix → lead → generic fix → discard hint → detail, so the head-kept clip eats only the tail while `--json` still carries every clause. The `≥1 name` override now takes an `overrideLimit` and YIELDS (`null`) past the room that keeps the actionable clauses whole (the regression this item named: pushing a name into a window that cannot show it, alive again in a narrower form); the observation is never lost — it rides `startFailureReadiness` for `--json`. The fill measures its own `'; '` separator (the unstated ≤2-char term). Box 4: the guaranteed clause is stated where it is enforced — the exact fix (the only clause the operator can act on without re-deriving; it leads, only the notice precedes), else the kept-path lead.
 
 Evidence: two ~700+-char-path tests (override yields, the notice names the truncation at the head, the exact fix survives whole, `--json` keeps the tail) + the ~1250-char-path extreme; focused start 73/73; full suite 3543; validate/lint/structure/prettier green; CI green. The lead added box 4's note and ran the full gates. Branch hygiene: the branch inherited pre-rebase tracker commits (the very class this wave ships a fix for) — rebased onto main and force-pushed **with lease**, so the PR carries only in-scope files.
-
-> > > > > > > f48a43f5 (chore(tasks): commented bug-gatebin-budget-reserved-block-can-exceed-clip)
