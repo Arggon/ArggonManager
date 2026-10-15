@@ -34,6 +34,7 @@ import { assertOrder } from "../../test/assert-order.js";
 import { runInit } from "./init.js";
 import {
   dependencyPrepNote,
+  gateBinFailureReport,
   inheritedCommitReport,
   inheritedCommitsNotes,
   isTrackerAutoCommit,
@@ -687,11 +688,93 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
     expect(message.length).toBeLessThanOrEqual(MAX_HUMAN_ERROR_CHARS);
   });
 
-  it("keeps every actionable clause whole even when ONE entry cannot fit", () => {
-    // The budget is spent by the evidence, never taken from a remedy: an entry
-    // long enough to blow the whole remainder still yields a report that keeps
-    // the generic fix, the exact fix, the attach re-run and the discard hint
-    // intact — because those are reserved before the fill runs.
+  it("yields the `≥1 name` override rather than push a name past the actionable clauses", () => {
+    // bug-gatebin-budget-reserved-block-can-exceed-clip: the override is what
+    // keeps the sentence from naming nothing, but it may never cross the room
+    // that leaves every actionable clause whole. Past that ceiling it YIELDS —
+    // a name the human channel would clip is not named.
+    const bins: GateBinResolution[] = [
+      { name: "native-gate-dep", source: "missing" },
+      { name: "native-gate-tool", source: "missing" },
+    ];
+    // No budget AND no room at the ceiling → the clause is omitted (the
+    // observation still rides the --json payload).
+    expect(gateBinFailureReport({ hasInstall: true, gateBins: bins }, 0, 10)).toBeNull();
+    // No budget but room at the ceiling → the minimum useful sentence: exactly
+    // ONE name, the same override as before, now bounded.
+    const one = gateBinFailureReport({ hasInstall: true, gateBins: bins }, -100, 10_000);
+    expect(one).toContain("native-gate-dep: not resolvable from the worktree");
+    expect(one).not.toContain("native-gate-tool");
+    expect(one).toContain("and 1 more bin not resolving inside it");
+  });
+
+  /**
+   * The window bug-gatebin-budget-reserved-block-can-exceed-clip names: a
+   * ~700+ char worktree path makes the ACTIONABLE block alone (the path is
+   * named in the kept note, the exact fix and the discard hint) exceed the
+   * clip. Before the fix the `≥1 name` override still pushed a name in — past
+   * the remedy, into a window that could not show it — which is the silent
+   * loss the item set exists to remove, reappearing in a narrower window.
+   */
+  function overBudgetCommitGateFailure(): { message: string; worktreePath: string } {
+    const worktreePath = join("home", "arggon", "Projects", "x".repeat(697));
+    const message = worktreeFailureMessage({
+      id: ID,
+      branch: BRANCH,
+      worktreePath,
+      createBranch: true,
+      step: "committing the claim (pre-commit gate)",
+      err: new Error("gate: deliberate failure"),
+      readiness: {
+        hasInstall: true,
+        gateBins: [{ name: "native-gate-dep", source: "missing" }],
+      },
+    });
+    return { message, worktreePath };
+  }
+
+  it("prioritises the exact fix and names the truncation when the reserved block alone exceeds the clip", () => {
+    const { message, worktreePath } = overBudgetCommitGateFailure();
+    // The reserved block really is past the clip — otherwise this asserts
+    // nothing about the window.
+    expect(message.length).toBeGreaterThan(MAX_HUMAN_ERROR_CHARS);
+    const clipped = sanitizeHumanError(message);
+    // THE GUARANTEED CLAUSE: the exact fix survives the head-kept clip WHOLE,
+    // because the over-budget composition leads with it (only the bounded
+    // notice precedes it) — no readiness list, no generic remedy, no discard
+    // hint and no raw detail can push it past the cut.
+    expect(clipped).toContain(
+      `Exact fix for the observed resolution: run \`npm ci\` in ${worktreePath}, then re-run ` +
+        `\`arggon start ${ID} --worktree\` — it attaches to the existing worktree.`,
+    );
+    // The truncation is NAMED at the head instead of left to the silent `…`,
+    // and the order is pinned: notice → exact fix → kept note.
+    assertOrder(
+      clipped,
+      "[truncated:",
+      "Exact fix for the observed resolution",
+      "start failed while committing the claim",
+    );
+    expect(clipped).toContain("2000-char human clip");
+    expect(clipped).toContain("--json error");
+    // The `≥1 name` override YIELDED: no name is pushed into a message the
+    // human channel cannot show it in...
+    expect(message).not.toContain("Readiness:");
+    expect(message).not.toContain("native-gate-dep:");
+    // ...while the composed message stays COMPLETE for `--json`: the clauses
+    // below the human cut are still there, named by the notice rather than
+    // dropped.
+    expect(message).toContain("To discard it instead");
+    expect(message).toContain("gate: deliberate failure");
+    expect(message.slice(MAX_HUMAN_ERROR_CHARS)).toContain("To discard it instead");
+    // Negative control: the human cut really is inside the message.
+    expect(clipped.endsWith("…")).toBe(true);
+  });
+
+  it("keeps every clause in the composed message at an extreme path, and leads the clip with the exact fix", () => {
+    // The same shape at its extreme (~1250-char path): the evidence entry could
+    // never fit, so it is refused outright; the composed message keeps every
+    // clause for `--json` and the human cut is named at the head.
     const longPath = join("home", "arggon", "Projects", "x".repeat(1200), "node_modules", ".bin");
     const name = "a-bin-with-an-enormously-long-name-that-cannot-possibly-fit-the-budget";
     const message = worktreeFailureMessage({
@@ -710,8 +793,12 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
     expect(message).toContain("Exact fix for the observed resolution");
     expect(message).toContain(`re-run \`arggon start ${ID} --worktree\``);
     expect(message).toContain("To discard it instead: `git worktree remove --force ");
-    // The evidence is truncated to the cap, not the other way round.
-    expect(sanitizeHumanError(message)).toContain("Exact fix for the observed resolution");
+    // The evidence is refused, not truncated into a mangled name: the override
+    // yields and the notice says so.
+    expect(message).not.toContain("Readiness:");
+    const clipped = sanitizeHumanError(message);
+    expect(clipped).toContain("Exact fix for the observed resolution");
+    expect(clipped).toContain("[truncated:");
   });
 
   it("reports the readiness evidence on the claim-commit step ONLY", () => {
