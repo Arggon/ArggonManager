@@ -9,7 +9,6 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [worktree, hygiene, review-followup]
 created: "2026-10-12"
 updated: "2026-10-15"
-worktree_path: /home/arggon/Projects/ArggonManager-task-cleanup-probe-degradation-honesty
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-cleanup-probe-degradation-honesty.md
