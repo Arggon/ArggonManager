@@ -8,7 +8,6 @@ labels: []
 created: "2026-10-15"
 updated: "2026-10-15"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-prettier-reflow-breaks-item-frontmatter.md
   Leaves live only under a story. id is the filename stem: bug-prettier-reflow-breaks-item-frontmatter.
@@ -52,3 +51,10 @@ a formatter touches.
 - Discovered on the standard usage path, not an exotic one; the repo's own gates run the formatter over these files, so the collision is reachable from any item with a long list.
 
 ## Notes
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+**Reconciliation (2026-10-15, delivery lead): closed as a duplicate — the fix belongs to the class, not to this instance.**
+
+This instance (prettier --write reflowing a long inline `depends_on` list into a two-line form the parser refuses, hit on the standard tick → format → flip close-out path) is the same parser-side defect as `bug-update-depends-on-multiline-rejected` (`lib/src/frontmatter.ts`'s strictly single-line `key: value` parse refusing continuation-line forms, with the WRITE side as a second producer), and the same formatter class as `bug-start-claim-commit-frontmatter-fails-prettier` and `bug-session-formatter-normalizes-tracker-item-files`. Three producers, one parser line. Fixing this as its own item would split the fix in two, so it is cancelled with its evidence cross-posted to `bug-update-depends-on-multiline-rejected` — including the acceptance box that the fix must make the WRAPPED-list shape parse back to the identical list while a genuinely broken line is still refused.
+
+Restored on main the same day: the affected item file was repaired to single-line frontmatter (`b265f6b7`), `arggon validate` green throughout.
