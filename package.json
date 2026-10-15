@@ -36,6 +36,7 @@
     "smoke:native-start-cold": "tsx smoke/native-start-cold-smoke.ts",
     "smoke:opencode:panel-refresh": "tsx smoke/opencode-panel-refresh-smoke.ts",
     "smoke:opencode:prompt-stamp": "tsx smoke/opencode-prompt-stamp-smoke.ts",
+    "smoke:permissions-probe": "tsx smoke/opencode-permissions-probe.ts",
     "smoke:worktree-playwright": "tsx smoke/worktree-playwright-smoke.ts",
     "smoke:tui": "tsx smoke/tui-smoke.ts",
     "smoke:tui-board": "tsx smoke/tui-board-smoke.ts",

@@ -197,6 +197,19 @@ true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
   `.md` discovered; project files replace same-named global commands). Generated
   prompts drive the `arggon` CLI/MCP; they never restate the rules
   (https://opencode.ai/v2/docs/agents/, https://opencode.ai/v2/docs/commands/).
+- **The project `permissions` array is enforced by the runtime, per session and
+  per client runtime** (probed on v2.0.29, 2026-10-15,
+  `bug-task-permissions-enforcement-not-observed`, harness
+  `npm run smoke:permissions-probe`): the runtime's own permission layer
+  evaluates the flattened rule list (each agent's own rules first, then the
+  project array appended after every agent — last match wins) and a running
+  session picks up an edit made after it started: a fresh `opencode run`, a
+  session continued across runs, and a session attached to a long-lived
+  background service all denied `git commit --no-verify -m probe` once the
+  fixture carried the block, and allowed the otherwise-identical
+  `git commit -m probe`. The ZCode/Claude seams never read that file — their
+  `hooks/gate.mjs` gate is a separate, fail-open logic path. `ctx.permission.*`
+  above is the plugin-side surface and stays unused.
 - Session context is **advisory and bounded**: the plugin injects at most one
   ≤ 1024-byte item block per model call (never the comment tail), `ARGON_ITEM`
   is read per call, and every surface is feature-detected — on 2.0.7

@@ -504,7 +504,15 @@ claiming the item, NOTHING sourced — and pins that the WRITE reports `trackerR
   the Code Mode catalog. The base policy stays allow-all, so ordinary and
   headless sessions are never blocked; the verifier's explicit read `allow`s
   exist because a read set that rests on that default is a default, not a
-  contract (`agents.md` §Orchestration).
+  contract (`agents.md` §Orchestration). **Which layer honors the block, probed
+  per runtime** (`bug-task-permissions-enforcement-not-observed`, harness
+  `npm run smoke:permissions-probe`): the OpenCode V2 runtime's own permission
+  layer reads the project `permissions` array for every agent and picks up an
+  edit made after a session started (fresh run, continued session, long-lived
+  service — all enforced); the ZCode/Claude seams do not read it and run their
+  own `hooks/gate.mjs` gate; the vendored plugin declares no permission surface
+  of its own; the kernel stays the enforcement of record (`agents.md` §Which
+  layer enforces the seam's shell gates).
 * **MCP is out of the default path (W3)** — the plugin no longer registers
   `mcp.servers.arggon` and never touches `ctx.mcp`; the generated config carries
   no MCP stanza. `arggon mcp` and `.mcp.json` remain for non-OpenCode clients
@@ -629,6 +637,7 @@ not observed: the panel is event-driven, not a watcher.
 npm test                      # 1438+ tests
 npm run smoke:opencode        # headless scenarios on a real OpenCode runtime: dependency-less bundle, one session per native command, the W4 worktree lifecycle + invariants + permissions
 npm run smoke:opencode:wave   # scripted coordinator/worker/reviewer wave (2 fixtures)
+npm run smoke:permissions-probe  # per-runtime permissions probe (bug-task-permissions-enforcement-not-observed): one denied + one allowed command per runtime — V2 session (fresh, continued after a config edit, long-lived service), the ZCode/Claude hook gates, the kernel refusals, the plugin's empty own surface; deterministic legs model-free (also in `npm test`), V2 legs need opencode + credentials and skip otherwise
 npm run smoke:native-start-cold  # deterministic + model-free: the native tools.arggon.start cold worktree (dependency-requiring pre-commit gate, bounded readiness/claim-commit receipt, claim commit with only the item file, re-run attach, untouched installs)
 npm run smoke:opencode:prompt-stamp  # deterministic + model-free (T4): the prompt-admission stamp, the compaction retention, the no-polling timeline and the off-contract silence on a real `opencode serve` + scripted provider
 npm run smoke:opencode:panel-refresh  # deterministic + model-free (T4): the open board panel refreshes from the OpenCode event stream (session shell endpoint → `session.shell.ended`) with no keypress, and a tracker change no event announced never appears (no polling)
