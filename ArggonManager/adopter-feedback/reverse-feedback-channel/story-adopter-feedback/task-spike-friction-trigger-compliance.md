@@ -197,13 +197,13 @@ hours (2026-10-14 08:25 → 2026-10-15 20:29 -0300) with zero records.
 
 ## Acceptance
 
-- [ ] `depends_on: [task-friction-trigger-carrier]` is present, so this spike is not
+- [x] `depends_on: [task-friction-trigger-carrier]` is present, so this spike is not
       claimable before the trigger it measures exists (reviewer N2: the ADR makes it
       the gate on stage 2 **and** tier C, yet it was claimable while `arggon friction`
       did not exist).
-- [ ] A pass/fail criterion is written **before** any observation is collected (the `deftai` post-mortem failed partly because "silent" was indistinguishable from "absent").
-- [ ] At least one non-maintainer adopter repo is observed end to end: `arggon friction` invoked, or demonstrably not, with the transcript kept.
-- [ ] `arggon doctor --json`'s `friction.triggerPresent` is recorded for each observed repo, so "the trigger was never seen" is distinguishable from "the trigger was seen and ignored".
+- [x] A pass/fail criterion is written **before** any observation is collected (the `deftai` post-mortem failed partly because "silent" was indistinguishable from "absent").
+- [x] At least one non-maintainer adopter repo is observed end to end: `arggon friction` invoked, or demonstrably not, with the transcript kept.
+- [x] `arggon doctor --json`'s `friction.triggerPresent` is recorded for each observed repo, so "the trigger was never seen" is distinguishable from "the trigger was seen and ignored".
 - [ ] The result is reported as a number with its denominator (N repos observed, N with the trigger present, N with a record written) — not as a qualitative impression.
 - [ ] The finding is filed as a comment on this item, and the answer decides whether **stage 2** (tier C, `gh` upstream dedupe) proceeds, is deferred, or is abandoned in favor of a human-only channel.
 - [ ] Explicitly recorded even if the answer is "nobody ran it": a null result here is the input to choosing tier B as the primary channel rather than tier C.
@@ -213,3 +213,10 @@ hours (2026-10-14 08:25 → 2026-10-15 20:29 -0300) with zero records.
 Non-goal: shipping any code in this spike. If the answer is negative, the honest
 response is to make tier B (the prefilled URL a human clicks) the whole channel —
 not to add instruction pressure.
+
+Ticked in `## Acceptance`: the four boxes the file itself can show —
+`depends_on` in the frontmatter, the pre-registered criterion with its
+commit-ordering evidence, the end-to-end `../ArggonStores` observation, and the
+per-repo `friction.triggerPresent` table. The remaining three boxes are the
+**finding**, and a spike's acceptance is the recorded answer: they are answered in
+the 2026-10-15 comment, not ticked here.
