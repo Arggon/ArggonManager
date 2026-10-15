@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-task-permissions-enforcement-not-observed
 title: "opencode.jsonc permissions: the four shell denies are not enforced by the client runtimes we actually use"
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [seam, config]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-15"
-claimed_at: "2026-10-15T17:20:47.828Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-task-permissions-enforcement-not-observed
 ---
 <!--
