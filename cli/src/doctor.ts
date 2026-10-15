@@ -35,6 +35,7 @@ import {
   resolveProjectName,
 } from "./docs.js";
 import { agentForTemplate, AGENT_IDS, detectAgents, type AgentId } from "./adapters.js";
+import { readEnvGitignore, type EnvGitignoreReport } from "./env-gitignore.js";
 
 import { measureBudget, formatBudgetLines, type BudgetResult } from "./measure.js";
 import {
@@ -859,6 +860,15 @@ export type DoctorResult = {
   /** Git state of the tree (additive; bug-init-git-doctor-blindspot). */
   git: DoctorGit;
   /**
+   * Report-only probe of the tracked `.gitignore`'s `.arggon.env` entry
+   * (task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters,
+   * spec worktree-env-contract-016): `{ path, present, ignores, hint }`. `hint`
+   * is non-null exactly when the file exists and does not ignore the
+   * per-worktree env file `arggon start --worktree` writes — it names the exact
+   * line to append. Nothing is written, modified or staged, ever.
+   */
+  envGitignore: EnvGitignoreReport;
+  /**
    * OpenCode integration state (additive, task-opencode-v2-doctor): config
    * files, V1-shaped keys, generated seam artifacts (names only), and native
    * vs `.mcp.json`-only MCP registration. Report-only, bounded.
@@ -996,8 +1006,12 @@ export function runDoctor(opts: {
       docs: { ...ZERO_DOCS },
       tracker: { dir: null, layout: null, items: 0, todo: 0 },
       git: gitState(opts.cwd),
-      // No tasks/ tree, so cwd is the best root for the OpenCode probe — the
-      // same directory gitState probes (task-opencode-v2-doctor).
+      // No tasks/ tree, so cwd is the best root for both probes below — the
+      // same directory gitState probes (task-opencode-v2-doctor). An
+      // uninitialized tree can still carry an adopter `.gitignore` that misses
+      // the entry (init will keep it: adopter-owned, never rewritten), so the
+      // report is just as true here.
+      envGitignore: readEnvGitignore(opts.cwd),
       opencode: detectOpenCode(opts.cwd),
       // Same reasoning for the matrix probe: no tree, so no matrix — the
       // reader is tree-only and reports the absence instead of reaching for a
@@ -1136,6 +1150,10 @@ export function runDoctor(opts: {
       todo: items.filter((item) => item.status === "todo").length,
     },
     git: gitState(root),
+    // Report-only (spec worktree-env-contract-016): an adopter `.gitignore`
+    // that predates the template keeps its bytes — init never rewrites it — so
+    // doctor is the standing surface that tells the adopter what to append.
+    envGitignore: readEnvGitignore(root),
     opencode: detectOpenCode(root),
     // The tree's own committed matrix when it carries one (this repo does);
     // otherwise an honest absence. Tree-only by construction, never a package
@@ -1165,6 +1183,16 @@ function formatGitLine(git: DoctorGit): string {
   if (git.remote) parts.push(`remote ${sanitizeHumanText(git.remote)}`);
   else parts.push("no remote");
   return parts.join(", ");
+}
+
+/**
+ * Human line for the `.arggon.env` gitignore probe (spec
+ * worktree-env-contract-016): one `hint:` line naming the missing entry and the
+ * exact line to append, or nothing when there is nothing to report. The text is
+ * a constant; report-only, like every other doctor hint.
+ */
+function formatEnvGitignoreLine(envGitignore: EnvGitignoreReport): string[] {
+  return envGitignore.hint === null ? [] : [`  hint: ${envGitignore.hint}`];
 }
 
 /** Any OpenCode signal worth printing on a non-initialized tree? */
@@ -1305,6 +1333,9 @@ export function formatDoctorReport(result: DoctorResult): string {
       "arggon doctor: not initialized (no tracker .convention.yml found — ArggonManager/ or legacy tasks/) — run `arggon init`",
     ];
     if (hasOpenCodeSignal(result.opencode)) lines.push(...formatOpenCodeLines(result.opencode));
+    // The .gitignore probe is a tree fact, so it prints on both report shapes
+    // (spec worktree-env-contract-016) — non-null hint only.
+    lines.push(...formatEnvGitignoreLine(result.envGitignore));
     // The matrix describes the examined tree, so it prints on both report
     // shapes — whenever it is readable, or why it is not.
     lines.push(...formatMatrixLines(result.matrix));
@@ -1328,6 +1359,7 @@ export function formatDoctorReport(result: DoctorResult): string {
         ]
       : []),
     `  git: ${formatGitLine(result.git)}`,
+    ...formatEnvGitignoreLine(result.envGitignore),
     ...formatOpenCodeLines(result.opencode),
     // Gap rows are advisory (spec S3, ADR 0020): printed, never blocking.
     ...formatMatrixLines(result.matrix),
