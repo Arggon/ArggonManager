@@ -97,12 +97,25 @@ move the bar.
 **What this measurement can and cannot establish.** It CAN establish, at one
 instant, whether any record exists that is attributable to an observed repo, and
 whether the trigger bytes were on disk at that instant. It CANNOT establish
-longitudinal behaviour: this is a point-in-time observation, on one machine, with
-N adopters in the low single digits, where the maintainer and the adopter share a
-human. It cannot separate "no agent ever hit friction" from "an agent hit friction
-and did not record it" — only the log and the repos' own history speak, which is
-the exact silence/absence ambiguity the `deftai` post-mortem failed on, and the
-reason this criterion is committed before the sweep rather than written after it.
+longitudinal behaviour: this is a point-in-time observation, on one machine, where
+maintainer and adopter share a human, and where only one of the 15 adopter
+repositories (`../ArggonStores`) is a live product adoption with a materialized
+seam — the rest are the maintainer's own tooling experiments and dormant trees. It
+cannot separate "no agent ever hit friction" from "an agent hit friction and did
+not record it" — only the log and the repos' own history speak, which is the exact
+silence/absence ambiguity the `deftai` post-mortem failed on, and the reason this
+criterion is committed before the sweep rather than written after it.
+
+**Disclosure on ordering.** Unstructured reconnaissance preceded this
+registration: reading the merged carrier item and the spec, and a first look at
+`../ArggonStores`'s generated-file dates and at the machine friction log, while
+setting up. What that reconnaissance had already established is the _provenance_
+covariate (the adopter's files predate PR #850) and the fact that the log needed a
+noise audit — so the audit is a named covariate rather than a surprise. It did not
+touch the registered question: no `doctor --json` had been run in any observed
+repo, and no record in any friction log had been attributed to a repo path, when
+this section was committed (`cf2a88bc`, 2026-10-15 20:28:05 -0300, before the sweep
+at 20:29:05).
 
 ## Observation evidence (2026-10-15, one point in time)
 
