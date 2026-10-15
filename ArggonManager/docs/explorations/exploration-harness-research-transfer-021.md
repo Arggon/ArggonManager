@@ -275,6 +275,25 @@ measure one number before believing any of it.**
    reclassifying; if it is low, P1 is closed for us and we did not spend a week proving
    it.**
 
+> 2026-10-11 closure: measured in `task-measure-kernel-refusal-rate` (PR #726) — 0 recorded kernel refusals per 1,224 lifecycle transitions over 2026-08-16→2026-10-11 (auto-done CI spot-check 0/19). Verdict: AutoHarness's thesis has no measurable target in this repo (unmeasurable-and-observably-zero, not high). Remaining pin: `task-sweep-auto-done-refusal-warnings` (bounded sweep of the 497 auto-done logs for the merge-time done-gate rate).
+>
+> **2026-10-13 correction — the pin's sweep refuted the zero, so the verdict above is
+> withdrawn and the AutoHarness question is open again, not closed.** All 534
+> `auto-done` runs (2026-09-11→2026-10-13) were swept from the raw logs
+> (`gh run view --log`) and independently from the check-run annotations API; both
+> sources agree exactly (239 step-level warnings each, 0 runs disagreeing). In the
+> parent's own window (500 runs ≤ 2026-10-11) there are **42 done-gate refusals per
+> 262 kernel flip attempts = 16.0%** — reported as 0/220 — plus **138 illegal
+> `todo → done` warn-and-skips** (reported as 0). Full window: 52/288 = 18.1%,
+> 49 distinct items refused. Magnitude is consistent with ADR 0025's static
+> 117/482 (24.3%) whole-tree estimate. **Root cause of the zero:** the runner
+> renders an executed `::warning::` command as `##[warning]<msg>` in the raw log, so
+> a pattern keyed on the literal `::warning::` — which appears 3,369 times in these
+> same logs, always as script echo, never as executed output — matches no executed
+> warning at all. Recommendation item 4's branch therefore resolves to **high**:
+> P1's thesis has a target here, the follow-up is worth reclassifying, and the
+> substrate item itself is a lead call (see `task-sweep-auto-done-refusal-warnings`).
+
 **Trade-offs, stated rather than hidden:**
 
 1. **We decline the strongest empirical result in the batch** (P3: +9.2% on SWE-bench

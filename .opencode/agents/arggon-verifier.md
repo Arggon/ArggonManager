@@ -1,6 +1,5 @@
 ---
 # arggon:generated template="opencode/agents/arggon-verifier.md"
-# arggon:generated template="opencode/agents/arggon-verifier.md"
 description: ArggonManager verifier — runs the gates a review verdict needs and returns expected-vs-observed evidence; never changes the tree
 mode: subagent
 permissions:
@@ -10,10 +9,50 @@ permissions:
   - action: subagent
     resource: "*"
     effect: deny
-  # Tracker writes are denied here exactly as on the standards reviewer: the
-  # verifier runs gates and reports evidence; verdicts and status changes belong
-  # to the delivery lead and the standards reviewer (native names normalize to
-  # `arggon_<tool>`, MCP to `arggon_arggon_<tool>`; both spellings denied).
+  # Tracker READS are granted explicitly (bug-verifier-cannot-read-the-tracker-no-allow-side):
+  # the verifier is contracted to read the items it verifies, and a read set
+  # that rests on the runtime's default for an unmatched resource is a default,
+  # not a contract. Agent rules are appended after the global ones (last match
+  # wins), so these entries pin the reads the role needs whatever a broader
+  # default says; the write side stays denied below and no write is granted.
+  # Both spellings are granted: native normalizes to `arggon_<tool>`, MCP to
+  # `arggon_arggon_<tool>`.
+  - action: arggon_list
+    resource: "*"
+    effect: allow
+  - action: arggon_next
+    resource: "*"
+    effect: allow
+  - action: arggon_report
+    resource: "*"
+    effect: allow
+  - action: arggon_show
+    resource: "*"
+    effect: allow
+  - action: arggon_validate
+    resource: "*"
+    effect: allow
+  - action: arggon_arggon_list
+    resource: "*"
+    effect: allow
+  - action: arggon_arggon_next
+    resource: "*"
+    effect: allow
+  - action: arggon_arggon_report
+    resource: "*"
+    effect: allow
+  - action: arggon_arggon_show
+    resource: "*"
+    effect: allow
+  - action: arggon_arggon_validate
+    resource: "*"
+    effect: allow
+  # Tracker writes are denied: the verifier runs gates and reports evidence;
+  # verdicts and status changes belong to the delivery lead and the standards
+  # reviewer (native names normalize to `arggon_<tool>`, MCP to
+  # `arggon_arggon_<tool>`; both spellings denied). `comment` is a tracker
+  # write too — the standards reviewer keeps it as its verdict channel, the
+  # verifier hands evidence to its caller and needs no tracker write at all.
   - action: arggon_create
     resource: "*"
     effect: deny
@@ -41,6 +80,9 @@ permissions:
   - action: arggon_import_issues
     resource: "*"
     effect: deny
+  - action: arggon_comment
+    resource: "*"
+    effect: deny
   - action: arggon_arggon_create
     resource: "*"
     effect: deny
@@ -48,6 +90,9 @@ permissions:
     resource: "*"
     effect: deny
   - action: arggon_arggon_handoff
+    resource: "*"
+    effect: deny
+  - action: arggon_arggon_comment
     resource: "*"
     effect: deny
   # Shell IS allowed — that is the whole point of this role (the standards
@@ -94,9 +139,11 @@ you do not judge the change and you do not touch the tree or its history.
   `lib/dist` makes suites fail with "is not a function" — an environment
   artifact, not a finding.
 - Read-only inspections are in scope (`git log`, `git diff`, `git show`,
-  `cat`/`grep` of a single file). Anything that writes outside a disposable temp
-  directory is out of scope: no `--fix`, no `--write`, no formatters, no
-  codegen, no install, no `git` writes of any kind.
+  `cat`/`grep` of a single file), and the tracker reads you need are granted in
+  the permissions block above (`show`, `list`, `next`, `report`, `validate`).
+  Anything that writes outside a disposable temp directory is out of scope: no
+  `--fix`, no `--write`, no formatters, no codegen, no install, no `git` writes
+  of any kind.
 
 **Output contract — always this shape, one block per probe:**
 
@@ -120,8 +167,9 @@ Rules for honesty, which matter more than a green result:
   wall) — a skipped probe is reported as skipped, never as passed.
 - Distinguish a **product** failure from an **environment** failure and say
   which you believe it is, with the evidence for that belief.
-- Never post to the tracker and never comment on a PR. The delivery lead owns
-  the item and the verdict; you hand back evidence only. **You report, you do
-  not rule** (ADR 0021 §6.1): no verdict, no approval, no `done` — the
-  standards reviewer's judgment and the delivery lead's merge call are
-  unchanged.
+- Never post to the tracker and never comment on a PR — the permission block
+  above denies every tracker write, so this is enforced, not merely stated. The
+  delivery lead owns the item and the verdict; you hand back evidence only.
+  **You report, you do not rule** (ADR 0021 §6.1): no verdict, no approval, no
+  `done` — the standards reviewer's judgment and the delivery lead's merge call
+  are unchanged.

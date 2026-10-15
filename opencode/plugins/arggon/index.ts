@@ -46,7 +46,24 @@
  *      `arggon show <id> --meta --json`, cached for a few seconds. Per-call
  *      injection means the block is present again after compaction. Hard bound:
  *      ITEM_BLOCK_MAX_BYTES (1 KiB).
- *   5. Session ergonomics + hygiene (ADR 0010 W3): rename the session to a
+ *   5. Prompt-admission stamp (plan-methodology-adapters-017 T4, spec S4):
+ *      `ctx.session.hook("prompt")` writes a bounded branch/item stamp into the
+ *      admitted prompt's own `metadata` — the worktree env contract
+ *      (`ARGGON_*` / `ARGON_ITEM`, spec-worktree-env-contract-016) first, then
+ *      the process environment, then the resolution chain in (3). It resolves
+ *      the directory from the SESSION's own location (`session_move` updates
+ *      it), because only the session's checkout carries the `.arggon.env` — see
+ *      {@link hookDirectory}. It rewrites metadata ONLY: the prompt text,
+ *      files, delivery, session and message ids are left byte-identical, and no
+ *      permission or state surface is touched. The stamp is persisted with the
+ *      user message, so an admitted prompt carries the item it was opened
+ *      under — including after the session is moved or compacted.
+ *   6. Compaction retention (T4/S4): `ctx.session.hook("compaction")` re-injects
+ *      the item block into the checkpoint-summary request's system instructions,
+ *      so a summary is produced WITH the item block in scope instead of losing it
+ *      with the transcript it replaces. It never sets `result`: the model still
+ *      writes the summary.
+ *   7. Session ergonomics + hygiene (ADR 0010 W3): rename the session to a
  *      claimed item id (`ctx.session.rename`, or `ctx.session.update` on 2.0.7
  *      where rename is absent); after a shell `git commit`, run
  *      `arggon validate --json` and log a warning when it fails. The warning
@@ -160,6 +177,35 @@ type ContextEvent = {
   system?: unknown
 }
 
+/**
+ * V2 `prompt` hook event (Build a plugin → Hooks → Prompt admission): an owned,
+ * mutable admission draft. `prompt` carries `text`/`files`/`agents`/`skills`,
+ * `metadata` is application-defined admission metadata, `delivery` is `"steer"`
+ * unless a hook changes it. Structural — the vendored file imports no plugin
+ * types.
+ */
+type PromptEvent = {
+  sessionID?: unknown
+  messageID?: unknown
+  prompt?: unknown
+  metadata?: unknown
+  delivery?: unknown
+}
+
+/**
+ * V2 `compaction` model-request hook event: the checkpoint-summary request.
+ * `system` is the assembled system-instruction array (the same shape the
+ * `context` hook sees), `messages` the transcript being summarized, and
+ * `result` — set by a hook that wants to record the compaction itself and skip
+ * the model call — is absent until a hook writes it.
+ */
+type CompactionEvent = {
+  sessionID?: unknown
+  system?: unknown
+  messages?: unknown
+  result?: unknown
+}
+
 type ToolEvent = {
   tool?: unknown
   sessionID?: unknown
@@ -187,6 +233,20 @@ export const CACHE_MAX_ENTRIES = 256
 
 /** Branch prefixes correlated to an item id (arggon branch <id> defaults). */
 export const BRANCH_PREFIXES = ["feat/", "fix/"] as const
+
+/**
+ * Key one admission stamp rides under inside a prompt's `metadata`
+ * (`payload.metadata.arggon` once the host has admitted the prompt).
+ */
+export const ADMISSION_STAMP_KEY = "arggon"
+
+/**
+ * Hard byte bound of the whole admission stamp (ADR 0006: everything the seam
+ * adds to a model request pays for itself on every call). Enforced by
+ * {@link buildAdmissionStamp}: over-long values are clipped and the least
+ * load-bearing fields are dropped before the bound is exceeded.
+ */
+export const ADMISSION_STAMP_MAX_BYTES = 768
 
 const ITEM_MARKER = "<arggon-item>"
 const STORAGE_PREFIX = "arggon/session/"
@@ -914,6 +974,137 @@ export function boundText(
   return { text: bounded, bytes: byteLength(bounded), truncated: true }
 }
 
+// ---------------------------------------------------------------------------
+// Prompt-admission stamp (plan-methodology-adapters-017 T4, spec S4)
+// ---------------------------------------------------------------------------
+
+/** What one admitted prompt is stamped with, and where the values came from. */
+export type AdmissionStamp = {
+  /** The claimed item id (`ARGON_ITEM` / the correlated item). */
+  item?: string
+  /** The item's working branch (`ARGGON_WORKTREE_BRANCH` / the correlated one). */
+  branch?: string
+  /** The absolute worktree the session declared (`ARGGON_WORKTREE_PATH`). */
+  worktreePath?: string
+  /** `<repo>-<item-id>` (`ARGGON_WORKTREE_ID`). */
+  worktreeId?: string
+  /** Where the stamp came from: a `.arggon.env` path, `process.env`, `storage` or `branch`. */
+  source: string
+}
+
+/**
+ * Stamp fields in the order they are dropped when the byte bound forces it:
+ * the identity (item/branch) and its source are the load-bearing part, the
+ * worktree coordinates are the nice-to-have.
+ */
+const STAMP_DROP_ORDER: ReadonlyArray<keyof AdmissionStamp> = [
+  "worktreeId",
+  "worktreePath",
+  "branch",
+  "item",
+]
+
+const STAMP_IDENTITY_FIELDS: ReadonlyArray<readonly [keyof AdmissionStamp, keyof WorktreeIdentity]> = [
+  ["item", "item"],
+  ["branch", "branch"],
+  ["worktreePath", "worktreePath"],
+  ["worktreeId", "worktreeId"],
+]
+
+/**
+ * A stamp from a worktree identity — the env contract's declared values, with
+ * the file path (or {@link PROCESS_ENV_SOURCE}) as the source.
+ *
+ * Returns undefined when the identity declares neither an item nor a branch:
+ * "nothing declared" is the ordinary plain-checkout case and must stay silent
+ * rather than produce an empty stamp. The byte bound is enforced by clipping
+ * every value and then dropping {@link STAMP_DROP_ORDER} fields, so an
+ * implausibly long path can never grow a prompt.
+ */
+export function buildAdmissionStamp(identity: WorktreeIdentity | undefined): AdmissionStamp | undefined {
+  if (identity === undefined) return undefined
+  const stamp: AdmissionStamp = { source: clip(identity.source, MAX_VALUE_CHARS) }
+  for (const [field, key] of STAMP_IDENTITY_FIELDS) {
+    const value = asString(identity[key])
+    if (value === undefined) continue
+    stamp[field] = clip(value, MAX_VALUE_CHARS)
+  }
+  return boundAdmissionStamp(stamp)
+}
+
+/**
+ * The same stamp from the resolution chain in `resolveItemId` — the correlation
+ * fallback for a plain checkout on `feat/<id>`, where no env contract exists.
+ */
+export function admissionStampFromResolution(
+  resolved: ResolvedItem | undefined,
+): AdmissionStamp | undefined {
+  if (resolved === undefined) return undefined
+  return boundAdmissionStamp({ item: clip(resolved.id, MAX_VALUE_CHARS), source: resolved.source })
+}
+
+/** Drop fields, least load-bearing first, until the stamp fits its byte bound. */
+function boundAdmissionStamp(stamp: AdmissionStamp): AdmissionStamp | undefined {
+  if (stamp.item === undefined && stamp.branch === undefined) return undefined
+  for (const field of STAMP_DROP_ORDER) {
+    if (byteLength(JSON.stringify(stamp)) <= ADMISSION_STAMP_MAX_BYTES) break
+    delete stamp[field]
+  }
+  if (stamp.item === undefined && stamp.branch === undefined) return undefined
+  return byteLength(JSON.stringify(stamp)) <= ADMISSION_STAMP_MAX_BYTES ? stamp : undefined
+}
+
+/**
+ * Write the stamp onto an admission draft and return what was written.
+ *
+ * This is the whole rewrite contract of the `prompt` hook, and it is
+ * deliberately narrow:
+ * - ONLY `metadata` is written, and only under {@link ADMISSION_STAMP_KEY};
+ *   every other metadata key the caller set is preserved (the stamp merges, it
+ *   never replaces), and a re-admission of the same session overwrites the key
+ *   rather than accumulating.
+ * - `prompt.text`, `prompt.files`, `prompt.agents`, `prompt.skills` and
+ *   `delivery` are never touched: an admitted prompt stays byte-identical to
+ *   what the user submitted, and the delivery mode stays the host's.
+ * - `sessionID`/`messageID` are readonly by contract and never assigned.
+ */
+export function applyAdmissionStamp(
+  event: PromptEvent,
+  stamp: AdmissionStamp | undefined,
+): AdmissionStamp | undefined {
+  if (stamp === undefined) return undefined
+  const existing =
+    event.metadata !== null && typeof event.metadata === "object"
+      ? (event.metadata as Record<string, unknown>)
+      : undefined
+  event.metadata = { ...existing, [ADMISSION_STAMP_KEY]: stamp }
+  return stamp
+}
+
+/**
+ * Whether a `compaction` event still needs the item block: true when the system
+ * instructions are the array the hook can push into, no part already carries the
+ * marker (so a second compaction of the same session does not stack a duplicate)
+ * and no other plugin has already recorded the compaction (`result` set means
+ * the model is skipped, so there is nothing left to retain for).
+ */
+export function needsCompactionRetention(system: unknown, result?: unknown): boolean {
+  if (result !== undefined) return false
+  if (!Array.isArray(system)) return false
+  return !system.some(
+    (part) =>
+      part !== null &&
+      typeof part === "object" &&
+      typeof (part as { text?: unknown }).text === "string" &&
+      (part as { text: string }).text.includes(ITEM_MARKER),
+  )
+}
+
+/** The one system part a compaction retains: the item block, verbatim. */
+export function compactionRetentionPart(block: string): { type: "text"; text: string } {
+  return { type: "text", text: block }
+}
+
 /** Validate JSON failure → bounded warning detail (undefined when ok / unparsable). */
 export function parseValidateFailure(stdout: unknown): string | undefined {
   if (typeof stdout !== "string" || stdout.trim() === "") return undefined
@@ -997,6 +1188,40 @@ export function sessionDirectoryResolver(
   }
 }
 
+/**
+ * The directory a session-scoped hook acts on.
+ *
+ * The session's OWN location first — `Session.Info.location.directory`, the
+ * value `session_move` updates and the one {@link sessionDirectoryResolver}
+ * already reads per native-tool call — and the plugin instance's location
+ * directory only as a fallback for a host that exposes no session surface.
+ *
+ * This is the difference between the two: the worktree env contract's
+ * `.arggon.env` exists at the session's directory, never at the canonical
+ * checkout the plugin instance was loaded from (a worktree session and its
+ * project share one plugin registration, observed on 2.0.26). A hook that read
+ * `ctx.location.directory` would therefore never see a worktree session's
+ * declaration, and the stamp would silently come from the wrong checkout.
+ *
+ * A session lookup that throws (host storage unavailable) degrades to the
+ * plugin location: the hook still runs, it just holds the call to the
+ * coarser expectation.
+ */
+async function hookDirectory(ctx: PluginContext, sessionID: string | undefined): Promise<string | undefined> {
+  if (sessionID !== undefined) {
+    const resolve = sessionDirectoryResolver(ctx)
+    if (resolve !== undefined) {
+      try {
+        const directory = await resolve(sessionID)
+        if (directory !== undefined) return directory
+      } catch {
+        // Optional surface: fall through to the plugin instance's location.
+      }
+    }
+  }
+  return locationDirectory(ctx)
+}
+
 /** No-op outside ArggonManager trees: no tracker root, nothing to do. */
 function hasTasksTree(directory: string): boolean {
   try {
@@ -1048,6 +1273,14 @@ type CacheEntry = { at: number; item?: Record<string, unknown> }
 const itemCache = new Map<string, CacheEntry>()
 const branchCache = new Map<string, { at: number; branch?: string }>()
 const renamedSessions = new Map<string, string>()
+/**
+ * One admission-stamp log line per session per identity (`<session>:<item>:<source>`),
+ * so a long session that admits many prompts does not grow the log — the stamp
+ * itself rides on every prompt, the log line only reports the first.
+ */
+const stampedSessions = new Map<string, string>()
+/** One compaction-retention log line per session per item, same reason. */
+const retainedSessions = new Map<string, string>()
 
 /** Project-scoped cache key for one item view. */
 export function itemCacheKey(directory: string, id: string): string {
@@ -1224,19 +1457,34 @@ export async function onToolAfter(ctx: PluginContext, event: ToolEvent): Promise
   }
 }
 
+/**
+ * The item every injection path shares: resolve the session's item, load its
+ * bounded view through the CLI, and forget a stale storage correlation.
+ * Returns undefined when nothing resolves or the item is gone.
+ */
+async function resolveInjectedItem(
+  ctx: PluginContext,
+  sessionID: string,
+  directory: string,
+): Promise<Record<string, unknown> | undefined> {
+  const resolved = await resolveItemId(ctx, sessionID, directory)
+  if (resolved === undefined) return undefined
+  const item = await loadItem(ctx, directory, resolved.id)
+  if (item === undefined) {
+    // Stale storage entry (item moved/renamed): forget it, branch may resolve next call.
+    if (resolved.source === "storage") await storageRemove(ctx, sessionKey(sessionID))
+    return undefined
+  }
+  return item
+}
+
 async function onContext(ctx: PluginContext, event: ContextEvent): Promise<void> {
   try {
     const sessionID = asString(event.sessionID)
     const directory = locationDirectory(ctx)
     if (sessionID === undefined || directory === undefined || !hasTasksTree(directory)) return
-    const resolved = await resolveItemId(ctx, sessionID, directory)
-    if (resolved === undefined) return
-    const item = await loadItem(ctx, directory, resolved.id)
-    if (item === undefined) {
-      // Stale storage entry (item moved/renamed): forget it, branch may resolve next call.
-      if (resolved.source === "storage") await storageRemove(ctx, sessionKey(sessionID))
-      return
-    }
+    const item = await resolveInjectedItem(ctx, sessionID, directory)
+    if (item === undefined) return
     await maybeRename(ctx, sessionID, item)
     const system = event.system
     if (!Array.isArray(system)) return
@@ -1253,10 +1501,91 @@ async function onContext(ctx: PluginContext, event: ContextEvent): Promise<void>
     // `block=` carries the exact injected text so the smoke can measure its
     // bytes independently instead of trusting the reported count (F8).
     console.error(
-      `[arggon] context: injected item ${asString(item.id) ?? resolved.id} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`,
+      `[arggon] context: injected item ${asString(item.id)} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`,
     )
   } catch (error) {
     logOnce("context", "context injection failed", error)
+  }
+}
+
+/**
+ * T4 prompt-admission stamp: stamp the admitted prompt with the item/branch it
+ * was opened under.
+ *
+ * Resolution order is the worktree env contract first (the values `arggon start
+ * --worktree` writes at the worktree root, spec-worktree-env-contract-016 — the
+ * only source that names the worktree itself), then the host process's own
+ * declaration, then the correlation chain `resolveItemId` already uses
+ * (env → observed calls → branch). First source that declares an item or a
+ * branch wins and is named in the stamp, so a reader can always tell which
+ * expectation the stamp was held to.
+ *
+ * Read-only apart from the stamp: no CLI call, no storage write, no timer. A
+ * failure logs once and the prompt is admitted exactly as submitted.
+ *
+ * Exported so the guard order and the rewrite contract are testable with a fake
+ * context, like {@link onToolAfter}.
+ */
+export async function onPromptAdmission(ctx: PluginContext, event: PromptEvent): Promise<void> {
+  try {
+    const sessionID = asString(event.sessionID)
+    const directory = await hookDirectory(ctx, sessionID)
+    if (directory === undefined || !hasTasksTree(directory)) return
+    const stamp =
+      buildAdmissionStamp(findWorktreeEnv(directory)) ??
+      buildAdmissionStamp(processWorktreeIdentity()) ??
+      admissionStampFromResolution(
+        sessionID === undefined ? undefined : await resolveItemId(ctx, sessionID, directory),
+      )
+    const applied = applyAdmissionStamp(event, stamp)
+    if (applied === undefined) return
+    const id = applied.item ?? applied.branch ?? "?"
+    const key = `${sessionID ?? "?"}:${id}:${applied.source}`
+    if (stampedSessions.get(sessionID ?? "?") === key) return
+    setBounded(stampedSessions, sessionID ?? "?", key)
+    console.error(`[arggon] prompt: stamped admission ${id} from ${applied.source}`)
+  } catch (error) {
+    logOnce("prompt", "prompt admission stamping failed", error)
+  }
+}
+
+/**
+ * T4 compaction retention: keep the item block in scope for the checkpoint
+ * summary. A compaction request summarizes the transcript it replaces, so
+ * without this the block the context hook injects per call is the only copy
+ * left — and the summary is produced without it.
+ *
+ * The hook writes ONE system part and never `result`: the model still writes
+ * the summary. Idempotent per request (the marker check), bounded by the same
+ * ITEM_BLOCK_MAX_BYTES the context hook uses, and a no-op outside a tracker
+ * tree or when no item resolves. Exported for the same reason as
+ * {@link onToolAfter}: the guard order is testable with a fake context.
+ */
+export async function onCompaction(ctx: PluginContext, event: CompactionEvent): Promise<void> {
+  try {
+    const sessionID = asString(event.sessionID)
+    if (sessionID === undefined) return
+    const directory = await hookDirectory(ctx, sessionID)
+    if (directory === undefined || !hasTasksTree(directory)) return
+    if (!needsCompactionRetention(event.system, event.result)) return
+    const item = await resolveInjectedItem(ctx, sessionID, directory)
+    if (item === undefined) return
+    const system = event.system as unknown[]
+    const block = buildItemBlock(item, { currentDirectory: directory })
+    system.push(compactionRetentionPart(block.text))
+    // Tighter read, same as onContext: never fabricate an id to key the
+    // de-dup on. The block is already retained; a missing id (which the
+    // documented show envelope never produces) only skips the log de-dup.
+    const id = asString(item.id)
+    if (id !== undefined) {
+      if (retainedSessions.get(sessionID) === id) return
+      setBounded(retainedSessions, sessionID, id)
+    }
+    console.error(
+      `[arggon] compaction: retained item ${id} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`,
+    )
+  } catch (error) {
+    logOnce("compaction", "compaction retention failed", error)
   }
 }
 
@@ -2306,7 +2635,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
   {
     name: "report",
     description:
-      "Aggregate leaf statuses per story, grouped by epic; `trend: true` mines git history. Pure read — never writes.",
+      "Aggregate leaf statuses per story, grouped by epic, plus report-only container hygiene; `trend: true` mines git history. Pure read — never writes.",
     input: {
       type: "object",
       properties: {
@@ -2315,7 +2644,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
       },
       additionalProperties: false,
     },
-    output: envelopeSchema({ groups: { type: "array" }, trend: OBJECT }),
+    output: envelopeSchema({ groups: { type: "array" }, hygiene: OBJECT, trend: OBJECT }),
     run: (kernel, input, options) =>
       kernel.reportOperation({
         cwd: options.cwd,
@@ -2777,6 +3106,15 @@ type NativePreparationReceipt = {
    */
   stepsTruncated?: true
   /**
+   * The kernel's own count of the entries its cap dropped, MIRRORED verbatim
+   * beside `stepsTruncated` (bug-fresh-worktree-refusal-prose-drops-prep-step-
+   * truncation): the kernel sets the flag and the count together in the one
+   * branch that drops, so the two can never disagree — and the refusal prose
+   * quotes this count instead of re-deriving truncation from the list length.
+   * Present exactly when entries were dropped.
+   */
+  stepsDropped?: number
+  /**
    * Worktree env contract receipt (spec worktree-env-contract-016), forwarded
    * from the kernel when the caller requested env preparation (every
    * `start --worktree` run does).
@@ -2933,6 +3271,8 @@ function boundedPreparation(input: {
   steps?: NativePrepStep[]
   /** The kernel's own log-truncation decision; mirrored, never re-derived. */
   stepsTruncated?: true
+  /** The kernel's own count of the entries that decision dropped; mirrored. */
+  stepsDropped?: number
   env?: NativeEnvReceipt
   claim?: NativeClaimReceipt
 }): NativePreparationReceipt {
@@ -2980,7 +3320,9 @@ function boundedPreparation(input: {
   })
   // The kernel's own "the log was capped" decision (bug-native-steps-truncated-flag-dropped).
   // Mirrored verbatim, and only ever true when the kernel set it: a flag invented
-  // here would be a second, disagreeing account of the same event.
+  // here would be a second, disagreeing account of the same event. The dropped
+  // count below is forwarded from the same receipt, never recomputed from the
+  // bounded list's length.
   const kernelDroppedSteps = input.stepsTruncated === true
   // Env contract fragment (spec worktree-env-contract-016): projected, not
   // re-derived — the kernel owns the check and the six-key shape.
@@ -3001,8 +3343,7 @@ function boundedPreparation(input: {
     (input.steps?.length ?? 0) > steps.length ||
     input.missingDependenciesTotal > input.missingDependencies.length ||
     (input.gateBins?.length ?? 0) > gateBins.length ||
-    (claim?.foreignWrites !== undefined &&
-      claim.foreignWrites.total > claim.foreignWrites.files.length) ||
+    (claim !== undefined && claimForeignWritesTruncated(claim, input.claim)) ||
     (claim !== undefined && claimTakeoverTruncated(claim, input.claim)) ||
     built.some((name, index) => name !== input.builtWorkspaces[index]) ||
     linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
@@ -3026,6 +3367,12 @@ function boundedPreparation(input: {
     gateBins,
     ...(steps.length > 0 ? { steps } : {}),
     ...(kernelDroppedSteps ? { stepsTruncated: true as const } : {}),
+    // The kernel's own dropped-entry count, forwarded verbatim beside the flag
+    // (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation): the kernel
+    // emits the pair together in the one branch that drops, so the refusal
+    // prose that renders `steps` can state how much of the log is missing
+    // without re-deriving it from the list length.
+    ...(input.stepsDropped !== undefined ? { stepsDropped: input.stepsDropped } : {}),
     ...(env !== undefined ? { env } : {}),
     ...(claim !== undefined ? { claim } : {}),
     ...(truncated ? { truncated: true } : {}),
@@ -3123,8 +3470,43 @@ function boundedClaimStamp(input: NativeClaimStamp): NativeClaimStamp {
 }
 
 /**
+ * True when bounding shortened the foreign-write report: an over-cap
+ * named-file list or a string clipped at `MAX_NATIVE_PREPARATION_VALUE_CHARS`
+ * (`owner`, `claimedAt`, each `files` entry), compared against the kernel's
+ * own values.
+ *
+ * The decision (task-foreign-writes-char-clip-truncated): the shared flag
+ * reports CHARACTER clipping for `foreignWrites` too — the same discipline
+ * {@link claimTakeoverTruncated} and the
+ * `built`/`linked`/`missingDependencies` projections already apply. The
+ * alternative reading ("the flag only names kernel count caps, character
+ * clipping stays silent") was rejected: a repo-relative path or identity
+ * silently shortened to 200 chars and then reported as the whole value is
+ * exactly the failure this flag exists to name, and the kernel never caps
+ * these strings. A pathological path makes the default receipt carry
+ * `truncated: true`; that is the honest account. The kernel owns `total`, so
+ * the count fold never re-derives evidence.
+ */
+function claimForeignWritesTruncated(
+  bounded: NativeClaimReceipt,
+  input: NativeClaimReceipt | undefined,
+): boolean {
+  if (input === undefined) return true
+  const report = bounded.foreignWrites
+  const source = input.foreignWrites
+  if (report === undefined || source === undefined) return false
+  return (
+    report.owner !== source.owner ||
+    report.claimedAt !== source.claimedAt ||
+    report.total > report.files.length ||
+    report.files.some((file, index) => file !== source.files[index])
+  )
+}
+
+/**
  * True when bounding shortened the take-over's evidence: an over-cap named-file
- * list, a string clipped at `MAX_NATIVE_PREPARATION_VALUE_CHARS`, or an over-cap
+ * list, a string clipped at `MAX_NATIVE_PREPARATION_VALUE_CHARS` (including
+ * every string inside a `replaced.takeovers[]` chain entry), or an over-cap
  * chain inside the replaced stamp.
  *
  * The length fold is the honest "you are not seeing all of it" signal (the
@@ -3139,7 +3521,11 @@ function boundedClaimStamp(input: NativeClaimStamp): NativeClaimStamp {
  * already caps `takeovers` at `MAX_CLAIM_TAKEOVERS` (5) before this mapper
  * ever sees it, so through the kernel it cannot fire. It stays because the
  * input is a file in the worktree's git dir, and an unreachable-but-harmless
- * branch is cheaper than a silent assumption.
+ * branch is cheaper than a silent assumption. The per-entry string comparison
+ * is NOT that: the kernel caps the chain's LENGTH, never its strings, so a
+ * hostile `by` inside a chain entry reaches this mapper intact and would
+ * otherwise clip silently — the same question as `foreignWrites`, answered the
+ * same way (task-foreign-writes-char-clip-truncated).
  */
 function claimTakeoverTruncated(
   bounded: NativeClaimReceipt,
@@ -3162,10 +3548,23 @@ function claimTakeoverTruncated(
     takeOver.replaced.assignee !== replaced.assignee ||
     takeOver.replaced.surface !== replaced.surface ||
     takeOver.files.some((file, index) => file !== source.files[index])
+  const chain = replaced.takeovers ?? []
+  const projectedChain = takeOver.replaced.takeovers ?? []
+  const chainClipped = chain.some((entry, index) => {
+    const projected = projectedChain[index]
+    return (
+      projected === undefined ||
+      projected.at !== entry.at ||
+      projected.by !== entry.by ||
+      projected.replacedIdentity !== entry.replacedIdentity ||
+      projected.replacedClaimedAt !== entry.replacedClaimedAt
+    )
+  })
   return (
     clipped ||
+    chainClipped ||
     takeOver.total > takeOver.files.length ||
-    (replaced.takeovers?.length ?? 0) > (takeOver.replaced.takeovers?.length ?? 0)
+    chain.length > projectedChain.length
   )
 }
 
@@ -4363,6 +4762,12 @@ async function nativeStartBody(
       progress.preparation?.gateBins ?? [],
       worktreePath,
       progress.preparation?.steps ?? [],
+      // The kernel's own dropped-entry count, mirrored through
+      // `boundedPreparation` (bug-fresh-worktree-refusal-prose-drops-prep-step-
+      // truncation): the bounded log cannot say how much is missing, so the
+      // refusal prose quotes the count instead of reading a capped list as
+      // complete.
+      progress.preparation?.stepsDropped ?? 0,
     )
     if (refusal !== null) {
       // ORDER IS LOAD-BEARING, same contract the strict worktree-write gate
@@ -4652,7 +5057,19 @@ function nativeComposeDown(project: string, cwd: string): Promise<void> {
  * A removal that is not observably complete reports a per-candidate failure
  * and preserves both the branch and the record.
  * Skips (non-terminal item, unmerged branch, missing/foreign path) are
- * reported, never touched.
+ * reported, never touched, and so is removal-blocking content
+ * (bug-cleanup-prune-untracked-artifacts-no-force): untracked blockers keep the
+ * conservative skip unless the caller armed `force` (then the removal passes
+ * --force for exactly that entry), and tracked modifications are never
+ * force-discarded, with or without the flag.
+ *
+ * A recorded path that is no longer a LIVE worktree — missing on disk, or a
+ * leftover directory whose gitdir link is gone (`prunable` in `git worktree
+ * list`) — is a stale record, never a removal candidate
+ * (bug-cleanup-stuck-when-worktree-dir-gone): the reaper skips the removal,
+ * prunes the dead git record itself (`git worktree prune`, which is what pins
+ * the branch before the delete), deletes the merged branch and clears the
+ * record. A leftover directory is left in place.
  *
  * `release: <id>` takes the OTHER arm of the worktree domain: the inverse of
  * `start` for a claim that was dropped (bug-unclaim-leaves-worktree-record-
@@ -4660,15 +5077,20 @@ function nativeComposeDown(project: string, cwd: string): Promise<void> {
  * (`classifyReleaseEntry`, the same one the CLI uses), removes the worktree
  * through the domain, deletes its branch, reaps the start-created env file and
  * the claim stamp, and clears the record — reported as its own `release` /
- * `released` action family, never mixed into `pruned`. Refused with the same
- * evidence and remedy order the CLI reports: unconditionally while the item is
- * still claimed (a re-claimed item has a live owner; the hatch does not bypass
- * it), and for a stamp held by another identity whose window shows a live writer
- * or for removal-blocking content. `take_over_worktree` is the audited hatch for
- * a presumed-dead stamped owner — the mirror of `start`'s, and the only thing
- * that forces the removal; without a `release` it is refused (m5). The identity
- * is the calling session — exactly what `start` stamped — so the ordinary path
- * is never refused.
+ * `released` action family, never mixed into `pruned`. A recorded path that is
+ * no longer a LIVE worktree (missing on disk, or a leftover directory whose
+ * gitdir link is gone) is a stale record for the release too
+ * (bug-cleanup-release-stale-record-wedge): the domain removal is skipped, the
+ * dead git record is pruned (it pins the branch), the branch the record still
+ * names is deleted and the record is cleared — a leftover directory is left in
+ * place. Refused with the same evidence and remedy order the CLI reports:
+ * unconditionally while the item is still claimed (a re-claimed item has a live
+ * owner; the hatch does not bypass it), and for a stamp held by another identity
+ * whose window shows a live writer or for removal-blocking content.
+ * `take_over_worktree` is the audited hatch for a presumed-dead stamped owner —
+ * the mirror of `start`'s, and the only thing that forces the removal; without a
+ * `release` it is refused (m5). The identity is the calling session — exactly
+ * what `start` stamped — so the ordinary path is never refused.
  */
 async function nativeCleanup(
   kernel: ArgonKernel,
@@ -4723,6 +5145,17 @@ async function nativeCleanup(
       version,
     )
   }
+  if (input.force === true && input.prune !== true) {
+    // The prune force opt-in authorizes a prune; without one it is a silent
+    // no-op — refuse loudly (CLI parity: `--force requires --prune`).
+    return worktreeFail(
+      kernel,
+      "cleanup",
+      "CLEANUP_FAILED",
+      "force requires prune (it discards the untracked content of terminal+merged worktrees)",
+      version,
+    )
+  }
 
   const inventory = await domainWorktrees(options)
   const runner = {
@@ -4737,7 +5170,17 @@ async function nativeCleanup(
   const entries =
     releaseId === undefined
       ? tracked.map((item) =>
-          kernel.classifyCleanupEntry(item, root, base, runner, { noGh: input.no_gh === true }),
+          kernel.classifyCleanupEntry(item, root, base, runner, {
+            noGh: input.no_gh === true,
+            // The force opt-in (bug-cleanup-prune-untracked-artifacts-no-force)
+            // widens eligibility to untracked-only blockers; tracked
+            // modifications keep their refusal either way.
+            force: input.force === true,
+            // Exactly what the removal below unlinks against (canonical + this
+            // root), so classification and removal can never disagree about a
+            // start-created install entry.
+            primaryRoots: [canonicalRoot(options, root), root],
+          }),
         )
       : []
 
@@ -4806,9 +5249,11 @@ async function nativeCleanup(
           kernel.unlinkWorktreeEnv(entry.path)
           // The SAME observed removal the start rollback uses, without its force
           // policy: a dirty worktree must still be refused by git (bug-native-
-          // cleanup-unverified-worktree-removal).
+          // cleanup-unverified-worktree-removal). The one exception is the
+          // classification's own `forced` decision (terminal+merged, blockers
+          // all untracked, caller armed `force`) — never tracked modifications.
           const removal = await removeWorktreeObserved(options, entry.path, root, {
-            force: false,
+            force: entry.forced === true,
           })
           if (!removal.removed) {
             // A domain that resolves without removing (or a failing domain plus
@@ -4829,8 +5274,23 @@ async function nativeCleanup(
           pruned.push({
             id: entry.id,
             action: `removed worktree ${entry.path}`,
+            ...(entry.forced === true ? { forced: true } : {}),
             ...(entry.via !== undefined ? { via: entry.via } : {}),
           })
+        } else if (entry.action?.startsWith("clear stale worktree_path record")) {
+          // The worktree is already gone (missing on disk, or no longer a live
+          // worktree). Its git record may still be there — `prunable`, kept by
+          // git even when only the leftover directory survives — and that
+          // record PINS the branch: `git branch -d` refuses it with "cannot
+          // delete branch '<b>' used by worktree at '<path>'"
+          // (bug-cleanup-stuck-when-worktree-dir-gone). The reaper drops the
+          // dead record itself, so no manual `git worktree prune` step is ever
+          // needed before the branch step below. `--verbose` output is
+          // non-empty exactly when a record was dropped, so the action is only
+          // reported when something actually happened.
+          if (git.pruneWorktrees?.(root) === true) {
+            pruned.push({ id: entry.id, action: "pruned stale git worktree record" })
+          }
         }
         if (entry.branch !== null && git.branchExists(root, entry.branch)) {
           try {
@@ -4961,9 +5421,15 @@ type CleanupGitShape = ReturnType<ArgonKernel["defaultCleanupGit"]>
  * classification (`classifyReleaseEntry`), same Compose-first ordering, same
  * ownership-scoped reaping (install link, start-shaped env file, claim stamp),
  * same observed domain removal, same force branch delete, same record clear and
- * same both-surfaces failure reporting. The identity is the calling session —
- * what `start` stamped — with the item's assignee as the fallback when the
- * runtime supplies no session id.
+ * same both-surfaces failure reporting. A recorded path that is no longer a
+ * LIVE worktree is a stale record (bug-cleanup-release-stale-record-wedge): the
+ * domain removal and the stamp/env steps are skipped, while the declared Compose
+ * project is still reaped FIRST, exactly as the CLI arm and prune's stale entries
+ * do it (task-release-stale-compose-reaping; the project name derives from the
+ * recorded path, never from a live directory); the dead git record is pruned (it
+ * pins the branch), the branch git's record still names is deleted and the record
+ * is cleared. The identity is the calling session — what `start` stamped — with
+ * the item's assignee as the fallback when the runtime supplies no session id.
  */
 async function nativeRelease(
   kernel: ArgonKernel,
@@ -5016,21 +5482,42 @@ async function nativeRelease(
   // THAT worktree copy, so releasing it disposes the record with the directory —
   // nothing to write, and no commit could outlive the removal).
   const recordHome = resolve(root) !== resolve(path)
+  // Stale-record clause (bug-cleanup-release-stale-record-wedge): the worktree
+  // is already gone — missing on disk, or a leftover directory whose gitdir
+  // link is gone (`prunable`) — so there is no removal to attempt through the
+  // domain and no stamp/env to unlink. What is left is the declared Compose
+  // project (reaped below, exactly as prune reaps it for a stale entry), the
+  // dead git record (which PINS the branch: `git branch -D` refuses it with
+  // "cannot delete branch … used by worktree"), the branch and the item record.
+  const stale = classified.action?.startsWith("clear stale worktree_path record") === true
 
   try {
-    if (classified.action !== "clear stale worktree_path record (path missing on disk)") {
-      // Compose first (ADR 0019 layer 2, exploration 017 F8); an absent docker
-      // CLI degrades the run report-only, exactly as in the prune loop.
-      if (run.compose !== undefined && !run.isComposeUnavailable()) {
-        const project = kernel.worktreeComposeProject(run.compose.declared, basename(path))
-        try {
-          await nativeComposeDown(project, root)
-          actions.push({ id, action: `reaped compose project ${project}` })
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException | null)?.code !== "ENOENT") throw error
-          run.compose.dockerUnavailable = true
-        }
+    // Compose first, for EVERY releasable entry — live or stale (ADR 0019 layer
+    // 2, exploration 017 F8; CLI parity and prune's stale-entry parity,
+    // task-release-stale-compose-reaping). The teardown needs no live worktree:
+    // the project name derives from the RECORDED path's basename — the worktree
+    // id the adopter pattern built the project around — and an already-gone
+    // project is the exit-0 no-op prune relies on. Skipping it for a stale
+    // record would strand the stack for good: the item is not terminal, so prune
+    // never considers it again, and the cleared record would remove the last
+    // caller that could.
+    //
+    // The failure discipline is the release arm's own, not prune's: a failed
+    // teardown aborts the release (both surfaces report it, the worktree record
+    // stays), so a retry after the daemon recovers can still reach the stack.
+    // Following prune's non-fatal discipline here would clear the record that is
+    // the retry's only anchor.
+    if (run.compose !== undefined && !run.isComposeUnavailable()) {
+      const project = kernel.worktreeComposeProject(run.compose.declared, basename(path))
+      try {
+        await nativeComposeDown(project, root)
+        actions.push({ id, action: `reaped compose project ${project}` })
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException | null)?.code !== "ENOENT") throw error
+        run.compose.dockerUnavailable = true
       }
+    }
+    if (!stale) {
       // CLI parity: the start-created install link and the start-shaped env
       // file are untracked and block the removal; ownership-scoped removal only
       // (never a real directory, never an adopter's own file). The env contract
@@ -5043,10 +5530,6 @@ async function nativeRelease(
       // with it, so only the post-removal reap below matters for a DOMAIN
       // removal (it never touches `.git/worktrees/<name>`). CLI parity.
       const hadStamp = kernel.readWorktreeClaimStamp(path) !== null
-      // Uncommitted work is never discarded silently. The classification already
-      // refused removal-blocking content unless the take-over hatch was armed
-      // (the dirty gate, CLI parity), so forcing here is exactly the caller's
-      // "that owner is dead and that work is disposable" — the only case.
       // Uncommitted work is never discarded silently. The classification already
       // refused removal-blocking content unless the take-over hatch was armed
       // (the dirty gate, CLI parity), so forcing here is exactly the caller's
@@ -5074,31 +5557,42 @@ async function nativeRelease(
       } else if (hadStamp) {
         actions.push({ id, action: "arggon-claim.json stamp gone with the worktree" })
       }
-      if (classified.branch !== null && git.branchExists(gitRoot, classified.branch)) {
-        try {
-          // Force, never the safe delete: an abandoned claim's branch is by
-          // definition not provably merged (that is prune's eligibility), and
-          // the release is already an explicit, refusal-gated discard.
-          git.deleteBranchForce(gitRoot, classified.branch)
-          actions.push({ id, action: `deleted branch ${classified.branch}` })
-        } catch (error) {
-          const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)
-          failures.push(`${id}: ${message}`)
-          actions.push({
-            id,
-            action: "failed",
-            error: message,
-            leftoverBranch: classified.branch,
-          })
-        }
+    } else if (git.pruneWorktrees?.(gitRoot) === true) {
+      // The dead record PINS the branch, so it goes before the branch step —
+      // exactly like prune's stale entries (bug-cleanup-stuck-when-worktree-dir-gone).
+      // Reported only when a record was actually dropped (`--verbose` output is
+      // non-empty exactly then). Git calls run from the canonical worktree, like
+      // every other call in this release.
+      actions.push({ id, action: "pruned stale git worktree record" })
+    }
+    if (classified.branch !== null && git.branchExists(gitRoot, classified.branch)) {
+      try {
+        // Force, never the safe delete: an abandoned claim's branch is by
+        // definition not provably merged (that is prune's eligibility), and
+        // the release is already an explicit, refusal-gated discard. Reached
+        // for a stale record too: the branch comes from the dead git record
+        // (the worktree cannot be asked).
+        git.deleteBranchForce(gitRoot, classified.branch)
+        actions.push({ id, action: `deleted branch ${classified.branch}` })
+      } catch (error) {
+        const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)
+        failures.push(`${id}: ${message}`)
+        actions.push({
+          id,
+          action: "failed",
+          error: message,
+          leftoverBranch: classified.branch,
+        })
       }
     }
-    if (recordHome) {
+    if (stale || recordHome) {
       // The record outlives the removal here: cleared AFTER the worktree is
       // observably gone (prune's invariant), in ONE tracker commit — which this
       // run OWNS and RETURNS (review M3: committing here and then letting the
       // run-level commit stage the same path reported `skipped: "nothing to
-      // commit"` for a commit it had just made).
+      // commit"` for a commit it had just made). A stale record was never
+      // disposed WITH anything (nothing was removed; the leftover directory
+      // survives), so it is always cleared, wherever the run's tracker copy is.
       const cleared = kernel.updateOperation({
         cwd: root,
         id,
@@ -5201,6 +5695,9 @@ const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
       type: "object",
       properties: {
         prune: BOOLEAN,
+        // Bare by budget (ADR 0006): the force contract is named in the prune
+        // reason and documented in ArggonManager/docs/agents.md §Cleanup.
+        force: BOOLEAN,
         release: ID,
         take_over_worktree: BOOLEAN,
         no_gh: {
@@ -5456,6 +5953,23 @@ const definition: PluginDefinition = {
     } catch (error) {
       logOnce("context-hook", "session context hook unavailable", error)
     }
+    // T4 (plan-methodology-adapters-017): the prompt-admission stamp and the
+    // compaction retention. Registered beside the context hook — same
+    // feature detection, same failure isolation, same disposal. A host without
+    // either hook (older 2.0.x) keeps every other path unchanged.
+    for (const [name, handler, key] of [
+      ["prompt", onPromptAdmission, "prompt-hook"],
+      ["compaction", onCompaction, "compaction-hook"],
+    ] as const) {
+      try {
+        const hook = ctx?.session?.hook
+        if (typeof hook !== "function") break
+        const registration = await hook(name, (event) => handler(ctx, event as never))
+        disposers.push(() => dispose(registration))
+      } catch (error) {
+        logOnce(key, `session ${name} hook unavailable`, error)
+      }
+    }
     try {
       const hook = ctx?.tool?.hook
       if (typeof hook === "function") {
@@ -5494,17 +6008,20 @@ export {
   ARGON_BOARD_PANEL,
   BOARD_DETAIL_MAX_LINE_CHARS,
   BOARD_DETAIL_MAX_ROWS,
+  BOARD_HIERARCHY_CHILD_KEYS,
   BOARD_SELECTION_MARK,
   BOARD_SELECTION_PAGE,
   BOARD_STATUS_MARKS,
   BOARD_STATUS_ORDER,
   BOARD_TYPE_BADGES,
   activeBoardId,
+  boardChildrenOf,
   boardCountsLine,
   boardDetailLines,
   boardHeaderLine,
   boardItemDetail,
   boardItemLine,
+  boardParentId,
   boardRoot,
   boardSnapshot,
   boardTreeEntries,
@@ -5520,6 +6037,8 @@ export {
 } from "./board.js"
 export type {
   BoardActiveInput,
+  BoardHierarchyItem,
+  BoardHierarchyLink,
   BoardItem,
   BoardItemDetail,
   BoardSelection,

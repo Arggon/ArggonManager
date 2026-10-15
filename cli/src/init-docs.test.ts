@@ -26,7 +26,7 @@ import {
   updateGeneratedSection,
   type GeneratedEntry,
 } from "@arggondev/lib";
-import { runInit } from "./init.js";
+import { runInit, dryRunInit } from "./init.js";
 import { runCli as runCliBase } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -134,6 +134,19 @@ describe("init docs: tier-1 content", () => {
     expect(contributing).toContain("work item id");
   });
 
+  it("CONTRIBUTING.md and the PR template state the check as what the project declares", () => {
+    const contributing = readFileSync(join(dir, "CONTRIBUTING.md"), "utf8");
+    const pr = readFileSync(join(dir, ".github/PULL_REQUEST_TEMPLATE.md"), "utf8");
+    // bug-adopter-engineering-template-software-locked follow-up
+    // (task-adopter-template-family-followups): the check is named by what the
+    // project declares and the software case is a marked worked example, so a
+    // non-software adopter reads its own verification — not "tests pass".
+    for (const text of [contributing, pr]) {
+      expect(text).toContain("The verification this project declares");
+      expect(text).not.toContain("Tests pass locally");
+    }
+  });
+
   it("docs/tracking.md replaces GitHub issue templates", () => {
     const tracking = readFileSync(join(dir, "ArggonManager/docs/tracking.md"), "utf8");
     expect(tracking).toContain("ArggonManager/");
@@ -173,6 +186,19 @@ describe("init docs: tier-2 content (--full)", () => {
     expect(engineering).toContain("## Definition of done");
     // Adopter-owned: the generated docs must not leak this repo's own doc text.
     expect(engineering).not.toContain("auto-done workflow");
+  });
+
+  it("docs/engineering.md keeps the docs-only exemption outside the software worked example", () => {
+    const engineering = readFileSync(join(dir, "ArggonManager/docs/engineering.md"), "utf8");
+    // bug-adopter-engineering-template-software-locked follow-up
+    // (task-adopter-template-family-followups): the exemption is a general
+    // clause for every project, not a sentence inside the software example.
+    expect(engineering).toContain("Docs-only changes are exempt from the end-to-end check");
+    const workedExample = engineering
+      .split("\n")
+      .find((line) => line.includes("Worked examples (software)"));
+    expect(workedExample).toBeDefined();
+    expect(workedExample).not.toContain("Docs-only");
   });
 
   it("CHANGELOG.md follows Keep a Changelog", () => {
@@ -313,6 +339,77 @@ describe("init docs: --json payload", () => {
     expect(body.created).toContain("ArggonManager/docs/convention.md");
     expect(body.created).toContain("ArggonManager/docs/runbooks/README.md");
     expect(existsSync(join(dir, "ArggonManager/docs/engineering.md"))).toBe(true);
+  });
+});
+
+/**
+ * Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+ * a file under a managed path whose own visible marker claims arggon
+ * provenance but which has no `x-generated` entry is REPORTED by init (JSON and
+ * human) and by `--dry-run` — never silently kept as an anonymous
+ * adopter-modified edit. The file itself is never touched: init cannot know
+ * whether the content is the adopter's, and reporting is the whole remedy.
+ */
+describe("init docs: unprovenanced managed files", () => {
+  const DEST = ".opencode/agents/arggon-prover.md";
+  const TEMPLATE = "opencode/agents/arggon-prover.md";
+
+  /** The stranded shape: marker + no row + a template the install no longer ships. */
+  function strand(dir: string): string {
+    const abs = join(dir, ...DEST.split("/"));
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, `${generatedYamlMarker(TEMPLATE)}\ndescription: stranded\n`, "utf8");
+    return abs;
+  }
+
+  it("reports the file in the run and the dry run, and leaves it untouched", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const abs = strand(dir);
+    const before = readFileSync(abs, "utf8");
+
+    const result = runInit({ dir, force: false, full: true });
+    expect(result.unprovenanced).toEqual([
+      { dest: DEST, template: TEMPLATE, reason: expect.stringContaining("no x-generated entry") },
+    ]);
+    expect(readFileSync(abs, "utf8")).toBe(before); // kept, never regenerated
+
+    const dry = dryRunInit({ dir, force: false, full: true });
+    expect(dry.unprovenanced.map((file) => file.dest)).toEqual([DEST]);
+  });
+
+  it("carries the class on the CLI --json envelope and the human report", () => {
+    const dir = tempDir();
+    runCli(["init", dir, "--full", "--json"]);
+    strand(dir);
+
+    const proc = runCli(["init", dir, "--full", "--json"]);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      unprovenanced: { dest: string; template: string }[];
+    };
+    expect(body.unprovenanced).toEqual([
+      { dest: DEST, template: TEMPLATE, reason: expect.any(String) },
+    ]);
+
+    const human = runCli(["init", dir, "--full"]);
+    expect(human.status).toBe(0);
+    expect(human.stdout).toContain("unprovenanced managed file");
+    expect(human.stdout).toContain(DEST);
+    expect(human.stdout).toContain(TEMPLATE);
+  });
+
+  it("reports nothing on a clean scaffold (adopter-owned managed files stay silent)", () => {
+    const dir = tempDir();
+    expect(runInit({ dir, force: false, full: true }).unprovenanced).toEqual([]);
+    // A managed path with no marker and no row is the sanctioned
+    // pre-provenance adopter file: init skipping it is correct, and nothing is
+    // reported.
+    const mine = join(dir, ".opencode/agents/my-own-agent.md");
+    mkdirSync(dirname(mine), { recursive: true });
+    writeFileSync(mine, "---\ndescription: mine\n---\n", "utf8");
+    expect(runInit({ dir, force: false, full: true }).unprovenanced).toEqual([]);
+    expect(dryRunInit({ dir, force: false, full: true }).unprovenanced).toEqual([]);
   });
 });
 
@@ -599,10 +696,16 @@ describe("init docs: orchestration by default (task-orchestration-default-refile
     expect(agents).toMatch(/### orchestration/i);
     expect(agents).toMatch(/delegated by default/i);
     expect(agents).toContain("file-disjoint");
-    expect(agents).toContain("coordinator");
+    // ADR 0021 §6.1/§6.2: the adopter template names the shipped role
+    // ("delivery lead"), never the pre-rename "coordinator" — and the review
+    // clause names the bar by what the project declares, not by a software
+    // job title ("lead architect"). The family-wide guard is
+    // cli/src/adopter-template-invariant-drift.test.ts.
+    expect(agents).toContain("delivery lead");
+    expect(agents).not.toMatch(/\bcoordinat/i);
     expect(agents).toMatch(/never steal a claim/i);
     expect(agents).toMatch(/code-review/i);
-    expect(agents).toMatch(/lead architect/i);
+    expect(agents).toMatch(/project's own bar/i);
   });
 });
 

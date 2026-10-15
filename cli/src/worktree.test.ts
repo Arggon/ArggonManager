@@ -13,6 +13,7 @@ import {
   mkdtempSync as _mkdtempSync,
   readFileSync,
   readlinkSync,
+  rmSync,
   symlinkSync,
   utimesSync,
   writeFileSync,
@@ -23,7 +24,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { MAX_ENVELOPE_DETAIL_CHARS, defaultCleanupGit, runCleanup } from "./cleanup.js";
 import { parseFrontmatter, runCreate, runUpdate, runValidate } from "@arggondev/lib";
 
-import { satisfyAllAcceptance } from "../../test/acceptance.js";
+import { satisfyAllAcceptance, satisfyPlaceholders } from "../../test/acceptance.js";
 
 import { runInit } from "./init.js";
 import { defaultStartGit, runStart } from "./start.js";
@@ -93,6 +94,9 @@ function initRepo(): string {
   // Done gate (task-done-gate-acceptance-waiver, ADR 0015): these suites flip
   // the leaves done for cleanup/worktree rules, so arrange satisfied contracts.
   satisfyAllAcceptance(dir);
+  // Placeholder guard (task-validate-refuses-placeholder-bodies): the scaffold
+  // IS the template placeholder, so arrange real prose over the markers too.
+  satisfyPlaceholders(dir);
   // init now also generates AND auto-commits the governing docs; this is a
   // tolerant no-op when everything is already committed (tracker hygiene).
   commitAllIfDirty(dir, "init tasks");
@@ -1176,6 +1180,98 @@ describe("arggon cleanup", () => {
     expect(refExists(dir, "refs/heads/feat/task-charlie")).toBe(true);
   });
 
+  it("converges when the worktree directory was already removed by hand (stale record)", () => {
+    // bug-cleanup-stuck-when-worktree-dir-gone: an interrupted earlier removal
+    // leaves the item's worktree_path recorded while the directory is gone. The
+    // reaper may not need `git worktree prune` first — it prunes the dead record
+    // itself (the record pins the branch: `git branch -d` refuses with "used by
+    // worktree at <path>"), then deletes the merged branch and clears the record.
+    const { dir, paths } = initCleanupRepo();
+    const wt = paths["task-alpha"];
+    rmSync(wt, { recursive: true, force: true });
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true });
+
+    expect(result.failures).toEqual([]);
+    const entry = result.entries.find((e) => e.id === "task-alpha")!;
+    expect(entry.removable).toBe(true);
+    expect(entry.action).toBe("clear stale worktree_path record (path missing on disk)");
+    expect(result.pruned).toEqual([
+      { id: "task-alpha", action: "pruned stale git worktree record" },
+      { id: "task-alpha", action: "deleted branch feat/task-alpha" },
+      { id: "task-alpha", action: "cleared worktree_path" },
+    ]);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    expect(git(["worktree", "list", "--porcelain"], dir)).not.toContain(wt);
+    const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
+    expect(parseFrontmatter(raw).data.worktree_path).toBeUndefined();
+  });
+
+  it("converges when the directory survived but its gitdir was lost (interrupted removal)", () => {
+    // The exact wedge: `git worktree remove` died half-way, taking `.git` with
+    // it; git still lists the record as `prunable`, so the classifier reported
+    // `removable: true` and the removal failed forever ("validation failed,
+    // cannot remove working tree: '<path>/.git' does not exist"; after a manual
+    // prune, "fatal: '<path>' is not a working tree"). The entry is a stale
+    // record: no removal is attempted, the dead record is pruned, the merged
+    // branch is deleted and the record is cleared — debris untouched.
+    const { dir, paths } = initCleanupRepo();
+    const wt = paths["task-alpha"];
+    rmSync(join(wt, ".git"), { force: true });
+    expect(git(["worktree", "list", "--porcelain"], dir)).toContain("prunable");
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true });
+
+    expect(result.failures).toEqual([]);
+    const entry = result.entries.find((e) => e.id === "task-alpha")!;
+    expect(entry.removable).toBe(true);
+    expect(entry.action).toBe(
+      "clear stale worktree_path record (path is not a live worktree of this repo; " +
+        "any leftover directory is left in place)",
+    );
+    expect(result.pruned).toEqual([
+      { id: "task-alpha", action: "pruned stale git worktree record" },
+      { id: "task-alpha", action: "deleted branch feat/task-alpha" },
+      { id: "task-alpha", action: "cleared worktree_path" },
+    ]);
+    // The debris is never the reaper's to delete: the files stay in place.
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    expect(git(["worktree", "list", "--porcelain"], dir)).not.toContain(wt);
+    const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
+    expect(parseFrontmatter(raw).data.worktree_path).toBeUndefined();
+  });
+
+  it("converges when a manual `git worktree prune` already dropped the dead record", () => {
+    // The state the incident was hand-repaired from: the directory remains, git
+    // no longer knows the worktree. The old classifier skipped it forever
+    // ("path exists but is not a git worktree of this repo (remove it
+    // manually)"); the stale record is now cleared and the branch deleted.
+    const { dir, paths } = initCleanupRepo();
+    const wt = paths["task-alpha"];
+    rmSync(join(wt, ".git"), { force: true });
+    git(["worktree", "prune"], dir);
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true });
+
+    expect(result.failures).toEqual([]);
+    const entry = result.entries.find((e) => e.id === "task-alpha")!;
+    expect(entry.removable).toBe(true);
+    expect(entry.action).toBe(
+      "clear stale worktree_path record (path is not a live worktree of this repo; " +
+        "any leftover directory is left in place)",
+    );
+    // No prune step: git already dropped the record, so nothing was pruned.
+    expect(result.pruned).toEqual([
+      { id: "task-alpha", action: "deleted branch feat/task-alpha" },
+      { id: "task-alpha", action: "cleared worktree_path" },
+    ]);
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
+    expect(parseFrontmatter(raw).data.worktree_path).toBeUndefined();
+  });
+
   it("prunes a worktree whose start-created node_modules link is untracked (review F2)", () => {
     const dir = initRepo();
     addFakeDependency(dir, "fake-gate-dep");
@@ -1239,6 +1335,146 @@ describe("arggon cleanup", () => {
     expect(existsSync(wt)).toBe(false);
     // Only the worktree's link was removed: the main install is untouched.
     expect(existsSync(join(dir, "node_modules", "fake-gate-dep", "index.js"))).toBe(true);
+  });
+
+  it("honestly skips a worktree with untracked generated artifacts, then reaps it with --force", () => {
+    const dir = initRepo();
+    const alpha = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    const wt = alpha.worktreePath!;
+    // The incident's shape (2026-10-12): untracked generated scaffolding that
+    // only ever lives in the worktree — never committed, never in a PR. Plain
+    // `git worktree remove` refuses it.
+    writeFileSync(join(wt, "harness-output.json"), "{}\n", "utf8");
+    mkdirSync(join(wt, "generated"), { recursive: true });
+    writeFileSync(join(wt, "generated", "spec.json"), "{}\n", "utf8");
+    runUpdate({ cwd: wt, id: "task-alpha", status: "done", now: NOW });
+    git(["add", "ArggonManager"], wt);
+    git(["commit", "--quiet", "-m", "close task-alpha"], wt);
+    git(["merge", "--quiet", "feat/task-alpha"], dir);
+
+    // Default: conservative. The receipt says WHY, names the exact remedy, and
+    // nothing is attempted (no raw git failure).
+    const refused = runCleanup({ cwd: dir, prune: true, noGh: true });
+
+    const refusedEntry = refused.entries.find((e) => e.id === "task-alpha")!;
+    expect(refusedEntry.removable).toBe(false);
+    expect(refusedEntry.reason).toContain("untracked");
+    expect(refusedEntry.reason).toContain("harness-output.json");
+    expect(refusedEntry.reason).toContain("arggon cleanup --prune --force");
+    expect(refusedEntry.reason).toContain("cleanup({ prune: true, force: true })");
+    expect(refusedEntry.reason).toContain("git worktree remove --force");
+    expect(refusedEntry.reason).toContain("git branch -D feat/task-alpha");
+    expect(refusedEntry.blockingPaths?.sort()).toEqual(["generated/", "harness-output.json"]);
+    expect(refusedEntry.blockingTotal).toBe(2);
+    expect(refusedEntry.blockingTracked).toBeUndefined();
+    expect(refusedEntry.forced).toBeUndefined();
+    expect(refused.pruned).toEqual([]);
+    expect(refused.failures).toEqual([]);
+    // Nothing was touched: artifacts, worktree, branch and record all survive.
+    expect(existsSync(join(wt, "generated", "spec.json"))).toBe(true);
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(true);
+    const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
+    expect(parseFrontmatter(raw).data.worktree_path).toBe(wt);
+
+    // Armed: the removal passes --force for exactly this entry, and the
+    // receipt says the discard was forced.
+    const forced = runCleanup({ cwd: dir, prune: true, noGh: true, pruneForce: true });
+
+    expect(forced.failures).toEqual([]);
+    const forcedEntry = forced.entries.find((e) => e.id === "task-alpha")!;
+    expect(forcedEntry.removable).toBe(true);
+    expect(forcedEntry.forced).toBe(true);
+    expect(forcedEntry.action).toContain("forced past its untracked content");
+    expect(forced.pruned).toEqual([
+      { id: "task-alpha", action: `removed worktree ${wt}`, forced: true },
+      { id: "task-alpha", action: "deleted branch feat/task-alpha" },
+      { id: "task-alpha", action: "cleared worktree_path" },
+    ]);
+    expect(existsSync(wt)).toBe(false);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+  });
+
+  it("never force-removes uncommitted tracked work, with or without the force opt-in", () => {
+    const dir = initRepo();
+    const alpha = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    const wt = alpha.worktreePath!;
+    writeFileSync(join(wt, "tracked.txt"), "committed\n", "utf8");
+    git(["add", "tracked.txt"], wt);
+    git(["commit", "--quiet", "-m", "add tracked"], wt);
+    // One tracked modification plus one untracked artifact: the tracked change
+    // vetoes the forced removal too.
+    writeFileSync(join(wt, "tracked.txt"), "modified\n", "utf8");
+    writeFileSync(join(wt, "artifact.json"), "{}\n", "utf8");
+    runUpdate({ cwd: wt, id: "task-alpha", status: "done", now: NOW });
+    git(["add", "ArggonManager"], wt);
+    git(["commit", "--quiet", "-m", "close task-alpha"], wt);
+    git(["merge", "--quiet", "feat/task-alpha"], dir);
+
+    for (const pruneForce of [false, true]) {
+      const result = runCleanup({ cwd: dir, prune: true, noGh: true, pruneForce });
+
+      const entry = result.entries.find((e) => e.id === "task-alpha")!;
+      expect(entry.removable).toBe(false);
+      expect(entry.reason).toContain("tracked file has uncommitted changes");
+      expect(entry.reason).toContain("never discards tracked work");
+      expect(entry.blockingTracked).toEqual(["tracked.txt"]);
+      expect(entry.blockingTrackedTotal).toBe(1);
+      expect(entry.blockingTotal).toBe(2);
+      expect(entry.forced).toBeUndefined();
+      expect(result.pruned).toEqual([]);
+      expect(result.failures).toEqual([]);
+      // The uncommitted work is intact, not merely reported.
+      expect(readFileSync(join(wt, "tracked.txt"), "utf8")).toBe("modified\n");
+      expect(existsSync(wt)).toBe(true);
+      expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(true);
+    }
+  });
+
+  it("refuses --force without --prune (the flag would never be used)", () => {
+    const { dir } = initCleanupRepo();
+
+    expect(() => runCleanup({ cwd: dir, pruneForce: true })).toThrow(/--force requires --prune/);
+  });
+
+  it("threads --force through the CLI surface (human and --json)", () => {
+    const dir = initRepo();
+    const alpha = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    const wt = alpha.worktreePath!;
+    writeFileSync(join(wt, "harness-output.json"), "{}\n", "utf8");
+    runUpdate({ cwd: wt, id: "task-alpha", status: "done", now: NOW });
+    git(["add", "ArggonManager"], wt);
+    git(["commit", "--quiet", "-m", "close task-alpha"], wt);
+    git(["merge", "--quiet", "feat/task-alpha"], dir);
+
+    // Without the flag the human path reports the skip and exits 0 (a skip is
+    // not a failure) — no raw git error.
+    const skipped = runCli(["cleanup", "--prune", "--no-gh"], dir);
+    expect(skipped.status).toBe(0);
+    expect(skipped.stdout).toContain("--force");
+
+    const forced = runCli(["cleanup", "--prune", "--force", "--no-gh", "--json"], dir);
+    expect(forced.status, forced.stderr).toBe(0);
+    const envelope = JSON.parse(forced.stdout) as {
+      pruned: Array<{ id: string; action: string; forced?: boolean }>;
+      failures: string[];
+    };
+    expect(envelope.failures).toEqual([]);
+    expect(envelope.pruned[0]).toEqual({
+      id: "task-alpha",
+      action: `removed worktree ${wt}`,
+      forced: true,
+    });
+    expect(existsSync(wt)).toBe(false);
   });
 
   it("emits the standard --json envelope via the CLI", () => {
@@ -2337,7 +2573,10 @@ describe("claim release — unclaim leaves nothing (bug-unclaim-leaves-worktree-
     expect(done.claimFootprint).toBeUndefined();
     // The receipt is absent, not degraded: the release is never named on stdout
     // either (the human path is where an agent would read the remedy).
-    const human = runCli(["update", "task-bravo", "--status", "blocked", "--blocked-reason", "x"], dir);
+    const human = runCli(
+      ["update", "task-bravo", "--status", "blocked", "--blocked-reason", "x"],
+      dir,
+    );
     expect(human.stdout).not.toContain("claim dropped");
     expect(existsSync(wt)).toBe(true);
     // `--prune` is the merge-gated remedy the docs point a done item at: the
@@ -2389,7 +2628,9 @@ describe("claim release — unclaim leaves nothing (bug-unclaim-leaves-worktree-
     expect(refused.release?.entry.releasable).toBe(false);
     expect(refused.release?.entry.reason).toContain("uncommitted or untracked file");
     expect(refused.release?.entry.blockingTotal).toBeGreaterThan(0);
-    expect(refused.release?.entry.blockingPaths).toContain("ArggonManager/launch/auth/login/task-alpha.md");
+    expect(refused.release?.entry.blockingPaths).toContain(
+      "ArggonManager/launch/auth/login/task-alpha.md",
+    );
     expect(refused.failures).toHaveLength(1);
     expect(existsSync(wt)).toBe(true);
     expect(existsSync(stamp)).toBe(true); // the evidence survives a refused release
@@ -2420,9 +2661,9 @@ describe("claim release — unclaim leaves nothing (bug-unclaim-leaves-worktree-
     const dir = initRepo();
     const wt = claimedAndMerged(dir);
 
-    expect(() =>
-      runCleanup({ cwd: dir, releaseTakeOverWorktree: true, noGh: true }),
-    ).toThrow(/--take-over-worktree requires --release/);
+    expect(() => runCleanup({ cwd: dir, releaseTakeOverWorktree: true, noGh: true })).toThrow(
+      /--take-over-worktree requires --release/,
+    );
 
     const human = runCli(["cleanup", "--take-over-worktree"], dir);
     expect(human.status).not.toBe(0);
@@ -2459,5 +2700,197 @@ describe("claim release — unclaim leaves nothing (bug-unclaim-leaves-worktree-
     });
     expect(released.failures).toEqual([]);
     expect(existsSync(wt)).toBe(false);
+  });
+
+  // --- the release arm's own stale-record shape
+  // (bug-cleanup-release-stale-record-wedge) -------------------------------
+  // The prune arm learned this rule in bug-cleanup-stuck-when-worktree-dir-gone;
+  // the release arm kept asking the dead worktree for its branch
+  // (`worktreeBranch` -> `git -C <dir> rev-parse` -> "not a git repository"),
+  // which threw the whole run to the top-level CLEANUP_FAILED. Same liveness
+  // rule, same convergence: the dead record is pruned (it PINS the branch, so
+  // `git branch -D` would refuse it), the branch is deleted and the record is
+  // cleared — the leftover directory is never deleted.
+  it("converges when the release target's gitdir is gone (interrupted-removal debris)", () => {
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    // The exact wedge: an interrupted `git worktree remove` took `.git` with
+    // it; git still lists the record as `prunable` (and still pins the branch).
+    rmSync(join(wt, ".git"), { force: true });
+    expect(git(["worktree", "list", "--porcelain"], dir)).toContain("prunable");
+
+    const released = runCleanup({ cwd: dir, release: "task-alpha", releaseIdentity: "arggon" });
+
+    expect(released.failures).toEqual([]);
+    expect(released.release?.entry).toMatchObject({
+      id: "task-alpha",
+      releasable: true,
+      // The worktree cannot be asked anymore: the branch comes from git's own
+      // record (the `branch` line survives the `prunable` marker).
+      branch: "feat/task-alpha",
+      action:
+        "clear stale worktree_path record (path is not a live worktree of this repo; " +
+        "any leftover directory is left in place)",
+    });
+    expect(released.release?.actions.map((action) => action.action)).toEqual([
+      "pruned stale git worktree record",
+      "deleted branch feat/task-alpha",
+      "cleared worktree_path",
+    ]);
+    // The debris is never the reaper's to delete: the files stay in place.
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    expect(git(["worktree", "list", "--porcelain"], dir)).not.toContain(wt);
+    expect(itemData(dir, "task-alpha").worktree_path).toBeUndefined();
+    expect(released.commit?.message).toBe("chore(tasks): released task-alpha");
+  });
+
+  it("converges when a manual `git worktree prune` already dropped the release target's record", () => {
+    // The hand-repaired state: the directory remains, git no longer knows the
+    // worktree. The record is all that is left to clear (and the branch name is
+    // gone with the record — the unclaim already cleared the item field), so a
+    // release must still converge rather than refusing the directory forever.
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    rmSync(join(wt, ".git"), { force: true });
+    git(["worktree", "prune"], dir);
+
+    const released = runCleanup({ cwd: dir, release: "task-alpha", releaseIdentity: "arggon" });
+
+    expect(released.failures).toEqual([]);
+    expect(released.release?.entry).toMatchObject({
+      id: "task-alpha",
+      releasable: true,
+      branch: null,
+      action:
+        "clear stale worktree_path record (path is not a live worktree of this repo; " +
+        "any leftover directory is left in place)",
+    });
+    // No prune step: git already dropped the record, so nothing was pruned.
+    expect(released.release?.actions.map((action) => action.action)).toEqual([
+      "cleared worktree_path",
+    ]);
+    expect(existsSync(wt)).toBe(true);
+    expect(itemData(dir, "task-alpha").worktree_path).toBeUndefined();
+  });
+
+  it("deletes the branch a stale record still names when the directory is gone", () => {
+    // A keeps the branch reachable: removing the directory by hand leaves git's
+    // record (and its `branch` line) in place, and the record pins the branch
+    // until the run prunes it. Without reading that record the release would
+    // clear the item and leave an abandoned claim's branch behind forever.
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    rmSync(wt, { recursive: true, force: true });
+
+    const released = runCleanup({ cwd: dir, release: "task-alpha", releaseIdentity: "arggon" });
+
+    expect(released.failures).toEqual([]);
+    expect(released.release?.entry).toMatchObject({
+      id: "task-alpha",
+      releasable: true,
+      branch: "feat/task-alpha",
+      action: "clear stale worktree_path record (path missing on disk)",
+    });
+    expect(released.release?.actions.map((action) => action.action)).toEqual([
+      "pruned stale git worktree record",
+      "deleted branch feat/task-alpha",
+      "cleared worktree_path",
+    ]);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    expect(itemData(dir, "task-alpha").worktree_path).toBeUndefined();
+  });
+
+  // task-release-stale-compose-reaping: the stale-record clause used to skip
+  // Compose reaping along with the removal — but the project name derives from
+  // the RECORDED path, never from a live directory, and a released claim is
+  // never terminal, so prune will never consider it again. A skipped reap here
+  // is the permanent Docker residue ADR 0019 layer 2 exists to prevent.
+  it("reaps the declared Compose project of a stale record, exactly as prune does", () => {
+    const dir = initRepo();
+    setServices(dir, "true");
+    const wt = claimedAndMerged(dir);
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    // Interrupted-removal debris: files behind, `.git` gone, git's record
+    // `prunable` — the worktree cannot be asked, but its project name is still
+    // derivable from the recorded path (the missing-path shape reaches the same
+    // stale clause).
+    rmSync(join(wt, ".git"), { force: true });
+    const compose = fakeCompose();
+
+    const released = runCleanup(
+      { cwd: dir, release: "task-alpha", releaseIdentity: "arggon" },
+      { compose: compose.down },
+    );
+
+    const project = basename(wt).toLowerCase();
+    // The ADR 0019 teardown for the recorded worktree id, from the repo root —
+    // prune's stale-entry call exactly (its "already-removed worktree" case).
+    expect(compose.calls).toEqual([{ project, cwd: dir }]);
+    expect(released.compose).toEqual({ declared: "true" });
+    expect(released.failures).toEqual([]);
+    // Compose FIRST (the stack may still be running), then the stale-record
+    // convergence in prune's order.
+    expect(released.release?.actions.map((action) => action.action)).toEqual([
+      `reaped compose project ${project}`,
+      "pruned stale git worktree record",
+      "deleted branch feat/task-alpha",
+      "cleared worktree_path",
+    ]);
+    // The debris is retained; the record and the branch are gone.
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    expect(itemData(dir, "task-alpha").worktree_path).toBeUndefined();
+  });
+
+  it("keeps the stale record when the Compose reap fails, so a retry can reach the stack", () => {
+    // The release arm's own failure discipline (not prune's non-fatal one): a
+    // failed teardown aborts the release. Clearing the record would drop the
+    // only anchor a retry has — the item is not terminal, so prune will never
+    // reap this project.
+    const dir = initRepo();
+    setServices(dir, "true");
+    const wt = claimedAndMerged(dir);
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    rmSync(join(wt, ".git"), { force: true });
+    const compose = fakeCompose("Cannot connect to the Docker daemon");
+
+    const released = runCleanup(
+      { cwd: dir, release: "task-alpha", releaseIdentity: "arggon" },
+      { compose: compose.down },
+    );
+
+    expect(released.failures).toEqual(["task-alpha: Cannot connect to the Docker daemon"]);
+    expect(released.release?.actions).toEqual([
+      { id: "task-alpha", action: "failed", error: "Cannot connect to the Docker daemon" },
+    ]);
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(true);
+    expect(itemData(dir, "task-alpha").worktree_path).toBe(wt);
+  });
+
+  it("the human CLI releases the stale record instead of exiting at CLEANUP_FAILED", () => {
+    // The user-visible shape of the wedge: `cleanup --release` used to die at
+    // the top-level `CLEANUP_FAILED` (`git rev-parse --abbrev-ref HEAD failed:
+    // fatal: not a git repository`) with the record untouched, so every retry
+    // failed identically. Now the same command converges and says what it did.
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    rmSync(join(wt, ".git"), { force: true });
+
+    const human = runCli(["cleanup", "--release", "task-alpha"], dir);
+
+    expect(human.status).toBe(0);
+    expect(human.stdout + human.stderr).toContain("released task-alpha");
+    expect(human.stdout + human.stderr).toContain("pruned stale git worktree record");
+    expect(human.stdout + human.stderr).toContain("deleted branch feat/task-alpha");
+    expect(human.stdout + human.stderr).toContain("cleared worktree_path");
+    expect(existsSync(wt)).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+    expect(itemData(dir, "task-alpha").worktree_path).toBeUndefined();
   });
 });

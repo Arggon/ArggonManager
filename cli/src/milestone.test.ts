@@ -42,14 +42,19 @@ function primedTree(): {
 } {
   const dir = mkdtempSync(join(tmpdir(), "arggon-milestone-"));
   runInit({ dir, force: false });
-  runCreate({ cwd: dir, type: "initiative", title: "Launch MVP" });
-  runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp" });
+  // Real seed prose (task-validate-refuses-placeholder-bodies): the scaffold
+  // IS the placeholder, so default bodies would fail `validate` here.
+  const container = "## Context\n\nSeed.\n\n## Acceptance\n\nSeed.\n";
+  const leaf = "## Context\n\nSeed.\n\n## Acceptance\n\n- [x] seed\n";
+  runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", body: container });
+  runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", body: container });
   const story = runCreate({
     cwd: dir,
     type: "story",
     title: "Login",
     parent: "auth",
     id: "story-login",
+    body: container,
   });
   const taskA = runCreate({
     cwd: dir,
@@ -57,6 +62,7 @@ function primedTree(): {
     title: "First",
     parent: "story-login",
     id: "task-a",
+    body: leaf,
   });
   const taskB = runCreate({
     cwd: dir,
@@ -64,6 +70,7 @@ function primedTree(): {
     title: "Second",
     parent: "story-login",
     id: "task-b",
+    body: leaf,
   });
   const taskC = runCreate({
     cwd: dir,
@@ -71,6 +78,7 @@ function primedTree(): {
     title: "Third",
     parent: "story-login",
     id: "task-c",
+    body: leaf,
   });
   return {
     dir,
@@ -201,7 +209,7 @@ describe("runBoard --group-by", () => {
   it("rejects unsupported group-by fields", () => {
     const { dir } = primedTree();
     expect(() => runBoard({ cwd: dir, generatedAt: GENERATED_AT, groupBy: "priority" })).toThrow(
-      /unknown --group-by field 'priority' \(supported: milestone, story\)/,
+      /unknown --group-by field 'priority' \(supported: milestone, story, tree\)/,
     );
   });
 

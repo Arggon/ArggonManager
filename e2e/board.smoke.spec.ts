@@ -126,10 +126,26 @@ function screenshotPath(name: string): string {
  * 3. **Every scanned state gets its own deterministic readiness signal before
  *    its scan** (task-axe-board-drawer-and-lens-coverage): the ready page
  *    (first test), the open detail drawer (after an `expect` on its async
- *    `/api/item` content), the static `file://` export (after its h1) and the
- *    filtered/lens states (after the narrowed-card count) are each scanned at
- *    a settled point — never a sleep, never a `networkidle` guess, never a
- *    scan smuggled in after unrelated assertions have moved the page on.
+ *    `/api/item` content), the static `file://` export (after its h1), the
+ *    filtered/lens states (after the narrowed-card count), the static
+ *    grouped-ancestry export (`--group-by tree`, after its h1) and the
+ *    filtered ancestry tree on the served board (after the `N of M` count) are
+ *    each scanned at a settled point — never a sleep, never a `networkidle`
+ *    guess, never a scan smuggled in after unrelated assertions have moved
+ *    the page on. task-tree-rows-open-detail adds the same discipline for the
+ *    tree's interactive states: the row-opened drawer (after its title), the
+ *    tree keyboard/roving state (after the Home focus assertion), the folded
+ *    tree (after its subtree is asserted hidden), the folded branch holding a
+ *    lens match (after its `N matches inside` marker), the offline tree-row
+ *    drawer on the static `--details` tree export (after its acceptance-row
+ *    count) and the terminal + fold composed tree (after its counts).
+ *    bug-tree-done-container-hides-open-work adds the open-descendant
+ *    disclosure's scanned state: the served tree under a lens with the
+ *    terminal rule and a fold applied (after the badge and the `N of M`
+ *    counts). task-board-no-done-over-open-work widens the same state: the
+ *    masked container reads `open` (chip, node attribute, aria) and stays
+ *    visible under the terminal rule in BOTH layouts — the done column keeps
+ *    it while only the genuinely terminal cards hide.
  */
 const AXE_WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] as const;
 
@@ -299,6 +315,177 @@ function createFixture(): string {
     `${readFileSync(convention, "utf8").trimEnd()}\nx-views:\n  smoke: "label:smoke"\n  open: "status:todo"\n`,
     "utf8",
   );
+  return fixture;
+}
+
+/**
+ * Tree terminal-layout fixture (bug-tree-ignores-hide-terminal-toggle): the
+ * bug is about a LAYOUT preference applying to the ancestry tree, so the
+ * fixture needs the two shapes that rule distinguishes — a terminal row with a
+ * live descendant (hiding it would orphan the live row, so it must stay, muted)
+ * and terminal rows that must hide. Its own fixture, not the shared one: those
+ * extra terminal rows must not shift the card positions the column, drag and
+ * arrow tests measure.
+ */
+const TREE_STORY_ID = "tree-closed-story";
+const TREE_OPEN_CHILD_ID = "task-tree-open-child";
+const TREE_CLOSED_LEAF_ID = "task-tree-closed-leaf";
+const TREE_TERMINAL_ROOT_ID = "tree-terminal-root";
+
+function createTreeTerminalFixture(): string {
+  const fixture = mkdtempSync(join(tmpdir(), "arggon-e2e-tree-terminal-"));
+  const git = (args: string[]): void => {
+    const result = spawnSync("git", args, { cwd: fixture, encoding: "utf8" });
+    if (result.status !== 0) {
+      throw new Error(`git ${args.join(" ")} failed: ${result.stdout ?? ""}${result.stderr ?? ""}`);
+    }
+  };
+  git(["init", "-q"]);
+  git(["config", "user.email", "smoke@example.test"]);
+  git(["config", "user.name", "Board Smoke"]);
+  writeFileSync(join(fixture, "README.md"), "# tree terminal fixture\n", "utf8");
+  git(["add", "README.md"]);
+  git(["commit", "-qm", "chore: fixture"]);
+
+  cliJson(fixture, ["init", fixture]);
+  const chain: Array<[string, string, string | undefined]> = [
+    ["initiative", "Tree smoke", undefined],
+    ["epic", "Tree core", "tree-smoke"],
+    ["story", "Tree closed story", "tree-core"],
+    ["task", "Tree open child", "tree-closed-story"],
+    ["task", "Tree closed leaf", "tree-closed-story"],
+    // A parentless terminal root (tasks need a parent, an initiative does not):
+    // alone in the lens verdict, everything the lens keeps is terminal, so the
+    // composed tree has nothing visible at all.
+    ["initiative", "Tree terminal root", undefined],
+  ];
+  for (const [type, title, parent] of chain) {
+    runCli(fixture, [
+      "create",
+      type,
+      title,
+      ...(parent !== undefined ? ["--parent", parent] : []),
+      "--json",
+    ]);
+  }
+  // A terminal CONTAINER: cancelled directly, with the open child inside, so
+  // hiding it would orphan a visible task (the context case).
+  runCli(fixture, ["update", TREE_STORY_ID, "--status", "cancelled", "--json"]);
+  // A terminal LEAF: done has to pass the acceptance gate and the transition
+  // contract (todo -> in_progress -> done), so it carries a real criterion.
+  setBody(fixture, TREE_CLOSED_LEAF_ID, "# Tree closed leaf\n\n## Acceptance\n\n- [x] shipped\n");
+  runCli(fixture, [
+    "update",
+    TREE_CLOSED_LEAF_ID,
+    "--status",
+    "in_progress",
+    "--assignee",
+    "tree-bot",
+    "--json",
+  ]);
+  runCli(fixture, ["update", TREE_CLOSED_LEAF_ID, "--status", "done", "--json"]);
+  runCli(fixture, ["update", TREE_TERMINAL_ROOT_ID, "--status", "cancelled", "--json"]);
+  return fixture;
+}
+
+/**
+ * Open-descendant disclosure fixture (bug-tree-done-container-hides-open-work):
+ * the measured shape the report describes — a DONE container whose subtree
+ * still holds open work three levels down (two open descendants, plus a done
+ * task and a cancelled bug that must NOT count), and a second done container
+ * whose whole subtree is terminal (no badge). Its own fixture, not the shared
+ * one: the extra terminal containers must not shift the counts and card
+ * positions the other cases measure.
+ */
+const OPEN_ROOT_ID = "tree-done-root";
+const OPEN_EPIC_ID = "tree-done-epic";
+const OPEN_STORY_ID = "tree-done-story";
+const OPEN_TASK_ID = "task-tree-open-descendant";
+const OPEN_WIP_TASK_ID = "task-tree-wip-descendant";
+const OPEN_DONE_TASK_ID = "task-tree-done-descendant";
+const OPEN_CANCELLED_BUG_ID = "bug-tree-cancelled-descendant";
+const CLEAN_EPIC_ID = "tree-done-clean-epic";
+const CLEAN_STORY_ID = "tree-done-clean-story";
+const CLEAN_TASK_ID = "task-tree-clean-descendant";
+
+function createOpenDescendantFixture(): string {
+  const fixture = mkdtempSync(join(tmpdir(), "arggon-e2e-tree-open-"));
+  const git = (args: string[]): void => {
+    const result = spawnSync("git", args, { cwd: fixture, encoding: "utf8" });
+    if (result.status !== 0) {
+      throw new Error(`git ${args.join(" ")} failed: ${result.stdout ?? ""}${result.stderr ?? ""}`);
+    }
+  };
+  git(["init", "-q"]);
+  git(["config", "user.email", "smoke@example.test"]);
+  git(["config", "user.name", "Board Smoke"]);
+  writeFileSync(join(fixture, "README.md"), "# tree open-descendant fixture\n", "utf8");
+  git(["add", "README.md"]);
+  git(["commit", "-qm", "chore: fixture"]);
+
+  cliJson(fixture, ["init", fixture]);
+  const chain: Array<[string, string, string | undefined]> = [
+    ["initiative", "Tree done root", undefined],
+    ["epic", "Tree done epic", OPEN_ROOT_ID],
+    ["story", "Tree done story", OPEN_EPIC_ID],
+    ["task", "Tree open descendant", OPEN_STORY_ID],
+    ["task", "Tree wip descendant", OPEN_STORY_ID],
+    ["task", "Tree done descendant", OPEN_STORY_ID],
+    ["bug", "Tree cancelled descendant", OPEN_STORY_ID],
+    // The all-terminal container: a done story whose only child is done.
+    ["epic", "Tree done clean epic", OPEN_ROOT_ID],
+    ["story", "Tree done clean story", CLEAN_EPIC_ID],
+    ["task", "Tree clean descendant", CLEAN_STORY_ID],
+  ];
+  for (const [type, title, parent] of chain) {
+    runCli(fixture, [
+      "create",
+      type,
+      title,
+      ...(parent !== undefined ? ["--parent", parent] : []),
+      "--json",
+    ]);
+  }
+  // Terminal leaf flips carry `--no-cascade`: the cascade would auto-complete
+  // an ancestor whose whole subtree just went terminal, and this fixture needs
+  // every container's status to stay AUTHORED.
+  for (const id of [OPEN_DONE_TASK_ID, CLEAN_TASK_ID]) {
+    setBody(fixture, id, `# ${id}\n\n## Acceptance\n\n- [x] shipped\n`);
+    runCli(fixture, ["update", id, "--status", "in_progress", "--assignee", "tree-bot", "--json"]);
+    runCli(fixture, ["update", id, "--status", "done", "--no-cascade", "--json"]);
+  }
+  runCli(fixture, [
+    "update",
+    OPEN_CANCELLED_BUG_ID,
+    "--status",
+    "cancelled",
+    "--no-cascade",
+    "--json",
+  ]);
+  // One open descendant is claimed, so both non-terminal statuses count.
+  runCli(fixture, [
+    "update",
+    OPEN_WIP_TASK_ID,
+    "--status",
+    "in_progress",
+    "--assignee",
+    "tree-bot",
+    "--json",
+  ]);
+  // The containers: authored terminal status with open work below (containers
+  // are not acceptance-gated, and the claim step is the legal todo → done path).
+  for (const id of [OPEN_STORY_ID, CLEAN_STORY_ID, OPEN_EPIC_ID, CLEAN_EPIC_ID, OPEN_ROOT_ID]) {
+    const claimable = id === OPEN_STORY_ID || id === CLEAN_STORY_ID;
+    runCli(fixture, [
+      "update",
+      id,
+      "--status",
+      "in_progress",
+      ...(claimable ? ["--assignee", "tree-bot"] : []),
+      "--json",
+    ]);
+    runCli(fixture, ["update", id, "--status", "done", "--no-cascade", "--json"]);
+  }
   return fixture;
 }
 
@@ -638,6 +825,323 @@ test.describe("@smoke board --serve", () => {
     await expect(head).toContainText(/⚑ entries \d+\/\d+/);
   });
 
+  test("the static export renders the grouped-ancestry view (--group-by tree)", async ({
+    page,
+  }) => {
+    // task-web-board-hierarchy-view: `--group-by tree` opens the board in the
+    // nested ancestry layout (initiative → epic → story → leaf) instead of the
+    // status columns, and each level carries its own id + status chip.
+    const boardFile = join(fixture, "tree-board.html");
+    runCli(fixture, ["board", "--group-by", "tree", "--out", boardFile]);
+    await page.goto(`file://${boardFile}`);
+    await expect(page.locator("h1")).toContainText("arggon board");
+
+    // The board opens in the tree; the columns layout is present but hidden.
+    await expect(page.locator("main.board")).toBeHidden();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+    await expect(page.locator("#board-view-toggle")).toHaveAttribute("aria-pressed", "true");
+    // Every tracked item renders exactly one ancestry row.
+    await expect(tree.locator(".tree-node")).toHaveCount(listItems.length);
+
+    // Nesting is structural: story under epic under initiative, task under story.
+    await expect(
+      page.locator(
+        '#board-tree .tree-node[data-id="board-smoke"] .tree-node[data-id="core"] .tree-node[data-id="entries"]',
+      ),
+    ).toHaveCount(1);
+    await expect(
+      tree.locator('.tree-node[data-id="entries"] .tree-node[data-id="task-board-task"]'),
+    ).toHaveCount(1);
+    // Each level names its id and status; the leaf keeps its priority chip slot.
+    await expect(tree.locator('.tree-node[data-id="core"] > .tree-row > .status-chip')).toHaveText(
+      "todo",
+    );
+    await expect(
+      tree.locator('.tree-node[data-id="task-board-task"] > .tree-row > code'),
+    ).toHaveText("task-board-task");
+    // The h1 above is the readiness signal; this state is scanned on its own.
+    await axeScan(page);
+  });
+
+  test("a tree row click opens the detail drawer and Esc returns focus (task-tree-rows-open-detail)", async ({
+    page,
+  }) => {
+    // The tree was read-only before this item: the SAME drawer the columns
+    // open on a card click must open for the row's own item.
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+
+    const row = tree.locator(`.tree-node[data-id="${DETAIL_ITEM_ID}"] > .tree-row`);
+    await expect(row).toHaveCount(1);
+    await row.click();
+    const drawer = page.locator("#board-drawer");
+    await expect(drawer).toBeVisible();
+    await expect(drawer.locator(".drawer-title")).toHaveText("Board detail task");
+    // Same bounded content as the card path (serve fetch): deps and branch.
+    await expect(drawer.locator(".drawer-deps .drawer-dep.open")).toHaveText(
+      `${DETAIL_DEP_ID} · todo`,
+    );
+    await expect(drawer.locator(".drawer-row").filter({ hasText: "branch" })).toContainText(
+      "feat/task-board-detail",
+    );
+    // This state is scanned on its own (the title assertion above is its
+    // deterministic readiness signal): the row-as-trigger drawer.
+    await axeScan(page);
+
+    // Esc closes and focus returns to the ROW that opened it.
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(row).toBeFocused();
+
+    // The columns' own path is untouched by the row wiring.
+    await page.locator("#board-view-toggle").click();
+    const card = page.locator(`.card[data-id="${DETAIL_ITEM_ID}"]`);
+    await card.click();
+    await expect(drawer.locator(".drawer-title")).toHaveText("Board detail task");
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(card).toBeFocused();
+  });
+
+  test("tree rows are keyboard-reachable: Enter/Space open, arrows rove (task-tree-rows-open-detail)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+
+    // Roving focus: exactly one row is the tab stop, and the arrow keys move
+    // it in reading order (the row's own tab order keeps the fold control).
+    const anchor = tree.locator('.tree-row[tabindex="0"]');
+    await expect(anchor).toHaveCount(1);
+    await expect(anchor.locator("xpath=..")).toHaveAttribute("data-id", "board-smoke");
+
+    const row = tree.locator(`.tree-node[data-id="${DETAIL_ITEM_ID}"] > .tree-row`);
+    await row.focus();
+    const drawer = page.locator("#board-drawer");
+    await page.keyboard.press("Enter");
+    await expect(drawer).toBeVisible();
+    await expect(drawer.locator(".drawer-title")).toHaveText("Board detail task");
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(row).toBeFocused();
+
+    await page.keyboard.press(" ");
+    await expect(drawer).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+
+    // ArrowDown moves the roving anchor to the next visible row; Home brings
+    // it back to the tree's first row.
+    await page.keyboard.press("ArrowDown");
+    await expect(tree.locator('.tree-row[tabindex="0"]')).toHaveCount(1);
+    const afterArrow = await page.evaluate(() =>
+      document.activeElement?.closest(".tree-node")?.getAttribute("data-id"),
+    );
+    expect(afterArrow).not.toBeNull();
+    expect(afterArrow).not.toBe(DETAIL_ITEM_ID);
+    await page.keyboard.press("Home");
+    await expect(anchor).toBeFocused();
+    await expect(anchor.locator("xpath=..")).toHaveAttribute("data-id", "board-smoke");
+    // The tree keyboard state is a scanned surface of its own (the Home
+    // assertion above is its deterministic readiness signal).
+    await axeScan(page);
+  });
+
+  test("a container row folds and extends its subtree, persists, and reset restores it (task-tree-rows-open-detail)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+
+    const toggle = tree.locator('.tree-node[data-id="entries"] > .tree-row > .tree-toggle');
+    const child = tree.locator(`.tree-node[data-id="task-board-task"]`);
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(toggle).toHaveAttribute("aria-label", "collapse entries subtree");
+    await expect(child).toBeVisible();
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(toggle).toHaveText("+");
+    await expect(child).toBeHidden();
+    // The fold rides the EXISTING layout record (one key, one reset).
+    const stored = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("arggon-board-columns-v1") || "null"),
+    );
+    expect(stored?.treeCollapsed).toEqual(["entries"]);
+    // Folding never moves a counter: the lens verdict is untouched.
+    await expect(page.locator("#board-filter-count")).toHaveText(`${listItems.length} item(s)`);
+    await expect(page.locator("#board-tree-count")).toHaveText(String(listItems.length));
+    // The folded state is a scanned surface of its own (the hidden-child
+    // assertion above is its deterministic readiness signal).
+    await axeScan(page);
+
+    // The preference survives a reload, and expanding restores the subtree.
+    await page.reload();
+    await expect(tree).toBeVisible();
+    await expect(child).toBeHidden();
+    // The layout toggle composes: the fold survives a trip to the columns and
+    // back (it is not a property of the rendered rows).
+    await page.locator("#board-view-toggle").click();
+    await expect(page.locator("main.board")).toBeVisible();
+    await page.locator("#board-view-toggle").click();
+    await expect(tree).toBeVisible();
+    await expect(child).toBeHidden();
+    await toggle.click();
+    await expect(child).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    // Reset restores the default (expanded) and persists the reset.
+    await toggle.click();
+    await expect(child).toBeHidden();
+    await page.locator("#board-layout-reset").click();
+    await expect(child).toBeVisible();
+    const reset = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("arggon-board-columns-v1") || "null"),
+    );
+    expect(reset?.treeCollapsed).toEqual([]);
+    await page.reload();
+    await expect(child).toBeVisible();
+  });
+
+  test("a lens match inside a folded branch stays discoverable and the counts stay honest (task-tree-rows-open-detail)", async ({
+    page,
+  }) => {
+    // Decision (recorded on the item): a folded branch is MARKED with the
+    // matches inside instead of auto-expanding — the user's fold is never
+    // silently undone, and the lens answer stays visible.
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+
+    // Fold the whole epic that holds `entries` and the matching task.
+    const epicToggle = tree.locator('.tree-node[data-id="core"] > .tree-row > .tree-toggle');
+    await epicToggle.click();
+    await expect(tree.locator(`.tree-node[data-id="${DETAIL_ITEM_ID}"]`)).toBeHidden();
+
+    await page.locator("#board-filter-input").fill("label:detail");
+    // The match is inside the fold: its row stays hidden...
+    await expect(tree.locator(`.tree-node[data-id="${DETAIL_ITEM_ID}"]`)).toBeHidden();
+    // ...but the folded branch says so, in the row and in the disclosure's
+    // accessible name (the count is the lens verdict, not rendered rows).
+    const marker = tree.locator('.tree-node[data-id="core"] > .tree-row > .tree-matches');
+    await expect(marker).toHaveText("1 match inside");
+    await expect(epicToggle).toHaveAttribute("aria-label", "expand core subtree — 1 match inside");
+    await expect(page.locator("#board-filter-count")).toHaveText(
+      `1 of ${listItems.length} item(s)`,
+    );
+    await expect(page.locator("#board-tree-count")).toHaveText("1");
+    // The folded branch WITH its match is a scanned surface of its own.
+    await axeScan(page);
+
+    // Expanding the branch reveals the match's path — the marker clears.
+    await epicToggle.click();
+    await expect(tree.locator(`.tree-node[data-id="${DETAIL_ITEM_ID}"]`)).toBeVisible();
+    await expect(marker).toBeHidden();
+
+    // A folded branch whose subtree holds NO match invents no marker: under
+    // `type:epic` the folded `core` is the only match, everything inside is
+    // hidden by the lens, and the disclosure stays unadorned.
+    await page.locator("#board-filter-input").fill("type:epic");
+    await expect(marker).toBeHidden();
+    await epicToggle.click();
+    await expect(marker).toBeHidden();
+    await expect(epicToggle).toHaveAttribute("aria-label", "expand core subtree");
+
+    // Without a lens there is no verdict to report — "everything inside" is not
+    // information — so a fold stays unmarked even though its rows are visible
+    // in the lens's absence.
+    await page.locator("#board-filter-clear").click();
+    await expect(page.locator("#board-filter-count")).toHaveText(`${listItems.length} item(s)`);
+    await expect(tree.locator(`.tree-node[data-id="task-board-task"]`)).toBeHidden();
+    await expect(marker).toBeHidden();
+    await epicToggle.click();
+    await expect(tree.locator(`.tree-node[data-id="task-board-task"]`)).toBeVisible();
+  });
+
+  test("the filterbar toggle switches layouts and round-trips through the URL", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    const columns = page.locator("main.board");
+    const tree = page.locator("#board-tree");
+    const toggle = page.locator("#board-view-toggle");
+    await expect(columns).toBeVisible();
+    await expect(tree).toBeHidden();
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    await toggle.click();
+    await expect(columns).toBeHidden();
+    await expect(tree).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(new URL(page.url()).hash).toBe("#view=tree");
+
+    // Reload/copy/share: the hash restores the layout.
+    await page.reload();
+    await expect(tree).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    // ... and the columns stay one toggle away, with their cards intact.
+    await toggle.click();
+    await expect(columns).toBeVisible();
+    await expect(tree).toBeHidden();
+    await expect(page.locator(".board .card")).toHaveCount(listItems.length);
+    expect(new URL(page.url()).hash).toBe("");
+  });
+
+  test("the lens filters inside the ancestry view and keeps the path as context", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    await expect(page.locator("#board-tree")).toBeVisible();
+
+    // `label:detail` matches exactly one fixture task: it stays, its recorded
+    // ancestor chain stays as context, and nothing else does.
+    await page.locator("#board-filter-input").fill("label:detail");
+    const visibleNodes = page.locator("#board-tree .tree-node:not(.filtered-out)");
+    await expect(visibleNodes).toHaveCount(4);
+    await expect(
+      page.locator(`#board-tree .tree-node:not(.filtered-out)[data-id="${DETAIL_ITEM_ID}"]`),
+    ).toHaveCount(1);
+    // The ancestors render as context, the match never does.
+    for (const ancestor of ["board-smoke", "core", "entries"]) {
+      await expect(
+        page.locator(`#board-tree .tree-node.context[data-id="${ancestor}"]`),
+      ).toHaveCount(1);
+    }
+    await expect(
+      page.locator(`#board-tree .tree-node.context[data-id="${DETAIL_ITEM_ID}"]`),
+    ).toHaveCount(0);
+    // Unrelated rows (including sibling tasks of the matched story) are gone.
+    await expect(
+      page.locator('#board-tree .tree-node:not(.filtered-out)[data-id="task-board-task"]'),
+    ).toHaveCount(0);
+    // The counts stay honest: N of M counts the match, and the tree heading
+    // reports the same verdict rather than the rendered (context) rows.
+    await expect(page.locator("#board-filter-count")).toHaveText(
+      `1 of ${listItems.length} item(s)`,
+    );
+    await expect(page.locator("#board-tree-count")).toHaveText("1");
+    expect(filterFromUrl(page.url())).toBe("label:detail");
+    // The filtered tree state is a scanned surface of its own (the count
+    // assertion above is its deterministic readiness signal).
+    await axeScan(page);
+
+    // A filter matching nothing empties the tree honestly.
+    await page.locator("#board-filter-input").fill("label:does-not-exist");
+    await expect(page.locator("#board-tree .tree-node:not(.filtered-out)")).toHaveCount(0);
+    await expect(page.locator("#board-filter-count")).toHaveText(
+      `0 of ${listItems.length} item(s)`,
+    );
+  });
+
   test("the static export with --details opens the drawer offline from the embedded snapshot", async ({
     page,
   }) => {
@@ -690,6 +1194,75 @@ test.describe("@smoke board --serve", () => {
     await expect(menu).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(menu).toBeHidden();
+  });
+
+  test("the static tree export with --details opens the drawer from a row, offline (task-tree-rows-open-detail)", async ({
+    page,
+  }) => {
+    // Serve and static-with-`--details` behave the same: the row opens the
+    // embedded payload with no server (a fetch would show "detail unavailable").
+    const boardFile = join(fixture, "tree-details-board.html");
+    runCli(fixture, ["board", "--group-by", "tree", "--details", "--out", boardFile]);
+    await page.goto(`file://${boardFile}`);
+    await expect(page.locator("h1")).toContainText("arggon board");
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+
+    const row = tree.locator(`.tree-node[data-id="${DETAIL_ITEM_ID}"] > .tree-row`);
+    await row.click();
+    const drawer = page.locator("#board-drawer");
+    await expect(drawer).toBeVisible();
+    await expect(drawer.locator(".drawer-title")).toHaveText("Board detail task");
+    await expect(drawer.locator(".drawer-acceptance .drawer-check")).toHaveCount(2);
+    // The drawer-over-row state is scanned on its own (the acceptance count is
+    // its deterministic readiness signal) — same gate, file:// document.
+    await axeScan(page);
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(row).toBeFocused();
+
+    // Keyboard parity offline: Enter on the focused row opens the same drawer.
+    await page.keyboard.press("Enter");
+    await expect(drawer.locator(".drawer-title")).toHaveText("Board detail task");
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+  });
+
+  test("a drawer-free static tree export keeps the fold and offers no fake affordance (task-tree-rows-open-detail)", async ({
+    page,
+  }) => {
+    const boardFile = join(fixture, "tree-plain-board.html");
+    runCli(fixture, ["board", "--group-by", "tree", "--out", boardFile]);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(String(error)));
+    await page.goto(`file://${boardFile}`);
+    await expect(page.locator("h1")).toContainText("arggon board");
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+
+    // No drawer payload: no drawer markup, no focusable/named rows, no
+    // pointer-cursor rule — and no anchors, so nothing navigates on a click.
+    await expect(page.locator("#board-drawer")).toHaveCount(0);
+    await expect(tree.locator(".tree-row[tabindex]")).toHaveCount(0);
+    await expect(tree.locator('.tree-row[role="group"]')).toHaveCount(0);
+    await expect(tree.locator("a")).toHaveCount(0);
+
+    // Clicking a row does nothing (no drawer to open, no navigation)...
+    const row = tree.locator(`.tree-node[data-id="${DETAIL_ITEM_ID}"] > .tree-row`);
+    const urlBefore = page.url();
+    await row.click();
+    await expect(page.locator("#board-drawer")).toHaveCount(0);
+    expect(page.url()).toBe(urlBefore);
+
+    // ...while the fold is a real, working affordance in the same export.
+    const toggle = tree.locator('.tree-node[data-id="entries"] > .tree-row > .tree-toggle');
+    await toggle.click();
+    await expect(tree.locator(`.tree-node[data-id="task-board-task"]`)).toBeHidden();
+    await page.reload();
+    await expect(tree.locator(`.tree-node[data-id="task-board-task"]`)).toBeHidden();
+    await toggle.click();
+    await expect(tree.locator(`.tree-node[data-id="task-board-task"]`)).toBeVisible();
+    expect(errors).toEqual([]);
   });
 
   test("a status move round-trips through the UI and persists", async ({ page }) => {
@@ -1165,6 +1738,37 @@ test.describe("@smoke board --serve", () => {
     await page.keyboard.press("Escape");
     await expect(page.locator("#board-drawer")).toBeHidden();
     await expect(page.locator(`.card[data-id="${DETAIL_ITEM_ID}"]`)).toBeFocused();
+
+    // The same preservation covers the tree's own open path
+    // (task-tree-rows-open-detail): a drawer opened from a grouped-ancestry row
+    // re-opens through that row after a live reload, and Esc returns focus to it.
+    await page.locator("#board-view-toggle").click();
+    await expect(page.locator("#board-tree")).toBeVisible();
+    const treeRow = page.locator(`#board-tree .tree-node[data-id="${DETAIL_ITEM_ID}"] > .tree-row`);
+    await treeRow.click();
+    await expect(page.locator("#board-drawer .drawer-title")).toHaveText("Board detail task");
+    await page.evaluate(() => {
+      document.documentElement.dataset.preserveMarker = "43";
+    });
+    // Another external write fires the reload (a create, like the first
+    // trigger; a status reopen is refused for non-interactive callers).
+    cliJson<{ item: { id: string } }>(fixture, [
+      "create",
+      "task",
+      "Board preserve task 2",
+      "--parent",
+      "entries",
+      "--json",
+    ]);
+    await expect(page.locator("html:not([data-preserve-marker])")).toHaveCount(1, {
+      timeout: 30_000,
+    });
+    await expect(page.locator("#board-conn.live")).toHaveText("live", { timeout: 15_000 });
+    await expect(page.locator("#board-tree")).toBeVisible();
+    await expect(page.locator("#board-drawer .drawer-title")).toHaveText("Board detail task");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#board-drawer")).toBeHidden();
+    await expect(treeRow).toBeFocused();
   });
 
   test("columns collapse, terminal columns hide, and the layout persists (task-board-column-controls)", async ({
@@ -1241,15 +1845,25 @@ test.describe("@smoke board --serve", () => {
     // (100ms); its trailing broadcast can navigate while this test measures
     // and destroy the execution context. Two timeOrigin samples one debounce
     // window apart prove the reload storm has settled — re-armed debounces
-    // (the auto-commit writes) are covered by the poll retry.
+    // (the auto-commit writes) are covered by the poll retry, and the probe
+    // itself catches the destroyed-context throw so a navigation in flight
+    // reads as "not settled yet" instead of aborting the poll (bug-smoke-
+    // sticky-header-settle-retry: expect.poll does not retry a throwing
+    // probe). The raised ceiling covers contended machines (#521 saw >15s).
     await expect
       .poll(
         async () => {
-          const before = await page.evaluate(() => performance.timeOrigin);
-          await page.waitForTimeout(120);
-          return (await page.evaluate(() => performance.timeOrigin)) === before;
+          try {
+            const before = await page.evaluate(() => performance.timeOrigin);
+            await page.waitForTimeout(120);
+            return (await page.evaluate(() => performance.timeOrigin)) === before;
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            if (message.includes("Execution context was destroyed")) return false;
+            throw err;
+          }
         },
-        { intervals: [50], timeout: 10_000 },
+        { intervals: [50], timeout: 30_000 },
       )
       .toBe(true);
     const measure = async (): Promise<void> => {
@@ -1572,6 +2186,409 @@ test.describe("@smoke board from source (tsx path, bug-tsx-board-dead-script)", 
     await expect(page.locator(`.card:not(.filtered-out)[data-id="${FILTER_ITEM_ID}"]`)).toHaveCount(
       1,
     );
+    expect(errors).toEqual([]);
+  });
+});
+
+/**
+ * bug-tree-ignores-hide-terminal-toggle: the filterbar's hide done/cancelled
+ * toggle is a LAYOUT preference (it must never move the lens verdict), and it
+ * covers the grouped-ancestry tree exactly like the status columns. In the tree
+ * it is subtree-aware: a terminal row hides unless hiding it would orphan a
+ * visible row below it (then it stays, muted, as terminal context), and a tree
+ * whose composed state has no visible row left renders the same `—` empty state
+ * the empty columns use. The same page script runs in the static export and on
+ * the served board, so both are asserted here.
+ */
+test.describe("@smoke board tree terminal layout", () => {
+  let fixture: string;
+  let server: { child: ChildProcess; url: string } | undefined;
+
+  test.beforeAll(async () => {
+    fixture = createTreeTerminalFixture();
+    server = await startBoardServer(fixture);
+    await waitForBoard(server.url);
+  });
+
+  test.afterAll(async () => {
+    if (server) await stopServer(server.child);
+    if (fixture) rmSync(fixture, { recursive: true, force: true });
+  });
+
+  test("hide done/cancelled composes with the tree, keeps context rows and persists", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    const tree = page.locator("#board-tree");
+    const toggle = page.locator("#board-terminal-toggle");
+    const filterCount = page.locator("#board-filter-count");
+    const treeCount = page.locator("#board-tree-count");
+    const leaf = tree.locator(`.tree-node[data-id="${TREE_CLOSED_LEAF_ID}"]`);
+    const story = tree.locator(`.tree-node[data-id="${TREE_STORY_ID}"]`);
+    const openChild = tree.locator(`.tree-node[data-id="${TREE_OPEN_CHILD_ID}"]`);
+
+    await page.locator("#board-view-toggle").click();
+    await expect(tree).toBeVisible();
+    // The reproducer, pinned: with the toggle OFF every terminal row renders.
+    await expect(tree.locator(".tree-node:not(.filtered-out):not(.terminal-hidden)")).toHaveCount(
+      6,
+    );
+    await expect(leaf).toBeVisible();
+    await expect(story).toBeVisible();
+    await expect(filterCount).toHaveText("6 item(s)");
+    await expect(treeCount).toHaveText("6");
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(toggle).toHaveText("show done/cancelled");
+    // The preference rides the EXISTING layout state (one key, one reset).
+    const stored = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("arggon-board-columns-v1") || "null"),
+    );
+    expect(stored?.terminalHidden).toBe(true);
+
+    // The done leaf hides; the cancelled story stays because hiding it would
+    // orphan the open task under it — dimmed, not part of the lens verdict.
+    await expect(leaf).toBeHidden();
+    await expect(leaf).toHaveClass(/terminal-hidden/);
+    await expect(story).toBeVisible();
+    await expect(story).toHaveClass(/terminal-context/);
+    await expect(openChild).toBeVisible();
+    const storyRow = story.locator("> .tree-row");
+    const openRow = openChild.locator("> .tree-row");
+    const backgrounds = await Promise.all([
+      storyRow.evaluate((el) => getComputedStyle(el).backgroundColor),
+      openRow.evaluate((el) => getComputedStyle(el).backgroundColor),
+    ]);
+    expect(backgrounds[0]).not.toBe(backgrounds[1]);
+
+    // A layout preference moves no counter: the `N of M` line and the tree
+    // heading keep the lens verdict (all 6 rows still match).
+    await expect(filterCount).toHaveText("6 item(s)");
+    await expect(treeCount).toHaveText("6");
+    // Same invariant in the columns layout: hiding both terminal columns
+    // leaves the counts and the `N of M` line untouched.
+    const columnCounts = await page.locator(".column .count").allTextContents();
+    await page.locator("#board-view-toggle").click();
+    await expect(page.locator('.column[data-status="done"]')).toBeHidden();
+    await expect(page.locator('.column[data-status="cancelled"]')).toBeHidden();
+    await expect(filterCount).toHaveText("6 item(s)");
+    expect(await page.locator(".column .count").allTextContents()).toEqual(columnCounts);
+    // The tree terminal state is a scanned surface of its own (the counts
+    // above are its deterministic readiness signal).
+    await page.locator("#board-view-toggle").click();
+    await expect(leaf).toBeHidden();
+    await axeScan(page);
+
+    // The preference persists in the shared layout state and comes back with
+    // the view: reload keeps the tree layout AND the terminal hiding.
+    await page.reload();
+    await expect(tree).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(leaf).toBeHidden();
+    await expect(story).toHaveClass(/terminal-context/);
+
+    // OFF restores every row live, and reset restores the default and keeps it.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await expect(leaf).toBeVisible();
+    await expect(story).not.toHaveClass(/terminal-context/);
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(leaf).toBeHidden();
+    await page.locator("#board-layout-reset").click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await expect(leaf).toBeVisible();
+    await expect(story).not.toHaveClass(/terminal-context/);
+    const reset = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("arggon-board-columns-v1") || "null"),
+    );
+    expect(reset?.terminalHidden).toBe(false);
+    await page.reload();
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await expect(leaf).toBeVisible();
+  });
+
+  test("the lens composes with the terminal rule and an all-hidden tree is honest", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+    const toggle = page.locator("#board-terminal-toggle");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+    // Lens match deep under the cancelled story: the match plus its ancestor
+    // path stay — the terminal ancestor is BOTH lens context and terminal
+    // context (muted), never orphaned and never counted as a match.
+    await page.locator("#board-filter-input").fill(TREE_OPEN_CHILD_ID);
+    await expect(tree.locator(".tree-node:not(.filtered-out):not(.terminal-hidden)")).toHaveCount(
+      4,
+    );
+    const story = tree.locator(`.tree-node[data-id="${TREE_STORY_ID}"]`);
+    await expect(story).toHaveClass(/context/);
+    await expect(story).toHaveClass(/terminal-context/);
+    await expect(page.locator("#board-filter-count")).toHaveText("1 of 6 item(s)");
+    await expect(page.locator("#board-tree-count")).toHaveText("1");
+
+    // The lens matches a terminal row whose whole lens path is terminal too
+    // (a parentless cancelled initiative): the layout hides it, nothing else
+    // is in the verdict, so the composed tree has no visible row left.
+    await page.locator("#board-filter-input").fill(TREE_TERMINAL_ROOT_ID);
+    await expect(tree.locator(".tree-node:not(.filtered-out):not(.terminal-hidden)")).toHaveCount(
+      0,
+    );
+    // The counts still report the lens verdict, not the rendered rows.
+    await expect(page.locator("#board-filter-count")).toHaveText("1 of 6 item(s)");
+    await expect(page.locator("#board-tree-count")).toHaveText("1");
+    // Nothing visible is a state, not a blank gap: the tree renders the same
+    // empty placeholder an empty column uses.
+    const empty = tree.locator(".tree-empty");
+    await expect(empty).toBeVisible();
+    await expect(empty).toHaveText("—");
+
+    // Clearing the lens brings the rows back under the same terminal rule:
+    // the leaf and the parentless terminal root stay hidden, the cancelled
+    // story stays as context for the open child (4 visible rows).
+    await page.locator("#board-filter-clear").click();
+    await expect(empty).toHaveCount(0);
+    await expect(tree.locator(".tree-node:not(.filtered-out):not(.terminal-hidden)")).toHaveCount(
+      4,
+    );
+    await expect(page.locator("#board-filter-count")).toHaveText("6 item(s)");
+  });
+
+  test("folding composes with the terminal rule and the lens (task-tree-rows-open-detail)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+    const story = tree.locator(`.tree-node[data-id="${TREE_STORY_ID}"]`);
+    const openChild = tree.locator(`.tree-node[data-id="${TREE_OPEN_CHILD_ID}"]`);
+    const leaf = tree.locator(`.tree-node[data-id="${TREE_CLOSED_LEAF_ID}"]`);
+    await page.locator("#board-terminal-toggle").click();
+    await expect(story).toHaveClass(/terminal-context/);
+    await expect(leaf).toBeHidden();
+    await expect(openChild).toBeVisible();
+
+    // Folding the cancelled story hides the open child but never the folded row
+    // itself: the fold is a display rule under the terminal verdict, so the
+    // control the user just used cannot vanish with its subtree.
+    const storyToggle = story.locator("> .tree-row > .tree-toggle");
+    await storyToggle.click();
+    await expect(openChild).toBeHidden();
+    await expect(story).toBeVisible();
+    await expect(story).toHaveClass(/terminal-context/);
+    // Neither mechanic moves a counter: the lens verdict keeps counting.
+    await expect(page.locator("#board-filter-count")).toHaveText("6 item(s)");
+    await expect(page.locator("#board-tree-count")).toHaveText("6");
+    // The composed state (fold + terminal hiding) is a scanned surface of its
+    // own; the counts above are its deterministic readiness signal.
+    await axeScan(page);
+
+    // A lens match inside the folded terminal branch is MARKED, not swallowed:
+    // the match row stays folded away while the branch reports it honestly.
+    await page.locator("#board-filter-input").fill(TREE_OPEN_CHILD_ID);
+    const marker = story.locator("> .tree-row > .tree-matches");
+    await expect(marker).toHaveText("1 match inside");
+    await expect(openChild).toBeHidden();
+    await expect(page.locator("#board-filter-count")).toHaveText("1 of 6 item(s)");
+    await expect(page.locator("#board-tree-count")).toHaveText("1");
+    // Expanding restores the match with both rules still applied.
+    await storyToggle.click();
+    await expect(openChild).toBeVisible();
+    await expect(marker).toBeHidden();
+    await expect(story).toHaveClass(/terminal-context/);
+  });
+
+  test("the static export hides terminal tree rows exactly like the served board", async ({
+    page,
+  }) => {
+    const boardFile = join(fixture, "tree-terminal-board.html");
+    runCli(fixture, ["board", "--group-by", "tree", "--out", boardFile]);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(String(error)));
+    await page.goto(`file://${boardFile}`);
+    await expect(page.locator("h1")).toContainText("arggon board");
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+    const leaf = tree.locator(`.tree-node[data-id="${TREE_CLOSED_LEAF_ID}"]`);
+    const story = tree.locator(`.tree-node[data-id="${TREE_STORY_ID}"]`);
+    await expect(leaf).toBeVisible();
+
+    await page.locator("#board-terminal-toggle").click();
+    await expect(leaf).toBeHidden();
+    await expect(leaf).toHaveClass(/terminal-hidden/);
+    await expect(story).toBeVisible();
+    await expect(story).toHaveClass(/terminal-context/);
+    await expect(page.locator("#board-filter-count")).toHaveText("6 item(s)");
+    await expect(page.locator("#board-tree-count")).toHaveText("6");
+    expect(errors).toEqual([]);
+  });
+});
+
+/**
+ * bug-tree-done-container-hides-open-work: the tree rendered a container's
+ * AUTHORED status chip only, so a terminal container with open work below read
+ * as a bare `done` (15 of the tracker's 84 containers are in that state). The
+ * row now discloses `N open` — the count of `todo`/`in_progress`/`blocked`
+ * descendants at every depth — beside that chip; the chip itself never rolls
+ * up. The count is static markup computed from the complete item set, so the
+ * client-side layout preferences (hide done/cancelled, a lens, a fold) can
+ * never move it, and the static export renders it exactly like the served
+ * board. Both are asserted here.
+ */
+test.describe("@smoke board tree open-descendant disclosure", () => {
+  let fixture: string;
+  let server: { child: ChildProcess; url: string } | undefined;
+
+  test.beforeAll(async () => {
+    fixture = createOpenDescendantFixture();
+    server = await startBoardServer(fixture);
+    await waitForBoard(server.url);
+  });
+
+  test.afterAll(async () => {
+    if (server) await stopServer(server.child);
+    if (fixture) rmSync(fixture, { recursive: true, force: true });
+  });
+
+  test("a done container discloses its open descendants and no filter moves the count", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-view-toggle").click();
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+    const row = (id: string) => tree.locator(`.tree-node[data-id="${id}"] > .tree-row`);
+    const node = (id: string) => tree.locator(`.tree-node[data-id="${id}"]`);
+    const badge = (id: string) => row(id).locator("> .tree-open");
+
+    // The reproducer, pinned: the initiative reads `open 2 open` — the stored
+    // `done` is masked by the derived display (task-board-no-done-over-open-work),
+    // the disclosure sits right after the displayed chip.
+    await expect(row(OPEN_ROOT_ID).locator("> .status-chip")).toHaveText("open");
+    await expect(node(OPEN_ROOT_ID)).toHaveAttribute("data-status", "done");
+    await expect(node(OPEN_ROOT_ID)).toHaveAttribute("data-display-status", "open");
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    // The whole path discloses the same subtree count, three levels down from
+    // the initiative — a direct-children count would have answered 0 there.
+    await expect(badge(OPEN_EPIC_ID)).toHaveText("2 open");
+    await expect(badge(OPEN_STORY_ID)).toHaveText("2 open");
+    // The `done` story with the open leaf follow-ups is the acceptance's own
+    // case: its chip reads `open`, not the stored `done`.
+    await expect(row(OPEN_STORY_ID).locator("> .status-chip")).toHaveText("open");
+    await expect(node(OPEN_STORY_ID)).toHaveAttribute("data-status", "done");
+    await expect(node(OPEN_STORY_ID)).toHaveAttribute("data-display-status", "open");
+    // The accessible name carries the DISPLAYED state and the disclosure on the
+    // interactive row: never `done` over open work.
+    await expect(row(OPEN_ROOT_ID)).toHaveAttribute(
+      "aria-label",
+      /^initiative tree-done-root: Tree done root \(open, 2 open descendants\)$/,
+    );
+    // A done container whose whole subtree is terminal keeps its authored chip
+    // and discloses nothing, and neither do the leaves — open, done or cancelled.
+    await expect(row(CLEAN_EPIC_ID).locator("> .status-chip")).toHaveText("done");
+    await expect(node(CLEAN_EPIC_ID)).not.toHaveAttribute("data-display-status", /.+/);
+    await expect(row(CLEAN_EPIC_ID).locator("> .tree-open")).toHaveCount(0);
+    await expect(row(CLEAN_STORY_ID).locator("> .tree-open")).toHaveCount(0);
+    await expect(row(OPEN_TASK_ID).locator("> .tree-open")).toHaveCount(0);
+    await expect(row(OPEN_DONE_TASK_ID).locator("> .tree-open")).toHaveCount(0);
+    await expect(row(OPEN_CANCELLED_BUG_ID).locator("> .tree-open")).toHaveCount(0);
+
+    // Hide done/cancelled: a masked container READS OPEN, so it is not a
+    // terminal row at all — it stays visible at full strength (never muted
+    // terminal-context, never hidden) and the disclosure does not move.
+    await page.locator("#board-terminal-toggle").click();
+    await expect(node(OPEN_STORY_ID)).toBeVisible();
+    await expect(node(OPEN_STORY_ID)).not.toHaveClass(/terminal-context/);
+    await expect(node(OPEN_STORY_ID)).not.toHaveClass(/terminal-hidden/);
+    await expect(node(OPEN_ROOT_ID)).not.toHaveClass(/terminal-context/);
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await expect(badge(OPEN_STORY_ID)).toHaveText("2 open");
+    // The all-terminal container hides (nothing visible hangs below it).
+    await expect(row(CLEAN_EPIC_ID)).toBeHidden();
+    // The columns compose the same way: the done column stays (it hosts the
+    // masked containers, which read open) and only the genuinely terminal cards
+    // inside it hide; the cancelled column has no such card and hides whole.
+    await page.locator("#board-view-toggle").click();
+    await expect(page.locator('.column[data-status="done"]')).toBeVisible();
+    await expect(page.locator(`.card[data-id="${OPEN_STORY_ID}"]`)).toBeVisible();
+    await expect(
+      page.locator(`.card[data-id="${OPEN_ROOT_ID}"] .card-head > .status-chip`),
+    ).toHaveText("open");
+    await expect(page.locator(`.card[data-id="${OPEN_DONE_TASK_ID}"]`)).toBeHidden();
+    await expect(page.locator('.column[data-status="cancelled"]')).toBeHidden();
+    await page.locator("#board-view-toggle").click();
+    await expect(tree).toBeVisible();
+
+    // A fold hides the subtree, never the disclosure on the folded row.
+    const rootToggle = row(OPEN_ROOT_ID).locator("> .tree-toggle");
+    await rootToggle.click();
+    await expect(tree.locator(`.tree-node[data-id="${OPEN_STORY_ID}"]`)).toBeHidden();
+    await expect(rootToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await rootToggle.click();
+    await expect(tree.locator(`.tree-node[data-id="${OPEN_STORY_ID}"]`)).toBeVisible();
+
+    // A lens narrows the rows to one match plus its context path; the masked
+    // container is lens context but still NOT terminal context (it reads open),
+    // and the disclosure is the subtree's truth, not the lens verdict (the
+    // `N of M` counter stays the verdict).
+    await page.locator("#board-filter-input").fill(OPEN_TASK_ID);
+    await expect(node(OPEN_STORY_ID)).toHaveClass(/context/);
+    await expect(node(OPEN_STORY_ID)).not.toHaveClass(/terminal-context/);
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await expect(badge(OPEN_STORY_ID)).toHaveText("2 open");
+    await expect(page.locator("#board-filter-count")).toHaveText("1 of 10 item(s)");
+    await expect(page.locator("#board-tree-count")).toHaveText("1");
+    // The composed state (lens + terminal + fold) is a scanned surface of its
+    // own; the assertions above are its deterministic readiness signal.
+    await axeScan(page);
+    await page.locator("#board-filter-clear").click();
+    await page.locator("#board-terminal-toggle").click();
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await expect(row(CLEAN_EPIC_ID)).toBeVisible();
+  });
+
+  test("the static export carries the same disclosure (bug-tree-done-container-hides-open-work)", async ({
+    page,
+  }) => {
+    const boardFile = join(fixture, "tree-open-board.html");
+    runCli(fixture, ["board", "--group-by", "tree", "--out", boardFile]);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(String(error)));
+    await page.goto(`file://${boardFile}`);
+    await expect(page.locator("h1")).toContainText("arggon board");
+    const tree = page.locator("#board-tree");
+    await expect(tree).toBeVisible();
+    const row = (id: string) => tree.locator(`.tree-node[data-id="${id}"] > .tree-row`);
+    const badge = (id: string) => row(id).locator("> .tree-open");
+
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await expect(badge(OPEN_STORY_ID)).toHaveText("2 open");
+    // The derived display ships offline exactly like on the served board.
+    await expect(row(OPEN_ROOT_ID).locator("> .status-chip")).toHaveText("open");
+    await expect(row(CLEAN_EPIC_ID).locator("> .status-chip")).toHaveText("done");
+    await expect(row(CLEAN_EPIC_ID).locator("> .tree-open")).toHaveCount(0);
+
+    // The same layout preferences, offline: folding and hiding terminal rows
+    // leave the disclosure untouched, and a masked container is never hidden
+    // (it reads open, not terminal).
+    await row(OPEN_ROOT_ID).locator("> .tree-toggle").click();
+    await expect(tree.locator(`.tree-node[data-id="${OPEN_STORY_ID}"]`)).toBeHidden();
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await page.locator("#board-terminal-toggle").click();
+    await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await expect(tree.locator(`.tree-node[data-id="${OPEN_ROOT_ID}"]`)).toBeVisible();
+    await expect(tree.locator(`.tree-node[data-id="${OPEN_ROOT_ID}"]`)).not.toHaveClass(
+      /terminal-context/,
+    );
+    await expect(row(CLEAN_EPIC_ID)).toBeHidden();
     expect(errors).toEqual([]);
   });
 });

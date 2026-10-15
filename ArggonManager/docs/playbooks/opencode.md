@@ -34,7 +34,7 @@ docs or the V1 schema for V2 work.
   `.opencode/opencode.json(c)`) — a git-root-anchored prettier formatter
   override + compaction retention and **no MCP
   stanza** (W3, `task-native-commands-seam`; ADR 0011 §5/§6) — plus
-  `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` and the eleven
+  `.opencode/agents/arggon-{delivery-lead,maker,standards-reviewer,verifier}.md` and the eleven
   native `.opencode/commands/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook,adopt}.md`
   — never overwriting modified files (contract:
   [spec-opencode-seam-010](../specs/spec-opencode-seam-010.md)). The commands are
@@ -121,6 +121,41 @@ true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
     injected text as `block=<json>` and measures those bytes independently
     (reported = measured, ≤ 1024) instead of trusting the reported count; exits
     0 with `skipped: opencode not installed` when absent.
+- **Prompt admission + compaction (T4, plan-methodology-adapters-017 §T4).**
+  Two more session hooks, both resolved from the SESSION's own directory
+  (`ctx.session.get` → `location.directory`, the value `session_move` updates):
+  the plugin instance is loaded from the project's canonical checkout, so
+  `ctx.location.directory` would name the primary even for a session moved into
+  a worktree — and the env contract's `.arggon.env` exists only at the session's
+  directory (observed on 2.0.26). `session.hook("prompt")` writes a bounded
+  branch/item stamp into the admitted prompt's `metadata` under the `arggon`
+  key (worktree env contract → process environment → the correlation chain
+  above; never into the prompt text, files, agents, skills or `delivery`), which
+  the host persists with the user message. `session.hook("compaction")` appends
+  the same bounded item block to the checkpoint-summary request's `system`
+  instructions, once per request (marker check) and never sets `result`, so the
+  model still writes the summary. Evidence harness:
+  `npm run smoke:opencode:prompt-stamp` — model-free (real
+  `opencode serve` + a scripted OpenAI-compatible provider), skipping when the
+  binary is absent; it asserts the stamp on the persisted payload, the byte
+  identical prompt text, one item block in the compaction request, the summary
+  still landing, the block surviving into the next agent-loop request, an idle
+  window with no request at all (no polling) and no stamp on a plain checkout.
+- **Event-driven panel refresh (T4, plan-methodology-adapters-017 §T4).** The
+  open board panel subscribes to the host's TUI event stream
+  (`context.data.on`, feature-detected — see § TUI plugins) and re-reads the
+  tracker on the two events that mean argon work landed: `session.shell.ended`
+  (a command run through the session's shell endpoint) and `session.step.ended`
+  (an agent step, which is where shell tool calls and native `tools.arggon.*`
+  calls live). The subscription is disposed with the panel and
+  the entry declares no timer, so freshness is event-driven with the manual `r`
+  as the only fallback: a tracker change made outside OpenCode (another
+  terminal) is not observed, by contract. Evidence harness:
+  `npm run smoke:opencode:panel-refresh` — model-free (real TUI in a PTY over a
+  hermetic HOME + its own managed-service port), skipping when the binary or
+  util-linux `script` is absent; it asserts the panel opens stale, the API shell
+  call repaints it with no keypress, and a hand-written tracker change never
+  appears inside an idle window.
 - MCP (https://opencode.ai/v2/docs/mcp-servers/) is **optional** in V2 and not
   part of the default seam (W3): the native tools replace it. To use the stdio
   server with another client, register it under `mcp.servers` as
@@ -143,8 +178,13 @@ true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
 - **Never invent V2 fields from the V1 schema.** V2 server names live under
   `mcp.servers` (never directly under `mcp`), servers switch off with `disabled`
   (there is no `enabled`), and V1-era keys (`autoupdate`, `tools`, `maxSteps`,
-  `permission`) are wrong here. `https://opencode.ai/config.json` is the
-  field-level source of truth.
+  `permission`) are wrong here. The published `https://opencode.ai/config.json`
+  schema is **V1**, not a field-level source of truth for V2: the vendor's V2
+  guidance (runtime v2.0.26) says verbatim, "The schema served from
+  <https://opencode.ai/config.json> may describe V1 even though V2 configuration
+  files include that URL for editor integration. Never use it to infer V2 field
+  names or shapes." Take V2 names from the V2 docs (`plugins`, `agents` with
+  `system`/`permissions`, `commands`), never from that schema.
 - Config precedence (https://opencode.ai/v2/docs/config/): files merge farthest
   → closest, direct `opencode.json(c)` then `.opencode/opencode.json(c)`, so
   **every `.opencode` config overrides every direct config**. Hence the seam
@@ -157,6 +197,19 @@ true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
   `.md` discovered; project files replace same-named global commands). Generated
   prompts drive the `arggon` CLI/MCP; they never restate the rules
   (https://opencode.ai/v2/docs/agents/, https://opencode.ai/v2/docs/commands/).
+- **The project `permissions` array is enforced by the runtime, per session and
+  per client runtime** (probed on v2.0.29, 2026-10-15,
+  `bug-task-permissions-enforcement-not-observed`, harness
+  `npm run smoke:permissions-probe`): the runtime's own permission layer
+  evaluates the flattened rule list (each agent's own rules first, then the
+  project array appended after every agent — last match wins) and a running
+  session picks up an edit made after it started: a fresh `opencode run`, a
+  session continued across runs, and a session attached to a long-lived
+  background service all denied `git commit --no-verify -m probe` once the
+  fixture carried the block, and allowed the otherwise-identical
+  `git commit -m probe`. The ZCode/Claude seams never read that file — their
+  `hooks/gate.mjs` gate is a separate, fail-open logic path. `ctx.permission.*`
+  above is the plugin-side surface and stays unused.
 - Session context is **advisory and bounded**: the plugin injects at most one
   ≤ 1024-byte item block per model call (never the comment tail), `ARGON_ITEM`
   is read per call, and every surface is feature-detected — on 2.0.7
@@ -279,6 +332,37 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
   - The TUI runs locally in the terminal process with filesystem access (the
     W5 board surface reads the tracker through the inlined kernel), so the panel
     needs no server round-trip and stays display-only.
+  - **Event stream (T4 `task-opencode-event-panel`, probed 2026-10-13 on the
+    local 2.0.26).** `context.data.on(type, handler)` is the TUI-side
+    subscription surface — it returns the unsubscribe and the built-in TUI
+    plugins use it for `session.execution.*`, `session.step.ended`,
+    `worktree.updated`, `form.*`, `permission.*`, …; **there is no
+    `context.event`** (the v1 typings' `TuiEventBus` shape is not the v2
+    context), and `context.data` also carries `listen, session, project, shell,
+location`. Events arrive as `{id, created, type, location, data}`. A panel
+    can therefore be refreshed without polling: `session.shell.ended` fires when
+    a command run through the session's shell endpoint finishes — the endpoint
+    (`POST /api/session/:id/shell`, "Execute one shell command in the session's
+    working directory… Emits a shell.started event before execution and a
+    shell.ended event with the merged output after") answers `204` and the
+    command runs in the **session's** directory. The agent's own shell _tool_
+    calls do NOT emit it (observed: a step running the `shell` tool repeatedly
+    produced `session.step.ended` per step and zero `session.shell.*`), which is
+    why the refresh follows `session.step.ended` as well — that is where shell
+    tool calls and the native `tools.arggon.*` calls live.
+    Evidence: `npm run smoke:opencode:panel-refresh` (real TUI in a PTY, hermetic
+    HOME: the panel opens stale, an API shell call creates an item, the open
+    panel repaints with no keypress, and a hand-written tracker change never
+    appears).
+  - **Hermetic TUI runs need their own service port.** With an empty `HOME` the
+    TUI starts its own managed service — which binds the default port 49374 and
+    collides with a machine-wide `opencode service` (`Managed service port 49374
+… already in use`); `opencode service set port <free>` under the hermetic
+    `$XDG_CONFIG_HOME` fixes it, and `opencode api`/the TUI then share that one
+    service (password in `$XDG_CONFIG_HOME/opencode/service.json`, stop it with
+    `opencode service stop`). Also note `arggon init` prepends
+    `// arggon:generated template="…"` to BOTH vendored artifacts, so a
+    byte-for-byte fixture check must strip that line first.
   - Evidence: `npm run smoke:tui` (PTY via util-linux `script`: init fixture →
     4-item tree → `opencode plugin list` → API-created empty session → TUI run
     → types `/arggon-board` → asserts the captured panel header + tree, no
@@ -394,7 +478,18 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
   (`git push *` denies `git push origin main` with `Permission denied: shell`
   while `git status` still runs). The shipped defaults are deliberately
   non-breaking: no global `ask` (headless clients would stall), only narrow
-  `deny`s (force-push, `--no-verify`, reviewer mutations).
+  `deny`s (force-push, `--no-verify`, reviewer/verifier tracker writes) and one
+  explicit **read grant** — the verifier's
+  `show`/`list`/`next`/`report`/`validate`, both spellings
+  (`bug-verifier-cannot-read-the-tracker-no-allow-side`). Probe (2.0.26,
+  `opencode run --agent arggon-verifier`): with the entries present the five
+  reads return their envelopes while `update`/`create`/`comment` answer
+  `Unknown tool 'arggon.…'` and the catalog is exactly the granted reads. The
+  grant **pins** the read set; it does not by itself unblock it — the base
+  policy's allow-all already resolved an unmatched resource to `allow`, so the
+  entries are what make the read set a stated contract (agent rules are appended
+  last and win) rather than a runtime default, and the `comment` deny is the
+  catalog change a session actually observes.
 - **Transforms replay asynchronously (2.0.10; re-confirmed on 2.0.12).**
   `await ctx.tool.transform(cb)` resolves before `cb` runs: the runtime replays
   the registered callbacks when it rebuilds the registry (observed on 2.0.10
@@ -524,6 +619,7 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   `search({namespace:"arggon"})`. Compaction cannot be forced deterministically
   headless; the closest evidence is that the injection fires per model call (a
   later call in the same session gets the block again).
+- **One model pin for both harnesses:** `smoke/opencode-model.ts` is the only model id — a retirement is one change plus a canary, never two scripts. — bug-wave-smoke-retired-model-pin
 - Re-verified on 2.0.10 (2026-09-20, `opencode v2.0.10`): the plugin-import
   A/B re-probe recorded in task-playbook-opencode-2-0-10 (dependency-less
   fixture — no `node_modules` in the fixture or any ancestor: plugin A, the docs

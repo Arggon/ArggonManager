@@ -23,14 +23,38 @@
  *    RIGHT to skip (adopter edits, acknowledged baselines, vendored plugin
  *    artifacts).
  */
-import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { readGeneratedProjectName, readGeneratedState, updateGeneratedSection, type GeneratedEntry } from "@arggondev/lib";
-import { auditGeneratedProvenance, renderGeneratedDoc } from "./docs.js";
+import {
+  readGeneratedProjectName,
+  readGeneratedState,
+  updateGeneratedSection,
+  type GeneratedEntry,
+} from "@arggondev/lib";
+import {
+  BUNDLED_SKILLS,
+  auditGeneratedProvenance,
+  checksumOf,
+  currentGeneratedTemplates,
+  generatedMarker,
+  generatedYamlMarker,
+  readGeneratedMarker,
+  renderGeneratedDoc,
+} from "./docs.js";
 import { runInit } from "./init.js";
+import { syncBundledSkills } from "./sync-skills.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const templatesDir = join(repoRoot, "templates");
@@ -64,7 +88,11 @@ function writeState(dir: string, generated: Record<string, GeneratedEntry>): voi
   const path = join(dir, ...STATE_REL.split("/"));
   writeFileSync(
     path,
-    updateGeneratedSection(readFileSync(path, "utf8"), generated, readGeneratedProjectName(dir) ?? undefined),
+    updateGeneratedSection(
+      readFileSync(path, "utf8"),
+      generated,
+      readGeneratedProjectName(dir) ?? undefined,
+    ),
     "utf8",
   );
 }
@@ -149,5 +177,312 @@ describe("provenance audit: records vs committed seam bytes", () => {
     // `.opencode/commands/arggon-explore.md` record were exactly these rows.
     const violations = auditGeneratedProvenance({ root: repoRoot, templatesDir, full: true });
     expect(violations).toEqual([]);
+  });
+});
+
+/**
+ * The marker reader the class check is built on: anchored exactly like
+ * `stampGeneratedContent` writes the marker, so provenance is read from the
+ * file head only and a phrase in a body is never a claim.
+ */
+describe("provenance marker reader", () => {
+  it("reads each shape stampGeneratedContent writes", () => {
+    expect(readGeneratedMarker(`${generatedMarker("AGENTS.md")}\n# x\n`)).toBe("AGENTS.md");
+    expect(
+      readGeneratedMarker(`${generatedYamlMarker("github/workflows/arggon.yml")}\nname: x\n`),
+    ).toBe("github/workflows/arggon.yml");
+    expect(
+      readGeneratedMarker(`// arggon:generated template="opencode/plugins/arggon/index.ts"\n`),
+    ).toBe("opencode/plugins/arggon/index.ts");
+    // Frontmatter destinations take the marker INSIDE the frontmatter.
+    expect(
+      readGeneratedMarker(
+        `---\n# arggon:generated template="opencode/agents/x.md"\nmode: subagent\n`,
+      ),
+    ).toBe("opencode/agents/x.md");
+  });
+
+  it("tolerates CRLF and a BOM, and never trusts the phrase below the head", () => {
+    expect(readGeneratedMarker(`\uFEFF${generatedMarker("AGENTS.md")}\r\n# x\r\n`)).toBe(
+      "AGENTS.md",
+    );
+    expect(
+      readGeneratedMarker('---\r\n# arggon:generated template="opencode/agents/x.md"\r\n'),
+    ).toBe("opencode/agents/x.md");
+    expect(
+      readGeneratedMarker("description: mine\ndocs say <!-- arggon:generated -->\n"),
+    ).toBeNull();
+    expect(readGeneratedMarker("# ordinary markdown\n")).toBeNull();
+    expect(readGeneratedMarker("")).toBeNull();
+  });
+});
+
+/**
+ * The false-absence class (bug-prover-agent-has-no-x-generated-entry).
+ *
+ * The defect this pins: `.opencode/agents/arggon-prover.md` was committed with
+ * the visible generated marker but with NO `x-generated` entry, so init
+ * classified it adopter-modified and skipped it — and a walk over the CURRENT
+ * destinations could not see it either once its template left the install.
+ * Both enforcement layers were blind to a file that self-declares as generated
+ * content. The class fix reports the SHAPE, not this instance: any file under a
+ * managed path whose own marker claims arggon provenance but which has no row.
+ *
+ * The deliberate non-findings pin the boundary: an adopter-owned file with no
+ * marker and no row is init behaving correctly (the pre-provenance adopter
+ * file), and a marker-bearing file WITH a row is ordinary adopter content, not
+ * a false absence.
+ */
+describe("provenance audit: unprovenanced managed files", () => {
+  /** The stranded shape: marker + no row + a template the install no longer ships. */
+  function strand(dir: string, dest: string, marker: string, body: string): void {
+    const abs = join(dir, ...dest.split("/"));
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, `${marker}\n${body}`, "utf8");
+  }
+
+  it("reports a stranded marker file under a managed path with no row", () => {
+    const dir = scaffold();
+    const dest = ".opencode/agents/arggon-prover.md";
+    const template = "opencode/agents/arggon-prover.md";
+    // Precondition, asserted rather than assumed: the byte rule cannot see this
+    // file — the current template walk no longer owns its destination, and no
+    // ledger row exists. It is exactly the shape the item was filed for.
+    expect(currentGeneratedTemplates().some((d) => d.dest === dest)).toBe(false);
+    expect(stateEntries(dir)[dest]).toBeUndefined();
+    strand(dir, dest, generatedYamlMarker(template), "description: stranded\n");
+
+    const hit = auditGeneratedProvenance({ root: dir, templatesDir, full: true }).find(
+      (v) => v.dest === dest,
+    );
+    expect(hit).toBeDefined();
+    expect(hit!.kind).toBe("unprovenanced");
+    expect(hit!.template).toBe(template);
+    expect(hit!.reason).toContain("no x-generated entry");
+  });
+
+  it("reports a marker file in a nested managed namespace (frontmatter and HTML shapes)", () => {
+    const dir = scaffold();
+    const nested = "ArggonManager/docs/runbooks/stranded-runbook.md";
+    strand(dir, nested, generatedMarker("docs/runbooks/stranded-runbook.md"), "# Stranded\n");
+    const hits = auditGeneratedProvenance({ root: dir, templatesDir, full: true });
+    expect(hits.map((v) => [v.kind, v.dest])).toEqual([["unprovenanced", nested]]);
+  });
+
+  it("never reports an adopter-owned managed file (no marker, no row)", () => {
+    const dir = scaffold();
+    // The sanctioned pre-provenance adopter file: init is RIGHT to skip it, and
+    // a path-only check would false-positive here.
+    strand(dir, ".opencode/agents/my-own-agent.md", "", "description: mine\n");
+    // The marker phrase in a BODY is not provenance: the anchored read only
+    // trusts the file head.
+    strand(
+      dir,
+      ".opencode/agents/mentions-marker.md",
+      "description: mine",
+      "docs say <!-- arggon:generated -->",
+    );
+    expect(auditGeneratedProvenance({ root: dir, templatesDir, full: true })).toEqual([]);
+  });
+
+  it("never reports a marker file that has a row, even when its bytes diverge", () => {
+    const dir = scaffold();
+    // AGENTS.md carries a row and a marker; a hand edit keeps the marker and
+    // diverges from the render. It has a row, so it is not a false absence —
+    // and the byte rule stays silent because the bytes are adopter content.
+    appendFileSync(join(dir, "AGENTS.md"), "\nMY ADOPTER EDIT\n", "utf8");
+    expect(auditGeneratedProvenance({ root: dir, templatesDir, full: true })).toEqual([]);
+  });
+
+  it("reports a marker file whose row was dropped, independent of the byte rule", () => {
+    const dir = scaffold();
+    const generated = stateEntries(dir);
+    delete generated["CONTRIBUTING.md"];
+    writeState(dir, generated);
+    // Keep the marker, diverge the bytes: the byte rule stays silent (adopter
+    // content, and no row to compare), so only the class check can name it.
+    appendFileSync(join(dir, "CONTRIBUTING.md"), "\nMY EDIT\n", "utf8");
+    const violations = auditGeneratedProvenance({ root: dir, templatesDir, full: true });
+    expect(violations.map((v) => [v.kind, v.dest])).toEqual([["unprovenanced", "CONTRIBUTING.md"]]);
+  });
+});
+
+/**
+ * Derived bundled-skill rows (bug-skill-source-edit-leaves-ledger-stale).
+ *
+ * The skill copies are gitignored in the seam repo (single committed source),
+ * so a fresh checkout — and therefore CI — has NO copy for the byte rule above
+ * to compare a row against: that is how a source edit (`json-contract.md` after
+ * #751, `exploration.md` after #771) left the ledger stale, red only in local
+ * checkouts. This block pins the two halves of the fix:
+ *
+ *  - a skill row is DERIVABLE from the committed source, so a stale row fails
+ *    the audit even with no copy on disk — the CI surface the byte rule could
+ *    not reach;
+ *  - `skills:sync` re-records the row it regenerates, so the remedy is the
+ *    writer, never a hand-edited ledger. The recorded checksum is always the
+ *    SOURCE render, never read back from the destination, so a hand edit of a
+ *    copy can never be blessed as generated — and the seam's version stamp
+ *    (the drift gate's input) is never moved by a per-checkout copy.
+ */
+describe("provenance audit: derived bundled-skill rows", () => {
+  /**
+   * A seam-shaped fixture: the real committed skill sources, their ledger rows,
+   * and NO copies (the fresh-checkout/CI shape). Sources are copied rather than
+   * synthesized so the real render pipeline is exercised.
+   */
+  function skillFixture(): string {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-skill-derived-"));
+    cpSync(join(repoRoot, "skills"), join(dir, "skills"), { recursive: true });
+    // The bundle boundary `renderGeneratedDoc` resolves as `<templatesDir>/../skills`.
+    mkdirSync(join(dir, "templates"), { recursive: true });
+    const rows: Record<string, GeneratedEntry> = {};
+    for (const { source, dest } of BUNDLED_SKILLS) {
+      rows[dest] = {
+        template: source,
+        checksum: checksumOf(renderSkill(dir, source, dest)),
+        // Two distinct stamps so the inheritance rule below has a "newest".
+        arggonVersion: dest.includes("arggon-upgrade") ? "0.7.0" : "0.5.0",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+      };
+    }
+    const statePath = join(dir, ...STATE_REL.split("/"));
+    mkdirSync(dirname(statePath), { recursive: true });
+    writeFileSync(statePath, updateGeneratedSection("version: 5\n", rows, "Fixture"), "utf8");
+    return dir;
+  }
+
+  /** The generator's render of one bundled skill copy, in the fixture's own bundle. */
+  function renderSkill(dir: string, source: string, dest: string): string {
+    const rendered = renderGeneratedDoc({
+      templatesDir: join(dir, "templates"),
+      root: dir,
+      template: source,
+      dest,
+      projectName: "Fixture",
+    });
+    if (rendered === null) throw new Error(`no render for ${source}`);
+    return rendered;
+  }
+
+  function auditFixture(dir: string): ReturnType<typeof auditGeneratedProvenance> {
+    return auditGeneratedProvenance({
+      root: dir,
+      templatesDir: join(dir, "templates"),
+      full: true,
+    });
+  }
+
+  it("flags a row left stale by a source edit with no copy on disk, and skills:sync repairs it", () => {
+    const dir = skillFixture();
+    const source = "skills/arggon-cli/references/pitfalls.md";
+    const dest = ".agents/skills/arggon-cli/references/pitfalls.md";
+    // The CI shape, asserted rather than assumed: the copies are gitignored, so
+    // a fresh checkout has none of them.
+    expect(existsSync(join(dir, ...dest.split("/")))).toBe(false);
+    expect(auditFixture(dir)).toEqual([]);
+
+    // The recurrence: a source edit lands while the row keeps describing the
+    // previous revision.
+    appendFileSync(join(dir, ...source.split("/")), "\n- a new pitfall\n", "utf8");
+    expect(auditFixture(dir).map((v) => [v.kind, v.dest])).toEqual([
+      ["stale-derived-checksum", dest],
+    ]);
+
+    // The repair: the writer that materializes the copy re-records the row —
+    // no hand-edited ledger.
+    syncBundledSkills(dir);
+    expect(auditFixture(dir)).toEqual([]);
+    const row = readGeneratedState(dir)[dest]!;
+    expect(row.template).toBe(source);
+    expect(row.checksum).toBe(checksumOf(renderSkill(dir, source, dest)));
+  });
+
+  it("never blesses a hand edit of a copy: the row tracks the source render, not the destination", () => {
+    const dir = skillFixture();
+    const source = "skills/arggon-cli/references/orchestration.md";
+    const dest = ".agents/skills/arggon-cli/references/orchestration.md";
+    const copyPath = join(dir, ...dest.split("/"));
+    const sourceBytes = readFileSync(join(dir, ...source.split("/")), "utf8");
+    mkdirSync(dirname(copyPath), { recursive: true });
+    writeFileSync(copyPath, `${generatedMarker(source)}\n${sourceBytes}\nMY HAND EDIT\n`, "utf8");
+    const render = renderSkill(dir, source, dest);
+
+    // init skipping an edited copy is correct, so the audit stays silent about
+    // those bytes — and the row is not chased to describe them: it still is the
+    // source render, so the edit never reaches the ledger.
+    expect(auditFixture(dir)).toEqual([]);
+    expect(readGeneratedState(dir)[dest]!.checksum).toBe(checksumOf(render));
+    expect(checksumOf(readFileSync(copyPath, "utf8"))).not.toBe(checksumOf(render));
+
+    // The sanctioned writer regenerates from the source: the edit is overwritten
+    // because the copy is derived, never because the ledger recorded it.
+    syncBundledSkills(dir);
+    expect(readFileSync(copyPath, "utf8")).toBe(
+      `${generatedMarker(source)}\n${readFileSync(join(dir, ...source.split("/")), "utf8")}`,
+    );
+    expect(readGeneratedState(dir)[dest]!.checksum).toBe(
+      checksumOf(readFileSync(copyPath, "utf8")),
+    );
+  });
+
+  it("never advances the seam version stamp, and leaves unchanged rows byte-identical", () => {
+    const dir = skillFixture();
+    const statePath = join(dir, ...STATE_REL.split("/"));
+    const source = "skills/arggon-cli/references/methodology.md";
+    const dest = ".agents/skills/arggon-cli/references/methodology.md";
+
+    // A merge that dropped the row, plus a source edit: the writer recreates it
+    // from the source render and inherits the state's newest stamp. The stamp is
+    // the drift gate's input (release.md §"The re-pin"), and a gitignored
+    // per-checkout copy must never move it.
+    appendFileSync(join(dir, ...source.split("/")), "\nnew step\n", "utf8");
+    const rows = readGeneratedState(dir);
+    delete rows[dest];
+    writeFileSync(
+      statePath,
+      updateGeneratedSection(readFileSync(statePath, "utf8"), rows, "Fixture"),
+      "utf8",
+    );
+    syncBundledSkills(dir);
+    expect(readGeneratedState(dir)[dest]!.arggonVersion).toBe("0.7.0");
+
+    // Idempotent: a second run with nothing changed leaves the state untouched.
+    const before = readFileSync(statePath, "utf8");
+    syncBundledSkills(dir);
+    expect(readFileSync(statePath, "utf8")).toBe(before);
+  });
+
+  it("leaves acknowledged rows and an unparseable ledger alone", () => {
+    const dir = skillFixture();
+    const statePath = join(dir, ...STATE_REL.split("/"));
+    const source = "skills/arggon-cli/references/exploration.md";
+    const dest = ".agents/skills/arggon-cli/references/exploration.md";
+    appendFileSync(join(dir, ...source.split("/")), "\nsource moved on\n", "utf8");
+
+    // `adopt --ack` re-baselines a row from the adopter's bytes: it is an
+    // ownership statement, so the writer must not re-point it at the render.
+    const acked = readGeneratedState(dir);
+    acked[dest] = { ...acked[dest]!, checksum: `sha256:${"1".repeat(64)}`, acknowledged: true };
+    writeFileSync(
+      statePath,
+      updateGeneratedSection(readFileSync(statePath, "utf8"), acked, "Fixture"),
+      "utf8",
+    );
+    syncBundledSkills(dir);
+    expect(readGeneratedState(dir)[dest]).toMatchObject({
+      checksum: `sha256:${"1".repeat(64)}`,
+      acknowledged: true,
+    });
+
+    // A ledger this script cannot parse is `arggon init`'s repair: writing a
+    // fresh section from the tolerant reader's empty result would delete the
+    // rows it could not read. The source edit below WOULD be recorded, so the
+    // untouched bytes prove the parse guard, not an idle run.
+    appendFileSync(join(dir, "skills/arggon-cli/references/methodology.md"), "\nmore\n", "utf8");
+    const broken = `${readFileSync(statePath, "utf8")}x-tracker: {auto-commit: false}\n`;
+    writeFileSync(statePath, broken, "utf8");
+    syncBundledSkills(dir);
+    expect(readFileSync(statePath, "utf8")).toBe(broken);
   });
 });

@@ -33,8 +33,10 @@ import {
   planOrphanReaps,
   renderGeneratedDoc,
   resolveProjectName,
+  unprovenancedManagedFiles,
 } from "./docs.js";
 import { agentForTemplate, AGENT_IDS, detectAgents, type AgentId } from "./adapters.js";
+import { readEnvGitignore, type EnvGitignoreReport } from "./env-gitignore.js";
 
 import { measureBudget, formatBudgetLines, type BudgetResult } from "./measure.js";
 import {
@@ -87,6 +89,17 @@ export type DoctorDocs = {
    * per-destination detail behind the count.
    */
   outdatedDocs: string[];
+  /**
+   * False-absence class (bug-prover-agent-has-no-x-generated-entry): files
+   * under a managed path whose own visible marker claims arggon provenance but
+   * which have no `x-generated` entry at all. Report-only and independent of
+   * the entry buckets above (a no-row file has no entry to iterate): init
+   * classifies these adopter-modified and keeps them, so without this count
+   * they would be invisible.
+   */
+  unprovenanced: number;
+  /** Destinations counted in `unprovenanced` (posix, relative to root). */
+  unprovenancedDocs: string[];
 };
 
 /**
@@ -720,9 +733,20 @@ export function runAdapterReport(opts: {
   projectName: string | null;
   /** Matrix already read by runDoctor — reused, never parsed twice. */
   matrix: CapabilityMatrix;
+  /**
+   * `x-generated` entries ALREADY read by runDoctor — reused, never parsed
+   * twice. The same argument the matrix makes above: the `docs` block and this
+   * block classify the same provenance state, so they read one read of it and
+   * cannot disagree. (`docs` uses `readConventionConfig`, which throws on a
+   * malformed file; this block would have swallowed it as `{}` through
+   * `readGeneratedState`, i.e. reported every adapter file adopter-modified
+   * while `docs` had already failed the run. One shared read removes both the
+   * second parse and that asymmetry.)
+   */
+  state: Record<string, GeneratedEntry>;
 }): DoctorAdapters {
   const templatesDir = opts.templatesDir;
-  const state = readGeneratedState(opts.root);
+  const state = opts.state;
   const detected = new Set(detectAgents(opts.root));
   // Layout-aware so the destinations match what init writes on this tree.
   const layout = trackerAt(opts.root)?.layout ?? "arggon-manager";
@@ -848,6 +872,15 @@ export type DoctorResult = {
   /** Git state of the tree (additive; bug-init-git-doctor-blindspot). */
   git: DoctorGit;
   /**
+   * Report-only probe of the tracked `.gitignore`'s `.arggon.env` entry
+   * (task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters,
+   * spec worktree-env-contract-016): `{ path, present, ignores, hint }`. `hint`
+   * is non-null exactly when the file exists and does not ignore the
+   * per-worktree env file `arggon start --worktree` writes — it names the exact
+   * line to append. Nothing is written, modified or staged, ever.
+   */
+  envGitignore: EnvGitignoreReport;
+  /**
    * OpenCode integration state (additive, task-opencode-v2-doctor): config
    * files, V1-shaped keys, generated seam artifacts (names only), and native
    * vs `.mcp.json`-only MCP registration. Report-only, bounded.
@@ -893,6 +926,8 @@ const ZERO_DOCS: DoctorDocs = {
   missing: 0,
   outdated: 0,
   outdatedDocs: [],
+  unprovenanced: 0,
+  unprovenancedDocs: [],
 };
 
 const NOT_A_REPO: DoctorGit = { isRepo: false, dirty: null, remote: null };
@@ -985,8 +1020,12 @@ export function runDoctor(opts: {
       docs: { ...ZERO_DOCS },
       tracker: { dir: null, layout: null, items: 0, todo: 0 },
       git: gitState(opts.cwd),
-      // No tasks/ tree, so cwd is the best root for the OpenCode probe — the
-      // same directory gitState probes (task-opencode-v2-doctor).
+      // No tasks/ tree, so cwd is the best root for both probes below — the
+      // same directory gitState probes (task-opencode-v2-doctor). An
+      // uninitialized tree can still carry an adopter `.gitignore` that misses
+      // the entry (init will keep it: adopter-owned, never rewritten), so the
+      // report is just as true here.
+      envGitignore: readEnvGitignore(opts.cwd),
       opencode: detectOpenCode(opts.cwd),
       // Same reasoning for the matrix probe: no tree, so no matrix — the
       // reader is tree-only and reports the absence instead of reaching for a
@@ -1002,6 +1041,10 @@ export function runDoctor(opts: {
               // `unverified` (cannot decide) instead of a false `stale`.
               projectName: null,
               matrix,
+              // No tracker tree, so no earlier read to reuse: this branch never
+              // called readConventionConfig. The tolerant read answers `{}` for
+              // a tree carrying no `.convention.yml`, which is exactly the case.
+              state: readGeneratedState(opts.cwd),
             }),
           }
         : {}),
@@ -1098,6 +1141,16 @@ export function runDoctor(opts: {
 
   const items = loadItems(tasksDir);
   const matrix = readCapabilityMatrix({ root });
+  // False-absence class (bug-prover-agent-has-no-x-generated-entry): files under
+  // a managed path whose own marker claims provenance but which have no
+  // x-generated entry. Computed independently of the entry walk above — a
+  // no-row file has no entry to iterate — and pure read, report-only.
+  const unprovenanced = unprovenancedManagedFiles({
+    root,
+    templatesDir,
+    layout,
+    state: config.generated,
+  });
   return {
     root,
     initialized: true,
@@ -1113,6 +1166,8 @@ export function runDoctor(opts: {
       missing,
       outdated,
       outdatedDocs: outdatedDocs.sort(),
+      unprovenanced: unprovenanced.length,
+      unprovenancedDocs: unprovenanced.map((file) => file.dest).sort(),
     },
     tracker: {
       dir: relative(root, tasksDir).split(sep).join("/"),
@@ -1121,6 +1176,10 @@ export function runDoctor(opts: {
       todo: items.filter((item) => item.status === "todo").length,
     },
     git: gitState(root),
+    // Report-only (spec worktree-env-contract-016): an adopter `.gitignore`
+    // that predates the template keeps its bytes — init never rewrites it — so
+    // doctor is the standing surface that tells the adopter what to append.
+    envGitignore: readEnvGitignore(root),
     opencode: detectOpenCode(root),
     // The tree's own committed matrix when it carries one (this repo does);
     // otherwise an honest absence. Tree-only by construction, never a package
@@ -1134,6 +1193,9 @@ export function runDoctor(opts: {
             templatesDir,
             projectName: nameRes.name,
             matrix,
+            // The provenance state the `docs` block above already classified —
+            // read once, so the two blocks cannot disagree about the same bytes.
+            state: config.generated,
           }),
         }
       : {}),
@@ -1147,6 +1209,16 @@ function formatGitLine(git: DoctorGit): string {
   if (git.remote) parts.push(`remote ${sanitizeHumanText(git.remote)}`);
   else parts.push("no remote");
   return parts.join(", ");
+}
+
+/**
+ * Human line for the `.arggon.env` gitignore probe (spec
+ * worktree-env-contract-016): one `hint:` line naming the missing entry and the
+ * exact line to append, or nothing when there is nothing to report. The text is
+ * a constant; report-only, like every other doctor hint.
+ */
+function formatEnvGitignoreLine(envGitignore: EnvGitignoreReport): string[] {
+  return envGitignore.hint === null ? [] : [`  hint: ${envGitignore.hint}`];
 }
 
 /** Any OpenCode signal worth printing on a non-initialized tree? */
@@ -1287,6 +1359,9 @@ export function formatDoctorReport(result: DoctorResult): string {
       "arggon doctor: not initialized (no tracker .convention.yml found — ArggonManager/ or legacy tasks/) — run `arggon init`",
     ];
     if (hasOpenCodeSignal(result.opencode)) lines.push(...formatOpenCodeLines(result.opencode));
+    // The .gitignore probe is a tree fact, so it prints on both report shapes
+    // (spec worktree-env-contract-016) — non-null hint only.
+    lines.push(...formatEnvGitignoreLine(result.envGitignore));
     // The matrix describes the examined tree, so it prints on both report
     // shapes — whenever it is readable, or why it is not.
     lines.push(...formatMatrixLines(result.matrix));
@@ -1310,6 +1385,7 @@ export function formatDoctorReport(result: DoctorResult): string {
         ]
       : []),
     `  git: ${formatGitLine(result.git)}`,
+    ...formatEnvGitignoreLine(result.envGitignore),
     ...formatOpenCodeLines(result.opencode),
     // Gap rows are advisory (spec S3, ADR 0020): printed, never blocking.
     ...formatMatrixLines(result.matrix),
@@ -1345,6 +1421,15 @@ export function formatDoctorReport(result: DoctorResult): string {
   if (result.docs.modified > 0) {
     lines.push(
       "  hint: re-run `arggon init --backup` to archive modified docs and regenerate them",
+    );
+  }
+  if (result.docs.unprovenanced > 0) {
+    lines.push(
+      "  hint: " +
+        `${result.docs.unprovenanced} file(s) under a managed path claim arggon provenance ` +
+        "(generated marker) but have no x-generated entry — init keeps them adopter-modified " +
+        "and never propagates template edits to them; regenerate from the owning template, " +
+        "remove the stranded file, or drop the marker if the content is yours",
     );
   }
   // task-adapter-orphan-reaping: `docs.stale` IS the orphan condition for a

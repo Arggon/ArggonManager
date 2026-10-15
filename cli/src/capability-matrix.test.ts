@@ -2,13 +2,16 @@
  * Capability matrix: schema contract + doctor report (task-capability-matrix,
  * spec-methodology-adapters-017 §S3, plan T3, ADR 0020).
  *
- * Three gates travel with the data:
+ * Four gates travel with the data:
  *   1. the COMMITTED `adapters/capability-matrix.json` matches its schema —
  *      one row per invariant × agent, no rule logic in the file, bounded size;
  *   2. its invariants MIRROR the carriers' `- **Invariants:**` header block,
  *      so the matrix cannot drift away from the methodology it declares;
  *   3. every gap row carries a non-empty note — a gap nobody explains is the
- *      failure mode the whole surface exists to prevent.
+ *      failure mode the whole surface exists to prevent;
+ *   4. the SHIPPED template is that same file byte-for-byte, so the copy
+ *      `arggon init` writes into an adopter tree reports the same rows and gaps
+ *      the report does here (task-matrix-reaches-adopters).
  *
  * Plus the reader's own robustness (never throws, drops malformed rows, caps
  * the gap list) and the doctor surface that prints it — bounded, sanitized and
@@ -29,7 +32,9 @@ import {
   parseCapabilityMatrix,
   readCapabilityMatrix,
 } from "./capability-matrix.js";
+import { currentGeneratedTemplates } from "./docs.js";
 import { formatDoctorReport, runDoctor } from "./doctor.js";
+import { runInit } from "./init.js";
 import { packageRoot } from "./package-assets.js";
 import { runCli } from "./test-spawn.js";
 
@@ -164,13 +169,23 @@ describe("capability matrix: committed file matches its schema", () => {
       expect(row?.package).toBe("claude-code");
     }
     // What Claude Code genuinely lacks is client-native and agent-scoped: a
-    // hook gate and a session context hook. No `.claude/` config or hook
-    // template ships anywhere in `templates/`, so these stay gaps.
-    for (const invariant of ["discipline-enforceable", "docs-travel-with-code"]) {
-      expect(byInvariant.get(invariant)?.gap, `${invariant} has no client-native mechanism`).toBe(
-        true,
-      );
-    }
+    // session context hook. The hook gate is no longer in that set: the shipped
+    // bundle carries `hooks/gate.mjs` (spec-claude-code-adapter-024), the same
+    // PreToolUse shape as the ZCode gate, so `discipline-enforceable` is
+    // delivered from inside the client now.
+    const discipline = byInvariant.get("discipline-enforceable");
+    expect(
+      discipline?.gap,
+      "discipline-enforceable is delivered by the shipped claude hook gate",
+    ).toBe(false);
+    expect(discipline?.mechanism).toContain("claude:plugin.hooks.PreToolUse");
+    expect(discipline?.package).toBe("claude-code");
+    // A plugin still has no session-context hook: every client-native way to
+    // inject the active work item is absent, so this row must stay a gap.
+    expect(
+      byInvariant.get("docs-travel-with-code")?.gap,
+      "docs-travel-with-code has no session context hook on this client",
+    ).toBe(true);
   });
 
   it("never claims a gap on a surface `arggon init` ships to every client", () => {
@@ -188,11 +203,17 @@ describe("capability matrix: committed file matches its schema", () => {
       "CLAUDE.md",
       "pre-commit",
     ];
-    // Only the GAP CLAUSE is linted: a note's job is to name what the client
-    // cannot do, and everything after a contrastive connective ("..., so the
-    // kernel, pre-commit and CI carry it alone") is the enforcement story, not
-    // a claim of absence. Linting the whole note would flag the honest
-    // "what still enforces it" half as a false absence.
+    // Scope, precisely: this catches ONE failure shape — a note that CLAIMS a
+    // universal surface is missing — and it is not a general honesty gate: a
+    // note that invents an absence without naming a surface passes it (round-1's
+    // `state-in-git` note did), which is the shape the seam-derived test above
+    // ("credits the surfaces an init'd tree actually gives Claude Code") covers.
+    // Only the GAP CLAUSE is linted, too: a note's job is to name what the
+    // client cannot do, and everything after a contrastive connective ("..., so
+    // the kernel, pre-commit and CI carry it alone") is the enforcement story,
+    // not a claim of absence. Linting the whole note would flag the honest
+    // "what still enforces it" half as a false absence — that clause-scoped
+    // split is load-bearing, never "fix" it into a whole-note scan.
     const gapClause = (note: string): string =>
       note.split(/,?\s+(?:so|therefore|meanwhile|but)\s+/)[0] ?? note;
     for (const row of committed().rows.filter((r) => r.gap)) {
@@ -265,6 +286,62 @@ describe("capability matrix: committed file matches its schema", () => {
     expect(parsed.rows).toBe(committed().rows.length);
     expect(parsed.gaps).toBe(committed().rows.filter((row) => row.gap).length);
     expect(parsed.truncated).toBe(false);
+  });
+});
+
+describe("capability matrix: the tree copy reaches an adopter (task-matrix-reaches-adopters)", () => {
+  // The shipped source: `templates/docs/adapters/capability-matrix.json` maps
+  // 1:1 (cli/src/docs.ts `canonicalTemplateDest`) to the destination doctor
+  // reads, and `templates/` is already in the pack `files` allowlist — so the
+  // matrix travels without a shipping-field change (and without a version bump).
+  const templateAbs = join(repoRoot, "templates/docs/adapters/capability-matrix.json");
+  const templateId = "docs/adapters/capability-matrix.json";
+
+  it("ships the committed matrix byte-for-byte as the init template", () => {
+    // The template is the shipped SOURCE (`arggon init` regenerates this repo's
+    // own copy from it — recorded in `x-generated`, so a template edit
+    // propagates on the next init), and this file gates both. An edit to one
+    // WITHOUT the other must fail here: an adopter must never be handed a matrix
+    // whose rows, gaps or invariants differ from the one doctor reports here.
+    expect(
+      readFileSync(templateAbs, "utf8"),
+      `${templateAbs} must be a byte-identical copy of ${MATRIX_PATH} — edit the template and re-run init (or copy the file); never hand-divide the two`,
+    ).toBe(committed().raw);
+  });
+
+  it("registers the destination in the generated-doc set", () => {
+    // The docs walk owns the destination; assert the registration rather than
+    // re-deriving the mapping, so a rename of either path fails loudly.
+    const rows = currentGeneratedTemplates({ layout: "arggon-manager" });
+    expect(rows.find((t) => t.dest === MATRIX_PATH)?.template).toBe(templateId);
+  });
+
+  it("init writes it into a FRESH tree and doctor reports the expected counts there", () => {
+    // Fixture, never this repo: a bare temp dir initialized by the very CLI
+    // path adopters run. The counts come from the committed file, so this test
+    // cannot pass by hardcoding a number that later drifts.
+    const dir = tempDir();
+    const result = runInit({ dir, force: false, commit: false });
+    expect(result.created).toContain(MATRIX_PATH);
+    // No marker on a JSON destination: the generated copy is the file itself.
+    expect(readFileSync(join(dir, ...MATRIX_PATH.split("/")), "utf8")).toBe(committed().raw);
+
+    const report = runDoctor({ cwd: dir });
+    expect(report.matrix.present).toBe(true);
+    expect(report.matrix.source).toBe(MATRIX_PATH);
+    expect(report.matrix.schemaVersion).toBe(MATRIX_SCHEMA_VERSION);
+    expect(report.matrix.invariants).toBe(committed().invariants.length);
+    expect(report.matrix.rows).toBe(committed().rows.length);
+    expect(report.matrix.gaps).toBe(committed().rows.filter((row) => row.gap).length);
+    expect([...report.matrix.agents].sort()).toEqual(
+      committed()
+        .agents.map((agent) => agent.id)
+        .sort(),
+    );
+    expect(report.matrix.invalid).toBe(0);
+    expect(report.matrix.truncated).toBe(false);
+    // The human line names the tree's own copy, never an installed one.
+    expect(formatDoctorReport(report)).toContain(`matrix: ${MATRIX_PATH}`);
   });
 });
 

@@ -83,7 +83,11 @@
  *    tool call for a session it has no record of, so the refusal is driven at
  *    the plugin seam with the host's observed absence, not through a live tool
  *    call; the scripted provider stands in for the model's DECISION, while the
- *    session, the move, the tool execution and the commit are all real.
+ *    session, the move, the tool execution and the commit are all real. The leg
+ *    serves with a hermetic HOME/XDG set (`smoke/opencode-hermetic.ts`), so the
+ *    machine-global `~/.config/opencode/plugins/arggon` cannot compete with the
+ *    fixture's vendored bundle for the same plugin id, and it asserts from the
+ *    host's own log that the fixture's copy is the one that loaded.
  * 7. teardown removes the worktrees, their git registrations and the whole
  *    disposable root, and the bounded receipts are asserted along the way.
  *
@@ -122,6 +126,12 @@ import { fileURLToPath } from "node:url";
 // checkout whose kernel was never built gets the actionable "build first" line
 // instead of a bare ERR_MODULE_NOT_FOUND stack.
 import type { ArgonToolDefinition, ArgonKernel } from "../opencode/plugins/arggon/index.js";
+import {
+  createHermeticHome,
+  hostConfigHome,
+  pluginEvidenceFaults,
+  vendoredSourceMatches,
+} from "./opencode-hermetic.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 /** The item claimed by the smoke, and the branch the convention generates. */
@@ -922,11 +932,27 @@ async function serveOpenCode(
   port: number,
   env: NodeJS.ProcessEnv,
 ): Promise<ServingOpenCode> {
-  const child = spawn(bin, ["serve", "--hostname", "127.0.0.1", "--port", String(port)], {
-    cwd,
-    env,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const child = spawn(
+    bin,
+    [
+      "serve",
+      "--hostname",
+      "127.0.0.1",
+      "--port",
+      String(port),
+      // The supervisor's own `loading plugin id=…` line is the evidence that
+      // THIS fixture's bundle loaded (and no machine-global copy did); serve
+      // prints server logs only with the flag (graded by the check below).
+      "--print-logs",
+      "--log-level",
+      "info",
+    ],
+    {
+      cwd,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
   // The holder is mutated by the data handlers, so readers via logText() see
   // the live output instead of the snapshot from spawn time.
   const acc = { text: "" };
@@ -1072,6 +1098,21 @@ async function runMoveLeg(
         gitOrThrow(worktree, ["rev-parse", "--abbrev-ref", "HEAD"]).trim() === MOVE_BRANCH,
       `worktree: ${worktree}`,
     );
+    // The vendored copy's bytes are the committed bundle's (task-plugin-smoke-
+    // home-isolation): the runtime leg below must run THIS checkout's plugin,
+    // not a machine-global copy that happens to share the plugin id.
+    const movePluginPath = join(worktree, ".opencode", "plugins", "arggon", "index.ts");
+    const moveVendored = existsSync(movePluginPath) ? readFileSync(movePluginPath, "utf8") : "";
+    const moveCommitted = readFileSync(
+      fileURLToPath(new URL("../opencode/plugins/arggon/index.bundle.ts", import.meta.url)),
+      "utf8",
+    );
+    check(
+      report,
+      "the move fixture's vendored plugin is this checkout's committed bundle byte for byte",
+      vendoredSourceMatches(moveVendored, moveCommitted),
+      `vendored bytes: ${moveVendored.length}; committed bytes: ${moveCommitted.length}`,
+    );
 
     // The primary's invariant baseline, taken before the host does anything.
     const primaryHeadBefore = gitOrThrow(repoMove, ["rev-parse", "HEAD"]).trim();
@@ -1096,9 +1137,16 @@ async function runMoveLeg(
     );
     chmodSync(shim, 0o755);
 
+    // Hermetic serving for the host: HOME + every XDG dir under the disposable
+    // root, so the machine-global `~/.config/opencode/plugins/arggon` cannot
+    // compete with the fixture's vendored bundle for the same plugin id
+    // (smoke/opencode-hermetic.ts). Model-free: the scripted provider needs no
+    // provider credentials, so nothing is seeded into the store.
+    const hermetic = createHermeticHome(parent, "move-home");
     const port = await freePort();
     serve = await serveOpenCode(bin, repoMove, port, {
       ...process.env,
+      ...hermetic.env,
       ARGON_ITEM: undefined,
       PWD: repoMove,
       PATH: `${binDir}:${process.env.PATH ?? ""}`,
@@ -1155,6 +1203,24 @@ async function runMoveLeg(
       "the real host loaded the vendored plugin and registered the native tools",
       registered && serveRegisteredTools(serve.logText()) !== undefined,
       `registered: ${String(serveRegisteredTools(serve.logText()))}`,
+    );
+    // Which plugin the host loaded is asserted, not assumed: the log's own
+    // `loading plugin id=…` line must name a fixture copy — the moved session
+    // still loads the canonical checkout's plugin (observed on 2.0.26), and
+    // both fixture copies are the same committed bundle bytes — and must not
+    // name the machine-global plugin directory (smoke/opencode-hermetic.ts).
+    const pluginFaults = pluginEvidenceFaults(serve.logText(), {
+      pluginDirs: [
+        join(repoMove, ".opencode", "plugins", "arggon"),
+        join(worktree, ".opencode", "plugins", "arggon"),
+      ],
+      hostConfigHome: hostConfigHome(),
+    });
+    check(
+      report,
+      "the host loaded the fixture's plugin, not a machine-global copy",
+      pluginFaults.length === 0,
+      pluginFaults.join("; "),
     );
 
     // 3. the scripted drive: one Code Mode execute round calling the native

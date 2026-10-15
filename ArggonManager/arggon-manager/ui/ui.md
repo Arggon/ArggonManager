@@ -1,14 +1,15 @@
 ---
 type: epic
-status: done
+status: in_progress
 id: ui
 title: "UI surfaces: web board, terminal TUI and OpenCode panel"
 parent: arggon-manager
 labels: [ui, viewer, tui]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-30"
+updated: "2026-10-14"
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui.md (epic index; required).
   parent MUST be the initiative id. Container ids must not start with task-/bug-.
@@ -18,14 +19,24 @@ updated: "2026-09-30"
 
 ## Context
 
-<!-- Why this epic exists. -->
+Product-owner directive (2026-09-22): improve the three UI surfaces — the static/served web
+board, the terminal kanban (`arggon board --tui`) and the OpenCode board panel. The
+2026-09/10 wave delivered `ui-foundation`, `ui-web-board-v2`, `ui-tui-v2` and
+`ui-native-panel-v2`; the web board then gained the grouped-ancestry tree
+(`story-board-hierarchy-grouping`, closed 2026-10-14). The epic is open again because
+`story-hierarchy-navigation` — reaching an item's parent and children from every GUI surface
+(product-owner requirement 2026-10-11) — is not finished (one of its three surfaces still
+open). The dated record below carries the original spike and constraints.
 
 ## Acceptance
 
+- [ ] `story-hierarchy-navigation` closes with all three surfaces verified (web drawer, TUI, OpenCode panel) against its own acceptance
+- [ ] The 2026-09-22 constraints still hold: no new runtime dependency (web artifact self-contained, TUI raw-ANSI), and no tracker write bypasses the kernel update path
 
 ## Notes
 
 ### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+
 ## Context
 
 Product-owner directive (2026-09-22): improve the user interfaces — the static/served web board, the CLI terminal kanban (`arggon board --tui`) and the OpenCode V2 native board panel (`/arggon-board`).

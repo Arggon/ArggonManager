@@ -141,6 +141,16 @@ export type CleanupOptions = {
    */
   noGh?: boolean;
   /**
+   * Force opt-in (bug-cleanup-prune-untracked-artifacts-no-force): with
+   * `prune`, a terminal+merged worktree whose ONLY removal blockers are
+   * untracked files is removed anyway — the removal passes `git worktree
+   * remove --force`, and the classification (`entry.forced`) says so.
+   * Default OFF, so unknown untracked content still blocks; tracked
+   * modifications are never force-discarded, with or without this flag. Never
+   * inferred — only the caller's flag arms it.
+   */
+  pruneForce?: boolean;
+  /**
    * Release the named item's claim footprint (bug-unclaim-leaves-worktree-record-without-reaper):
    * remove the recorded worktree, delete its branch, reap the start-created
    * `.arggon.env` + `arggon-claim.json` stamp and clear the `worktree_path`
@@ -173,6 +183,13 @@ export type CleanupAction = {
   error?: string;
   /** Present when the branch could not be deleted (worktree already removed). */
   leftoverBranch?: string;
+  /**
+   * Additive (bug-cleanup-prune-untracked-artifacts-no-force): present on a
+   * `removed worktree` action whose removal passed `--force` because the
+   * entry's only blockers were untracked (its classification carried
+   * `forced: true`). Never set for a plain removal, never for tracked content.
+   */
+  forced?: boolean;
   /**
    * Present when the prune was enabled by the squash-merge fallback rather
    * than git ancestry (task-cleanup-squash-merge), e.g. "squash-merged PR #12".
@@ -246,8 +263,19 @@ export type CleanupDeps = {
  * mode only lists; `prune: true` removes removable worktrees (git worktree
  * remove), deletes their merged branches (git branch -d), and clears the
  * record. Items that are not done/cancelled and branches that are not fully
- * merged are reported as skipped and never touched. Before anything is
- * removed, both the local branch AND its remote counterpart (when
+ * merged are reported as skipped and never touched. A removable entry must
+ * also be free of removal-blocking content: untracked blockers keep the
+ * conservative skip unless the caller armed `pruneForce`
+ * (bug-cleanup-prune-untracked-artifacts-no-force — the skip names the flag and
+ * the manual sequence), while tracked modifications are never force-discarded.
+ * A recorded path that is no longer a LIVE worktree (missing on disk, or a
+ * leftover directory whose gitdir link is gone — the `prunable` record an
+ * interrupted removal leaves) is a stale record, never a removal candidate
+ * (bug-cleanup-stuck-when-worktree-dir-gone): the removal is skipped, the dead
+ * git record is pruned by this run itself (it pins the branch, so
+ * `git branch -d` would refuse it), the merged branch is still deleted and the
+ * record is cleared — a leftover directory is left in place.
+ * Before anything is removed, both the local branch AND its remote counterpart (when
  * `origin/<branch>` exists) must be merged into the base, so a lost push can
  * never leave a stranded remote tip (bug-cleanup-partial-failure). When the
  * repo's convention declares services (`x-worktree.services`, ADR 0019 layer
@@ -279,6 +307,14 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
       "--take-over-worktree requires --release <id> (it authorizes a release of a worktree whose stamped owner is presumed dead)",
     );
   }
+  if (opts.pruneForce === true && !opts.prune) {
+    // The prune force opt-in is meaningless without the prune it authorizes
+    // (bug-cleanup-prune-untracked-artifacts-no-force): refuse loudly instead
+    // of reading a flag that would never be used.
+    throw new Error(
+      "--force requires --prune (it discards the untracked content of terminal+merged worktrees)",
+    );
+  }
   const base = gitRunner.defaultBranch(root);
   // Captured before any release can remove this run's own working directory.
   const conventionVersionAtStart = readConventionVersion(root);
@@ -294,7 +330,11 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
   const entries =
     opts.release === undefined
       ? tracked.map((item) =>
-          classifyCleanupEntry(item, root, base, gitRunner, { noGh: opts.noGh, gh: deps.gh }),
+          classifyCleanupEntry(item, root, base, gitRunner, {
+            noGh: opts.noGh,
+            gh: deps.gh,
+            force: opts.pruneForce === true,
+          }),
         )
       : [];
 
@@ -383,12 +423,32 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
           // way; only start-created shape (the six documented KEY=value lines)
           // is ever removed here, never an adopter-customized one.
           unlinkWorktreeEnv(entry.path);
-          gitRunner.removeWorktree(root, entry.path);
+          // `forced` is the classification's per-entry decision — terminal +
+          // merged, untracked-only blockers, caller armed --force. Every other
+          // removal stays exactly as strict as before
+          // (bug-cleanup-prune-untracked-artifacts-no-force).
+          const force = entry.forced === true;
+          gitRunner.removeWorktree(root, entry.path, { force });
           pruned.push({
             id: entry.id,
             action: `removed worktree ${entry.path}`,
+            ...(force ? { forced: true } : {}),
             ...(entry.via ? { via: entry.via } : {}),
           });
+        } else if (entry.action?.startsWith("clear stale worktree_path record")) {
+          // The worktree is already gone (missing on disk, or no longer a live
+          // worktree). Its git record may still be there — `prunable`, kept by
+          // git even when only the leftover directory survives — and that
+          // record PINS the branch: `git branch -d` refuses it with "cannot
+          // delete branch '<b>' used by worktree at '<path>'"
+          // (bug-cleanup-stuck-when-worktree-dir-gone). The reaper drops the
+          // dead record itself, so no manual `git worktree prune` step is ever
+          // needed before the branch step below. `--verbose` output is
+          // non-empty exactly when a record was dropped, so the action is only
+          // reported when something actually happened.
+          if (gitRunner.pruneWorktrees?.(root) === true) {
+            pruned.push({ id: entry.id, action: "pruned stale git worktree record" });
+          }
         }
         if (entry.branch && gitRunner.branchExists(root, entry.branch)) {
           try {
@@ -536,6 +596,21 @@ type ReleaseRun = {
  *
  * All git calls run from the canonical (first) worktree, never from a directory
  * this run is about to delete.
+ *
+ * A recorded path that is not a LIVE worktree — missing on disk, a leftover
+ * directory whose gitdir link is gone, or the state after a manual `git worktree
+ * prune` — is a stale record, never a removal candidate
+ * (bug-cleanup-release-stale-record-wedge; the release half of the rule
+ * `classifyCleanupEntry` learned in bug-cleanup-stuck-when-worktree-dir-gone).
+ * The removal and the stamp/env steps are skipped — there is nothing to remove —
+ * while the declared Compose project is STILL REAPED, first, exactly as prune
+ * reaps it for its own stale entries (task-release-stale-compose-reaping): the
+ * project name derives from the recorded path's basename, never from a live
+ * directory, and the item is not terminal, so prune will never consider it
+ * again — a skipped reap here is the permanent Docker residue ADR 0019 layer 2
+ * exists to prevent. The dead git record is pruned (it PINS the branch), the
+ * branch the record still names is deleted (force, like every release) and the
+ * record is cleared. A leftover directory is never deleted.
  */
 function releaseClaimedWorktree(run: ReleaseRun): CleanupRelease {
   const { id, root, byId, gitRunner, opts, failures } = run;
@@ -590,27 +665,42 @@ function releaseClaimedWorktree(run: ReleaseRun): CleanupRelease {
   // the caller's "that owner is dead and that work is disposable" — and it is
   // the only case in which the removal is forced.
   const forceArmed = opts.releaseTakeOverWorktree === true;
+  // Stale-record clause (bug-cleanup-release-stale-record-wedge): the worktree
+  // is already gone — missing on disk, or a leftover directory whose gitdir
+  // link is gone (`prunable`) — so there is no removal to attempt and no
+  // stamp/env to unlink. What is left is the declared Compose project (reaped
+  // below, exactly as prune reaps it for a stale entry), the dead git record
+  // (which PINS the branch: `git branch -D` refuses it with "cannot delete
+  // branch … used by worktree"), the branch and the item record.
+  const stale = entry.action?.startsWith("clear stale worktree_path record") === true;
 
   try {
-    // Stale-record clause: the worktree is already gone, so the record is the
-    // only thing left. No Compose project, no stamp, no branch — nothing the
-    // removal does not already own.
-    if (entry.action !== "clear stale worktree_path record (path missing on disk)") {
-      // Compose first, before the worktree removal (ADR 0019 layer 2,
-      // exploration 017 F8): the stack that lives only for the run dies with
-      // the worktree. Only a repo whose convention declares services ever
-      // reaches Docker, and an absent docker CLI degrades this run to the same
-      // report-only path prune uses.
-      if (run.compose !== undefined && !run.isComposeUnavailable()) {
-        const project = worktreeComposeProject(run.compose.declared, basename(entry.path));
-        try {
-          (run.deps.compose ?? defaultComposeDown)(project, root);
-          actions.push({ id, action: `reaped compose project ${project}` });
-        } catch (err) {
-          if ((err as NodeJS.ErrnoException | null)?.code !== "ENOENT") throw err;
-          run.compose.dockerUnavailable = true;
-        }
+    // Compose first, for EVERY releasable entry — live or stale (ADR 0019 layer
+    // 2, exploration 017 F8; parity with prune's stale entries,
+    // task-release-stale-compose-reaping). The teardown needs no live worktree:
+    // the project name derives from the RECORDED path's basename — the worktree
+    // id the adopter pattern built the project around — and an already-gone
+    // project is the exit-0 no-op prune relies on. Skipping it for a stale
+    // record would strand the stack for good: the item is not terminal, so
+    // prune never considers it again, and the cleared record would remove the
+    // last caller that could.
+    //
+    // The failure discipline is the release arm's own, not prune's: a failed
+    // teardown aborts the release (both surfaces report it, the worktree record
+    // stays), so a retry after the daemon recovers can still reach the stack.
+    // Following prune's non-fatal discipline here would clear the record that
+    // is the retry's only anchor.
+    if (run.compose !== undefined && !run.isComposeUnavailable()) {
+      const project = worktreeComposeProject(run.compose.declared, basename(entry.path));
+      try {
+        (run.deps.compose ?? defaultComposeDown)(project, root);
+        actions.push({ id, action: `reaped compose project ${project}` });
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException | null)?.code !== "ENOENT") throw err;
+        run.compose.dockerUnavailable = true;
       }
+    }
+    if (!stale) {
       // Ownership, not blanket deletion: only a start-created install link (a
       // symlink to the canonical checkout's install) and a start-shaped
       // `.arggon.env` are removed — an adopter's own file is left for git to
@@ -641,19 +731,30 @@ function releaseClaimedWorktree(run: ReleaseRun): CleanupRelease {
       } else if (hadStamp) {
         actions.push({ id, action: "arggon-claim.json stamp gone with the worktree" });
       }
-      if (entry.branch !== null && gitRunner.branchExists(gitRoot, entry.branch)) {
-        // Force, never the safe delete: an abandoned claim's branch is by
-        // definition NOT provably merged into the base (that is what prune's
-        // eligibility means), and the release is already an explicit,
-        // refusal-gated discard of that work.
-        gitRunner.deleteBranchForce(gitRoot, entry.branch);
-        actions.push({ id, action: `deleted branch ${entry.branch}` });
-      }
+    } else if (gitRunner.pruneWorktrees?.(gitRoot) === true) {
+      // The dead record PINS the branch, so it goes before the branch step —
+      // exactly like prune's stale entries (bug-cleanup-stuck-when-worktree-dir-gone).
+      // Reported only when a record was actually dropped (`--verbose` output is
+      // non-empty exactly then). Git calls run from the canonical worktree, like
+      // every other call in this release.
+      actions.push({ id, action: "pruned stale git worktree record" });
     }
-    if (recordHome) {
+    if (entry.branch !== null && gitRunner.branchExists(gitRoot, entry.branch)) {
+      // Force, never the safe delete: an abandoned claim's branch is by
+      // definition NOT provably merged into the base (that is what prune's
+      // eligibility means), and the release is already an explicit,
+      // refusal-gated discard of that work. Reached for a stale record too: the
+      // branch comes from the dead git record (the worktree cannot be asked).
+      gitRunner.deleteBranchForce(gitRoot, entry.branch);
+      actions.push({ id, action: `deleted branch ${entry.branch}` });
+    }
+    if (stale || recordHome) {
       // The record outlives the removal here, so it is cleared AFTER the
       // worktree is observably gone — prune's invariant (a surviving worktree
-      // keeps the record that makes it reapable) — and rides one commit.
+      // keeps the record that makes it reapable) — and rides one commit. A
+      // stale record was never disposed WITH anything (nothing was removed;
+      // the leftover directory survives), so it is always cleared, wherever
+      // the run's tracker copy is.
       runUpdate({ cwd: root, id, worktreePath: "" });
       actions.push({ id, action: "cleared worktree_path" });
       const cleared = commitTrackerMutation(root, [item.filePath], {

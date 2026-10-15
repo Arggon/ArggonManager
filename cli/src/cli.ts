@@ -17,6 +17,7 @@ import {
   failJson,
   formatCommitLine,
   formatListTable,
+  formatReportHygiene,
   formatReportMarkdown,
   formatReportTable,
   formatTrendMarkdown,
@@ -26,6 +27,7 @@ import {
   buildFrictionPublishDoc,
   frictionClearOperation,
   frictionOperation,
+  formatRankedFrom,
   frictionReportOperation,
   handoffOperation,
   importIssuesOperation,
@@ -70,7 +72,13 @@ import {
   type TrendResult,
 } from "@arggondev/lib";
 
-import { runStart, startFailureReadiness, startTakeoverNotes } from "./start.js";
+import {
+  dependencyPrepNote,
+  inheritedCommitsNotes,
+  runStart,
+  startFailureReadiness,
+  startTakeoverNotes,
+} from "./start.js";
 import { runCleanup } from "./cleanup.js";
 import { goalOperation, runGoal } from "./goal-mode.js";
 
@@ -340,6 +348,14 @@ program
                 // the dry run classifies the identical plan, so these numbers
                 // are exactly what the run it previews will carry.
                 adapters: result.adapters,
+                // Report-only `.arggon.env` gitignore probe (spec
+                // worktree-env-contract-016, additive): the current disk state,
+                // with the hint when the entry is missing.
+                envGitignore: result.envGitignore,
+                // Report-only false-absence class
+                // (bug-prover-agent-has-no-x-generated-entry, additive): the
+                // same rows a real run with these flags would report.
+                unprovenanced: result.unprovenanced,
                 dryRun: true,
                 plan: result.plan,
                 ...(result.warning ? { warning: result.warning } : {}),
@@ -392,6 +408,16 @@ program
               // Per-artifact adapter selection outcome (task-adapter-selection-flags,
               // additive): written/skipped per adapter destination with reasons.
               adapters: result.adapters,
+              // Report-only `.arggon.env` gitignore probe (spec
+              // worktree-env-contract-016, additive), read after this run's
+              // writes: the adopter's kept `.gitignore` reports the missing
+              // entry; a generated one is clean.
+              envGitignore: result.envGitignore,
+              // Report-only false-absence class
+              // (bug-prover-agent-has-no-x-generated-entry, additive): files
+              // under a managed path whose own marker claims provenance but
+              // which have no x-generated entry.
+              unprovenanced: result.unprovenanced,
               commit: commitPayload(result.commit),
               ...(result.warning ? { warning: result.warning } : {}),
             },
@@ -459,6 +485,9 @@ program
             docs: result.docs,
             tracker: result.tracker,
             git: result.git,
+            // Report-only `.arggon.env` gitignore probe (spec
+            // worktree-env-contract-016, additive).
+            envGitignore: result.envGitignore,
             // OpenCode integration state (task-opencode-v2-doctor, additive).
             opencode: result.opencode,
             // Capability-matrix state (task-capability-matrix, additive;
@@ -552,6 +581,10 @@ program
               skipped: result.skipped,
               taskPath: result.taskPath,
               inventory: result.inventory,
+              // Report-only `.arggon.env` gitignore probe (spec
+              // worktree-env-contract-016, additive) — the pre-flight doctor's
+              // own read, surfaced at the adoption moment.
+              envGitignore: result.envGitignore,
               dryRun: result.dryRun,
               commit: commitPayload(result.commit),
             },
@@ -771,6 +804,11 @@ program
           olderThan: opts.olderThan,
         });
         process.stdout.write(formatListTable(result.items));
+        // Coverage declaration (bug-claim-pool-computed-from-main-misses-
+        // branch-claims): the table is computed from THIS tree's copies, so a
+        // claim committed on an unmerged branch is not in it. Name the tree
+        // and the boundary instead of leaving it silent.
+        console.log(`arggon list: ${sanitizeHumanError(formatRankedFrom(result.rankedFrom))}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (json) {
@@ -836,6 +874,8 @@ program
               : "arggon next: todo pool is empty — nothing claimable.",
         );
         console.log('  Create work with `arggon create task "<title>" --parent <story-id>`.');
+        // An empty pool is exactly where the boundary matters most.
+        console.log(`arggon next: ${sanitizeHumanError(formatRankedFrom(result.rankedFrom))}`);
         return;
       }
       const item = result.suggestion.item;
@@ -847,6 +887,10 @@ program
       );
       console.log(`  why: ${sanitizeHumanError(result.suggestion.reason)}`);
       console.log(`  next: arggon start ${sanitizeHumanError(item.id)} --assignee <login>`);
+      // Coverage declaration (bug-claim-pool-computed-from-main-misses-
+      // branch-claims): never rank from one tree silently — name it and the
+      // boundary (claims on unmerged branches need `arggon sync`).
+      console.log(`arggon next: ${sanitizeHumanError(formatRankedFrom(result.rankedFrom))}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (json) {
@@ -954,7 +998,9 @@ program
 
 program
   .command("report")
-  .description("Aggregate leaf statuses per container, grouped by epic (display only)")
+  .description(
+    "Aggregate leaf statuses per container, grouped by epic, plus a report-only terminal-container hygiene check (display only)",
+  )
   .option(
     "--format <format>",
     "output format: table (default) or markdown (standup summary)",
@@ -1029,6 +1075,8 @@ program
         return;
       }
       process.stdout.write(formatReportTable(result.groups));
+      // Additive, report-only hygiene block (task-container-hygiene-check).
+      process.stdout.write(formatReportHygiene(result.hygiene));
       if (trend) process.stdout.write(formatTrendTable(trend));
     } catch (err) {
       printHumanError("arggon report", err instanceof Error ? err.message : String(err));
@@ -2701,8 +2749,19 @@ program
               missingDependenciesTotal: result.missingDependenciesTotal,
               gateBins: result.gateBins,
               prepSteps: result.prepSteps,
+              // The kernel's truncation decision + dropped-entry count, mirrored
+              // beside the log they qualify (bug-native-steps-truncated-flag-dropped,
+              // bug-fresh-worktree-refusal-prose-drops-prep-step-truncation):
+              // omitted together on an uncapped log, exactly like the receipt.
+              ...(result.stepsTruncated !== undefined
+                ? { stepsTruncated: result.stepsTruncated }
+                : {}),
+              ...(result.stepsDropped !== undefined ? { stepsDropped: result.stepsDropped } : {}),
               env: result.env,
               ...(result.claim !== undefined ? { claim: result.claim } : {}),
+              ...(result.inheritedCommits !== undefined
+                ? { inheritedCommits: result.inheritedCommits }
+                : {}),
               ...(result.postStartRelink !== undefined
                 ? { postStartRelink: result.postStartRelink }
                 : {}),
@@ -2754,30 +2813,14 @@ program
           {
             // Bounded preparation log (bug-start-install-ordering): a skip or
             // a failure in the prep path is never silent — name the decisions
-            // that left the worktree in its state.
-            const noteworthy = result.prepSteps.filter((entry) =>
-              [
-                "primary-install-missing",
-                "worktree-install-present",
-                "farm-failed-symlink-fallback",
-                "failed",
-                "install-cannot-consume",
-                "build-failed",
-                "build-no-entry",
-                "flip-failed",
-                "errored",
-                "foreign-resolution",
-              ].includes(entry.outcome),
-            );
-            if (noteworthy.length > 0) {
-              const named = noteworthy
-                .map((entry) =>
-                  entry.pkg === undefined
-                    ? `${entry.step}: ${entry.outcome}`
-                    : `${entry.step}: ${entry.outcome} (${sanitizeHumanError(entry.pkg)})`,
-                )
-                .join("; ");
-              console.log(`  note: dependency prep — ${sanitizeHumanError(named)}`);
+            // that left the worktree in its state. The kernel's truncation
+            // decision leads the note when its cap dropped entries
+            // (bug-native-steps-truncated-flag-dropped,
+            // bug-fresh-worktree-refusal-prose-drops-prep-step-truncation), so
+            // the capped log is never read as the whole log.
+            const prepNote = dependencyPrepNote(result);
+            if (prepNote !== null) {
+              console.log(`  note: dependency prep — ${sanitizeHumanError(prepNote)}`);
             }
           }
           if (result.claim?.foreignWrites !== undefined) {
@@ -2831,6 +2874,15 @@ program
               );
             }
           }
+        }
+        // Inherited commits (bug-start-claim-branch-inherits-unpushed-tracker-commits):
+        // a branch cut by this run starts from the local HEAD, so unpushed
+        // commits — tracker auto-commits included — ride the PR diff as
+        // unrelated churn. The report names them and the remedy BEFORE the lead
+        // opens the PR; `--json` forwards `inheritedCommits` verbatim. Printed
+        // for both flows (plain `start` cuts from the same HEAD).
+        for (const note of inheritedCommitsNotes(result.inheritedCommits)) {
+          console.log(`  ${sanitizeHumanError(note)}`);
         }
         if (result.postStart) {
           if (result.postStart.ok) {
@@ -2891,6 +2943,11 @@ program
     false,
   )
   .option(
+    "--force",
+    "with --prune: also remove terminal+merged worktrees whose untracked files block 'git worktree remove' (nothing is discarded without this flag; tracked changes are never force-discarded)",
+    false,
+  )
+  .option(
     "--no-commit",
     "keep the tracker dirty: skip the tracker auto-commit of the cleared worktree_path records (default: on with --prune; x-tracker.auto-commit: false opts out tree-wide)",
   )
@@ -2912,6 +2969,7 @@ program
   .action(
     (opts: {
       prune?: boolean;
+      force?: boolean;
       commit?: boolean;
       gh?: boolean;
       release?: string;
@@ -2928,6 +2986,7 @@ program
           // the flag is passed); reading `noGh` made the flag a silent no-op
           // (bug-cleanup-no-gh-ignored).
           noGh: opts.gh === false,
+          ...(opts.force === true ? { pruneForce: true } : {}),
           ...(opts.release !== undefined ? { release: opts.release } : {}),
           ...(opts.takeOverWorktree === true ? { releaseTakeOverWorktree: true } : {}),
         });
@@ -3045,7 +3104,7 @@ program
   .option("--github", "overlay live GitHub PR state on cards with a branch (read-only)", false)
   .option(
     "--group-by <field>",
-    "group cards within each column by milestone (ADR 0003) or parent story (story)",
+    "group cards by milestone (ADR 0003) or parent story (story) within each column, or open the grouped-ancestry layout (tree: initiative → epic → story → leaf)",
   )
   .option(
     "--details",
@@ -3166,6 +3225,10 @@ program
                   serving: true,
                   url: handle.url,
                   port: handle.port,
+                  // Parity with the static envelope (task-serve-envelope-groupby-parity):
+                  // the validated --group-by is echoed when it was given, and
+                  // the field is absent (never null) when it was not.
+                  ...(handle.groupBy ? { groupBy: handle.groupBy } : {}),
                   ...(opts.open ? { open: true } : {}),
                 },
                 readConventionVersion(handle.root),
@@ -3211,8 +3274,13 @@ program
           );
           return;
         }
+        const grouping = result.groupBy
+          ? result.groupBy === "tree"
+            ? ", grouped ancestry view"
+            : `, grouped by ${result.groupBy}`
+          : "";
         console.log(
-          `arggon board: wrote ${sanitizeHumanError(displayPath(result.outPath, process.cwd()))} (${result.itemCount} item(s)${result.groupBy ? `, grouped by ${result.groupBy}` : ""}${opts.github ? `, ${result.prCount} PR(s) linked` : ""}${result.detailBytes !== undefined ? `, details embedded (${result.detailBytes} bytes)` : ""})`,
+          `arggon board: wrote ${sanitizeHumanError(displayPath(result.outPath, process.cwd()))} (${result.itemCount} item(s)${grouping}${opts.github ? `, ${result.prCount} PR(s) linked` : ""}${result.detailBytes !== undefined ? `, details embedded (${result.detailBytes} bytes)` : ""})`,
         );
         console.log(
           "  Open it in a browser. Re-run after tree changes — the tracker remains the source of truth.",
@@ -3293,6 +3361,9 @@ function printInitProposeHuman(result: InitResult): void {
   if (proposals.length === 0) {
     console.log("  (nothing to propose — every doc matches its current template)");
   }
+  // Report-only (spec worktree-env-contract-016), same as every other init
+  // mode: proposals never touch the adopter's `.gitignore`.
+  if (result.envGitignore.hint) console.log(`  hint: ${result.envGitignore.hint}`);
   console.log(
     "Originals untouched. Next: diff each proposal, merge what you want as normal work, then re-ack via `arggon adopt --ack` and delete the proposal file.",
   );
@@ -3325,6 +3396,16 @@ function printInitDryRun(result: InitDryRunResult): void {
         `${result.reapRefused.length} to keep (one row each above)`,
     );
   }
+  // Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+  // a preview names the rows a real run would report.
+  if (result.unprovenanced.length > 0) {
+    console.log(
+      `  unprovenanced managed files (marker, no x-generated entry): ` +
+        `${sanitizeHumanError(result.unprovenanced.map((file) => file.dest).join(", "))}`,
+    );
+  }
+  // Report-only (spec worktree-env-contract-016), from the current disk state.
+  if (result.envGitignore.hint) console.log(`  hint: ${result.envGitignore.hint}`);
   console.log("nothing was written (dry run)");
 }
 
@@ -3413,6 +3494,23 @@ function printInitConvention(convention: ConventionRewriteReport): void {
   console.log(`arggon init: .convention.yml ${kept}; ${replaced}`);
 }
 
+/**
+ * Human lines for the report-only false-absence class
+ * (bug-prover-agent-has-no-x-generated-entry): one line per file, so a managed
+ * path whose own marker claims provenance but which has no `x-generated` entry
+ * is never silent — the marker it claims and the fact that it is kept
+ * adopter-modified both travel with the path.
+ */
+function printInitUnprovenanced(files: readonly { dest: string; template: string }[]): void {
+  for (const file of files) {
+    console.log(
+      `arggon init: unprovenanced managed file: ${sanitizeHumanError(file.dest)} — ` +
+        `claims template ${sanitizeHumanError(file.template)} but has no x-generated entry; ` +
+        "kept adopter-modified (regenerate from the owning template, remove it, or drop the marker)",
+    );
+  }
+}
+
 function printInitHuman(result: InitResult): void {
   // bug-init-git-doctor-blindspot: human path warns on stderr; the --json
   // envelope carries the same text as the additive `warning` field instead.
@@ -3449,6 +3547,12 @@ function printInitHuman(result: InitResult): void {
     }
     printInitReaps(result.reaped, result.reapRefused);
     printInitAdapters(result.adapters);
+    // Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+    // a managed path with no provenance entry is named, never silent.
+    printInitUnprovenanced(result.unprovenanced);
+    // Report-only (spec worktree-env-contract-016): an adopter `.gitignore`
+    // kept by the modified-skip path misses the entry — say what to append.
+    if (result.envGitignore.hint) console.log(`arggon init: hint: ${result.envGitignore.hint}`);
     const commitLine = formatCommitLine(result.commit);
     if (commitLine && result.commit?.committed) console.log(`arggon init: ${commitLine}`);
     console.log("Next: create work with `arggon create` (coming soon), or copy from templates/.");
@@ -3486,6 +3590,13 @@ function printInitHuman(result: InitResult): void {
   if (result.convention) printInitConvention(result.convention);
   printInitReaps(result.reaped, result.reapRefused);
   printInitAdapters(result.adapters);
+  // Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+  // the same rows the `--json` envelope carries, never silent.
+  printInitUnprovenanced(result.unprovenanced);
+  // Report-only (spec worktree-env-contract-016): the generated `.gitignore`
+  // carries the entry, so this only fires on a tree whose own `.gitignore`
+  // pre-existed — exactly the adoption case.
+  if (result.envGitignore.hint) console.log(`arggon init: hint: ${result.envGitignore.hint}`);
   console.log("Next:");
   console.log(
     `  1. Add an initiative under ${trackerName}/<slug>/<slug>.md (see ${trackerName}/docs/convention.md)`,
@@ -3542,6 +3653,29 @@ program
       }
       for (const amb of result.ambiguous) {
         console.log(`  ambiguous: ${sanitizeHumanError(amb.id)} (PRs ${amb.prs.join(", ")})`);
+      }
+      // Branch-resident claims (bug-claim-pool-computed-from-main-misses-
+      // branch-claims): the claim commit rides the item branch, so these items
+      // read todo/unassigned HERE while being held there. Report-only.
+      for (const claim of result.branchClaims) {
+        const where = claim.pr ? `${claim.branch} (#${claim.pr})` : claim.branch;
+        console.log(
+          `  branch-claim: ${sanitizeHumanError(claim.id)} claimed by ${sanitizeHumanError(claim.assignee)} on ${sanitizeHumanError(where)}` +
+            `${claim.claimed_at ? ` since ${sanitizeHumanError(claim.claimed_at)}` : ""} — this tree shows ` +
+            `${sanitizeHumanError(`${claim.local.status}/${claim.local.assignee ?? "unassigned"}`)}`,
+        );
+      }
+      for (const err of result.branchClaimErrors) {
+        console.log(
+          `  branch-claim: ${sanitizeHumanError(err.id)} on ${sanitizeHumanError(err.branch)} could not be read ` +
+            `(${sanitizeHumanError(err.reason)}) — claim state unknown`,
+        );
+      }
+      if (result.branchClaims.length > 0) {
+        console.log(
+          "hint: treat branch-claimed items as held (coordinate; never force or steal) — " +
+            "release or take over a stale claim where it lives, via the human-only `update --steal` gate",
+        );
       }
       // Report-only verdict classification (task-review-verdict-checker):
       // only the informative states print; `none` stays silent.

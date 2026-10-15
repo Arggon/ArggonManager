@@ -81,6 +81,9 @@ describe("tracker layout detection (ADR 0012)", () => {
       parent: "launch",
       // Legacy fixtures carry no repo-local templates/ (ADR 0013).
       templatesDir: bundledTemplatesDir(),
+      // Real prose (task-validate-refuses-placeholder-bodies): the scaffold
+      // IS the placeholder, so a default body would fail `validate` here.
+      body: "## Context\n\nSeed.\n\n## Acceptance\n\nSeed.\n",
     });
     expect(created.path).toBe(join(dir, "tasks/launch/auth/auth.md"));
     expect(existsSync(join(dir, "tasks/launch/auth/auth.md"))).toBe(true);

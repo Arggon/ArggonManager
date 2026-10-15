@@ -9,6 +9,7 @@ import {
   STATUSES,
   commentOperation,
   createOperation,
+  failEnvelope,
   handoffOperation,
   importIssuesOperation,
   listOperation,
@@ -22,6 +23,11 @@ import {
   validateOperation,
   type CommandOutcome,
 } from "@arggondev/lib";
+import {
+  TRACKER_ROOT_MISMATCH,
+  itemWorktreeRefusalMessage,
+  resolveItemCallCwd,
+} from "./mcp-routing.js";
 
 /**
  * Stdio MCP server exposing the shared kernel (list/create/update/comment) as
@@ -60,6 +66,16 @@ import {
  * metadata only — never authentication or authorization, never logged, and it
  * triggers no state transitions (the shared rules module stays the only path
  * for updates).
+ *
+ * Item-addressed cwd (bug-mcp-server-binds-session-cwd-tracker-root): the
+ * session is bound to ONE launch cwd (`cwd: process.cwd()` from the CLI), but
+ * the item-addressed tools (`arggon_update`/`arggon_comment`/`arggon_handoff`/
+ * `arggon_show`) resolve their cwd per call through the item's own
+ * `worktree_path` — the claim address `start --worktree` records — so a session
+ * launched from a stale primary writes the item where its branch lives, and a
+ * write whose recorded claim tree is unavailable is refused with the named
+ * `TRACKER_ROOT_MISMATCH` error instead of landing in the launching tree. See
+ * `mcp-routing.ts`.
  */
 
 const SUPPORTED_PROTOCOL_VERSIONS = ["2024-11-05", "2025-03-26", "2025-06-18"] as const;
@@ -356,7 +372,7 @@ const TOOLS: ToolDefinition[] = [
   {
     name: "arggon_report",
     description:
-      "Aggregate leaf (task/bug) statuses per story, grouped by epic — display only, never writes. Returns the arggon `report --json` envelope: {ok, schemaVersion, conventionVersion, command, groups[, trend]}.",
+      "Aggregate leaf (task/bug) statuses per story, grouped by epic, plus a report-only container-hygiene check — display only, never writes. Returns the arggon `report --json` envelope: {ok, schemaVersion, conventionVersion, command, groups, hygiene[, trend]}.",
     inputSchema: {
       type: "object",
       properties: {
@@ -527,6 +543,10 @@ const TOOLS: ToolDefinition[] = [
             "remove removable worktrees (git worktree remove), delete their merged branches, and clear the worktree_path records",
           default: false,
         },
+        // Bare by budget (ADR 0006/0014), like `release`/`take_over_worktree`:
+        // the force contract is named in the tool description and documented in
+        // ArggonManager/docs/agents.md §Cleanup.
+        force: { type: "boolean", default: false },
         // Lean by design (ADR 0006/0014 schema budget): the release contract is
         // named in the tool description and documented in
         // ArggonManager/docs/agents.md §Worktrees — the properties stay bare.
@@ -608,7 +628,12 @@ export type CliSpawnSpec = { command: string; args: string[] };
 
 /** One MCP server session bound to fixed streams and a fixed repo root. */
 export type McpServerOptions = {
-  /** Repo root (parent of the tracker dir); all tool calls run against this tree. */
+  /**
+   * Repo root (parent of the tracker dir) the session was launched with. Pool
+   * calls run against this tree; item-addressed calls resolve through the
+   * item's `worktree_path` when its claim lives in another worktree
+   * (bug-mcp-server-binds-session-cwd-tracker-root, see `mcp-routing.ts`).
+   */
   cwd: string;
   input: Readable;
   output: Writable;
@@ -624,6 +649,57 @@ export type McpServerOptions = {
    */
   cliSpawn?: CliSpawnSpec;
 };
+
+/**
+ * The item-addressed tools and the command name each refusal envelope carries.
+ * Deliberately a table, not a name test: the item-scoped set is a routing
+ * decision, so it is stated once where the routing decision is made. `create`
+ * is absent on purpose — its `id` is the stem of an item that does not exist
+ * yet, so there is no claim to route through (the native surface draws the
+ * same line).
+ */
+const ITEM_SCOPED_TOOLS: Record<string, { command: string; mutating: boolean }> = {
+  arggon_update: { command: "update", mutating: true },
+  arggon_comment: { command: "comment", mutating: true },
+  arggon_handoff: { command: "handoff", mutating: true },
+  arggon_show: { command: "show", mutating: false },
+};
+
+/**
+ * Which tree ONE tool call runs against. Everything but the item-addressed
+ * tools keeps the launch cwd — pool reads/writes (`list`, `create`, `next`,
+ * `report`, `validate`, `priority`, `sync`, `import_issues`) are per-tree by
+ * definition, and the worktree lifecycle tools spawn the CLI, which manages
+ * worktrees itself. An item-scoped WRITE whose item records a worktree that
+ * cannot be written into returns the named `TRACKER_ROOT_MISMATCH` failure
+ * envelope instead of a cwd — the fallback to the launching tree is the
+ * defect (bug-mcp-server-binds-session-cwd-tracker-root).
+ */
+function itemCallTarget(
+  opts: { cwd: string },
+  name: unknown,
+  args: Record<string, unknown>,
+): { cwd: string } | { error: Record<string, unknown> } {
+  const scoped = ITEM_SCOPED_TOOLS[String(name)];
+  if (scoped === undefined) return { cwd: opts.cwd };
+  const id = str(args.id) ?? "";
+  const routing = resolveItemCallCwd({ cwd: opts.cwd, id, mutating: scoped.mutating });
+  if (routing.kind === "refuse") {
+    return {
+      error: failEnvelope({
+        command: scoped.command,
+        code: TRACKER_ROOT_MISMATCH,
+        message: itemWorktreeRefusalMessage({
+          command: scoped.command,
+          id,
+          recorded: routing.recorded,
+          resolvedRoot: routing.resolvedRoot,
+        }),
+      }),
+    };
+  }
+  return { cwd: routing.kind === "routed" ? routing.root : opts.cwd };
+}
 
 export function runMcpServer(opts: McpServerOptions): void {
   const write = (message: Record<string, unknown>): void => {
@@ -667,10 +743,19 @@ export function runMcpServer(opts: McpServerOptions): void {
     // OpenCode V2 session context (opaque correlation, may be absent); used
     // only as the default attribution below, never for any decision.
     const metaSession = sessionIDFromMeta(params);
+    // Which tree THIS call runs against: the launch cwd for pool calls and the
+    // worktree lifecycle, and the item's own claim tree for item-addressed
+    // calls. A write whose recorded claim tree is unavailable refuses here
+    // with a named error rather than landing in the launching tree.
+    const target = itemCallTarget(opts, name, args);
+    if ("error" in target) {
+      return toolResult({ ok: false, envelope: target.error });
+    }
+    const cwd = target.cwd;
     if (name === "arggon_list") {
       return toolResult(
         listOperation({
-          cwd: opts.cwd,
+          cwd,
           status: str(args.status),
           type: str(args.type),
           parent: str(args.parent),
@@ -706,7 +791,7 @@ export function runMcpServer(opts: McpServerOptions): void {
     if (name === "arggon_update") {
       return toolResult(
         updateOperation({
-          cwd: opts.cwd,
+          cwd,
           id: str(args.id) ?? "",
           title: str(args.title),
           status: str(args.status),
@@ -729,7 +814,7 @@ export function runMcpServer(opts: McpServerOptions): void {
     if (name === "arggon_comment") {
       return toolResult(
         commentOperation({
-          cwd: opts.cwd,
+          cwd,
           id: str(args.id) ?? "",
           text: str(args.text) ?? "",
           // Explicit author wins; otherwise the V2 session ID is the default.
@@ -741,7 +826,7 @@ export function runMcpServer(opts: McpServerOptions): void {
     if (name === "arggon_handoff") {
       return toolResult(
         handoffOperation({
-          cwd: opts.cwd,
+          cwd,
           id: str(args.id) ?? "",
           next: str(args.next) ?? "",
           branch: str(args.branch),
@@ -757,7 +842,7 @@ export function runMcpServer(opts: McpServerOptions): void {
     if (name === "arggon_show") {
       return toolResult(
         showOperation({
-          cwd: opts.cwd,
+          cwd,
           id: str(args.id) ?? "",
           meta: args.meta === true,
           body: args.body === true,
@@ -834,6 +919,7 @@ export function runMcpServer(opts: McpServerOptions): void {
       return toolResult(
         spawnedOutcome(opts, "cleanup", [
           ...(args.prune === true ? ["--prune"] : []),
+          ...(args.force === true ? ["--force"] : []),
           ...(typeof args.release === "string" ? ["--release", args.release] : []),
           ...(args.take_over_worktree === true ? ["--take-over-worktree"] : []),
           ...(args.no_commit === true ? ["--no-commit"] : []),

@@ -13,6 +13,7 @@ import {
   ghIssueListJson,
   importedBody,
   mapIssueState,
+  MAX_HUMAN_ERROR_CHARS,
   normalizeGhLabels,
   parseFrontmatter,
   resolveImportType,
@@ -25,6 +26,7 @@ import {
 } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
+import { satisfyPlaceholders } from "../../test/acceptance.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -72,9 +74,19 @@ const FIXTURE_ISSUES = [
 function primed(withEpic = true): string {
   const dir = mkdtempSync(join(tmpdir(), "arggon-import-issues-"));
   runInit({ dir, force: false });
-  runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
+  // Real seed prose (task-validate-refuses-placeholder-bodies): the scaffold
+  // IS the placeholder, so default bodies would fail `validate` here.
+  const container = "## Context\n\nSeed.\n\n## Acceptance\n\nSeed.\n";
+  runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW, body: container });
   if (withEpic) {
-    runCreate({ cwd: dir, type: "epic", title: "Backlog", parent: "launch-mvp", now: NOW });
+    runCreate({
+      cwd: dir,
+      type: "epic",
+      title: "Backlog",
+      parent: "launch-mvp",
+      now: NOW,
+      body: container,
+    });
   }
   return dir;
 }
@@ -179,7 +191,11 @@ describe("runImportIssues", () => {
     // The temporary import claimant never persists on the closed item.
     expect(fm(closedPath).assignee).toBeUndefined();
 
-    // The imported tree must be convention-clean.
+    // The imported tree must be convention-clean. The auto-created story
+    // scaffolds placeholder sections (as every `create` does), so the test
+    // authors them — the decided-A workflow is import, then author, then
+    // green — before asserting (task-validate-refuses-placeholder-bodies).
+    satisfyPlaceholders(dir);
     const validation = runValidate({ cwd: dir });
     expect(validation.errors).toEqual([]);
   });
@@ -207,6 +223,8 @@ describe("runImportIssues", () => {
     const { items } = runList({ cwd: dir });
     const imported = items.find((i) => i.id === "bug-issue-1");
     expect(toContractWorkItem(imported!, dir).issue).toBe(1);
+    // Author the auto-created story's scaffold sections first (see above).
+    satisfyPlaceholders(dir);
     const validation = runValidate({ cwd: dir });
     expect(validation.errors).toEqual([]);
     expect(validation.warnings).toEqual([]);
@@ -394,6 +412,8 @@ describe("import type mapping (task-import-type-mapping)", () => {
       status: "todo",
       issue: 5,
     });
+    // Author the auto-created story's scaffold sections first (see above).
+    satisfyPlaceholders(dir);
     const validation = runValidate({ cwd: dir });
     expect(validation.errors).toEqual([]);
   });
@@ -566,6 +586,34 @@ describe("ghIssueListJson", () => {
     expect(() => ghIssueListJson({ execGh: execGh as unknown as GhExecutor })).toThrow(
       /gh issue list returned unparseable JSON/,
     );
+  });
+
+  it("keeps its gh failure message bounded, so the trailing remedy is never clip-reachable", () => {
+    // Recorded compliant by task-clip-class-sweep-remaining-sites (the sibling
+    // item's F5 correction): gh runs with stderr IGNORED
+    // (`stdio: ["ignore", "pipe", "ignore"]` in the kernel wrapper), so the
+    // interpolated detail is Node's BOUNDED `Command failed: gh … <argv>`
+    // echo — never an unbounded stderr tail — and the `check \`gh auth
+    // status\`` remedy appended AFTER it cannot be pushed past any head-kept
+    // clip. The mock reproduces Node's real echo shape, derived from the
+    // invocation the wrapper itself makes, so it tracks any argv change.
+    const execGh = vi.fn((cmd: string, args: string[]) => {
+      throw new Error(`Command failed: ${cmd} ${args.join(" ")}`);
+    });
+    let message = "";
+    try {
+      ghIssueListJson({ repo: "octocat/hello-world", execGh: execGh as unknown as GhExecutor });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    // Both the receipt and the trailing remedy arrive…
+    expect(message).toContain("gh issue list failed (Command failed: gh issue list");
+    expect(message).toContain("check `gh auth status`");
+    // …with more than 1000 chars of headroom under the human-channel clip, so
+    // no ordering of these clauses can expose the remedy to the clip. A future
+    // edit that interpolates anything unbounded into this message fails here.
+    expect(message.length).toBeLessThan(MAX_HUMAN_ERROR_CHARS);
+    expect(MAX_HUMAN_ERROR_CHARS - message.length).toBeGreaterThan(1000);
   });
 });
 

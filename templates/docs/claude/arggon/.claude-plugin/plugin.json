@@ -1,0 +1,16 @@
+{
+  "name": "arggon",
+  "version": "0.1.0",
+  "description": "ArggonManager native seam for Claude Code: the arggon MCP tools (tracker + worktree lifecycle), the /arggon:<command> commands, the maker and standards-reviewer subagents (the delivery lead is the main session — see README), the bundled arggon-cli skill, and the hook gates (global git gates; reviewer dispatch backstop). Requires the arggon CLI on PATH (npm i -g arggon-manager) — the MCP server is `arggon mcp`.",
+  "author": { "name": "Arggon" },
+  "license": "MIT",
+  "commands": "./commands",
+  "skills": "./skills",
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": {
+    "arggon": {
+      "command": "arggon",
+      "args": ["mcp"]
+    }
+  }
+}

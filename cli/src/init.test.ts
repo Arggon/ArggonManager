@@ -49,6 +49,39 @@ const TIER1_DOCS = [
   ".agents/skills/arggon-cli/references/orchestration.md",
   ".agents/skills/arggon-cli/references/pitfalls.md",
   ".agents/skills/arggon-upgrade/SKILL.md",
+  // spec-claude-code-adapter-024 (task-claude-plugin-seam): the Claude Code
+  // plugin seam is tier-1 — marketplace catalog + the vendored declarative
+  // plugin, with the bundled arggon-cli skill. Order mirrors the template
+  // walk: the bundled sources come first, then the template docs in code-unit
+  // name order (`README.md` precedes the lowercase directories), and the
+  // command files carry the command word alone (the plugin namespace already
+  // carries `arggon`, so `/arggon:next` comes from `commands/next.md`).
+  ".claude-marketplace/.claude-plugin/marketplace.json",
+  ".claude-marketplace/arggon/.claude-plugin/plugin.json",
+  ".claude-marketplace/arggon/README.md",
+  ".claude-marketplace/arggon/agents/arggon-maker.md",
+  ".claude-marketplace/arggon/agents/arggon-standards-reviewer.md",
+  ".claude-marketplace/arggon/commands/adopt.md",
+  ".claude-marketplace/arggon/commands/adr.md",
+  ".claude-marketplace/arggon/commands/board.md",
+  ".claude-marketplace/arggon/commands/done.md",
+  ".claude-marketplace/arggon/commands/explore.md",
+  ".claude-marketplace/arggon/commands/goal.md",
+  ".claude-marketplace/arggon/commands/handoff.md",
+  ".claude-marketplace/arggon/commands/next.md",
+  ".claude-marketplace/arggon/commands/playbook.md",
+  ".claude-marketplace/arggon/commands/review.md",
+  ".claude-marketplace/arggon/commands/spec.md",
+  ".claude-marketplace/arggon/commands/start.md",
+  ".claude-marketplace/arggon/commands/status.md",
+  ".claude-marketplace/arggon/hooks/gate.mjs",
+  ".claude-marketplace/arggon/hooks/hooks.json",
+  ".claude-marketplace/arggon/skills/arggon-cli/SKILL.md",
+  ".claude-marketplace/arggon/skills/arggon-cli/references/exploration.md",
+  ".claude-marketplace/arggon/skills/arggon-cli/references/json-contract.md",
+  ".claude-marketplace/arggon/skills/arggon-cli/references/methodology.md",
+  ".claude-marketplace/arggon/skills/arggon-cli/references/orchestration.md",
+  ".claude-marketplace/arggon/skills/arggon-cli/references/pitfalls.md",
   ".editorconfig",
   ".github/CODEOWNERS",
   ".github/PULL_REQUEST_TEMPLATE.md",
@@ -121,6 +154,10 @@ const TIER1_DOCS = [
   "CLAUDE.md",
   "CONTRIBUTING.md",
   "SECURITY.md",
+  // task-matrix-reaches-adopters: the committed capability matrix ships as a
+  // tier-1 generated destination (`templates/docs/adapters/**` maps 1:1), so
+  // `arggon doctor` reports it in an adopter tree.
+  "adapters/capability-matrix.json",
   "opencode.jsonc",
 ];
 
@@ -187,6 +224,53 @@ describe("init", () => {
     expect(result.modified).toContain(".gitignore");
     expect(result.created).not.toContain(".gitignore");
     expect(readFileSync(join(adopter, ".gitignore"), "utf8")).toBe("node_modules/\n");
+  });
+
+  // task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters: an
+  // adopter `.gitignore` that predates the template is kept, so init must
+  // REPORT the missing `.arggon.env` entry instead of silently leaving the hole.
+  it("reports a missing .arggon.env gitignore entry, strictly report-only", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-envhint-"));
+    gitInit(dir);
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf8");
+    git(dir, ["add", ".gitignore"]);
+    git(dir, ["commit", "--quiet", "-m", "adopter gitignore"]);
+
+    const result = runInit({ dir, force: false });
+    expect(result.envGitignore.present).toBe(true);
+    expect(result.envGitignore.ignores).toBe(false);
+    expect(result.envGitignore.hint).toContain(".arggon.env");
+    expect(result.envGitignore.hint).toContain("worktree-env-contract-016");
+    // Strictly report-only: the adopter's bytes survive, nothing is staged and
+    // the auto-commit leaves a clean tree.
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe("node_modules/\n");
+    expect(git(dir, ["status", "--porcelain"])).toBe("");
+    expect(git(dir, ["diff", "HEAD", "--", ".gitignore"])).toBe("");
+
+    // A fresh scaffold generates its own `.gitignore` WITH the entry: no hint.
+    const fresh = mkdtempSync(join(tmpdir(), "arggon-init-envhint-"));
+    expect(runInit({ dir: fresh, force: false }).envGitignore.hint).toBeNull();
+
+    // The entry (appended by hand, exactly as documented) silences the hint.
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n.arggon.env\n", "utf8");
+    expect(runInit({ dir, force: false }).envGitignore.hint).toBeNull();
+  });
+
+  it("surfaces the gitignore hint on init stdout and in the --json envelope", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-envhint-cli-"));
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf8");
+    const proc = runCli(["init", "--json"], dir);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      envGitignore: { path: string; present: boolean; ignores: boolean; hint: string | null };
+    };
+    expect(body.envGitignore.present).toBe(true);
+    expect(body.envGitignore.ignores).toBe(false);
+    expect(body.envGitignore.hint).toContain("worktree-env-contract-016");
+    const human = runCli(["init"], dir);
+    expect(human.status).toBe(0);
+    expect(human.stdout).toContain("worktree-env-contract-016");
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe("node_modules/\n");
   });
 
   it("generates the tier-2 doc set only with full", () => {

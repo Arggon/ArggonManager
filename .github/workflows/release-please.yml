@@ -37,6 +37,71 @@ jobs:
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      - name: Surface an aborted release (release-please found no tag for a merged release PR)
+        # bug-release-config-workflow-agreement-ungated: release-please can ABORT
+        # with only a `logger.warn` while the job reports success — that
+        # warned-and-succeeded shape kept the release pipeline dead from
+        # 2026-10-02 to 2026-10-07 behind green runs nobody could read as failure.
+        # This step turns the abort into a red run. Its predicate is
+        # release-please's OWN (src/manifest.ts): a MERGED release PR still
+        # carrying `autorelease: pending` — findMergedReleasePullRequests() →
+        # "There are untagged, merged release PRs outstanding - aborting". The
+        # logic is a tested, injectable-gh script (cli/release-abort-check.mjs),
+        # not inline shell, and it runs on EVERY push with no `if:`. It cannot
+        # go red on a legitimate no-release push: on such a push no release PR is
+        # merged and every already-merged one has had its label flipped to
+        # `autorelease: tagged`, so the query is empty (the green path is proven
+        # in cli/release-abort-check.test.ts). An OPEN release PR is excluded by
+        # `--state merged`; a gh query failure warns and exits 0 rather than cry
+        # wolf on a healthy push. The tag↔config agreement that causes the abort
+        # is pinned by cli/src/release-config-agreement.test.ts.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node cli/release-abort-check.mjs --repo "$GITHUB_REPOSITORY"
+
+      - name: Surface a broken release PR (non-lockstep versions or a non-exact kernel pin)
+        # bug-release-proposal-non-lockstep-undetected + bug-kernel-pin-never-exact.
+        # Two shapes an open release PR must never merge:
+        #  - non-lockstep versions (#764: root 0.8.0, lib 0.7.1). release-please
+        #    bumps only the components whose paths a wave touched, while
+        #    release-please-config.json's extra-files rule rewrites the root's
+        #    kernel pin assuming lockstep; release.yml refuses to tag it, but
+        #    its only red surface was the PR's own approval-gated CI.
+        #  - a kernel pin that is not the bare released version. ADR 0018 §2 /
+        #    spec-release-pipeline-015 A3 require `"@arggondev/lib": "X.Y.Z"`
+        #    (no ^/~/range operator). Through v0.7.1 every release shipped a
+        #    caret — the C1 amendment's one-time hand-unpin never executed and
+        #    nothing detected it; the 0.8.0 PR un-pinned (5fd10db4) and v0.9.0
+        #    kept it exact automatically (#770), because release-please's
+        #    extra-files updater preserves the operator that is there (its
+        #    absence included). The guard keeps it that way: a test in
+        #    cli/release-lockstep-check.test.ts pins main's own pin, and this
+        #    step catches a broken proposal while it is still open.
+        # The logic is the tested, injectable-gh script
+        # cli/release-lockstep-check.mjs: it reads both package.json files AT
+        # the PR's head ref and reddens the maintenance run naming the values
+        # and the fix (cli/release-lockstep-check.test.ts witnesses the green
+        # and red paths offline). It runs on EVERY push with no `if:`, BEFORE
+        # the lockfile sync below — a broken proposal must fail before this
+        # workflow mutates its branch. No open PR and a clean proposal are
+        # silent; a gh query/read failure warns and exits 0 rather than cry
+        # wolf (the pre-tag gate in release.yml is the backstop).
+        #
+        # A red run between releases is EXPECTED, not a pipeline failure: a
+        # root-only accumulating proposal is the ordinary state while the
+        # version is undecided, so this step reds on every push until the
+        # Release-As commit lands and it stays a hard failure by design — a
+        # warning inside a green run is the 2026-10-02 → 2026-10-07 outage
+        # shape. The FAIL message states the reading ("do not merge this PR
+        # yet — a Release-As decision is pending", not "the pipeline is
+        # broken"); release.md §Exception: the release PR is non-lockstep
+        # (root != lib) documents the window.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node cli/release-lockstep-check.mjs --repo "$GITHUB_REPOSITORY"
+
       # release-please does not update lockfiles (googleapis/release-please#1993,
       # open): the release PR bumps both package versions and rewrites the root's
       # kernel dependency to the exact released version, so an unsynced
@@ -47,6 +112,19 @@ jobs:
       # the PR branch. release-please's own later branch updates are re-synced
       # by the next run of this step; the push starts no new workflow runs
       # (GITHUB_TOKEN recursion rule) and only updates the PR.
+      #
+      # `--ignore-scripts` is load-bearing, not tidiness: `npm install
+      # --package-lock-only` still runs the root `prepare` (`npm run build`), and
+      # that build needs a toolchain (`tsc`, `@types/node`) this workflow never
+      # installs — every run with an open release PR died on it: 49 failures,
+      # from the workflow's first run (36908073600, 2026-10-01, which created PR
+      # #556) through 38283343454 (bug-release-lockfile-sync-step-cannot-run).
+      # The flag suppresses lifecycle scripts only: resolution is byte-identical
+      # with and without it (registry tarballs + the local `lib` workspace link;
+      # the tree has no git dependency whose build the install would need).
+      # Keep the step fail-loud — npm rewrites package-lock.json even when a
+      # lifecycle script then fails, so swallowing the exit code would commit a
+      # lockfile whose install was never proven.
       #
       # PR discovery keys off the manifest-mode branch name default
       # (`release-please--branches--main`, manifest-releaser.md) rather than the
@@ -68,12 +146,18 @@ jobs:
           echo "release PR branch: $branch"
           git fetch --force origin "refs/heads/$branch:refs/remotes/origin/$branch"
           git checkout -B "$branch" "origin/$branch"
-          npm install --package-lock-only
+          npm install --package-lock-only --ignore-scripts
           if git diff --quiet -- package-lock.json; then
             echo "package-lock.json already in sync"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Stage BY PATH: the install only writes the working tree, so a bare
+          # `git commit` fails with "Changes not staged for commit" — run
+          # 38292422896 died exactly there (bug-release-lockfile-sync-step-
+          # cannot-run). Explicit path, never `git add -A`, so the commit can
+          # only ever carry package-lock.json.
+          git add package-lock.json
           git commit -m "chore: sync package-lock.json with the release PR versions"
           git push origin "HEAD:refs/heads/$branch"

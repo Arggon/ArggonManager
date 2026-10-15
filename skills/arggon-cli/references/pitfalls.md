@@ -63,6 +63,9 @@ agents in this codebase — read before mutating the tracker or merging.
   checkout (auto-commits land on local main), `git push origin main` immediately
   after every mutation — before opening or merging any PR — so the post-merge
   pull stays fast-forward.
+- **A claim branch cut from local HEAD inherits its unpushed commits: `start`
+  reports `inheritedCommits` and the remedy — push main before the PR.**
+  — bug-start-claim-branch-inherits-unpushed-tracker-commits
 
 ## Repo hygiene and staging
 
@@ -115,6 +118,7 @@ agents in this codebase — read before mutating the tracker or merging.
 - `init` docs are never overwritten — even with `--force`; re-runs regenerate
   untouched generated docs silently, skip modified ones, and `--backup` archives
   them to `backup/<date>/`.
+- **Expand brace elisions before an id check.** `arggon-{a,b}` hides every member from a substring guard — three live docs hid retired ids this way. — bug-zcode-agents-brace-elided-retired-ids
 - `adopt` requires an initialized tree; it creates the migration task — executing
   it is an agent job per the checklist body.
 - Conventions evolve: check `conventionVersion` in any envelope.

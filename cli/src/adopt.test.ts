@@ -799,3 +799,56 @@ describe("adopt --ack via the CLI (--json)", () => {
     expect(body.error.message).toContain("arggon init");
   });
 });
+
+// task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters: the
+// adoption moment is exactly when an adopter `.gitignore` that predates the
+// worktree-env-contract template should learn the missing entry exists.
+describe("adopt: .arggon.env gitignore hint (spec worktree-env-contract-016)", () => {
+  it("reports a missing entry report-only, and is silent once it is present", () => {
+    const dir = seedTree();
+    // seedTree's init generated a `.gitignore` with the entry; simulate the
+    // pre-template adopter file it keeps untouched.
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf8");
+    const before = readFileSync(join(dir, ".gitignore"), "utf8");
+
+    const result = runAdopt({ cwd: dir });
+    expect(result.envGitignore.present).toBe(true);
+    expect(result.envGitignore.ignores).toBe(false);
+    expect(result.envGitignore.hint).toContain(".arggon.env");
+    expect(result.envGitignore.hint).toContain("worktree-env-contract-016");
+    expect(formatAdoptReport(result)).toContain("worktree-env-contract-016");
+    // Strictly report-only: the adopter's bytes are untouched.
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(before);
+
+    // The idempotent re-run (open adoption task) still reports it...
+    const again = runAdopt({ cwd: dir });
+    expect(again.skipped).toBe(true);
+    expect(again.envGitignore.hint).not.toBeNull();
+
+    // ...and the documented hand-step silences it.
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n.arggon.env\n", "utf8");
+    expect(runAdopt({ cwd: dir }).envGitignore.hint).toBeNull();
+  });
+
+  it("carries the hint in the adopt --json envelope and on stdout", () => {
+    const dir = seedTree();
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf8");
+    const proc = runCli(["adopt", "--json"], dir);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      envGitignore: { path: string; present: boolean; ignores: boolean; hint: string | null };
+    };
+    expect(body.envGitignore).toMatchObject({
+      path: ".gitignore",
+      present: true,
+      ignores: false,
+    });
+    expect(body.envGitignore.hint).toContain("worktree-env-contract-016");
+    // Human output (a second tree: the first adoption task is open and would
+    // skip, but the hint is reported on the skip path too).
+    const human = runCli(["adopt"], dir);
+    expect(human.status).toBe(0);
+    expect(human.stdout).toContain("worktree-env-contract-016");
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe("node_modules/\n");
+  });
+});

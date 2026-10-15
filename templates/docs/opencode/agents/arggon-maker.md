@@ -1,5 +1,4 @@
 ---
-# arggon:generated template="opencode/agents/arggon-maker.md"
 description: ArggonManager maker — owns exactly one already-claimed item, works inside the worktree the delivery lead created for it, reports findings back to the delivery lead
 mode: subagent
 permissions:
@@ -51,6 +50,13 @@ its git worktree; the delivery lead owns tracker decisions, review and completio
   behavior plus the project's test, lint and build scripts; in any other project
   it is whatever its own engineering docs require, and the item's acceptance
   checklist is what the gates are checked against.
+- If the work **repeats** a class another item already met, promote the lesson into the
+  carrier that owns the topic — **one line, ≤ 160 characters excluding the citation, and
+  the citation is mandatory** (`— <item-id>` or `— ADR NNNN`): the `arggon-cli` skill's
+  `references/pitfalls.md` for loop/tool mechanics, `ArggonManager/docs/playbooks/<tech>.md`
+  for technology behaviour, a tracker item's `## Context` for a refuted approach, an ADR for
+  a cross-cutting decision. No lesson store and no lessons section in the item body; the
+  rule is `ArggonManager/docs/agents.md` §Promoting lessons.
 - Do **not** flip your item to `done` — completion is the delivery lead's call
   after merge.
 - Before finishing, leave context on the item: `tools.arggon.handoff` with the branch,

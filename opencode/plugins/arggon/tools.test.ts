@@ -52,7 +52,7 @@ import {
   runUpdate,
 } from "@arggondev/lib";
 import { runInit } from "../../../cli/src/init.js";
-import { satisfyAcceptance, satisfyAllAcceptance } from "../../../test/acceptance.js";
+import { satisfyAcceptance, satisfyAllAcceptance, satisfyPlaceholders } from "../../../test/acceptance.js";
 // Ordering assertions go through assertOrder, never a bare `indexOf`
 // comparison: `-1 < n` makes a renamed clause pass as if it were still
 // ordered (bug-vacuous-substring-ordering-assertions).
@@ -163,6 +163,9 @@ function seedInto(dir: string): void {
   // Committed, because suites below merge branches back into this tree and git
   // refuses a merge that would overwrite a dirty file.
   satisfyAllAcceptance(dir);
+  // Placeholder guard (task-validate-refuses-placeholder-bodies): the scaffold
+  // IS the template placeholder, so arrange real prose over the markers too.
+  satisfyPlaceholders(dir);
   commitIfRepo(dir, "arrange live acceptance");
 }
 
@@ -2733,11 +2736,11 @@ describe("worktree domain tools (W4)", () => {
    *
    * The mirror is asserted against the kernel, not against this seam's own
    * arithmetic, and the log is compared with the CLI on a twin fixture carrying
-   * the same packages — the same kernel event on both surfaces. The CLI's
-   * envelope forwards `prepSteps` but not the kernel's flag (`cli/src/start.ts`
-   * assigns `prepSteps = prepared.steps`; `cli/src/cli.ts` forwards only
-   * `prepSteps`), so the CLI-side mirror is a reported follow-up, not asserted
-   * here as either present or absent.
+   * the same packages — the same kernel event on both surfaces, now including
+   * the kernel's dropped-entry COUNT and the CLI's mirrored pair
+   * (task-cli-surface-never-carries-steps-truncated): the CLI envelope carries
+   * `stepsTruncated` and `stepsDropped` beside `prepSteps`, so the deep-equal
+   * per-entry assertion extends to the truncation decision itself.
    */
   it("mirrors the kernel's capped preparation log instead of re-deriving it (CLI parity on the same kernel event)", async () => {
     const nativeDir = seedGitTree("arggon-preplog-a-");
@@ -2773,11 +2776,12 @@ describe("worktree domain tools (W4)", () => {
     expect(steps.some((entry) => entry.step === "gate-bins")).toBe(false);
 
     // The kernel is the authority the mirror reads: a second receipt for the
-    // same worktree agrees on the cap AND the flag, so the projection reports
-    // the kernel's decision rather than a coincidence.
+    // same worktree agrees on the cap, the flag AND the count, so the
+    // projection reports the kernel's decision rather than a coincidence.
     const kernelReceipt = prepareWorktreeDependencies(nativeDir, worktreePath);
     expect(kernelReceipt.steps).toHaveLength(MAX_PREP_STEPS);
     expect(kernelReceipt.stepsTruncated).toBe(true);
+    expect(kernelReceipt.stepsDropped).toBe(preparation.stepsDropped);
 
     // CLI parity on the same kernel event: the twin fixture carries the same
     // packages, and the same shortened log comes back — entry for entry. The
@@ -2791,6 +2795,24 @@ describe("worktree domain tools (W4)", () => {
     const cli = JSON.parse(cliProc.stdout) as Record<string, unknown>;
     expect(cli.prepSteps).toHaveLength(MAX_PREP_STEPS);
     expect(cli.prepSteps).toEqual(preparation.steps);
+    // The kernel's decision, mirrored on the CLI surface too
+    // (task-cli-surface-never-carries-steps-truncated): the deep-equal
+    // per-entry assertion extends to the flag and the dropped-entry count.
+    expect(cli.stepsTruncated).toBe(true);
+    expect(cli.stepsDropped).toBe(preparation.stepsDropped);
+
+    // The human channel states the same count (the note leads with it, before
+    // the capped log): an attach re-run on the claimed fixture still records
+    // more preparation decisions than the kernel's cap, so the truncation
+    // state renders without `--json` too.
+    const humanProc = runCli(["start", "task-rate-limit", "--worktree", "--assignee", "smoke"], cliDir);
+    expect(humanProc.status, humanProc.stderr || humanProc.stdout).toBe(0);
+    const dropped = Number(preparation.stepsDropped);
+    expect(dropped).toBeGreaterThan(0);
+    expect(humanProc.stdout).toContain(
+      `${dropped} ${dropped === 1 ? "entry was" : "entries were"} dropped ` +
+        `(the preparation log is capped at ${MAX_PREP_STEPS})`,
+    );
   });
 
   it("keeps an uncapped preparation log unflagged (the mirror reports the kernel, not a cap of its own)", async () => {
@@ -2814,7 +2836,24 @@ describe("worktree domain tools (W4)", () => {
       { step: "gate-bins", outcome: "all-worktree" },
     ]);
     expect(preparation.stepsTruncated).toBeUndefined();
+    expect(preparation.stepsDropped).toBeUndefined();
     expect(preparation.truncated).toBeUndefined();
+
+    // The same uncapped log on the CLI surface stays unflagged too: the mirror
+    // never invents a truncation the kernel did not decide
+    // (task-cli-surface-never-carries-steps-truncated).
+    const cliDir = seedGitTree("arggon-preplog-d-");
+    addPrepLogWorkspacePackages(cliDir, 1);
+    const cliRemote = join(dirname(cliDir), `${basename(cliDir)}-remote.git`);
+    git(dirname(cliRemote), ["init", "--bare", "-q", cliRemote]);
+    git(cliRemote, ["config", "maintenance.auto", "false"]);
+    git(cliDir, ["remote", "add", "origin", cliRemote]);
+    const cliProc = runCliJson(["start", "task-rate-limit", "--worktree", "--assignee", "smoke"], cliDir);
+    expect(cliProc.status, cliProc.stderr || cliProc.stdout).toBe(0);
+    const cli = JSON.parse(cliProc.stdout) as Record<string, unknown>;
+    expect(cli.prepSteps).toEqual(preparation.steps);
+    expect(cli.stepsTruncated).toBeUndefined();
+    expect(cli.stepsDropped).toBeUndefined();
   });
 
   it("keeps the worktree and reports a skipped claim commit when the gate fails, then retries on attach", async () => {
@@ -2937,6 +2976,50 @@ describe("worktree domain tools (W4)", () => {
     const worktreePath = String(payload.worktreePath);
     expect(existsSync(worktreePath)).toBe(true);
     expect(itemData(dir, "task-rate-limit", worktreePath)).toMatchObject({ status: "todo" });
+  });
+
+  it("states the kernel's dropped-entry count in the fresh-worktree refusal when the prep log is capped (task-cli-surface-never-carries-steps-truncated)", async () => {
+    // The refusal renders the preparation log, and the kernel caps that log at
+    // MAX_PREP_STEPS: with more decisions than the cap, the refusal used to
+    // present the capped list as if it were the whole log. The kernel now
+    // counts what it dropped; the native projection mirrors the count through
+    // `boundedPreparation` and the refusal quotes it
+    // (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation).
+    const dir = seedGitTree("arggon-preplog-refusal-");
+    addNativeManifest(dir, { name: "fixture", devDependencies: { "native-gate-dep": "1.0.0" } });
+    addPrepLogWorkspacePackages(dir, MAX_PREP_STEPS);
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    const payload = typed.envelope;
+    const preparation = payload.preparation as Record<string, unknown>;
+    expect(preparation.steps).toHaveLength(MAX_PREP_STEPS);
+    expect(preparation.stepsTruncated).toBe(true);
+    const dropped = Number(preparation.stepsDropped);
+    expect(dropped).toBeGreaterThan(0);
+
+    const claimCommit = payload.claimCommit as Record<string, unknown>;
+    expect(claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+      reason: "fresh-worktree install gate refused",
+    });
+    const message = String((payload.error as Record<string, unknown>).message);
+    expect(message).toContain("fresh worktree must leave a gate-usable install");
+    expect(message).toContain("Preparation ran:");
+    // The kernel's own count, quoted — not a length-vs-cap guess.
+    expect(message).toContain(
+      `${dropped} ${dropped === 1 ? "entry was" : "entries were"} dropped ` +
+        `(the preparation log is capped at ${MAX_PREP_STEPS})`,
+    );
   });
 
   it("refuses a fresh worktree whose gate bin resolves only via PATH, by default (bug-start-install-ordering masking flavor)", async () => {
@@ -3793,6 +3876,141 @@ describe("worktree domain tools (W4)", () => {
     expect(preparation.truncated).toBe(true);
   });
 
+  it("folds CHARACTER clipping of the foreign-write report into `truncated` (task-foreign-writes-char-clip-truncated)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    // Exactly ONE dirty path, and it is over `MAX_NATIVE_PREPARATION_VALUE_CHARS`
+    // (200): the list cap and `total > files.length` cannot fire here, so the
+    // only honest signal that the value was shortened is `truncated` itself —
+    // the same shape the take-over fold is pinned with, one receipt over.
+    const longPath = `deep/${"segment-".repeat(28)}end.md`;
+    expect(longPath.length).toBeGreaterThan(200);
+    const longFile = join(worktreePath, longPath);
+    mkdirSync(dirname(longFile), { recursive: true });
+    writeFileSync(longFile, "dirty\n", "utf8");
+    git(worktreePath, ["add", longPath]);
+    const when = new Date(Date.now() + 60_000);
+    utimesSync(longFile, when, when);
+
+    const attached = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_b" },
+    );
+    const preparation = (attached.output as Record<string, unknown>).preparation as {
+      claim?: {
+        foreignWrites?: { owner: string; claimedAt: string; files: string[]; total: number };
+      };
+      truncated?: boolean;
+    };
+    const report = preparation.claim?.foreignWrites;
+    // Nothing was DROPPED here: one path named, the count honest. Only the
+    // characters were clipped.
+    expect(report?.total).toBe(1);
+    expect(report?.files).toHaveLength(1);
+    expect(String(report?.files[0]).length).toBeLessThanOrEqual(200);
+    // …and that is exactly why the receipt must SAY so.
+    expect(preparation.truncated).toBe(true);
+  });
+
+  it("folds a clipped `foreignWrites.owner` identity into `truncated` too (task-foreign-writes-char-clip-truncated)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    // The path stays SHORT and the count honest, so the owner comparison is
+    // the only fold term in play: an attacker-shaped stamp identity over the
+    // per-value cap must not read as the whole identity.
+    foreignWrite(worktreePath);
+    const stampPath = join(worktreeGitDir(dir, worktreePath), "arggon-claim.json");
+    const hostile = JSON.parse(readFileSync(stampPath, "utf8")) as Record<string, unknown>;
+    hostile.identity = "x".repeat(600);
+    writeFileSync(stampPath, `${JSON.stringify(hostile)}\n`, "utf8");
+
+    const attached = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_b" },
+    );
+    const preparation = (attached.output as Record<string, unknown>).preparation as {
+      claim?: { foreignWrites?: { owner: string; files: string[]; total: number } };
+      truncated?: boolean;
+    };
+    const report = preparation.claim?.foreignWrites;
+    expect(report?.total).toBe(1);
+    expect(report?.files).toHaveLength(1);
+    expect(String(report?.owner).length).toBeLessThanOrEqual(200);
+    expect(preparation.truncated).toBe(true);
+  });
+
+  it("keeps the common-case foreign-write report silent: an under-cap path leaves `truncated` unset (task-foreign-writes-char-clip-truncated)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    // The ordinary case the fold must not disturb: a short repo-relative path
+    // is reported whole, so nothing was shortened and the flag stays absent —
+    // the default receipt keeps its pre-fold bytes.
+    foreignWrite(worktreePath);
+
+    const attached = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_b" },
+    );
+    const preparation = (attached.output as Record<string, unknown>).preparation as {
+      claim?: { foreignWrites?: { files: string[]; total: number } };
+      truncated?: boolean;
+    };
+    const report = preparation.claim?.foreignWrites;
+    expect(report?.total).toBe(1);
+    expect(report?.files).toEqual([
+      "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md",
+    ]);
+    expect(preparation.truncated).toBeUndefined();
+  });
+
+  it("folds a clipped string inside a `replaced.takeovers[]` chain entry into `truncated` (task-foreign-writes-char-clip-truncated)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    foreignWrite(worktreePath);
+    // A chain the kernel's reader accepts (5 entries) with ONE hostile string
+    // and every other value under the per-value cap: the chain LENGTH and the
+    // top-level strings cannot fire the fold, so `truncated` can only come
+    // from the clipped chain entry. Neither receipt folded this before.
+    const stampPath = join(worktreeGitDir(dir, worktreePath), "arggon-claim.json");
+    const hostile = JSON.parse(readFileSync(stampPath, "utf8")) as Record<string, unknown>;
+    hostile.takeovers = [
+      {
+        at: "2020-01-01T00:00:00.000Z",
+        by: "t".repeat(600),
+        replacedIdentity: "owner-0",
+        replacedClaimedAt: "2019-01-01T00:00:00.000Z",
+      },
+      ...Array.from({ length: 4 }, (_unused, index) => ({
+        at: `2020-01-0${index + 2}T00:00:00.000Z`,
+        by: `taker-${index}`,
+        replacedIdentity: `owner-${index + 1}`,
+        replacedClaimedAt: "2019-01-01T00:00:00.000Z",
+      })),
+    ];
+    writeFileSync(stampPath, `${JSON.stringify(hostile)}\n`, "utf8");
+
+    const taken = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke", takeOverWorktree: true },
+      { sessionID: "ses_b" },
+    );
+    const preparation = (taken.output as Record<string, unknown>).preparation as {
+      claim?: { takeOver?: { replaced: { takeovers?: Array<{ by: string }> } } };
+      truncated?: boolean;
+    };
+    const chain = preparation.claim?.takeOver?.replaced.takeovers;
+    expect(chain).toHaveLength(5);
+    expect(String(chain?.[0]?.by).length).toBeLessThanOrEqual(200);
+    expect(preparation.truncated).toBe(true);
+  });
+
   it("start refuses to steal a claim and removes the worktree it just created", async () => {
     const dir = seedGitTree();
     const { domain, calls } = fakeDomain(dir);
@@ -4470,35 +4688,163 @@ describe("worktree domain tools (W4)", () => {
     ]);
   });
 
-  it("cleanup prune never force-removes a foreign node_modules install and keeps the record", async () => {
+  it("cleanup prune converges on the next run when the worktree's gitdir is gone (reaper wedge)", async () => {
+    // bug-cleanup-stuck-when-worktree-dir-gone: the first run above leaves a
+    // PARTIAL removal — files behind, `.git` deleted, git's record `prunable`
+    // and still pinning the branch. Before the fix every later run reported the
+    // candidate removable and failed forever ("git worktree removal failed:
+    // fatal: … is not a working tree"). The stale record is now recognized as
+    // already-gone: no removal is attempted, the dead git record is pruned
+    // (which unpins the branch), the merged branch is deleted and the record is
+    // cleared.
     const dir = seedGitTree();
-    const { worktreePath, defs } = await completedWorktree(dir);
+    const { worktreePath, defs, calls } = await completedWorktree(
+      dir,
+      "task-rate-limit",
+      ({ domain, calls: seen }) => {
+        domain.remove = async (input) => {
+          seen.remove.push(input);
+          rmSync(join(input.directory, ".git"), { force: true });
+          throw new Error("worktree domain unavailable");
+        };
+      },
+    );
+
+    const first = await tool(defs, "cleanup").execute({ prune: true });
+    expect((first.output as Record<string, unknown>).failures).toHaveLength(1);
+
+    const second = await tool(defs, "cleanup").execute({ prune: true });
+    const envelope = second.output as Record<string, unknown>;
+    expect(envelope.failures).toEqual([]);
+    expect(envelope.pruned).toEqual([
+      { id: "task-rate-limit", action: "pruned stale git worktree record" },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    // The debris is left in place (it is not a worktree); the branch and the
+    // record are gone, and no removal was attempted through the domain again.
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: false },
+    ]);
+    expect(envelope.commit).toMatchObject({ message: "chore(tasks): pruned task-rate-limit" });
+  });
+
+  it("cleanup prune skips a foreign node_modules install instead of force-removing it without force", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(dir);
     // A real install start never created (no link, no link-farm marker) is not
-    // ours to delete: the unlink helper leaves it alone, git still refuses the
-    // dirty worktree, and the candidate is reported instead of forced.
+    // ours to delete: the unlink helper leaves it alone, and the honest
+    // classification says so instead of classifying the worktree removable and
+    // then failing on git's raw refusal
+    // (bug-cleanup-prune-untracked-artifacts-no-force).
     const foreign = join(worktreePath, "node_modules", "foreign-dep");
     mkdirSync(foreign, { recursive: true });
     writeFileSync(join(foreign, "package.json"), '{"name":"foreign-dep"}\n', "utf8");
 
     const output = await tool(defs, "cleanup").execute({ prune: true });
     const envelope = output.output as Record<string, unknown>;
-    const actions = envelope.pruned as Array<Record<string, unknown>>;
-    expect(actions.map((action) => action.action)).toEqual(["failed"]);
-    expect(actions[0]).toMatchObject({
-      id: "task-rate-limit",
-      leftoverPath: worktreePath,
-      leftoverBranch: "feat/task-rate-limit",
-    });
-    expect(String(actions[0].error)).toContain("git worktree removal failed");
-    expect(envelope.failures).toHaveLength(1);
-    expect(envelope.commit).toBeUndefined();
-    // The foreign install, the worktree, the branch and the record all survive.
+    expect(envelope.pruned).toEqual([]);
+    expect(envelope.failures).toEqual([]);
+    const candidate = (envelope.candidates as Array<Record<string, unknown>>)[0];
+    expect(candidate.removable).toBe(false);
+    expect(candidate.blockingPaths).toEqual(["node_modules/"]);
+    expect(candidate.blockingTracked).toBeUndefined();
+    expect(String(candidate.reason)).toContain("untracked");
+    expect(String(candidate.reason)).toContain("force");
+    // Nothing was attempted through the domain, and the install, the worktree,
+    // the branch and the record all survive.
+    expect(calls.remove).toEqual([]);
     expect(existsSync(join(foreign, "package.json"))).toBe(true);
     expect(existsSync(worktreePath)).toBe(true);
     expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain(
       "feat/task-rate-limit",
     );
     expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+  });
+
+  it("cleanup prune reaps untracked blockers only with force, and reports the forced discard", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(dir);
+    // The 2026-10-12 incident shape: untracked generated scaffolding that lives
+    // only in the worktree (agent-harness output), never committed.
+    mkdirSync(join(worktreePath, "generated"), { recursive: true });
+    writeFileSync(join(worktreePath, "generated", "spec.json"), "{}\n", "utf8");
+
+    const skipped = await tool(defs, "cleanup").execute({ prune: true });
+    const skippedEnvelope = skipped.output as Record<string, unknown>;
+    expect(skippedEnvelope.pruned).toEqual([]);
+    expect(skippedEnvelope.failures).toEqual([]);
+    expect(calls.remove).toEqual([]);
+    const candidate = (skippedEnvelope.candidates as Array<Record<string, unknown>>)[0];
+    expect(candidate.removable).toBe(false);
+    expect(candidate.blockingPaths).toEqual(["generated/"]);
+    expect(candidate.blockingTotal).toBe(1);
+    expect(String(candidate.reason)).toContain("cleanup({ prune: true, force: true })");
+    expect(existsSync(worktreePath)).toBe(true);
+
+    const forced = await tool(defs, "cleanup").execute({ prune: true, force: true });
+    const forcedEnvelope = forced.output as Record<string, unknown>;
+    expect(forcedEnvelope.failures).toEqual([]);
+    expect(forcedEnvelope.pruned).toEqual([
+      { id: "task-rate-limit", action: `removed worktree ${worktreePath}`, forced: true },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    // The domain removal is forced for exactly this entry.
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: true },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+  });
+
+  it("cleanup prune never force-discards uncommitted tracked work", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(dir);
+    // A tracked file committed on the branch (then merged, so the entry stays
+    // eligible) and modified afterwards: the tracked change vetoes the forced
+    // removal even when the untracked artifact would otherwise allow it.
+    writeFileSync(join(worktreePath, "tracked.txt"), "committed\n", "utf8");
+    git(worktreePath, ["add", "tracked.txt"]);
+    git(worktreePath, ["commit", "-qm", "feat: tracked file"]);
+    git(dir, ["merge", "--no-ff", "feat/task-rate-limit", "-m", "Merge PR (stubbed)"]);
+    writeFileSync(join(worktreePath, "tracked.txt"), "modified\n", "utf8");
+    writeFileSync(join(worktreePath, "artifact.json"), "{}\n", "utf8");
+
+    const output = await tool(defs, "cleanup").execute({ prune: true, force: true });
+    const envelope = output.output as Record<string, unknown>;
+    const candidate = (envelope.candidates as Array<Record<string, unknown>>)[0];
+    expect(candidate.removable).toBe(false);
+    expect(candidate.blockingTracked).toEqual(["tracked.txt"]);
+    expect(candidate.blockingTrackedTotal).toBe(1);
+    expect(candidate.forced).toBeUndefined();
+    expect(String(candidate.reason)).toContain("never discards tracked work");
+    expect(calls.remove).toEqual([]);
+    expect(envelope.pruned).toEqual([]);
+    expect(envelope.failures).toEqual([]);
+    // The uncommitted work is intact, not merely reported.
+    expect(readFileSync(join(worktreePath, "tracked.txt"), "utf8")).toBe("modified\n");
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+  });
+
+  it("cleanup force without prune fails typed (CLI parity: --force requires --prune)", async () => {
+    const dir = seedGitTree();
+    const { defs } = await completedWorktree(dir);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "cleanup").execute({ force: true });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    expect((caught as ArgonToolError).code).toBe("CLEANUP_FAILED");
+    const forceError = (caught as ArgonToolError).envelope.error as Record<string, unknown>;
+    expect(String(forceError.message)).toContain("force requires prune");
   });
 
   it("cleanup prune keeps the rest of the run honest when one removal cannot be observed", async () => {
@@ -5176,6 +5522,55 @@ describe("native release of a dropped claim (bug-unclaim-leaves-worktree-record-
       normalize(JSON.parse(cliProc.stdout) as Record<string, unknown>, cliDir),
     );
   });
+
+  // The release arm's own stale-record shape
+  // (bug-cleanup-release-stale-record-wedge): the prune arm learned this in
+  // bug-cleanup-stuck-when-worktree-dir-gone, but the release arm still asked
+  // the dead worktree for its branch — the same throw that wedges the CLI at
+  // CLEANUP_FAILED — and a domain inventory listing the path attempted a
+  // removal that can never succeed. Same liveness rule, same convergence.
+  it("release converges when the worktree's gitdir is gone (interrupted-removal debris)", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await claimedAndMerged(dir);
+    await tool(defs, "update").execute(
+      { id: "task-rate-limit", status: "todo" },
+      { sessionID: "ses_a" },
+    );
+    // The interrupted removal: files behind, `.git` gone, git's record
+    // `prunable` and still pinning the branch.
+    rmSync(join(worktreePath, ".git"), { force: true });
+    expect(gitOut(dir, ["worktree", "list", "--porcelain"])).toContain("prunable");
+
+    const output = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    const envelope = output.output as Record<string, unknown>;
+    expect(envelope.failures).toEqual([]);
+    expect(envelope.release).toMatchObject({
+      id: "task-rate-limit",
+      releasable: true,
+      // The branch comes from git's own record: the dead worktree cannot be
+      // asked and the unclaim already cleared the item field.
+      branch: "feat/task-rate-limit",
+      action:
+        "clear stale worktree_path record (path is not a live worktree of this repo; " +
+        "any leftover directory is left in place)",
+    });
+    expect(envelope.released).toEqual([
+      { id: "task-rate-limit", action: "pruned stale git worktree record" },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    // No removal was attempted through the domain — there is no worktree to
+    // remove — and the debris directory is left in place.
+    expect(calls.remove).toEqual([]);
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(gitOut(dir, ["worktree", "list"]).includes("task-rate-limit")).toBe(false);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+    expect(envelope.commit).toMatchObject({ message: "chore(tasks): released task-rate-limit" });
+  });
 });
 
 /**
@@ -5421,6 +5816,58 @@ describe("native cleanup reaps declared Compose projects (ADR 0019 layer 2, task
     expect(dockerCalls(log).map((call) => call.argv[2])).toEqual([project]);
     expect(envelope.compose).toEqual({ declared: "MyApp" });
     expect(envelope.failures).toEqual([]);
+  });
+
+  it("release reaps the declared project of a stale record too (task-release-stale-compose-reaping)", async () => {
+    const dir = seedGitTree();
+    declareServices(dir, "true");
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const started = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_a" },
+    );
+    const worktreePath = String((started.output as { worktreePath?: unknown }).worktreePath);
+    git(dir, ["merge", "--no-ff", "feat/task-rate-limit", "-m", "Merge claim (stubbed)"]);
+    await tool(defs, "update").execute(
+      { id: "task-rate-limit", status: "todo" },
+      { sessionID: "ses_a" },
+    );
+    // The interrupted removal: files behind, `.git` gone — the worktree can no
+    // longer be asked, but the project name still derives from the RECORDED
+    // path (the missing-path shape reaches the same stale clause).
+    rmSync(join(worktreePath, ".git"), { force: true });
+    const log = dockerLog();
+    const bin = fakeDocker();
+
+    const output = await withEnv(dockerEnv(bin, log, worktreePath), () =>
+      tool(defs, "cleanup").execute({ release: "task-rate-limit" }, { sessionID: "ses_a" }),
+    );
+    const envelope = output.output as Record<string, unknown>;
+    const project = basename(worktreePath).toLowerCase();
+
+    // Same ADR 0019 command shape as prune's stale entries, from the repo root.
+    expect(dockerCalls(log)).toEqual([
+      {
+        cwd: dir,
+        argv: ["compose", "-p", project, "down", "-v", "--remove-orphans"],
+        worktree: "present",
+      },
+    ]);
+    // Compose FIRST, then the stale-record convergence in prune's order — the
+    // release's own `released` family, never mixed into `pruned`.
+    expect(envelope.released).toEqual([
+      { id: "task-rate-limit", action: `reaped compose project ${project}` },
+      { id: "task-rate-limit", action: "pruned stale git worktree record" },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    expect(envelope.compose).toEqual({ declared: "true" });
+    expect(envelope.failures).toEqual([]);
+    expect(envelope.pruned).toEqual([]);
+    // The debris directory is retained; the record and the branch are gone.
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
   });
 
   it("never invokes Docker when the repo declares nothing (report-only path)", async () => {

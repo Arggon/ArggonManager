@@ -4,6 +4,7 @@ import { basename, join, relative, resolve, sep } from "node:path";
 import {
   LEGACY_TRACKER_DIR_NAME,
   MAX_HUMAN_ERROR_CHARS,
+  MAX_PREP_STEPS,
   TRACKER_DIR_NAME,
   findTasksDir,
   freshWorktreeInstallRefusal,
@@ -180,6 +181,22 @@ export type StartResult = {
    */
   prepSteps: WorktreePrepStep[];
   /**
+   * The kernel's own count of the entries its `MAX_PREP_STEPS` cap dropped
+   * (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation): MIRRORED
+   * from the receipt, never re-derived from `prepSteps.length` — the list
+   * alone cannot say whether it is the whole log. Present exactly when the
+   * kernel dropped entries (it sets the count and `stepsTruncated` together in
+   * the one branch that drops), so an uncapped log keeps its shape.
+   */
+  stepsDropped?: number;
+  /**
+   * The kernel's own "the log was capped" decision, MIRRORED verbatim
+   * (bug-native-steps-truncated-flag-dropped): present only when the kernel's
+   * cap dropped entries. A flag derived here from a cap of this surface's own
+   * would be a second, disagreeing account of the same event.
+   */
+  stepsTruncated?: true;
+  /**
    * The worktree env contract receipt (spec worktree-env-contract-016):
    * `.arggon.env` written with the six identity keys, the `.env` seeded
    * copy-if-absent, the per-OS state/cache dirs created, and the read-only
@@ -216,9 +233,173 @@ export type StartResult = {
    * passed. Absent otherwise (no config = no-op).
    */
   postStart?: PostStartResult;
+  /**
+   * Commits a claim branch cut by THIS run inherits from the primary
+   * checkout's LOCAL HEAD beyond its upstream base
+   * (bug-start-claim-branch-inherits-unpushed-tracker-commits) — the unpushed
+   * commits that ride the PR diff as unrelated churn, reported so the lead
+   * sees the contamination before opening the PR. Present only when this run
+   * actually CUT the branch (a fresh `git checkout -b` / `git worktree add -b`)
+   * and that branch inherits at least one commit; absent on attach re-runs (the
+   * branch was cut earlier) and on a clean base. Report-only: the claim always
+   * proceeds — the report names the remedy (`remedy`).
+   */
+  inheritedCommits?: InheritedCommitsReport;
   /** The item, reloaded from disk. */
   item: WorkItem;
 };
+
+/**
+ * Cap for the reported `inheritedCommits.commits` list (the exact `total` and
+ * the per-class counts ride beside it, the `missingDependencies` precedent).
+ */
+export const MAX_INHERITED_COMMITS = 10;
+
+/**
+ * The tracker auto-commit message prefix (`chore(tasks): <verb> …`, the
+ * convention `trackerCommitMessage` builds in `lib/src/tracker-commit.ts`).
+ * Kept local on purpose: a test pins it against the kernel's own message
+ * builder, so a convention change fails the suite instead of silently
+ * reclassifying the lead's commits as tracker churn.
+ */
+const TRACKER_COMMIT_PREFIX = "chore(tasks): ";
+
+/** Whether a commit subject is a tracker auto-commit (the CLI's own mutation). */
+export function isTrackerAutoCommit(subject: string): boolean {
+  return subject.startsWith(TRACKER_COMMIT_PREFIX);
+}
+
+/** One commit a newly cut claim branch inherits beyond its upstream base. */
+export type InheritedCommit = {
+  /** Full commit SHA. */
+  sha: string;
+  /** First line of the commit message. */
+  subject: string;
+  /**
+   * True when the subject matches the tracker auto-commit convention
+   * (`chore(tasks): …`) — the CLI's own mutation, not the lead's work.
+   */
+  tracker: boolean;
+};
+
+/**
+ * The raw observation a git runner answers for the inherited-commit probe:
+ * the commits a branch cut from the CURRENT HEAD carries beyond its upstream
+ * base, plus whether the claimed item's file already exists there. `undefined`
+ * when no upstream resolves (nothing to compare — see
+ * {@link StartGit.inheritedCommits}).
+ */
+export type InheritedCommitProbe = {
+  /** The upstream ref compared against, e.g. `origin/main`. */
+  base: string;
+  /** The commit the branch is cut from (the primary checkout's HEAD). */
+  branchPoint: string;
+  /** `base..HEAD`, newest first: every commit the new branch inherits. */
+  commits: { sha: string; subject: string }[];
+  /**
+   * Whether the claimed item's file already exists at `base`. When it does
+   * not, the item's own creation commit is among the inherited ones, so
+   * dropping them would take the item off the branch — the remedy says so.
+   */
+  itemOnBase: boolean;
+};
+
+/**
+ * The inherited-commit report the `--json` envelope carries and the human
+ * channel warns about (bug-start-claim-branch-inherits-unpushed-tracker-commits).
+ * Classification: `tracker` marks the CLI's own auto-commits
+ * (`chore(tasks): …`); everything else is the lead's own deliberate work.
+ */
+export type InheritedCommitsReport = {
+  /** The upstream ref the claim branch's PR diff is measured against. */
+  base: string;
+  /** The commit the branch was cut from (`git rebase --onto` uses it). */
+  branchPoint: string;
+  /** How many commits `base..HEAD` holds (full count; `commits` is capped). */
+  total: number;
+  /** Full count of commits classified as tracker auto-commits. */
+  trackerTotal: number;
+  /** Full count of the lead's own work (subjects that are not auto-commits). */
+  workTotal: number;
+  /** The commits, newest first, capped at {@link MAX_INHERITED_COMMITS}. */
+  commits: InheritedCommit[];
+  /** Whether the item file already exists at `base` (drop-remedy safety). */
+  itemOnBase: boolean;
+  /** The named remedy: push the primary branch, or drop the inherited commits. */
+  remedy: string;
+};
+
+/** `git push <remote> <branch>` for a remote-qualified base ref (`origin/main`). */
+function pushRemedy(base: string): string {
+  const slash = base.indexOf("/");
+  return slash > 0 ? `git push ${base.slice(0, slash)} ${base.slice(slash + 1)}` : "git push";
+}
+
+/**
+ * Compose the report from a raw probe. Pure, so the classification, the cap
+ * and the remedy are unit-testable; returns null when the branch inherits
+ * nothing (a clean base needs no report).
+ */
+export function inheritedCommitReport(
+  probe: InheritedCommitProbe,
+  branch: string,
+): InheritedCommitsReport | null {
+  if (probe.commits.length === 0) return null;
+  const trackerTotal = probe.commits.filter((commit) => isTrackerAutoCommit(commit.subject)).length;
+  const push = pushRemedy(probe.base);
+  // The remedy distinguishes the two situations the acceptance names: with the
+  // item already on the base, dropping the inherited commits is safe (the
+  // rebase replays only the claim + later work); without it, the item's own
+  // creation commit IS one of the inherited commits, so dropping them would
+  // take the item off the branch and only pushing main is a safe remedy.
+  const remedy = probe.itemOnBase
+    ? `push the primary checkout's branch (\`${push}\`) so the inherited commits are already on ${probe.base}, or drop them from this branch (\`git rebase --onto ${probe.base} ${probe.branchPoint} ${branch}\`)`
+    : `push the primary checkout's branch (\`${push}\`) so the inherited commits are already on ${probe.base} — the claimed item file itself rides one of them, so dropping them would take it off this branch`;
+  return {
+    base: probe.base,
+    branchPoint: probe.branchPoint,
+    total: probe.commits.length,
+    trackerTotal,
+    workTotal: probe.commits.length - trackerTotal,
+    commits: probe.commits.slice(0, MAX_INHERITED_COMMITS).map((commit) => ({
+      sha: commit.sha,
+      subject: commit.subject,
+      tracker: isTrackerAutoCommit(commit.subject),
+    })),
+    itemOnBase: probe.itemOnBase,
+    remedy,
+  };
+}
+
+/**
+ * Human-channel lines for a claim branch that inherits unpushed commits: the
+ * counts and the remedy LEAD (the actionable clause, the same ordering
+ * contract every other start report keeps), the named commits follow so the
+ * lead can tell the CLI's own auto-commits from their own work. Kept here so
+ * the human channel is unit-testable; `--json` forwards the report verbatim.
+ * Empty when there is no report (clean base, attach, plain re-run).
+ */
+export function inheritedCommitsNotes(report: InheritedCommitsReport | undefined): string[] {
+  if (report === undefined) return [];
+  const count = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" : "s"}`;
+  const classes = [
+    report.trackerTotal > 0 ? count(report.trackerTotal, "tracker auto-commit") : null,
+    report.workTotal > 0 ? count(report.workTotal, "other commit") : null,
+  ].filter((part): part is string => part !== null);
+  const named = report.commits
+    .map(
+      (commit) =>
+        `${commit.sha.slice(0, 7)} ${commit.subject} ${commit.tracker ? "[tracker]" : "[work]"}`,
+    )
+    .join("; ");
+  const extra = report.total - report.commits.length;
+  return [
+    `note: the claim branch inherits ${count(report.total, "unpushed commit")} from the primary ` +
+      `checkout beyond ${report.base} (${classes.join(", ")}) — the PR diff will carry them as ` +
+      `unrelated churn: ${report.remedy}.`,
+    `note: inherited commits (newest first) — ${named}${extra > 0 ? `; and ${extra} more` : ""}`,
+  ];
+}
 
 /** Outcome of the `x-worktree.post-start` bootstrap hook (task-start-post-hook). */
 export type PostStartResult = {
@@ -265,6 +446,15 @@ export interface StartGit extends GitRunner {
    * existing branch is checked out otherwise.
    */
   worktreeAdd(cwd: string, path: string, opts: { branch: string; createBranch: boolean }): void;
+  /**
+   * The commits a branch cut from `cwd`'s CURRENT HEAD would inherit beyond
+   * its upstream base (bug-start-claim-branch-inherits-unpushed-tracker-commits),
+   * with `itemPath`'s own presence at that base. `undefined` when no upstream
+   * resolves — nothing to compare, nothing to report. Best-effort and
+   * report-only: it never changes the branch or the claim. Absent in an
+   * injected fake → no report (the default runner implements it).
+   */
+  inheritedCommits?(cwd: string, itemPath: string): InheritedCommitProbe | undefined;
 }
 
 export type StartDeps = {
@@ -284,6 +474,30 @@ function git(args: string[], cwd: string): string {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`git ${args.join(" ")} failed${stderr ? `: ${stderr}` : ` (${message})`}`);
   }
+}
+
+/**
+ * The ref a claim branch's PR diff is measured against: the checked-out
+ * branch's own upstream (normally `origin/main`), else `origin/HEAD`, else the
+ * conventional `origin/main` / `origin/master` when either exists. Null when
+ * nothing resolves (no remote, no upstream) — nothing to compare, no report.
+ */
+function resolveUpstreamRef(cwd: string): string | null {
+  const attempt = (args: string[]): string | null => {
+    try {
+      return git(args, cwd);
+    } catch {
+      return null;
+    }
+  };
+  return (
+    attempt(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]) ??
+    attempt(["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]) ??
+    ["origin/main", "origin/master"].find(
+      (name) => attempt(["rev-parse", "--verify", "--quiet", `${name}^{commit}`]) !== null,
+    ) ??
+    null
+  );
 }
 
 function gh(args: string[], cwd: string): string {
@@ -406,6 +620,32 @@ export function defaultStartGit(): StartGit {
         ],
         cwd,
       );
+    },
+    inheritedCommits(cwd: string, itemPath: string): InheritedCommitProbe | undefined {
+      const base = resolveUpstreamRef(cwd);
+      if (base === null) return undefined;
+      const branchPoint = git(["rev-parse", "HEAD"], cwd);
+      const log = git(["log", "--format=%H%x1f%s", `${base}..HEAD`], cwd);
+      const commits = log
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .map((line) => {
+          const separator = line.indexOf("\x1f");
+          return { sha: line.slice(0, separator), subject: line.slice(separator + 1) };
+        });
+      const rel = relative(cwd, itemPath).split(sep).join("/");
+      let itemOnBase = false;
+      try {
+        execFileSync("git", ["cat-file", "-e", `${base}:${rel}`], {
+          cwd,
+          stdio: ["ignore", "ignore", "ignore"],
+        });
+        itemOnBase = true;
+      } catch {
+        itemOnBase = false;
+      }
+      return { base, branchPoint, commits, itemOnBase };
     },
   };
 }
@@ -573,6 +813,27 @@ export function assertStartableTree(
 }
 
 /**
+ * Best-effort inherited-commit probe (bug-start-claim-branch-inherits-unpushed-tracker-commits):
+ * a runner without the method, a git failure or no resolvable upstream degrades
+ * to no report — the report is advisory and never blocks a claim (the same
+ * contract as the claim stamp). Report-only: nothing about the branch or the
+ * claim changes; the remedy rides the report.
+ */
+function probeInheritedCommits(
+  gitRunner: StartGit,
+  root: string,
+  itemPath: string,
+  branch: string,
+): InheritedCommitsReport | null {
+  try {
+    const probe = gitRunner.inheritedCommits?.(root, itemPath);
+    return probe === undefined ? null : inheritedCommitReport(probe, branch);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Start work on an item in one flow: claim (in_progress + assignee) →
  * working branch (pattern or recorded field) → commit the claim →
  * push → optional draft PR with the item id in the body.
@@ -651,6 +912,14 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
     });
     const branch = runBranch({ cwd: opts.cwd, id, now: opts.now }, { git: gitRunner });
 
+    // Inherited-commit report (bug-start-claim-branch-inherits-unpushed-tracker-commits):
+    // `checkout -b` cuts from this checkout's LOCAL HEAD, so unpushed commits
+    // ride the claim branch's PR diff as unrelated churn. Report-only, and only
+    // when THIS run cut the branch — an attach inherits what was cut earlier.
+    const inherited = branch.created
+      ? probeInheritedCommits(gitRunner, root, branch.path, branch.branch)
+      : null;
+
     let committed = false;
     if (gitRunner.fileStatus(root, branch.path).trim()) {
       gitRunner.commitFile(root, branch.path, `claim: ${id}`);
@@ -701,6 +970,7 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
         written: false,
         warning: "no --worktree: the env contract is written only inside worktree checkouts",
       },
+      ...(inherited !== null ? { inheritedCommits: inherited } : {}),
       item: branch.item,
     };
   });
@@ -711,7 +981,9 @@ const READINESS_LEAD = "Readiness: the gate binaries do not resolve inside the w
 
 /** The overflow marker: how many bins the budget could not fit, never a silent drop. */
 function readinessOverflow(extra: number): string {
-  return extra > 0 ? `; and ${extra} more bin${extra === 1 ? "" : "s"} not resolving inside it.` : ".";
+  return extra > 0
+    ? `; and ${extra} more bin${extra === 1 ? "" : "s"} not resolving inside it.`
+    : ".";
 }
 
 /** The bins whose resolution keeps the worktree off its own install. */
@@ -735,7 +1007,10 @@ function gateBinEntry(bin: GateBinResolution): string {
 export function hasReadinessEvidence(
   readiness: { hasInstall: boolean; gateBins: GateBinResolution[] } | undefined,
 ): boolean {
-  return readiness !== undefined && (!readiness.hasInstall || foreignGateBins(readiness.gateBins).length > 0);
+  return (
+    readiness !== undefined &&
+    (!readiness.hasInstall || foreignGateBins(readiness.gateBins).length > 0)
+  );
 }
 
 /**
@@ -757,14 +1032,23 @@ export function hasReadinessEvidence(
  * over: on deep-sibling-path entries it is generous enough to let the discard
  * hint get cut, and in an ordinary checkout it silently hides names that would
  * have fitted (measured: 6 of 8 at ~124 chars an entry, 2 of 8 at the ~330-char
- * pathological shape). One name is always included when there is evidence —
- * the whole point of the sentence is to name a bin — and the budget can never
- * reach a mandatory clause, because they are reserved first and never measured
- * against it.
+ * pathological shape).
+ *
+ * The `≥1 name` override is bounded by `overrideLimit`
+ * (bug-gatebin-budget-reserved-block-can-exceed-clip): one name is still
+ * forced in when `budget` held none — an evidence sentence that names nothing
+ * answers no question — but never past the room that keeps every ACTIONABLE
+ * clause (kept note, remedy, discard hint) whole inside the head-kept clip.
+ * When even one entry does not fit that ceiling the override YIELDS (`null`):
+ * a name the human channel would clip is not named, and forcing it in is
+ * exactly the regression this bounds. The observation is never lost — the
+ * caller still carries it to the `--json` payload via
+ * {@link startFailureReadiness}.
  */
 export function gateBinFailureReport(
   input: { hasInstall: boolean; gateBins: GateBinResolution[] },
   budget: number,
+  overrideLimit = budget,
 ): string | null {
   const broken = foreignGateBins(input.gateBins);
   if (broken.length === 0) {
@@ -779,11 +1063,20 @@ export function gateBinFailureReport(
   const shown: string[] = [];
   for (const bin of broken) {
     const entry = gateBinEntry(bin);
-    // At least one name, whatever the budget: an evidence sentence that names
-    // nothing answers no question.
-    if (shown.length > 0 && used + entry.length > budget) break;
+    // The `; ` separator is part of what the clause grows by, so it is measured
+    // too (≤2 chars that used to land in the trailing detail unstated).
+    const separator = shown.length === 0 ? 0 : "; ".length;
+    if (used + separator + entry.length > budget) break;
     shown.push(entry);
-    used += entry.length + (shown.length > 1 ? "; ".length : 0);
+    used += separator + entry.length;
+  }
+  // At least one name when the budget held none, up to the ceiling that leaves
+  // the actionable clauses whole — past it the override yields.
+  if (shown.length === 0) {
+    const first = gateBinEntry(broken[0]!);
+    if (used + first.length > overrideLimit) return null;
+    shown.push(first);
+    used += first.length;
   }
   const extra = broken.length - shown.length;
   return `${READINESS_LEAD}${shown.join("; ")}${readinessOverflow(extra)}`;
@@ -798,12 +1091,18 @@ export function gateBinFailureReport(
  * push is NOT retried by attach (attach only lands a pending claim commit —
  * review F3), so the branch must be pushed manually there.
  *
+ * The `committing the claim` branch also carries an EXACT fix (the observed
+ * resolution, `npm ci` + attach), split out as its own clause so the
+ * over-budget composition can lead with it
+ * (bug-gatebin-budget-reserved-block-can-exceed-clip); the fitting
+ * composition joins the two back into the one remedy clause it always was.
+ *
  * ORDERING is load-bearing (task-cli-start-remediation-tail-clipped-on-human-channel):
- * the `committing the claim` branch's EXACT fix leads, for the same head-kept
- * `MAX_HUMAN_ERROR_CHARS` contract every other remedy on this channel keeps. It
- * used to append the exact fix AFTER the readiness bin list, so at the
- * reachable worst case the clip ate the only clause that named the command to
- * run. This branch is the MOST COMMON start failure — the one that actually
+ * the `committing the claim` branch's EXACT fix leads the mandatory clauses, for
+ * the same head-kept `MAX_HUMAN_ERROR_CHARS` contract every other remedy on this
+ * channel keeps. It used to append the exact fix AFTER the readiness bin list, so
+ * at the reachable worst case the clip ate the only clause that named the command
+ * to run. This branch is the MOST COMMON start failure — the one that actually
  * creates the worktree — so it is the worst place to leave the class open.
  */
 function worktreeRemediation(input: {
@@ -812,36 +1111,40 @@ function worktreeRemediation(input: {
   branch: string;
   worktreePath?: string;
   readiness?: { hasInstall: boolean; gateBins: GateBinResolution[] };
-}): string {
+}): { remedy: string; exactFix?: string } {
   const attach = `re-run \`arggon start ${input.id} --worktree\` — it attaches to the existing worktree`;
   if (input.step.startsWith("committing the claim")) {
-    const installFix = hasReadinessEvidence(input.readiness)
-      ? ` Exact fix for the observed resolution: run \`npm ci\` in ${input.worktreePath ?? "the worktree"}, then ${attach}.`
-      : "";
-    return (
+    const remedy =
       "The pre-commit gate (or the git commit itself) failed inside the worktree — fix the " +
       "reported cause there (install dependencies, or link the primary checkout's node_modules: " +
       "`ln -s <primary>/node_modules <worktree>/node_modules`; start does this itself when the " +
-      `primary has one), then ${attach}.${installFix}`
-    );
+      `primary has one), then ${attach}.`;
+    return hasReadinessEvidence(input.readiness)
+      ? {
+          remedy,
+          exactFix: `Exact fix for the observed resolution: run \`npm ci\` in ${input.worktreePath ?? "the worktree"}, then ${attach}.`,
+        }
+      : { remedy };
   }
   if (input.step.startsWith("pushing")) {
-    return (
-      "Fix remote access (`git fetch origin`, credentials), then push the kept branch manually: " +
-      `\`git push -u origin ${input.branch}\` — a re-run of ` +
-      `\`arggon start ${input.id} --worktree\` attaches to the worktree but does not retry the push.`
-    );
+    return {
+      remedy:
+        "Fix remote access (`git fetch origin`, credentials), then push the kept branch manually: " +
+        `\`git push -u origin ${input.branch}\` — a re-run of ` +
+        `\`arggon start ${input.id} --worktree\` attaches to the worktree but does not retry the push.`,
+    };
   }
   if (input.step.startsWith("opening the draft PR")) {
-    return `Check \`gh auth status\` (and the remote), then ${attach}.`;
+    return { remedy: `Check \`gh auth status\` (and the remote), then ${attach}.` };
   }
   if (input.step.startsWith("recording the claim")) {
-    return (
-      "Resolve the reported tracker error in the worktree (claim conflict or branch mismatch); " +
-      `no claim commit was made. Then ${attach}.`
-    );
+    return {
+      remedy:
+        "Resolve the reported tracker error in the worktree (claim conflict or branch mismatch); " +
+        `no claim commit was made. Then ${attach}.`,
+    };
   }
-  return `Fix the reported cause in the worktree, then ${attach}.`;
+  return { remedy: `Fix the reported cause in the worktree, then ${attach}.` };
 }
 
 /**
@@ -867,6 +1170,65 @@ export function startTakeoverNotes(claim: WorktreeClaimReceipt | undefined): str
     );
   }
   return notes;
+}
+
+/**
+ * Outcomes of the bounded preparation log that earn a human note
+ * (bug-start-install-ordering): every skip or failure in the prep path is
+ * named, so a broken worktree can be correlated with the silent decision that
+ * produced it.
+ */
+const NOTEWORTHY_PREP_OUTCOMES: ReadonlySet<string> = new Set([
+  "primary-install-missing",
+  "worktree-install-present",
+  "farm-failed-symlink-fallback",
+  "failed",
+  "install-cannot-consume",
+  "build-failed",
+  "build-no-entry",
+  "flip-failed",
+  "errored",
+  "foreign-resolution",
+]);
+
+/**
+ * The `note: dependency prep — …` payload for the human channel, or null when
+ * there is nothing to say. Kept here rather than inline in the CLI action so
+ * the human channel is unit-testable, the same reason `startTakeoverNotes`
+ * lives here.
+ *
+ * TRUNCATION leads and is MIRRORED, never re-derived from `prepSteps.length`
+ * (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation,
+ * bug-native-steps-truncated-flag-dropped): the kernel's own dropped-entry
+ * count is stated BEFORE the capped log, so the line never presents a
+ * shortened list as the whole log — and a bounded line's head-clip can never
+ * eat the count. An uncapped log states no count, so no truncation is ever
+ * invented.
+ */
+export function dependencyPrepNote(input: {
+  prepSteps: WorktreePrepStep[];
+  stepsTruncated?: true;
+  stepsDropped?: number;
+}): string | null {
+  const parts: string[] = [];
+  if (input.stepsTruncated === true) {
+    const dropped = input.stepsDropped;
+    parts.push(
+      dropped === undefined
+        ? `entries were dropped (the preparation log is capped at ${MAX_PREP_STEPS})`
+        : `${dropped} ${dropped === 1 ? "entry was" : "entries were"} dropped ` +
+            `(the preparation log is capped at ${MAX_PREP_STEPS})`,
+    );
+  }
+  for (const entry of input.prepSteps) {
+    if (!NOTEWORTHY_PREP_OUTCOMES.has(entry.outcome)) continue;
+    parts.push(
+      entry.pkg === undefined
+        ? `${entry.step}: ${entry.outcome}`
+        : `${entry.step}: ${entry.outcome} (${entry.pkg})`,
+    );
+  }
+  return parts.length === 0 ? null : parts.join("; ");
 }
 
 /** The readiness observation a worktree failure reports, in full (never bounded). */
@@ -897,6 +1259,23 @@ export function startFailureReadiness(err: unknown): StartFailureReadiness | und
 }
 
 /**
+ * The named truncation for the over-budget composition
+ * (bug-gatebin-budget-reserved-block-can-exceed-clip): when the actionable
+ * block alone exceeds the clip, the human channel WILL cut the message, so the
+ * message says so FIRST — ahead of every clause the clip can eat — instead of
+ * leaving a silent `…` at the cut. Kept here (not inline in the composer) so
+ * the wording is unit-testable.
+ */
+function humanClipNotice(hasEvidence: boolean): string {
+  return (
+    "[truncated: the worktree path leaves no room for the whole message inside the " +
+    "2000-char human clip; the tail is clipped there — the full message" +
+    (hasEvidence ? " and the bin evidence" : "") +
+    " ride the --json error]"
+  );
+}
+
+/**
  * Failure report for a start that already created (or attached) the worktree.
  * The worktree is NEVER rolled back (bug-start-worktree-node-modules): the
  * diagnostic context survives, and the message names the failing step, the
@@ -921,6 +1300,30 @@ export function startFailureReadiness(err: unknown): StartFailureReadiness | und
  * the rest (`task-cli-start-remediation-tail-clipped-on-human-channel`). The full
  * uncapped observation is still enumerable from a machine surface — see
  * {@link startFailureReadiness}.
+ *
+ * THE RESERVED BLOCK CAN ITSELF EXCEED THE CLIP
+ * (bug-gatebin-budget-reserved-block-can-exceed-clip): with a ~700+ char
+ * worktree path the actionable clauses alone — the path is named in the kept
+ * note, in the exact fix and in the discard hint — pass 2000, so no evidence
+ * ordering can keep them whole, and the old `≥1 name` override only pushed a
+ * name the clip could not show past the remedy. That window has a DEFINED
+ * behaviour, the OVER-BUDGET SHAPE, taken when the actionable block alone
+ * exceeds the clip: the truncation notice is composed first (so the naming can
+ * never be the thing that is eaten), then the exact fix, then the kept-worktree
+ * note, the generic remedy, the discard hint and the raw detail — all verbatim,
+ * so the composed message stays COMPLETE for `--json` (the notice states the
+ * human-channel cut; the tail lives on the machine surface). The readiness fill
+ * is REFUSED in this shape: the `≥1 name` override never fires here, and the
+ * observation rides the `--json` payload ({@link startFailureReadiness}).
+ *
+ * THE CLAUSE GUARANTEED TO SURVIVE THE HUMAN HEAD-CLIP IS THE EXACT FIX: it is
+ * the first mandatory clause of the over-budget composition (the kept note
+ * takes its place for a step without one), and the only thing composed ahead of
+ * it is the bounded notice — so no readiness list, no generic remedy, no
+ * discard hint and no raw detail can push it past the clip. Only the path
+ * length itself can still cut it, and the notice names that cut instead of
+ * leaving it silent. The invariant is enforced HERE, at the one place that
+ * decides the order.
  */
 export function worktreeFailureMessage(input: {
   id: string;
@@ -939,13 +1342,51 @@ export function worktreeFailureMessage(input: {
     `start failed while ${input.step}; the worktree was kept at ${input.worktreePath} ` +
     `(nothing was rolled back).`;
   const discardClause = `To discard it instead: \`${discard}\`.`;
-  const remedy = worktreeRemediation({
+  const { remedy, exactFix } = worktreeRemediation({
     step: input.step,
     id: input.id,
     branch: input.branch,
     worktreePath: input.worktreePath,
     readiness: input.readiness,
   });
+  // The readiness evidence belongs to the claim-commit step only: on a push or
+  // draft-PR failure "gate binaries do not resolve" is noise, and this wrapper
+  // takes a readiness snapshot for EVERY step (bug-start-worktree-npm-ci-claim
+  // wants it reported wherever the gate ran). Same condition the exact fix hangs
+  // off — a smoke probe caught the leak when a push failure grew a bin list.
+  const readinessObservation = input.readiness;
+  const readinessEligible =
+    input.step.startsWith("committing the claim") &&
+    readinessObservation !== undefined &&
+    hasReadinessEvidence(readinessObservation);
+  // The fitting composition joins generic fix + exact fix into the ONE remedy
+  // clause it always was (byte-identical); the over-budget shape leads with the
+  // exact fix alone.
+  const fullRemedy = exactFix === undefined ? remedy : `${remedy} ${exactFix}`;
+  // The actionable block: the clauses the head-kept clip must show WHOLE. When
+  // it alone exceeds the clip, the over-budget shape below takes over.
+  const actionables = lead.length + 1 + fullRemedy.length + 1 + discardClause.length;
+  if (actionables > MAX_HUMAN_ERROR_CHARS) {
+    // Which clause is GUARANTEED (bug-gatebin-budget-reserved-block-can-exceed-clip,
+    // acceptance box 4): the **exact fix** when the step produced one — the only
+    // clause that names the worktree- and package-specific command and therefore
+    // the only one the operator can act on without re-deriving, which is why the
+    // over-budget shape leads with it (only the one-line notice precedes) instead
+    // of reserving the generic fix or the discard hint ahead of it. Without an
+    // exact fix the lead clause — the failing step and the KEPT PATH — leads,
+    // because a discarded worktree cannot be recovered. Everything above the
+    // notice fits or the composed message keeps it for `--json` regardless: the
+    // human clip removes the tail, never the head.
+    const notice = humanClipNotice(readinessEligible);
+    return [
+      notice,
+      ...(exactFix === undefined ? [] : [exactFix]),
+      lead,
+      remedy,
+      discardClause,
+      detail,
+    ].join("\n");
+  }
   // Reserve EVERY mandatory clause first — the step, the kept path, the generic
   // fix, the exact fix, the attach re-run, the discard hint and the raw detail —
   // and hand only what is left to the readiness evidence. They are never
@@ -954,28 +1395,22 @@ export function worktreeFailureMessage(input: {
   // space between remedy and evidence is reserved too, so the clause can never
   // push the following discard clause over the line.
   const mandatory =
-    lead.length +
-    1 +
-    remedy.length +
-    1 +
-    discardClause.length +
-    1 +
-    detail.length +
-    1;
-  // The readiness evidence belongs to the claim-commit step only: on a push or
-  // draft-PR failure "gate binaries do not resolve" is noise, and this wrapper
-  // takes a readiness snapshot for EVERY step (bug-start-worktree-npm-ci-claim
-  // wants it reported wherever the gate ran). Same condition the exact fix hangs
-  // off — a smoke probe caught the leak when a push failure grew a bin list.
+    lead.length + 1 + fullRemedy.length + 1 + discardClause.length + 1 + detail.length + 1;
+  // The room that keeps every actionable clause whole. The fill — and the `≥1`
+  // override in particular — may not cross it, so the evidence can never push
+  // the discard hint past the clip (bug-gatebin-budget-reserved-block-can-exceed-clip).
+  const overrideLimit = MAX_HUMAN_ERROR_CHARS - actionables - 1;
   const readiness =
-    input.step.startsWith("committing the claim") &&
-    input.readiness !== undefined &&
-    hasReadinessEvidence(input.readiness)
-      ? (gateBinFailureReport(input.readiness, MAX_HUMAN_ERROR_CHARS - mandatory) ?? "")
+    readinessEligible && readinessObservation !== undefined
+      ? (gateBinFailureReport(
+          readinessObservation,
+          MAX_HUMAN_ERROR_CHARS - mandatory,
+          overrideLimit,
+        ) ?? "")
       : "";
   return [
     lead,
-    `${remedy}${readiness === "" ? "" : ` ${readiness}`}`,
+    `${fullRemedy}${readiness === "" ? "" : ` ${readiness}`}`,
     discardClause,
     detail,
   ].join("\n");
@@ -1041,6 +1476,15 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
   }
 
   const createBranch = !gitRunner.branchExists(root, name);
+  // Inherited-commit report (bug-start-claim-branch-inherits-unpushed-tracker-commits):
+  // a branch cut here is cut from the primary checkout's LOCAL HEAD, so every
+  // unpushed commit — tracker auto-commits included — rides the PR diff as
+  // unrelated churn. Report-only, computed BEFORE the worktree/branch exist so
+  // it names what the cut is about to inherit; attach re-runs inherit what an
+  // earlier run cut and stay report-free.
+  const inherited = createBranch
+    ? probeInheritedCommits(gitRunner, root, item.filePath, name)
+    : null;
   let worktreeCreated = false;
   if (!pathTaken) {
     gitRunner.worktreeAdd(root, worktreePath, { branch: name, createBranch });
@@ -1054,6 +1498,11 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
   let linkedWorkspaces: string[] = [];
   let builtWorkspaces: string[] = [];
   let prepSteps: WorktreePrepStep[] = [];
+  // The kernel's truncation decision and dropped-entry count, mirrored beside
+  // the log they qualify (bug-native-steps-truncated-flag-dropped,
+  // bug-fresh-worktree-refusal-prose-drops-prep-step-truncation).
+  let stepsTruncated: true | undefined;
+  let stepsDropped: number | undefined;
   let manifestCoverage: ManifestCoverage = "unknown";
   let missingDependencies: string[] = [];
   let missingDependenciesTotal = 0;
@@ -1129,6 +1578,12 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     // build decisions, the gate-bin verdict — carried on the result so a
     // broken worktree can be correlated with the decision that produced it.
     prepSteps = prepared.steps;
+    // The kernel's own truncation decision + dropped-entry count, mirrored
+    // verbatim (never re-derived from `prepSteps.length`): the list alone
+    // cannot say whether it is the whole log, and this surface used to forward
+    // it as if it were (bug-native-steps-truncated-flag-dropped).
+    stepsTruncated = prepared.stepsTruncated;
+    stepsDropped = prepared.stepsDropped;
     // A mirrored install is only as current as the primary's; the receipt names
     // what the worktree cannot resolve (bug-worktree-readiness-misses-stale-primary-install).
     manifestCoverage = prepared.manifestCoverage;
@@ -1163,7 +1618,16 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     // (or the armed strict gate above), so the `npm ci` then attach remedy
     // stays possible.
     if (worktreeCreated) {
-      const refusal = freshWorktreeInstallRefusal(gateBins, worktreePath, prepSteps);
+      // The kernel's own dropped-entry count rides the refusal prose
+      // (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation): the
+      // log is bounded, so the message must say how much of it is missing
+      // instead of presenting a capped list as complete.
+      const refusal = freshWorktreeInstallRefusal(
+        gateBins,
+        worktreePath,
+        prepSteps,
+        prepared.stepsDropped ?? 0,
+      );
       if (refusal !== null) {
         step = "enforcing the fresh-worktree install gate";
         throw new Error(refusal);
@@ -1309,8 +1773,14 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       missingDependenciesTotal,
       gateBins,
       prepSteps,
+      // The kernel's truncation decision, mirrored as the exact pair its
+      // receipt carries: present together only when entries were dropped, so
+      // an uncapped log keeps its shape on this surface too.
+      ...(stepsTruncated !== undefined ? { stepsTruncated } : {}),
+      ...(stepsDropped !== undefined ? { stepsDropped } : {}),
       env,
       ...(prepared.claim !== undefined ? { claim: prepared.claim } : {}),
+      ...(inherited !== null ? { inheritedCommits: inherited } : {}),
       ...(postStartRelink !== undefined ? { postStartRelink } : {}),
       postStart,
       item: finalItem,
@@ -1328,7 +1798,15 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       gateBins: inspectGateBinResolution(worktreePath, root),
     };
     const failure = new Error(
-      worktreeFailureMessage({ id, branch: name, worktreePath, createBranch, step, err, readiness }),
+      worktreeFailureMessage({
+        id,
+        branch: name,
+        worktreePath,
+        createBranch,
+        step,
+        err,
+        readiness,
+      }),
     );
     // Carried, not embedded: the message bounds the names, this keeps them
     // enumerable for a machine consumer of the failure envelope.

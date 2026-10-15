@@ -99,6 +99,12 @@ describe("board --serve", () => {
     // wiring embedded from board.ts.
     expect(html).toContain('drawerEl.setAttribute("data-item-id", id)');
     expect(html).toContain('drawerEl.removeAttribute("data-item-id")');
+    // The restore re-opens through the SAME open paths the user has, choosing
+    // the opener of the RESTORED layout: a card, or a tree row in the
+    // grouped-ancestry layout (task-tree-rows-open-detail), whose id lives on
+    // the enclosing node.
+    expect(html).toContain('tree && !tree.hidden ? "#board-tree .tree-row" : ".card[data-id]"');
+    expect(html).toContain('closest(".tree-node")');
   });
 
   it("keeps the serve-only reload client out of the static render", () => {
@@ -278,6 +284,43 @@ describe("board --serve", () => {
     expect(res.status).toBe(404);
     const body = (await res.json()) as { ok: boolean; error: { message: string } };
     expect(body.ok).toBe(false);
+  });
+});
+
+describe("board --serve grouped-ancestry view (task-web-board-hierarchy-view)", () => {
+  it("opens the served board in the ancestry tree with --group-by tree", async () => {
+    const treeHandle = startBoardServer({ cwd: dir, groupBy: "tree" });
+    await treeHandle.ready;
+    // The handle carries the validated value (the CLI mirrors it into the
+    // one-shot --serve --json envelope, task-serve-envelope-groupby-parity).
+    expect(treeHandle.groupBy).toBe("tree");
+    try {
+      const html = await (await fetch(`${treeHandle.url}/`)).text();
+      expect(html).toContain('<main class="board" aria-label="arggon board" hidden>');
+      expect(html).toContain(
+        '<section class="tree" id="board-tree" aria-labelledby="board-tree-heading">',
+      );
+      expect(html).toContain('aria-pressed="true">grouped ancestry</button>');
+      // The fixture chain nests: the task's row sits inside the story's
+      // subtree, the story's inside the epic's (recorded parent edges only).
+      const epicAt = html.indexOf('data-id="auth"');
+      const storyAt = html.indexOf('data-id="story-login"');
+      const taskAt = html.indexOf('data-id="task-a"');
+      expect(epicAt).toBeGreaterThan(-1);
+      expect(storyAt).toBeGreaterThan(epicAt);
+      expect(taskAt).toBeGreaterThan(storyAt);
+      // The default view's opposite layout still ships (one toggle away).
+      expect(html).toContain('aria-pressed="false"');
+      expect(html).toContain("<main");
+    } finally {
+      await treeHandle.close();
+    }
+  });
+
+  it("rejects unknown --group-by fields naming all three modes", () => {
+    expect(() => startBoardServer({ cwd: dir, groupBy: "priority" })).toThrow(
+      /unknown --group-by field 'priority' \(supported: milestone, story, tree\)/,
+    );
   });
 });
 
@@ -462,28 +505,47 @@ describe("arggon board --serve (CLI)", () => {
     });
   }
 
+  /** Parse the first non-empty stdout line of a spawned `--json` child. */
+  function readFirstEnvelope(child: ReturnType<typeof spawnCli>): Promise<Record<string, unknown>> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("no JSON output within 15s")), 15000);
+      child.stdout.on("data", (chunk: Buffer) => {
+        const text = chunk.toString("utf8").trim();
+        if (!text) return;
+        clearTimeout(timer);
+        try {
+          resolve(JSON.parse(text) as Record<string, unknown>);
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error(String(err)));
+        }
+      });
+    });
+  }
+
   it("--serve --json emits one envelope with url/port and keeps serving", async () => {
     const child = spawnCli(["--json", "board", "--serve"], dir);
     try {
-      const line = await new Promise<string>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("no JSON output within 15s")), 15000);
-        child.stdout!.on("data", (chunk: Buffer) => {
-          const text = chunk.toString("utf8").trim();
-          if (text) {
-            clearTimeout(timer);
-            resolve(text);
-          }
-        });
-      });
-      const envelope = JSON.parse(line) as {
-        ok: boolean;
-        command: string;
-        serving: boolean;
-        url: string;
-        port: number;
-      };
+      const envelope = await readFirstEnvelope(child);
       expect(envelope).toMatchObject({ ok: true, command: "board", serving: true });
-      expect(envelope.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+      expect(String(envelope.url)).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+      // task-serve-envelope-groupby-parity: the conditional groupBy echo stays
+      // conditional on both surfaces — no --group-by, no field.
+      expect("groupBy" in envelope).toBe(false);
+    } finally {
+      child.kill("SIGTERM");
+    }
+  }, 20_000);
+
+  it("--serve --json echoes the validated --group-by like the static envelope (task-serve-envelope-groupby-parity)", async () => {
+    const child = spawnCli(["--json", "board", "--serve", "--group-by", "tree"], dir);
+    try {
+      const envelope = await readFirstEnvelope(child);
+      expect(envelope).toMatchObject({
+        ok: true,
+        command: "board",
+        serving: true,
+        groupBy: "tree",
+      });
     } finally {
       child.kill("SIGTERM");
     }
@@ -684,6 +746,24 @@ ${"y".repeat(MAX_DETAIL_COMMENT_BYTES + 512)}`,
     ]);
     expect(body.detail.comments[0].text).toBe("comment three");
     expect(body.detail.hidden_comments).toBe(2);
+  });
+
+  it("serves the parent edge and the child list for hierarchy navigation", async () => {
+    const task = (await (
+      await fetch(`${detailHandle.url}/api/item?id=task-detail`)
+    ).json()) as BoardDetailPayload;
+    expect(task.detail.parent).toEqual({ id: "detail-entries", status: "todo" });
+    expect(task.detail.children).toEqual([]);
+    const entries = (await (
+      await fetch(`${detailHandle.url}/api/item?id=detail-entries`)
+    ).json()) as BoardDetailPayload;
+    expect(entries.detail.parent).toEqual({ id: "detail-core", status: "todo" });
+    expect(entries.detail.children).toEqual([
+      { id: "task-dep-open", status: "todo" },
+      { id: "task-dep-terminal", status: "cancelled" },
+      { id: "task-detail", status: "todo" },
+      { id: "task-huge", status: "todo" },
+    ]);
   });
 
   it("bounds the payload: prose cap, per-comment cap, no PR without a branch match", async () => {

@@ -5,14 +5,14 @@
   "decision": "ArggonManager/docs/adr/0020-methodology-first-productization.md",
   "spec": "ArggonManager/docs/specs/spec-methodology-adapters-017.md",
   "planTask": "T3 (task-capability-matrix)",
-  "derivation": "Every row is derived from the seam this project actually ships for that agent, never from ADR 0020's prose (which describes intent, not delivery). Evidence per row: `opencode/plugins/arggon/index.ts` + generated `.opencode/agents|commands` + `opencode.jsonc`; `templates/docs/zcode/arggon/` (plugin manifest, hooks/gate.mjs, commands, agents); and for Claude Code the two surfaces a standard `arggon init` tree already gives it - the generated `CLAUDE.md` -> `@AGENTS.md` pointer and the generated `.mcp.json`, which registers `arggon mcp` \"for other clients (e.g. Claude Code)\" (docs/agents.md) and hands that client the same 15 tools and envelopes as every other seam.",
+  "derivation": "Every row is derived from the seam this project actually ships for that agent, never transcribed from ADR 0020's prose. The stale-seam collision is a transcription problem, not the record's: the ADR's prose models the adapter-bundle state and once understated the `.mcp.json` floor every client gets (its own amendments mark those corrected points), so a row copied from that prose collides with the seam the tree actually ships. Evidence per row: `opencode/plugins/arggon/index.ts` + generated `.opencode/agents|commands` + `opencode.jsonc`; `templates/docs/zcode/arggon/` (plugin manifest, hooks/gate.mjs, commands, agents); and for Claude Code the shipped bundle `templates/docs/claude/arggon/` (the manifest's `mcpServers` registration of `arggon mcp`, the commands, the two subagents and the hooks gate, installed through `.claude-marketplace/`), plus the generated `CLAUDE.md` -> `@AGENTS.md` pointer and the generated `.mcp.json`, which registers the same `arggon mcp` \"for other clients (e.g. Claude Code)\" (docs/agents.md) and hands that client the same 15 tools and envelopes as every other seam.",
   "mode": "report-only",
   "modeNote": "Data consumed by `arggon doctor`. No rule logic lives here: the rows DECLARE which native mechanism each agent uses for each methodology invariant, and `gap: true` means this agent's client seam does not deliver that invariant, so only the shared floor applies. The kernel (@arggondev/lib) behind the arggon CLI stays the enforcement of record on every row, and a gap row is advisory in every surface - never blocking in CI or in a transition.",
   "fieldNotes": {
     "invariants[].statement": "Verbatim clause from the carriers' `- **Invariants:**` header block (agents.md / engineering.md / convention.md).",
-    "rows[].mechanism": "The native client feature used, agent-namespaced (`opencode:` / `zcode:` / `claude:`). The `claude:` prefix covers the two surfaces an init'd tree gives a Claude Code client without a bundle: `claude:mcp` (the generated `.mcp.json` -> `arggon mcp`) and `claude:CLAUDE.md`.",
+    "rows[].mechanism": "The native client feature used, agent-namespaced (`opencode:` / `zcode:` / `claude:`). The `claude:` prefix covers the shipped bundle's own surface (`claude:plugin.hooks.PreToolUse`) and the floor an init'd tree has always given this client: `claude:mcp` (the generated `.mcp.json` -> `arggon mcp`) and `claude:CLAUDE.md`.",
     "rows[].package": "The client whose seam carries the mechanism (`opencode`, `zcode`, `claude-code`); `none` on a gap row, where no client mechanism delivers the invariant.",
-    "rows[].gap": "true when THIS AGENT'S CLIENT SEAM does not deliver the invariant natively - only the shared floor applies. A surface `arggon init` ships to every client can never be the missing thing: the `arggon mcp` server (registered per client - in the ZCode plugin manifest, in the generated `.mcp.json` for everyone else), the generated `AGENTS.md`/`CLAUDE.md` playbook, the `arggon-cli` skill, and the generated pre-commit `arggon validate` gate. What a gap row names is therefore always client-native and agent-scoped: a client permission DSL, a client hook gate, a session context hook, or a bundled agent/command set.",
+    "rows[].gap": "true when THIS AGENT'S CLIENT SEAM does not deliver the invariant natively - only the shared floor applies. A surface that reaches every client can never be the missing thing, however it is registered: the `arggon mcp` server (the ZCode plugin manifest and the generated `.mcp.json` are two registrations of one server - registration is per-client, reach is not), the generated `AGENTS.md`/`CLAUDE.md` playbook, the `arggon-cli` skill, and the generated pre-commit `arggon validate` gate. What a gap row names is therefore always client-native and agent-scoped: a client permission DSL, a client hook gate, a session context hook, or a bundled agent/command set. A gap row carries `package: none` and a `docs + CLI floor:` mechanism; `package: zcode` (etc.) marks a mechanism that client's own bundle carries - a client registration of a universal surface is never a gap, and a package-carried mechanism is never the shared floor.",
     "rows[].note": "Required non-empty for every gap row (schema-gated) and kept within the doctor's human-value cap so a rendered `gap:` line is never silently truncated; null otherwise."
   },
   "invariants": [
@@ -42,7 +42,7 @@
     {
       "id": "claude",
       "package": "claude-code",
-      "adapter": "no bundle yet (spec S6 follow-on story); an init'd tree already gives this client the generated `CLAUDE.md` -> `@AGENTS.md` pointer and the generated `.mcp.json` -> `arggon mcp` registration"
+      "adapter": "generated plugin bundle `templates/docs/claude/arggon/` (`arggon mcp` in the plugin manifest, commands, the two subagents, hooks) installed through the repo-local marketplace at `.claude-marketplace/`, plus the generated `CLAUDE.md` -> `@AGENTS.md` pointer and the generated `.mcp.json` -> `arggon mcp` registration"
     }
   ],
   "rows": [
@@ -113,7 +113,7 @@
     {
       "invariant": "docs-travel-with-code",
       "agent": "zcode",
-      "mechanism": "zcode:plugin bundle - the generated commands/, agents/ (coordinator, worker, reviewer) and the `arggon-cli` skill are refreshed by `arggon init` with provenance and never overwriting adopter edits",
+      "mechanism": "zcode:plugin bundle - the generated commands/, agents/ (`arggon-maker`, `arggon-standards-reviewer`; the delivery lead is the main session) and the `arggon-cli` skill are refreshed by `arggon init` with provenance and never overwriting adopter edits",
       "package": "zcode",
       "gap": false,
       "note": null
@@ -145,23 +145,23 @@
     {
       "invariant": "discipline-enforceable",
       "agent": "claude",
-      "mechanism": "docs + CLI floor: the generated pre-commit hook and CI run `arggon validate` and the kernel refuses what it owns; nothing is enforced inside the client",
-      "package": "none",
-      "gap": true,
-      "note": "no claude:plugin.hooks.PreToolUse gate and no permission DSL: the OpenCode deny rules and the ZCode PreToolUse gate have no Claude Code equivalent, so the kernel, pre-commit and CI carry it alone."
+      "mechanism": "claude:plugin.hooks.PreToolUse (hooks/gate.mjs) denies force-push and `commit --no-verify` for every session and holds the reviewer backstop window; fail-open by design, so the kernel stays the enforcement of record",
+      "package": "claude-code",
+      "gap": false,
+      "note": null
     },
     {
       "invariant": "docs-travel-with-code",
       "agent": "claude",
-      "mechanism": "docs + CLI floor: CLAUDE.md -> @AGENTS.md loads the generated playbook and the agent pulls item context itself with `arggon show`; nothing injects it",
+      "mechanism": "docs + CLI floor: CLAUDE.md -> @AGENTS.md loads the generated playbook and the bundle's commands carry it, but nothing injects the active work item; the agent fetches it with `arggon show`",
       "package": "none",
       "gap": true,
-      "note": "no session context hook injects the active work item (the OpenCode session.hook('context') block), so the agent must fetch it with `arggon show`; the playbook still travels via CLAUDE.md."
+      "note": "the bundle ships no session context hook: Claude Code has no plugin surface that injects the active work item, so the agent fetches it with `arggon show`."
     },
     {
       "invariant": "claim-integrity",
       "agent": "claude",
-      "mechanism": "claude:mcp - on those same `arggon mcp` tools the kernel refuses a stolen claim and every reopen, and the loaded playbook states the rule; no client-side backstop exists, so the kernel is the only enforcement here",
+      "mechanism": "claude:mcp - on `arggon mcp` the kernel refuses a stolen claim and every reopen, and the plugin's reviewer backstop denies the mutating mcp tools under both spellings (arggon_comment stays open as the verdict channel)",
       "package": "claude-code",
       "gap": false,
       "note": null

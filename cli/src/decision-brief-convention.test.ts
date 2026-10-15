@@ -244,6 +244,19 @@ describe("decision-brief states and attribution (AC 2)", () => {
     ].join("\n");
     expect(classifyDecisionBrief(body, "ana")).toBe("decided");
   });
+
+  it("pins the owner-assigned case: the owner's normal answer reads self-decided", () => {
+    // bug-self-decided-false-positive-owner-assigned: an item may be assigned to
+    // the product owner's own login, and when the owner answers the lead's brief
+    // on that item the author equals the assignee. The state means exactly
+    // "author == assignee" — a same-name hint, not authentication — so this is
+    // pinned as intentional (ADR 0026's 2026-10-15 amendment), not an anomaly.
+    const body = [
+      comment("2026-10-06", ["decide: the question"], "lead"),
+      comment("2026-10-07", ["decided: option A"], "gonzalo"),
+    ].join("\n");
+    expect(classifyDecisionBrief(body, "gonzalo")).toBe("self-decided");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -392,6 +405,46 @@ describe("show carries the additive decision_brief field (AC 3)", () => {
     expect(payload.decision_brief).toBe("self-decided");
   });
 
+  it("reports self-decided on an owner-assigned item, and the finding stays silent", () => {
+    // bug-self-decided-false-positive-owner-assigned: the assignee is the product
+    // owner's own login (a legitimate claim), the lead wrote the brief and the
+    // owner answered it. The state reads `self-decided` — the NORMAL owner answer
+    // on their own item — and, being report-only, nothing fires on it: only
+    // `open` produces the finding.
+    const dir = mkdtempSync(join(tmpdir(), "arggon-brief-owner-assigned-"));
+    seeded(dir);
+    arm(dir);
+    writeSpec(dir);
+    runUpdate({
+      cwd: dir,
+      id: "story-login",
+      status: "in_progress",
+      assignee: "gonzalo",
+      now: NOW,
+    });
+    runComment({
+      cwd: dir,
+      id: "story-login",
+      text: "decide: q",
+      author: "lead",
+      now: NOW,
+      commit: false,
+    });
+    runComment({
+      cwd: dir,
+      id: "story-login",
+      text: "decided: option A",
+      author: "gonzalo",
+      now: new Date("2026-10-06T12:00:00Z"),
+      commit: false,
+    });
+    const payload = JSON.parse(runCli(["show", "story-login", "--json"], dir).stdout) as {
+      decision_brief: string;
+    };
+    expect(payload.decision_brief).toBe("self-decided");
+    expect(runSpecAnalyze({ cwd: dir }).unansweredDecisionBrief).toEqual([]);
+  });
+
   it("reads the canonical body, so a comment-only brief beyond the tail is seen", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-brief-comment-only-"));
     seeded(dir);
@@ -513,6 +566,10 @@ describe("report and sync stay byte-identical (AC 7)", () => {
     expect(result.exit_code).toBe(0);
     expect(Object.keys(result).sort()).toEqual([
       "ambiguous",
+      // bug-claim-pool-computed-from-main-misses-branch-claims: additive
+      // report-only branch-claim fields; decision briefs stay invisible to sync.
+      "branchClaimErrors",
+      "branchClaims",
       "command",
       "errors",
       "exit_code",

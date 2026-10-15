@@ -26,7 +26,7 @@ file — read the one that matches the task **before** acting:
 | `references/json-contract.md` | **JSON contract**: `--json` envelopes, error codes, filters, output surfaces, native tools, MCP                                                  |
 | `references/methodology.md`   | **Methodology**: what the work needs — spec, plan, ADR, exploration, playbook, runbook — and the quality bar                                     |
 | `references/exploration.md`   | **Greenfield exploration**: the six-phase protocol — classify, stance, ground, frontier rounds, edge-case hunt, artifacts + hard gate (ADR 0017) |
-| `references/orchestration.md` | **Orchestration**: the four agent roles (named by what they decide), coordinator/subagent waves, review bar, smoke gate, worktrees               |
+| `references/orchestration.md` | **Orchestration**: the four agent roles (named by what they decide), delivery-lead/subagent waves, review bar, smoke gate, worktrees             |
 | `references/pitfalls.md`      | **Pitfalls**: claim, cascade, tracker-merge and commit-staging traps                                                                             |
 
 The full workflow rules are `ArggonManager/docs/agents.md`; the review bar, the
@@ -165,7 +165,7 @@ Non-trivial items are orchestrated per `references/orchestration.md`.
 ```bash
 <!-- arggon:generated-commands start: board,report,doctor,sync,import-issues,instructions,cleanup,priority migrate,migrate,friction -->
 arggon board  # Write a static read-only HTML board from the tracker (git files stay the source of truth)
-arggon report  # Aggregate leaf statuses per container, grouped by epic (display only)
+arggon report  # Aggregate leaf statuses per container, grouped by epic, plus a report-only terminal-container hygiene check (display only)
 arggon doctor  # Report installation state: convention version, generated-doc provenance, tracker counts (pure read); with --budget, also the ADR 0006 context-budget surfaces incl. the live MCP tool-schema size (report-only)
 arggon sync  # Reconcile task branch fields with open GitHub PRs
 arggon import-issues  # One-shot import of GitHub issues into the tracker as task/bug items (idempotent; x-import maps labels to types)

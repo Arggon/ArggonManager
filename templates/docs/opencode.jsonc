@@ -45,10 +45,42 @@
   // ordinary and headless sessions are never blocked. The patterns are
   // best-effort shell text (documented limits): delete a rule here if your
   // workflow needs it, this file is yours once edited.
+  //
+  // WHICH LAYER HONORS THIS BLOCK — probed 2026-10-15
+  // (bug-task-permissions-enforcement-not-observed, harness
+  // `npm run smoke:permissions-probe`): the OpenCode V2 runtime's own
+  // permission evaluation reads it, for every agent, and a session picks up an
+  // edit made after it started (fresh run, continued session and a long-lived
+  // background service all enforced it). The ZCode and Claude seams do NOT
+  // read this file: they enforce their own `hooks/gate.mjs` gate, which still
+  // refuses `--force-with-lease`. The vendored plugin adds no permission
+  // surface of its own. The kernel stays the enforcement of record.
+  //
+  // Force-push discriminator
+  // (bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use). One
+  // `git push --force*` glob cannot tell the blind `--force` from the
+  // lease-checked `--force-with-lease` — its `*` matches the `-` — so it
+  // refused the very spelling a rebase needs. The deny stays as it is (that is
+  // what keeps `;` / `&&` / quoted forms refused) and the lease-checked
+  // spellings are re-allowed AFTER it: OpenCode selects rules with `findLast`
+  // over the flattened list, so the last matching rule wins.
+  //   permitted — `--force-with-lease`, `--force-with-lease=<ref>:<expect>`,
+  //               `--force-if-includes` (the lease, not the refname, is what
+  //               makes these safe: git still refuses an unseen remote tip);
+  //   refused   — bare `--force`, `-f` and the `+refspec` spelling, wherever
+  //               they sit and whatever else the command carries.
+  // Known limit of text matching: an allowed lease flag is permitted with any
+  // tail, so a command that adds a SECOND, bare `--force`/`-f` next to it is
+  // not caught here — the gate discriminates on the lease spelling, not on
+  // every flag in the line. The kernel, the pre-commit gate and CI stay the
+  // enforcement of record.
   "permissions": [
     { "action": "shell", "resource": "git commit --no-verify*", "effect": "deny" },
     { "action": "shell", "resource": "git push --force*", "effect": "deny" },
     { "action": "shell", "resource": "git push -f*", "effect": "deny" },
+    { "action": "shell", "resource": "git push --force-with-lease *", "effect": "allow" },
+    { "action": "shell", "resource": "git push --force-with-lease=*", "effect": "allow" },
+    { "action": "shell", "resource": "git push --force-if-includes *", "effect": "allow" },
     { "action": "shell", "resource": "git push *+*", "effect": "deny" }
   ]
 }

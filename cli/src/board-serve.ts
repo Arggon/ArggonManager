@@ -124,10 +124,22 @@ const RELOAD_SCRIPT = `<script>
     }
     window.scrollTo(state.x || 0, state.y || 0);
     if (state.drawer) {
-      var cards = document.querySelectorAll(".card[data-id]");
-      for (var i = 0; i < cards.length; i++) {
-        if (cards[i].getAttribute("data-id") === state.drawer) {
-          cards[i].click(); /* the user's own open path: fetch + render */
+      /* Re-open through the user's own path IN THE RESTORED LAYOUT: a
+         grouped-ancestry row when the tree is the visible layout, a card
+         otherwise (task-tree-rows-open-detail). A row reads its id from the
+         node it belongs to. */
+      var tree = document.getElementById("board-tree");
+      var selector =
+        tree && !tree.hidden ? "#board-tree .tree-row" : ".card[data-id]";
+      var openers = document.querySelectorAll(selector);
+      for (var i = 0; i < openers.length; i++) {
+        var id = openers[i].getAttribute("data-id");
+        if (!id) {
+          var node = openers[i].closest(".tree-node");
+          id = node ? node.getAttribute("data-id") : "";
+        }
+        if (id === state.drawer) {
+          openers[i].click();
           break;
         }
       }
@@ -149,7 +161,7 @@ export type BoardServeOptions = {
   cwd: string;
   /** Port to bind on 127.0.0.1; 0 (default) picks a free ephemeral port. */
   port?: number;
-  /** Group cards within each column: `milestone` (ADR 0003) or `story`. */
+  /** Group cards within each column: `milestone` (ADR 0003) or `story`; `tree` opens the grouped-ancestry layout (task-web-board-hierarchy-view). */
   groupBy?: string;
   /** Injectable GitHub reader (tests pass a fake; default shells out to `gh`). */
   gh?: BoardGithub;
@@ -168,6 +180,13 @@ export type BoardServeHandle = {
   url: string;
   port: number;
   root: string;
+  /**
+   * Validated `--group-by` the board was started with; absent when the flag
+   * was not given. The CLI mirrors it into the one-shot `--serve --json`
+   * envelope so static and serve agree on the field
+   * (task-serve-envelope-groupby-parity).
+   */
+  groupBy?: "milestone" | "story" | "tree";
   /** Resolves once the server is accepting connections. */
   ready: Promise<void>;
   /** Stops the watcher, disconnects SSE clients, closes the server. */
@@ -246,10 +265,12 @@ export const FAVICON_SVG =
 export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
-  let groupBy: "milestone" | "story" | undefined;
+  let groupBy: "milestone" | "story" | "tree" | undefined;
   if (opts.groupBy !== undefined) {
-    if (opts.groupBy !== "milestone" && opts.groupBy !== "story") {
-      throw new Error(`unknown --group-by field '${opts.groupBy}' (supported: milestone, story)`);
+    if (opts.groupBy !== "milestone" && opts.groupBy !== "story" && opts.groupBy !== "tree") {
+      throw new Error(
+        `unknown --group-by field '${opts.groupBy}' (supported: milestone, story, tree)`,
+      );
     }
     groupBy = opts.groupBy;
   }
@@ -481,6 +502,10 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
       return port();
     },
     root,
+    // Validated at the top of this function: the handle carries the resolved
+    // value (absent when the flag was absent) and the CLI echoes it into the
+    // serve envelope — the same conditional field the static envelope carries.
+    ...(groupBy ? { groupBy } : {}),
     ready,
     close: () => {
       watcher.close();

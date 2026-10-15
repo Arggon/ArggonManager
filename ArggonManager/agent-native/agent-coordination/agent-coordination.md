@@ -3,10 +3,11 @@ type: epic
 status: done
 id: agent-coordination
 title: agent-coordination
+assignee: arggon-delivery-lead
 parent: agent-native
 labels: []
 created: "2026-09-11"
-updated: "2026-09-12"
+updated: "2026-10-15"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/agent-coordination.md (epic index; required).
@@ -21,6 +22,6 @@ Claims are the coordination primitive, but today a dead agent leaves an eternal 
 
 ## Acceptance
 
-- [ ] Claims carry timestamps and staleness is visible and actionable
-- [ ] `arggon start --worktree` isolates filesystem per claim; cleanup is one command
-- [ ] Items accept timestamped comments for handoff context
+- [x] Claims carry timestamps and staleness is visible and actionable
+- [x] `arggon start --worktree` isolates filesystem per claim; cleanup is one command
+- [x] Items accept timestamped comments for handoff context

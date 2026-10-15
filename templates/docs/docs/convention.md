@@ -1,6 +1,11 @@
 # Convention ({{PROJECT_NAME}})
 
-Work in this repo is tracked as Markdown work items under `ArggonManager/`, managed by [`arggon`](https://github.com/Arggon/ArggonManager). Humans and agents follow the same rules. This file is **project-owned**: it describes how {{PROJECT_NAME}} applies the arggon convention. (The full v0 spec lives in the ArggonManager repository; this template is the adopter-local summary.)
+> **Methodology carrier.** Declared together with [`AGENTS.md`](../../AGENTS.md) and [`engineering.md`](engineering.md).
+>
+> - **Scope:** any project — not only software.
+> - **Invariants:** work-loop parity: any human and any agent may claim, work, review, comment and merge under the same kernel rules and the same JSON contracts; state lives in git; discipline is enforceable; docs travel with code; never-steal / never-reopen, with authority asymmetric and named — the irreversible overrides stay product-owner powers, structurally human-only.
+
+Work in this repo is tracked as Markdown work items under `ArggonManager/`, managed by [`arggon`](https://github.com/Arggon/ArggonManager). Two axes, not one: **work-loop parity** — any human and any agent creates, claims and updates items the same way, under the same kernel rules and the same JSON contracts — alongside **authority that is asymmetric and named**, never implied: a bounded set of decisions belongs to the **product owner**, and the irreversible overrides are structurally human-only. This file is **project-owned**: it describes how {{PROJECT_NAME}} applies the arggon convention. (The full v0 spec lives in the ArggonManager repository; this template is the adopter-local summary.)
 
 ## Folder layout
 
@@ -70,15 +75,15 @@ priority: p1
 
 `ArggonManager/.convention.yml` supports `x-*` namespaced extension keys (older tools ignore them). The generated file documents each one-line; the full normative reference lives in the ArggonManager repository (`ArggonManager/docs/convention.md`):
 
-| Extension     | What it does                                                                                                                                        | Where                                         |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `x-views`     | Saved list/board views: a mapping of `name: "<predicate expression>"` using the filter predicate language (`arggon list --filter`)                  | ArggonManager repo § Saved views              |
-| `x-playbooks` | Playbook staleness options for `arggon playbook status` (`max-age-days`)                                                                            | ArggonManager repo § Technology playbooks     |
-| `x-tracker`   | Tracker hygiene options: `auto-commit`, `allow-steal`                                                                                               | ArggonManager repo § Tracker hygiene          |
-| `x-import`    | `arggon import-issues` options, e.g. `label-types` (GitHub label → work-item type mapping)                                                          | ArggonManager repo § Import type mapping      |
-| `x-github`    | GitHub issue round-trip: with `issue-roundtrip: true` (default OFF), flipping an item with an `issue:` field to done closes the linked GitHub issue | ArggonManager repo § Issue round-trip         |
+| Extension     | What it does                                                                                                                                                                                                      | Where                                         |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `x-views`     | Saved list/board views: a mapping of `name: "<predicate expression>"` using the filter predicate language (`arggon list --filter`)                                                                                | ArggonManager repo § Saved views              |
+| `x-playbooks` | Playbook staleness options for `arggon playbook status` (`max-age-days`)                                                                                                                                          | ArggonManager repo § Technology playbooks     |
+| `x-tracker`   | Tracker hygiene options: `auto-commit`, `allow-steal`                                                                                                                                                             | ArggonManager repo § Tracker hygiene          |
+| `x-import`    | `arggon import-issues` options, e.g. `label-types` (GitHub label → work-item type mapping)                                                                                                                        | ArggonManager repo § Import type mapping      |
+| `x-github`    | GitHub issue round-trip: with `issue-roundtrip: true` (default OFF), flipping an item with an `issue:` field to done closes the linked GitHub issue                                                               | ArggonManager repo § Issue round-trip         |
 | `x-worktree`  | Worktree bootstrap for `arggon start --worktree`: `post-start` / `post-start-shell` commands, and `env: false` to opt out of the per-worktree `.arggon.env` identity/state contract (gitignored; never committed) | ArggonManager repo § Worktree bootstrap       |
-| `x-generated` | Checksum/provenance state for arggon-generated docs (drives `arggon doctor` modified/stale reporting)                                               | ArggonManager repo § Generated-doc provenance |
+| `x-generated` | Checksum/provenance state for arggon-generated docs (drives `arggon doctor` modified/stale reporting)                                                                                                             | ArggonManager repo § Generated-doc provenance |
 
 ## Validation
 

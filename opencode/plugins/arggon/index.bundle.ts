@@ -7,6 +7,10 @@ const __arggonNodeRequire = __arggonCreateRequire(import.meta.url)
 const __arggonModules = new Map()
 const __arggonCache = new Map()
 const __arggonEdges = new Map()
+__arggonEdges.set("lib/src/branch-claims.ts\u0000./frontmatter.js", "lib/src/frontmatter.ts")
+__arggonEdges.set("lib/src/branch-claims.ts\u0000./ids.js", "lib/src/ids.ts")
+__arggonEdges.set("lib/src/branch-claims.ts\u0000./status.js", "lib/src/status.ts")
+__arggonEdges.set("lib/src/branch-claims.ts\u0000./sync-types.js", "lib/src/sync-types.ts")
 __arggonEdges.set("lib/src/cleanup.ts\u0000./status.js", "lib/src/status.ts")
 __arggonEdges.set("lib/src/cleanup.ts\u0000./worktree.js", "lib/src/worktree.ts")
 __arggonEdges.set("lib/src/comment.ts\u0000./atomic.js", "lib/src/atomic.ts")
@@ -45,6 +49,7 @@ __arggonEdges.set("lib/src/import-issues.ts\u0000./tracker-commit.js", "lib/src/
 __arggonEdges.set("lib/src/import-issues.ts\u0000./update.js", "lib/src/update.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./acceptance.js", "lib/src/acceptance.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./atomic.js", "lib/src/atomic.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./branch-claims.js", "lib/src/branch-claims.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./brief.js", "lib/src/brief.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./cleanup.js", "lib/src/cleanup.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./comment.js", "lib/src/comment.ts")
@@ -69,6 +74,7 @@ __arggonEdges.set("lib/src/index.ts\u0000./lock.js", "lib/src/lock.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./next.js", "lib/src/next.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./operations.js", "lib/src/operations.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./paths.js", "lib/src/paths.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./placeholder.js", "lib/src/placeholder.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./relations.js", "lib/src/relations.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./report.js", "lib/src/report.ts")
@@ -78,6 +84,7 @@ __arggonEdges.set("lib/src/index.ts\u0000./show.js", "lib/src/show.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./status.js", "lib/src/status.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./sync-command.js", "lib/src/sync-command.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./tracker-commit.js", "lib/src/tracker-commit.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./tree-state.js", "lib/src/tree-state.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./trend.js", "lib/src/trend.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./update.js", "lib/src/update.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./validate.js", "lib/src/validate.ts")
@@ -98,11 +105,13 @@ __arggonEdges.set("lib/src/list.ts\u0000./paths.js", "lib/src/paths.ts")
 __arggonEdges.set("lib/src/list.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/list.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
 __arggonEdges.set("lib/src/list.ts\u0000./status.js", "lib/src/status.ts")
+__arggonEdges.set("lib/src/list.ts\u0000./tree-state.js", "lib/src/tree-state.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./filter.js", "lib/src/filter.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./paths.js", "lib/src/paths.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./status.js", "lib/src/status.ts")
+__arggonEdges.set("lib/src/next.ts\u0000./tree-state.js", "lib/src/tree-state.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./acceptance.js", "lib/src/acceptance.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./brief.js", "lib/src/brief.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./comment.js", "lib/src/comment.ts")
@@ -126,6 +135,7 @@ __arggonEdges.set("lib/src/operations.ts\u0000./tracker-commit.js", "lib/src/tra
 __arggonEdges.set("lib/src/operations.ts\u0000./trend.js", "lib/src/trend.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./update.js", "lib/src/update.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./validate.js", "lib/src/validate.ts")
+__arggonEdges.set("lib/src/placeholder.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./atomic.js", "lib/src/atomic.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./dates.js", "lib/src/dates.ts")
 __arggonEdges.set("lib/src/priority.ts\u0000./frontmatter.js", "lib/src/frontmatter.ts")
@@ -140,6 +150,7 @@ __arggonEdges.set("lib/src/rules.ts\u0000./status.js", "lib/src/status.ts")
 __arggonEdges.set("lib/src/show.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/show.ts\u0000./paths.js", "lib/src/paths.ts")
 __arggonEdges.set("lib/src/show.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
+__arggonEdges.set("lib/src/sync-command.ts\u0000./branch-claims.js", "lib/src/branch-claims.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./get-open-prs.js", "lib/src/get-open-prs.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./paths.js", "lib/src/paths.ts")
@@ -170,6 +181,7 @@ __arggonEdges.set("lib/src/validate.ts\u0000./convention.js", "lib/src/conventio
 __arggonEdges.set("lib/src/validate.ts\u0000./ids.js", "lib/src/ids.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./paths.js", "lib/src/paths.ts")
+__arggonEdges.set("lib/src/validate.ts\u0000./placeholder.js", "lib/src/placeholder.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./relations.js", "lib/src/relations.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
@@ -331,6 +343,176 @@ function verifyOnDisk(path, tmpStat, expected) {
 }
 })
 
+__arggonModules.set("lib/src/branch-claims.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.findBranchClaims = findBranchClaims;
+const node_child_process_1 = require("node:child_process");
+const node_path_1 = require("node:path");
+const frontmatter_js_1 = require("./frontmatter.js");
+const ids_js_1 = require("./ids.js");
+const status_js_1 = require("./status.js");
+const sync_types_js_1 = require("./sync-types.js");
+const defaultExecGit = (file, args, options) => (0, node_child_process_1.execFileSync)(file, args, options);
+const TERMINAL_STATUSES = new Set(["done", "cancelled"]);
+function shortReason(err) {
+    const stderr = err !== null && typeof err === "object" && "stderr" in err
+        ? String(err.stderr ?? "")
+        : "";
+    const message = stderr.trim() || (err instanceof Error ? err.message : String(err));
+    return message.split("\n")[0].trim().slice(0, 240);
+}
+function listRefs(root, execGit) {
+    let out;
+    try {
+        out = execGit("git", ["-C", root, "for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes/origin"], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+            timeout: 10_000,
+        });
+    }
+    catch {
+        return null;
+    }
+    const local = new Set();
+    const remote = new Set();
+    for (const raw of out.split("\n")) {
+        const ref = raw.trim();
+        if (ref.startsWith("refs/heads/"))
+            local.add(ref.slice("refs/heads/".length));
+        else if (ref.startsWith("refs/remotes/origin/")) {
+            const name = ref.slice("refs/remotes/origin/".length);
+            if (name !== "HEAD")
+                remote.add(name);
+        }
+    }
+    return { local, remote };
+}
+function showFile(root, ref, path, execGit) {
+    try {
+        const content = execGit("git", ["-C", root, "show", `${ref}:${path}`], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+            timeout: 10_000,
+            maxBuffer: 32 * 1024 * 1024,
+        });
+        return { ok: true, content };
+    }
+    catch (err) {
+        return { ok: false, reason: shortReason(err) };
+    }
+}
+function readFrontmatter(content) {
+    try {
+        return (0, frontmatter_js_1.parseFrontmatter)(content).data;
+    }
+    catch {
+        return null;
+    }
+}
+function findBranchClaims(opts) {
+    const execGit = opts.execGit ?? defaultExecGit;
+    const refs = listRefs(opts.root, execGit);
+    if (refs === null)
+        return { claims: [], errors: [] };
+    const prByBranch = new Map(opts.prs.map((pr) => [pr.headRefName, pr.number]));
+    const claims = [];
+    const errors = [];
+    const candidates = opts.items.filter((item) => (0, status_js_1.isClaimable)(item.type) &&
+        !(0, status_js_1.isClaimed)(item.type, item.status, item.assignee) &&
+        !TERMINAL_STATUSES.has(item.status));
+    for (const item of candidates) {
+        const path = (0, node_path_1.relative)(opts.root, item.filePath).split(node_path_1.sep).join("/");
+        const names = new Set();
+        if (item.branch)
+            names.add(item.branch);
+        for (const name of refs.local) {
+            if ((0, sync_types_js_1.branchReferencesItem)(name, item.id))
+                names.add(name);
+        }
+        for (const name of refs.remote) {
+            if ((0, sync_types_js_1.branchReferencesItem)(name, item.id))
+                names.add(name);
+        }
+        for (const pr of opts.prs) {
+            if ((0, sync_types_js_1.branchReferencesItem)(pr.headRefName, item.id))
+                names.add(pr.headRefName);
+        }
+        for (const branch of [...names].sort()) {
+            const pr = prByBranch.get(branch) ?? null;
+            const ref = refs.local.has(branch)
+                ? `refs/heads/${branch}`
+                : refs.remote.has(branch)
+                    ? `refs/remotes/origin/${branch}`
+                    : null;
+            if (ref === null) {
+                errors.push({
+                    id: item.id,
+                    branch,
+                    pr,
+                    reason: "branch not available locally (fetch it to read its copy)",
+                });
+                continue;
+            }
+            const read = showFile(opts.root, ref, path, execGit);
+            if (!read.ok) {
+                errors.push({ id: item.id, branch, pr, reason: read.reason });
+                continue;
+            }
+            const data = readFrontmatter(read.content);
+            if (data === null) {
+                errors.push({
+                    id: item.id,
+                    branch,
+                    pr,
+                    reason: "item file on the branch has no readable frontmatter",
+                });
+                continue;
+            }
+            if (data.id !== item.id) {
+                if (typeof data.id === "string" && data.id.length > 0)
+                    continue;
+                errors.push({
+                    id: item.id,
+                    branch,
+                    pr,
+                    reason: "item file on the branch has no item id in frontmatter",
+                });
+                continue;
+            }
+            const { type, status, assignee } = data;
+            if (typeof type !== "string" ||
+                !(0, ids_js_1.isItemType)(type) ||
+                typeof status !== "string" ||
+                !(0, status_js_1.isStatus)(status)) {
+                errors.push({
+                    id: item.id,
+                    branch,
+                    pr,
+                    reason: "item file on the branch has no readable frontmatter",
+                });
+                continue;
+            }
+            const assigneeName = typeof assignee === "string" && assignee.length > 0 ? assignee : null;
+            if (!(0, status_js_1.isClaimed)(type, status, assigneeName))
+                continue;
+            claims.push({
+                id: item.id,
+                branch,
+                pr,
+                assignee: assigneeName,
+                claimed_at: typeof data.claimed_at === "string" ? data.claimed_at : null,
+                local: { status: item.status, assignee: item.assignee ?? null },
+            });
+        }
+    }
+    const byIdThenBranch = (a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : a.branch < b.branch ? -1 : a.branch > b.branch ? 1 : 0;
+    claims.sort(byIdThenBranch);
+    errors.sort(byIdThenBranch);
+    return { claims, errors };
+}
+})
+
 __arggonModules.set("lib/src/brief.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -436,6 +618,9 @@ exports.findMergedPr = findMergedPr;
 exports.classifyCleanupEntry = classifyCleanupEntry;
 exports.worktreeReleaseRefusal = worktreeReleaseRefusal;
 exports.parseRemovalBlockingPaths = parseRemovalBlockingPaths;
+exports.parseRemovalBlockers = parseRemovalBlockers;
+exports.worktreeUntrackedRefusal = worktreeUntrackedRefusal;
+exports.worktreeTrackedRefusal = worktreeTrackedRefusal;
 exports.worktreeDirtyRefusal = worktreeDirtyRefusal;
 exports.classifyReleaseEntry = classifyReleaseEntry;
 const node_child_process_1 = require("node:child_process");
@@ -481,6 +666,63 @@ function defaultCleanupGit() {
                 .filter((line) => line.startsWith("worktree "))
                 .map((line) => line.slice("worktree ".length).trim())
                 .filter((path) => path.length > 0);
+        },
+        worktreeIsLive(cwd, path) {
+            let out;
+            try {
+                out = git(["worktree", "list", "--porcelain"], cwd);
+            }
+            catch {
+                return true;
+            }
+            const target = (0, node_path_1.resolve)(path);
+            for (const block of out.split(/\n\s*\n/)) {
+                const lines = block.split("\n");
+                const head = lines.find((line) => line.startsWith("worktree "));
+                if (head === undefined)
+                    continue;
+                if ((0, node_path_1.resolve)(head.slice("worktree ".length).trim()) !== target)
+                    continue;
+                return !lines.some((line) => line.startsWith("prunable"));
+            }
+            return false;
+        },
+        worktreeRecordBranch(cwd, path) {
+            let out;
+            try {
+                out = git(["worktree", "list", "--porcelain"], cwd);
+            }
+            catch {
+                return null;
+            }
+            const target = (0, node_path_1.resolve)(path);
+            for (const block of out.split(/\n\s*\n/)) {
+                const lines = block.split("\n");
+                const head = lines.find((line) => line.startsWith("worktree "));
+                if (head === undefined)
+                    continue;
+                if ((0, node_path_1.resolve)(head.slice("worktree ".length).trim()) !== target)
+                    continue;
+                const branchLine = lines.find((line) => line.startsWith("branch refs/heads/"));
+                if (branchLine === undefined)
+                    return null;
+                const name = branchLine.slice("branch refs/heads/".length).trim();
+                return name.length > 0 ? name : null;
+            }
+            return null;
+        },
+        pruneWorktrees(cwd) {
+            const result = (0, node_child_process_1.spawnSync)("git", ["worktree", "prune", "--verbose"], {
+                cwd,
+                encoding: "utf8",
+                stdio: ["ignore", "pipe", "pipe"],
+            });
+            if (result.error !== undefined || result.status !== 0) {
+                const stderr = String(result.stderr ?? "").trim();
+                const spawnMessage = result.error !== undefined ? String(result.error.message ?? result.error) : "";
+                throw new Error(`git worktree prune failed${stderr ? `: ${stderr}` : spawnMessage ? ` (${spawnMessage})` : ""}`);
+            }
+            return String(result.stderr ?? "").trim().length > 0;
         },
         defaultBranch(cwd) {
             try {
@@ -642,15 +884,46 @@ function classifyCleanupEntry(item, root, base, gitRunner, deps = {}) {
     if (!(0, node_fs_1.existsSync)(path)) {
         entry.action = "clear stale worktree_path record (path missing on disk)";
     }
-    else if (!gitRunner
-        .worktreeList(root)
-        .map((p) => (0, node_path_1.resolve)(p))
-        .includes(path)) {
-        entry.reason = "path exists but is not a git worktree of this repo (remove it manually)";
-        return entry;
+    else if (gitRunner.worktreeIsLive !== undefined && !gitRunner.worktreeIsLive(root, path)) {
+        entry.action =
+            "clear stale worktree_path record (path is not a live worktree of this repo; " +
+                "any leftover directory is left in place)";
     }
     else {
-        entry.action = "remove worktree and delete the merged branch";
+        const registered = gitRunner.worktreeList(root).map((p) => (0, node_path_1.resolve)(p));
+        if (!registered.includes(path)) {
+            entry.reason = "path exists but is not a git worktree of this repo (remove it manually)";
+            return entry;
+        }
+        const porcelain = (deps.status ?? worktree_js_1.defaultWorktreeStatus)(path);
+        if (porcelain === undefined) {
+            entry.reason = worktreeProbeFailureRefusal(item, path);
+            return entry;
+        }
+        const primaryRoots = (deps.primaryRoots ?? [registered[0] ?? (0, node_path_1.resolve)(root), (0, node_path_1.resolve)(root)]).map((primary) => (0, node_path_1.resolve)(primary));
+        const blockers = parseRemovalBlockers(porcelain);
+        const untracked = blockers.untracked.filter((rel) => !isSelfReapedArtifact(path, rel, primaryRoots));
+        if (blockers.tracked.length > 0) {
+            entry.reason = worktreeTrackedRefusal(item, path, blockers.tracked);
+            entry.blockingPaths = [...untracked, ...blockers.tracked].slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
+            entry.blockingTotal = untracked.length + blockers.tracked.length;
+            entry.blockingTracked = blockers.tracked.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
+            entry.blockingTrackedTotal = blockers.tracked.length;
+            return entry;
+        }
+        if (untracked.length > 0) {
+            entry.blockingPaths = untracked.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
+            entry.blockingTotal = untracked.length;
+            if (deps.force !== true) {
+                entry.reason = worktreeUntrackedRefusal(item, path, untracked);
+                return entry;
+            }
+            entry.forced = true;
+        }
+        entry.action =
+            entry.forced === true
+                ? "remove worktree (forced past its untracked content), delete its branch and clear the worktree_path record"
+                : "remove worktree and delete the merged branch";
     }
     entry.removable = true;
     return entry;
@@ -669,11 +942,15 @@ function worktreeReleaseRefusal(item, path, report) {
         `Files modified after that claim: ${named}${extra > 0 ? ` (and ${extra} more)` : ""}.`);
 }
 function parseRemovalBlockingPaths(porcelain) {
-    const paths = [];
+    return parsePorcelainPaths(porcelain).map((entry) => entry.path);
+}
+function parsePorcelainPaths(porcelain) {
+    const entries = [];
     for (const line of porcelain.split("\n")) {
         if (line.trim().length === 0)
             continue;
-        if (line.slice(0, 2) === "!!")
+        const code = line.slice(0, 2);
+        if (code === "!!")
             continue;
         let path = line.slice(3).trim();
         const arrow = path.indexOf(" -> ");
@@ -681,9 +958,60 @@ function parseRemovalBlockingPaths(porcelain) {
             path = path.slice(arrow + 4);
         path = path.replace(/^"|"$/g, "");
         if (path.length > 0)
-            paths.push(path);
+            entries.push({ path, untracked: code === "??" });
     }
-    return paths;
+    return entries;
+}
+function parseRemovalBlockers(porcelain) {
+    const untracked = [];
+    const tracked = [];
+    for (const entry of parsePorcelainPaths(porcelain)) {
+        (entry.untracked ? untracked : tracked).push(entry.path);
+    }
+    return { untracked, tracked };
+}
+function boundedPathName(path) {
+    return path.length > 120 ? `${path.slice(0, 119)}…` : path;
+}
+function worktreeUntrackedRefusal(item, path, paths) {
+    const named = paths.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES).map(boundedPathName);
+    const extra = paths.length - named.length;
+    const branchStep = item.branch ? `, then git branch -D ${item.branch}` : "";
+    return (`skipping the worktree of '${item.id}': ${paths.length} untracked file` +
+        `${paths.length === 1 ? "" : "s"} block 'git worktree remove' (${named.join(", ")}` +
+        `${extra > 0 ? `, and ${extra} more` : ""}). Nothing was removed. Discard them with the force ` +
+        "opt-in — arggon cleanup --prune --force (native cleanup({ prune: true, force: true })), which " +
+        "never discards tracked changes — or reap the worktree by hand: git worktree remove --force " +
+        `${path}${branchStep}, then arggon cleanup --prune to clear the record.`);
+}
+function worktreeTrackedRefusal(item, path, paths) {
+    const named = paths.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES).map(boundedPathName);
+    const extra = paths.length - named.length;
+    const branchStep = item.branch ? `, then git branch -D ${item.branch}` : "";
+    return (`skipping the worktree of '${item.id}': ${paths.length} tracked file` +
+        `${paths.length === 1 ? " has" : "s have"} uncommitted changes (${named.join(", ")}` +
+        `${extra > 0 ? `, and ${extra} more` : ""}), which block 'git worktree remove'; the force ` +
+        "opt-in never discards tracked work. Commit or discard that work first, then re-run prune — or " +
+        `reap the worktree by hand: git worktree remove --force ${path}${branchStep}, then ` +
+        "arggon cleanup --prune to clear the record.");
+}
+function worktreeProbeFailureRefusal(item, path) {
+    const branchStep = item.branch ? `, then git branch -D ${item.branch}` : "";
+    return (`skipping the worktree of '${item.id}': the removal-blocker probe ` +
+        `('git status --porcelain' in ${path}) did not answer, so it is unknown whether ` +
+        "'git worktree remove' would succeed. Nothing was removed. Inspect it by hand " +
+        `(git -C ${path} status --porcelain), then re-run prune — or reap the worktree by ` +
+        `hand: git worktree remove ${path} (add --force only for content you inspected and ` +
+        `chose to discard)${branchStep}, then arggon cleanup --prune to clear the record.`);
+}
+function isSelfReapedArtifact(worktreePath, relPath, primaryRoots) {
+    const rel = relPath.replace(/\/+$/, "");
+    if (rel === worktree_js_1.WORKTREE_ENV_FILE)
+        return (0, worktree_js_1.isStartOwnedWorktreeEnv)(worktreePath);
+    if (rel === worktree_js_1.WORKTREE_NODE_MODULES_ENTRY) {
+        return primaryRoots.some((primary) => (0, worktree_js_1.isStartOwnedNodeModulesInstall)(primary, worktreePath));
+    }
+    return false;
 }
 function worktreeDirtyRefusal(item, paths) {
     const named = paths.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
@@ -695,6 +1023,12 @@ function worktreeDirtyRefusal(item, paths) {
         "and re-run with the take-over flag (cleanup --release <id> --take-over-worktree; native " +
         `cleanup({ release, take_over_worktree })). Blocking paths: ${named.join(", ")}` +
         `${extra > 0 ? ` (and ${extra} more)` : ""}.`);
+}
+function staleRecordBranch(gitRunner, root, path, item) {
+    const recorded = gitRunner.worktreeRecordBranch?.(root, path);
+    if (recorded !== undefined && recorded !== null)
+        return recorded;
+    return item.branch ?? null;
 }
 function classifyReleaseEntry(item, root, gitRunner, request) {
     const path = item.worktreePath ? (0, node_path_1.resolve)(item.worktreePath) : "";
@@ -721,6 +1055,15 @@ function classifyReleaseEntry(item, root, gitRunner, request) {
     }
     if (!(0, node_fs_1.existsSync)(path)) {
         entry.action = "clear stale worktree_path record (path missing on disk)";
+        entry.branch = staleRecordBranch(gitRunner, root, path, item);
+        entry.releasable = true;
+        return entry;
+    }
+    if (gitRunner.worktreeIsLive !== undefined && !gitRunner.worktreeIsLive(root, path)) {
+        entry.action =
+            "clear stale worktree_path record (path is not a live worktree of this repo; " +
+                "any leftover directory is left in place)";
+        entry.branch = staleRecordBranch(gitRunner, root, path, item);
         entry.releasable = true;
         return entry;
     }
@@ -3628,12 +3971,13 @@ function runImportIssues(opts) {
 __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.liveAcceptanceUnchecked = exports.liveAcceptanceRows = exports.liveAcceptanceRegion = exports.liveAcceptanceCriteria = exports.itemsById = exports.acceptanceUnchecked = exports.acceptanceRows = exports.acceptanceGate = exports.acceptanceCriteria = exports.acceptanceComplete = exports.acceptanceBody = void 0;
-exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = void 0;
-exports.frictionFenceFor = exports.FRICTION_REPORT_MAX_ROWS = exports.resolveRepoAbsPath = exports.redactFrictionText = exports.readOrCreateMachineSalt = exports.readFrictionLog = exports.readFrictionDropped = exports.normalizeCommandShape = exports.frictionStateDir = exports.frictionStateBase = exports.frictionSaltPath = exports.frictionReporterId = exports.frictionMajorVersion = exports.frictionLogPath = exports.frictionFingerprintMaterial = exports.frictionFingerprint = exports.frictionDroppedPath = exports.clearFrictionLog = exports.buildFrictionRecord = exports.appendFrictionRecord = exports.FrictionError = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SECRET_PLACEHOLDER = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_REDACTION_MAX_SUBSTITUTIONS = exports.FRICTION_REDACTED_FIELD = exports.FRICTION_PATH_PLACEHOLDER = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_MAX_LINES = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_HARNESS_CAP = exports.FRICTION_FORMAT_VERSION = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_DROPPED_FILE_NAME = exports.FRICTION_DEFAULT_HARNESS = exports.FRICTION_COMMAND_SHAPE_CAP = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = void 0;
-exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.isFrictionPublishTier = exports.buildFrictionPublishUrl = exports.buildFrictionPublishTitle = exports.buildFrictionPublishDoc = exports.buildFrictionPublishBody = exports.FRICTION_PUBLISH_URL_BASE = exports.FRICTION_PUBLISH_TITLE_PREFIX = exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = exports.FRICTION_PUBLISH_TIERS = exports.FRICTION_PUBLISH_NARRATIVE_CAP = exports.FRICTION_PUBLISH_MAX_URL_CHARS = exports.FRICTION_PUBLISH_MAX_CLASSES = exports.FRICTION_PUBLISH_LABEL = exports.FRICTION_PUBLISH_FENCE_INFO = exports.resolveFrictionOptOut = exports.readFrictionOptOut = exports.FRICTION_OPT_OUT_ENV = exports.summarizeFrictionLog = exports.renderFrictionReport = exports.readFrictionReport = void 0;
-exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeReleaseRefusal = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.frictionClearOperation = void 0;
+exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.liveContextRegion = exports.liveAcceptanceUnchecked = exports.liveAcceptanceRows = exports.liveAcceptanceRegion = exports.liveAcceptanceCriteria = exports.itemsById = exports.acceptanceUnchecked = exports.acceptanceRows = exports.acceptanceGate = exports.acceptanceCriteria = exports.acceptanceComplete = exports.acceptanceBody = void 0;
+exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = void 0;
+exports.FRICTION_REPORT_MAX_ROWS = exports.resolveRepoAbsPath = exports.redactFrictionText = exports.readOrCreateMachineSalt = exports.readFrictionLog = exports.readFrictionDropped = exports.normalizeCommandShape = exports.frictionStateDir = exports.frictionStateBase = exports.frictionSaltPath = exports.frictionReporterId = exports.frictionMajorVersion = exports.frictionLogPath = exports.frictionFingerprintMaterial = exports.frictionFingerprint = exports.frictionDroppedPath = exports.clearFrictionLog = exports.buildFrictionRecord = exports.appendFrictionRecord = exports.FrictionError = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SECRET_PLACEHOLDER = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_REDACTION_MAX_SUBSTITUTIONS = exports.FRICTION_REDACTED_FIELD = exports.FRICTION_PATH_PLACEHOLDER = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_MAX_LINES = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_HARNESS_CAP = exports.FRICTION_FORMAT_VERSION = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_DROPPED_FILE_NAME = exports.FRICTION_DEFAULT_HARNESS = exports.FRICTION_COMMAND_SHAPE_CAP = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = void 0;
+exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.stripInlineCodeSpans = exports.regionHasScaffoldMarker = exports.placeholderSections = exports.bodyHasScaffoldPlaceholder = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.MAX_HYGIENE_OPEN_CONTAINERS = exports.MAX_HYGIENE_OFFENDERS = exports.runReport = exports.containerHygiene = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.isFrictionPublishTier = exports.buildFrictionPublishUrl = exports.buildFrictionPublishTitle = exports.buildFrictionPublishDoc = exports.buildFrictionPublishBody = exports.FRICTION_PUBLISH_URL_BASE = exports.FRICTION_PUBLISH_TITLE_PREFIX = exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = exports.FRICTION_PUBLISH_TIERS = exports.FRICTION_PUBLISH_NARRATIVE_CAP = exports.FRICTION_PUBLISH_MAX_URL_CHARS = exports.FRICTION_PUBLISH_MAX_CLASSES = exports.FRICTION_PUBLISH_LABEL = exports.FRICTION_PUBLISH_FENCE_INFO = exports.resolveFrictionOptOut = exports.readFrictionOptOut = exports.FRICTION_OPT_OUT_ENV = exports.summarizeFrictionLog = exports.renderFrictionReport = exports.readFrictionReport = exports.frictionFenceFor = void 0;
+exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.isStartOwnedWorktreeEnv = exports.isStartOwnedNodeModulesInstall = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeUntrackedRefusal = exports.worktreeTrackedRefusal = exports.worktreeReleaseRefusal = exports.parseRemovalBlockingPaths = exports.parseRemovalBlockers = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.readRankedFrom = exports.RANKED_FROM_NOTE = exports.formatRankedFrom = exports.findBranchClaims = void 0;
+exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.frictionClearOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_NODE_MODULES_ENTRY = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.formatReportHygiene = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceBody", { enumerable: true, get: function () { return items_js_1.acceptanceBody; } });
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
@@ -3646,6 +3990,7 @@ Object.defineProperty(exports, "liveAcceptanceCriteria", { enumerable: true, get
 Object.defineProperty(exports, "liveAcceptanceRegion", { enumerable: true, get: function () { return items_js_1.liveAcceptanceRegion; } });
 Object.defineProperty(exports, "liveAcceptanceRows", { enumerable: true, get: function () { return items_js_1.liveAcceptanceRows; } });
 Object.defineProperty(exports, "liveAcceptanceUnchecked", { enumerable: true, get: function () { return items_js_1.liveAcceptanceUnchecked; } });
+Object.defineProperty(exports, "liveContextRegion", { enumerable: true, get: function () { return items_js_1.liveContextRegion; } });
 Object.defineProperty(exports, "loadItems", { enumerable: true, get: function () { return items_js_1.loadItems; } });
 Object.defineProperty(exports, "softTryLoadItem", { enumerable: true, get: function () { return items_js_1.softTryLoadItem; } });
 Object.defineProperty(exports, "tryLoadItem", { enumerable: true, get: function () { return items_js_1.tryLoadItem; } });
@@ -3836,7 +4181,11 @@ Object.defineProperty(exports, "showBoundedParts", { enumerable: true, get: func
 var report_js_1 = require("./report.js");
 Object.defineProperty(exports, "aggregateReport", { enumerable: true, get: function () { return report_js_1.aggregateReport; } });
 Object.defineProperty(exports, "completedOf", { enumerable: true, get: function () { return report_js_1.completedOf; } });
+Object.defineProperty(exports, "containerHygiene", { enumerable: true, get: function () { return report_js_1.containerHygiene; } });
 Object.defineProperty(exports, "runReport", { enumerable: true, get: function () { return report_js_1.runReport; } });
+var report_js_2 = require("./report.js");
+Object.defineProperty(exports, "MAX_HYGIENE_OFFENDERS", { enumerable: true, get: function () { return report_js_2.MAX_HYGIENE_OFFENDERS; } });
+Object.defineProperty(exports, "MAX_HYGIENE_OPEN_CONTAINERS", { enumerable: true, get: function () { return report_js_2.MAX_HYGIENE_OPEN_CONTAINERS; } });
 var trend_js_1 = require("./trend.js");
 Object.defineProperty(exports, "runTrend", { enumerable: true, get: function () { return trend_js_1.runTrend; } });
 var trend_js_2 = require("./trend.js");
@@ -3847,6 +4196,11 @@ var list_js_2 = require("./list.js");
 Object.defineProperty(exports, "parseOlderThan", { enumerable: true, get: function () { return list_js_2.parseOlderThan; } });
 var validate_js_1 = require("./validate.js");
 Object.defineProperty(exports, "runValidate", { enumerable: true, get: function () { return validate_js_1.runValidate; } });
+var placeholder_js_1 = require("./placeholder.js");
+Object.defineProperty(exports, "bodyHasScaffoldPlaceholder", { enumerable: true, get: function () { return placeholder_js_1.bodyHasScaffoldPlaceholder; } });
+Object.defineProperty(exports, "placeholderSections", { enumerable: true, get: function () { return placeholder_js_1.placeholderSections; } });
+Object.defineProperty(exports, "regionHasScaffoldMarker", { enumerable: true, get: function () { return placeholder_js_1.regionHasScaffoldMarker; } });
+Object.defineProperty(exports, "stripInlineCodeSpans", { enumerable: true, get: function () { return placeholder_js_1.stripInlineCodeSpans; } });
 var update_js_1 = require("./update.js");
 Object.defineProperty(exports, "runUpdate", { enumerable: true, get: function () { return update_js_1.runUpdate; } });
 Object.defineProperty(exports, "maybeCommitUpdate", { enumerable: true, get: function () { return update_js_1.maybeCommitUpdate; } });
@@ -3859,6 +4213,12 @@ Object.defineProperty(exports, "HANDOFF_SESSION_CAP", { enumerable: true, get: f
 Object.defineProperty(exports, "runHandoff", { enumerable: true, get: function () { return handoff_js_1.runHandoff; } });
 var sync_command_js_1 = require("./sync-command.js");
 Object.defineProperty(exports, "runSync", { enumerable: true, get: function () { return sync_command_js_1.runSync; } });
+var branch_claims_js_1 = require("./branch-claims.js");
+Object.defineProperty(exports, "findBranchClaims", { enumerable: true, get: function () { return branch_claims_js_1.findBranchClaims; } });
+var tree_state_js_1 = require("./tree-state.js");
+Object.defineProperty(exports, "formatRankedFrom", { enumerable: true, get: function () { return tree_state_js_1.formatRankedFrom; } });
+Object.defineProperty(exports, "RANKED_FROM_NOTE", { enumerable: true, get: function () { return tree_state_js_1.RANKED_FROM_NOTE; } });
+Object.defineProperty(exports, "readRankedFrom", { enumerable: true, get: function () { return tree_state_js_1.readRankedFrom; } });
 var verdict_js_1 = require("./verdict.js");
 Object.defineProperty(exports, "classifyVerdicts", { enumerable: true, get: function () { return verdict_js_1.classifyVerdicts; } });
 Object.defineProperty(exports, "parseVerdicts", { enumerable: true, get: function () { return verdict_js_1.parseVerdicts; } });
@@ -3879,13 +4239,19 @@ Object.defineProperty(exports, "classifyCleanupEntry", { enumerable: true, get: 
 Object.defineProperty(exports, "classifyReleaseEntry", { enumerable: true, get: function () { return cleanup_js_1.classifyReleaseEntry; } });
 Object.defineProperty(exports, "defaultCleanupGit", { enumerable: true, get: function () { return cleanup_js_1.defaultCleanupGit; } });
 Object.defineProperty(exports, "findMergedPr", { enumerable: true, get: function () { return cleanup_js_1.findMergedPr; } });
+Object.defineProperty(exports, "parseRemovalBlockers", { enumerable: true, get: function () { return cleanup_js_1.parseRemovalBlockers; } });
+Object.defineProperty(exports, "parseRemovalBlockingPaths", { enumerable: true, get: function () { return cleanup_js_1.parseRemovalBlockingPaths; } });
 Object.defineProperty(exports, "worktreeReleaseRefusal", { enumerable: true, get: function () { return cleanup_js_1.worktreeReleaseRefusal; } });
+Object.defineProperty(exports, "worktreeTrackedRefusal", { enumerable: true, get: function () { return cleanup_js_1.worktreeTrackedRefusal; } });
+Object.defineProperty(exports, "worktreeUntrackedRefusal", { enumerable: true, get: function () { return cleanup_js_1.worktreeUntrackedRefusal; } });
 var worktree_js_1 = require("./worktree.js");
 Object.defineProperty(exports, "buildLocalWorkspaces", { enumerable: true, get: function () { return worktree_js_1.buildLocalWorkspaces; } });
 Object.defineProperty(exports, "detectWorktreeForeignWrites", { enumerable: true, get: function () { return worktree_js_1.detectWorktreeForeignWrites; } });
 Object.defineProperty(exports, "freshWorktreeInstallRefusal", { enumerable: true, get: function () { return worktree_js_1.freshWorktreeInstallRefusal; } });
 Object.defineProperty(exports, "inspectDeclaredDependencies", { enumerable: true, get: function () { return worktree_js_1.inspectDeclaredDependencies; } });
 Object.defineProperty(exports, "inspectGateBinResolution", { enumerable: true, get: function () { return worktree_js_1.inspectGateBinResolution; } });
+Object.defineProperty(exports, "isStartOwnedNodeModulesInstall", { enumerable: true, get: function () { return worktree_js_1.isStartOwnedNodeModulesInstall; } });
+Object.defineProperty(exports, "isStartOwnedWorktreeEnv", { enumerable: true, get: function () { return worktree_js_1.isStartOwnedWorktreeEnv; } });
 Object.defineProperty(exports, "linkNodeModules", { enumerable: true, get: function () { return worktree_js_1.linkNodeModules; } });
 Object.defineProperty(exports, "linkNodeModulesDetailed", { enumerable: true, get: function () { return worktree_js_1.linkNodeModulesDetailed; } });
 Object.defineProperty(exports, "linkedWorkspacePackages", { enumerable: true, get: function () { return worktree_js_1.linkedWorkspacePackages; } });
@@ -3913,7 +4279,9 @@ Object.defineProperty(exports, "MAX_CLAIM_TAKEOVERS", { enumerable: true, get: f
 Object.defineProperty(exports, "MAX_MISSING_DEPENDENCIES", { enumerable: true, get: function () { return worktree_js_1.MAX_MISSING_DEPENDENCIES; } });
 Object.defineProperty(exports, "MAX_GATE_BINS", { enumerable: true, get: function () { return worktree_js_1.MAX_GATE_BINS; } });
 Object.defineProperty(exports, "MAX_PREP_STEPS", { enumerable: true, get: function () { return worktree_js_1.MAX_PREP_STEPS; } });
+Object.defineProperty(exports, "WORKTREE_ENV_FILE", { enumerable: true, get: function () { return worktree_js_1.WORKTREE_ENV_FILE; } });
 Object.defineProperty(exports, "WORKTREE_ENV_KEYS", { enumerable: true, get: function () { return worktree_js_1.WORKTREE_ENV_KEYS; } });
+Object.defineProperty(exports, "WORKTREE_NODE_MODULES_ENTRY", { enumerable: true, get: function () { return worktree_js_1.WORKTREE_NODE_MODULES_ENTRY; } });
 var import_issues_js_1 = require("./import-issues.js");
 Object.defineProperty(exports, "runImportIssues", { enumerable: true, get: function () { return import_issues_js_1.runImportIssues; } });
 var import_issues_js_2 = require("./import-issues.js");
@@ -3968,9 +4336,10 @@ Object.defineProperty(exports, "resolveCurrentLogin", { enumerable: true, get: f
 var show_js_2 = require("./show.js");
 Object.defineProperty(exports, "DEFAULT_TAIL_COMMENTS", { enumerable: true, get: function () { return show_js_2.DEFAULT_TAIL_COMMENTS; } });
 Object.defineProperty(exports, "renderShowText", { enumerable: true, get: function () { return show_js_2.renderShowText; } });
-var report_js_2 = require("./report.js");
-Object.defineProperty(exports, "formatReportMarkdown", { enumerable: true, get: function () { return report_js_2.formatReportMarkdown; } });
-Object.defineProperty(exports, "formatReportTable", { enumerable: true, get: function () { return report_js_2.formatReportTable; } });
+var report_js_3 = require("./report.js");
+Object.defineProperty(exports, "formatReportHygiene", { enumerable: true, get: function () { return report_js_3.formatReportHygiene; } });
+Object.defineProperty(exports, "formatReportMarkdown", { enumerable: true, get: function () { return report_js_3.formatReportMarkdown; } });
+Object.defineProperty(exports, "formatReportTable", { enumerable: true, get: function () { return report_js_3.formatReportTable; } });
 var trend_js_3 = require("./trend.js");
 Object.defineProperty(exports, "formatTrendMarkdown", { enumerable: true, get: function () { return trend_js_3.formatTrendMarkdown; } });
 Object.defineProperty(exports, "formatTrendTable", { enumerable: true, get: function () { return trend_js_3.formatTrendTable; } });
@@ -4042,6 +4411,7 @@ exports.acceptanceCriteria = acceptanceCriteria;
 exports.acceptanceUnchecked = acceptanceUnchecked;
 exports.acceptanceComplete = acceptanceComplete;
 exports.liveAcceptanceRegion = liveAcceptanceRegion;
+exports.liveContextRegion = liveContextRegion;
 exports.liveAcceptanceRows = liveAcceptanceRows;
 exports.liveAcceptanceCriteria = liveAcceptanceCriteria;
 exports.liveAcceptanceUnchecked = liveAcceptanceUnchecked;
@@ -4294,6 +4664,7 @@ function acceptanceComplete(body) {
     return acceptanceUnchecked(body).length === 0;
 }
 const ACCEPTANCE_HEADING = /^##[ \t]+acceptance[ \t]*$/i;
+const CONTEXT_HEADING = /^##[ \t]+context[ \t]*$/i;
 const SECTION_END_HEADING = /^#{1,2}[ \t]/;
 const COMMENT_BLOCK_HEADING = /^###[ \t]+(?:\d{4}-\d{2}-\d{2}[ \t]+@|Waiver\b)/;
 const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
@@ -4341,6 +4712,26 @@ function liveAcceptanceRegion(body) {
     let start = -1;
     for (let i = 0; i < lines.length; i += 1) {
         if (ACCEPTANCE_HEADING.test(lines[i])) {
+            start = i + 1;
+            break;
+        }
+    }
+    if (start === -1)
+        return null;
+    const region = [];
+    for (let i = start; i < lines.length; i += 1) {
+        const line = lines[i];
+        if (SECTION_END_HEADING.test(line))
+            break;
+        region.push(line);
+    }
+    return region.join("\n");
+}
+function liveContextRegion(body) {
+    const lines = liveAcceptanceLines(body);
+    let start = -1;
+    for (let i = 0; i < lines.length; i += 1) {
+        if (CONTEXT_HEADING.test(lines[i])) {
             start = i + 1;
             break;
         }
@@ -4471,6 +4862,7 @@ const priority_js_1 = require("./priority.js");
 const paths_js_1 = require("./paths.js");
 const sanitize_js_1 = require("./sanitize.js");
 const status_js_1 = require("./status.js");
+const tree_state_js_1 = require("./tree-state.js");
 function ghLogin(env) {
     try {
         const out = (0, node_child_process_1.execFileSync)("gh", ["api", "user", "-q", ".login"], {
@@ -4624,7 +5016,7 @@ function runList(opts, deps = {}) {
         return true;
     })
         .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    return { root: repoRoot, items };
+    return { root: repoRoot, items, rankedFrom: (0, tree_state_js_1.readRankedFrom)(repoRoot) };
 }
 function formatListTable(items) {
     const headers = ["id", "type", "status", "assignee", "branch", "title"];
@@ -4748,6 +5140,7 @@ const items_js_1 = require("./items.js");
 const paths_js_1 = require("./paths.js");
 const filter_js_1 = require("./filter.js");
 const priority_js_1 = require("./priority.js");
+const tree_state_js_1 = require("./tree-state.js");
 const TERMINAL_STATUSES = new Set(["done", "cancelled"]);
 function openDependencies(item, byId) {
     return item.dependsOn.filter((depId) => {
@@ -4780,6 +5173,7 @@ function runNext(opts) {
     const items = (0, items_js_1.loadItems)(tasksDir);
     const byId = (0, items_js_1.itemsById)(items);
     const blockedByIndex = (0, filter_js_1.buildBlockedByIndex)(items);
+    const rankedFrom = (0, tree_state_js_1.readRankedFrom)(root);
     const lexicographic = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
     const todos = items
         .filter((item) => (0, status_js_1.isClaimable)(item.type) &&
@@ -4798,7 +5192,7 @@ function runNext(opts) {
         .map((entry) => entry.item);
     const pool = opts.ready ? rankedReady : [...rankedReady, ...blocked];
     if (pool.length === 0)
-        return { root, suggestion: null };
+        return { root, suggestion: null, rankedFrom };
     const item = pool[0];
     const chain = [];
     const seen = new Set([item.id]);
@@ -4846,6 +5240,7 @@ function runNext(opts) {
             blockedBy,
             unblocks,
         },
+        rankedFrom,
     };
 }
 })
@@ -4919,6 +5314,7 @@ function listOperation(opts) {
         const result = (0, list_js_1.runList)(opts);
         return succeed("list", {
             items: result.items.map((item) => (0, contract_js_1.toContractWorkItem)(item, result.root, { full: opts.full === true })),
+            rankedFrom: result.rankedFrom,
         }, (0, convention_js_1.readConventionVersion)(result.root));
     }
     catch (err) {
@@ -4954,7 +5350,7 @@ function nextOperation(opts) {
                 unblocks: result.suggestion.unblocks,
             }
             : null;
-        return succeed("next", { suggestion }, (0, convention_js_1.readConventionVersion)(result.root));
+        return succeed("next", { suggestion, rankedFrom: result.rankedFrom }, (0, convention_js_1.readConventionVersion)(result.root));
     }
     catch (err) {
         return fail("next", opts.cwd, "NEXT_FAILED", err);
@@ -4975,7 +5371,7 @@ function reportOperation(opts) {
             }
         }
         const result = (0, report_js_1.runReport)({ cwd: opts.cwd });
-        const payload = { groups: result.groups };
+        const payload = { groups: result.groups, hygiene: result.hygiene };
         if (trend)
             payload.trend = trend;
         return succeed("report", payload, (0, convention_js_1.readConventionVersion)(result.root));
@@ -5100,6 +5496,8 @@ function syncOperation(opts) {
             suggestions: result.suggestions,
             filled: result.filled,
             verdicts: result.verdicts,
+            branchClaims: result.branchClaims,
+            branchClaimErrors: result.branchClaimErrors,
             errors: result.errors,
             exit_code: result.exit_code,
         };
@@ -5324,6 +5722,55 @@ function newItemPath(opts) {
 }
 })
 
+__arggonModules.set("lib/src/placeholder.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.stripInlineCodeSpans = stripInlineCodeSpans;
+exports.regionHasScaffoldMarker = regionHasScaffoldMarker;
+exports.placeholderSections = placeholderSections;
+exports.bodyHasScaffoldPlaceholder = bodyHasScaffoldPlaceholder;
+const items_js_1 = require("./items.js");
+function stripInlineCodeSpans(text) {
+    let out = "";
+    let i = 0;
+    while (i < text.length) {
+        if (text[i] !== "`") {
+            out += text[i];
+            i += 1;
+            continue;
+        }
+        let run = 0;
+        while (text[i + run] === "`")
+            run += 1;
+        const closer = "`".repeat(run);
+        const end = text.indexOf(closer, i + run);
+        if (end === -1) {
+            out += text.slice(i);
+            break;
+        }
+        i = end + run;
+    }
+    return out;
+}
+const SCAFFOLD_COMMENT = /<!--[\s\S]*?-->/;
+function regionHasScaffoldMarker(region) {
+    if (region === null)
+        return false;
+    return SCAFFOLD_COMMENT.test(stripInlineCodeSpans(region));
+}
+function placeholderSections(body) {
+    const sections = [];
+    if (regionHasScaffoldMarker((0, items_js_1.liveContextRegion)(body)))
+        sections.push("Context");
+    if (regionHasScaffoldMarker((0, items_js_1.liveAcceptanceRegion)(body)))
+        sections.push("Acceptance");
+    return sections;
+}
+function bodyHasScaffoldPlaceholder(source) {
+    return placeholderSections((0, items_js_1.acceptanceBody)(source)).length > 0;
+}
+})
+
 __arggonModules.set("lib/src/priority.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -5429,11 +5876,14 @@ function assertParentEdge(childType, parentType) {
 __arggonModules.set("lib/src/report.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MAX_HYGIENE_OPEN_CONTAINERS = exports.MAX_HYGIENE_OFFENDERS = void 0;
 exports.emptyCounts = emptyCounts;
 exports.aggregateReport = aggregateReport;
+exports.containerHygiene = containerHygiene;
 exports.runReport = runReport;
 exports.completedOf = completedOf;
 exports.formatReportTable = formatReportTable;
+exports.formatReportHygiene = formatReportHygiene;
 exports.formatReportMarkdown = formatReportMarkdown;
 const acceptance_js_1 = require("./acceptance.js");
 const items_js_1 = require("./items.js");
@@ -5443,6 +5893,11 @@ const status_js_1 = require("./status.js");
 function emptyCounts() {
     return { todo: 0, in_progress: 0, blocked: 0, done: 0, cancelled: 0, total: 0 };
 }
+exports.MAX_HYGIENE_OFFENDERS = 10;
+exports.MAX_HYGIENE_OPEN_CONTAINERS = 5;
+const CONTAINER_TYPES = new Set(["initiative", "epic", "story"]);
+const OPEN_CONTAINER_TYPES = new Set(["story", "epic"]);
+const TERMINAL_STATUSES = new Set(["done", "cancelled"]);
 function titleOf(item) {
     return item.title ?? item.id;
 }
@@ -5511,13 +5966,55 @@ function aggregateReport(items) {
             blockedReason: leaf.blockedReason,
         };
     });
-    return { groups, blocked };
+    return { groups, blocked, hygiene: containerHygiene(items) };
+}
+function containerHygiene(items) {
+    const byId = (0, items_js_1.itemsById)(items);
+    const openByOffender = new Map();
+    for (const item of items) {
+        if (!OPEN_CONTAINER_TYPES.has(item.type) || TERMINAL_STATUSES.has(item.status))
+            continue;
+        let parentId = item.parent;
+        while (parentId) {
+            const parent = byId.get(parentId);
+            if (!parent)
+                break;
+            if (CONTAINER_TYPES.has(parent.type) && TERMINAL_STATUSES.has(parent.status)) {
+                const list = openByOffender.get(parent.id) ?? [];
+                list.push(item);
+                openByOffender.set(parent.id, list);
+            }
+            parentId = parent.parent;
+        }
+    }
+    const offenders = [...openByOffender.entries()]
+        .map(([id, open]) => {
+        const container = byId.get(id);
+        const sorted = [...open].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+        return {
+            id,
+            type: container.type,
+            status: container.status,
+            openContainers: sorted.slice(0, exports.MAX_HYGIENE_OPEN_CONTAINERS).map((c) => ({
+                id: c.id,
+                type: c.type,
+                status: c.status,
+            })),
+            openContainersTotal: sorted.length,
+        };
+    })
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    return {
+        checked: items.filter((item) => CONTAINER_TYPES.has(item.type)).length,
+        offenders: offenders.slice(0, exports.MAX_HYGIENE_OFFENDERS),
+        offendersTotal: offenders.length,
+    };
 }
 function runReport(opts) {
     const tasksDir = (0, paths_js_1.findTasksDir)(opts.cwd);
     const root = (0, paths_js_1.repoRootFromTasks)(tasksDir);
-    const { groups, blocked } = aggregateReport((0, items_js_1.loadItems)(tasksDir));
-    return { root, groups, blocked };
+    const { groups, blocked, hygiene } = aggregateReport((0, items_js_1.loadItems)(tasksDir));
+    return { root, groups, blocked, hygiene };
 }
 function completedOf(counts) {
     return counts.done + counts.cancelled;
@@ -5540,6 +6037,28 @@ function formatReportTable(groups) {
 function formatCounts(counts) {
     const parts = status_js_1.STATUSES.map((status) => `${status}=${counts[status]}`);
     return `${parts.join(" ")} (total ${counts.total})`;
+}
+function formatHygieneOpenContainers(offender) {
+    const open = offender.openContainers
+        .map((c) => `${(0, sanitize_js_1.sanitizeHumanTextUncapped)(c.id)} (${c.status})`)
+        .join(", ");
+    const dropped = offender.openContainersTotal - offender.openContainers.length;
+    return dropped > 0 ? `${open} (+${dropped} more)` : open;
+}
+function formatReportHygiene(hygiene) {
+    const checked = `${hygiene.checked} containers checked`;
+    if (hygiene.offendersTotal === 0) {
+        return `hygiene: clean — no terminal container holds an open container (${checked})\n`;
+    }
+    const noun = hygiene.offendersTotal === 1 ? "offender" : "offenders";
+    const lines = [`hygiene: ${hygiene.offendersTotal} ${noun} (${checked})`];
+    for (const offender of hygiene.offenders) {
+        lines.push(`  ${(0, sanitize_js_1.sanitizeHumanTextUncapped)(offender.id)} (${offender.status}) — open containers: ${formatHygieneOpenContainers(offender)}`);
+    }
+    const dropped = hygiene.offendersTotal - hygiene.offenders.length;
+    if (dropped > 0)
+        lines.push(`  … and ${dropped} more`);
+    return `${lines.join("\n")}\n`;
 }
 function formatReportMarkdown(result, opts = {}) {
     const date = opts.date ?? new Date().toISOString().slice(0, 10);
@@ -5576,6 +6095,22 @@ function formatReportMarkdown(result, opts = {}) {
             const scope = where ? ` (${where})` : "";
             lines.push(`- **${(0, sanitize_js_1.sanitizeHumanTextUncapped)(b.id)}**${scope} — ${(0, sanitize_js_1.sanitizeHumanTextUncapped)(b.blockedReason)}`);
         }
+        lines.push("");
+    }
+    lines.push("## Hygiene", "");
+    const checked = `${result.hygiene.checked} containers checked`;
+    if (result.hygiene.offendersTotal === 0) {
+        lines.push(`_No terminal container holds an open container (${checked})._`, "");
+    }
+    else {
+        const noun = result.hygiene.offendersTotal === 1 ? "offender" : "offenders";
+        lines.push(`- ${result.hygiene.offendersTotal} ${noun} (${checked})`);
+        for (const offender of result.hygiene.offenders) {
+            lines.push(`- **${(0, sanitize_js_1.sanitizeHumanTextUncapped)(offender.id)}** (${offender.status}) — open containers: ${formatHygieneOpenContainers(offender)}`);
+        }
+        const dropped = result.hygiene.offendersTotal - result.hygiene.offenders.length;
+        if (dropped > 0)
+            lines.push(`- … and ${dropped} more`);
         lines.push("");
     }
     return `${lines.join("\n")}\n`;
@@ -5858,6 +6393,7 @@ __arggonModules.set("lib/src/sync-command.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.runSync = runSync;
 const node_child_process_1 = require("node:child_process");
+const branch_claims_js_1 = require("./branch-claims.js");
 const items_js_1 = require("./items.js");
 const paths_js_1 = require("./paths.js");
 const get_open_prs_js_1 = require("./get-open-prs.js");
@@ -5872,8 +6408,10 @@ function runSync(opts, execGh = node_child_process_1.execFileSync) {
     const cwd = opts.cwd || process.cwd();
     let items;
     let prs;
+    let root;
     try {
         const tasksDir = (0, paths_js_1.findTasksDir)(cwd);
+        root = (0, paths_js_1.repoRootFromTasks)(tasksDir);
         items = (0, items_js_1.loadItems)(tasksDir);
         prs = (0, get_open_prs_js_1.getOpenPRs)(opts.repo || null, cwd, execGh);
     }
@@ -5916,7 +6454,8 @@ function runSync(opts, execGh = node_child_process_1.execFileSync) {
         const item = byId.get(match.itemId);
         verdicts[match.itemId] = (0, verdict_js_1.classifyVerdicts)(item.body);
     }
-    return (0, sync_types_js_1.toSyncResult)(reported, mode, filled, updateErrors, verdicts);
+    const branchClaims = (0, branch_claims_js_1.findBranchClaims)({ root, items, prs });
+    return (0, sync_types_js_1.toSyncResult)(reported, mode, filled, updateErrors, verdicts, branchClaims.claims, branchClaims.errors);
 }
 })
 
@@ -5970,7 +6509,7 @@ function matchItem(item, prs) {
     }
     return { status: "pending", itemId: item.id };
 }
-function toSyncResult(matches, mode, filled = null, errors = [], verdicts = {}) {
+function toSyncResult(matches, mode, filled = null, errors = [], verdicts = {}, branchClaims = [], branchClaimErrors = []) {
     const matched = [];
     const unmatched = [];
     const pending = [];
@@ -6011,9 +6550,13 @@ function toSyncResult(matches, mode, filled = null, errors = [], verdicts = {}) 
         suggestions,
         filled,
         verdicts,
+        branchClaims,
+        branchClaimErrors,
         errors,
         exit_code: mode === "check"
-            ? (pending.length > 0 || ambiguous.length > 0 || errors.length > 0 ? 1 : 0)
+            ? pending.length > 0 || ambiguous.length > 0 || errors.length > 0
+                ? 1
+                : 0
             : ambiguous.length > 0 || errors.length > 0
                 ? 1
                 : 0,
@@ -6304,6 +6847,45 @@ function formatCommitLine(result) {
         return (0, sanitize_js_1.sanitizeHumanError)(`no-commit: tracker dirty state kept${suffix}`);
     }
     return (0, sanitize_js_1.sanitizeHumanError)(`no-commit: ${result.skipReason}${suffix}`);
+}
+})
+
+__arggonModules.set("lib/src/tree-state.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RANKED_FROM_NOTE = void 0;
+exports.readRankedFrom = readRankedFrom;
+exports.formatRankedFrom = formatRankedFrom;
+const node_child_process_1 = require("node:child_process");
+exports.RANKED_FROM_NOTE = "claims made on unmerged branches are not visible from this tree; run `arggon sync` to surface branch-resident claims";
+const defaultExecGit = (file, args, options) => (0, node_child_process_1.execFileSync)(file, args, options);
+function gitText(execGit, root, args) {
+    try {
+        const out = execGit("git", ["-C", root, ...args], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+            timeout: 5_000,
+        }).trim();
+        return out.length > 0 ? out : null;
+    }
+    catch {
+        return null;
+    }
+}
+function readRankedFrom(root, execGit = defaultExecGit) {
+    return {
+        branch: gitText(execGit, root, ["rev-parse", "--abbrev-ref", "HEAD"]),
+        head: gitText(execGit, root, ["rev-parse", "--short", "HEAD"]),
+        note: exports.RANKED_FROM_NOTE,
+    };
+}
+function formatRankedFrom(rankedFrom) {
+    const where = rankedFrom.branch
+        ? rankedFrom.head
+            ? `${rankedFrom.branch}@${rankedFrom.head}`
+            : rankedFrom.branch
+        : "this tree (no git checkout detected)";
+    return `ranked from ${where} — ${rankedFrom.note}`;
 }
 })
 
@@ -7190,6 +7772,7 @@ const convention_js_1 = require("./convention.js");
 const ids_js_1 = require("./ids.js");
 const priority_js_1 = require("./priority.js");
 const items_js_1 = require("./items.js");
+const placeholder_js_1 = require("./placeholder.js");
 const paths_js_1 = require("./paths.js");
 const relations_js_1 = require("./relations.js");
 const sanitize_js_1 = require("./sanitize.js");
@@ -7272,6 +7855,18 @@ function checkItemShape(item, errors) {
     }
     if (item.priority !== undefined && item.priority !== null && !(0, priority_js_1.isPriority)(item.priority)) {
         push(errors, rel, `priority must be one of p0, p1, p2, p3 (got ${JSON.stringify(item.priority)})`, "PRIORITY_INVALID");
+    }
+}
+function checkPlaceholderBodies(items, errors) {
+    for (const item of items) {
+        if (item.status !== "todo" && item.status !== "in_progress" && item.status !== "blocked") {
+            continue;
+        }
+        const sections = (0, placeholder_js_1.placeholderSections)(item.body);
+        if (sections.length === 0)
+            continue;
+        const where = sections.map((section) => `'## ${section}'`).join(" and ");
+        push(errors, item.relPath, `open ${item.type} '${item.id}' still carries the scaffold placeholder marker (<!-- … -->) in its live ${where} section — done/cancelled items are excluded (history, not the contract). Write the real prose there (a marker quoted inside code spans or fenced blocks does not count)`, "PLACEHOLDER_BODY");
     }
 }
 function checkDependencies(items, byId, errors) {
@@ -7440,6 +8035,7 @@ function runValidate(opts) {
         }
     }
     checkDependencies(items, byId, errors);
+    checkPlaceholderBodies(items, errors);
     for (const item of items) {
         if (item.type !== "story")
             continue;
@@ -7809,13 +8405,14 @@ function applyViewFilter(items, expr, opts = {}) {
 __arggonModules.set("lib/src/worktree.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MAX_CLAIM_WRITE_NAMES = exports.MAX_CLAIM_TAKEOVERS = exports.MAX_PREP_STEPS = exports.WORKTREE_ENV_KEYS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = void 0;
+exports.MAX_CLAIM_WRITE_NAMES = exports.MAX_CLAIM_TAKEOVERS = exports.MAX_PREP_STEPS = exports.WORKTREE_ENV_KEYS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.WORKTREE_NODE_MODULES_ENTRY = exports.WORKTREE_ENV_FILE = void 0;
 exports.packageEntryPaths = packageEntryPaths;
 exports.packageEntryExists = packageEntryExists;
 exports.packageBuildScript = packageBuildScript;
 exports.localWorkspacePackages = localWorkspacePackages;
 exports.linkNodeModules = linkNodeModules;
 exports.linkNodeModulesDetailed = linkNodeModulesDetailed;
+exports.isStartOwnedNodeModulesInstall = isStartOwnedNodeModulesInstall;
 exports.unlinkNodeModulesLink = unlinkNodeModulesLink;
 exports.pointWorkspaceAtLocal = pointWorkspaceAtLocal;
 exports.buildLocalWorkspaces = buildLocalWorkspaces;
@@ -7827,6 +8424,7 @@ exports.inspectDeclaredDependencies = inspectDeclaredDependencies;
 exports.worktreeStateBase = worktreeStateBase;
 exports.worktreeCacheBase = worktreeCacheBase;
 exports.prepareWorktreeEnv = prepareWorktreeEnv;
+exports.isStartOwnedWorktreeEnv = isStartOwnedWorktreeEnv;
 exports.unlinkWorktreeEnv = unlinkWorktreeEnv;
 exports.defaultWorktreeStatus = defaultWorktreeStatus;
 exports.readWorktreeClaimStamp = readWorktreeClaimStamp;
@@ -7844,6 +8442,8 @@ const node_fs_1 = require("node:fs");
 const node_os_1 = require("node:os");
 const node_path_1 = require("node:path");
 const LINK_FARM_MARKER = ".arggon-link-farm";
+exports.WORKTREE_ENV_FILE = ".arggon.env";
+exports.WORKTREE_NODE_MODULES_ENTRY = "node_modules";
 function isInside(parent, child) {
     return child === parent || child.startsWith(`${parent}${node_path_1.sep}`);
 }
@@ -8052,14 +8652,14 @@ function linkNodeModulesDetailed(primaryRoot, worktreePath) {
     }
 }
 function ownedLinkFarm(primaryRoot, worktreePath) {
-    const link = (0, node_path_1.join)(worktreePath, "node_modules");
+    const link = (0, node_path_1.join)(worktreePath, exports.WORKTREE_NODE_MODULES_ENTRY);
     try {
         if ((0, node_fs_1.lstatSync)(link).isSymbolicLink())
             return null;
         const marker = (0, node_fs_1.readFileSync)((0, node_path_1.join)(link, LINK_FARM_MARKER), "utf8").trim();
         if (marker.length === 0)
             return null;
-        if ((0, node_path_1.resolve)(marker) !== (0, node_path_1.resolve)((0, node_path_1.join)(primaryRoot, "node_modules")))
+        if ((0, node_path_1.resolve)(marker) !== (0, node_path_1.resolve)((0, node_path_1.join)(primaryRoot, exports.WORKTREE_NODE_MODULES_ENTRY)))
             return null;
         return link;
     }
@@ -8067,46 +8667,52 @@ function ownedLinkFarm(primaryRoot, worktreePath) {
         return null;
     }
 }
-function unlinkNodeModulesLink(primaryRoot, worktreePath) {
-    const target = (0, node_path_1.resolve)((0, node_path_1.join)(primaryRoot, "node_modules"));
-    const link = (0, node_path_1.join)(worktreePath, "node_modules");
+function nodeModulesInstallKind(primaryRoot, worktreePath) {
+    const target = (0, node_path_1.resolve)((0, node_path_1.join)(primaryRoot, exports.WORKTREE_NODE_MODULES_ENTRY));
+    const link = (0, node_path_1.join)(worktreePath, exports.WORKTREE_NODE_MODULES_ENTRY);
     let isLink;
     try {
         isLink = (0, node_fs_1.lstatSync)(link).isSymbolicLink();
     }
     catch {
-        return false;
+        return null;
     }
     if (isLink) {
         try {
-            if ((0, node_path_1.resolve)((0, node_path_1.dirname)(link), (0, node_fs_1.readlinkSync)(link)) !== target)
-                return false;
+            return (0, node_path_1.resolve)((0, node_path_1.dirname)(link), (0, node_fs_1.readlinkSync)(link)) === target ? "link" : null;
         }
         catch {
-            return false;
+            return null;
         }
-        try {
+    }
+    return ownedLinkFarm(primaryRoot, worktreePath) === null ? null : "farm";
+}
+function isStartOwnedNodeModulesInstall(primaryRoot, worktreePath) {
+    return nodeModulesInstallKind(primaryRoot, worktreePath) !== null;
+}
+function unlinkNodeModulesLink(primaryRoot, worktreePath) {
+    const kind = nodeModulesInstallKind(primaryRoot, worktreePath);
+    if (kind === null)
+        return false;
+    const link = (0, node_path_1.join)(worktreePath, exports.WORKTREE_NODE_MODULES_ENTRY);
+    try {
+        if (kind === "link") {
             (0, node_fs_1.unlinkSync)(link);
             return true;
         }
-        catch {
-            try {
-                (0, node_fs_1.rmdirSync)(link);
-                return true;
-            }
-            catch {
-                return false;
-            }
-        }
-    }
-    if (ownedLinkFarm(primaryRoot, worktreePath) === null)
-        return false;
-    try {
         (0, node_fs_1.rmSync)(link, { recursive: true, force: true });
         return true;
     }
     catch {
-        return false;
+        if (kind !== "link")
+            return false;
+        try {
+            (0, node_fs_1.rmdirSync)(link);
+            return true;
+        }
+        catch {
+            return false;
+        }
     }
 }
 function pointWorkspaceAtLocal(primaryRoot, worktreePath, name) {
@@ -8352,7 +8958,7 @@ function strictGateBinFailure(gateBins, worktreePath) {
         `x-tracker.strict-gate-bins is set: refusing the claim commit — gate binaries do not ` +
         `resolve inside the worktree: ${named}.`);
 }
-function freshWorktreeInstallRefusal(gateBins, worktreePath, steps = []) {
+function freshWorktreeInstallRefusal(gateBins, worktreePath, steps = [], stepsDropped = 0) {
     const broken = strictGateBinViolations(gateBins);
     if (broken.length === 0)
         return null;
@@ -8366,11 +8972,16 @@ function freshWorktreeInstallRefusal(gateBins, worktreePath, steps = []) {
         return `${bin.name}: resolves from ${bin.path}, above the worktree`;
     })
         .join("; ");
-    const prep = steps.length > 0
+    const logged = steps.length > 0
         ? ` Preparation ran: ${steps
             .map((entry) => `${entry.step}:${entry.outcome}${entry.pkg ? ` (${entry.pkg})` : ""}`)
             .join(", ")}.`
         : "";
+    const dropped = stepsDropped > 0
+        ? ` ${stepsDropped} ${stepsDropped === 1 ? "entry was" : "entries were"} dropped ` +
+            `(the preparation log is capped at ${exports.MAX_PREP_STEPS}).`
+        : "";
+    const prep = `${logged}${dropped}`;
     return (`refusing the claim commit — a fresh worktree must leave a gate-usable install.${prep} ` +
         `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install ` +
         `(or \`npm install\` in the primary checkout if its install is stale or missing), ` +
@@ -8462,7 +9073,7 @@ function prepareWorktreeEnv(primaryRoot, worktreePath, request) {
         };
     }
     const checkIgnore = request.checkIgnore ?? defaultCheckIgnore;
-    const ignored = checkIgnore(worktreePath, ".arggon.env");
+    const ignored = checkIgnore(worktreePath, exports.WORKTREE_ENV_FILE);
     const gitignored = ignored === undefined ? undefined : ignored;
     let seededDotenv;
     const dotenvSource = (0, node_path_1.join)(primaryRoot, ".env");
@@ -8477,7 +9088,7 @@ function prepareWorktreeEnv(primaryRoot, worktreePath, request) {
         }
     }
     const attachWarning = () => [...warnings, "already exists — left byte-identical (never overwritten)"].join("; ");
-    const envPath = (0, node_path_1.join)(worktreePath, ".arggon.env");
+    const envPath = (0, node_path_1.join)(worktreePath, exports.WORKTREE_ENV_FILE);
     if ((0, node_fs_1.existsSync)(envPath)) {
         return {
             written: false,
@@ -8532,28 +9143,37 @@ function prepareWorktreeEnv(primaryRoot, worktreePath, request) {
     };
 }
 exports.MAX_PREP_STEPS = 16;
-function unlinkWorktreeEnv(worktreePath) {
-    const envPath = (0, node_path_1.join)(worktreePath, ".arggon.env");
+function startOwnedEnvPath(worktreePath) {
+    const envPath = (0, node_path_1.join)(worktreePath, exports.WORKTREE_ENV_FILE);
     let raw;
     try {
         if ((0, node_fs_1.lstatSync)(envPath).isSymbolicLink())
-            return false;
+            return null;
         raw = (0, node_fs_1.readFileSync)(envPath, "utf8");
     }
     catch {
-        return false;
+        return null;
     }
     const lines = raw.split("\n");
     if (lines.pop() !== "")
-        return false;
+        return null;
     if (lines.length === 0)
-        return false;
+        return null;
     const keys = new Set(exports.WORKTREE_ENV_KEYS);
     for (const line of lines) {
         const eq = line.indexOf("=");
         if (eq <= 0 || !keys.has(line.slice(0, eq)))
-            return false;
+            return null;
     }
+    return envPath;
+}
+function isStartOwnedWorktreeEnv(worktreePath) {
+    return startOwnedEnvPath(worktreePath) !== null;
+}
+function unlinkWorktreeEnv(worktreePath) {
+    const envPath = startOwnedEnvPath(worktreePath);
+    if (envPath === null)
+        return false;
     try {
         (0, node_fs_1.rmSync)(envPath);
         return true;
@@ -8835,9 +9455,11 @@ function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
     const worktreeModules = (0, node_path_1.join)(worktreePath, "node_modules");
     const steps = [];
     let stepsTruncated = false;
+    let stepsDropped = 0;
     const record = (step, outcome, pkg) => {
         if (steps.length >= exports.MAX_PREP_STEPS) {
             stepsTruncated = true;
+            stepsDropped += 1;
             return;
         }
         steps.push(pkg === undefined ? { step, outcome } : { step, outcome, pkg });
@@ -8878,7 +9500,7 @@ function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
         missingDependenciesTotal: declared.missingTotal,
         gateBins,
         steps,
-        ...(stepsTruncated ? { stepsTruncated: true } : {}),
+        ...(stepsTruncated ? { stepsTruncated: true, stepsDropped } : {}),
         ...(envReceipt !== undefined ? { env: envReceipt } : {}),
         ...(claimReceipt !== undefined ? { claim: claimReceipt } : {}),
     };
@@ -8944,7 +9566,7 @@ function linkedWorkspacePackages(primaryRoot, worktreePath) {
 __arggonModules.set("opencode/plugins/arggon/board.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_SELECTION_MARK = exports.BOARD_SELECTION_PAGE = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_TYPE_BADGES = exports.ARGON_BOARD_PANEL = void 0;
+exports.BOARD_HIERARCHY_CHILD_KEYS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_SELECTION_MARK = exports.BOARD_SELECTION_PAGE = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_TYPE_BADGES = exports.ARGON_BOARD_PANEL = void 0;
 exports.boardRoot = boardRoot;
 exports.emptyBoardSnapshot = emptyBoardSnapshot;
 exports.activeBoardId = activeBoardId;
@@ -8959,6 +9581,8 @@ exports.clipBoardLine = clipBoardLine;
 exports.boardHeaderLine = boardHeaderLine;
 exports.boardCountsLine = boardCountsLine;
 exports.boardItemLine = boardItemLine;
+exports.boardParentId = boardParentId;
+exports.boardChildrenOf = boardChildrenOf;
 exports.boardItemDetail = boardItemDetail;
 exports.boardDetailLines = boardDetailLines;
 exports.boardTreeLines = boardTreeLines;
@@ -9155,6 +9779,21 @@ function boardItemLine(entry, options = {}) {
 }
 exports.BOARD_DETAIL_MAX_ROWS = 16;
 exports.BOARD_DETAIL_MAX_LINE_CHARS = 200;
+exports.BOARD_HIERARCHY_CHILD_KEYS = 9;
+function boardParentId(items, id) {
+    const wanted = id.trim();
+    if (wanted === "")
+        return null;
+    const item = items.find((entry) => entry.id === wanted);
+    const parent = (item?.parent ?? "").trim();
+    return parent === "" ? null : parent;
+}
+function boardChildrenOf(items, id) {
+    const wanted = id.trim();
+    if (wanted === "")
+        return [];
+    return (0, lib_1.sortById)(items.filter((entry) => (entry.parent ?? "").trim() === wanted));
+}
 function acceptanceRenderRows(item) {
     return (0, lib_1.acceptanceRows)((0, lib_1.acceptanceBody)(item)).map((row) => {
         const mark = row.checked ? "x" : " ";
@@ -9196,6 +9835,8 @@ function boardItemDetail(cwd, id, options = {}) {
         acceptanceDone: 0,
         acceptanceTotal: 0,
         truncated: false,
+        parent: null,
+        children: [],
         error: (0, lib_1.sanitizeHumanError)(error),
     });
     if (requested === "")
@@ -9208,6 +9849,32 @@ function boardItemDetail(cwd, id, options = {}) {
         const shownAcceptance = acceptance.slice(0, budget);
         const shownBody = body.slice(0, Math.max(budget - shownAcceptance.length, 0));
         const row = (value) => clipBoardLine((0, lib_1.sanitizeHumanTextUncapped)(value), exports.BOARD_DETAIL_MAX_LINE_CHARS);
+        const link = (item) => ({
+            id: (0, lib_1.sanitizeHumanTextUncapped)(item.id),
+            title: (0, lib_1.sanitizeHumanTextUncapped)(item.title),
+            status: item.status,
+            missing: false,
+        });
+        const snapshotItems = options.items ?? boardSnapshot(cwd).items;
+        const parentId = snapshotItems.length > 0
+            ? boardParentId(snapshotItems, requested)
+            : (shown.item.parent ?? "").trim() || null;
+        const byId = snapshotItems.length > 0
+            ? new Map(snapshotItems.map((entry) => [entry.id, entry]))
+            : new Map();
+        const parent = parentId === null
+            ? null
+            : byId.get(parentId) !== undefined
+                ? link(byId.get(parentId))
+                : {
+                    id: (0, lib_1.sanitizeHumanTextUncapped)(parentId),
+                    title: null,
+                    status: null,
+                    missing: true,
+                };
+        const children = snapshotItems.length > 0
+            ? boardChildrenOf(snapshotItems, requested).map(link)
+            : [];
         return {
             id: requested,
             title: (0, lib_1.sanitizeHumanTextUncapped)(shown.item.title ?? requested),
@@ -9217,6 +9884,8 @@ function boardItemDetail(cwd, id, options = {}) {
             acceptanceDone: criteria.filter((entry) => entry.checked).length,
             acceptanceTotal: criteria.length,
             truncated: acceptance.length + body.length > budget,
+            parent,
+            children,
             error: null,
         };
     }
@@ -9231,6 +9900,29 @@ function boardDetailLines(detail, options = {}) {
         return [clip(`  ┌ argon detail · ${detail.id}`), clip(`  └ ${detail.error}`)];
     }
     const lines = [clip(`  ┌ argon detail · ${detail.id} — ${detail.title ?? detail.id}`)];
+    const safe = (value) => (0, lib_1.sanitizeHumanTextUncapped)(value);
+    const parentRow = detail.parent === null
+        ? "parent: none"
+        : detail.parent.missing
+            ? `parent: ${safe(detail.parent.id)} (missing) [p]`
+            : `parent: ${safe(detail.parent.id)} — ${safe(detail.parent.title ?? detail.parent.id)}${detail.parent.status !== null ? ` (${detail.parent.status})` : ""} [p]`;
+    lines.push(clip(`  │ ${parentRow}`));
+    if (detail.children.length === 0) {
+        lines.push(clip("  │ children: none"));
+    }
+    else {
+        lines.push(clip(`  │ children (${detail.children.length}):`));
+        const shown = detail.children.slice(0, Math.max(exports.BOARD_HIERARCHY_CHILD_KEYS, 0));
+        shown.forEach((child, index) => {
+            const label = child.missing
+                ? `${safe(child.id)} (missing)`
+                : `${safe(child.id)} — ${safe(child.title ?? child.id)}${child.status !== null ? ` (${child.status})` : ""}`;
+            lines.push(clip(`  │   [${index + 1}] ${label}`));
+        });
+        const hidden = detail.children.length - shown.length;
+        if (hidden > 0)
+            lines.push(clip(`  │   … +${hidden} more — walk the tree`));
+    }
     const row = (value) => (value === "" ? "  │" : `  │ ${value}`);
     for (const entry of detail.acceptance)
         lines.push(clip(row(entry)));
@@ -9325,7 +10017,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.TRACKER_ROOT_MISMATCH = exports.PROCESS_ENV_SOURCE = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
+exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardParentId = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.boardChildrenOf = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_HIERARCHY_CHILD_KEYS = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.TRACKER_ROOT_MISMATCH = exports.PROCESS_ENV_SOURCE = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.ADMISSION_STAMP_MAX_BYTES = exports.ADMISSION_STAMP_KEY = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
 exports.isArggonItemId = isArggonItemId;
 exports.parseArggonItemFromCommand = parseArggonItemFromCommand;
 exports.parseArggonItemFromCode = parseArggonItemFromCode;
@@ -9334,11 +10026,18 @@ exports.itemIdFromBranch = itemIdFromBranch;
 exports.looksLikeCommitCommand = looksLikeCommitCommand;
 exports.buildItemBlock = buildItemBlock;
 exports.boundText = boundText;
+exports.buildAdmissionStamp = buildAdmissionStamp;
+exports.admissionStampFromResolution = admissionStampFromResolution;
+exports.applyAdmissionStamp = applyAdmissionStamp;
+exports.needsCompactionRetention = needsCompactionRetention;
+exports.compactionRetentionPart = compactionRetentionPart;
 exports.parseValidateFailure = parseValidateFailure;
 exports.sessionDirectoryResolver = sessionDirectoryResolver;
 exports.itemCacheKey = itemCacheKey;
 exports.setBounded = setBounded;
 exports.onToolAfter = onToolAfter;
+exports.onPromptAdmission = onPromptAdmission;
+exports.onCompaction = onCompaction;
 exports.csvList = csvList;
 exports.sessionToken = sessionToken;
 exports.resolveToolCwd = resolveToolCwd;
@@ -9368,6 +10067,8 @@ exports.ITEM_BLOCK_MAX_BYTES = 1024;
 exports.CACHE_TTL_MS = 5_000;
 exports.CACHE_MAX_ENTRIES = 256;
 exports.BRANCH_PREFIXES = ["feat/", "fix/"];
+exports.ADMISSION_STAMP_KEY = "arggon";
+exports.ADMISSION_STAMP_MAX_BYTES = 768;
 const ITEM_MARKER = "<arggon-item>";
 const STORAGE_PREFIX = "arggon/session/";
 const MAX_CLI_OUTPUT = 256 * 1024;
@@ -9881,6 +10582,69 @@ function boundText(text, max = exports.ITEM_BLOCK_MAX_BYTES) {
     const bounded = `${cut}${marker}`;
     return { text: bounded, bytes: byteLength(bounded), truncated: true };
 }
+const STAMP_DROP_ORDER = [
+    "worktreeId",
+    "worktreePath",
+    "branch",
+    "item",
+];
+const STAMP_IDENTITY_FIELDS = [
+    ["item", "item"],
+    ["branch", "branch"],
+    ["worktreePath", "worktreePath"],
+    ["worktreeId", "worktreeId"],
+];
+function buildAdmissionStamp(identity) {
+    if (identity === undefined)
+        return undefined;
+    const stamp = { source: clip(identity.source, MAX_VALUE_CHARS) };
+    for (const [field, key] of STAMP_IDENTITY_FIELDS) {
+        const value = asString(identity[key]);
+        if (value === undefined)
+            continue;
+        stamp[field] = clip(value, MAX_VALUE_CHARS);
+    }
+    return boundAdmissionStamp(stamp);
+}
+function admissionStampFromResolution(resolved) {
+    if (resolved === undefined)
+        return undefined;
+    return boundAdmissionStamp({ item: clip(resolved.id, MAX_VALUE_CHARS), source: resolved.source });
+}
+function boundAdmissionStamp(stamp) {
+    if (stamp.item === undefined && stamp.branch === undefined)
+        return undefined;
+    for (const field of STAMP_DROP_ORDER) {
+        if (byteLength(JSON.stringify(stamp)) <= exports.ADMISSION_STAMP_MAX_BYTES)
+            break;
+        delete stamp[field];
+    }
+    if (stamp.item === undefined && stamp.branch === undefined)
+        return undefined;
+    return byteLength(JSON.stringify(stamp)) <= exports.ADMISSION_STAMP_MAX_BYTES ? stamp : undefined;
+}
+function applyAdmissionStamp(event, stamp) {
+    if (stamp === undefined)
+        return undefined;
+    const existing = event.metadata !== null && typeof event.metadata === "object"
+        ? event.metadata
+        : undefined;
+    event.metadata = { ...existing, [exports.ADMISSION_STAMP_KEY]: stamp };
+    return stamp;
+}
+function needsCompactionRetention(system, result) {
+    if (result !== undefined)
+        return false;
+    if (!Array.isArray(system))
+        return false;
+    return !system.some((part) => part !== null &&
+        typeof part === "object" &&
+        typeof part.text === "string" &&
+        part.text.includes(ITEM_MARKER));
+}
+function compactionRetentionPart(block) {
+    return { type: "text", text: block };
+}
 function parseValidateFailure(stdout) {
     if (typeof stdout !== "string" || stdout.trim() === "")
         return undefined;
@@ -9937,6 +10701,21 @@ function sessionDirectoryResolver(ctx) {
         return asString(session?.location?.directory) ?? asString(session?.directory);
     };
 }
+async function hookDirectory(ctx, sessionID) {
+    if (sessionID !== undefined) {
+        const resolve = sessionDirectoryResolver(ctx);
+        if (resolve !== undefined) {
+            try {
+                const directory = await resolve(sessionID);
+                if (directory !== undefined)
+                    return directory;
+            }
+            catch {
+            }
+        }
+    }
+    return locationDirectory(ctx);
+}
 function hasTasksTree(directory) {
     try {
         return (0, node_fs_1.existsSync)((0, node_path_1.join)(directory, "ArggonManager")) || (0, node_fs_1.existsSync)((0, node_path_1.join)(directory, "tasks"));
@@ -9981,6 +10760,8 @@ async function storageRemove(ctx, key) {
 const itemCache = new Map();
 const branchCache = new Map();
 const renamedSessions = new Map();
+const stampedSessions = new Map();
+const retainedSessions = new Map();
 function itemCacheKey(directory, id) {
     return `${directory}\u0000${id}`;
 }
@@ -10136,21 +10917,27 @@ async function onToolAfter(ctx, event) {
         logOnce("tool-observe", "tool observation failed", error);
     }
 }
+async function resolveInjectedItem(ctx, sessionID, directory) {
+    const resolved = await resolveItemId(ctx, sessionID, directory);
+    if (resolved === undefined)
+        return undefined;
+    const item = await loadItem(ctx, directory, resolved.id);
+    if (item === undefined) {
+        if (resolved.source === "storage")
+            await storageRemove(ctx, sessionKey(sessionID));
+        return undefined;
+    }
+    return item;
+}
 async function onContext(ctx, event) {
     try {
         const sessionID = asString(event.sessionID);
         const directory = locationDirectory(ctx);
         if (sessionID === undefined || directory === undefined || !hasTasksTree(directory))
             return;
-        const resolved = await resolveItemId(ctx, sessionID, directory);
-        if (resolved === undefined)
+        const item = await resolveInjectedItem(ctx, sessionID, directory);
+        if (item === undefined)
             return;
-        const item = await loadItem(ctx, directory, resolved.id);
-        if (item === undefined) {
-            if (resolved.source === "storage")
-                await storageRemove(ctx, sessionKey(sessionID));
-            return;
-        }
         await maybeRename(ctx, sessionID, item);
         const system = event.system;
         if (!Array.isArray(system))
@@ -10163,10 +10950,61 @@ async function onContext(ctx, event) {
             return;
         const block = buildItemBlock(item, { currentDirectory: directory });
         system.push({ type: "text", text: block.text });
-        console.error(`[arggon] context: injected item ${asString(item.id) ?? resolved.id} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`);
+        console.error(`[arggon] context: injected item ${asString(item.id)} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`);
     }
     catch (error) {
         logOnce("context", "context injection failed", error);
+    }
+}
+async function onPromptAdmission(ctx, event) {
+    try {
+        const sessionID = asString(event.sessionID);
+        const directory = await hookDirectory(ctx, sessionID);
+        if (directory === undefined || !hasTasksTree(directory))
+            return;
+        const stamp = buildAdmissionStamp(findWorktreeEnv(directory)) ??
+            buildAdmissionStamp(processWorktreeIdentity()) ??
+            admissionStampFromResolution(sessionID === undefined ? undefined : await resolveItemId(ctx, sessionID, directory));
+        const applied = applyAdmissionStamp(event, stamp);
+        if (applied === undefined)
+            return;
+        const id = applied.item ?? applied.branch ?? "?";
+        const key = `${sessionID ?? "?"}:${id}:${applied.source}`;
+        if (stampedSessions.get(sessionID ?? "?") === key)
+            return;
+        setBounded(stampedSessions, sessionID ?? "?", key);
+        console.error(`[arggon] prompt: stamped admission ${id} from ${applied.source}`);
+    }
+    catch (error) {
+        logOnce("prompt", "prompt admission stamping failed", error);
+    }
+}
+async function onCompaction(ctx, event) {
+    try {
+        const sessionID = asString(event.sessionID);
+        if (sessionID === undefined)
+            return;
+        const directory = await hookDirectory(ctx, sessionID);
+        if (directory === undefined || !hasTasksTree(directory))
+            return;
+        if (!needsCompactionRetention(event.system, event.result))
+            return;
+        const item = await resolveInjectedItem(ctx, sessionID, directory);
+        if (item === undefined)
+            return;
+        const system = event.system;
+        const block = buildItemBlock(item, { currentDirectory: directory });
+        system.push(compactionRetentionPart(block.text));
+        const id = asString(item.id);
+        if (id !== undefined) {
+            if (retainedSessions.get(sessionID) === id)
+                return;
+            setBounded(retainedSessions, sessionID, id);
+        }
+        console.error(`[arggon] compaction: retained item ${id} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`);
+    }
+    catch (error) {
+        logOnce("compaction", "compaction retention failed", error);
     }
 }
 exports.ARGON_TOOL_NAMESPACE = "arggon";
@@ -10704,7 +11542,7 @@ const TOOL_SPECS = [
     },
     {
         name: "report",
-        description: "Aggregate leaf statuses per story, grouped by epic; `trend: true` mines git history. Pure read — never writes.",
+        description: "Aggregate leaf statuses per story, grouped by epic, plus report-only container hygiene; `trend: true` mines git history. Pure read — never writes.",
         input: {
             type: "object",
             properties: {
@@ -10713,7 +11551,7 @@ const TOOL_SPECS = [
             },
             additionalProperties: false,
         },
-        output: envelopeSchema({ groups: { type: "array" }, trend: OBJECT }),
+        output: envelopeSchema({ groups: { type: "array" }, hygiene: OBJECT, trend: OBJECT }),
         run: (kernel, input, options) => kernel.reportOperation({
             cwd: options.cwd,
             trend: input.trend === true,
@@ -11038,8 +11876,7 @@ function boundedPreparation(input) {
         (input.steps?.length ?? 0) > steps.length ||
         input.missingDependenciesTotal > input.missingDependencies.length ||
         (input.gateBins?.length ?? 0) > gateBins.length ||
-        (claim?.foreignWrites !== undefined &&
-            claim.foreignWrites.total > claim.foreignWrites.files.length) ||
+        (claim !== undefined && claimForeignWritesTruncated(claim, input.claim)) ||
         (claim !== undefined && claimTakeoverTruncated(claim, input.claim)) ||
         built.some((name, index) => name !== input.builtWorkspaces[index]) ||
         linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
@@ -11060,6 +11897,7 @@ function boundedPreparation(input) {
         gateBins,
         ...(steps.length > 0 ? { steps } : {}),
         ...(kernelDroppedSteps ? { stepsTruncated: true } : {}),
+        ...(input.stepsDropped !== undefined ? { stepsDropped: input.stepsDropped } : {}),
         ...(env !== undefined ? { env } : {}),
         ...(claim !== undefined ? { claim } : {}),
         ...(truncated ? { truncated: true } : {}),
@@ -11123,6 +11961,18 @@ function boundedClaimStamp(input) {
     }
     return bounded;
 }
+function claimForeignWritesTruncated(bounded, input) {
+    if (input === undefined)
+        return true;
+    const report = bounded.foreignWrites;
+    const source = input.foreignWrites;
+    if (report === undefined || source === undefined)
+        return false;
+    return (report.owner !== source.owner ||
+        report.claimedAt !== source.claimedAt ||
+        report.total > report.files.length ||
+        report.files.some((file, index) => file !== source.files[index]));
+}
 function claimTakeoverTruncated(bounded, input) {
     if (input === undefined)
         return true;
@@ -11142,9 +11992,20 @@ function claimTakeoverTruncated(bounded, input) {
         takeOver.replaced.assignee !== replaced.assignee ||
         takeOver.replaced.surface !== replaced.surface ||
         takeOver.files.some((file, index) => file !== source.files[index]);
+    const chain = replaced.takeovers ?? [];
+    const projectedChain = takeOver.replaced.takeovers ?? [];
+    const chainClipped = chain.some((entry, index) => {
+        const projected = projectedChain[index];
+        return (projected === undefined ||
+            projected.at !== entry.at ||
+            projected.by !== entry.by ||
+            projected.replacedIdentity !== entry.replacedIdentity ||
+            projected.replacedClaimedAt !== entry.replacedClaimedAt);
+    });
     return (clipped ||
+        chainClipped ||
         takeOver.total > takeOver.files.length ||
-        (replaced.takeovers?.length ?? 0) > (takeOver.replaced.takeovers?.length ?? 0));
+        chain.length > projectedChain.length);
 }
 function boundedEnvReceipt(input) {
     const bounded = { written: input.written };
@@ -11791,7 +12652,7 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
         }
     }
     if (worktreePath !== undefined && progress.worktreeCreated) {
-        const refusal = kernel.freshWorktreeInstallRefusal(progress.preparation?.gateBins ?? [], worktreePath, progress.preparation?.steps ?? []);
+        const refusal = kernel.freshWorktreeInstallRefusal(progress.preparation?.gateBins ?? [], worktreePath, progress.preparation?.steps ?? [], progress.preparation?.stepsDropped ?? 0);
         if (refusal !== null) {
             return failBeforeClaim(`The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
                 "Then re-run " +
@@ -11994,13 +12855,20 @@ async function nativeCleanup(kernel, input, options, tool) {
     if (releaseId === undefined && input.take_over_worktree === true) {
         return worktreeFail(kernel, "cleanup", "CLEANUP_FAILED", "take_over_worktree requires release (it authorizes a release of a worktree whose stamped owner is presumed dead)", version);
     }
+    if (input.force === true && input.prune !== true) {
+        return worktreeFail(kernel, "cleanup", "CLEANUP_FAILED", "force requires prune (it discards the untracked content of terminal+merged worktrees)", version);
+    }
     const inventory = await domainWorktrees(options);
     const runner = {
         ...git,
         worktreeList: (cwd) => inventory.length > 0 ? inventory : git.worktreeList(cwd),
     };
     const entries = releaseId === undefined
-        ? tracked.map((item) => kernel.classifyCleanupEntry(item, root, base, runner, { noGh: input.no_gh === true }))
+        ? tracked.map((item) => kernel.classifyCleanupEntry(item, root, base, runner, {
+            noGh: input.no_gh === true,
+            force: input.force === true,
+            primaryRoots: [canonicalRoot(options, root), root],
+        }))
         : [];
     const pruned = [];
     const failures = [];
@@ -12046,7 +12914,7 @@ async function nativeCleanup(kernel, input, options, tool) {
                     }
                     kernel.unlinkWorktreeEnv(entry.path);
                     const removal = await removeWorktreeObserved(options, entry.path, root, {
-                        force: false,
+                        force: entry.forced === true,
                     });
                     if (!removal.removed) {
                         const message = boundedNativeText(removal.errors.join("; "), MAX_NATIVE_DETAIL_CHARS);
@@ -12064,8 +12932,14 @@ async function nativeCleanup(kernel, input, options, tool) {
                     pruned.push({
                         id: entry.id,
                         action: `removed worktree ${entry.path}`,
+                        ...(entry.forced === true ? { forced: true } : {}),
                         ...(entry.via !== undefined ? { via: entry.via } : {}),
                     });
+                }
+                else if (entry.action?.startsWith("clear stale worktree_path record")) {
+                    if (git.pruneWorktrees?.(root) === true) {
+                        pruned.push({ id: entry.id, action: "pruned stale git worktree record" });
+                    }
                 }
                 if (entry.branch !== null && git.branchExists(root, entry.branch)) {
                     try {
@@ -12179,20 +13053,21 @@ async function nativeRelease(kernel, run) {
     const path = classified.path;
     const gitRoot = (0, node_path_1.resolve)(git.worktreeList(root)[0] ?? root);
     const recordHome = (0, node_path_1.resolve)(root) !== (0, node_path_1.resolve)(path);
+    const stale = classified.action?.startsWith("clear stale worktree_path record") === true;
     try {
-        if (classified.action !== "clear stale worktree_path record (path missing on disk)") {
-            if (run.compose !== undefined && !run.isComposeUnavailable()) {
-                const project = kernel.worktreeComposeProject(run.compose.declared, (0, node_path_1.basename)(path));
-                try {
-                    await nativeComposeDown(project, root);
-                    actions.push({ id, action: `reaped compose project ${project}` });
-                }
-                catch (error) {
-                    if (error?.code !== "ENOENT")
-                        throw error;
-                    run.compose.dockerUnavailable = true;
-                }
+        if (run.compose !== undefined && !run.isComposeUnavailable()) {
+            const project = kernel.worktreeComposeProject(run.compose.declared, (0, node_path_1.basename)(path));
+            try {
+                await nativeComposeDown(project, root);
+                actions.push({ id, action: `reaped compose project ${project}` });
             }
+            catch (error) {
+                if (error?.code !== "ENOENT")
+                    throw error;
+                run.compose.dockerUnavailable = true;
+            }
+        }
+        if (!stale) {
             kernel.unlinkNodeModulesLink(gitRoot, path);
             if (gitRoot !== (0, node_path_1.resolve)(root))
                 kernel.unlinkNodeModulesLink(root, path);
@@ -12214,24 +13089,27 @@ async function nativeRelease(kernel, run) {
             else if (hadStamp) {
                 actions.push({ id, action: "arggon-claim.json stamp gone with the worktree" });
             }
-            if (classified.branch !== null && git.branchExists(gitRoot, classified.branch)) {
-                try {
-                    git.deleteBranchForce(gitRoot, classified.branch);
-                    actions.push({ id, action: `deleted branch ${classified.branch}` });
-                }
-                catch (error) {
-                    const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS);
-                    failures.push(`${id}: ${message}`);
-                    actions.push({
-                        id,
-                        action: "failed",
-                        error: message,
-                        leftoverBranch: classified.branch,
-                    });
-                }
+        }
+        else if (git.pruneWorktrees?.(gitRoot) === true) {
+            actions.push({ id, action: "pruned stale git worktree record" });
+        }
+        if (classified.branch !== null && git.branchExists(gitRoot, classified.branch)) {
+            try {
+                git.deleteBranchForce(gitRoot, classified.branch);
+                actions.push({ id, action: `deleted branch ${classified.branch}` });
+            }
+            catch (error) {
+                const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS);
+                failures.push(`${id}: ${message}`);
+                actions.push({
+                    id,
+                    action: "failed",
+                    error: message,
+                    leftoverBranch: classified.branch,
+                });
             }
         }
-        if (recordHome) {
+        if (stale || recordHome) {
             const cleared = kernel.updateOperation({
                 cwd: root,
                 id,
@@ -12308,6 +13186,7 @@ const WORKTREE_TOOL_SPECS = [
             type: "object",
             properties: {
                 prune: BOOLEAN,
+                force: BOOLEAN,
                 release: ID,
                 take_over_worktree: BOOLEAN,
                 no_gh: {
@@ -12463,6 +13342,21 @@ const definition = {
         catch (error) {
             logOnce("context-hook", "session context hook unavailable", error);
         }
+        for (const [name, handler, key] of [
+            ["prompt", onPromptAdmission, "prompt-hook"],
+            ["compaction", onCompaction, "compaction-hook"],
+        ]) {
+            try {
+                const hook = ctx?.session?.hook;
+                if (typeof hook !== "function")
+                    break;
+                const registration = await hook(name, (event) => handler(ctx, event));
+                disposers.push(() => dispose(registration));
+            }
+            catch (error) {
+                logOnce(key, `session ${name} hook unavailable`, error);
+            }
+        }
         try {
             const hook = ctx?.tool?.hook;
             if (typeof hook === "function") {
@@ -12495,17 +13389,20 @@ var board_js_1 = require("./board.js");
 Object.defineProperty(exports, "ARGON_BOARD_PANEL", { enumerable: true, get: function () { return board_js_1.ARGON_BOARD_PANEL; } });
 Object.defineProperty(exports, "BOARD_DETAIL_MAX_LINE_CHARS", { enumerable: true, get: function () { return board_js_1.BOARD_DETAIL_MAX_LINE_CHARS; } });
 Object.defineProperty(exports, "BOARD_DETAIL_MAX_ROWS", { enumerable: true, get: function () { return board_js_1.BOARD_DETAIL_MAX_ROWS; } });
+Object.defineProperty(exports, "BOARD_HIERARCHY_CHILD_KEYS", { enumerable: true, get: function () { return board_js_1.BOARD_HIERARCHY_CHILD_KEYS; } });
 Object.defineProperty(exports, "BOARD_SELECTION_MARK", { enumerable: true, get: function () { return board_js_1.BOARD_SELECTION_MARK; } });
 Object.defineProperty(exports, "BOARD_SELECTION_PAGE", { enumerable: true, get: function () { return board_js_1.BOARD_SELECTION_PAGE; } });
 Object.defineProperty(exports, "BOARD_STATUS_MARKS", { enumerable: true, get: function () { return board_js_1.BOARD_STATUS_MARKS; } });
 Object.defineProperty(exports, "BOARD_STATUS_ORDER", { enumerable: true, get: function () { return board_js_1.BOARD_STATUS_ORDER; } });
 Object.defineProperty(exports, "BOARD_TYPE_BADGES", { enumerable: true, get: function () { return board_js_1.BOARD_TYPE_BADGES; } });
 Object.defineProperty(exports, "activeBoardId", { enumerable: true, get: function () { return board_js_1.activeBoardId; } });
+Object.defineProperty(exports, "boardChildrenOf", { enumerable: true, get: function () { return board_js_1.boardChildrenOf; } });
 Object.defineProperty(exports, "boardCountsLine", { enumerable: true, get: function () { return board_js_1.boardCountsLine; } });
 Object.defineProperty(exports, "boardDetailLines", { enumerable: true, get: function () { return board_js_1.boardDetailLines; } });
 Object.defineProperty(exports, "boardHeaderLine", { enumerable: true, get: function () { return board_js_1.boardHeaderLine; } });
 Object.defineProperty(exports, "boardItemDetail", { enumerable: true, get: function () { return board_js_1.boardItemDetail; } });
 Object.defineProperty(exports, "boardItemLine", { enumerable: true, get: function () { return board_js_1.boardItemLine; } });
+Object.defineProperty(exports, "boardParentId", { enumerable: true, get: function () { return board_js_1.boardParentId; } });
 Object.defineProperty(exports, "boardRoot", { enumerable: true, get: function () { return board_js_1.boardRoot; } });
 Object.defineProperty(exports, "boardSnapshot", { enumerable: true, get: function () { return board_js_1.boardSnapshot; } });
 Object.defineProperty(exports, "boardTreeEntries", { enumerable: true, get: function () { return board_js_1.boardTreeEntries; } });
@@ -12524,7 +13421,10 @@ exports.default = definition;
 const __arggonEntry = __arggonRequire("opencode/plugins/arggon/index.ts", undefined)
 export default __arggonEntry.default
 export const ARGON_BOARD_PANEL = __arggonEntry.ARGON_BOARD_PANEL
+export const BOARD_HIERARCHY_CHILD_KEYS = __arggonEntry.BOARD_HIERARCHY_CHILD_KEYS
+export const boardChildrenOf = __arggonEntry.boardChildrenOf
 export const boardItemDetail = __arggonEntry.boardItemDetail
+export const boardParentId = __arggonEntry.boardParentId
 export const boardSnapshot = __arggonEntry.boardSnapshot
 export const boardTreeLines = __arggonEntry.boardTreeLines
 export const emptyBoardSelection = __arggonEntry.emptyBoardSelection

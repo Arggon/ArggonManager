@@ -54,14 +54,14 @@ The day-to-day loop is unchanged and documented in
 
 ## What `arggon init` generates
 
-| Artifact                                                   | What it is                                                                                                                                                                    | Notes                                                                                                                           |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `opencode.jsonc`                                           | Project config: formatter, compaction retention (no MCP stanza since W3) and the minimal shell gates (W4: no `--no-verify`, no force-push)                                    | Generated **only when the repo has no OpenCode config** (root or `.opencode/`); otherwise reported in `skipped[]`               |
-| `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` | The repo's orchestration model as V2 agents                                                                                                                                   | Coordinator subagent allow-list; worker nesting + `arggon.create` denied; reviewer `edit` denied and read-only shell gates (W4) |
-| `.opencode/commands/arggon-*.md`                           | Eleven native commands (`/arggon-next`, `-start`, `-done`, `-handoff`, `-review`, `-status`, `-spec`, `-adr`, `-explore`, `-playbook`, `-adopt`)                              | Prompt templates driving the native tools (Code Mode `tools.arggon.*`); no CLI-driving prose, no shell blocks                   |
-| `.opencode/plugins/arggon/`                                | Vendored **single-file** plugin bundle (kernel inlined; ambient behavior + the native `arggon` tool namespace) plus the vendored **TUI entry** `tui.tsx` (board/status panel) | Built from the in-repo source by `npm run build:plugin`; loads with no `node_modules`; drift-gated by `npm run check:plugin`    |
-| `.agents/skills/arggon-cli/`                               | Umbrella skill + `references/` (json-contract, methodology, orchestration, pitfalls)                                                                                          | Progressive disclosure: detail loads on demand                                                                                  |
-| `AGENTS.md`                                                | Slim router                                                                                                                                                                   | V2 reads `AGENTS.md` only (no `CLAUDE.md` fallback)                                                                             |
+| Artifact                                                                       | What it is                                                                                                                                                                    | Notes                                                                                                                           |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `opencode.jsonc`                                                               | Project config: formatter, compaction retention (no MCP stanza since W3) and the minimal shell gates (W4: no `--no-verify`, no force-push)                                    | Generated **only when the repo has no OpenCode config** (root or `.opencode/`); otherwise reported in `skipped[]`               |
+| `.opencode/agents/arggon-{delivery-lead,maker,standards-reviewer,verifier}.md` | The repo's orchestration model as V2 agents                                                                                                                                   | Coordinator subagent allow-list; worker nesting + `arggon.create` denied; reviewer `edit` denied and read-only shell gates (W4) |
+| `.opencode/commands/arggon-*.md`                                               | Eleven native commands (`/arggon-next`, `-start`, `-done`, `-handoff`, `-review`, `-status`, `-spec`, `-adr`, `-explore`, `-playbook`, `-adopt`)                              | Prompt templates driving the native tools (Code Mode `tools.arggon.*`); no CLI-driving prose, no shell blocks                   |
+| `.opencode/plugins/arggon/`                                                    | Vendored **single-file** plugin bundle (kernel inlined; ambient behavior + the native `arggon` tool namespace) plus the vendored **TUI entry** `tui.tsx` (board/status panel) | Built from the in-repo source by `npm run build:plugin`; loads with no `node_modules`; drift-gated by `npm run check:plugin`    |
+| `.agents/skills/arggon-cli/`                                                   | Umbrella skill + `references/` (json-contract, methodology, orchestration, pitfalls)                                                                                          | Progressive disclosure: detail loads on demand                                                                                  |
+| `AGENTS.md`                                                                    | Slim router                                                                                                                                                                   | V2 reads `AGENTS.md` only (no `CLAUDE.md` fallback)                                                                             |
 
 Everything generated flows through the repo's never-overwrite +
 `x-generated` provenance machinery: untouched files refresh, modified files are
@@ -80,8 +80,9 @@ namespace:
   W3 eight plus `start` from W4: nine) so the runtime keeps them in its Code
   Mode catalog; a kernel failure becomes a typed tool error (`ArgonToolError`:
   kernel code + envelope) and the session continues. The whole 15-definition
-  payload measures 11,821 B ≤ 12,288 B advisory (ADR 0006; W7 re-measure,
-  trimmed from the W4-era 12,182 B).
+  payload measures 12,189 B ≤ 12,288 B advisory (ADR 0006; re-measured with
+  the `cleanup` `force` input in bug-cleanup-prune-untracked-artifacts-no-force,
+  which is declared bare because of the bound — 99 B of headroom).
 - **Worktree lifecycle tools (W4)** — `tools.arggon.start`, `branch` and
   `cleanup` own the item worktree through the V2 worktree domain
   (`ctx.worktree.create/list/remove`). For a fresh worktree, `start` uses the
@@ -101,16 +102,25 @@ namespace:
   domain, deletes their branches and clears the records in one tracker commit.
   Push and the `gh` PR step stay explicit agent steps; the CLI
   (`arggon start --worktree`, `arggon cleanup --prune`) is the documented
-  fallback when the domain is unavailable.
+  fallback when the domain is unavailable. The CLI's `start` (plain and
+  `--worktree`) also reports the commits a claim branch cut by that run inherits
+  from the canonical checkout's **local** HEAD beyond its upstream base
+  (`inheritedCommits` with the named remedy — push the primary branch, or drop
+  the inherited commits), so unpushed tracker auto-commits cannot ride a PR diff
+  unnoticed (bug-start-claim-branch-inherits-unpushed-tracker-commits, see
+  [`json-output.md`](./json-output.md) §`start`); the native `preparation`
+  receipt does not carry that report yet — the branch is cut by the host
+  `ctx.worktree.create` domain — so a native run has no equivalent field until
+  parity lands.
 
   Payload contract (documented here; the output schemas stay loose to respect
   the ADR 0006 budget and the contract tests assert the envelopes):
 
   | Tool      | Payload fields (beyond `ok`/`schemaVersion`/`conventionVersion`/`command`)                                                                                                                                                                                                                                             |
   | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `start`   | `id`, `branch`, `worktreePath` (`null` with `worktree: false`), `worktreeCreated`, `branchCreated`, `pushed`, `item`, `preparation?` (bounded `ready`/install/workspace/dependency-coverage receipt: `ready`, `install`, `linkedNodeModules`, `builtWorkspaces`, `linkedWorkspaces`, `manifestCoverage` (`"satisfied"` | `"stale"` | `"unknown"`), `missingDependencies` (kernel-capped at 10 names), `missingDependenciesTotal` and `gateBins` (which node_modules each declared gate binary resolves from — `"worktree"` | `"external"` | `"path"` | `"missing"` — bounded at 8), the bounded preparation log `steps` (`{ step, outcome, pkg? }`, bug-start-install-ordering, kernel-capped at 16) with `stepsTruncated` when the kernel's own cap dropped entries (mirrored, see below), plus `truncated` when a list was capped; `ready` is the conjunction of "an install is present", "no worktree-owned package resolves into the primary", "the install provides the worktree's declared `dependencies`/`devDependencies`" and "every reported gate bin resolves inside the worktree — the clause is vacuous when nothing declared exposes a bin", so a stale primary mirror is reported as `ready: false` **with the missing names in the payload** and a gate bin resolving from a sibling checkout's `.bin` (or nowhere) is named instead of silently running the gate on a foreign install — see [`agents.md`](./agents.md) §4 for the remedy), `claimCommitted`, `claimCommit` (`committed`, `not-needed`, `failed`, or `not-attempted` with a bounded reason), `commit?`, and `rollback?` on a refused claim |
+  | `start`   | `id`, `branch`, `worktreePath` (`null` with `worktree: false`), `worktreeCreated`, `branchCreated`, `pushed`, `item`, `preparation?` (bounded `ready`/install/workspace/dependency-coverage receipt: `ready`, `install`, `linkedNodeModules`, `builtWorkspaces`, `linkedWorkspaces`, `manifestCoverage` (`"satisfied"` | `"stale"` | `"unknown"`), `missingDependencies` (kernel-capped at 10 names), `missingDependenciesTotal` and `gateBins` (which node_modules each declared gate binary resolves from — `"worktree"` | `"external"` | `"path"` | `"missing"` — bounded at 8), the bounded preparation log `steps` (`{ step, outcome, pkg? }`, bug-start-install-ordering, kernel-capped at 16) with `stepsTruncated` and the exact `stepsDropped` count when the kernel's own cap dropped entries (mirrored, see below), plus `truncated` when a list was capped; `ready` is the conjunction of "an install is present", "no worktree-owned package resolves into the primary", "the install provides the worktree's declared `dependencies`/`devDependencies`" and "every reported gate bin resolves inside the worktree — the clause is vacuous when nothing declared exposes a bin", so a stale primary mirror is reported as `ready: false` **with the missing names in the payload** and a gate bin resolving from a sibling checkout's `.bin` (or nowhere) is named instead of silently running the gate on a foreign install — see [`agents.md`](./agents.md) §4 for the remedy), `claimCommitted`, `claimCommit` (`committed`, `not-needed`, `failed`, or `not-attempted` with a bounded reason), `commit?`, and `rollback?` on a refused claim |
   | `branch`  | `id`, `branch`, `item`, `commit?`                                                                                                                                                                                                                                                                                      |
-  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverPath?`, `leftoverBranch?`, `via?`), `failures[]`, `commit?`                                                                                                         |
+  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `forced?`, `blockingPaths?`, `blockingTotal?`, `blockingTracked?`, `blockingTrackedTotal?`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverPath?`, `leftoverBranch?`, `forced?`, `via?`), `failures[]`, `commit?`  |
 
   `start`'s `preparation` receipt is the bounded pre-claim dependency receipt
   the row above describes plus two ADDITIVE fragments the kernel builds in the
@@ -129,13 +139,18 @@ namespace:
   these rows against real `start` runs, so a field that ships without a row here
   fails that suite. A trailing `?` marks a field the payload omits on some
   paths; `Bound` names the kernel constant that caps a list (`lib/src/worktree.ts`).
-  `preparation.stepsTruncated` is the KERNEL's own decision about the bounded
-  preparation log, and it is **mirrored, never re-derived**
-  (bug-native-steps-truncated-flag-dropped): the kernel caps that log at
-  `MAX_PREP_STEPS = 16` and sets the flag when it drops entries, so a run with
-  more preparation decisions than that arrives with a shortened `steps` list and
-  `stepsTruncated: true` — the same event the CLI's `prepSteps` reports. Both
-  are additive within the payload: the flag also folds into `truncated`, so a
+  `preparation.stepsTruncated` and `preparation.stepsDropped` are the KERNEL's
+  own decision about the bounded preparation log — the flag and its
+  dropped-entry count — and they are **mirrored, never re-derived**
+  (bug-native-steps-truncated-flag-dropped,
+  bug-fresh-worktree-refusal-prose-drops-prep-step-truncation): the kernel caps
+  that log at `MAX_PREP_STEPS = 16` and sets the pair together when it drops
+  entries, so a run with more preparation decisions than that arrives with a
+  shortened `steps` list, `stepsTruncated: true` and the exact `stepsDropped` —
+  the same event the CLI's `prepSteps` carries with the same mirrored pair (see
+  [`json-output.md`](./json-output.md) §`start`), and the count the refusal
+  prose quotes so a capped log is never presented as complete. Both are
+  additive within the payload: the flag also folds into `truncated`, so a
   caller watching only that one still learns the log is not the whole log.
 
   | Field                                            | Type                                                   | Bound                                  | Notes                                                                                                                                                                                                                                                                                                                                                                            |
@@ -151,6 +166,7 @@ namespace:
   | `preparation.gateBins`                           | `object[]`                                             | kernel `MAX_GATE_BINS` (8)             | Entries `{ name, source, path? }`, `source` = `"worktree" \| "external" \| "path" \| "missing"`; `path` is absent when `source` is `"missing"`. `[]` leaves `ready` unchanged.                                                                                                                                                                                                   |
   | `preparation.steps?`                             | `object[]`                                             | kernel `MAX_PREP_STEPS` (16)           | The bounded preparation log (bug-start-install-ordering): entries `{ step, outcome, pkg? }` naming WHICH prep path ran, so a silent skip becomes nameable. Omitted when the log is empty.                                                                                                                                                                                        |
   | `preparation.stepsTruncated?`                    | `boolean`                                              | kernel `MAX_PREP_STEPS` (16)           | Present only when the kernel's own log hit that cap and dropped entries — MIRRORED, never re-derived (bug-native-steps-truncated-flag-dropped): this seam's own list cap (32 names) sits above the kernel's, so re-deriving the flag from it could never fire and a shortened `steps` reached the agent as if it were the whole log. It also folds into `preparation.truncated`. |
+  | `preparation.stepsDropped?`                      | `number`                                               | exact                                  | The kernel's own count of the entries its `MAX_PREP_STEPS` cap dropped, present exactly when `stepsTruncated` is — MIRRORED, never re-derived (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation): the refusal prose quotes it, and the CLI's `stepsDropped` carries the same number, so a capped log is never presented as complete.                                  |
   | `preparation.truncated?`                         | `boolean`                                              | —                                      | Present only when bounding shortened something (an over-cap list, a clipped string), so a capped list never reads as the whole set.                                                                                                                                                                                                                                              |
   | `preparation.env?`                               | `object`                                               | —                                      | Worktree env contract (spec worktree-env-contract-016): the `.arggon.env` write, the copy-if-absent `.env` seed and the read-only ignore probe. Present even under `x-worktree.env: false` (then `written: false` + `warning`).                                                                                                                                                  |
   | `preparation.env.written`                        | `boolean`                                              | —                                      | `true` only when THIS run created `.arggon.env`; an attach re-run reports `false` with `warning`.                                                                                                                                                                                                                                                                                |
@@ -187,8 +203,20 @@ namespace:
   checked against the directory and `git worktree list` before anything else
   happens, and a domain that resolves without removing (or fails) falls through
   to the literal `git worktree remove` fallback — the same primitive the `start`
-  rollback uses, without its force policy, so git keeps refusing dirty
-  worktrees. `removed worktree`, `deleted branch` and `cleared worktree_path`
+  rollback uses, with the force policy of the shared classification instead of
+  the rollback's blanket force, so git keeps refusing dirty worktrees unless
+  the caller armed `force` for an entry whose blockers are ALL untracked
+  (bug-cleanup-prune-untracked-artifacts-no-force; tracked modifications are
+  never force-discarded, and the skip names the blockers and the remedy). A
+  recorded path that is no longer a **live** worktree — missing on disk, or a
+  leftover directory whose gitdir link is gone (git lists the record as
+  `prunable` after an interrupted removal) — is a stale record, never a removal
+  candidate (bug-cleanup-stuck-when-worktree-dir-gone): the run skips the
+  removal, prunes the dead git record itself (`pruned stale git worktree
+record`; the record pins the branch, so it goes before `deleted branch`),
+  still deletes the merged branch and clears the record — any leftover
+  directory is left in place.
+  `removed worktree`, `deleted branch` and `cleared worktree_path`
   are reported only when the removal is observably complete; otherwise the
   candidate reports one bounded `failed` action plus a `failures[]` entry
   carrying `leftoverPath` (the worktree that is still there) and
@@ -203,10 +231,16 @@ namespace:
   (**unconditional**), another identity's stamp shows a live writer, or the
   worktree has uncommitted/untracked content (refused before anything is
   reaped, so a failed release keeps the stamp and env file; the stamp is reaped
-  only after an observed removal). `take_over_worktree` is the audited hatch for
-  a presumed-dead stamped owner on an unclaimed item, the only thing that forces
-  the removal, and is refused without a `release`. The release owns its tracker
-  commit and reports it, exactly like the CLI.
+  only after an observed removal). A recorded path that is no longer a live
+  worktree — missing on disk, or a leftover directory whose gitdir link is gone
+  — is a stale record for the release too
+  (bug-cleanup-release-stale-record-wedge): the domain removal is skipped
+  (nothing to remove), the dead git record is pruned (it pins the branch), the
+  branch git's dead record still names is deleted and the record is cleared —
+  the leftover directory is left in place. `take_over_worktree` is the audited
+  hatch for a presumed-dead stamped owner on an unclaimed item, the only thing
+  that forces the removal, and is refused without a `release`. The release owns
+  its tracker commit and reports it, exactly like the CLI.
   `update` cannot release — it is frontmatter-only, and it is the same call that
   CLEARS a `worktree_path` record — so the native `update` payload carries the
   additive `claimFootprint` receipt naming this call instead. See
@@ -454,14 +488,31 @@ claiming the item, NOTHING sourced — and pins that the WRITE reports `trackerR
   suite; the survivors pin deliberately unchanged behavior.
 
 * **Permissions (W4)** — the generated seam adds minimal shell gates (deny
-  `git commit --no-verify*`, `git push --force*`, `git push -f*`) that
+  `git commit --no-verify*`, `git push --force*`, `git push -f*`,
+  `git push *+*`, with the lease-checked `--force-with-lease` /
+  `--force-with-lease=*` / `--force-if-includes` spellings re-allowed after the
+  force deny — the last matching rule wins, so the discriminator is the lease,
+  not the spelling; `agents.md` §Force-push spellings) that
   complement — never replace — the kernel invariants; the shipped agents add
   role gates (reviewer `edit`/subagent denied plus read-only shell gates;
-  worker `arggon.create` denied; coordinator subagent allow-list). Native tool
+  worker `arggon.create` denied; coordinator subagent allow-list; verifier
+  `edit`/`subagent` plus every tracker write — `comment` included — denied,
+  with its read-only tracker tools granted explicitly in both spellings:
+  `bug-verifier-cannot-read-the-tracker-no-allow-side`). Native tool
   actions normalize to `<namespace>_<tool>` (`arggon_update`), MCP tools to
   `<server>_<tool>` (`arggon_arggon_update`): a `deny` removes the tool from
   the Code Mode catalog. The base policy stays allow-all, so ordinary and
-  headless sessions are never blocked.
+  headless sessions are never blocked; the verifier's explicit read `allow`s
+  exist because a read set that rests on that default is a default, not a
+  contract (`agents.md` §Orchestration). **Which layer honors the block, probed
+  per runtime** (`bug-task-permissions-enforcement-not-observed`, harness
+  `npm run smoke:permissions-probe`): the OpenCode V2 runtime's own permission
+  layer reads the project `permissions` array for every agent and picks up an
+  edit made after a session started (fresh run, continued session, long-lived
+  service — all enforced); the ZCode/Claude seams do not read it and run their
+  own `hooks/gate.mjs` gate; the vendored plugin declares no permission surface
+  of its own; the kernel stays the enforcement of record (`agents.md` §Which
+  layer enforces the seam's shell gates).
 * **MCP is out of the default path (W3)** — the plugin no longer registers
   `mcp.servers.arggon` and never touches `ctx.mcp`; the generated config carries
   no MCP stanza. `arggon mcp` and `.mcp.json` remain for non-OpenCode clients
@@ -479,9 +530,31 @@ claiming the item, NOTHING sourced — and pins that the WRITE reports `trackerR
   runtime resolve `solid-js`, so the adopter tree still needs no `node_modules`.
 * **Session ↔ item correlation** — `ARGON_ITEM` env → observed `arggon` calls
   (shell invocations and Code Mode `tools.arggon.<name>(…)` calls) →
-  `feat/<id>` / `fix/<id>` branch.
+  `feat/<id>` / `fix/<id>` branch. For the prompt-admission stamp the
+  **worktree env contract** (`.arggon.env`, spec-worktree-env-contract-016) is
+  consulted first, because it is the only source that names the session's own
+  worktree; the chain above is its fallback on a plain checkout.
 * **Bounded context** — injects an `arggon show --json`-shaped item block
   (≤ 1024 B) per model call, so it is present after compaction by construction.
+* **Prompt-admission stamp (T4)** — the `prompt` hook writes a bounded
+  branch/item stamp into the admitted prompt's own `metadata`
+  (`payload.metadata.arggon`), so a persisted user message carries the item it
+  was opened under. Metadata only: the prompt text, files, agents, skills and
+  `delivery` are left byte-identical, and nothing permission-related is touched.
+* **Compaction retention (T4)** — the `compaction` hook re-injects the item
+  block into the checkpoint-summary request's system instructions exactly once,
+  so the summary is produced WITH the item in scope. It never sets `result`: the
+  model still writes the summary.
+* **Event-driven panel refresh (T4)** — the open board panel follows the host's
+  OpenCode event stream (`context.data.on`, the surface the built-in TUI plugins
+  use on 2.0.26; there is no `context.event` there — probed 2026-10-13) and
+  re-reads the tracker on the events that mean argon work landed:
+  `session.shell.ended` (a command run through the session's shell endpoint —
+  the TUI prompt's shell mode or the API) and `session.step.ended` (an agent
+  step, which is where the shell tool calls and the native `tools.arggon.*`
+  calls live). A mutation made by
+  another terminal fires no event and stays invisible until the next event or
+  `r` — the panel has no timer and no watcher, by contract.
 * **Session ergonomics** — renames the session to the claimed item; surfaces
   the recorded `worktree_path` for `session_move`.
 * **Hygiene signal** — logs a non-blocking warning when `arggon validate`
@@ -515,25 +588,36 @@ panel. `n` jumps to the kernel `next` suggestion and `a` to the session's active
 item (`ARGON_ITEM` or the `feat/<id>`/`fix/<id>` branch), with a toast when there
 is no target. Nothing in the panel writes to the tracker.
 
+The panel is **fresh without polling** (T4): while it is open it subscribes to
+the host event stream (`context.data.on`) and re-reads the tracker when a step
+ends or a session shell command finishes — the events that mean argon work
+landed, so `arggon create/update/done/…` run from the session repaints the open
+panel within a frame and no keypress. The subscription is disposed with the
+panel (`onCleanup`), there is no timer or filesystem watcher anywhere in the
+entry, and a host without that surface keeps the manual `r` reload and nothing
+else. A tracker change made OUTSIDE OpenCode (another terminal) is deliberately
+not observed: the panel is event-driven, not a watcher.
+
 **Manual checklist** (no interactive driver in CI — the automated evidence is
 `npm run smoke:tui`, which drives exactly this flow in a PTY: init → tree →
 `/arggon-board` → panel captured):
 
-| Step                                                     | Expected                                                                                                                                                                                                               |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Open a session, run `/arggon-board`                      | Panel opens, header `arggon board · N item(s) · next: <id>`, counters line, indented tree (I/E/S/T/B badge + status glyph + id + title), cursor `❯` on the first line                                                  |
-| `j` / `k` (or `↓`/`↑`)                                   | Cursor moves one tree line down/up; the selected line is marked `❯`; `j` at the last line stays there                                                                                                                  |
-| `PgUp` / `PgDn`, `g` / `Home`, `G` / `End`               | Cursor pages (10 rows) or jumps to the first/last line; the window follows beyond the 200-line cap                                                                                                                     |
-| `n` / `a`                                                | Cursor jumps to the kernel `next` suggestion / the session's active item (`ARGON_ITEM` or `feat/<id>`/`fix/<id>` branch); a toast when there is no target                                                              |
-| `Enter`                                                  | Inline detail block under the selected line: `┌ argon detail · <id> — <title>`, acceptance rows `[ ]`/`[x]`, bounded sanitized body, `└ x/y acceptance · path`; `Enter` again or moving the cursor returns to the tree |
-| `Esc` (detail block open)                                | Detail block closes; the tree stays with the cursor where it was                                                                                                                                                       |
-| `esc` (no detail block)                                  | Panel closes; the session view returns; nothing else changes                                                                                                                                                           |
-| `f`                                                      | Presentation toggles to full-screen and back (host no-op on a narrow terminal — it is already full-screen)                                                                                                             |
-| `r`                                                      | Tree is re-read from disk (edits to items appear); the cursor stays on the same item when it still exists, else clamps                                                                                                 |
-| Resize to a narrow terminal (< ~70 cols)                 | Panel stays full-screen, each line clips with `…`, no wrap/ghost (the detail block clips with it)                                                                                                                      |
-| Sidebar (wide terminal, ~160 cols)                       | `arggon ▶ <active item> <status>` when the session resolves an item, else `arggon · N ready · next <id>`; the host hides the sidebar on narrower terminals                                                             |
-| Open the TUI outside a tracker                           | `arggon board · no ArggonManager tracker found here`; session unaffected                                                                                                                                               |
-| Open the TUI with a corrupt tracker (duplicate item ids) | `arggon board · tracker unreadable: Duplicate id '…'`; no "crashed in slot" overlay, session unaffected; `Enter`/`n`/`a` stay inert                                                                                    |
+| Step                                                           | Expected                                                                                                                                                                                                               |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Open a session, run `/arggon-board`                            | Panel opens, header `arggon board · N item(s) · next: <id>`, counters line, indented tree (I/E/S/T/B badge + status glyph + id + title), cursor `❯` on the first line                                                  |
+| `j` / `k` (or `↓`/`↑`)                                         | Cursor moves one tree line down/up; the selected line is marked `❯`; `j` at the last line stays there                                                                                                                  |
+| `PgUp` / `PgDn`, `g` / `Home`, `G` / `End`                     | Cursor pages (10 rows) or jumps to the first/last line; the window follows beyond the 200-line cap                                                                                                                     |
+| `n` / `a`                                                      | Cursor jumps to the kernel `next` suggestion / the session's active item (`ARGON_ITEM` or `feat/<id>`/`fix/<id>` branch); a toast when there is no target                                                              |
+| `Enter`                                                        | Inline detail block under the selected line: `┌ argon detail · <id> — <title>`, acceptance rows `[ ]`/`[x]`, bounded sanitized body, `└ x/y acceptance · path`; `Enter` again or moving the cursor returns to the tree |
+| `Esc` (detail block open)                                      | Detail block closes; the tree stays with the cursor where it was                                                                                                                                                       |
+| `esc` (no detail block)                                        | Panel closes; the session view returns; nothing else changes                                                                                                                                                           |
+| `f`                                                            | Presentation toggles to full-screen and back (host no-op on a narrow terminal — it is already full-screen)                                                                                                             |
+| `r`                                                            | Tree is re-read from disk (edits to items appear); the cursor stays on the same item when it still exists, else clamps                                                                                                 |
+| A session shell command or agent step mutates the tracker (T4) | The open panel repaints the new state with no keypress (the event stream refreshed it). A change made outside OpenCode (another terminal) does NOT appear: the panel has no timer and no watcher — press `r`           |
+| Resize to a narrow terminal (< ~70 cols)                       | Panel stays full-screen, each line clips with `…`, no wrap/ghost (the detail block clips with it)                                                                                                                      |
+| Sidebar (wide terminal, ~160 cols)                             | `arggon ▶ <active item> <status>` when the session resolves an item, else `arggon · N ready · next <id>`; the host hides the sidebar on narrower terminals                                                             |
+| Open the TUI outside a tracker                                 | `arggon board · no ArggonManager tracker found here`; session unaffected                                                                                                                                               |
+| Open the TUI with a corrupt tracker (duplicate item ids)       | `arggon board · tracker unreadable: Duplicate id '…'`; no "crashed in slot" overlay, session unaffected; `Enter`/`n`/`a` stay inert                                                                                    |
 
 ## Guarantees
 
@@ -553,7 +637,10 @@ is no target. Nothing in the panel writes to the tracker.
 npm test                      # 1438+ tests
 npm run smoke:opencode        # headless scenarios on a real OpenCode runtime: dependency-less bundle, one session per native command, the W4 worktree lifecycle + invariants + permissions
 npm run smoke:opencode:wave   # scripted coordinator/worker/reviewer wave (2 fixtures)
+npm run smoke:permissions-probe  # per-runtime permissions probe (bug-task-permissions-enforcement-not-observed): one denied + one allowed command per runtime — V2 session (fresh, continued after a config edit, long-lived service), the ZCode/Claude hook gates, the kernel refusals, the plugin's empty own surface; deterministic legs model-free (also in `npm test`), V2 legs need opencode + credentials and skip otherwise
 npm run smoke:native-start-cold  # deterministic + model-free: the native tools.arggon.start cold worktree (dependency-requiring pre-commit gate, bounded readiness/claim-commit receipt, claim commit with only the item file, re-run attach, untouched installs)
+npm run smoke:opencode:prompt-stamp  # deterministic + model-free (T4): the prompt-admission stamp, the compaction retention, the no-polling timeline and the off-contract silence on a real `opencode serve` + scripted provider
+npm run smoke:opencode:panel-refresh  # deterministic + model-free (T4): the open board panel refreshes from the OpenCode event stream (session shell endpoint → `session.shell.ended`) with no keypress, and a tracker change no event announced never appears (no polling)
 npm run smoke:tui             # TUI evidence on a real runtime: init seam, plugin discovery, PTY run, /arggon-board opens and renders the tree
 npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, item block, keep.tokens
 ```
@@ -562,11 +649,20 @@ npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, ite
 sensitive**: run them on their own, without a concurrent test suite or another
 headless harness (a loaded machine can stall a provider call past the per-command
 timeout and leave a scenario half-done). The deterministic gates (`npm test`,
-lint/build/`check:plugin`, `validate`) are safe to run in parallel; `smoke:tui`
-and `smoke:native-start-cold` are model-free and cheap — the latter needs
-`npm run build` first, because it drives the native tool against **this
-checkout's** plugin source and kernel build, not a vendored or primary-copy
-build.
+lint/build/`check:plugin`, `validate`) are safe to run in parallel; `smoke:tui`,
+`smoke:native-start-cold` and `smoke:opencode:prompt-stamp` are
+model-free and cheap — the latter two need `npm run build` first, because they
+drive the native tools and the vendored bundle against **this checkout's**
+plugin source and kernel build, not a vendored or primary-copy build. The plugin
+smokes (`smoke:opencode`, `smoke:native-start-cold`'s move leg and the T4 two)
+all serve under a hermetic HOME now: the supervisor resolves plugin ids
+globally, so a machine-global
+`~/.config/opencode/plugins/arggon/index.ts` competes with the fixture's
+vendored copy for the same id and the run could silently exercise the wrong
+plugin — HOME/`XDG_*` point into a disposable root, each smoke asserts from the
+host's own log that the fixture's copy is the one that loaded, and
+`smoke:opencode` seeds the credentials its model-driven sessions need into the
+disposable data home through `opencode auth export`/`import`.
 
 ## Side-by-side installs
 

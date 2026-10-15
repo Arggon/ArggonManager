@@ -1,9 +1,12 @@
 import {
+  closeSync,
   existsSync,
   lstatSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
+  readSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -335,8 +338,9 @@ const BUNDLED_SOURCES = [...BUNDLED_SKILLS, ...BUNDLED_PLUGINS];
  * (bug-stale-vendored-plugin-copy)? They are gitignored, derived per-checkout
  * copies of the committed bundle — never adopter-owned content — so a
  * provenance mismatch re-vendors instead of modified-skip. Skill copies are
- * excluded: `.agents/skills/**` is tracked and follows the normal provenance
- * decisions.
+ * excluded: `.agents/skills/**` follows the normal provenance decisions —
+ * adopter-tracked in an adopter tree, and a gitignored per-checkout copy in
+ * the seam repo's own checkout (see {@link isBundledSkillDest}).
  *
  * Exported for `doctor --agents` (task-adapter-selection-flags), which must
  * classify the SAME destinations as derived artifacts rather than as
@@ -345,6 +349,53 @@ const BUNDLED_SOURCES = [...BUNDLED_SKILLS, ...BUNDLED_PLUGINS];
  */
 export function isBundledPluginDest(dest: string): boolean {
   return BUNDLED_PLUGINS.some((p) => p.dest === dest);
+}
+
+/**
+ * Is this destination one of the bundled skill copies
+ * (`.agents/skills/arggon-cli/**`, `.agents/skills/arggon-upgrade/**`)?
+ *
+ * The copies are a PURE function of a committed source
+ * (`generatedMarker(source) + source`, no placeholders in `skills/**`), which
+ * makes their `x-generated` row derivable without the copy: the row must
+ * describe the current source render. That derivation is what
+ * `auditGeneratedProvenance` checks for these destinations — the seam repo
+ * gitignores its own copies (`.gitignore`: "single committed source"), so a
+ * fresh checkout/CI has no copy to compare the row against and the byte
+ * rule alone cannot see a stale row
+ * (bug-skill-source-edit-leaves-ledger-stale).
+ */
+export function isBundledSkillDest(dest: string): boolean {
+  return BUNDLED_SKILLS.some((s) => s.dest === dest);
+}
+
+/**
+ * The source prefix of the ONE skill the Claude Code bundle vendors
+ * (spec-claude-code-adapter-024, task-claude-plugin-seam): the plugin manifest
+ * declares `skills: "./skills"`, so `init` materializes the skill under
+ * `.claude-marketplace/arggon/skills/arggon-cli/**` (the `claude/` prefix
+ * mapping). The `arggon-upgrade` skill is deliberately not vendored: the
+ * bundle ships the skill an adopting agent reads to run the arggon loop, and
+ * upgrade guidance is the generated docs' job.
+ */
+const CLAUDE_BUNDLED_SKILL_SOURCE = "skills/arggon-cli/";
+
+/**
+ * Staging path inside the Claude bundle's template subtree for one bundled
+ * skill source — `skills/arggon-cli/SKILL.md` →
+ * `templates/docs/claude/arggon/skills/arggon-cli/SKILL.md` — or `null` for any
+ * source that is not a file of the vendored `arggon-cli` skill.
+ *
+ * This is the "one skill, two destinations" seam: the committed source stays
+ * `skills/arggon-cli/**`; `npm run skills:sync` writes this staging copy
+ * (byte-equal, marker-less — the marker is `init`'s, like every other
+ * template), and `init` renders it into the adopter tree. The parity tests
+ * pin both hops, so a source edit that misses the staging copy fails CI
+ * instead of shipping a stale skill inside the plugin.
+ */
+export function claudeBundleSkillStagingPath(source: string): string | null {
+  if (!source.startsWith(CLAUDE_BUNDLED_SKILL_SOURCE)) return null;
+  return `templates/docs/claude/arggon/skills/${source.slice("skills/".length)}`;
 }
 
 /** Is this template id one of the bundled (package-root source) artifacts? */
@@ -390,6 +441,12 @@ const DOC_PREFIX_MAP: { prefix: string; dest: string }[] = [
   // catalog + the vendored declarative plugin land under one root the user
   // adds as a local marketplace (the platform's one manual install step).
   { prefix: "zcode/", dest: ".zcode-marketplace/" },
+  // Claude Code plugin seam (spec-claude-code-adapter-024,
+  // task-claude-plugin-seam): same shape as the ZCode seam — the marketplace
+  // root (`.claude-plugin/marketplace.json`) plus the vendored plugin under
+  // `arggon/`, added as a local marketplace with
+  // `claude plugin marketplace add <repo>/.claude-marketplace`.
+  { prefix: "claude/", dest: ".claude-marketplace/" },
 ];
 
 /** Canonical (v5) destination of a template-relative path. */
@@ -457,12 +514,14 @@ function isGitignoreDestination(dest: string): boolean {
 
 /**
  * Markdown artifacts whose syntax requires YAML frontmatter on the first line
- * (OpenCode and ZCode agents/commands): their visible marker is a `#` comment
- * INSIDE the frontmatter instead of a leading HTML comment.
+ * (OpenCode, ZCode and Claude Code agents/commands): their visible marker is a
+ * `#` comment INSIDE the frontmatter instead of a leading HTML comment.
  */
 function isFrontmatterDestination(dest: string): boolean {
   return (
-    (dest.startsWith(".opencode/") || dest.startsWith(".zcode-marketplace/")) &&
+    (dest.startsWith(".opencode/") ||
+      dest.startsWith(".zcode-marketplace/") ||
+      dest.startsWith(".claude-marketplace/")) &&
     dest.endsWith(".md")
   );
 }
@@ -679,14 +738,41 @@ function walkTemplates(dir: string, base = dir): string[] {
   return found.sort();
 }
 
+/**
+ * The literal `ARGGON_VERSION: "<x>"` pin in the generated CI workflow
+ * (templates/docs/github/workflows/arggon.yml). Only the first such line, at
+ * any indentation, is matched.
+ */
+const WORKFLOW_PIN_LINE = /^([ \t]*ARGGON_VERSION:[ \t]*)"[^"\n]*"/m;
+const PIN_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+
+/**
+ * Rewrite the generated workflow's literal `ARGGON_VERSION` pin to `version`
+ * (bug-init-writes-stale-workflow-pin). The template's own literal is only a
+ * placeholder value: the release flow bumps package.json before the template
+ * is re-pinned, so a published tarball could carry an older pin than itself
+ * (0.5.0 shipped "0.4.0", 0.10.0 shipped "0.7.0") and every adopter's first
+ * `tasks-validate` installed the wrong generator. The output stays a LITERAL
+ * pin (task-ci-seam-pin-tracks-release); only its value now comes from the
+ * running CLI. Content without a pin line, or a non-semver version, is
+ * returned unchanged.
+ */
+export function renderWorkflowPin(content: string, version: string): string {
+  if (!PIN_VERSION.test(version)) return content;
+  return content.replace(WORKFLOW_PIN_LINE, (_, prefix: string) => `${prefix}"${version}"`);
+}
+
 /** Render the known placeholders; unknown ones are left untouched. */
 export function renderDocPlaceholders(
   content: string,
-  vars: { projectName: string; year: number },
+  vars: { projectName: string; year: number; arggonVersion?: string },
 ): string {
-  return content
-    .replaceAll("{{PROJECT_NAME}}", vars.projectName)
-    .replaceAll("{{YEAR}}", String(vars.year));
+  return renderWorkflowPin(
+    content
+      .replaceAll("{{PROJECT_NAME}}", vars.projectName)
+      .replaceAll("{{YEAR}}", String(vars.year)),
+    vars.arggonVersion ?? arggonVersion(),
+  );
 }
 
 /**
@@ -1592,6 +1678,176 @@ export function generateDocs(opts: GenerateDocsOptions): DocsResult {
 }
 
 /**
+ * The template id a file's OWN bytes claim, or `null` when the file carries no
+ * visible provenance marker (bug-prover-agent-has-no-x-generated-entry).
+ *
+ * Anchored exactly like {@link stampGeneratedContent} writes the marker — the
+ * first line, or the first line INSIDE frontmatter — so the phrase appearing in
+ * a body, or a file that merely documents the marker, is never read as
+ * provenance (the same anchoring lesson as `isArggonGeneratedConfig`). CRLF and
+ * a BOM are tolerated; the returned value is the raw template id from the
+ * marker, not a resolved path.
+ */
+export function readGeneratedMarker(text: string): string | null {
+  const [first = "", second = ""] = text.replace(/^\uFEFF/, "").split(/\r?\n/, 3);
+  const match =
+    /^<!-- arggon:generated template="([^"]+)" -->$/.exec(first) ??
+    /^\/\/ arggon:generated template="([^"]+)"$/.exec(first) ??
+    /^# arggon:generated template="([^"]+)"$/.exec(first) ??
+    (first.trim() === "---" ? /^# arggon:generated template="([^"]+)"$/.exec(second) : null);
+  return match?.[1] ?? null;
+}
+
+/**
+ * One file whose own bytes claim arggon provenance but which has NO
+ * `x-generated` entry (bug-prover-agent-has-no-x-generated-entry): the
+ * false-absence shape.
+ *
+ * A file that carries the visible marker declares "arggon generated me from
+ * `<template>`" — but with no ledger row, init classifies it adopter-modified
+ * and silently stops propagating template edits to it, and a walk over the
+ * CURRENT destinations cannot see it at all once its template leaves the
+ * install (the exact shape of the stranded `.opencode/agents/arggon-prover.md`:
+ * a marker-bearing file, no row, template gone). The marker is what separates
+ * this from the sanctioned pre-provenance adopter file: an adopter-owned file
+ * with no marker and no row is init behaving correctly, and is never reported
+ * here.
+ */
+export type UnprovenancedManagedFile = {
+  /** Destination path (posix, relative to the probed root). */
+  dest: string;
+  /** The template id the file's own visible marker claims. */
+  template: string;
+  /** One-line explanation naming the marker and the missing row. */
+  reason: string;
+};
+
+/** Safety valves for the managed-path walk: the seam is far below either. */
+const MAX_UNPROVENANCED_SCAN_FILES = 5000;
+const MAX_UNPROVENANCED_HEAD_BYTES = 8192;
+
+/** Directories the managed-path walk never descends into. */
+const UNPROVENANCED_SKIP_DIRS = new Set([".git", "node_modules", "dist", "backup"]);
+
+/** Read just enough of a file to decide whether it carries the marker. */
+function readGeneratedMarkerAt(abs: string): string | null {
+  let fd: number | undefined;
+  try {
+    fd = openSync(abs, "r");
+    const buffer = Buffer.alloc(MAX_UNPROVENANCED_HEAD_BYTES);
+    const read = readSync(fd, buffer, 0, buffer.length, 0);
+    return readGeneratedMarker(buffer.subarray(0, read).toString("utf8"));
+  } catch {
+    return null; // unreadable or vanished: nothing can be claimed about it
+  } finally {
+    if (fd !== undefined) {
+      try {
+        closeSync(fd);
+      } catch {
+        // closing a read-only fd cannot lose data
+      }
+    }
+  }
+}
+
+/** The shared reason text for one unprovenanced managed file. */
+function unprovenancedReason(dest: string, template: string): string {
+  return (
+    `carries the visible provenance marker for template "${template}" but has no ` +
+    `x-generated entry for ${dest} — init classifies it adopter-modified and silently ` +
+    "stops propagating template edits to it; regenerate it with the generator that owns " +
+    "the template (which records the row), remove the stranded file, or drop the marker " +
+    "if the content is adopter-owned"
+  );
+}
+
+/**
+ * Every file under a managed path whose own marker claims arggon provenance but
+ * which has no `x-generated` entry (bug-prover-agent-has-no-x-generated-entry).
+ *
+ * The managed paths are the ones the generator owns: every current destination
+ * (the SAME walk init plans from, tier-2 included) plus every destination the
+ * ledger has ever recorded — and, for destinations in a directory, the whole
+ * namespace directory (so a stranded sibling whose template left the install is
+ * still covered: `.opencode/agents/` is managed whether or not a given file in
+ * it still has a template). A row-bearing file is never a finding; a
+ * marker-less file is never a finding (that is the sanctioned pre-provenance
+ * adopter file init is RIGHT to skip). Pure read, bounded, never throws.
+ */
+export function unprovenancedManagedFiles(opts: {
+  root: string;
+  /** Defaults to the bundle (`bundledTemplatesDir()`), like every caller. */
+  templatesDir?: string;
+  /** Overrides the detected tracker layout (defaults to detection at root). */
+  layout?: TrackerLayout;
+  /** Ledger rows to test against; defaults to the tree's own. */
+  state?: Record<string, GeneratedEntry>;
+}): UnprovenancedManagedFile[] {
+  const templatesDir = opts.templatesDir ?? bundledTemplatesDir();
+  const layout: TrackerLayout = opts.layout ?? trackerAt(opts.root)?.layout ?? "arggon-manager";
+  const state = opts.state ?? readGeneratedState(opts.root);
+
+  const managed = new Set<string>();
+  for (const { dest } of currentGeneratedTemplatesFrom(templatesDir, layout)) managed.add(dest);
+  for (const dest of Object.keys(state)) managed.add(dest);
+
+  const rootDests: string[] = [];
+  const dirs: string[] = [];
+  for (const dest of managed) {
+    const segments = dest.split("/");
+    if (segments.length === 1) rootDests.push(dest);
+    else dirs.push(segments.slice(0, -1).join("/"));
+  }
+  // Minimal covering set: an ancestor covers its descendants, so each managed
+  // namespace is walked exactly once.
+  const covering: string[] = [];
+  for (const dir of [...new Set(dirs)].sort()) {
+    if (covering.some((kept) => dir === kept || dir.startsWith(`${kept}/`))) continue;
+    covering.push(dir);
+  }
+
+  const findings: UnprovenancedManagedFile[] = [];
+  const considered = new Set<string>();
+  const consider = (dest: string): void => {
+    if (considered.has(dest)) return;
+    considered.add(dest);
+    if (state[dest] !== undefined) return; // a row exists: not a false absence
+    const template = readGeneratedMarkerAt(join(opts.root, ...dest.split("/")));
+    if (template === null) return; // no marker: sanctioned adopter content
+    findings.push({ dest, template, reason: unprovenancedReason(dest, template) });
+  };
+
+  // Root-level destinations are checked as exact paths only: the repo root is
+  // not a managed namespace, so it is never walked.
+  for (const dest of rootDests.sort()) consider(dest);
+
+  let scanned = 0;
+  const walk = (dir: string): void => {
+    let entries;
+    try {
+      entries = readdirSync(join(opts.root, ...dir.split("/")), { withFileTypes: true });
+    } catch {
+      return; // absent or unreadable namespace: nothing to report
+    }
+    for (const entry of entries) {
+      if (scanned >= MAX_UNPROVENANCED_SCAN_FILES) return;
+      if (UNPROVENANCED_SKIP_DIRS.has(entry.name)) continue;
+      const child = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        walk(child);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      scanned++;
+      consider(child);
+    }
+  };
+  for (const dir of covering) walk(dir);
+
+  return findings.sort((a, b) => a.dest.localeCompare(b.dest));
+}
+
+/**
  * One broken row of the provenance ledger (bug-stale-x-generated-records-
  * goal-mode-seam-pair): a committed generated file whose bytes are EXACTLY
  * what the current generator produces, but whose `x-generated` record is
@@ -1612,8 +1868,17 @@ export type ProvenanceRecordViolation = {
    * all (init reads it as a pre-provenance adopter file); `stale-checksum` —
    * an entry exists but its checksum no longer matches the committed bytes
    * (init reads it as an adopter edit). Same consequence either way.
+   * `stale-derived-checksum` — a bundled-skill row whose checksum no longer
+   * matches the current source render: the row is checkable without the copy,
+   * because a skill copy is a pure function of its committed source
+   * (bug-skill-source-edit-leaves-ledger-stale).
+   * `unprovenanced` — a file under a managed path whose own visible marker
+   * claims arggon provenance but which has no `x-generated` entry at all: the
+   * false absence (bug-prover-agent-has-no-x-generated-entry). Independent of
+   * the current template walk, so a stranded file whose template left the
+   * install is still reported.
    */
-  kind: "missing-record" | "stale-checksum";
+  kind: "missing-record" | "stale-checksum" | "stale-derived-checksum" | "unprovenanced";
   /** One-line explanation naming the bytes and the record that disagree. */
   reason: string;
 };
@@ -1638,6 +1903,30 @@ export type ProvenanceRecordViolation = {
  *    (bug-stale-vendored-plugin-copy);
  *  - renders that cannot be produced (template absent, project name
  *    unrecoverable) — "cannot decide", the doctor `unverified` semantics.
+ *
+ * The false-absence class (bug-prover-agent-has-no-x-generated-entry) is
+ * checked SEPARATELY from the byte rule above, because the byte rule can only
+ * see destinations the CURRENT generator walk still owns: a file under a
+ * managed path whose own visible marker claims arggon provenance but which has
+ * no `x-generated` entry at all is a finding whatever its bytes are and whether
+ * or not its template still exists — the stranded `.opencode/agents/
+ * arggon-prover.md` (marker, no row, template gone) is exactly this shape. The
+ * marker is what separates it from the sanctioned pre-provenance adopter file,
+ * which has no marker and no row and is init behaving correctly (see
+ * `unprovenancedManagedFiles`). Findings already reported by the byte rule are
+ * not repeated.
+ *
+ * Bundled-skill rows (`isBundledSkillDest`) are the one destination class whose
+ * row is DERIVABLE, so it is checked even where the copy is absent — the seam
+ * repo gitignores its own copies, which is exactly how a stale row stayed
+ * invisible to CI (bug-skill-source-edit-leaves-ledger-stale):
+ * `checksumOf(render)` is a pure function of the committed source, and the row
+ * must describe it. The remedy is `npm run skills:sync` (which regenerates the
+ * copies AND re-records the rows), never a hand-edited ledger. This does NOT
+ * weaken the adopter-edit doctrine: the row is compared against the SOURCE
+ * render, never read back from the destination, so a hand edit can never be
+ * blessed as generated — and a hand-edited copy (bytes ≠ render) still keeps
+ * its row silent exactly as before.
  *
  * Pure read: no writes, never throws on unreadable files. The repo's own test
  * suite runs this against the arggon checkout itself on every CI run, so a
@@ -1671,6 +1960,35 @@ export function auditGeneratedProvenance(opts: {
     if (state[dest]?.acknowledged) continue;
     // Derived vendored artifact: per-checkout bytes, re-vendored on mismatch.
     if (isBundledPluginDest(dest)) continue;
+    const render = renderGeneratedDoc({
+      templatesDir,
+      root: opts.root,
+      template,
+      dest,
+      projectName,
+    });
+    // Render refused: "cannot decide" — no row of the ledger is decidable.
+    if (render === null) continue;
+    const entry = state[dest];
+    // Derived skill row (bug-skill-source-edit-leaves-ledger-stale): the copy
+    // is a pure function of the committed source, so the ROW is checkable
+    // without the copy — the check that CI (a fresh checkout, no copies) can
+    // always run. A hand-edited copy never reaches this verdict: the row is
+    // compared against the source render, never read back from the dest.
+    if (isBundledSkillDest(dest) && entry?.checksum && !checksumMatches(entry.checksum, render)) {
+      violations.push({
+        dest,
+        template,
+        kind: "stale-derived-checksum",
+        reason:
+          "the x-generated checksum (" +
+          entry.checksum +
+          ") does not match the render of the committed source template (" +
+          checksumOf(render) +
+          ") — the copy is a pure function of that source, so the row is stale; " +
+          "run `npm run skills:sync` and commit the refreshed row",
+      });
+    }
     const destAbs = join(opts.root, ...dest.split("/"));
     if (!existsSync(destAbs)) continue;
     let disk: string;
@@ -1679,18 +1997,9 @@ export function auditGeneratedProvenance(opts: {
     } catch {
       continue; // unreadable: nothing can be decided about its bytes
     }
-    const render = renderGeneratedDoc({
-      templatesDir,
-      root: opts.root,
-      template,
-      dest,
-      projectName,
-    });
-    // Render refused, or the bytes are adopter content (differ from the
-    // render): no row of the ledger is broken — init skipping those files is
-    // init behaving correctly.
-    if (render === null || !checksumMatches(checksumOf(render), disk)) continue;
-    const entry = state[dest];
+    // The bytes are adopter content (differ from the render): no row of the
+    // ledger is broken — init skipping those files is init behaving correctly.
+    if (!checksumMatches(checksumOf(render), disk)) continue;
     if (!entry?.checksum) {
       violations.push({
         dest,
@@ -1714,6 +2023,26 @@ export function auditGeneratedProvenance(opts: {
           "and silently stops propagating template edits to it",
       });
     }
+  }
+  // The false-absence class (bug-prover-agent-has-no-x-generated-entry): files
+  // under a managed path whose own marker claims provenance but which have no
+  // row. Independent of the walk above — the stranded prover file was in
+  // neither the current destination set nor the ledger. A destination the byte
+  // rule already reported is not repeated here.
+  const reported = new Set(violations.map((v) => v.dest));
+  for (const file of unprovenancedManagedFiles({
+    root: opts.root,
+    templatesDir,
+    layout,
+    state,
+  })) {
+    if (reported.has(file.dest)) continue;
+    violations.push({
+      dest: file.dest,
+      template: file.template,
+      kind: "unprovenanced",
+      reason: file.reason,
+    });
   }
   return violations.sort((a, b) => a.dest.localeCompare(b.dest));
 }

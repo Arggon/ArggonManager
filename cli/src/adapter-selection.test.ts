@@ -10,7 +10,6 @@
  * adopter-edited generated file is never overwritten.
  */
 import {
-  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync as _mkdtempSync,
@@ -21,8 +20,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { readGeneratedState } from "@arggondev/lib";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -37,8 +35,6 @@ import { currentGeneratedTemplates, GENERATED_DOC_COUNT } from "./docs.js";
 import { dryRunInit, runInit, type InitOptions, type InitResult } from "./init.js";
 import { formatDoctorReport, runDoctor } from "./doctor.js";
 import { runCli } from "./test-spawn.js";
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -80,7 +76,15 @@ const PER_AGENT_COUNT: Record<string, number> = Object.fromEntries(
 );
 
 /** Docs+CLI outputs that are NOT adapter seams — the always-complete floor. */
-const NON_ADAPTER_DOCS = ["AGENTS.md", "CONTRIBUTING.md", "SECURITY.md", ".editorconfig"];
+const NON_ADAPTER_DOCS = [
+  "AGENTS.md",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
+  ".editorconfig",
+  // task-matrix-reaches-adopters: the capability matrix is product data, not a
+  // seam — it is generated whatever `--agents` says, like the docs it reports on.
+  "adapters/capability-matrix.json",
+];
 
 function existsIn(root: string, rel: string): boolean {
   return existsSync(join(root, ...rel.split("/")));
@@ -132,9 +136,9 @@ function onDisk(root: string, agent: string): string[] {
   // localeCompare: the comparator BY_AGENT itself is sorted with (matches
   // doctor's file-row order), not a case-sensitive `.sort()` that would rank
   // an uppercase entry (the seam README.md) ahead of lowercase directories.
-  return (BY_AGENT[agent] ?? []).filter((rel) => existsIn(root, rel)).sort((a, b) =>
-    a.localeCompare(b),
-  );
+  return (BY_AGENT[agent] ?? [])
+    .filter((rel) => existsIn(root, rel))
+    .sort((a, b) => a.localeCompare(b));
 }
 
 /** The `adapters` rows for one agent in an init result. */
@@ -158,10 +162,18 @@ describe("adapter selection: registry", () => {
     // zcode: the whole vendored marketplace, nothing outside it.
     expect(BY_AGENT.zcode.some((d) => d.startsWith(".zcode-marketplace/"))).toBe(true);
     expect(BY_AGENT.zcode.some((d) => !d.startsWith(".zcode-marketplace/"))).toBe(false);
-    // claude: the CLAUDE.md pointer shim and the .mcp.json registration — the
-    // two surfaces an init'd tree hands that client today (spec §S6 is the
-    // follow-on that adds a bundle).
-    expect(BY_AGENT.claude).toEqual([".mcp.json", "CLAUDE.md"]);
+    // claude: the CLAUDE.md pointer shim and the .mcp.json registration (the
+    // floor an init'd tree always hands that client) PLUS the vendored plugin
+    // under .claude-marketplace/ (spec-claude-code-adapter-024) — and nothing
+    // outside those two surfaces.
+    expect(BY_AGENT.claude).toContain(".mcp.json");
+    expect(BY_AGENT.claude).toContain("CLAUDE.md");
+    expect(BY_AGENT.claude.some((d) => d.startsWith(".claude-marketplace/"))).toBe(true);
+    expect(
+      BY_AGENT.claude.filter(
+        (d) => !d.startsWith(".claude-marketplace/") && d !== ".mcp.json" && d !== "CLAUDE.md",
+      ),
+    ).toEqual([]);
     // A plain generated doc is nobody's adapter artifact.
     expect(agentForTemplate("docs/AGENTS.md")).toBeNull();
     expect(agentForTemplate("docs/docs/engineering.md")).toBeNull();
@@ -197,6 +209,15 @@ describe("adapter selection: registry", () => {
     expect(detectAgents(dir)).toEqual(["claude", "opencode"]);
     mkdirSync(join(dir, ".zcode-marketplace"), { recursive: true });
     expect(detectAgents(dir)).toEqual(["claude", "opencode", "zcode"]);
+  });
+
+  it("detects the claude bundle from its own marketplace marker alone", () => {
+    // spec-claude-code-adapter-024: `.claude-marketplace` is a claude marker in
+    // its own right — a tree that installed the bundle is a claude tree even
+    // without CLAUDE.md present.
+    const dir = tempDir();
+    mkdirSync(join(dir, ".claude-marketplace"), { recursive: true });
+    expect(detectAgents(dir)).toEqual(["claude"]);
   });
 
   it("refuses --agents together with --no-agents (two contradictory selections)", () => {
@@ -282,13 +303,21 @@ describe("adapter selection: init flag matrix", () => {
       // counts are honest: every adapter destination is accounted for exactly once.
       const total = AGENT_IDS.reduce((n, agent) => n + (BY_AGENT[agent]?.length ?? 0), 0);
       expect(result.adapters.counts.total).toBe(total);
-      expect(result.adapters.counts.written + result.adapters.counts.skipped).toBe(total);
+      // The FULL identity, `replaced` included. This table never runs `--backup`,
+      // so the bucket is 0 today — asserting it anyway keeps the identity the code
+      // ships (and the `--backup` case below proves) enforced at every call site
+      // rather than only at the one that happens to exercise it.
+      expect(
+        result.adapters.counts.written +
+          result.adapters.counts.replaced +
+          result.adapters.counts.skipped,
+      ).toBe(total);
       const selectedTotal = row.selected.reduce(
         (n, agent) => n + (BY_AGENT[agent]?.length ?? 0),
         0,
       );
       expect(result.adapters.counts.written).toBe(selectedTotal);
-      // The per-artifact detail is capped, but this bundle is far below the cap,
+      // The per-artifact detail is capped, but this bundle is under the cap,
       // so nothing is cut here — a cap regression must be visible.
       expect(result.adapters.truncated).toBe(false);
       expect(result.adapters.artifacts.length).toBe(total);
@@ -559,14 +588,10 @@ describe("doctor --agents: per-agent report", () => {
 
   it("reuses the capability-matrix reader: per-agent gap rows come from it", () => {
     const dir = tempDir();
+    // `init` generates the tree's own copy (task-matrix-reaches-adopters:
+    // `templates/docs/adapters/capability-matrix.json` → `adapters/…`), which is
+    // exactly what tree-only resolution reads — no per-test copy needed.
     runInit({ dir, force: false });
-    // Give the fixture tree this repo's committed matrix (tree-only resolution
-    // means the fixture must CARRY it, exactly as an adopter tree would).
-    mkdirSync(join(dir, "adapters"), { recursive: true });
-    cpSync(
-      join(repoRoot, "adapters/capability-matrix.json"),
-      join(dir, "adapters/capability-matrix.json"),
-    );
     const result = runDoctor({ cwd: dir, agents: true });
     const matrix = result.matrix;
     expect(matrix.present).toBe(true);
@@ -589,10 +614,12 @@ describe("doctor --agents: per-agent report", () => {
   it("snapshots the per-agent human block on a full init (the report's contract)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    // A full init with no markers narrowing it and no matrix in the tree: every
-    // file is present, every agent is detected, every gap list is empty. That is
-    // the deterministic shape, so the block's exact wording — the report an
-    // operator reads — is pinned rather than merely probed for substrings.
+    // A full init with no markers narrowing it: every file is present, every
+    // agent is detected, and the init-generated matrix gives claude its one
+    // documented gap — the session-context hook no plugin surface can carry
+    // (task-matrix-reaches-adopters, task-claude-matrix-and-docs). That is the
+    // deterministic shape, so the block's exact wording — the report an operator
+    // reads — is pinned rather than merely probed for substrings.
     //
     // Only the per-agent lines are snapshotted: they carry counts and statuses,
     // never a path, so they do not move with a new template, while the file
@@ -602,16 +629,23 @@ describe("doctor --agents: per-agent report", () => {
       .filter((line) => /^ {2}agent[s]?\b/.test(line) || /^ {4}gap:/.test(line));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "  agents: claude, opencode, zcode (adapter selection: init --agents / --no-agents; report-only)
-        agent claude: 2 file(s) — 2 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)
+        agent claude: 28 file(s) — 28 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 1 capability gap(s)
+          gap: docs-travel-with-code x claude — the bundle ships no session context hook: Claude Code has no plugin surface that injects the active work item, so the agent fetches it with \`arggon show\`. (report-only)
         agent opencode: 18 file(s) — 18 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)
         agent zcode: 23 file(s) — 23 present, 0 acknowledged (yours, never regenerated), 0 acknowledged-drifted (hand edit after the ack), 0 adopter-edited (yours; init skips it unless --backup), 0 stale (arggon init would refresh it), 0 missing, 0 unverified, 0 orphaned (template gone from this arggon; init removes it when unmodified, else you delete it by hand); 0 capability gap(s)"
     `);
   });
 
   it("reports a tree with no matrix as present:false, exit 0, never a failure", () => {
+    // Since task-matrix-reaches-adopters `init` generates the matrix, so the
+    // no-matrix shape is a tree that LOST it (an adopter who deleted it, or a
+    // tree initialized before the destination shipped) — reached here by
+    // removing the init-generated file.
     const dir = tempDir();
     runInit({ dir, force: false });
+    rmSync(join(dir, "adapters"), { recursive: true, force: true });
     const result = runDoctor({ cwd: dir, agents: true });
+    expect(result.matrix.present).toBe(false);
     expect(result.agents!.matrix.present).toBe(false);
     for (const entry of result.agents!.agents) {
       expect(entry.gaps.total).toBe(0);
@@ -634,11 +668,6 @@ describe("doctor --agents: per-agent report", () => {
   it("human output carries one line per agent, with the gap rows attached", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    mkdirSync(join(dir, "adapters"), { recursive: true });
-    cpSync(
-      join(repoRoot, "adapters/capability-matrix.json"),
-      join(dir, "adapters/capability-matrix.json"),
-    );
     const text = formatDoctorReport(runDoctor({ cwd: dir, agents: true }));
     // One `agent <id>:` line per known agent, in registry order.
     for (const agent of AGENT_IDS) {

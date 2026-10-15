@@ -40,9 +40,11 @@ import {
   renderGeneratedDoc,
   resolveProjectName,
   TIER2_DESTS,
+  unprovenancedManagedFiles,
   type DocsPlan,
   type DocsPlanEntry,
   type OrphanReapDecision,
+  type UnprovenancedManagedFile,
 } from "./docs.js";
 import {
   agentForTemplate,
@@ -52,6 +54,7 @@ import {
   type AdapterSelectionReport,
   type AgentSelection,
 } from "./adapters.js";
+import { readEnvGitignore, type EnvGitignoreReport } from "./env-gitignore.js";
 
 const CONVENTION_YML =
   `version: ${CONVENTION_VERSION}\n` +
@@ -188,6 +191,15 @@ export type InitResult = {
   /** Tracker auto-commit outcome for the files written this run. */
   commit?: TrackerCommitResult;
   /**
+   * Report-only probe of the tracked `.gitignore`'s `.arggon.env` entry
+   * (task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters,
+   * spec worktree-env-contract-016), read AFTER this run's writes: a freshly
+   * generated `.gitignore` carries the entry (no hint), while an adopter's
+   * kept one reports the missing entry with the exact line to append. The probe
+   * never writes, modifies or stages anything.
+   */
+  envGitignore: EnvGitignoreReport;
+  /**
    * Present only when the target tree is NOT a git repository
    * (bug-init-git-doctor-blindspot): branch/worktree/push/PR flows and the
    * pre-commit validate hook are unavailable until the adopter runs
@@ -196,6 +208,15 @@ export type InitResult = {
    * Never auto-`git init` — explicitly out of scope.
    */
   warning?: string;
+  /**
+   * Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+   * files under a managed path whose own visible marker claims arggon
+   * provenance but which have no `x-generated` entry. init classifies these as
+   * adopter-modified and keeps them, which is why they used to be silent;
+   * naming them here (and in `doctor`) is what makes the class visible. Never a
+   * write, never a failure.
+   */
+  unprovenanced: UnprovenancedManagedFile[];
 };
 
 function ensureTemplates(root: string, force: boolean): string[] {
@@ -418,6 +439,14 @@ export type InitPlan = {
    * to the doc planner, so the plan and the real run can never disagree.
    */
   adapters: AgentSelection;
+  /**
+   * Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+   * files under a managed path whose own visible marker claims arggon
+   * provenance but which have no `x-generated` entry — read from the tree the
+   * plan decided against, so the preview and the real run report the same
+   * rows. Pure read; never a plan decision (init keeps such files).
+   */
+  unprovenanced: UnprovenancedManagedFile[];
   /** Fatal precondition, identical to the error runInit would throw. */
   error?: string;
 };
@@ -445,6 +474,16 @@ export function planInit(opts: InitOptions): InitPlan {
     backup: Boolean(opts.backup),
     layout,
     conventionPath,
+    // Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+    // computed ONCE, from the tree this plan decides against, so `runInit`,
+    // `--dry-run` and the carried result cannot disagree about it. A managed
+    // path with no `x-generated` entry and no marker is the sanctioned
+    // pre-provenance adopter file and is deliberately not reported.
+    unprovenanced: unprovenancedManagedFiles({
+      root,
+      layout,
+      ...(opts.templatesDir !== undefined ? { templatesDir: opts.templatesDir } : {}),
+    }),
   };
   // Adapter selection (spec §S2, task-adapter-selection-flags), resolved from
   // the flags plus the tree's own markers. The doc planner receives the very
@@ -1184,8 +1223,24 @@ export type InitDryRunResult = {
    * zero and the selection itself is still reported.
    */
   adapters: AdapterSelectionReport;
+  /**
+   * Report-only probe of the tracked `.gitignore`'s `.arggon.env` entry
+   * (spec worktree-env-contract-016), from the CURRENT disk state — a dry run
+   * writes nothing. `hint` is non-null exactly when an existing `.gitignore`
+   * does not ignore the per-worktree env file; a tree with no `.gitignore`
+   * reports no hint (a real run generates one that carries the entry).
+   */
+  envGitignore: EnvGitignoreReport;
   /** Same not-a-git-repo warning a real run would surface. */
   warning?: string;
+  /**
+   * Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+   * the same rows a real run with these flags would report — files under a
+   * managed path whose own marker claims provenance but which have no
+   * `x-generated` entry. A dry run writes nothing, so these are the current
+   * tree's rows.
+   */
+  unprovenanced: UnprovenancedManagedFile[];
 };
 
 export function dryRunInit(opts: InitOptions): InitDryRunResult {
@@ -1242,7 +1297,16 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
         // which is why `scope` carries `propose`.
         counts: { total: 0, written: 0, replaced: 0, skipped: 0 },
       },
+      // Report-only, from the current disk state (a proposal sweep writes only
+      // side files): the same hint the real run and doctor report.
+      envGitignore: readEnvGitignore(root),
       warning,
+      // Report-only false-absence class, from the current tree (nothing was
+      // written): the same rows a real proposal sweep would report.
+      unprovenanced: unprovenancedManagedFiles({
+        root,
+        ...(opts.templatesDir !== undefined ? { templatesDir: opts.templatesDir } : {}),
+      }),
     };
   }
 
@@ -1275,7 +1339,14 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
       reaped: plan.docs.reaped,
       reapRefused: reapRefusals(plan.docs.reapRefused),
       adapters,
+      // Nothing was written (dry run), so the probe reports the current disk
+      // state — the same entry an adopting human or agent has to append.
+      envGitignore: readEnvGitignore(root),
       warning,
+      // Same rows a real run with these flags would report
+      // (bug-prover-agent-has-no-x-generated-entry): from the plan, so the
+      // preview and the run cannot disagree.
+      unprovenanced: plan.unprovenanced,
     };
   }
   const scaffoldWritten = plan.scaffold
@@ -1310,7 +1381,13 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
     reaped: plan.docs.reaped,
     reapRefused: reapRefusals(plan.docs.reapRefused),
     adapters,
+    // Preview only (nothing written): the hint a real run would report on this
+    // tree's existing `.gitignore`.
+    envGitignore: readEnvGitignore(root),
     warning,
+    // Same rows a real run with these flags would report
+    // (bug-prover-agent-has-no-x-generated-entry), from the same plan.
+    unprovenanced: plan.unprovenanced,
   };
 }
 
@@ -1364,7 +1441,17 @@ export function runInit(opts: InitOptions): InitResult {
         // which is why `scope` carries `propose`.
         counts: { total: 0, written: 0, replaced: 0, skipped: 0 },
       },
+      // Report-only, after the sweep (proposal side files only): the current
+      // `.gitignore` state, with the hint when the entry is missing.
+      envGitignore: readEnvGitignore(root),
       warning: isGitRepo(root) ? undefined : NOT_A_REPO_WARNING,
+      // Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+      // a proposal sweep writes no doc and mutates no state, so the class is
+      // read straight from the current tree.
+      unprovenanced: unprovenancedManagedFiles({
+        root,
+        ...(opts.templatesDir !== undefined ? { templatesDir: opts.templatesDir } : {}),
+      }),
     };
   }
   // Plan first (task-init-dry-run-plan): the shared pure planner computes
@@ -1415,8 +1502,16 @@ export function runInit(opts: InitOptions): InitResult {
       // Built from the plan, not from the apply result, so a dry run over the
       // same options reports the same rows before anything is written.
       adapters,
+      // Report-only, after the docs were applied (spec
+      // worktree-env-contract-016): an adopter `.gitignore` kept by the
+      // modified-skip path reports the missing entry; a generated one carries
+      // it. Never a write.
+      envGitignore: readEnvGitignore(root),
       commit: commitGeneratedDocs(root, written, opts.commit),
       warning: gitWarning,
+      // From the plan, so a dry run over the same options reports the same
+      // rows (bug-prover-agent-has-no-x-generated-entry).
+      unprovenanced: plan.unprovenanced,
     };
   }
 
@@ -1466,7 +1561,15 @@ export function runInit(opts: InitOptions): InitResult {
     reaped: docs.reaped,
     reapRefused: reapRefusals(docs.reapRefused),
     adapters,
+    // Report-only, after the writes above: a fresh scaffold's generated
+    // `.gitignore` carries the entry (no hint), an adopter's pre-existing one
+    // was kept byte-identical and reports the missing entry.
+    envGitignore: readEnvGitignore(root),
     commit: commitGeneratedDocs(root, written, opts.commit),
     warning: gitWarning,
+    // From the plan (bug-prover-agent-has-no-x-generated-entry): the class the
+    // plan saw — a fresh scaffold starts with none, an upgrade names every
+    // marker-bearing file it will keep adopter-modified for lack of a row.
+    unprovenanced: plan.unprovenanced,
   };
 }

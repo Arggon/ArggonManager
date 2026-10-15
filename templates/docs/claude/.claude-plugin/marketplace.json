@@ -1,0 +1,15 @@
+{
+  "name": "arggon-local",
+  "description": "ArggonManager's local marketplace: the vendored arggon seam (`mcpServers` registration of `arggon mcp`, the /arggon:<command> commands, the maker/standards-reviewer subagents and the hook gates).",
+  "owner": { "name": "Arggon" },
+  "plugins": [
+    {
+      "name": "arggon",
+      "source": "./arggon",
+      "version": "0.1.0",
+      "description": "ArggonManager native seam: the arggon MCP tools, the /arggon:<command> commands, the maker/standards-reviewer subagents, the bundled arggon-cli skill and the hook gates (ADR 0014). Requires the arggon CLI on PATH.",
+      "displayName": "Arggon",
+      "category": "developer-tools"
+    }
+  ]
+}

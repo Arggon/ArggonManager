@@ -54,6 +54,7 @@ export {
   liveAcceptanceRegion,
   liveAcceptanceRows,
   liveAcceptanceUnchecked,
+  liveContextRegion,
   loadItems,
   softTryLoadItem,
   tryLoadItem,
@@ -303,14 +304,18 @@ export { runList } from "./list.js";
 export type { ListOptions, ListResult } from "./list.js";
 export { runShow, showBoundedParts } from "./show.js";
 export type { ShowComment, ShowOptions, ShowResult } from "./show.js";
-export { aggregateReport, completedOf, runReport } from "./report.js";
+export { aggregateReport, completedOf, containerHygiene, runReport } from "./report.js";
 export type {
   ReportBlocked,
   ReportContainer,
   ReportGroup,
+  ReportHygiene,
+  ReportHygieneOffender,
+  ReportHygieneOpenContainer,
   ReportResult,
   StatusCounts,
 } from "./report.js";
+export { MAX_HYGIENE_OFFENDERS, MAX_HYGIENE_OPEN_CONTAINERS } from "./report.js";
 export { runTrend } from "./trend.js";
 export type { RunTrendOptions, TrendCycleTime, TrendResult, TrendWeek } from "./trend.js";
 export { isoWeekKey, parseLog, parseSince } from "./trend.js";
@@ -318,6 +323,13 @@ export type { ParsedLog } from "./trend.js";
 export { parseOlderThan } from "./list.js";
 export { runValidate } from "./validate.js";
 export type { ValidateOptions, ValidateResult } from "./validate.js";
+export {
+  bodyHasScaffoldPlaceholder,
+  placeholderSections,
+  regionHasScaffoldMarker,
+  stripInlineCodeSpans,
+} from "./placeholder.js";
+export type { PlaceholderSection } from "./placeholder.js";
 export { runUpdate, maybeCommitUpdate, parseCsvList } from "./update.js";
 export type { UpdateOptions, UpdateResult } from "./update.js";
 export type { ClaimFootprintReceipt } from "./update.js";
@@ -326,7 +338,16 @@ export type { CommentOptions, CommentResult } from "./comment.js";
 export { HANDOFF_FIELD_CAP, HANDOFF_SESSION_CAP, runHandoff } from "./handoff.js";
 export type { HandoffOptions, HandoffResult } from "./handoff.js";
 export { runSync } from "./sync-command.js";
-export type { SyncResult } from "./sync-types.js";
+export { findBranchClaims } from "./branch-claims.js";
+export type { BranchClaimsGitExecutor, BranchClaimsOptions } from "./branch-claims.js";
+export type {
+  BranchClaim,
+  BranchClaimError,
+  BranchClaimsResult,
+  SyncResult,
+} from "./sync-types.js";
+export { formatRankedFrom, RANKED_FROM_NOTE, readRankedFrom } from "./tree-state.js";
+export type { RankedFrom, TreeGitExecutor } from "./tree-state.js";
 export { classifyVerdicts, parseVerdicts } from "./verdict.js";
 export type { VerdictComment, VerdictState } from "./verdict.js";
 export {
@@ -355,7 +376,11 @@ export {
   classifyReleaseEntry,
   defaultCleanupGit,
   findMergedPr,
+  parseRemovalBlockers,
+  parseRemovalBlockingPaths,
   worktreeReleaseRefusal,
+  worktreeTrackedRefusal,
+  worktreeUntrackedRefusal,
 } from "./cleanup.js";
 export type {
   ClassifyCleanupDeps,
@@ -364,6 +389,7 @@ export type {
   MergedPr,
   ReleaseEntry,
   ReleaseRequest,
+  RemovalBlockers,
 } from "./cleanup.js";
 export {
   buildLocalWorkspaces,
@@ -371,6 +397,8 @@ export {
   freshWorktreeInstallRefusal,
   inspectDeclaredDependencies,
   inspectGateBinResolution,
+  isStartOwnedNodeModulesInstall,
+  isStartOwnedWorktreeEnv,
   linkNodeModules,
   linkNodeModulesDetailed,
   linkedWorkspacePackages,
@@ -398,7 +426,9 @@ export {
   MAX_MISSING_DEPENDENCIES,
   MAX_GATE_BINS,
   MAX_PREP_STEPS,
+  WORKTREE_ENV_FILE,
   WORKTREE_ENV_KEYS,
+  WORKTREE_NODE_MODULES_ENTRY,
 } from "./worktree.js";
 export type {
   CheckIgnoreRunner,
@@ -515,7 +545,7 @@ export {
 } from "./tracker-commit.js";
 export { formatListTable, resolveCurrentLogin } from "./list.js";
 export { DEFAULT_TAIL_COMMENTS, renderShowText } from "./show.js";
-export { formatReportMarkdown, formatReportTable } from "./report.js";
+export { formatReportHygiene, formatReportMarkdown, formatReportTable } from "./report.js";
 export { formatTrendMarkdown, formatTrendTable } from "./trend.js";
 export { formatValidateHuman } from "./validate.js";
 export { ghPrListJson } from "./get-open-prs.js";

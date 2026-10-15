@@ -20,23 +20,33 @@ import {
   buildLocalWorkspaces,
   MAX_GATE_BINS,
   MAX_HUMAN_ERROR_CHARS,
+  MAX_PREP_STEPS,
   pointWorkspaceAtLocal,
   runCreate,
   runUpdate,
   sanitizeHumanError,
   strictGateBinFailure,
+  trackerCommitMessage,
+  updateCommitMessage,
   type GateBinResolution,
 } from "@arggondev/lib";
 import { assertOrder } from "../../test/assert-order.js";
 import { runInit } from "./init.js";
 import {
+  dependencyPrepNote,
+  gateBinFailureReport,
+  inheritedCommitReport,
+  inheritedCommitsNotes,
+  isTrackerAutoCommit,
   linkNodeModules,
   linkedWorkspacePackages,
+  MAX_INHERITED_COMMITS,
   runStart,
   startFailureReadiness,
   startTakeoverNotes,
   unlinkNodeModulesLink,
   worktreeFailureMessage,
+  type InheritedCommitProbe,
   type StartGit,
 } from "./start.js";
 
@@ -501,24 +511,19 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
     // ORDER pinned: the CLI's own remediation and the kernel's `npm ci` fix
     // both precede the FIRST named bin — not merely the last one. With the
     // remediation trailing (the pre-fix composition) the clip below ate it.
-    const remedy = message.indexOf(`arggon start ${ID} --worktree`);
-    const discard = message.indexOf("To discard it instead");
-    const detail = message.indexOf("Fix: run `npm ci` in ");
-    // Every needle is present BEFORE it is compared: `indexOf` answers -1 for
-    // an absent needle, and `-1 < anything` passes, so a missing clause would
-    // make the whole ordering assertion vacuous.
-    for (const [label, index] of [
-      ["remedy", remedy],
-      ["discard", discard],
-      ["detail", detail],
-      ["first bin", message.indexOf(firstEntry)],
-    ] as const) {
-      expect(index, `${label} needle must be present`).toBeGreaterThanOrEqual(0);
-    }
-    expect(remedy).toBeLessThan(discard);
-    expect(discard).toBeLessThan(detail);
-    expect(remedy).toBeLessThan(message.indexOf(firstEntry));
-    expect(detail).toBeLessThan(message.indexOf(firstEntry));
+    // `assertOrder` makes each clause's PRESENCE a precondition of the
+    // comparison, so a clause renamed out from under the test fails loudly
+    // instead of answering -1 and passing vacuously
+    // (bug-vacuous-substring-ordering-assertions). This was the suite's last
+    // inline presence-check + bare-`indexOf` ordering pair; the sweep converts
+    // it so the whole ordering contract rides the one helper.
+    assertOrder(
+      message,
+      `arggon start ${ID} --worktree`,
+      "To discard it instead",
+      "Fix: run `npm ci` in ",
+      firstEntry,
+    );
   });
 
   it("keeps the remediation inside the MAX_HUMAN_ERROR_CHARS head-clip at the worst case", () => {
@@ -678,11 +683,93 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
     expect(message.length).toBeLessThanOrEqual(MAX_HUMAN_ERROR_CHARS);
   });
 
-  it("keeps every actionable clause whole even when ONE entry cannot fit", () => {
-    // The budget is spent by the evidence, never taken from a remedy: an entry
-    // long enough to blow the whole remainder still yields a report that keeps
-    // the generic fix, the exact fix, the attach re-run and the discard hint
-    // intact — because those are reserved before the fill runs.
+  it("yields the `≥1 name` override rather than push a name past the actionable clauses", () => {
+    // bug-gatebin-budget-reserved-block-can-exceed-clip: the override is what
+    // keeps the sentence from naming nothing, but it may never cross the room
+    // that leaves every actionable clause whole. Past that ceiling it YIELDS —
+    // a name the human channel would clip is not named.
+    const bins: GateBinResolution[] = [
+      { name: "native-gate-dep", source: "missing" },
+      { name: "native-gate-tool", source: "missing" },
+    ];
+    // No budget AND no room at the ceiling → the clause is omitted (the
+    // observation still rides the --json payload).
+    expect(gateBinFailureReport({ hasInstall: true, gateBins: bins }, 0, 10)).toBeNull();
+    // No budget but room at the ceiling → the minimum useful sentence: exactly
+    // ONE name, the same override as before, now bounded.
+    const one = gateBinFailureReport({ hasInstall: true, gateBins: bins }, -100, 10_000);
+    expect(one).toContain("native-gate-dep: not resolvable from the worktree");
+    expect(one).not.toContain("native-gate-tool");
+    expect(one).toContain("and 1 more bin not resolving inside it");
+  });
+
+  /**
+   * The window bug-gatebin-budget-reserved-block-can-exceed-clip names: a
+   * ~700+ char worktree path makes the ACTIONABLE block alone (the path is
+   * named in the kept note, the exact fix and the discard hint) exceed the
+   * clip. Before the fix the `≥1 name` override still pushed a name in — past
+   * the remedy, into a window that could not show it — which is the silent
+   * loss the item set exists to remove, reappearing in a narrower window.
+   */
+  function overBudgetCommitGateFailure(): { message: string; worktreePath: string } {
+    const worktreePath = join("home", "arggon", "Projects", "x".repeat(697));
+    const message = worktreeFailureMessage({
+      id: ID,
+      branch: BRANCH,
+      worktreePath,
+      createBranch: true,
+      step: "committing the claim (pre-commit gate)",
+      err: new Error("gate: deliberate failure"),
+      readiness: {
+        hasInstall: true,
+        gateBins: [{ name: "native-gate-dep", source: "missing" }],
+      },
+    });
+    return { message, worktreePath };
+  }
+
+  it("prioritises the exact fix and names the truncation when the reserved block alone exceeds the clip", () => {
+    const { message, worktreePath } = overBudgetCommitGateFailure();
+    // The reserved block really is past the clip — otherwise this asserts
+    // nothing about the window.
+    expect(message.length).toBeGreaterThan(MAX_HUMAN_ERROR_CHARS);
+    const clipped = sanitizeHumanError(message);
+    // THE GUARANTEED CLAUSE: the exact fix survives the head-kept clip WHOLE,
+    // because the over-budget composition leads with it (only the bounded
+    // notice precedes it) — no readiness list, no generic remedy, no discard
+    // hint and no raw detail can push it past the cut.
+    expect(clipped).toContain(
+      `Exact fix for the observed resolution: run \`npm ci\` in ${worktreePath}, then re-run ` +
+        `\`arggon start ${ID} --worktree\` — it attaches to the existing worktree.`,
+    );
+    // The truncation is NAMED at the head instead of left to the silent `…`,
+    // and the order is pinned: notice → exact fix → kept note.
+    assertOrder(
+      clipped,
+      "[truncated:",
+      "Exact fix for the observed resolution",
+      "start failed while committing the claim",
+    );
+    expect(clipped).toContain("2000-char human clip");
+    expect(clipped).toContain("--json error");
+    // The `≥1 name` override YIELDED: no name is pushed into a message the
+    // human channel cannot show it in...
+    expect(message).not.toContain("Readiness:");
+    expect(message).not.toContain("native-gate-dep:");
+    // ...while the composed message stays COMPLETE for `--json`: the clauses
+    // below the human cut are still there, named by the notice rather than
+    // dropped.
+    expect(message).toContain("To discard it instead");
+    expect(message).toContain("gate: deliberate failure");
+    expect(message.slice(MAX_HUMAN_ERROR_CHARS)).toContain("To discard it instead");
+    // Negative control: the human cut really is inside the message.
+    expect(clipped.endsWith("…")).toBe(true);
+  });
+
+  it("keeps every clause in the composed message at an extreme path, and leads the clip with the exact fix", () => {
+    // The same shape at its extreme (~1250-char path): the evidence entry could
+    // never fit, so it is refused outright; the composed message keeps every
+    // clause for `--json` and the human cut is named at the head.
     const longPath = join("home", "arggon", "Projects", "x".repeat(1200), "node_modules", ".bin");
     const name = "a-bin-with-an-enormously-long-name-that-cannot-possibly-fit-the-budget";
     const message = worktreeFailureMessage({
@@ -701,8 +788,12 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
     expect(message).toContain("Exact fix for the observed resolution");
     expect(message).toContain(`re-run \`arggon start ${ID} --worktree\``);
     expect(message).toContain("To discard it instead: `git worktree remove --force ");
-    // The evidence is truncated to the cap, not the other way round.
-    expect(sanitizeHumanError(message)).toContain("Exact fix for the observed resolution");
+    // The evidence is refused, not truncated into a mangled name: the override
+    // yields and the notice says so.
+    expect(message).not.toContain("Readiness:");
+    const clipped = sanitizeHumanError(message);
+    expect(clipped).toContain("Exact fix for the observed resolution");
+    expect(clipped).toContain("[truncated:");
   });
 
   it("reports the readiness evidence on the claim-commit step ONLY", () => {
@@ -815,9 +906,38 @@ describe("start --worktree fresh-worktree install gate (bug-start-install-orderi
         mkdirSync(path, { recursive: true });
         writeFileSync(join(path, "package.json"), JSON.stringify(manifest));
         cpSync(join(dir, "ArggonManager"), join(path, "ArggonManager"), { recursive: true });
+        // Workspace packages the primary's install links are discovered
+        // through matching relative paths in the worktree, so a fixture that
+        // seeded `packages/` carries it into the fresh worktree too.
+        if (existsSync(join(dir, "packages"))) {
+          cpSync(join(dir, "packages"), join(path, "packages"), { recursive: true });
+        }
       },
     });
     return { dir, id, worktreePath, git };
+  }
+
+  /**
+   * Link `count` workspace packages into the primary's install (the same
+   * shape the plugin suite's `addPrepLogWorkspacePackages` builds), so the
+   * kernel's preparation log records one build decision per package and can
+   * overflow its `MAX_PREP_STEPS` cap. Each package declares no entry file and
+   * no `build` script: the decision is still recorded (`no-build-script`)
+   * without a build ever running, so the log overflows on the package COUNT.
+   */
+  function addWorkspacePackages(dir: string, count: number): void {
+    const scope = join(dir, "node_modules", "@scope");
+    mkdirSync(scope, { recursive: true });
+    for (let index = 0; index < count; index += 1) {
+      const pkgDir = join(dir, "packages", `pkg-${index}`);
+      mkdirSync(pkgDir, { recursive: true });
+      writeFileSync(
+        join(pkgDir, "package.json"),
+        `${JSON.stringify({ name: `@scope/pkg-${index}`, version: "1.0.0", private: true }, null, 2)}\n`,
+        "utf8",
+      );
+      symlinkSync(pkgDir, join(scope, `pkg-${index}`), "dir");
+    }
   }
 
   it("refuses a fresh worktree whose gate bin resolves nowhere, before any claim (flag unset)", () => {
@@ -896,7 +1016,58 @@ describe("start --worktree fresh-worktree install gate (bug-start-install-orderi
       { step: "link", outcome: "primary-install-missing" },
       { step: "gate-bins", outcome: "all-worktree" },
     ]);
+    // An uncapped log keeps its shape: the kernel decided no truncation, so
+    // neither the flag nor the count may appear — a mirror that invents one is
+    // the defect's other half (bug-native-steps-truncated-flag-dropped).
+    expect(result.stepsTruncated).toBeUndefined();
+    expect(result.stepsDropped).toBeUndefined();
     expect(worktreePath).toContain(id);
+  });
+
+  it("carries the kernel's truncation flag and dropped count when the prep log is capped (task-cli-surface-never-carries-steps-truncated)", () => {
+    const { dir, id, git } = primedFreshTask({ name: "fixture", private: true });
+    // More preparation decisions than the kernel's cap: the link, one step per
+    // workspace package, and the gate-bin verdict.
+    addWorkspacePackages(dir, MAX_PREP_STEPS);
+    const result = runStart(
+      { cwd: dir, id, assignee: "arggon", worktree: true, now: NOW },
+      { git },
+    );
+    expect(result.committed).toBe(true);
+    // The shortened list AND the kernel's own decision about it, mirrored
+    // verbatim: the CLI half #617 left out
+    // (bug-native-steps-truncated-flag-dropped).
+    expect(result.prepSteps).toHaveLength(MAX_PREP_STEPS);
+    expect(result.stepsTruncated).toBe(true);
+    // The kernel's count, never `MAX_PREP_STEPS - prepSteps.length` arithmetic:
+    // 16 packages + the link + the gate-bin verdict = 18 attempts against the
+    // 16-entry cap.
+    expect(result.stepsDropped).toBe(2);
+  });
+
+  it("states the kernel's dropped-entry count in the fresh-worktree refusal (task-cli-surface-never-carries-steps-truncated)", () => {
+    const { dir, id, git } = primedFreshTask({
+      name: "fixture",
+      private: true,
+      devDependencies: { "native-gate-dep": "1.0.0" },
+    });
+    addWorkspacePackages(dir, MAX_PREP_STEPS);
+    let message = "";
+    try {
+      runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    // The refusal fires (the declared gate dep resolves nowhere) AND the log it
+    // renders is capped: the kernel's dropped count rides the prose
+    // (bug-fresh-worktree-refusal-prose-drops-prep-step-truncation), so the
+    // human-visible refusal never presents the capped list as the whole log.
+    expect(message).toContain("fresh worktree must leave a gate-usable install");
+    expect(message).toContain("native-gate-dep: not resolvable from the worktree");
+    expect(message).toContain("Preparation ran:");
+    expect(message).toContain("2 entries were dropped");
+    expect(message).toContain(`the preparation log is capped at ${MAX_PREP_STEPS}`);
+    expect(git.calls.some((c) => c.op === "commit")).toBe(false);
   });
 
   it("lands a fresh worktree whose stale install misses only bin-less dependencies (stale stays informational)", () => {
@@ -1791,5 +1962,291 @@ describe("start --worktree claim stamp: single-writer detection (task-single-wri
     expect(result.committed).toBe(true);
     expect(JSON.parse(readFileSync(stampPath, "utf8"))).toMatchObject({ identity: "arggon" });
     expect(readFileSync(stampPath, "utf8")).not.toContain("takeovers");
+  });
+});
+
+describe("dependencyPrepNote (task-cli-surface-never-carries-steps-truncated)", () => {
+  it("leads with the kernel's dropped count when the log is capped", () => {
+    // The kernel's pair is mirrored and the count is stated BEFORE the capped
+    // log, so the note never presents a shortened list as the whole log — and
+    // the bounded line's head-clip can never eat the count.
+    expect(
+      dependencyPrepNote({
+        prepSteps: [{ step: "link", outcome: "primary-install-missing" }],
+        stepsTruncated: true,
+        stepsDropped: 2,
+      }),
+    ).toBe(
+      `2 entries were dropped (the preparation log is capped at ${MAX_PREP_STEPS}); ` +
+        "link: primary-install-missing",
+    );
+  });
+
+  it("names a single dropped entry in the singular", () => {
+    expect(
+      dependencyPrepNote({
+        prepSteps: [{ step: "link", outcome: "farm-created" }],
+        stepsTruncated: true,
+        stepsDropped: 1,
+      }),
+    ).toContain("1 entry was dropped");
+  });
+
+  it("states the truncation even when the count is absent (never invents one)", () => {
+    // The kernel emits the pair together, so this shape only reaches here from
+    // a hand-built result — the note still says the log is not whole rather
+    // than printing an invented count.
+    expect(dependencyPrepNote({ prepSteps: [], stepsTruncated: true })).toBe(
+      `entries were dropped (the preparation log is capped at ${MAX_PREP_STEPS})`,
+    );
+  });
+
+  it("keeps the uncapped note to the noteworthy entries only", () => {
+    expect(
+      dependencyPrepNote({
+        prepSteps: [
+          { step: "link", outcome: "farm-created" },
+          { step: "build", outcome: "no-build-script", pkg: "@scope/pkg-0" },
+          { step: "gate-bins", outcome: "foreign-resolution" },
+        ],
+      }),
+    ).toBe("gate-bins: foreign-resolution");
+    expect(
+      dependencyPrepNote({ prepSteps: [{ step: "link", outcome: "farm-created" }] }),
+    ).toBeNull();
+  });
+});
+
+describe("start claim-branch base: inherited unpushed commits (bug-start-claim-branch-inherits-unpushed-tracker-commits)", () => {
+  /**
+   * A REAL checkout whose `main` tracks a bare `origin`: the commits a claim
+   * branch inherits beyond `origin/main` are exactly the churn a PR diff
+   * carries. Everything below runs real git — the cut under test is the real
+   * `git worktree add -b` / `git checkout -b`, never a fake.
+   */
+  function realCheckout(): { dir: string; id: string; git: (args: string[]) => string } {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-start-base-"));
+    const origin = mkdtempSync(join(tmpdir(), "arggon-start-origin-"));
+    execFileSync("git", ["init", "-q", "--bare", "-b", "main", origin]);
+    runInit({ dir, force: false });
+    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir });
+    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: dir });
+    execFileSync("git", ["remote", "add", "origin", origin], { cwd: dir });
+    execFileSync("git", ["add", "--", "."], { cwd: dir });
+    execFileSync("git", ["commit", "-qm", "chore: init tracker"], { cwd: dir });
+    execFileSync("git", ["push", "-q", "-u", "origin", "main"], { cwd: dir });
+    runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
+    runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
+    runCreate({
+      cwd: dir,
+      type: "story",
+      title: "Login",
+      parent: "auth",
+      id: "story-login",
+      now: NOW,
+    });
+    const task = runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Add rate limiting",
+      parent: "story-login",
+      id: "rate-limit",
+      now: NOW,
+    });
+    execFileSync("git", ["push", "-q", "origin", "main"], { cwd: dir });
+    return {
+      dir,
+      id: task.id,
+      git: (args) => execFileSync("git", args, { cwd: dir, encoding: "utf8" }).trim(),
+    };
+  }
+
+  /** The worktree start will create, tracked so afterEach reaps it too. */
+  function worktreeOf(dir: string, id: string): string {
+    const path = resolve(dir, "..", `${basename(dir)}-${id}`);
+    tmpDirs.push(path);
+    return path;
+  }
+
+  it("classifies the kernel's own auto-commit messages as tracker commits (drift pin)", () => {
+    // The CLI's predicate is local on purpose; this pins it against the
+    // kernel's own message builder, so a convention change fails HERE instead
+    // of silently reclassifying the lead's commits as tracker churn.
+    expect(isTrackerAutoCommit(trackerCommitMessage("created", ["task-x"]))).toBe(true);
+    expect(isTrackerAutoCommit(updateCommitMessage("updated", "task-x", []))).toBe(true);
+    expect(isTrackerAutoCommit("feat: deliberate work")).toBe(false);
+    expect(isTrackerAutoCommit("fix(bug-x): a fix")).toBe(false);
+  });
+
+  it("composes the counts, the cap and the remedy from a probe", () => {
+    const probe: InheritedCommitProbe = {
+      base: "origin/main",
+      branchPoint: "a".repeat(40),
+      commits: [
+        { sha: "b".repeat(40), subject: "feat: deliberate work" },
+        { sha: "c".repeat(40), subject: "chore(tasks): created other-task" },
+      ],
+      itemOnBase: true,
+    };
+    const report = inheritedCommitReport(probe, "fix/task-x");
+    expect(report).toMatchObject({
+      base: "origin/main",
+      branchPoint: probe.branchPoint,
+      total: 2,
+      trackerTotal: 1,
+      workTotal: 1,
+      itemOnBase: true,
+    });
+    expect(report?.commits.map((commit) => [commit.subject, commit.tracker])).toEqual([
+      ["feat: deliberate work", false],
+      ["chore(tasks): created other-task", true],
+    ]);
+    // The remedy names BOTH arms when dropping is safe: push main, or rebase
+    // the branch onto the base from the recorded branch point.
+    expect(report?.remedy).toContain("git push origin main");
+    expect(report?.remedy).toContain(
+      `git rebase --onto origin/main ${probe.branchPoint} fix/task-x`,
+    );
+    // A clean base is not a report.
+    expect(inheritedCommitReport({ ...probe, commits: [] }, "fix/task-x")).toBeNull();
+    // The list is capped; the totals and counts stay exact.
+    const many: InheritedCommitProbe = {
+      ...probe,
+      commits: Array.from({ length: MAX_INHERITED_COMMITS + 2 }, (_, i) => ({
+        sha: `${i}`.padStart(40, "0"),
+        subject: `chore(tasks): updated task-${i}`,
+      })),
+    };
+    const capped = inheritedCommitReport(many, "fix/task-x");
+    expect(capped?.commits).toHaveLength(MAX_INHERITED_COMMITS);
+    expect(capped?.total).toBe(MAX_INHERITED_COMMITS + 2);
+    expect(capped?.trackerTotal).toBe(MAX_INHERITED_COMMITS + 2);
+    expect(capped?.workTotal).toBe(0);
+  });
+
+  it("never suggests dropping an item that only exists on the branch", () => {
+    const report = inheritedCommitReport(
+      {
+        base: "origin/main",
+        branchPoint: "a".repeat(40),
+        commits: [{ sha: "b".repeat(40), subject: "chore(tasks): created task-x" }],
+        itemOnBase: false,
+      },
+      "feat/task-x",
+    );
+    expect(report?.remedy).toContain("git push origin main");
+    expect(report?.remedy).toContain("the claimed item file itself rides one of them");
+    expect(report?.remedy).not.toContain("git rebase --onto");
+  });
+
+  it("formats the human warning with the remedy leading and the commits named", () => {
+    expect(inheritedCommitsNotes(undefined)).toEqual([]);
+    const report = inheritedCommitReport(
+      {
+        base: "origin/main",
+        branchPoint: "a".repeat(40),
+        commits: [
+          { sha: "b".repeat(40), subject: "feat: deliberate work" },
+          { sha: "c".repeat(40), subject: "chore(tasks): created other-task" },
+        ],
+        itemOnBase: true,
+      },
+      "fix/task-x",
+    );
+    const notes = inheritedCommitsNotes(report ?? undefined);
+    expect(notes).toHaveLength(2);
+    expect(notes[0]).toContain("note: the claim branch inherits 2 unpushed commits");
+    expect(notes[0]).toContain("beyond origin/main (1 tracker auto-commit, 1 other commit)");
+    expect(notes[0]).toContain("git push origin main");
+    expect(notes[1]).toContain("feat: deliberate work [work]");
+    expect(notes[1]).toContain("chore(tasks): created other-task [tracker]");
+  });
+
+  it("reports the inherited commits on a real --worktree start and pins the branch's churn", () => {
+    const { dir, id, git } = realCheckout();
+    // One unpushed tracker auto-commit (an unrelated item) plus one unpushed
+    // deliberate commit — the shape of the PR #681/#683 churn.
+    const unrelated = runCreate({
+      cwd: dir,
+      type: "initiative",
+      title: "Unrelated",
+      id: "unrelated",
+      now: NOW,
+    });
+    writeFileSync(join(dir, "deliberate.ts"), "export const deliberate = true;\n");
+    git(["add", "--", "deliberate.ts"]);
+    git(["commit", "-qm", "feat: deliberate work"]);
+    expect(git(["rev-list", "--count", "origin/main..HEAD"])).toBe("2");
+
+    const worktreePath = worktreeOf(dir, id);
+    const result = runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW });
+
+    // The report names the contamination, classified, with the remedy.
+    expect(result.inheritedCommits).toMatchObject({
+      base: "origin/main",
+      total: 2,
+      trackerTotal: 1,
+      workTotal: 1,
+      itemOnBase: true,
+    });
+    expect(result.inheritedCommits?.commits.map((c) => [c.subject, c.tracker])).toEqual([
+      ["feat: deliberate work", false],
+      ["chore(tasks): created unrelated", true],
+    ]);
+    expect(result.inheritedCommits?.remedy).toContain("git push origin main");
+
+    // REPRO (acceptance box 1): the freshly cut claim branch demonstrably
+    // CONTAINS the local commits — `git diff origin/main...HEAD` carries them
+    // into the PR as unrelated churn.
+    const churn = git(["-C", worktreePath, "diff", "--name-only", "origin/main...HEAD"]).split(
+      "\n",
+    );
+    expect(churn).toContain("deliberate.ts");
+    expect(churn).toContain(relative(dir, unrelated.path));
+    expect(churn).toContain(relative(worktreePath, result.path));
+    expect(git(["-C", worktreePath, "log", "--format=%s", "origin/main..HEAD"])).toContain(
+      "feat: deliberate work",
+    );
+  });
+
+  it("reports nothing on a clean base: the claimed branch's diff is only the item file", () => {
+    const { dir, id, git } = realCheckout();
+    const worktreePath = worktreeOf(dir, id);
+    const result = runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW });
+    expect(result.inheritedCommits).toBeUndefined();
+    // Acceptance box 3: `git diff <base>...HEAD` on the freshly claimed branch
+    // contains ONLY the item file — no unrelated churn.
+    expect(git(["-C", worktreePath, "diff", "--name-only", "origin/main...HEAD"])).toBe(
+      relative(worktreePath, result.path),
+    );
+    // An attach re-run cut nothing, so it reports nothing: the field is a
+    // cut-time observation (the branch was cut by the first run).
+    const attach = runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW });
+    expect(attach.worktreeCreated).toBe(false);
+    expect(attach.inheritedCommits).toBeUndefined();
+  });
+
+  it("reports inherited commits for a plain start too (checkout -b cuts from the same HEAD)", () => {
+    const { dir, id, git } = realCheckout();
+    const unrelated = runCreate({
+      cwd: dir,
+      type: "initiative",
+      title: "Unrelated",
+      id: "unrelated",
+      now: NOW,
+    });
+    const result = runStart({ cwd: dir, id, assignee: "arggon", now: NOW });
+    expect(result.worktreePath).toBeNull();
+    expect(result.inheritedCommits).toMatchObject({
+      base: "origin/main",
+      total: 1,
+      trackerTotal: 1,
+      workTotal: 0,
+    });
+    // The branch this run checked out carries the inherited commit.
+    expect(git(["diff", "--name-only", "origin/main...HEAD"]).split("\n")).toContain(
+      relative(dir, unrelated.path),
+    );
   });
 });

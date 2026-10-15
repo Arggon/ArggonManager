@@ -19,7 +19,7 @@ import {
   updateGeneratedSection,
   type GeneratedEntry,
 } from "@arggondev/lib";
-import { GENERATED_DOC_COUNT, OPENCODE_CONFIG_CANDIDATES } from "./docs.js";
+import { GENERATED_DOC_COUNT, OPENCODE_CONFIG_CANDIDATES, generatedYamlMarker } from "./docs.js";
 import {
   formatDoctorReport,
   MAX_HUMAN_VALUE_CHARS,
@@ -67,6 +67,8 @@ describe("doctor: non-initialized repos", () => {
       missing: 0,
       outdated: 0,
       outdatedDocs: [],
+      unprovenanced: 0,
+      unprovenancedDocs: [],
     });
     expect(result.tracker).toEqual({ dir: null, layout: null, items: 0, todo: 0 });
     expect(formatDoctorReport(result)).toContain("not initialized");
@@ -109,6 +111,8 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
       missing: 0,
       outdated: 0,
       outdatedDocs: [],
+      unprovenanced: 0,
+      unprovenancedDocs: [],
     });
     expect(result.tracker).toEqual({
       dir: "ArggonManager",
@@ -147,6 +151,8 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
       missing: 0,
       outdated: 0,
       outdatedDocs: [],
+      unprovenanced: 0,
+      unprovenancedDocs: [],
     });
   });
 
@@ -206,6 +212,8 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
       outdated: 2,
       outdatedDocs: ["AGENTS.md", "CONTRIBUTING.md"],
       missing: 0,
+      unprovenanced: 0,
+      unprovenancedDocs: [],
     });
     const report = formatDoctorReport(result);
     expect(report).toContain(` acknowledged`);
@@ -230,6 +238,8 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
       outdated: 1,
       outdatedDocs: ["AGENTS.md"],
       missing: 0,
+      unprovenanced: 0,
+      unprovenancedDocs: [],
     });
     const report = formatDoctorReport(result);
     expect(report).toContain("1 acknowledgedDrifted");
@@ -303,6 +313,8 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
       missing: 0,
       outdated: 1,
       outdatedDocs: ["CONTRIBUTING.md"],
+      unprovenanced: 0,
+      unprovenancedDocs: [],
     });
     expect(body.tracker).toEqual({
       dir: "ArggonManager",
@@ -1146,5 +1158,132 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(body.opencode.mcp.mcpJson).toBe(true);
     // W3: no MCP stanza in the generated config and no registration nagging.
     expect(body.opencode.mcp.hint).toBeNull();
+  });
+});
+
+// task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters: doctor is
+// the standing surface for the `.arggon.env` gitignore probe (spec
+// worktree-env-contract-016) — a tree that adopted before the template shipped
+// keeps its own `.gitignore` and never gains the entry on its own.
+describe("doctor: .arggon.env gitignore hint (spec worktree-env-contract-016)", () => {
+  it("reports a missing entry report-only, and stays silent once present", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    // The generated `.gitignore` carries the entry: no hint.
+    expect(runDoctor({ cwd: dir }).envGitignore).toEqual({
+      path: ".gitignore",
+      present: true,
+      ignores: true,
+      hint: null,
+    });
+
+    // The pre-template adopter file: kept by init, so doctor reports it.
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf8");
+    const before = readFileSync(join(dir, ".gitignore"), "utf8");
+    const result = runDoctor({ cwd: dir });
+    expect(result.envGitignore.present).toBe(true);
+    expect(result.envGitignore.ignores).toBe(false);
+    expect(result.envGitignore.hint).toContain(".arggon.env");
+    expect(result.envGitignore.hint).toContain("worktree-env-contract-016");
+    expect(formatDoctorReport(result)).toContain("worktree-env-contract-016");
+    // Strictly report-only: the bytes survive the probe.
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(before);
+
+    // Appending the documented line silences the hint.
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n.arggon.env\n", "utf8");
+    expect(runDoctor({ cwd: dir }).envGitignore.hint).toBeNull();
+  });
+
+  it("reports no hint when there is no .gitignore, and probes the cwd when uninitialized", () => {
+    const bare = tempDir();
+    expect(runDoctor({ cwd: bare }).envGitignore).toEqual({
+      path: ".gitignore",
+      present: false,
+      ignores: false,
+      hint: null,
+    });
+
+    // An uninitialized tree with a pre-existing adopter `.gitignore` still
+    // reports: `init` will keep that file, so the entry stays missing.
+    writeFileSync(join(bare, ".gitignore"), "node_modules/\n", "utf8");
+    const result = runDoctor({ cwd: bare });
+    expect(result.initialized).toBe(false);
+    expect(result.envGitignore.hint).toContain("worktree-env-contract-016");
+    expect(formatDoctorReport(result)).toContain("worktree-env-contract-016");
+  });
+
+  it("carries the probe in the doctor --json envelope", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf8");
+    const proc = runCli(["doctor", "--json"], dir);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      envGitignore: { path: string; present: boolean; ignores: boolean; hint: string | null };
+    };
+    expect(body.envGitignore).toMatchObject({
+      path: ".gitignore",
+      present: true,
+      ignores: false,
+    });
+    expect(body.envGitignore.hint).toContain("worktree-env-contract-016");
+  });
+});
+
+/**
+ * Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+ * doctor is the standing surface for a managed path whose own visible marker
+ * claims arggon provenance but which has no `x-generated` entry. Report-only —
+ * no write, no exit-code change — and independent of the entry buckets (a
+ * no-row file has no entry for the `managed`/`modified` walk to see).
+ */
+describe("doctor: unprovenanced managed files", () => {
+  const DEST = ".opencode/agents/arggon-prover.md";
+
+  /** The stranded shape: marker + no row + a template the install no longer ships. */
+  function strand(dir: string): void {
+    const abs = join(dir, ...DEST.split("/"));
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(
+      abs,
+      `${generatedYamlMarker("opencode/agents/arggon-prover.md")}\ndescription: stranded\n`,
+      "utf8",
+    );
+  }
+
+  it("counts and names a stranded marker file, and hints in the human report", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    strand(dir);
+
+    const result = runDoctor({ cwd: dir });
+    expect(result.docs.unprovenanced).toBe(1);
+    expect(result.docs.unprovenancedDocs).toEqual([DEST]);
+    // No entry means no bucket: the class is not folded into `modified`.
+    expect(result.docs.modified).toBe(0);
+    const report = formatDoctorReport(result);
+    expect(report).toContain("claim arggon provenance");
+    expect(report).toContain("no x-generated entry");
+
+    // Report-only: the probe writes nothing, including the state file.
+    const state = join(dir, "ArggonManager/.convention.yml");
+    const before = readFileSync(state, "utf8");
+    runDoctor({ cwd: dir });
+    expect(readFileSync(state, "utf8")).toBe(before);
+  });
+
+  it("reports zero on a clean scaffold and on an adopter-owned managed file", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    // A managed path with no marker and no row is the sanctioned pre-provenance
+    // adopter file: init skipping it is correct, and doctor stays silent.
+    const mine = join(dir, ".opencode/agents/my-own-agent.md");
+    mkdirSync(dirname(mine), { recursive: true });
+    writeFileSync(mine, "---\ndescription: mine\n---\n", "utf8");
+
+    const result = runDoctor({ cwd: dir });
+    expect(result.docs.unprovenanced).toBe(0);
+    expect(result.docs.unprovenancedDocs).toEqual([]);
+    expect(formatDoctorReport(result)).not.toContain("claim arggon provenance");
   });
 });
