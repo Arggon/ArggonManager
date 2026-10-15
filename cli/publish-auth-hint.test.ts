@@ -17,6 +17,11 @@
  *      already-published version, a pack/lifecycle failure, an unknown code and
  *      a passing publish. A wrong hint on a real failure is worse than none.
  *
+ * The wrapper's own failure path is pinned too: when `spawnSync` fails (the
+ * command is missing, or npm's stderr exceeds its 1 MiB maxBuffer — ENOBUFS),
+ * the captured npm output is re-emitted before the wrapper fails closed with
+ * exit 2, so the wrapper can never hide the npm error it exists to surface.
+ *
  * Everything is offline: the "npm" is a fixture script that prints a saved npm
  * error log and exits, and the logs replay the shapes real runs produced (the
  * two release attempts this repo lost were a missing `@arggondev/lib` entry and
@@ -186,8 +191,11 @@ function logFile(log: string): string {
   return path;
 }
 
-function hint(args: string[]): { status: number; stdout: string; stderr: string } {
-  const result = spawnSync("node", [hintPath, ...args], { encoding: "utf8" });
+function hint(
+  args: string[],
+  { maxBuffer = 1024 * 1024 }: { maxBuffer?: number } = {},
+): { status: number; stdout: string; stderr: string } {
+  const result = spawnSync("node", [hintPath, ...args], { encoding: "utf8", maxBuffer });
   return {
     status: result.status ?? -1,
     stdout: result.stdout ?? "",
@@ -228,6 +236,32 @@ describe("classifyPublishFailure — a genuine authentication failure", () => {
   it("classifies E401 on a non-zero exit whatever the message says", () => {
     // A 401 IS the registry refusing the credential; no message reading needed.
     expect(isAuthFailure({ exitCode: 128, stderr: E401 })).toBe(true);
+  });
+});
+
+describe("classifyPublishFailure — a code line is authoritative over message text", () => {
+  it("consults the message patterns ONLY when the log carries no code line", () => {
+    // The review observation this pins: the header says the message patterns
+    // are for a log with no code line, and the code must agree. With a code
+    // line present — auth or not — the code wins: an incidental auth phrase
+    // must never turn a real `E404` into an auth hint (a wrong hint on a real
+    // failure is worse than none).
+    const phrase = "npm error need auth This command requires you to be logged in";
+    // no code line + auth phrase -> auth (a trimmed log, an older npm)
+    const messageOnly = classifyPublishFailure({ exitCode: 1, stderr: phrase });
+    expect(messageOnly.verdict).toBe("auth");
+    expect(messageOnly.evidence).toContain("message");
+    // non-auth code + auth phrase -> other: the code is authoritative
+    const codeWins = classifyPublishFailure({
+      exitCode: 1,
+      stderr: `npm error code E404\n${phrase}`,
+    });
+    expect(codeWins.verdict).toBe("other");
+    expect(codeWins.evidence).toBe("npm error code E404");
+    // no code line + no phrase -> other
+    expect(classifyPublishFailure({ exitCode: 1, stderr: "npm error it broke" }).verdict).toBe(
+      "other",
+    );
   });
 });
 
@@ -412,6 +446,22 @@ describe("wrapper mode — the failure path the workflow runs", () => {
     }
   });
 
+  it("does not annotate a non-auth code even when the log carries an auth phrase", () => {
+    // The end-to-end shape of the message-fallback ordering fix: `E404` plus an
+    // incidental "requires you to be logged in" is still the 404 it is — the
+    // code line is authoritative, so no pointer is printed.
+    const log = [
+      "npm error code E404",
+      "npm error 404 Not Found - PUT https://registry.npmjs.org/@arggondev%2flib",
+      "npm error 404 This command requires you to be logged in to publish a package.",
+    ].join("\n");
+    const run = hint(["--package", LIB, "--", "node", fakeNpm(log, 1)]);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain("npm error code E404"); // npm's own error, verbatim
+    expect(run.stderr).not.toContain("AUTHENTICATION");
+    expect(run.stderr).not.toContain("npm trust list");
+  });
+
   it("preserves the child's exit code exactly, and a passing publish is silent", () => {
     expect(hint(["--package", LIB, "--", "node", fakeNpm(ENEEDAUTH_NPM11, 7)]).status).toBe(7);
     const ok = hint(["--package", LIB, "--", "node", fakeNpm(WARNINGS_ONLY, 0)]);
@@ -453,6 +503,40 @@ describe("wrapper mode — the failure path the workflow runs", () => {
     expect(hint(["--bogus", "x"]).status).toBe(2);
     expect(hint(["--package", LIB, "--log", join(tmp("missing"), "nope.log")]).status).toBe(2);
     expect(hint(["--package", LIB, "--", "arggon-no-such-binary-xyz"]).status).toBe(2);
+  });
+
+  it("re-emits captured npm output when spawnSync hits the maxBuffer edge (ENOBUFS)", () => {
+    // npm stderr past spawnSync's 1 MiB default buffer makes spawnSync fail
+    // with ENOBUFS and kill the child. Whatever npm wrote before that must
+    // still be re-emitted — a hidden npm error must not become a hidden
+    // wrapper error — before the wrapper fails closed with its own exit 2.
+    // The marker sits past one pipe buffer, so it only arrives if the re-emit
+    // is flushed rather than dropped by an exiting process; the parent's own
+    // buffer is raised so it can observe the full re-emit.
+    const script = join(tmp("maxbuffer"), "npm.mjs");
+    writeFileSync(
+      script,
+      [
+        'import { writeSync } from "node:fs";',
+        'const chunk = "npm error code ENEEDAUTH\\n" + "x".repeat(65535);',
+        "for (let i = 0; i < 8; i++) writeSync(2, chunk);",
+        'writeSync(2, "CAPTURED-PAST-ONE-PIPE-BUFFER\\n");',
+        "for (let i = 0; i < 16; i++) writeSync(2, chunk);",
+        "process.exit(1);",
+      ].join("\n"),
+    );
+    const run = hint(["--package", LIB, "--", "node", script], { maxBuffer: 8 * 1024 * 1024 });
+    expect(run.status).toBe(2); // fail closed: spawnSync failed, not a publish result
+    expect(run.stderr).toContain("npm error code ENEEDAUTH"); // npm's captured output…
+    expect(run.stderr).toContain("CAPTURED-PAST-ONE-PIPE-BUFFER"); // …past one pipe buffer
+    assertOrder(
+      run.stderr,
+      "npm error code ENEEDAUTH",
+      "CAPTURED-PAST-ONE-PIPE-BUFFER",
+      "cannot run", // the usage line comes after the re-emit
+    );
+    expect(run.stderr).toContain("ENOBUFS"); // the wrapper's own diagnosis still lands
+    expect(run.stdout).toBe("");
   });
 });
 

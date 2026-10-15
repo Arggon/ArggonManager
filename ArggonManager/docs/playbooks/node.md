@@ -42,6 +42,7 @@ October 2026; Node 22 is in Maintenance LTS. Sources:
 - Build with `npm run build` (tsc) → `dist/`; `dist/` is gitignored.
 - Errors: CLI paths set `process.exitCode = 1` and keep stdout reserved for the
   JSON envelope; human diagnostics go to stderr (docs/json-output.md).
+- `spawnSync` ENOBUFS keeps the truncated output in `child.stderr`; re-emit it, and use `process.exitCode` — `process.exit` drops pending pipe writes. — task-publish-auth-hint-review-observations
 
 ## Testing
 

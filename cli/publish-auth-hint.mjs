@@ -23,6 +23,12 @@
  * failing publish fails the step exactly as before and a passing publish
  * prints no annotation at all.
  *
+ * The wrapper's own failures fail closed with exit 2 and still re-emit: when
+ * `spawnSync` itself fails — the command cannot run, or npm's stderr exceeds
+ * the 1 MiB `maxBuffer` (ENOBUFS: the child is killed and its output
+ * truncated) — the output npm managed to write is re-emitted before the usage
+ * line, so a hidden npm error cannot become a hidden wrapper error.
+ *
  * WHAT COUNTS AS AN AUTHENTICATION FAILURE (deliberately narrow: a wrong hint
  * on a real failure is worse than none):
  *   - an `npm error code <CODE>` / `npm ERR! code <CODE>` line whose code is
@@ -30,9 +36,11 @@
  *     shape `release.md` names — or `E401`, the registry answering 401. This
  *     pipeline carries no `NPM_TOKEN` anywhere, so a 401 here is by definition
  *     the trusted-publisher path being refused.
- *   - the matching message text when the log carries no code line (a trimmed
- *     log, an older npm): "need auth", "requires you to be logged in",
- *     "authorize this machine using `npm adduser`", "401 Unauthorized".
+ *   - the matching message text ONLY when the log carries no `code` line at
+ *     all (a trimmed log, an older npm): "need auth", "requires you to be
+ *     logged in", "authorize this machine using `npm adduser`", "401
+ *     Unauthorized". Any code line — auth or not — is authoritative, so an
+ *     incidental auth phrase cannot override a non-auth code.
  *
  * NOT auth, so NOT annotated (the original npm error stands on its own):
  * `E404` — a 404 on a name typo (npm can also mask a trusted-publisher
@@ -52,7 +60,8 @@
  *
  * Exit codes: wrapper mode — the child's status, unchanged (the step still
  * fails the way npm failed it); log mode — 0, report-only; 2 — usage / IO
- * error (fail closed, the `cli/release-guard.mjs` precedent).
+ * error, including a `spawnSync` failure after the captured output is
+ * re-emitted (fail closed, the `cli/release-guard.mjs` precedent).
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -104,8 +113,14 @@ export function classifyPublishFailure({ exitCode = 0, stderr = "" } = {}) {
   if (Number(exitCode) === 0) return { verdict: "success", codes, evidence: "" };
   const authCode = codes.find((code) => AUTH_CODES.includes(code));
   if (authCode) return { verdict: "auth", codes, evidence: `npm error code ${authCode}` };
-  const message = AUTH_MESSAGES.find((pattern) => pattern.test(log));
-  if (message) return { verdict: "auth", codes, evidence: `message ${message.source}` };
+  if (codes.length === 0) {
+    // Message matching is for a log with no `code` line at all: any code line —
+    // auth or not — is authoritative, so an incidental auth phrase must not
+    // override a non-auth code (a wrong hint on a real failure is worse than
+    // none).
+    const message = AUTH_MESSAGES.find((pattern) => pattern.test(log));
+    if (message) return { verdict: "auth", codes, evidence: `message ${message.source}` };
+  }
   return {
     verdict: "other",
     codes,
@@ -220,7 +235,10 @@ function usage(message) {
       "         [--workflow <file>] [--manifest <package.json>] -- <cmd> [args...]\n" +
       "       node cli/publish-auth-hint.mjs --package <name> --log <file> [--exit-code <n>]\n",
   );
-  process.exit(2);
+  // exitCode, not process.exit (the release-guard.mjs precedent): the CI step's
+  // stderr is a PIPE, and process.exit can drop a pending write — including the
+  // npm output re-emitted just before this line on a spawnSync failure.
+  process.exitCode = 2;
 }
 
 function writeStderr(text) {
@@ -238,10 +256,11 @@ function main(argv) {
   try {
     parsed = parseArgs(argv);
   } catch (err) {
-    usage(err instanceof Error ? err.message : String(err));
+    return usage(err instanceof Error ? err.message : String(err));
   }
   const { opts, command } = parsed;
-  const packageName = opts.package ?? usage("--package is required (which package failed)");
+  if (!opts.package) return usage("--package is required (which package failed)");
+  const packageName = opts.package;
   const workflow = opts.workflow ?? FALLBACK_WORKFLOW;
   const manifestRepo = repoFromManifest(resolve(opts.manifest ?? "package.json"));
   const options = {
@@ -258,7 +277,7 @@ function main(argv) {
     try {
       log = readFileSync(resolve(opts.log), "utf8");
     } catch (err) {
-      usage(`cannot read ${opts.log}: ${err instanceof Error ? err.message : String(err)}`);
+      return usage(`cannot read ${opts.log}: ${err instanceof Error ? err.message : String(err)}`);
     }
     writeStderr(log);
     annotate(
@@ -268,13 +287,22 @@ function main(argv) {
     return;
   }
 
-  if (!command || command.length === 0) usage("nothing to run: pass `-- <cmd> [args...]`");
+  if (!command || command.length === 0) return usage("nothing to run: pass `-- <cmd> [args...]`");
   const program = command[0];
   const child = spawnSync(program, command.slice(1), {
     stdio: ["ignore", "inherit", "pipe"],
     encoding: "utf8",
   });
-  if (child.error) usage(`cannot run ${program}: ${child.error.message}`);
+  if (child.error) {
+    // spawnSync failed before the child could finish: the program is missing,
+    // or npm's stderr exceeded the 1 MiB maxBuffer (ENOBUFS — the child is
+    // killed and its output truncated). Re-emit whatever npm managed to write
+    // before failing closed: a hidden npm error must not become a hidden
+    // wrapper error. usage() keeps exit 2 and returns, so Node flushes this
+    // write.
+    writeStderr(child.stderr ?? "");
+    return usage(`cannot run ${program}: ${child.error.message}`);
+  }
   const stderr = child.stderr ?? "";
   writeStderr(stderr);
   const status = child.status ?? 1;
