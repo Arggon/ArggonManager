@@ -56,3 +56,16 @@ Filed from the #579 review round 2: PR #579 taught the native claim mapper to fo
 - [ ] Decide and document: does the native `truncated` flag report character clipping for `foreignWrites` too (consistent with `takeOver`, `built`, `linked`, `missingDependencies`), accepting that a pathological path makes the default receipt carry `truncated: true` — or is the flag defined as "the kernel capped the counts" and character clipping stays silent?
 - [ ] Whatever the decision, make the code and the docs say the same thing (json-output.md `claim.foreignWrites` note), and pin it with a hostile long-path test (and a plain-path test proving the common case stays silent under the chosen semantics).
 - [ ] Same question answered for a long string inside a `replaced.takeovers[]` chain entry, which neither receipt folds today.
+
+### 2026-10-15 @Arggon
+Delivered on `feat/task-foreign-writes-char-clip-truncated`, PR #838 (ready, not draft). Commits: `b5006a52` (fix + tests + docs), `5fc596f1` (bundle regen). CI was pending at comment time (cli / tasks-validate / ui-smoke).
+
+**Decision (acceptance 1 + 3).** The shared `truncated` flag reports CHARACTER clipping for `preparation.claim.foreignWrites` too — consistent with `takeOver` / `built` / `linked` / `missingDependencies`. The alternative reading ("the flag only names kernel count caps, character clipping stays silent") was rejected: a repo-relative path or identity silently shortened to 200 chars and then reported as the whole value is exactly the failure the flag exists to name, and the kernel never caps these strings. A pathological path therefore makes the default receipt carry `truncated: true` — the honest account; the common case stays byte-identical (nothing set when nothing was clipped). The same answer applies to a long string inside a `replaced.takeovers[]` chain entry (neither receipt folded it before; the kernel caps the chain LENGTH at 5, never its strings).
+
+**Shape.** New `claimForeignWritesTruncated(bounded, input)` compares `owner`, `claimedAt`, each `files` entry and the count against the kernel's own values; `boundedPreparation` calls it in place of the inline `total > files.length` term. `claimTakeoverTruncated` gained the per-entry chain comparison (all four strings, compared against the source). Docs: `json-output.md` `claim` row states the fold; the code comments carry the decision; `opencode2.md`'s `preparation.truncated` row already said "a clipped string" — the code now agrees.
+
+**Evidence (commands run; expected vs observed).**
+- Pre-fix (index.ts reverted to HEAD, new tests kept): `npx vitest run opencode/plugins/arggon/tools.test.ts -t task-foreign-writes-char-clip-truncated` → 3 failed | 1 passed, each failure `AssertionError: expected undefined to be true` — the long-path fold, the long-owner fold and the chain-entry fold. Control passed.
+- Post-fix: focused `tools.test.ts` 146 passed; `npm test` 160 files / 3529 passed; `npm run arggon -- validate` ok (0 warnings); `npm run lint` exit 0; `npm run test:structure` 5 passed / 0 failed; `npx prettier --check` on touched files clean; `npm run check:plugin` exit 0 (bundle 573,559 B).
+
+**Acceptance boxes.** [1] decided and documented; [2] code + docs agree, hostile long-path test plus plain-path control pin it; [3] chain-entry answer documented and folded, with its own test. No blocker.
