@@ -12,6 +12,7 @@ updated: "2026-10-15"
 claimed_at: "2026-10-15T01:53:24.524Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-cleanup-probe-degradation-honesty
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-cleanup-probe-degradation-honesty.md
   Leaves live only under a story. id is the filename stem: task-cleanup-probe-degradation-honesty.
@@ -37,22 +38,24 @@ was not blocking; recorded so the rule does not have a silent exception.
 
 ## Acceptance
 
-- [ ] On the degradation path, either classify `removable: false` with a reason
+- [x] On the degradation path, either classify `removable: false` with a reason
       naming the failed probe and the manual remedy, or carry the same honest
       `action: "failed"` shape with the manual sequence — decide and record why
-- [ ] A test pins the degradation path's shape (injected failing probe), so the
+- [x] A test pins the degradation path's shape (injected failing probe), so the
       honesty rule is total rather than path-dependent
-- [ ] The normal paths and their tests are untouched
+- [x] The normal paths and their tests are untouched
 
 ## Notes
 
 ### 2026-10-15 @arggon-maker
+
 Decision: classify `removable: false` with a reason naming the failed probe and the manual remedy — NOT the `action: "failed"` receipt shape.
 
 - Rationale: the porcelain probe is the only evidence that `git worktree remove` will succeed, so an unanswered probe must not print `removable: true` with a null reason; the failed-receipt shape would need CLI/native surface changes (outside this item's kernel scope) and would still leave the candidates list promising a removal the tool cannot verify. The path is reachable only for an already-broken worktree (git's own removal check runs the same probe), so refusing loses nothing — the old shape ended in a raw error and an identical retry. `--force` does not bypass: force discards untracked content a WORKING probe observed; an unanswered probe observed nothing.
 - After: `removable: false`, `action: null`, reason names the probe (`'git status --porcelain' in <path> did not answer`), the inspection command (`git -C <path> status --porcelain`) and the manual sequence (`git worktree remove <path>` — `--force` only for inspected, disposable content; `git branch -D <branch>`; re-run `arggon cleanup --prune` to clear the record).
 
 Evidence (worktree, all green):
+
 - `npm run arggon -- validate` → ok (0 warnings).
 - `npx vitest run lib/src/cleanup.test.ts` → 11 passed (3 new: injected failing probe ⇒ removable:false + reason + action null; force does not bypass; answering probe ⇒ clean path unchanged).
 - `npm test` (after `npm run build`) → 158 files / 3484 tests passed.
@@ -63,5 +66,16 @@ Files: `lib/src/cleanup.ts`, `lib/src/cleanup.test.ts`, `lib/src/worktree.proper
 PR #832 (branch pushed). Acceptance: (1) decided + recorded here and in the PR body; (2) pinned by an injected failing probe; (3) normal-path behavior unchanged — the only existing-test edit is the disclosed 1-line probe injection. Boxes left for the lead's completion call.
 
 ### handoff 2026-10-15 @arggon-maker — next: Review and merge PR #832, then tick the 3 acceptance boxes and flip to done. Optional docs line for the probe-failure skip in agents.md §Cleanup / json-output.md §cleanup left to you.
+
 - branch: feat/task-cleanup-probe-degradation-honesty
 - open questions: Docs mention of the probe-failure skip left to the lead (out of kernel scope); property-test harness injection approved by the lead and disclosed in the PR.
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
+verdict: approve
+
+### Lead review + merge verification — 2026-10-14 (delivery lead)
+
+Merged as 7841ff4a (PR #832). Decision: an unanswered removal-blocker probe classifies the entry `removable: false` with a reason — not the `action: "failed"` receipt shape (that would need CLI/native surface changes, would still leave the candidates list promising a removal the tool cannot verify, and the path is reachable only for an already-broken worktree). The refusal names the failed probe, the inspection command and the manual sequence; `--force` does not bypass it (force discards content a WORKING probe observed; an unanswered probe observed nothing). The answering-probe path is behavior-equivalent (early-return refactor, no logic change).
+
+Good catch folded in: the property-test harness now answers the porcelain probe explicitly — its ambient tmp worktree is not a git repo, so the property had silently depended on the pre-fix degradation. Bundle regenerated for the drift gate. Evidence: `cleanup.test.ts` +3 (injected failing probe; force does not bypass; answering-probe control), property harness injection, full suite 3484 green, CI green on all lanes.
