@@ -10,7 +10,6 @@ labels: [worktree, methodology]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-15"
-worktree_path: /home/arggon/Projects/ArggonManager-task-arm-strict-worktree-writes
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-arm-strict-worktree-writes.md
