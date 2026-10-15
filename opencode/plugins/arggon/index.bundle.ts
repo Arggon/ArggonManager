@@ -7,6 +7,10 @@ const __arggonNodeRequire = __arggonCreateRequire(import.meta.url)
 const __arggonModules = new Map()
 const __arggonCache = new Map()
 const __arggonEdges = new Map()
+__arggonEdges.set("lib/src/branch-claims.ts\u0000./frontmatter.js", "lib/src/frontmatter.ts")
+__arggonEdges.set("lib/src/branch-claims.ts\u0000./ids.js", "lib/src/ids.ts")
+__arggonEdges.set("lib/src/branch-claims.ts\u0000./status.js", "lib/src/status.ts")
+__arggonEdges.set("lib/src/branch-claims.ts\u0000./sync-types.js", "lib/src/sync-types.ts")
 __arggonEdges.set("lib/src/cleanup.ts\u0000./status.js", "lib/src/status.ts")
 __arggonEdges.set("lib/src/cleanup.ts\u0000./worktree.js", "lib/src/worktree.ts")
 __arggonEdges.set("lib/src/comment.ts\u0000./atomic.js", "lib/src/atomic.ts")
@@ -45,6 +49,7 @@ __arggonEdges.set("lib/src/import-issues.ts\u0000./tracker-commit.js", "lib/src/
 __arggonEdges.set("lib/src/import-issues.ts\u0000./update.js", "lib/src/update.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./acceptance.js", "lib/src/acceptance.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./atomic.js", "lib/src/atomic.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./branch-claims.js", "lib/src/branch-claims.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./brief.js", "lib/src/brief.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./cleanup.js", "lib/src/cleanup.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./comment.js", "lib/src/comment.ts")
@@ -79,6 +84,7 @@ __arggonEdges.set("lib/src/index.ts\u0000./show.js", "lib/src/show.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./status.js", "lib/src/status.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./sync-command.js", "lib/src/sync-command.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./tracker-commit.js", "lib/src/tracker-commit.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./tree-state.js", "lib/src/tree-state.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./trend.js", "lib/src/trend.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./update.js", "lib/src/update.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./validate.js", "lib/src/validate.ts")
@@ -99,11 +105,13 @@ __arggonEdges.set("lib/src/list.ts\u0000./paths.js", "lib/src/paths.ts")
 __arggonEdges.set("lib/src/list.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/list.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
 __arggonEdges.set("lib/src/list.ts\u0000./status.js", "lib/src/status.ts")
+__arggonEdges.set("lib/src/list.ts\u0000./tree-state.js", "lib/src/tree-state.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./filter.js", "lib/src/filter.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./paths.js", "lib/src/paths.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/next.ts\u0000./status.js", "lib/src/status.ts")
+__arggonEdges.set("lib/src/next.ts\u0000./tree-state.js", "lib/src/tree-state.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./acceptance.js", "lib/src/acceptance.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./brief.js", "lib/src/brief.ts")
 __arggonEdges.set("lib/src/operations.ts\u0000./comment.js", "lib/src/comment.ts")
@@ -142,6 +150,7 @@ __arggonEdges.set("lib/src/rules.ts\u0000./status.js", "lib/src/status.ts")
 __arggonEdges.set("lib/src/show.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/show.ts\u0000./paths.js", "lib/src/paths.ts")
 __arggonEdges.set("lib/src/show.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
+__arggonEdges.set("lib/src/sync-command.ts\u0000./branch-claims.js", "lib/src/branch-claims.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./get-open-prs.js", "lib/src/get-open-prs.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./paths.js", "lib/src/paths.ts")
@@ -331,6 +340,176 @@ function verifyOnDisk(path, tmpStat, expected) {
         return;
     throw new Error(`shrink guard: wrote ${expected} bytes but ${path} has ${written.size} bytes on disk — ` +
         `refusing to leave a truncated doc`);
+}
+})
+
+__arggonModules.set("lib/src/branch-claims.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.findBranchClaims = findBranchClaims;
+const node_child_process_1 = require("node:child_process");
+const node_path_1 = require("node:path");
+const frontmatter_js_1 = require("./frontmatter.js");
+const ids_js_1 = require("./ids.js");
+const status_js_1 = require("./status.js");
+const sync_types_js_1 = require("./sync-types.js");
+const defaultExecGit = (file, args, options) => (0, node_child_process_1.execFileSync)(file, args, options);
+const TERMINAL_STATUSES = new Set(["done", "cancelled"]);
+function shortReason(err) {
+    const stderr = err !== null && typeof err === "object" && "stderr" in err
+        ? String(err.stderr ?? "")
+        : "";
+    const message = stderr.trim() || (err instanceof Error ? err.message : String(err));
+    return message.split("\n")[0].trim().slice(0, 240);
+}
+function listRefs(root, execGit) {
+    let out;
+    try {
+        out = execGit("git", ["-C", root, "for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes/origin"], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+            timeout: 10_000,
+        });
+    }
+    catch {
+        return null;
+    }
+    const local = new Set();
+    const remote = new Set();
+    for (const raw of out.split("\n")) {
+        const ref = raw.trim();
+        if (ref.startsWith("refs/heads/"))
+            local.add(ref.slice("refs/heads/".length));
+        else if (ref.startsWith("refs/remotes/origin/")) {
+            const name = ref.slice("refs/remotes/origin/".length);
+            if (name !== "HEAD")
+                remote.add(name);
+        }
+    }
+    return { local, remote };
+}
+function showFile(root, ref, path, execGit) {
+    try {
+        const content = execGit("git", ["-C", root, "show", `${ref}:${path}`], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+            timeout: 10_000,
+            maxBuffer: 32 * 1024 * 1024,
+        });
+        return { ok: true, content };
+    }
+    catch (err) {
+        return { ok: false, reason: shortReason(err) };
+    }
+}
+function readFrontmatter(content) {
+    try {
+        return (0, frontmatter_js_1.parseFrontmatter)(content).data;
+    }
+    catch {
+        return null;
+    }
+}
+function findBranchClaims(opts) {
+    const execGit = opts.execGit ?? defaultExecGit;
+    const refs = listRefs(opts.root, execGit);
+    if (refs === null)
+        return { claims: [], errors: [] };
+    const prByBranch = new Map(opts.prs.map((pr) => [pr.headRefName, pr.number]));
+    const claims = [];
+    const errors = [];
+    const candidates = opts.items.filter((item) => (0, status_js_1.isClaimable)(item.type) &&
+        !(0, status_js_1.isClaimed)(item.type, item.status, item.assignee) &&
+        !TERMINAL_STATUSES.has(item.status));
+    for (const item of candidates) {
+        const path = (0, node_path_1.relative)(opts.root, item.filePath).split(node_path_1.sep).join("/");
+        const names = new Set();
+        if (item.branch)
+            names.add(item.branch);
+        for (const name of refs.local) {
+            if ((0, sync_types_js_1.branchReferencesItem)(name, item.id))
+                names.add(name);
+        }
+        for (const name of refs.remote) {
+            if ((0, sync_types_js_1.branchReferencesItem)(name, item.id))
+                names.add(name);
+        }
+        for (const pr of opts.prs) {
+            if ((0, sync_types_js_1.branchReferencesItem)(pr.headRefName, item.id))
+                names.add(pr.headRefName);
+        }
+        for (const branch of [...names].sort()) {
+            const pr = prByBranch.get(branch) ?? null;
+            const ref = refs.local.has(branch)
+                ? `refs/heads/${branch}`
+                : refs.remote.has(branch)
+                    ? `refs/remotes/origin/${branch}`
+                    : null;
+            if (ref === null) {
+                errors.push({
+                    id: item.id,
+                    branch,
+                    pr,
+                    reason: "branch not available locally (fetch it to read its copy)",
+                });
+                continue;
+            }
+            const read = showFile(opts.root, ref, path, execGit);
+            if (!read.ok) {
+                errors.push({ id: item.id, branch, pr, reason: read.reason });
+                continue;
+            }
+            const data = readFrontmatter(read.content);
+            if (data === null) {
+                errors.push({
+                    id: item.id,
+                    branch,
+                    pr,
+                    reason: "item file on the branch has no readable frontmatter",
+                });
+                continue;
+            }
+            if (data.id !== item.id) {
+                if (typeof data.id === "string" && data.id.length > 0)
+                    continue;
+                errors.push({
+                    id: item.id,
+                    branch,
+                    pr,
+                    reason: "item file on the branch has no item id in frontmatter",
+                });
+                continue;
+            }
+            const { type, status, assignee } = data;
+            if (typeof type !== "string" ||
+                !(0, ids_js_1.isItemType)(type) ||
+                typeof status !== "string" ||
+                !(0, status_js_1.isStatus)(status)) {
+                errors.push({
+                    id: item.id,
+                    branch,
+                    pr,
+                    reason: "item file on the branch has no readable frontmatter",
+                });
+                continue;
+            }
+            const assigneeName = typeof assignee === "string" && assignee.length > 0 ? assignee : null;
+            if (!(0, status_js_1.isClaimed)(type, status, assigneeName))
+                continue;
+            claims.push({
+                id: item.id,
+                branch,
+                pr,
+                assignee: assigneeName,
+                claimed_at: typeof data.claimed_at === "string" ? data.claimed_at : null,
+                local: { status: item.status, assignee: item.assignee ?? null },
+            });
+        }
+    }
+    const byIdThenBranch = (a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : a.branch < b.branch ? -1 : a.branch > b.branch ? 1 : 0;
+    claims.sort(byIdThenBranch);
+    errors.sort(byIdThenBranch);
+    return { claims, errors };
 }
 })
 
@@ -3796,9 +3975,9 @@ exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = expo
 exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = void 0;
 exports.FRICTION_REPORT_MAX_ROWS = exports.resolveRepoAbsPath = exports.redactFrictionText = exports.readOrCreateMachineSalt = exports.readFrictionLog = exports.readFrictionDropped = exports.normalizeCommandShape = exports.frictionStateDir = exports.frictionStateBase = exports.frictionSaltPath = exports.frictionReporterId = exports.frictionMajorVersion = exports.frictionLogPath = exports.frictionFingerprintMaterial = exports.frictionFingerprint = exports.frictionDroppedPath = exports.clearFrictionLog = exports.buildFrictionRecord = exports.appendFrictionRecord = exports.FrictionError = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SECRET_PLACEHOLDER = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_REDACTION_MAX_SUBSTITUTIONS = exports.FRICTION_REDACTED_FIELD = exports.FRICTION_PATH_PLACEHOLDER = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_MAX_LINES = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_HARNESS_CAP = exports.FRICTION_FORMAT_VERSION = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_DROPPED_FILE_NAME = exports.FRICTION_DEFAULT_HARNESS = exports.FRICTION_COMMAND_SHAPE_CAP = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = void 0;
 exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.stripInlineCodeSpans = exports.regionHasScaffoldMarker = exports.placeholderSections = exports.bodyHasScaffoldPlaceholder = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.MAX_HYGIENE_OPEN_CONTAINERS = exports.MAX_HYGIENE_OFFENDERS = exports.runReport = exports.containerHygiene = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.isFrictionPublishTier = exports.buildFrictionPublishUrl = exports.buildFrictionPublishTitle = exports.buildFrictionPublishDoc = exports.buildFrictionPublishBody = exports.FRICTION_PUBLISH_URL_BASE = exports.FRICTION_PUBLISH_TITLE_PREFIX = exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = exports.FRICTION_PUBLISH_TIERS = exports.FRICTION_PUBLISH_NARRATIVE_CAP = exports.FRICTION_PUBLISH_MAX_URL_CHARS = exports.FRICTION_PUBLISH_MAX_CLASSES = exports.FRICTION_PUBLISH_LABEL = exports.FRICTION_PUBLISH_FENCE_INFO = exports.resolveFrictionOptOut = exports.readFrictionOptOut = exports.FRICTION_OPT_OUT_ENV = exports.summarizeFrictionLog = exports.renderFrictionReport = exports.readFrictionReport = exports.frictionFenceFor = void 0;
-exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.isStartOwnedWorktreeEnv = exports.isStartOwnedNodeModulesInstall = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeUntrackedRefusal = exports.worktreeTrackedRefusal = exports.worktreeReleaseRefusal = exports.parseRemovalBlockingPaths = exports.parseRemovalBlockers = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = void 0;
-exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.frictionClearOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_NODE_MODULES_ENTRY = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.formatReportHygiene = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = void 0;
+exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.isStartOwnedWorktreeEnv = exports.isStartOwnedNodeModulesInstall = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeUntrackedRefusal = exports.worktreeTrackedRefusal = exports.worktreeReleaseRefusal = exports.parseRemovalBlockingPaths = exports.parseRemovalBlockers = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.readRankedFrom = exports.RANKED_FROM_NOTE = exports.formatRankedFrom = exports.findBranchClaims = void 0;
+exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.frictionClearOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_NODE_MODULES_ENTRY = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.formatReportHygiene = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceBody", { enumerable: true, get: function () { return items_js_1.acceptanceBody; } });
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
@@ -4034,6 +4213,12 @@ Object.defineProperty(exports, "HANDOFF_SESSION_CAP", { enumerable: true, get: f
 Object.defineProperty(exports, "runHandoff", { enumerable: true, get: function () { return handoff_js_1.runHandoff; } });
 var sync_command_js_1 = require("./sync-command.js");
 Object.defineProperty(exports, "runSync", { enumerable: true, get: function () { return sync_command_js_1.runSync; } });
+var branch_claims_js_1 = require("./branch-claims.js");
+Object.defineProperty(exports, "findBranchClaims", { enumerable: true, get: function () { return branch_claims_js_1.findBranchClaims; } });
+var tree_state_js_1 = require("./tree-state.js");
+Object.defineProperty(exports, "formatRankedFrom", { enumerable: true, get: function () { return tree_state_js_1.formatRankedFrom; } });
+Object.defineProperty(exports, "RANKED_FROM_NOTE", { enumerable: true, get: function () { return tree_state_js_1.RANKED_FROM_NOTE; } });
+Object.defineProperty(exports, "readRankedFrom", { enumerable: true, get: function () { return tree_state_js_1.readRankedFrom; } });
 var verdict_js_1 = require("./verdict.js");
 Object.defineProperty(exports, "classifyVerdicts", { enumerable: true, get: function () { return verdict_js_1.classifyVerdicts; } });
 Object.defineProperty(exports, "parseVerdicts", { enumerable: true, get: function () { return verdict_js_1.parseVerdicts; } });
@@ -4677,6 +4862,7 @@ const priority_js_1 = require("./priority.js");
 const paths_js_1 = require("./paths.js");
 const sanitize_js_1 = require("./sanitize.js");
 const status_js_1 = require("./status.js");
+const tree_state_js_1 = require("./tree-state.js");
 function ghLogin(env) {
     try {
         const out = (0, node_child_process_1.execFileSync)("gh", ["api", "user", "-q", ".login"], {
@@ -4830,7 +5016,7 @@ function runList(opts, deps = {}) {
         return true;
     })
         .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    return { root: repoRoot, items };
+    return { root: repoRoot, items, rankedFrom: (0, tree_state_js_1.readRankedFrom)(repoRoot) };
 }
 function formatListTable(items) {
     const headers = ["id", "type", "status", "assignee", "branch", "title"];
@@ -4954,6 +5140,7 @@ const items_js_1 = require("./items.js");
 const paths_js_1 = require("./paths.js");
 const filter_js_1 = require("./filter.js");
 const priority_js_1 = require("./priority.js");
+const tree_state_js_1 = require("./tree-state.js");
 const TERMINAL_STATUSES = new Set(["done", "cancelled"]);
 function openDependencies(item, byId) {
     return item.dependsOn.filter((depId) => {
@@ -4986,6 +5173,7 @@ function runNext(opts) {
     const items = (0, items_js_1.loadItems)(tasksDir);
     const byId = (0, items_js_1.itemsById)(items);
     const blockedByIndex = (0, filter_js_1.buildBlockedByIndex)(items);
+    const rankedFrom = (0, tree_state_js_1.readRankedFrom)(root);
     const lexicographic = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
     const todos = items
         .filter((item) => (0, status_js_1.isClaimable)(item.type) &&
@@ -5004,7 +5192,7 @@ function runNext(opts) {
         .map((entry) => entry.item);
     const pool = opts.ready ? rankedReady : [...rankedReady, ...blocked];
     if (pool.length === 0)
-        return { root, suggestion: null };
+        return { root, suggestion: null, rankedFrom };
     const item = pool[0];
     const chain = [];
     const seen = new Set([item.id]);
@@ -5052,6 +5240,7 @@ function runNext(opts) {
             blockedBy,
             unblocks,
         },
+        rankedFrom,
     };
 }
 })
@@ -5125,6 +5314,7 @@ function listOperation(opts) {
         const result = (0, list_js_1.runList)(opts);
         return succeed("list", {
             items: result.items.map((item) => (0, contract_js_1.toContractWorkItem)(item, result.root, { full: opts.full === true })),
+            rankedFrom: result.rankedFrom,
         }, (0, convention_js_1.readConventionVersion)(result.root));
     }
     catch (err) {
@@ -5160,7 +5350,7 @@ function nextOperation(opts) {
                 unblocks: result.suggestion.unblocks,
             }
             : null;
-        return succeed("next", { suggestion }, (0, convention_js_1.readConventionVersion)(result.root));
+        return succeed("next", { suggestion, rankedFrom: result.rankedFrom }, (0, convention_js_1.readConventionVersion)(result.root));
     }
     catch (err) {
         return fail("next", opts.cwd, "NEXT_FAILED", err);
@@ -5306,6 +5496,8 @@ function syncOperation(opts) {
             suggestions: result.suggestions,
             filled: result.filled,
             verdicts: result.verdicts,
+            branchClaims: result.branchClaims,
+            branchClaimErrors: result.branchClaimErrors,
             errors: result.errors,
             exit_code: result.exit_code,
         };
@@ -6201,6 +6393,7 @@ __arggonModules.set("lib/src/sync-command.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.runSync = runSync;
 const node_child_process_1 = require("node:child_process");
+const branch_claims_js_1 = require("./branch-claims.js");
 const items_js_1 = require("./items.js");
 const paths_js_1 = require("./paths.js");
 const get_open_prs_js_1 = require("./get-open-prs.js");
@@ -6215,8 +6408,10 @@ function runSync(opts, execGh = node_child_process_1.execFileSync) {
     const cwd = opts.cwd || process.cwd();
     let items;
     let prs;
+    let root;
     try {
         const tasksDir = (0, paths_js_1.findTasksDir)(cwd);
+        root = (0, paths_js_1.repoRootFromTasks)(tasksDir);
         items = (0, items_js_1.loadItems)(tasksDir);
         prs = (0, get_open_prs_js_1.getOpenPRs)(opts.repo || null, cwd, execGh);
     }
@@ -6259,7 +6454,8 @@ function runSync(opts, execGh = node_child_process_1.execFileSync) {
         const item = byId.get(match.itemId);
         verdicts[match.itemId] = (0, verdict_js_1.classifyVerdicts)(item.body);
     }
-    return (0, sync_types_js_1.toSyncResult)(reported, mode, filled, updateErrors, verdicts);
+    const branchClaims = (0, branch_claims_js_1.findBranchClaims)({ root, items, prs });
+    return (0, sync_types_js_1.toSyncResult)(reported, mode, filled, updateErrors, verdicts, branchClaims.claims, branchClaims.errors);
 }
 })
 
@@ -6313,7 +6509,7 @@ function matchItem(item, prs) {
     }
     return { status: "pending", itemId: item.id };
 }
-function toSyncResult(matches, mode, filled = null, errors = [], verdicts = {}) {
+function toSyncResult(matches, mode, filled = null, errors = [], verdicts = {}, branchClaims = [], branchClaimErrors = []) {
     const matched = [];
     const unmatched = [];
     const pending = [];
@@ -6354,9 +6550,13 @@ function toSyncResult(matches, mode, filled = null, errors = [], verdicts = {}) 
         suggestions,
         filled,
         verdicts,
+        branchClaims,
+        branchClaimErrors,
         errors,
         exit_code: mode === "check"
-            ? (pending.length > 0 || ambiguous.length > 0 || errors.length > 0 ? 1 : 0)
+            ? pending.length > 0 || ambiguous.length > 0 || errors.length > 0
+                ? 1
+                : 0
             : ambiguous.length > 0 || errors.length > 0
                 ? 1
                 : 0,
@@ -6647,6 +6847,45 @@ function formatCommitLine(result) {
         return (0, sanitize_js_1.sanitizeHumanError)(`no-commit: tracker dirty state kept${suffix}`);
     }
     return (0, sanitize_js_1.sanitizeHumanError)(`no-commit: ${result.skipReason}${suffix}`);
+}
+})
+
+__arggonModules.set("lib/src/tree-state.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RANKED_FROM_NOTE = void 0;
+exports.readRankedFrom = readRankedFrom;
+exports.formatRankedFrom = formatRankedFrom;
+const node_child_process_1 = require("node:child_process");
+exports.RANKED_FROM_NOTE = "claims made on unmerged branches are not visible from this tree; run `arggon sync` to surface branch-resident claims";
+const defaultExecGit = (file, args, options) => (0, node_child_process_1.execFileSync)(file, args, options);
+function gitText(execGit, root, args) {
+    try {
+        const out = execGit("git", ["-C", root, ...args], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+            timeout: 5_000,
+        }).trim();
+        return out.length > 0 ? out : null;
+    }
+    catch {
+        return null;
+    }
+}
+function readRankedFrom(root, execGit = defaultExecGit) {
+    return {
+        branch: gitText(execGit, root, ["rev-parse", "--abbrev-ref", "HEAD"]),
+        head: gitText(execGit, root, ["rev-parse", "--short", "HEAD"]),
+        note: exports.RANKED_FROM_NOTE,
+    };
+}
+function formatRankedFrom(rankedFrom) {
+    const where = rankedFrom.branch
+        ? rankedFrom.head
+            ? `${rankedFrom.branch}@${rankedFrom.head}`
+            : rankedFrom.branch
+        : "this tree (no git checkout detected)";
+    return `ranked from ${where} — ${rankedFrom.note}`;
 }
 })
 

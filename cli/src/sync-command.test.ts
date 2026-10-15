@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { execFileSync } from "node:child_process";
 import { parseFrontmatter, runCreate, runSync } from "@arggondev/lib";
 import { runInit } from "./init.js";
@@ -569,6 +569,91 @@ describe("sync command", () => {
     );
 
     expect(result.verdicts).toEqual({});
+  });
+
+  // bug-claim-pool-computed-from-main-misses-branch-claims, box 4 regression:
+  // the claim commit rides the item branch, so main's copy still reads
+  // todo/unassigned. The fixed surface must report the item as branch-held
+  // instead of advertising it as claimable — and must not touch either copy.
+  // Hermetic: a real local git repo, a stubbed gh, no network.
+  it("reports a claim on an unmerged branch while main's copy stays todo", () => {
+    const dir = createTestRepo();
+    const path = createTask(dir, "task-held", null);
+    const git = (...args: string[]): string =>
+      execFileSync("git", ["-C", dir, ...args], { encoding: "utf8" }).trim();
+
+    git("init", "-q", "-b", "main");
+    git("config", "user.email", "t@example.com");
+    git("config", "user.name", "T");
+    git("add", "-A");
+    git("commit", "-qm", "seed");
+    git("checkout", "-q", "-b", "feat/task-held");
+    setFrontmatter(path, {
+      status: "in_progress",
+      assignee: "alice",
+      claimed_at: "2026-10-01T00:00:00.000Z",
+    });
+    git("add", "-A");
+    git("commit", "-qm", "claim: task-held");
+    git("checkout", "-q", "main");
+
+    const result = runSync(
+      { check: true, cwd: dir, repo: "test/test" },
+      createGhMock([]) as unknown as typeof execFileSync,
+    );
+
+    expect(result.branchClaims).toEqual([
+      {
+        id: "task-held",
+        branch: "feat/task-held",
+        pr: null,
+        assignee: "alice",
+        claimed_at: "2026-10-01T00:00:00.000Z",
+        local: { status: "todo", assignee: null },
+      },
+    ]);
+    expect(result.branchClaimErrors).toEqual([]);
+    // main's copy is untouched (still todo/unassigned) — the surface reports,
+    // it never rewrites the tree to make the pool look clean.
+    const local = readFrontmatter(path);
+    expect(local.status).toBe("todo");
+    expect(local.assignee ?? null).toBeNull();
+    // Report-only, like `verdicts`: a branch-resident claim never gates the
+    // sync exit code.
+    expect(result.exit_code).toBe(0);
+  });
+
+  it("sync --write reports the branch claim and leaves the branch copy untouched", () => {
+    const dir = createTestRepo();
+    const path = createTask(dir, "task-held", null);
+    const rel = relative(dir, path).split(sep).join("/");
+    const git = (...args: string[]): string =>
+      execFileSync("git", ["-C", dir, ...args], { encoding: "utf8" }).trim();
+
+    git("init", "-q", "-b", "main");
+    git("config", "user.email", "t@example.com");
+    git("config", "user.name", "T");
+    git("add", "-A");
+    git("commit", "-qm", "seed");
+    git("checkout", "-q", "-b", "feat/task-held");
+    setFrontmatter(path, {
+      status: "in_progress",
+      assignee: "alice",
+      claimed_at: "2026-10-01T00:00:00.000Z",
+    });
+    git("add", "-A");
+    git("commit", "-qm", "claim: task-held");
+    git("checkout", "-q", "main");
+
+    const result = runSync(
+      { write: true, cwd: dir, repo: "test/test" },
+      createGhMock([]) as unknown as typeof execFileSync,
+    );
+
+    expect(result.branchClaims).toHaveLength(1);
+    expect(result.filled).toBeNull();
+    // The claim still lives on the branch, untouched — sync never releases it.
+    expect(git("show", `feat/task-held:${rel}`)).toContain('status: "in_progress"');
   });
 });
 

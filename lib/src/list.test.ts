@@ -1,9 +1,11 @@
+import { execFileSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync as _mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { toContractWorkItem } from "./contract.js";
 import { formatListTable, resolveCurrentLoginDetailed, runList } from "./list.js";
+import { RANKED_FROM_NOTE } from "./tree-state.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -343,7 +345,10 @@ branch: feat/a
 
     it("uses gh when it is on PATH", () => {
       const bins = fakeBin("gh", "echo octo-gh");
-      expect(resolveCurrentLoginDetailed({ PATH: bins })).toEqual({ login: "octo-gh", source: "gh" });
+      expect(resolveCurrentLoginDetailed({ PATH: bins })).toEqual({
+        login: "octo-gh",
+        source: "gh",
+      });
     });
 
     it("degrades gracefully to the local git identity when gh is not on PATH", () => {
@@ -480,17 +485,17 @@ branch: feat/a
       write(
         dir,
         "tasks/.convention.yml",
-        [
-          "version: 0",
-          "x-views:",
-          '  launch: "ancestor:launch-mvp status:todo"',
-          "",
-        ].join("\n"),
+        ["version: 0", "x-views:", '  launch: "ancestor:launch-mvp status:todo"', ""].join("\n"),
       );
       const { items } = runList({ cwd: dir, view: "launch" });
       // Under the initiative at any depth and still todo; launch-mvp itself
       // is in_progress and never matches its own ancestor chain.
-      expect(items.map((i) => i.id)).toEqual(["story-login", "task-h1-only", "task-rate-limit", "z-later"]);
+      expect(items.map((i) => i.id)).toEqual([
+        "story-login",
+        "task-h1-only",
+        "task-rate-limit",
+        "z-later",
+      ]);
     });
   });
 
@@ -498,7 +503,12 @@ branch: feat/a
     it("matches items at any depth under an id and composes with flags", () => {
       const dir = makeTree();
       const { items } = runList({ cwd: dir, filter: "ancestor:launch-mvp", type: "task" });
-      expect(items.map((i) => i.id)).toEqual(["task-h1-only", "task-mine", "task-no-title", "task-rate-limit"]);
+      expect(items.map((i) => i.id)).toEqual([
+        "task-h1-only",
+        "task-mine",
+        "task-no-title",
+        "task-rate-limit",
+      ]);
       const { items: negated } = runList({ cwd: dir, filter: "!ancestor:launch-mvp" });
       expect(negated.map((i) => i.id)).toEqual(["launch-mvp"]);
     });
@@ -507,7 +517,12 @@ branch: feat/a
       const dir = makeTree();
       const { items } = runList({ cwd: dir, filter: "ancestor:nope" });
       expect(items).toEqual([]);
-      const { items: self } = runList({ cwd: dir, filter: "ancestor:launch-mvp", status: "in_progress", type: "initiative" });
+      const { items: self } = runList({
+        cwd: dir,
+        filter: "ancestor:launch-mvp",
+        status: "in_progress",
+        type: "initiative",
+      });
       expect(self.map((i) => i.id)).toEqual([]);
     });
   });
@@ -543,17 +558,20 @@ describe("runList dependency predicates (spec-deps-022)", () => {
     const root = mkdtempSync(join(tmpdir(), "arggon-list-deps-"));
     mkdirSync(join(root, "tasks"), { recursive: true });
     write(root, "tasks/.convention.yml", "version: 3\n");
-    const md = (frontmatter: string) =>
-      `---\n${frontmatter}---\n\n# item\n`;
+    const md = (frontmatter: string) => `---\n${frontmatter}---\n\n# item\n`;
     write(
       root,
       "tasks/x/task-aaa.md",
-      md('type: task\nstatus: todo\nid: task-aaa\ndepends_on: ["task-x", "done-y"]\nlabels: []\ncreated: "2026-09-11"\n'),
+      md(
+        'type: task\nstatus: todo\nid: task-aaa\ndepends_on: ["task-x", "done-y"]\nlabels: []\ncreated: "2026-09-11"\n',
+      ),
     );
     write(
       root,
       "tasks/x/bug-bbb.md",
-      md('type: bug\nstatus: todo\nid: bug-bbb\ndepends_on: ["task-aaa"]\nlabels: []\ncreated: "2026-09-11"\n'),
+      md(
+        'type: bug\nstatus: todo\nid: bug-bbb\ndepends_on: ["task-aaa"]\nlabels: []\ncreated: "2026-09-11"\n',
+      ),
     );
     write(
       root,
@@ -563,7 +581,9 @@ describe("runList dependency predicates (spec-deps-022)", () => {
     write(
       root,
       "tasks/x/task-x.md",
-      md('type: task\nstatus: in_progress\nid: task-x\nassignee: alice\nlabels: []\ncreated: "2026-09-11"\n'),
+      md(
+        'type: task\nstatus: in_progress\nid: task-x\nassignee: alice\nlabels: []\ncreated: "2026-09-11"\n',
+      ),
     );
     write(
       root,
@@ -615,5 +635,41 @@ describe("runList --parent flag", () => {
     expect(() => runList({ cwd: makeTree(), parent: "nope" })).toThrowError(
       'unknown parent "nope" (no work item with that id in the tracker)',
     );
+  });
+});
+
+describe("runList rankedFrom (bug-claim-pool-computed-from-main-misses-branch-claims)", () => {
+  /** Seed a real git checkout so the declaration has a branch + head to read. */
+  function gitSeed(root: string): void {
+    execFileSync("git", ["-C", root, "init", "-q", "-b", "main"]);
+    execFileSync("git", ["-C", root, "config", "user.email", "t@example.com"]);
+    execFileSync("git", ["-C", root, "config", "user.name", "T"]);
+    execFileSync("git", ["-C", root, "add", "-A"]);
+    execFileSync("git", ["-C", root, "commit", "-qm", "seed"]);
+  }
+
+  it("declares the branch and head the items were read from", () => {
+    const root = makeTree();
+    gitSeed(root);
+
+    const { rankedFrom } = runList({ cwd: root });
+
+    expect(rankedFrom.branch).toBe("main");
+    expect(rankedFrom.head).toBe(
+      execFileSync("git", ["-C", root, "rev-parse", "--short", "HEAD"], {
+        encoding: "utf8",
+      }).trim(),
+    );
+    expect(rankedFrom.note).toBe(RANKED_FROM_NOTE);
+  });
+
+  it("reports a non-git tree honestly instead of guessing a branch", () => {
+    const root = makeTree();
+
+    expect(runList({ cwd: root }).rankedFrom).toEqual({
+      branch: null,
+      head: null,
+      note: RANKED_FROM_NOTE,
+    });
   });
 });

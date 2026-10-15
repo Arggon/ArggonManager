@@ -905,6 +905,11 @@ describe("sync stays byte-identical", () => {
     expect(result.exit_code).toBe(0);
     expect(Object.keys(result).sort()).toEqual([
       "ambiguous",
+      // bug-claim-pool-computed-from-main-misses-branch-claims: additive
+      // report-only branch-claim fields; the acceptance convention itself
+      // stays invisible to sync.
+      "branchClaimErrors",
+      "branchClaims",
       "command",
       "errors",
       "exit_code",

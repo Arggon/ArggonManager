@@ -88,6 +88,8 @@ Rules:
 - Do **not** set `in_progress` on a claimable item without `assignee` (`update` enforces this).
 - Initiative/epic may be `in_progress` without assignee (container status only).
 
+**Which copy is authoritative while a claim is in flight.** A claim made through `start` commits the item's frontmatter — `status`, `assignee`, `claimed_at`, `branch`, `worktree_path` — on the item's **branch**. Until that branch merges, the **branch's copy is authoritative** and the primary checkout's copy (normally `main`) still reads `todo`/unassigned. The disagreement is expected, not a lost claim: `show` from the primary legitimately answers `todo`, and `list`/`next` ranked from the primary cannot see the claim (every ranking envelope names the checkout it read — `rankedFrom`). Before treating a `todo`/unassigned item as claimable, run `arggon sync` and read its `branchClaims`: it reports the claims riding unmerged branches (`assignee` + `claimed_at` per branch, read from the branch copies themselves) and `branchClaimErrors` names branches it could not read. Treat a branch-claimed item as held — coordinate, and never force or steal to make the pool look clean.
+
 ## 3. Create bugs/tasks from findings
 
 When work reveals new work, create items under the correct parent story — this is the issue tracker (see §0); do not file GitHub issues:

@@ -13,6 +13,7 @@ import { isPriority, PRIORITIES } from "./priority.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 import { sanitizeHumanTextUncapped } from "./sanitize.js";
 import { isStatus, isClaimed, STATUSES } from "./status.js";
+import { readRankedFrom, type RankedFrom } from "./tree-state.js";
 
 export type ListOptions = {
   /** Start dir; tasks/ is located with walk-up (same as create). */
@@ -44,6 +45,13 @@ export type ListResult = {
   root: string;
   /** Kernel items, lexicographic by id. */
   items: WorkItem[];
+  /**
+   * The checkout these items were read from (bug-claim-pool-computed-from-
+   * main-misses-branch-claims). The pool is computed from THIS tree's copies;
+   * a claim committed on an unmerged branch is not in them, so the read
+   * declares its tree instead of leaving that boundary silent.
+   */
+  rankedFrom: RankedFrom;
 };
 
 /**
@@ -62,7 +70,9 @@ export type CurrentLoginResolution =
  * nothing — binary absent from PATH (`gh-not-found`, the local-DX case) vs
  * present but failing/unauthenticated (`gh-failed`).
  */
-function ghLogin(env: NodeJS.ProcessEnv): { login: string } | { gap: "gh-not-found" | "gh-failed" } {
+function ghLogin(
+  env: NodeJS.ProcessEnv,
+): { login: string } | { gap: "gh-not-found" | "gh-failed" } {
   try {
     const out = execFileSync("gh", ["api", "user", "-q", ".login"], {
       encoding: "utf8",
@@ -260,7 +270,7 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
     })
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
-  return { root: repoRoot, items };
+  return { root: repoRoot, items, rankedFrom: readRankedFrom(repoRoot) };
 }
 
 /** Human-readable table for CLI stdout. Missing titles fall back to id. */

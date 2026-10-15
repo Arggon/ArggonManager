@@ -30,6 +30,50 @@ export type SyncMatchResult =
 
 export type SyncFilled = Record<string, string>;
 
+/**
+ * A branch-resident claim (bug-claim-pool-computed-from-main-misses-branch-
+ * claims): a copy of the item file on another branch that holds a claim the
+ * tree this run read does not show. `start`'s claim commit rides the item
+ * branch, so until that branch merges the primary's copy still reads
+ * `todo`/unassigned — this is how sync makes that claim visible.
+ */
+export type BranchClaim = {
+  /** Item id the claim belongs to. */
+  id: string;
+  /** Branch whose copy of the item file carries the claim. */
+  branch: string;
+  /** Open-PR number naming the branch, when one does; null for a local-only branch. */
+  pr: number | null;
+  /** Claim read from the branch copy (in_progress + assignee). */
+  assignee: string;
+  /** Soft lease read from the branch copy; null when the claim predates `claimed_at`. */
+  claimed_at: string | null;
+  /**
+   * The state THIS tree shows for the item, so an invisible claim is a visible
+   * diff: `{ status: "todo", assignee: null }` is the incident case.
+   */
+  local: { status: string; assignee: string | null };
+};
+
+/**
+ * A branch that could not be read, so its claim state is unknown — never
+ * assumed unclaimed. Emitted for a recorded/PR branch that is not available
+ * locally (not fetched) and for a branch copy without readable frontmatter.
+ */
+export type BranchClaimError = {
+  id: string;
+  branch: string;
+  pr: number | null;
+  /** Why the branch copy could not be read (bounded, first line of the git/parse error). */
+  reason: string;
+};
+
+/** The branch-claim read over one tracker tree. */
+export type BranchClaimsResult = {
+  claims: BranchClaim[];
+  errors: BranchClaimError[];
+};
+
 export type SyncResult = {
   command: "sync";
   mode: "check" | "write";
@@ -53,6 +97,16 @@ export type SyncResult = {
    * additive within schemaVersion 1 and never gates matching or exit_code.
    */
   verdicts: Record<string, VerdictState>;
+  /**
+   * Branch-resident claims (bug-claim-pool-computed-from-main-misses-branch-
+   * claims), read from the branch copies themselves: every locally-unclaimed
+   * claimable item whose recorded branch, a local/origin ref referencing its
+   * id, or an open-PR head branch names it. Additive within schemaVersion 1
+   * and report-only — never gates matching or exit_code.
+   */
+  branchClaims: BranchClaim[];
+  /** Branches whose item copy could not be read — claim state unknown. */
+  branchClaimErrors: BranchClaimError[];
   errors: string[];
   exit_code: 0 | 1;
 };
@@ -80,10 +134,7 @@ export function branchReferencesItem(branch: string, id: string): boolean {
  * equality for items with a branch, id-referencing candidates otherwise, and
  * anything not uniquely resolvable degrades to pending/ambiguous.
  */
-export function matchItem(
-  item: Pick<WorkItem, "id" | "branch">,
-  prs: PRInfo[]
-): SyncMatchResult {
+export function matchItem(item: Pick<WorkItem, "id" | "branch">, prs: PRInfo[]): SyncMatchResult {
   if (item.branch) {
     const matching = prs.filter((pr) => pr.headRefName === item.branch);
     if (matching.length === 0) {
@@ -136,7 +187,9 @@ export function toSyncResult(
   mode: "check" | "write",
   filled: SyncFilled | null = null,
   errors: string[] = [],
-  verdicts: Record<string, VerdictState> = {}
+  verdicts: Record<string, VerdictState> = {},
+  branchClaims: BranchClaim[] = [],
+  branchClaimErrors: BranchClaimError[] = [],
 ): SyncResult {
   const matched: string[] = [];
   const unmatched: string[] = [];
@@ -179,10 +232,14 @@ export function toSyncResult(
     suggestions,
     filled,
     verdicts,
+    branchClaims,
+    branchClaimErrors,
     errors,
     exit_code:
       mode === "check"
-        ? (pending.length > 0 || ambiguous.length > 0 || errors.length > 0 ? 1 : 0)
+        ? pending.length > 0 || ambiguous.length > 0 || errors.length > 0
+          ? 1
+          : 0
         : ambiguous.length > 0 || errors.length > 0
           ? 1
           : 0,

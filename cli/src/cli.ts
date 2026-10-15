@@ -27,6 +27,7 @@ import {
   buildFrictionPublishDoc,
   frictionClearOperation,
   frictionOperation,
+  formatRankedFrom,
   frictionReportOperation,
   handoffOperation,
   importIssuesOperation,
@@ -803,6 +804,11 @@ program
           olderThan: opts.olderThan,
         });
         process.stdout.write(formatListTable(result.items));
+        // Coverage declaration (bug-claim-pool-computed-from-main-misses-
+        // branch-claims): the table is computed from THIS tree's copies, so a
+        // claim committed on an unmerged branch is not in it. Name the tree
+        // and the boundary instead of leaving it silent.
+        console.log(`arggon list: ${sanitizeHumanError(formatRankedFrom(result.rankedFrom))}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (json) {
@@ -868,6 +874,8 @@ program
               : "arggon next: todo pool is empty — nothing claimable.",
         );
         console.log('  Create work with `arggon create task "<title>" --parent <story-id>`.');
+        // An empty pool is exactly where the boundary matters most.
+        console.log(`arggon next: ${sanitizeHumanError(formatRankedFrom(result.rankedFrom))}`);
         return;
       }
       const item = result.suggestion.item;
@@ -879,6 +887,10 @@ program
       );
       console.log(`  why: ${sanitizeHumanError(result.suggestion.reason)}`);
       console.log(`  next: arggon start ${sanitizeHumanError(item.id)} --assignee <login>`);
+      // Coverage declaration (bug-claim-pool-computed-from-main-misses-
+      // branch-claims): never rank from one tree silently — name it and the
+      // boundary (claims on unmerged branches need `arggon sync`).
+      console.log(`arggon next: ${sanitizeHumanError(formatRankedFrom(result.rankedFrom))}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (json) {
@@ -3641,6 +3653,29 @@ program
       }
       for (const amb of result.ambiguous) {
         console.log(`  ambiguous: ${sanitizeHumanError(amb.id)} (PRs ${amb.prs.join(", ")})`);
+      }
+      // Branch-resident claims (bug-claim-pool-computed-from-main-misses-
+      // branch-claims): the claim commit rides the item branch, so these items
+      // read todo/unassigned HERE while being held there. Report-only.
+      for (const claim of result.branchClaims) {
+        const where = claim.pr ? `${claim.branch} (#${claim.pr})` : claim.branch;
+        console.log(
+          `  branch-claim: ${sanitizeHumanError(claim.id)} claimed by ${sanitizeHumanError(claim.assignee)} on ${sanitizeHumanError(where)}` +
+            `${claim.claimed_at ? ` since ${sanitizeHumanError(claim.claimed_at)}` : ""} — this tree shows ` +
+            `${sanitizeHumanError(`${claim.local.status}/${claim.local.assignee ?? "unassigned"}`)}`,
+        );
+      }
+      for (const err of result.branchClaimErrors) {
+        console.log(
+          `  branch-claim: ${sanitizeHumanError(err.id)} on ${sanitizeHumanError(err.branch)} could not be read ` +
+            `(${sanitizeHumanError(err.reason)}) — claim state unknown`,
+        );
+      }
+      if (result.branchClaims.length > 0) {
+        console.log(
+          "hint: treat branch-claimed items as held (coordinate; never force or steal) — " +
+            "release or take over a stale claim where it lives, via the human-only `update --steal` gate",
+        );
       }
       // Report-only verdict classification (task-review-verdict-checker):
       // only the informative states print; `none` stays silent.
