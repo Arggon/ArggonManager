@@ -21,6 +21,6 @@ Claims are the coordination primitive, but today a dead agent leaves an eternal 
 
 ## Acceptance
 
-- [ ] Claims carry timestamps and staleness is visible and actionable
-- [ ] `arggon start --worktree` isolates filesystem per claim; cleanup is one command
-- [ ] Items accept timestamped comments for handoff context
+- [x] Claims carry timestamps and staleness is visible and actionable
+- [x] `arggon start --worktree` isolates filesystem per claim; cleanup is one command
+- [x] Items accept timestamped comments for handoff context
