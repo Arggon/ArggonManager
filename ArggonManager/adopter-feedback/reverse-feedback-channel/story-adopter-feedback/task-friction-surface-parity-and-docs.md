@@ -131,3 +131,7 @@ MCP `tools/list` 16,384 → 20,480 B (live 18,054 B / 16 tools, `arggon_friction
 to sixteen, and `ArggonManager/.convention.yml`'s `x-generated` checksum for the
 regenerated skill copy is refreshed so `cli/src/provenance-audit.test.ts`
 stays green.
+
+### handoff 2026-10-15 @Arggon — next: Delivery lead: review PR #849 (three-surface friction parity + the doctor.friction doc row) and merge; T6 (task-friction-trigger-carrier) is unblocked and owns the block's code, fields and tests.
+- branch: feat/task-friction-surface-parity-and-docs
+- open questions: Should the two raised ADR-0006 advisory schema bounds (MCP 20 KiB, native catalog 13,312 B) be re-tightened once the surface stops growing, or is 20 KiB the standing bound?; Keep the CLI re-entry for…
