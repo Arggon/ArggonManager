@@ -54,3 +54,18 @@ Acceptance:
 - [ ] One of the three repairs is chosen and implemented, with the reason recorded (refusing to write cross-tree is acceptable and minimal)
 - [ ] A regression test pins: a comment/handoff/update for an item whose `worktree_path` is another tree either lands in that tree or fails named — never writes into the launching tree
 - [ ] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green; `arggon validate` ok
+
+### 2026-10-15 @Arggon
+PR #846 (branch fix/bug-mcp-server-binds-session-cwd-tracker-root). Impact class: Behavioral (agents.md + arggon-cli skill are methodology carriers).
+
+REPRO (MCP surface, before the fix) — real `arggon mcp` over stdio JSON-RPC, server launched from the primary of a scratch git repo whose item was claimed through `start --worktree`:
+- expected: comment/handoff land in the claim worktree (worktree_path tree).
+- observed: envelopes `ok: true` with `path: <primary>/ArggonManager/.../task-thing.md`; handoff recorded `branch: master`; two local-only commits on the primary's base branch; the worktree copy untouched. (`arggon_update --status done` rode the same door.)
+
+REPAIR — route through the item's `worktree_path` (the lead's steer), new `cli/src/mcp-routing.ts`: item-addressed tools (update/comment/handoff/show) resolve per call from the launch copy's own `worktree_path`, else the sibling worktrees' claim footprints (`.arggon.env` or their item copy). A write whose recorded claim tree is gone/not-a-tracker refuses with `error.code: "TRACKER_ROOT_MISMATCH"` (the native surface's code) naming both trees + remedies — never falls back to the launching tree; reads never refuse. Pool calls and start/branch/cleanup untouched; CLI stays unrouted by design. Boundary recorded in the module doc: a branch claim with no worktree records no worktree_path, so it has no address to route through.
+
+REPRO (after the fix) — same script: comment + handoff land in the worktree copy, handoff records `branch: feat/task-thing`, commits ride the claim branch, primary `git status` clean.
+
+REGRESSION — cli/src/mcp-routing.test.ts (10) + the mcp-server.test.ts block end-to-end over the in-process stdio server: comment/handoff/`update --status done` land in the claim worktree, launching tree byte-unchanged; `show` reads the claim copy; a gone worktree fails named with nothing written; a plain tree keeps the old behavior.
+
+GATES (worktree, expected → observed): `arggon validate` ok → ok (0 warnings) · MCP suites 90/90 → passed · `npm test` → 3581/3581 passed · `npm run lint` → clean · `npm run test:structure` → exit 0 · `prettier --check` on touched files → clean · `npm run check:plugin` → exit 0 (bundle byte-unchanged; the native surface needed no edit). Note: two intermediate full-suite runs hit a 30s timeout in prose-format.test.ts under this box's load average ~20 (pristine main isolation baseline for that file: 45s); the final full run is green.
