@@ -63,6 +63,9 @@ agents in this codebase — read before mutating the tracker or merging.
   checkout (auto-commits land on local main), `git push origin main` immediately
   after every mutation — before opening or merging any PR — so the post-merge
   pull stays fast-forward.
+- **A claim branch cut from local HEAD inherits its unpushed commits: `start`
+  reports `inheritedCommits` and the remedy — push main before the PR.**
+  — bug-start-claim-branch-inherits-unpushed-tracker-commits
 
 ## Repo hygiene and staging
 

@@ -71,7 +71,12 @@ import {
   type TrendResult,
 } from "@arggondev/lib";
 
-import { runStart, startFailureReadiness, startTakeoverNotes } from "./start.js";
+import {
+  inheritedCommitsNotes,
+  runStart,
+  startFailureReadiness,
+  startTakeoverNotes,
+} from "./start.js";
 import { runCleanup } from "./cleanup.js";
 import { goalOperation, runGoal } from "./goal-mode.js";
 
@@ -2724,6 +2729,9 @@ program
               prepSteps: result.prepSteps,
               env: result.env,
               ...(result.claim !== undefined ? { claim: result.claim } : {}),
+              ...(result.inheritedCommits !== undefined
+                ? { inheritedCommits: result.inheritedCommits }
+                : {}),
               ...(result.postStartRelink !== undefined
                 ? { postStartRelink: result.postStartRelink }
                 : {}),
@@ -2852,6 +2860,15 @@ program
               );
             }
           }
+        }
+        // Inherited commits (bug-start-claim-branch-inherits-unpushed-tracker-commits):
+        // a branch cut by this run starts from the local HEAD, so unpushed
+        // commits — tracker auto-commits included — ride the PR diff as
+        // unrelated churn. The report names them and the remedy BEFORE the lead
+        // opens the PR; `--json` forwards `inheritedCommits` verbatim. Printed
+        // for both flows (plain `start` cuts from the same HEAD).
+        for (const note of inheritedCommitsNotes(result.inheritedCommits)) {
+          console.log(`  ${sanitizeHumanError(note)}`);
         }
         if (result.postStart) {
           if (result.postStart.ok) {

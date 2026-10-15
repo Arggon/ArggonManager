@@ -25,18 +25,25 @@ import {
   runUpdate,
   sanitizeHumanError,
   strictGateBinFailure,
+  trackerCommitMessage,
+  updateCommitMessage,
   type GateBinResolution,
 } from "@arggondev/lib";
 import { assertOrder } from "../../test/assert-order.js";
 import { runInit } from "./init.js";
 import {
+  inheritedCommitReport,
+  inheritedCommitsNotes,
+  isTrackerAutoCommit,
   linkNodeModules,
   linkedWorkspacePackages,
+  MAX_INHERITED_COMMITS,
   runStart,
   startFailureReadiness,
   startTakeoverNotes,
   unlinkNodeModulesLink,
   worktreeFailureMessage,
+  type InheritedCommitProbe,
   type StartGit,
 } from "./start.js";
 
@@ -1791,5 +1798,239 @@ describe("start --worktree claim stamp: single-writer detection (task-single-wri
     expect(result.committed).toBe(true);
     expect(JSON.parse(readFileSync(stampPath, "utf8"))).toMatchObject({ identity: "arggon" });
     expect(readFileSync(stampPath, "utf8")).not.toContain("takeovers");
+  });
+});
+
+describe("start claim-branch base: inherited unpushed commits (bug-start-claim-branch-inherits-unpushed-tracker-commits)", () => {
+  /**
+   * A REAL checkout whose `main` tracks a bare `origin`: the commits a claim
+   * branch inherits beyond `origin/main` are exactly the churn a PR diff
+   * carries. Everything below runs real git — the cut under test is the real
+   * `git worktree add -b` / `git checkout -b`, never a fake.
+   */
+  function realCheckout(): { dir: string; id: string; git: (args: string[]) => string } {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-start-base-"));
+    const origin = mkdtempSync(join(tmpdir(), "arggon-start-origin-"));
+    execFileSync("git", ["init", "-q", "--bare", "-b", "main", origin]);
+    runInit({ dir, force: false });
+    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir });
+    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: dir });
+    execFileSync("git", ["remote", "add", "origin", origin], { cwd: dir });
+    execFileSync("git", ["add", "--", "."], { cwd: dir });
+    execFileSync("git", ["commit", "-qm", "chore: init tracker"], { cwd: dir });
+    execFileSync("git", ["push", "-q", "-u", "origin", "main"], { cwd: dir });
+    runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
+    runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
+    runCreate({
+      cwd: dir,
+      type: "story",
+      title: "Login",
+      parent: "auth",
+      id: "story-login",
+      now: NOW,
+    });
+    const task = runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Add rate limiting",
+      parent: "story-login",
+      id: "rate-limit",
+      now: NOW,
+    });
+    execFileSync("git", ["push", "-q", "origin", "main"], { cwd: dir });
+    return {
+      dir,
+      id: task.id,
+      git: (args) => execFileSync("git", args, { cwd: dir, encoding: "utf8" }).trim(),
+    };
+  }
+
+  /** The worktree start will create, tracked so afterEach reaps it too. */
+  function worktreeOf(dir: string, id: string): string {
+    const path = resolve(dir, "..", `${basename(dir)}-${id}`);
+    tmpDirs.push(path);
+    return path;
+  }
+
+  it("classifies the kernel's own auto-commit messages as tracker commits (drift pin)", () => {
+    // The CLI's predicate is local on purpose; this pins it against the
+    // kernel's own message builder, so a convention change fails HERE instead
+    // of silently reclassifying the lead's commits as tracker churn.
+    expect(isTrackerAutoCommit(trackerCommitMessage("created", ["task-x"]))).toBe(true);
+    expect(isTrackerAutoCommit(updateCommitMessage("updated", "task-x", []))).toBe(true);
+    expect(isTrackerAutoCommit("feat: deliberate work")).toBe(false);
+    expect(isTrackerAutoCommit("fix(bug-x): a fix")).toBe(false);
+  });
+
+  it("composes the counts, the cap and the remedy from a probe", () => {
+    const probe: InheritedCommitProbe = {
+      base: "origin/main",
+      branchPoint: "a".repeat(40),
+      commits: [
+        { sha: "b".repeat(40), subject: "feat: deliberate work" },
+        { sha: "c".repeat(40), subject: "chore(tasks): created other-task" },
+      ],
+      itemOnBase: true,
+    };
+    const report = inheritedCommitReport(probe, "fix/task-x");
+    expect(report).toMatchObject({
+      base: "origin/main",
+      branchPoint: probe.branchPoint,
+      total: 2,
+      trackerTotal: 1,
+      workTotal: 1,
+      itemOnBase: true,
+    });
+    expect(report?.commits.map((commit) => [commit.subject, commit.tracker])).toEqual([
+      ["feat: deliberate work", false],
+      ["chore(tasks): created other-task", true],
+    ]);
+    // The remedy names BOTH arms when dropping is safe: push main, or rebase
+    // the branch onto the base from the recorded branch point.
+    expect(report?.remedy).toContain("git push origin main");
+    expect(report?.remedy).toContain(
+      `git rebase --onto origin/main ${probe.branchPoint} fix/task-x`,
+    );
+    // A clean base is not a report.
+    expect(inheritedCommitReport({ ...probe, commits: [] }, "fix/task-x")).toBeNull();
+    // The list is capped; the totals and counts stay exact.
+    const many: InheritedCommitProbe = {
+      ...probe,
+      commits: Array.from({ length: MAX_INHERITED_COMMITS + 2 }, (_, i) => ({
+        sha: `${i}`.padStart(40, "0"),
+        subject: `chore(tasks): updated task-${i}`,
+      })),
+    };
+    const capped = inheritedCommitReport(many, "fix/task-x");
+    expect(capped?.commits).toHaveLength(MAX_INHERITED_COMMITS);
+    expect(capped?.total).toBe(MAX_INHERITED_COMMITS + 2);
+    expect(capped?.trackerTotal).toBe(MAX_INHERITED_COMMITS + 2);
+    expect(capped?.workTotal).toBe(0);
+  });
+
+  it("never suggests dropping an item that only exists on the branch", () => {
+    const report = inheritedCommitReport(
+      {
+        base: "origin/main",
+        branchPoint: "a".repeat(40),
+        commits: [{ sha: "b".repeat(40), subject: "chore(tasks): created task-x" }],
+        itemOnBase: false,
+      },
+      "feat/task-x",
+    );
+    expect(report?.remedy).toContain("git push origin main");
+    expect(report?.remedy).toContain("the claimed item file itself rides one of them");
+    expect(report?.remedy).not.toContain("git rebase --onto");
+  });
+
+  it("formats the human warning with the remedy leading and the commits named", () => {
+    expect(inheritedCommitsNotes(undefined)).toEqual([]);
+    const report = inheritedCommitReport(
+      {
+        base: "origin/main",
+        branchPoint: "a".repeat(40),
+        commits: [
+          { sha: "b".repeat(40), subject: "feat: deliberate work" },
+          { sha: "c".repeat(40), subject: "chore(tasks): created other-task" },
+        ],
+        itemOnBase: true,
+      },
+      "fix/task-x",
+    );
+    const notes = inheritedCommitsNotes(report ?? undefined);
+    expect(notes).toHaveLength(2);
+    expect(notes[0]).toContain("note: the claim branch inherits 2 unpushed commits");
+    expect(notes[0]).toContain("beyond origin/main (1 tracker auto-commit, 1 other commit)");
+    expect(notes[0]).toContain("git push origin main");
+    expect(notes[1]).toContain("feat: deliberate work [work]");
+    expect(notes[1]).toContain("chore(tasks): created other-task [tracker]");
+  });
+
+  it("reports the inherited commits on a real --worktree start and pins the branch's churn", () => {
+    const { dir, id, git } = realCheckout();
+    // One unpushed tracker auto-commit (an unrelated item) plus one unpushed
+    // deliberate commit — the shape of the PR #681/#683 churn.
+    const unrelated = runCreate({
+      cwd: dir,
+      type: "initiative",
+      title: "Unrelated",
+      id: "unrelated",
+      now: NOW,
+    });
+    writeFileSync(join(dir, "deliberate.ts"), "export const deliberate = true;\n");
+    git(["add", "--", "deliberate.ts"]);
+    git(["commit", "-qm", "feat: deliberate work"]);
+    expect(git(["rev-list", "--count", "origin/main..HEAD"])).toBe("2");
+
+    const worktreePath = worktreeOf(dir, id);
+    const result = runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW });
+
+    // The report names the contamination, classified, with the remedy.
+    expect(result.inheritedCommits).toMatchObject({
+      base: "origin/main",
+      total: 2,
+      trackerTotal: 1,
+      workTotal: 1,
+      itemOnBase: true,
+    });
+    expect(result.inheritedCommits?.commits.map((c) => [c.subject, c.tracker])).toEqual([
+      ["feat: deliberate work", false],
+      ["chore(tasks): created unrelated", true],
+    ]);
+    expect(result.inheritedCommits?.remedy).toContain("git push origin main");
+
+    // REPRO (acceptance box 1): the freshly cut claim branch demonstrably
+    // CONTAINS the local commits — `git diff origin/main...HEAD` carries them
+    // into the PR as unrelated churn.
+    const churn = git(["-C", worktreePath, "diff", "--name-only", "origin/main...HEAD"]).split(
+      "\n",
+    );
+    expect(churn).toContain("deliberate.ts");
+    expect(churn).toContain(relative(dir, unrelated.path));
+    expect(churn).toContain(relative(worktreePath, result.path));
+    expect(git(["-C", worktreePath, "log", "--format=%s", "origin/main..HEAD"])).toContain(
+      "feat: deliberate work",
+    );
+  });
+
+  it("reports nothing on a clean base: the claimed branch's diff is only the item file", () => {
+    const { dir, id, git } = realCheckout();
+    const worktreePath = worktreeOf(dir, id);
+    const result = runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW });
+    expect(result.inheritedCommits).toBeUndefined();
+    // Acceptance box 3: `git diff <base>...HEAD` on the freshly claimed branch
+    // contains ONLY the item file — no unrelated churn.
+    expect(git(["-C", worktreePath, "diff", "--name-only", "origin/main...HEAD"])).toBe(
+      relative(worktreePath, result.path),
+    );
+    // An attach re-run cut nothing, so it reports nothing: the field is a
+    // cut-time observation (the branch was cut by the first run).
+    const attach = runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW });
+    expect(attach.worktreeCreated).toBe(false);
+    expect(attach.inheritedCommits).toBeUndefined();
+  });
+
+  it("reports inherited commits for a plain start too (checkout -b cuts from the same HEAD)", () => {
+    const { dir, id, git } = realCheckout();
+    const unrelated = runCreate({
+      cwd: dir,
+      type: "initiative",
+      title: "Unrelated",
+      id: "unrelated",
+      now: NOW,
+    });
+    const result = runStart({ cwd: dir, id, assignee: "arggon", now: NOW });
+    expect(result.worktreePath).toBeNull();
+    expect(result.inheritedCommits).toMatchObject({
+      base: "origin/main",
+      total: 1,
+      trackerTotal: 1,
+      workTotal: 0,
+    });
+    // The branch this run checked out carries the inherited commit.
+    expect(git(["diff", "--name-only", "origin/main...HEAD"]).split("\n")).toContain(
+      relative(dir, unrelated.path),
+    );
   });
 });

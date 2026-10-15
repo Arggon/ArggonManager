@@ -216,9 +216,173 @@ export type StartResult = {
    * passed. Absent otherwise (no config = no-op).
    */
   postStart?: PostStartResult;
+  /**
+   * Commits a claim branch cut by THIS run inherits from the primary
+   * checkout's LOCAL HEAD beyond its upstream base
+   * (bug-start-claim-branch-inherits-unpushed-tracker-commits) — the unpushed
+   * commits that ride the PR diff as unrelated churn, reported so the lead
+   * sees the contamination before opening the PR. Present only when this run
+   * actually CUT the branch (a fresh `git checkout -b` / `git worktree add -b`)
+   * and that branch inherits at least one commit; absent on attach re-runs (the
+   * branch was cut earlier) and on a clean base. Report-only: the claim always
+   * proceeds — the report names the remedy (`remedy`).
+   */
+  inheritedCommits?: InheritedCommitsReport;
   /** The item, reloaded from disk. */
   item: WorkItem;
 };
+
+/**
+ * Cap for the reported `inheritedCommits.commits` list (the exact `total` and
+ * the per-class counts ride beside it, the `missingDependencies` precedent).
+ */
+export const MAX_INHERITED_COMMITS = 10;
+
+/**
+ * The tracker auto-commit message prefix (`chore(tasks): <verb> …`, the
+ * convention `trackerCommitMessage` builds in `lib/src/tracker-commit.ts`).
+ * Kept local on purpose: a test pins it against the kernel's own message
+ * builder, so a convention change fails the suite instead of silently
+ * reclassifying the lead's commits as tracker churn.
+ */
+const TRACKER_COMMIT_PREFIX = "chore(tasks): ";
+
+/** Whether a commit subject is a tracker auto-commit (the CLI's own mutation). */
+export function isTrackerAutoCommit(subject: string): boolean {
+  return subject.startsWith(TRACKER_COMMIT_PREFIX);
+}
+
+/** One commit a newly cut claim branch inherits beyond its upstream base. */
+export type InheritedCommit = {
+  /** Full commit SHA. */
+  sha: string;
+  /** First line of the commit message. */
+  subject: string;
+  /**
+   * True when the subject matches the tracker auto-commit convention
+   * (`chore(tasks): …`) — the CLI's own mutation, not the lead's work.
+   */
+  tracker: boolean;
+};
+
+/**
+ * The raw observation a git runner answers for the inherited-commit probe:
+ * the commits a branch cut from the CURRENT HEAD carries beyond its upstream
+ * base, plus whether the claimed item's file already exists there. `undefined`
+ * when no upstream resolves (nothing to compare — see
+ * {@link StartGit.inheritedCommits}).
+ */
+export type InheritedCommitProbe = {
+  /** The upstream ref compared against, e.g. `origin/main`. */
+  base: string;
+  /** The commit the branch is cut from (the primary checkout's HEAD). */
+  branchPoint: string;
+  /** `base..HEAD`, newest first: every commit the new branch inherits. */
+  commits: { sha: string; subject: string }[];
+  /**
+   * Whether the claimed item's file already exists at `base`. When it does
+   * not, the item's own creation commit is among the inherited ones, so
+   * dropping them would take the item off the branch — the remedy says so.
+   */
+  itemOnBase: boolean;
+};
+
+/**
+ * The inherited-commit report the `--json` envelope carries and the human
+ * channel warns about (bug-start-claim-branch-inherits-unpushed-tracker-commits).
+ * Classification: `tracker` marks the CLI's own auto-commits
+ * (`chore(tasks): …`); everything else is the lead's own deliberate work.
+ */
+export type InheritedCommitsReport = {
+  /** The upstream ref the claim branch's PR diff is measured against. */
+  base: string;
+  /** The commit the branch was cut from (`git rebase --onto` uses it). */
+  branchPoint: string;
+  /** How many commits `base..HEAD` holds (full count; `commits` is capped). */
+  total: number;
+  /** Full count of commits classified as tracker auto-commits. */
+  trackerTotal: number;
+  /** Full count of the lead's own work (subjects that are not auto-commits). */
+  workTotal: number;
+  /** The commits, newest first, capped at {@link MAX_INHERITED_COMMITS}. */
+  commits: InheritedCommit[];
+  /** Whether the item file already exists at `base` (drop-remedy safety). */
+  itemOnBase: boolean;
+  /** The named remedy: push the primary branch, or drop the inherited commits. */
+  remedy: string;
+};
+
+/** `git push <remote> <branch>` for a remote-qualified base ref (`origin/main`). */
+function pushRemedy(base: string): string {
+  const slash = base.indexOf("/");
+  return slash > 0 ? `git push ${base.slice(0, slash)} ${base.slice(slash + 1)}` : "git push";
+}
+
+/**
+ * Compose the report from a raw probe. Pure, so the classification, the cap
+ * and the remedy are unit-testable; returns null when the branch inherits
+ * nothing (a clean base needs no report).
+ */
+export function inheritedCommitReport(
+  probe: InheritedCommitProbe,
+  branch: string,
+): InheritedCommitsReport | null {
+  if (probe.commits.length === 0) return null;
+  const trackerTotal = probe.commits.filter((commit) => isTrackerAutoCommit(commit.subject)).length;
+  const push = pushRemedy(probe.base);
+  // The remedy distinguishes the two situations the acceptance names: with the
+  // item already on the base, dropping the inherited commits is safe (the
+  // rebase replays only the claim + later work); without it, the item's own
+  // creation commit IS one of the inherited commits, so dropping them would
+  // take the item off the branch and only pushing main is a safe remedy.
+  const remedy = probe.itemOnBase
+    ? `push the primary checkout's branch (\`${push}\`) so the inherited commits are already on ${probe.base}, or drop them from this branch (\`git rebase --onto ${probe.base} ${probe.branchPoint} ${branch}\`)`
+    : `push the primary checkout's branch (\`${push}\`) so the inherited commits are already on ${probe.base} — the claimed item file itself rides one of them, so dropping them would take it off this branch`;
+  return {
+    base: probe.base,
+    branchPoint: probe.branchPoint,
+    total: probe.commits.length,
+    trackerTotal,
+    workTotal: probe.commits.length - trackerTotal,
+    commits: probe.commits.slice(0, MAX_INHERITED_COMMITS).map((commit) => ({
+      sha: commit.sha,
+      subject: commit.subject,
+      tracker: isTrackerAutoCommit(commit.subject),
+    })),
+    itemOnBase: probe.itemOnBase,
+    remedy,
+  };
+}
+
+/**
+ * Human-channel lines for a claim branch that inherits unpushed commits: the
+ * counts and the remedy LEAD (the actionable clause, the same ordering
+ * contract every other start report keeps), the named commits follow so the
+ * lead can tell the CLI's own auto-commits from their own work. Kept here so
+ * the human channel is unit-testable; `--json` forwards the report verbatim.
+ * Empty when there is no report (clean base, attach, plain re-run).
+ */
+export function inheritedCommitsNotes(report: InheritedCommitsReport | undefined): string[] {
+  if (report === undefined) return [];
+  const count = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" : "s"}`;
+  const classes = [
+    report.trackerTotal > 0 ? count(report.trackerTotal, "tracker auto-commit") : null,
+    report.workTotal > 0 ? count(report.workTotal, "other commit") : null,
+  ].filter((part): part is string => part !== null);
+  const named = report.commits
+    .map(
+      (commit) =>
+        `${commit.sha.slice(0, 7)} ${commit.subject} ${commit.tracker ? "[tracker]" : "[work]"}`,
+    )
+    .join("; ");
+  const extra = report.total - report.commits.length;
+  return [
+    `note: the claim branch inherits ${count(report.total, "unpushed commit")} from the primary ` +
+      `checkout beyond ${report.base} (${classes.join(", ")}) — the PR diff will carry them as ` +
+      `unrelated churn: ${report.remedy}.`,
+    `note: inherited commits (newest first) — ${named}${extra > 0 ? `; and ${extra} more` : ""}`,
+  ];
+}
 
 /** Outcome of the `x-worktree.post-start` bootstrap hook (task-start-post-hook). */
 export type PostStartResult = {
@@ -265,6 +429,15 @@ export interface StartGit extends GitRunner {
    * existing branch is checked out otherwise.
    */
   worktreeAdd(cwd: string, path: string, opts: { branch: string; createBranch: boolean }): void;
+  /**
+   * The commits a branch cut from `cwd`'s CURRENT HEAD would inherit beyond
+   * its upstream base (bug-start-claim-branch-inherits-unpushed-tracker-commits),
+   * with `itemPath`'s own presence at that base. `undefined` when no upstream
+   * resolves — nothing to compare, nothing to report. Best-effort and
+   * report-only: it never changes the branch or the claim. Absent in an
+   * injected fake → no report (the default runner implements it).
+   */
+  inheritedCommits?(cwd: string, itemPath: string): InheritedCommitProbe | undefined;
 }
 
 export type StartDeps = {
@@ -284,6 +457,30 @@ function git(args: string[], cwd: string): string {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`git ${args.join(" ")} failed${stderr ? `: ${stderr}` : ` (${message})`}`);
   }
+}
+
+/**
+ * The ref a claim branch's PR diff is measured against: the checked-out
+ * branch's own upstream (normally `origin/main`), else `origin/HEAD`, else the
+ * conventional `origin/main` / `origin/master` when either exists. Null when
+ * nothing resolves (no remote, no upstream) — nothing to compare, no report.
+ */
+function resolveUpstreamRef(cwd: string): string | null {
+  const attempt = (args: string[]): string | null => {
+    try {
+      return git(args, cwd);
+    } catch {
+      return null;
+    }
+  };
+  return (
+    attempt(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]) ??
+    attempt(["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]) ??
+    ["origin/main", "origin/master"].find(
+      (name) => attempt(["rev-parse", "--verify", "--quiet", `${name}^{commit}`]) !== null,
+    ) ??
+    null
+  );
 }
 
 function gh(args: string[], cwd: string): string {
@@ -406,6 +603,32 @@ export function defaultStartGit(): StartGit {
         ],
         cwd,
       );
+    },
+    inheritedCommits(cwd: string, itemPath: string): InheritedCommitProbe | undefined {
+      const base = resolveUpstreamRef(cwd);
+      if (base === null) return undefined;
+      const branchPoint = git(["rev-parse", "HEAD"], cwd);
+      const log = git(["log", "--format=%H%x1f%s", `${base}..HEAD`], cwd);
+      const commits = log
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .map((line) => {
+          const separator = line.indexOf("\x1f");
+          return { sha: line.slice(0, separator), subject: line.slice(separator + 1) };
+        });
+      const rel = relative(cwd, itemPath).split(sep).join("/");
+      let itemOnBase = false;
+      try {
+        execFileSync("git", ["cat-file", "-e", `${base}:${rel}`], {
+          cwd,
+          stdio: ["ignore", "ignore", "ignore"],
+        });
+        itemOnBase = true;
+      } catch {
+        itemOnBase = false;
+      }
+      return { base, branchPoint, commits, itemOnBase };
     },
   };
 }
@@ -573,6 +796,27 @@ export function assertStartableTree(
 }
 
 /**
+ * Best-effort inherited-commit probe (bug-start-claim-branch-inherits-unpushed-tracker-commits):
+ * a runner without the method, a git failure or no resolvable upstream degrades
+ * to no report — the report is advisory and never blocks a claim (the same
+ * contract as the claim stamp). Report-only: nothing about the branch or the
+ * claim changes; the remedy rides the report.
+ */
+function probeInheritedCommits(
+  gitRunner: StartGit,
+  root: string,
+  itemPath: string,
+  branch: string,
+): InheritedCommitsReport | null {
+  try {
+    const probe = gitRunner.inheritedCommits?.(root, itemPath);
+    return probe === undefined ? null : inheritedCommitReport(probe, branch);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Start work on an item in one flow: claim (in_progress + assignee) →
  * working branch (pattern or recorded field) → commit the claim →
  * push → optional draft PR with the item id in the body.
@@ -651,6 +895,14 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
     });
     const branch = runBranch({ cwd: opts.cwd, id, now: opts.now }, { git: gitRunner });
 
+    // Inherited-commit report (bug-start-claim-branch-inherits-unpushed-tracker-commits):
+    // `checkout -b` cuts from this checkout's LOCAL HEAD, so unpushed commits
+    // ride the claim branch's PR diff as unrelated churn. Report-only, and only
+    // when THIS run cut the branch — an attach inherits what was cut earlier.
+    const inherited = branch.created
+      ? probeInheritedCommits(gitRunner, root, branch.path, branch.branch)
+      : null;
+
     let committed = false;
     if (gitRunner.fileStatus(root, branch.path).trim()) {
       gitRunner.commitFile(root, branch.path, `claim: ${id}`);
@@ -701,6 +953,7 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
         written: false,
         warning: "no --worktree: the env contract is written only inside worktree checkouts",
       },
+      ...(inherited !== null ? { inheritedCommits: inherited } : {}),
       item: branch.item,
     };
   });
@@ -711,7 +964,9 @@ const READINESS_LEAD = "Readiness: the gate binaries do not resolve inside the w
 
 /** The overflow marker: how many bins the budget could not fit, never a silent drop. */
 function readinessOverflow(extra: number): string {
-  return extra > 0 ? `; and ${extra} more bin${extra === 1 ? "" : "s"} not resolving inside it.` : ".";
+  return extra > 0
+    ? `; and ${extra} more bin${extra === 1 ? "" : "s"} not resolving inside it.`
+    : ".";
 }
 
 /** The bins whose resolution keeps the worktree off its own install. */
@@ -735,7 +990,10 @@ function gateBinEntry(bin: GateBinResolution): string {
 export function hasReadinessEvidence(
   readiness: { hasInstall: boolean; gateBins: GateBinResolution[] } | undefined,
 ): boolean {
-  return readiness !== undefined && (!readiness.hasInstall || foreignGateBins(readiness.gateBins).length > 0);
+  return (
+    readiness !== undefined &&
+    (!readiness.hasInstall || foreignGateBins(readiness.gateBins).length > 0)
+  );
 }
 
 /**
@@ -954,14 +1212,7 @@ export function worktreeFailureMessage(input: {
   // space between remedy and evidence is reserved too, so the clause can never
   // push the following discard clause over the line.
   const mandatory =
-    lead.length +
-    1 +
-    remedy.length +
-    1 +
-    discardClause.length +
-    1 +
-    detail.length +
-    1;
+    lead.length + 1 + remedy.length + 1 + discardClause.length + 1 + detail.length + 1;
   // The readiness evidence belongs to the claim-commit step only: on a push or
   // draft-PR failure "gate binaries do not resolve" is noise, and this wrapper
   // takes a readiness snapshot for EVERY step (bug-start-worktree-npm-ci-claim
@@ -973,12 +1224,9 @@ export function worktreeFailureMessage(input: {
     hasReadinessEvidence(input.readiness)
       ? (gateBinFailureReport(input.readiness, MAX_HUMAN_ERROR_CHARS - mandatory) ?? "")
       : "";
-  return [
-    lead,
-    `${remedy}${readiness === "" ? "" : ` ${readiness}`}`,
-    discardClause,
-    detail,
-  ].join("\n");
+  return [lead, `${remedy}${readiness === "" ? "" : ` ${readiness}`}`, discardClause, detail].join(
+    "\n",
+  );
 }
 
 type WorktreeStartInput = {
@@ -1041,6 +1289,15 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
   }
 
   const createBranch = !gitRunner.branchExists(root, name);
+  // Inherited-commit report (bug-start-claim-branch-inherits-unpushed-tracker-commits):
+  // a branch cut here is cut from the primary checkout's LOCAL HEAD, so every
+  // unpushed commit — tracker auto-commits included — rides the PR diff as
+  // unrelated churn. Report-only, computed BEFORE the worktree/branch exist so
+  // it names what the cut is about to inherit; attach re-runs inherit what an
+  // earlier run cut and stay report-free.
+  const inherited = createBranch
+    ? probeInheritedCommits(gitRunner, root, item.filePath, name)
+    : null;
   let worktreeCreated = false;
   if (!pathTaken) {
     gitRunner.worktreeAdd(root, worktreePath, { branch: name, createBranch });
@@ -1311,6 +1568,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       prepSteps,
       env,
       ...(prepared.claim !== undefined ? { claim: prepared.claim } : {}),
+      ...(inherited !== null ? { inheritedCommits: inherited } : {}),
       ...(postStartRelink !== undefined ? { postStartRelink } : {}),
       postStart,
       item: finalItem,
@@ -1328,7 +1586,15 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       gateBins: inspectGateBinResolution(worktreePath, root),
     };
     const failure = new Error(
-      worktreeFailureMessage({ id, branch: name, worktreePath, createBranch, step, err, readiness }),
+      worktreeFailureMessage({
+        id,
+        branch: name,
+        worktreePath,
+        createBranch,
+        step,
+        err,
+        readiness,
+      }),
     );
     // Carried, not embedded: the message bounds the names, this keeps them
     // enumerable for a machine consumer of the failure envelope.
