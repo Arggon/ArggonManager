@@ -105,3 +105,7 @@ Yes, but only through the human-only takeover gate and only where the claim live
 
 **Gates, from this worktree.**
 `npm run arggon -- validate --json` → `{"ok":true,...,"errors":[],"warnings":[]}`; focused suites (branch-claims 11, list, next, sync-types, sync-command 21, sync-smoke 5, cli, mcp-parity, lib-build, tools, measure, acceptance-convention, decision-brief-convention) green; `npm run lint` clean; `npm run test:structure` 5/5 PASS; `npm run check:plugin` exit 0 (bundle regenerated, deterministic); `npx prettier --check` on every touched file clean. Full `npm test`: **161 files / 3543 tests passed** (clean run, tree committed, no concurrent writes). A full-suite failure seen on an earlier intermediate run (`cli/src/prose-format.test.ts` code-span test timing out at 30s) is the pre-existing load flake tracked as `bug-prose-format-codespan-test-times-out-under-full-suite`; it passes standalone and in the final run.
+
+### handoff 2026-10-15 @arggon-maker (session: maker-claim-pool) — next: Standards review of the recorded route (declare + sync) against boxes 1/4; then merge the PR with a merge commit (tracker auto-commits ride the branch).
+- branch: fix/bug-claim-pool-computed-from-main-misses-branch-claims
+- open questions: Follow-up option: exclude locally-visible branch claims from next's pool? Rejected here (incomplete without a fetch; hides the boundary). Box 6: the four items merged 2026-10-06 — recorded as observe…
