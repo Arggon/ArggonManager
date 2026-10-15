@@ -9,7 +9,6 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [seam, hygiene]
 created: "2026-10-03"
 updated: "2026-10-15"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-prover-agent-has-no-x-generated-entry
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-prover-agent-has-no-x-generated-entry.md
