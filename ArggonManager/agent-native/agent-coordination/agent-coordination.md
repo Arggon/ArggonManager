@@ -1,6 +1,6 @@
 ---
 type: epic
-status: in_progress
+status: done
 id: agent-coordination
 title: agent-coordination
 assignee: arggon-delivery-lead
