@@ -327,6 +327,28 @@ How it ships:
 > authority, the generated delivery-lead contract, the `arggon-cli` skill and
 > the ADR 0016 channel).
 
+> **Amendment (2026-10-15, `bug-self-decided-false-positive-owner-assigned`): what
+> `self-decided` means, and its limit — a same-name hint, never authentication.**
+> The decision above is unchanged and nothing above this note is rewritten. The
+> first amendment names the field; this one states the case that field description
+> left implicit: an item **assigned to the product owner's own login**. Nothing
+> forbids that assignment, and when the owner answers a brief on their own item
+> the answer's author equals the item's `assignee`, so the state reads
+> `self-decided`. That is the **normal owner answer**, not an agent answering its
+> own brief — and the tracker cannot tell the two apart, because it has no identity
+> layer (§6, inherited from ADR 0021 §4, where `self-accepted` carries exactly the
+> same limit). So the semantics stay **"the `decided:` author equals the item's own
+> assignee"**, case-insensitively, and nothing more: `self-decided` is a
+> **same-name hint** whose reader is the human deciding whether to trust an
+> answer, never a claim about who answered. The resolution is the statement, not a
+> classifier change — `spec-owner-decision-brief-021` §States,
+> `docs/json-output.md` §`decision_brief` and `docs/engineering.md` §Roles and
+> authority → The decision brief each name the owner-assigned case, and
+> `cli/src/decision-brief-convention.test.ts` pins the behaviour with the repro.
+> It remains report-only in every respect, as §6 requires: no transition consults
+> it, no command refuses because of it, and `spec analyze` stays silent on it —
+> only `open` fires `UNANSWERED-DECISION-BRIEF`.
+
 ## Alternatives considered
 
 - **C2 — teach only:** put the plain-language rule in the delivery-lead contract
