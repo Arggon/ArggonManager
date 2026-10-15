@@ -75,3 +75,12 @@ Decisions recorded: `cancelled` never masked (abandoned, not finished); TUI/Open
 
 ### 2026-10-15 @Arggon
 **Finding for the delivery lead (out of this item's scope):** this change adds an additive `open_descendants: number` to the board detail payload (`GET /api/item` and the static `--details` snapshot). `ArggonManager/docs/json-output.md` documents that payload field-by-field (line ~691) and is owned by `task-container-hygiene-check` — I did not touch it. Either that item adds the one field line, or a follow-up is filed; the README board section carries the user-facing rule in the meantime.
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-14 (delivery lead)
+Merged as c5b36bd6 (PR #827). The owner's "fix all" rule ships: the board DERIVES the displayed status — a container with any open descendant (todo/in_progress/blocked, any depth) never renders `done`; it renders `open` (the tracker's antonym of terminal) with the existing `N open` badge. Stored statuses are untouched (the closure record); `cancelled` stays unmasked (recorded: the misleading case is `done` over open work); leaves and fully-terminal containers render exactly as before.
+
+Consistency: the derivation is computed server-side once and stamped `data-display-status`; the tree and the columns' terminal-hide/lens logic both read the displayed status, so the hide done/cancelled toggle can never hide a masked container; the drawer keeps the stored status and explains `reads open · N open below`; the keyboard roving anchor skips hidden cards; the static export mirrors the serve.
+
+Evidence: `board.ts` +290 (`openDescendantCounts`/`displayedStatus`, attributes, drawer explanation), `board.test.ts` +272 (mask/no-mask matrix, aria, attributes, card matrix, contrast pair), `board-parity.test.ts` +19, e2e `@smoke` +78 (a done story with open leaf follow-ups reads `open`; toggle/lens never hide it; static parity; axe), README bullet; `json-output.md` drawer field documented in review round 1 (866dde08). Gates green in the worktree (focused 159, full 3472, lint/structure/prettier, @smoke 48); CI green on the refreshed head.
