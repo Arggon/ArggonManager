@@ -110,5 +110,11 @@ parameter). The one `force` on the surface is `arggon_cleanup`'s audited prune
 opt-in: terminal+merged worktrees whose only removal blockers are untracked,
 refused without `prune` (`force requires prune`), and it never discards tracked
 modifications — the CLI and MCP share one rules module.
+The item-addressed tools (`arggon_update`/`arggon_comment`/`arggon_handoff`/
+`arggon_show`) resolve their tree through the item's `worktree_path` when its
+claim lives in a worktree, so a comment/handoff/update lands on the item's
+branch — never in the server's launch tree; a write whose recorded claim tree
+is gone refuses with the named `TRACKER_ROOT_MISMATCH` error instead
+(bug-mcp-server-binds-session-cwd-tracker-root).
 Tool schemas mirror the CLI options both ways; the standing invariant is
 `mcp-parity.test.ts` (exceptions documented there, `--json` always excepted).

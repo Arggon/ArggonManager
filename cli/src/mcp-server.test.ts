@@ -12,7 +12,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { HANDOFF_SESSION_CAP, conventionPathForRoot, runCreate } from "@arggondev/lib";
+import { HANDOFF_SESSION_CAP, conventionPathForRoot, runCreate, runUpdate } from "@arggondev/lib";
 import { arggonVersion } from "./docs.js";
 
 import { runInit } from "./init.js";
@@ -1166,6 +1166,302 @@ describe("mcp server additive update contract (task-native-kernel-lib-polish fin
     expect((envelope.item as Record<string, unknown>).status).toBe("done");
   });
 });
+
+/**
+ * The PR #713 incident shape, end to end (bug-mcp-server-binds-session-cwd-
+ * tracker-root): a git repo whose item is claimed in a worktree, with the
+ * MCP server launched from the PRIMARY checkout — the stale base branch the
+ * incident session was bound to. Every item-scoped write must land in the
+ * worktree (where the claim branch lives) or fail named; never in the
+ * launching tree.
+ */
+describe("mcp server item-scoped cwd routing (bug-mcp-server-binds-session-cwd-tracker-root)", () => {
+  const itemRelPath = "ArggonManager/inc/area/story-topic/task-thing.md";
+  let client: McpTestClient;
+  let primary: string;
+  let worktree: string;
+
+  const git = (cwd: string, args: string[]): void => {
+    execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.com", ...args], {
+      cwd,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  };
+
+  /** The claim as `start --worktree` writes it, in the worktree copy. */
+  const recordClaim = (): void => {
+    runUpdate({
+      cwd: worktree,
+      id: "task-thing",
+      status: "in_progress",
+      assignee: "arggon-maker",
+      branch: "feat/task-thing",
+    });
+    const file = join(worktree, itemRelPath);
+    writeFileSync(
+      file,
+      readFileSync(file, "utf8").replace(
+        /^branch: .*$/m,
+        `branch: feat/task-thing\nworktree_path: ${worktree}`,
+      ),
+      "utf8",
+    );
+    writeFileSync(
+      join(worktree, ".arggon.env"),
+      `ARGON_ITEM=task-thing\nARGGON_WORKTREE_PATH=${worktree}\nARGGON_WORKTREE_BRANCH=feat/task-thing\n`,
+      "utf8",
+    );
+    git(worktree, ["add", "-A"]);
+    git(worktree, ["commit", "-q", "--allow-empty", "-m", "claim: task-thing"]);
+  };
+
+  /**
+   * Primary git checkout + tracker + task, and the claim worktree. With
+   * `recordedWorktree` the claim points elsewhere (the stale-record refusal
+   * case). The primary is left on its base branch with the STALE todo copy —
+   * the incident's launch tree.
+   */
+  function seed(opts: { recordedWorktree?: string } = {}): { primary: string; worktree: string } {
+    primary = mkdtempSync(join(tmpdir(), "arggon-mcp-route-"));
+    git(primary, ["init", "-q"]);
+    git(primary, ["config", "user.name", "test"]);
+    git(primary, ["config", "user.email", "test@example.com"]);
+    git(primary, ["commit", "-q", "--allow-empty", "-m", "seed"]);
+    runInit({ dir: primary, force: false });
+    const body = "## Context\n\nSeed.\n\n## Acceptance\n\nSeed.\n";
+    runCreate({ cwd: primary, type: "initiative", title: "Inc", body });
+    runCreate({ cwd: primary, type: "epic", title: "Area", parent: "inc", body });
+    runCreate({
+      cwd: primary,
+      type: "story",
+      title: "Topic",
+      parent: "area",
+      id: "story-topic",
+      body,
+    });
+    runCreate({
+      cwd: primary,
+      type: "task",
+      title: "Do the thing",
+      parent: "story-topic",
+      id: "task-thing",
+      body,
+    });
+    git(primary, ["add", "-A"]);
+    git(primary, ["commit", "-q", "--allow-empty", "-m", "seed tracker"]);
+
+    worktree = `${primary}-task-thing`;
+    git(primary, ["worktree", "add", "-q", worktree, "-b", "feat/task-thing"]);
+    if (opts.recordedWorktree !== undefined) {
+      // Claim recorded in the LAUNCH tree pointing at a tree that is gone:
+      // no worktree checkout exists for the claim.
+      runUpdate({
+        cwd: primary,
+        id: "task-thing",
+        status: "in_progress",
+        assignee: "arggon-maker",
+        branch: "feat/task-thing",
+      });
+      const file = join(primary, itemRelPath);
+      writeFileSync(
+        file,
+        readFileSync(file, "utf8").replace(
+          /^branch: .*$/m,
+          `branch: feat/task-thing\nworktree_path: ${opts.recordedWorktree}`,
+        ),
+        "utf8",
+      );
+      git(primary, ["add", "-A"]);
+      git(primary, ["commit", "-q", "--allow-empty", "-m", "claim: task-thing (stale record)"]);
+      return { primary, worktree };
+    }
+    recordClaim();
+    return { primary, worktree };
+  }
+
+  const primaryItem = (): string => readFileSync(join(primary, itemRelPath), "utf8");
+  const worktreeItem = (): string => readFileSync(join(worktree, itemRelPath), "utf8");
+
+  beforeEach(() => {
+    seed();
+    client = new McpTestClient();
+    client.cwd = primary;
+    client.start();
+  });
+
+  it("arggon_comment lands in the claim worktree, never in the launching tree", async () => {
+    const result = await client.request("tools/call", {
+      name: "arggon_comment",
+      arguments: { id: "task-thing", text: "maker comment through MCP", author: "arggon-maker" },
+    });
+    expect(result.isError).toBeUndefined();
+    const envelope = textContent(result) as Record<string, unknown>;
+    expect(envelope).toMatchObject({ ok: true, command: "comment" });
+    // The envelope's path names the WORKTREE copy, not the launching tree's.
+    expect(String(envelope.path)).toBe(join(worktree, itemRelPath));
+    // …and so does the file content.
+    expect(worktreeItem()).toContain("@arggon-maker\nmaker comment through MCP");
+    expect(primaryItem()).not.toContain("maker comment through MCP");
+    // The comment commit rode the claim branch; the launch tree stayed clean.
+    expect(gitOut(worktree, ["log", "--oneline", "-1"])).toContain("commented task-thing");
+    expect(gitOut(primary, ["status", "--porcelain"])).toBe("");
+  });
+
+  it("arggon_handoff routes and records the claim branch, not the launch branch", async () => {
+    const result = await client.request("tools/call", {
+      name: "arggon_handoff",
+      arguments: { id: "task-thing", next: "continue in the worktree", author: "arggon-maker" },
+    });
+    expect(result.isError).toBeUndefined();
+    const envelope = textContent(result) as Record<string, unknown>;
+    expect(envelope).toMatchObject({
+      ok: true,
+      command: "handoff",
+      handoff: { branch: "feat/task-thing", next: "continue in the worktree" },
+    });
+    // The incident's symptom (`handoff recording branch: main`) is gone: the
+    // branch auto-detected from the claim tree is the claim branch.
+    expect(worktreeItem()).toContain("- branch: feat/task-thing");
+    expect(primaryItem()).not.toContain("continue in the worktree");
+    expect(gitOut(primary, ["status", "--porcelain"])).toBe("");
+  });
+
+  it("arggon_update --status done flips the item in the claim tree (the auto-done wedge half)", async () => {
+    // Done gate: the live checklist must be satisfied in the tree the write
+    // lands in — the claim worktree.
+    satisfyAcceptance(worktree, "task-thing");
+    const result = await client.request("tools/call", {
+      name: "arggon_update",
+      arguments: { id: "task-thing", status: "done" },
+    });
+    expect(result.isError).toBeUndefined();
+    const envelope = textContent(result) as Record<string, unknown>;
+    expect(envelope).toMatchObject({ ok: true, command: "update" });
+    expect((envelope.item as Record<string, unknown>).status).toBe("done");
+    // The flip landed on the branch the claim rides; the launch tree's copy
+    // still reads todo — it is not the item's tree and was never written.
+    expect(worktreeItem()).toContain("status: done");
+    expect(primaryItem()).toContain("status: todo");
+    expect(gitOut(worktree, ["log", "--oneline", "-1"])).toContain("done task-thing");
+    expect(gitOut(primary, ["status", "--porcelain"])).toBe("");
+  });
+
+  it("arggon_show reads the claim copy, not the stale launch copy", async () => {
+    const result = await client.request("tools/call", {
+      name: "arggon_show",
+      arguments: { id: "task-thing", meta: true },
+    });
+    expect(result.isError).toBeUndefined();
+    const envelope = textContent(result) as Record<string, unknown>;
+    expect((envelope.item as Record<string, unknown>).status).toBe("in_progress");
+    expect(String(envelope.path)).toBe(join(worktree, itemRelPath));
+  });
+
+  it("refuses an item-scoped write named when the recorded worktree is gone — and writes nothing into the launching tree", async () => {
+    // The claim in the new primary points at a tree that never existed.
+    const gone = `${worktree}-gone`;
+    const seeded = seed({ recordedWorktree: gone });
+    client = new McpTestClient();
+    client.cwd = seeded.primary;
+    client.start();
+    const before = readFileSync(join(seeded.primary, itemRelPath), "utf8");
+
+    const comment = await client.request("tools/call", {
+      name: "arggon_comment",
+      arguments: { id: "task-thing", text: "must not land here", author: "arggon-maker" },
+    });
+    expect(comment.isError).toBe(true);
+    expect(textContent(comment)).toMatchObject({
+      ok: false,
+      command: "comment",
+      error: {
+        code: "TRACKER_ROOT_MISMATCH",
+        message: expect.stringContaining(gone),
+      },
+    });
+    // The refusal names both trees: the launching one and the recorded claim tree.
+    expect(textContent(comment)).toMatchObject({
+      error: { message: expect.stringContaining(seeded.primary) },
+    });
+
+    // update is refused the same way — the dangerous half cannot land either.
+    const done = await client.request("tools/call", {
+      name: "arggon_update",
+      arguments: { id: "task-thing", status: "done" },
+    });
+    expect(done.isError).toBe(true);
+    expect(textContent(done)).toMatchObject({
+      ok: false,
+      command: "update",
+      error: { code: "TRACKER_ROOT_MISMATCH" },
+    });
+
+    // Nothing was written into the launching tree: no comment, no flip, no commit.
+    expect(readFileSync(join(seeded.primary, itemRelPath), "utf8")).toBe(before);
+    expect(gitOut(seeded.primary, ["status", "--porcelain"])).toBe("");
+    // The session survives the refusals.
+    const still = await client.request("tools/list");
+    expect(Array.isArray(still.tools)).toBe(true);
+  });
+
+  it("keeps the plain single-tree behavior for an item with no worktree claim", async () => {
+    // No worktree at all: the comment lands in the launching tree, exactly as
+    // before the routing existed.
+    const plain = mkdtempSync(join(tmpdir(), "arggon-mcp-route-plain-"));
+    git(plain, ["init", "-q"]);
+    git(plain, ["config", "user.name", "test"]);
+    git(plain, ["config", "user.email", "test@example.com"]);
+    git(plain, ["commit", "-q", "--allow-empty", "-m", "seed"]);
+    runInit({ dir: plain, force: false });
+    const body = "## Context\n\nSeed.\n\n## Acceptance\n\nSeed.\n";
+    runCreate({ cwd: plain, type: "initiative", title: "Inc", body });
+    runCreate({ cwd: plain, type: "epic", title: "Area", parent: "inc", body });
+    runCreate({
+      cwd: plain,
+      type: "story",
+      title: "Topic",
+      parent: "area",
+      id: "story-topic",
+      body,
+    });
+    runCreate({
+      cwd: plain,
+      type: "task",
+      title: "Plain",
+      parent: "story-topic",
+      id: "task-plain",
+      body,
+    });
+    client = new McpTestClient();
+    client.cwd = plain;
+    client.start();
+    const result = await client.request("tools/call", {
+      name: "arggon_comment",
+      arguments: { id: "task-plain", text: "plain tree comment", author: "arggon-maker" },
+    });
+    expect(result.isError).toBeUndefined();
+    const envelope = textContent(result) as Record<string, unknown>;
+    expect(String(envelope.path)).toBe(
+      join(plain, itemRelPath.replace("task-thing", "task-plain")),
+    );
+    expect(
+      readFileSync(join(plain, itemRelPath.replace("task-thing", "task-plain")), "utf8"),
+    ).toContain("plain tree comment");
+  });
+});
+
+/** Stdout of one git command in a seeded routing fixture. */
+function gitOut(cwd: string, args: string[]): string {
+  return execFileSync(
+    "git",
+    ["-c", "user.name=test", "-c", "user.email=test@example.com", ...args],
+    {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+}
 
 describe("deriveDefaultCliSpawn recognition (task-derive-cli-spawn-loader)", () => {
   it("derives the built-bin spec from a dist/cli.js entry", () => {
