@@ -8,7 +8,6 @@ labels: []
 created: "2026-10-14"
 updated: "2026-10-14"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-container-rollup/task-container-status-vs-open-workstreams.md
   Leaves live only under a story. id is the filename stem: task-container-status-vs-open-workstreams.
@@ -108,3 +107,9 @@ Remaining under option 1: the report-only guard (a terminal container holding an
 ### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
 
 **Owner extension (2026-10-14): fix ALL of them, not just the workstream cases.** The owner pointed at `methodology-improvements` (`done` with 18 open follow-ups) and said: "Fix all not just what I point." Reading: the board must never show `done` over open work — leaves included. Reopening every stored status is human-only and recurs with every new follow-up filed under a closed container, so the systemic answer is the **option-2 extension**: the board derives the displayed status — a container with any open descendant (todo/in_progress/blocked, any depth) displays `open` instead of `done`; the stored status stays as the closure record. Filed as `task-board-no-done-over-open-work` and dispatched. The reopen decision above stands (option 1, executed); this extends the display half to all open work.
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+**Closed loop (2026-10-14):** both halves of the owner's decision are executed and merged.
+- **Option 1 (reopen):** the five containers are `in_progress`; `ui`/`arggon-manager` live bodies authored (19a0153e).
+- **The guard:** `arggon report` carries the report-only `hygiene` section (859e4bdf, PR #826) — live check on today's tree: `hygiene: clean — 84 containers checked`.
+- **The "fix all" extension:** the board derives the displayed status (c5b36bd6, PR #827) — no container with open work inside (leaves included) renders `done` anywhere on the web board; stored statuses stay the closure record; the drawer explains (`reads open · N open below`).
