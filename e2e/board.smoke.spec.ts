@@ -142,7 +142,10 @@ function screenshotPath(name: string): string {
  *    bug-tree-done-container-hides-open-work adds the open-descendant
  *    disclosure's scanned state: the served tree under a lens with the
  *    terminal rule and a fold applied (after the badge and the `N of M`
- *    counts).
+ *    counts). task-board-no-done-over-open-work widens the same state: the
+ *    masked container reads `open` (chip, node attribute, aria) and stays
+ *    visible under the terminal rule in BOTH layouts — the done column keeps
+ *    it while only the genuinely terminal cards hide.
  */
 const AXE_WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] as const;
 
@@ -2465,34 +2468,63 @@ test.describe("@smoke board tree open-descendant disclosure", () => {
     const node = (id: string) => tree.locator(`.tree-node[data-id="${id}"]`);
     const badge = (id: string) => row(id).locator("> .tree-open");
 
-    // The reproducer, pinned: the initiative reads `done 2 open` — the authored
-    // chip stays, the disclosure sits right after it.
-    await expect(row(OPEN_ROOT_ID).locator("> .status-chip")).toHaveText("done");
+    // The reproducer, pinned: the initiative reads `open 2 open` — the stored
+    // `done` is masked by the derived display (task-board-no-done-over-open-work),
+    // the disclosure sits right after the displayed chip.
+    await expect(row(OPEN_ROOT_ID).locator("> .status-chip")).toHaveText("open");
+    await expect(node(OPEN_ROOT_ID)).toHaveAttribute("data-status", "done");
+    await expect(node(OPEN_ROOT_ID)).toHaveAttribute("data-display-status", "open");
     await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
     // The whole path discloses the same subtree count, three levels down from
     // the initiative — a direct-children count would have answered 0 there.
     await expect(badge(OPEN_EPIC_ID)).toHaveText("2 open");
     await expect(badge(OPEN_STORY_ID)).toHaveText("2 open");
-    // The accessible name carries the disclosure on the interactive row.
-    await expect(row(OPEN_ROOT_ID)).toHaveAttribute("aria-label", /2 open descendants/);
-    // A done container whose whole subtree is terminal discloses nothing, and
-    // neither do the leaves — open, done or cancelled.
+    // The `done` story with the open leaf follow-ups is the acceptance's own
+    // case: its chip reads `open`, not the stored `done`.
+    await expect(row(OPEN_STORY_ID).locator("> .status-chip")).toHaveText("open");
+    await expect(node(OPEN_STORY_ID)).toHaveAttribute("data-status", "done");
+    await expect(node(OPEN_STORY_ID)).toHaveAttribute("data-display-status", "open");
+    // The accessible name carries the DISPLAYED state and the disclosure on the
+    // interactive row: never `done` over open work.
+    await expect(row(OPEN_ROOT_ID)).toHaveAttribute(
+      "aria-label",
+      /^initiative tree-done-root: Tree done root \(open, 2 open descendants\)$/,
+    );
+    // A done container whose whole subtree is terminal keeps its authored chip
+    // and discloses nothing, and neither do the leaves — open, done or cancelled.
+    await expect(row(CLEAN_EPIC_ID).locator("> .status-chip")).toHaveText("done");
+    await expect(node(CLEAN_EPIC_ID)).not.toHaveAttribute("data-display-status", /.+/);
     await expect(row(CLEAN_EPIC_ID).locator("> .tree-open")).toHaveCount(0);
     await expect(row(CLEAN_STORY_ID).locator("> .tree-open")).toHaveCount(0);
     await expect(row(OPEN_TASK_ID).locator("> .tree-open")).toHaveCount(0);
     await expect(row(OPEN_DONE_TASK_ID).locator("> .tree-open")).toHaveCount(0);
     await expect(row(OPEN_CANCELLED_BUG_ID).locator("> .tree-open")).toHaveCount(0);
 
-    // Hide done/cancelled: the terminal containers stay as muted context for
-    // their open descendants, and the disclosure does not move.
+    // Hide done/cancelled: a masked container READS OPEN, so it is not a
+    // terminal row at all — it stays visible at full strength (never muted
+    // terminal-context, never hidden) and the disclosure does not move.
     await page.locator("#board-terminal-toggle").click();
-    await expect(node(OPEN_STORY_ID)).toHaveClass(/terminal-context/);
+    await expect(node(OPEN_STORY_ID)).toBeVisible();
+    await expect(node(OPEN_STORY_ID)).not.toHaveClass(/terminal-context/);
+    await expect(node(OPEN_STORY_ID)).not.toHaveClass(/terminal-hidden/);
+    await expect(node(OPEN_ROOT_ID)).not.toHaveClass(/terminal-context/);
     await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
     await expect(badge(OPEN_STORY_ID)).toHaveText("2 open");
     // The all-terminal container hides (nothing visible hangs below it).
     await expect(row(CLEAN_EPIC_ID)).toBeHidden();
-    await page.locator("#board-terminal-toggle").click();
-    await expect(row(CLEAN_EPIC_ID)).toBeVisible();
+    // The columns compose the same way: the done column stays (it hosts the
+    // masked containers, which read open) and only the genuinely terminal cards
+    // inside it hide; the cancelled column has no such card and hides whole.
+    await page.locator("#board-view-toggle").click();
+    await expect(page.locator('.column[data-status="done"]')).toBeVisible();
+    await expect(page.locator(`.card[data-id="${OPEN_STORY_ID}"]`)).toBeVisible();
+    await expect(
+      page.locator(`.card[data-id="${OPEN_ROOT_ID}"] .card-head > .status-chip`),
+    ).toHaveText("open");
+    await expect(page.locator(`.card[data-id="${OPEN_DONE_TASK_ID}"]`)).toBeHidden();
+    await expect(page.locator('.column[data-status="cancelled"]')).toBeHidden();
+    await page.locator("#board-view-toggle").click();
+    await expect(tree).toBeVisible();
 
     // A fold hides the subtree, never the disclosure on the folded row.
     const rootToggle = row(OPEN_ROOT_ID).locator("> .tree-toggle");
@@ -2503,11 +2535,13 @@ test.describe("@smoke board tree open-descendant disclosure", () => {
     await rootToggle.click();
     await expect(tree.locator(`.tree-node[data-id="${OPEN_STORY_ID}"]`)).toBeVisible();
 
-    // A lens narrows the rows to one match plus its context path; the
-    // disclosure is the subtree's truth, not the lens verdict (the `N of M`
-    // counter stays the verdict).
+    // A lens narrows the rows to one match plus its context path; the masked
+    // container is lens context but still NOT terminal context (it reads open),
+    // and the disclosure is the subtree's truth, not the lens verdict (the
+    // `N of M` counter stays the verdict).
     await page.locator("#board-filter-input").fill(OPEN_TASK_ID);
     await expect(node(OPEN_STORY_ID)).toHaveClass(/context/);
+    await expect(node(OPEN_STORY_ID)).not.toHaveClass(/terminal-context/);
     await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
     await expect(badge(OPEN_STORY_ID)).toHaveText("2 open");
     await expect(page.locator("#board-filter-count")).toHaveText("1 of 10 item(s)");
@@ -2516,7 +2550,9 @@ test.describe("@smoke board tree open-descendant disclosure", () => {
     // own; the assertions above are its deterministic readiness signal.
     await axeScan(page);
     await page.locator("#board-filter-clear").click();
+    await page.locator("#board-terminal-toggle").click();
     await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await expect(row(CLEAN_EPIC_ID)).toBeVisible();
   });
 
   test("the static export carries the same disclosure (bug-tree-done-container-hides-open-work)", async ({
@@ -2535,15 +2571,23 @@ test.describe("@smoke board tree open-descendant disclosure", () => {
 
     await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
     await expect(badge(OPEN_STORY_ID)).toHaveText("2 open");
+    // The derived display ships offline exactly like on the served board.
+    await expect(row(OPEN_ROOT_ID).locator("> .status-chip")).toHaveText("open");
+    await expect(row(CLEAN_EPIC_ID).locator("> .status-chip")).toHaveText("done");
     await expect(row(CLEAN_EPIC_ID).locator("> .tree-open")).toHaveCount(0);
 
     // The same layout preferences, offline: folding and hiding terminal rows
-    // leave the disclosure untouched.
+    // leave the disclosure untouched, and a masked container is never hidden
+    // (it reads open, not terminal).
     await row(OPEN_ROOT_ID).locator("> .tree-toggle").click();
     await expect(tree.locator(`.tree-node[data-id="${OPEN_STORY_ID}"]`)).toBeHidden();
     await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
     await page.locator("#board-terminal-toggle").click();
     await expect(badge(OPEN_ROOT_ID)).toHaveText("2 open");
+    await expect(tree.locator(`.tree-node[data-id="${OPEN_ROOT_ID}"]`)).toBeVisible();
+    await expect(tree.locator(`.tree-node[data-id="${OPEN_ROOT_ID}"]`)).not.toHaveClass(
+      /terminal-context/,
+    );
     await expect(row(CLEAN_EPIC_ID)).toBeHidden();
     expect(errors).toEqual([]);
   });
