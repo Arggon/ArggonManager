@@ -8,7 +8,6 @@ labels: [seam, hygiene]
 created: "2026-10-03"
 updated: "2026-10-03"
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-prover-agent-has-no-x-generated-entry.md
   Leaves live only under a story. id is the filename stem: bug-prover-agent-has-no-x-generated-entry.
@@ -52,3 +51,6 @@ Found by the worker on PR #607 (bug-seam-drift-gate-blocks-new-generated-seam-co
 This is a genuine blind spot in BOTH enforcement layers: the file is unverified and unreported, and it looks like ordinary committed content. Note the irony worth recording — it is also the one file that PR #606's classification fix was _proven against_ (a present dest with no provenance state must be `adopter-edited`, not `stale`), so the bug that made it invisible is the same bug that class caught.
 
 Two possible remedies, and the choice is not obvious: (a) run a full seam regeneration and commit the resulting state entry, accepting the known 15-stamp drift sweep; or (b) make the gates report "a committed file under a managed path has no provenance entry" as a finding, which would catch the whole CLASS rather than this instance — the same false-absence lint shape the capability matrix adopted for gap notes.
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+Premise update (2026-10-15, delivery lead): the specific file is gone — `.opencode/agents/arggon-prover.md` was dropped by 40292f97 ("chore(seam): drop the stranded arggon-prover.md from this repo's own seam"), and the role now ships as `arggon-verifier.md` with its `x-generated` row and template. So remedy (a) (regenerate the state entry for the prover file) is moot, and the item's real remaining deliverable is remedy **(b): make the gates report a committed file under a managed path with no provenance entry as a finding — the whole class**, which is what this item's own reasoning prefers ("the same false-absence lint shape the capability matrix adopted"). The class gap is live: a no-row file under a managed path is classified adopter-edited and skipped, invisible to the provenance audit. Keep open; queued for a following wave with remedy (b) as the chosen route.
