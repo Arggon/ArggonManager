@@ -28,6 +28,7 @@ file — read the one that matches the task **before** acting:
 | `references/exploration.md`   | **Greenfield exploration**: the six-phase protocol — classify, stance, ground, frontier rounds, edge-case hunt, artifacts + hard gate (ADR 0017) |
 | `references/orchestration.md` | **Orchestration**: the four agent roles (named by what they decide), delivery-lead/subagent waves, review bar, smoke gate, worktrees             |
 | `references/pitfalls.md`      | **Pitfalls**: claim, cascade, tracker-merge and commit-staging traps                                                                             |
+| `references/friction.md`      | **Friction**: `arggon friction` — capture friction in ArggonManager itself, render the redacted report, opt-out keys (ADR 0024)                  |
 
 The full workflow rules are `ArggonManager/docs/agents.md`; the review bar, the
 role table and the named (asymmetric) authority are
