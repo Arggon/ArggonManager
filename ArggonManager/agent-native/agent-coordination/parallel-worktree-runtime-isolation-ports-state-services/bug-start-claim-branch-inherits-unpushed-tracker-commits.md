@@ -11,6 +11,7 @@ created: "2026-10-11"
 updated: "2026-10-15"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-start-claim-branch-inherits-unpushed-tracker-commits
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-start-claim-branch-inherits-unpushed-tracker-commits.md
   Leaves live only under a story. id is the filename stem: bug-start-claim-branch-inherits-unpushed-tracker-commits.
@@ -57,8 +58,6 @@ until the PR is open and its diff is read.
 
 ## Notes
 
-<<<<<<< HEAD
-
 ### 2026-10-15 @Arggon
 
 ### Evidence — route (c): report inherited unpushed commits (maker session, 2026-10-15)
@@ -94,7 +93,6 @@ until the PR is open and its diff is read.
 
 - branch: fix/bug-start-claim-branch-inherits-unpushed-tracker-commits
 - open questions: Native tools.arggon.start parity (no report yet) — follow-up item; strict-mode refusal could be armed later if reporting proves insufficient; rebase --onto remedy relies on branchPoint at cut time.
-  \=======
 
 ### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
 
@@ -105,5 +103,3 @@ verdict: approve
 Merged as f4553a0a (PR #834). Route (c) — report, not prevent — accepted, with the maker's reasoning on the record: (a) branch-from-clean-base would leave the worktree without the item file (its creation commit is often itself unpushed) and needs a fetch; (b) refusing fires on the normal flow (item-creation auto-commits are local by nature) and `start` cannot repair it (a push is a network mutation); (c) is additive, offline-safe, and surfaces the evidence before the PR opens. The report rides both start paths when THIS run cuts the branch: `inheritedCommits` in `--json` (base, branchPoint, exact totals, capped list, tracker-vs-work classification, `itemOnBase`, remedy) plus human notes with the remedy leading; attach re-runs and clean bases stay report-free. `itemOnBase` correctly drops the rebase arm when dropping the inherited commits would take the item off the branch.
 
 Evidence: real-git repro (contaminated primary → the branch carries the auto-commit and the envelope names it; clean primary → only the item file), 7 new tests including the drift pin against the kernel's own commit-message builder, the cap/totals, the remedy split and the human formatter; full suite 3488 green; CI green on the refreshed head. Docs: README §start, `json-output.md` §start, `opencode2.md`, and the tracker-merge pitfalls line (skill source + derived copies + ledger). Note: acceptance box 3 is pinned in its clean-base reading ("only the item file") with the contaminated case covered by the report tests — that is the chosen route's contract; recorded.
-
-> > > > > > > 6b3b15c0 (chore(tasks): commented bug-start-claim-branch-inherits-unpushed-tracker-commits)
