@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-container-hygiene-check
 title: "Report-only check: a terminal container holding an open container (the 2026-10-14 reopen guard)"
+assignee: arggon-delivery-lead
+branch: feat/task-container-hygiene-check
 parent: story-container-rollup
 labels: []
 created: "2026-10-15"
 updated: "2026-10-15"
+claimed_at: "2026-10-15T00:03:28.353Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-container-hygiene-check
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-container-rollup/task-container-hygiene-check.md
   Leaves live only under a story. id is the filename stem: task-container-hygiene-check.
