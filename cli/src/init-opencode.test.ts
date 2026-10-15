@@ -605,20 +605,32 @@ describe("opencode seam: fresh init", () => {
     const parsed = JSON.parse(raw.replace(/^\s*\/\/.*$/gm, "")) as {
       permissions?: Array<{ action?: string; resource?: string; effect?: string }>;
     };
+    // The deny/allow ordering is load-bearing: OpenCode selects rules with
+    // `findLast`, so the lease-checked spellings are re-allowed AFTER the broad
+    // `git push --force*` deny (bug-force-push-gate-blocks-the-rebase-path-the-
+    // lead-must-use). The discriminator itself — what each spelling resolves to
+    // — is pinned in `opencode-force-push.test.ts`; this test pins the shipped
+    // list and its order.
     expect(parsed.permissions).toEqual([
       { action: "shell", resource: "git commit --no-verify*", effect: "deny" },
       { action: "shell", resource: "git push --force*", effect: "deny" },
       { action: "shell", resource: "git push -f*", effect: "deny" },
+      // bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use: the
+      // lease-checked spellings a rebase push needs — permitted, but only
+      // after the deny above, never by narrowing it.
+      { action: "shell", resource: "git push --force-with-lease *", effect: "allow" },
+      { action: "shell", resource: "git push --force-with-lease=*", effect: "allow" },
+      { action: "shell", resource: "git push --force-if-includes *", effect: "allow" },
       // bug-force-push-gate-misses-refspec-plus: `git push origin +main` is a
       // force push in refspec spelling; mid-pattern glob, best-effort like
-      // its siblings.
+      // its siblings — and last, so it stays refused even next to a lease flag.
       { action: "shell", resource: "git push *+*", effect: "deny" },
     ]);
     // Non-breaking by construction: the base policy stays allow-all — a global
     // `ask`/deny-all would block ordinary and headless sessions.
     for (const rule of parsed.permissions ?? []) {
       expect(rule.resource, JSON.stringify(rule)).not.toBe("*");
-      expect(rule.effect).toBe("deny");
+      expect(["allow", "deny"], JSON.stringify(rule)).toContain(rule.effect);
     }
   });
 

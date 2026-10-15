@@ -106,18 +106,23 @@ describe("opencode.jsonc permissions block (bug-opencode-jsonc-malformed-permiss
     expect(config.permissions?.length ?? 0).toBeGreaterThan(0);
   });
 
-  it("every rule is a well-formed shell deny with a resource pattern", () => {
+  it("every rule is a well-formed shell rule with a resource pattern", () => {
+    // Effect is not pinned to `deny` here: the force-push discriminator
+    // (bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use) re-allows
+    // the lease-checked spellings with `allow` rules after the broad deny, and
+    // that ordering contract is pinned in `opencode-force-push.test.ts`.
     const rules = config.permissions ?? [];
     for (const rule of rules) {
       expect(rule.action, JSON.stringify(rule)).toBe("shell");
       expect(typeof rule.resource, JSON.stringify(rule)).toBe("string");
-      expect(rule.effect, JSON.stringify(rule)).toBe("deny");
+      expect(["allow", "deny"], JSON.stringify(rule)).toContain(rule.effect);
       expect(String(rule.resource).length).toBeGreaterThan(0);
     }
   });
 
   it("keeps the workflow's non-negotiable denies (no --no-verify, no force push)", () => {
-    const resources = (config.permissions ?? []).map((rule) => String(rule.resource));
+    const rules = config.permissions ?? [];
+    const resources = rules.map((rule) => String(rule.resource));
     for (const required of [
       "git commit --no-verify*",
       "git push --force*",
@@ -125,6 +130,8 @@ describe("opencode.jsonc permissions block (bug-opencode-jsonc-malformed-permiss
       "git push *+*",
     ]) {
       expect(resources, `missing deny for ${required}`).toContain(required);
+      const rule = rules.find((candidate) => candidate.resource === required);
+      expect(rule?.effect, `${required} must stay a deny`).toBe("deny");
     }
     expect(new Set(resources).size, "duplicate permission resource patterns").toBe(
       resources.length,
