@@ -68,3 +68,7 @@ Gates (worktree, all green):
 Before/after (real render, `arggon board --group-by tree` over this tracker): `methodology-improvements` stored `done` with 18 open — before `<span class="status-chip done">done</span><span class="tree-open">18 open</span>`, after `<span class="status-chip open">open</span><span class="tree-open">18 open</span>`.
 
 Decisions recorded: `cancelled` never masked (abandoned, not finished); TUI/OpenCode panel out of scope; the lens keeps the stored-status grammar (the mask changes the rendered state and the layout rule that could hide it, not the filter predicate).
+
+### handoff 2026-10-15 @Arggon — next: Delivery lead: review PR #827, then merge; after merge tick the acceptance and close the item (stored statuses untouched).
+- branch: feat/task-board-no-done-over-open-work
+- open questions: lens predicate reads the stored status by design — flag if the owner wants a status:open value; a kept done column still shows the lens-verdict count (layout never moves counters)
