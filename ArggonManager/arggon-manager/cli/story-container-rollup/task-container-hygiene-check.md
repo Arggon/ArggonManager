@@ -12,6 +12,7 @@ updated: "2026-10-15"
 claimed_at: "2026-10-15T00:03:28.353Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-container-hygiene-check
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-container-rollup/task-container-hygiene-check.md
   Leaves live only under a story. id is the filename stem: task-container-hygiene-check.
@@ -32,10 +33,10 @@ the product owner on the board.
 
 ## Acceptance
 
-- [ ] `arggon report` carries an additive `hygiene` section (human + `--json`): terminal containers (`done`/`cancelled`) whose subtree contains a non-terminal container (story/epic), with the offenders listed and bounded like the other report caps — report-only, exit 0, no gate and no `validate` change
-- [ ] Leaves-only follow-ups (an open bug/task under a closed story) are NOT flagged — that is the documented follow-up pattern; only open _containers_ count
-- [ ] `--json` shape documented in `ArggonManager/docs/json-output.md`; human + JSON parity pinned; a fixture covers: terminal container with an open story → flagged; terminal container with only open leaves → not flagged; open container with an open story → not flagged
-- [ ] `arggon validate`, the full suite, lint, structure and prettier green
+- [x] `arggon report` carries an additive `hygiene` section (human + `--json`): terminal containers (`done`/`cancelled`) whose subtree contains a non-terminal container (story/epic), with the offenders listed and bounded like the other report caps — report-only, exit 0, no gate and no `validate` change
+- [x] Leaves-only follow-ups (an open bug/task under a closed story) are NOT flagged — that is the documented follow-up pattern; only open _containers_ count
+- [x] `--json` shape documented in `ArggonManager/docs/json-output.md`; human + JSON parity pinned; a fixture covers: terminal container with an open story → flagged; terminal container with only open leaves → not flagged; open container with an open story → not flagged
+- [x] `arggon validate`, the full suite, lint, structure and prettier green
 
 ## Notes
 
