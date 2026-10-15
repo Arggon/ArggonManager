@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-claim-pool-computed-from-main-misses-branch-claims
 title: "`list`/`next` compute the claimable pool from `main`, but a claim made in a worktree rides its branch — so every in-flight item reads `todo`/unassigned on main and is offered to an agent that `start` then refuses"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [tracker-schema, worktree, hygiene, claims]
 created: "2026-10-05"
 updated: "2026-10-15"
-claimed_at: "2026-10-15T12:11:26.525Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-claim-pool-computed-from-main-misses-branch-claims
 ---
 <!--
