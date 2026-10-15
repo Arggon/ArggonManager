@@ -10,7 +10,6 @@ labels: [seam, config]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-15"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-task-permissions-enforcement-not-observed
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-task-permissions-enforcement-not-observed.md
