@@ -10,9 +10,7 @@ labels: [method]
 priority: p2
 created: "2026-10-02"
 updated: "2026-10-15"
-claimed_at: "2026-10-11T21:57:20.111Z"
 depends_on: [task-friction-tier-b-url-and-optout]
-worktree_path: /home/arggon/Projects/ArggonManager-task-friction-surface-parity-and-docs
 ---
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-surface-parity-and-docs.md

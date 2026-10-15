@@ -303,6 +303,13 @@ export const BUNDLED_SKILLS = [
     source: "skills/arggon-cli/references/pitfalls.md",
     dest: ".agents/skills/arggon-cli/references/pitfalls.md",
   },
+  {
+    // The adopter friction channel's operational reference (ADR 0024 stage 1,
+    // task-friction-trigger-carrier): bundled like every other reference so an
+    // adopter tree reads the same bytes this repo does.
+    source: "skills/arggon-cli/references/friction.md",
+    dest: ".agents/skills/arggon-cli/references/friction.md",
+  },
   { source: "skills/arggon-upgrade/SKILL.md", dest: ".agents/skills/arggon-upgrade/SKILL.md" },
 ];
 
@@ -406,6 +413,19 @@ function isBundledSource(templateRel: string): boolean {
 /** Resolve a bundled source against the package templates dir (sibling `skills/`, `opencode/`). */
 function bundledSourcePath(templatesDir: string, source: string): string {
   return resolve(templatesDir, "..", ...source.split("/"));
+}
+
+/**
+ * Absolute path of one template/bundled source — the resolution
+ * `renderGeneratedDoc` performs, exported so a reader can look at the template
+ * itself rather than at a render of it. Used by `doctor`'s friction block, which
+ * asks "does this TEMPLATE ship the marked trigger block" (a question about the
+ * carrier set) before it asks anything about the bytes on disk.
+ */
+export function templateSourcePath(templatesDir: string, template: string): string {
+  return isBundledSource(template)
+    ? bundledSourcePath(templatesDir, template)
+    : resolve(templatesDir, ...template.split("/"));
 }
 
 /**
@@ -762,7 +782,26 @@ export function renderWorkflowPin(content: string, version: string): string {
   return content.replace(WORKFLOW_PIN_LINE, (_, prefix: string) => `${prefix}"${version}"`);
 }
 
-/** Render the known placeholders; unknown ones are left untouched. */
+/**
+ * Render the known placeholders; unknown ones are left untouched.
+ *
+ * Three render-time substitutions, each because the generated file must carry a
+ * value the source template cannot know:
+ *
+ *  - `{{PROJECT_NAME}}` / `{{YEAR}}` — the destination tree's own name and the
+ *    year the doc was generated.
+ *  - `ARGGON_VERSION: "…"` — the generated CI workflow's literal pin, rewritten
+ *    to the same running version (see {@link renderWorkflowPin}).
+ *  - `<arggonVersion>` — the running arggon's version, resolved inside the marked
+ *    `arggon:friction-trigger` block the generated agent files carry (ADR 0024
+ *    §2, spec-friction-capture-020 §The trigger and its visibility). The spec's
+ *    trigger block is written `triggerVersion=<arggonVersion>`, so the render is
+ *    what turns it into the per-file `triggerVersion` `doctor --json` reports and
+ *    the version bump is what makes an old trigger visible as a stale one. An
+ *    unresolved placeholder left in the file would report no version at all,
+ *    which is exactly the "never seen" reading the block exists to distinguish
+ *    from "seen and ignored".
+ */
 export function renderDocPlaceholders(
   content: string,
   vars: { projectName: string; year: number; arggonVersion?: string },
@@ -770,7 +809,8 @@ export function renderDocPlaceholders(
   return renderWorkflowPin(
     content
       .replaceAll("{{PROJECT_NAME}}", vars.projectName)
-      .replaceAll("{{YEAR}}", String(vars.year)),
+      .replaceAll("{{YEAR}}", String(vars.year))
+      .replaceAll("<arggonVersion>", vars.arggonVersion ?? arggonVersion()),
     vars.arggonVersion ?? arggonVersion(),
   );
 }

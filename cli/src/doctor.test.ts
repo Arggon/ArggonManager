@@ -19,7 +19,12 @@ import {
   updateGeneratedSection,
   type GeneratedEntry,
 } from "@arggondev/lib";
-import { GENERATED_DOC_COUNT, OPENCODE_CONFIG_CANDIDATES, generatedYamlMarker } from "./docs.js";
+import {
+  GENERATED_DOC_COUNT,
+  OPENCODE_CONFIG_CANDIDATES,
+  arggonVersion,
+  generatedYamlMarker,
+} from "./docs.js";
 import {
   formatDoctorReport,
   MAX_HUMAN_VALUE_CHARS,
@@ -1285,5 +1290,165 @@ describe("doctor: unprovenanced managed files", () => {
     expect(result.docs.unprovenanced).toBe(0);
     expect(result.docs.unprovenancedDocs).toEqual([]);
     expect(formatDoctorReport(result)).not.toContain("claim arggon provenance");
+  });
+});
+
+/**
+ * The additive `friction` block (ADR 0024 §2, spec-friction-capture-020 §The
+ * trigger and its visibility) — owned solely by task-friction-trigger-carrier.
+ *
+ * What it must prove is narrow, because the block's justification is narrow: the
+ * generated agent files already surface a new trigger through `docs.outdated`
+ * (the render-vs-disk compare runs for every local state), so this block is NOT
+ * the channel's discoverability. What it buys is a per-file `triggerVersion` and
+ * the separation of _trigger absent_ from _generic template drift_ — the
+ * observable `task-spike-friction-trigger-compliance` needs to tell "never seen"
+ * from "seen and ignored". A test suite that only asserted "triggerPresent: true"
+ * on a fresh tree would not exercise any of that.
+ */
+describe("doctor: friction trigger block (ADR 0024 §2)", () => {
+  const MAKER = ".opencode/agents/arggon-maker.md";
+  const LEAD = ".opencode/agents/arggon-delivery-lead.md";
+
+  it("reports every managed agent file that carries the block, at its own version", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const result = runDoctor({ cwd: dir });
+    expect(result.friction.files.map((file) => file.path)).toEqual([LEAD, MAKER]);
+    expect(result.friction.triggerPresent).toBe(true);
+    expect(result.friction.triggerVersion).toBe(arggonVersion());
+    expect(result.friction.current).toBe(arggonVersion());
+    for (const file of result.friction.files) {
+      expect(file.triggerPresent).toBe(true);
+      expect(file.triggerVersion).toBe(arggonVersion());
+    }
+    // Present and current: the human report adds no per-file line to act on.
+    expect(formatDoctorReport(result)).toContain("friction: trigger present in 2/2 managed agent");
+    expect(formatDoctorReport(result)).not.toContain("does not carry the block");
+  });
+
+  it("renders the running version into the file, so the row is the build's own", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const maker = readFileSync(join(dir, ...MAKER.split("/")), "utf8");
+    expect(maker).toContain(
+      `<!-- arggon:friction-trigger begin triggerVersion=${arggonVersion()} -->`,
+    );
+    expect(maker).toContain("<!-- arggon:friction-trigger end -->");
+    // The carve-out the ADR asks for, verbatim enough to be the rule: friction in
+    // ArggonManager itself is not adoptable work.
+    expect(maker).toContain("not adoptable work");
+    expect(maker).toContain("do not file it in this repo's tracker");
+    expect(maker).toContain("arggon friction");
+  });
+
+  it("reports trigger absent — the 'never seen' reading — without hiding the file", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    // An adopter who never re-ran init: the file on disk predates the block.
+    const abs = join(dir, ...MAKER.split("/"));
+    writeFileSync(
+      abs,
+      readFileSync(abs, "utf8").replace(
+        /<!-- arggon:friction-trigger begin[\s\S]*?<!-- arggon:friction-trigger end -->\n\n/,
+        "",
+      ),
+      "utf8",
+    );
+    const result = runDoctor({ cwd: dir });
+    expect(result.friction.triggerPresent).toBe(false);
+    // One file still carries the block, and its version is the tree's truth: the
+    // consensus is over the files that HAVE a version, so a partially refreshed
+    // seam reports the version it does carry rather than nothing.
+    expect(result.friction.triggerVersion).toBe(arggonVersion());
+    const row = result.friction.files.find((file) => file.path === MAKER);
+    expect(row).toEqual({ path: MAKER, triggerPresent: false, triggerVersion: null });
+    expect(formatDoctorReport(result)).toContain("trigger present in 1/2 managed agent");
+    expect(formatDoctorReport(result)).toContain("does not carry the block");
+    expect(formatDoctorReport(result)).toContain("arggon init` to refresh it");
+  });
+
+  it("separates a stale triggerVersion from an absent trigger", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    // The trigger IS there in every file; both just predate this build. One
+    // boolean against the render could not say that (the render also moved for
+    // unrelated reasons), which is the whole point of the per-file version.
+    for (const rel of [MAKER, LEAD]) {
+      const abs = join(dir, ...rel.split("/"));
+      writeFileSync(
+        abs,
+        readFileSync(abs, "utf8").replace(
+          `triggerVersion=${arggonVersion()}`,
+          "triggerVersion=0.9.0",
+        ),
+        "utf8",
+      );
+    }
+    const result = runDoctor({ cwd: dir });
+    expect(result.friction.triggerPresent).toBe(true);
+    expect(result.friction.triggerVersion).toBe("0.9.0");
+    expect(result.friction.current).toBe(arggonVersion());
+    const report = formatDoctorReport(result);
+    expect(report).toContain("trigger present in 2/2 managed agent file(s) at 0.9.0");
+    expect(report).toContain(`(current ${arggonVersion()})`);
+    expect(report).not.toContain("does not carry the block");
+  });
+
+  it("reads mixed versions as null rather than picking one", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const abs = join(dir, ...LEAD.split("/"));
+    writeFileSync(
+      abs,
+      readFileSync(abs, "utf8").replace(
+        `triggerVersion=${arggonVersion()}`,
+        "triggerVersion=0.8.0",
+      ),
+      "utf8",
+    );
+    const result = runDoctor({ cwd: dir });
+    expect(result.friction.triggerPresent).toBe(true);
+    expect(result.friction.triggerVersion).toBeNull();
+    expect(formatDoctorReport(result)).toContain("mixed triggerVersions");
+  });
+
+  it("reports no files on a tree whose agent seam is not materialized", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    rmSync(join(dir, ".opencode", "agents"), { recursive: true, force: true });
+    rmSync(join(dir, ".claude-marketplace"), { recursive: true, force: true });
+    rmSync(join(dir, ".zcode-marketplace"), { recursive: true, force: true });
+    const result = runDoctor({ cwd: dir });
+    expect(result.friction.files).toEqual([]);
+    expect(result.friction.triggerPresent).toBe(false);
+    // Never a failure: report-only, and the line says why there are no rows.
+    expect(formatDoctorReport(result)).toContain(
+      "no managed agent file carries the arggon:friction-trigger block",
+    );
+  });
+
+  it("reports on an uninitialized tree too, with the exit code unchanged", () => {
+    const dir = tempDir();
+    const result = runDoctor({ cwd: dir });
+    expect(result.initialized).toBe(false);
+    expect(result.friction.files).toEqual([]);
+    expect(result.friction.current).toBe(arggonVersion());
+    expect(formatDoctorReport(result)).toContain("friction:");
+  });
+
+  it("is present in doctor --json as an additive field (no schemaVersion bump)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const proc = runCli(["doctor", "--json"], dir);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      schemaVersion: number;
+      friction: { triggerPresent: boolean; triggerVersion: string; current: string };
+    };
+    expect(body.schemaVersion).toBe(1);
+    expect(body.friction.triggerPresent).toBe(true);
+    expect(body.friction.triggerVersion).toBe(arggonVersion());
+    expect(body.friction.current).toBe(arggonVersion());
   });
 });

@@ -493,6 +493,9 @@ program
             // Capability-matrix state (task-capability-matrix, additive;
             // report-only — gap rows are advisory, never blocking).
             matrix: result.matrix,
+            // Per-file friction-trigger visibility (ADR 0024 §2,
+            // task-friction-trigger-carrier, additive; report-only).
+            friction: result.friction,
             // Per-agent adapter seams (task-adapter-selection-flags, additive,
             // only with --agents; report-only).
             ...(result.agents ? { agents: result.agents } : {}),

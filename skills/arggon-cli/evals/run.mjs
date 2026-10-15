@@ -3,7 +3,15 @@
 // only, runs them against a temp fixture repo, and scores pass/fail.
 // Usage: node skills/arggon-cli/evals/run.mjs
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,6 +63,36 @@ for (const a of seed) {
   const r = run(a, { cwd: dir });
   if (r.status !== 0) check("E0", `seed ${a[1]} ${a[2]}`, false, r.stderr || r.stdout);
 }
+// `validate` refuses an open item whose LIVE Context/Acceptance sections still
+// carry the scaffold placeholder (PLACEHOLDER_BODY, landed after this harness was
+// last green), so a fixture of bare `create`s cannot pass E9. Fill every seeded
+// and case-created item's placeholders with real prose just before E9 — the
+// harness scores the CLI, not the wording.
+function fillPlaceholders(root) {
+  const walk = (absDir) => {
+    for (const entry of readdirSync(absDir, { withFileTypes: true })) {
+      const abs = join(absDir, entry.name);
+      if (entry.isDirectory()) {
+        walk(abs);
+        continue;
+      }
+      if (!entry.name.endsWith(".md")) continue;
+      const filled = readFileSync(abs, "utf8")
+        .replace(/<!-- Why this [a-z ]+ exists\. -->/, "Eval fixture item.")
+        .replace(
+          /<!-- The real acceptance criteria; tick each box when met\. -->/,
+          "- [x] the item carries real prose",
+        );
+      if (filled !== readFileSync(abs, "utf8")) writeFileSync(abs, filled, "utf8");
+    }
+  };
+  walk(root);
+}
+// The tracker root this fixture's `init` produced — read from disk, never
+// assumed: `ArggonManager/` on the v5 layout, `tasks/` on a legacy one. A
+// hardcoded `tasks/` made every path below it an ENOENT once init moved the
+// tree (ADR 0012), which killed the run before the last case could be scored.
+const trackerRoot = existsSync(join(dir, "ArggonManager")) ? "ArggonManager" : "tasks";
 
 // E1: find open work
 let r = run(["list", "--status", "todo", "--json"], { cwd: dir });
@@ -143,6 +181,7 @@ check(
 );
 
 // E9: validate clean
+fillPlaceholders(join(dir, trackerRoot));
 r = run(["validate", "--json"], { cwd: dir });
 body = jsonOf(r);
 check("E9", "validate-clean", r.status === 0 && body.ok === true, r.stdout.slice(0, 200));
@@ -232,7 +271,7 @@ check(
 
 // E16: broken tree -> validate fails loudly
 writeFileSync(
-  join(dir, "tasks", "eval-mvp", "auth", "story-login", "task-broken.md"),
+  join(dir, trackerRoot, "eval-mvp", "auth", "story-login", "task-broken.md"),
   "---\ntype: task\nstatus: bogus\nid: task-broken\nparent: story-login\n---\n# Broken\n",
 );
 r = run(["validate", "--json"], { cwd: dir });
@@ -255,6 +294,68 @@ try {
 }
 rmSync(outside, { recursive: true, force: true });
 check("E18", "outside-repo", e18, r.stdout.slice(0, 200));
+
+// ---------------------------------------------------------------------------
+// E19 — friction --report derived from the AGENT FILE ALONE.
+//
+// deftai/directive#3633 shipped a skill documented as the sanctioned escalation
+// route and an agent that was actively escalating still missed it, because the
+// skill was absent from the host's discovery inventory: the friction was
+// "absorbed into the session", which is silent loss and looks like success. ADR
+// 0024 §2 answers that by putting the trigger in the generated AGENT FILES, not
+// only in a skill reference — so this case reproduces the failure mode: the whole
+// bundled skill tree is deleted from the fixture, and the only thing the deriving
+// agent may read is `.opencode/agents/arggon-maker.md`. If the trigger text stops
+// carrying the workflow, this case fails instead of a real session going silent.
+// ---------------------------------------------------------------------------
+rmSync(join(dir, ".agents", "skills"), { recursive: true, force: true });
+const skillGone = !existsSync(
+  join(dir, ".agents", "skills", "arggon-cli", "references", "friction.md"),
+);
+const agentText = readFileSync(join(dir, ".opencode", "agents", "arggon-maker.md"), "utf8");
+const block =
+  /<!-- arggon:friction-trigger begin[\s\S]*?<!-- arggon:friction-trigger end -->/.exec(
+    agentText,
+  )?.[0] ?? "";
+check(
+  "E19",
+  "trigger-in-agent-file",
+  skillGone &&
+    /arggon:friction-trigger begin/.test(block) &&
+    block.includes('arggon friction "<one line>" --command "<argv shape>"') &&
+    block.includes("arggon friction --report"),
+  `skillGone=${skillGone} block=${block.length}`,
+);
+// Both modes, from the block above and nothing else.
+const state = join(dir, "state");
+const captureEnv = { ...process.env, ARGGON_STATE_DIR: state };
+r = run(["friction", "eval probe", "--command", "friction --report", "--json"], {
+  cwd: dir,
+  env: captureEnv,
+});
+let e19b = r.status === 0;
+try {
+  e19b = e19b && typeof jsonOf(r).record?.fingerprint === "string";
+} catch {
+  e19b = false;
+}
+check("E19", "capture", e19b, r.stdout.slice(0, 200));
+r = run(["friction", "--report", "--json"], { cwd: dir, env: captureEnv });
+let e19c = r.status === 0;
+try {
+  body = jsonOf(r);
+  e19c =
+    e19c &&
+    body.report === true &&
+    body.count === 1 &&
+    body.classes === 1 &&
+    body.optedOut === false &&
+    body.dedupeScope === "local-only" &&
+    body.rows?.[0]?.count === 1;
+} catch {
+  e19c = false;
+}
+check("E19", "report", e19c, r.stdout.slice(0, 200));
 
 console.log(results.join("\n"));
 console.log(`\n${pass} passed, ${fail} failed`);

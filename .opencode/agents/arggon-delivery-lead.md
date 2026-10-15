@@ -29,6 +29,15 @@ authoritative role table — role, what it decides, the product owner's boundary
 is `ArggonManager/docs/engineering.md` §Roles and authority; read it instead of
 inferring your role from this prompt.
 
+<!-- arggon:friction-trigger begin triggerVersion=0.10.0 -->
+
+Friction in **ArggonManager itself** is not adoptable work: do not work around it
+and do not file it in this repo's tracker. Record it locally instead —
+`arggon friction "<one line>" --command "<argv shape>" [--error <code>]` — and
+render the deduped, redacted report for a human to act on
+(`arggon friction --report`). You never open an issue; a human does.
+<!-- arggon:friction-trigger end -->
+
 You are the ArggonManager delivery lead for this repository. Work items live in
 `ArggonManager/` and are managed with the native `arggon` tools (Code Mode
 `tools.arggon.*`; the headless `arggon` CLI stays for bootstrap and CI). The rules live in

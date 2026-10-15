@@ -632,6 +632,28 @@ x-github:
 - Unknown option keys inside `x-github` are ignored (ignore-unknown, forward compat); a scalar `x-github` value or an `issue-roundtrip` value that is not `true`/`false` is a parse error.
 - The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
 
+### Friction opt-out (`x-friction`)
+
+`x-friction` is the official namespaced extension for the adopter friction channel ([ADR 0024](./adr/0024-adopter-friction-channel.md), [spec-friction-capture-020](./specs/spec-friction-capture-020.md)). It is a mapping of option names to values; the only official option today is `capture`, the friction-capture opt-out. The documented spelling is the scalar one, because the spec, the ADR and the plan all write it that way:
+
+```yaml
+version: 5
+x-friction: false
+```
+
+```yaml
+version: 5
+x-friction:
+  capture: false
+```
+
+- **Opting out gates capture, never discoverability** (ADR 0024 §3). `false` writes no record and renders an empty report with `optedOut: true`. It does **not** remove the marked `arggon:friction-trigger` block from the generated agent files and does not hide `arggon friction` from `--help`: an adopter who opted out and later wants the channel back must be able to find it, and an agent that cannot see the rule cannot tell the user it exists.
+- `ARGGON_NO_FRICTION=1` (any non-empty value) is the per-invocation off-switch and **wins** over this key, mirroring `--no-commit` over `x-tracker.auto-commit`. There is deliberately no per-invocation opt-in: a tree that opted out at the config level re-enables by editing the config, never by an ambient variable a wrapper shell may or may not have set.
+- The feedback itself never enters the tracker: `arggon friction` appends to a local, append-only log outside the work items, redacted at write, and the resulting `arggon create` stays a human decision.
+- `arggon doctor --json` reports the trigger per managed agent file in the additive `friction` block (`triggerPresent` / `triggerVersion`), which is what separates _trigger absent_ from a template that moved for unrelated reasons.
+- Unknown nested keys inside `x-friction` are ignored (ignore-unknown, forward compat); a scalar `x-friction` value or an `capture` value that is not `true`/`false` is a parse error.
+- The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
+
 ### Generated-doc provenance (`x-generated`)
 
 `x-generated` is the official namespaced extension for generated-file provenance (`arggon init` / `generateDocs`, story-adoption-state; Copier/Helm precedent). It maps each generated destination (posix, relative to the repo root) to its provenance record:

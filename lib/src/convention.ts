@@ -913,7 +913,18 @@ export function parseConventionConfig(
       // ignored (ignore-unknown, forward compat); the official `capture` option
       // is the boolean capture opt-out the scalar spelling sets directly.
       if (key === "capture") {
-        friction.capture = parseBooleanOption(sourcePath, "capture", rawValue);
+        // Spelled inline, like every sibling option, rather than delegated to
+        // `parseBooleanOption`: the doc-contract guard
+        // (cli/src/convention-option-doc-contract.test.ts rule 3) derives the
+        // boolean options from the `'<key>' must be a boolean` text on the
+        // option's own branch, so a shared helper would hide a validated
+        // option from the guard that keeps convention.md honest.
+        if (rawValue !== "true" && rawValue !== "false") {
+          throw new Error(
+            `${sourcePath}: 'capture' must be a boolean (got ${JSON.stringify(rawValue)})`,
+          );
+        }
+        friction.capture = rawValue === "true";
         continue;
       }
       continue; // unknown nested key: ignored, never fatal

@@ -81,6 +81,10 @@ The carriers, one hop from here:
 
 Per-agent enforcement (OpenCode V2, ZCode, Claude Code) builds on the same kernel — one rules path, no forks — see the [native agent adapters epic](ArggonManager/methodology-productization/native-agent-adapters/native-agent-adapters.md) and [spec methodology-adapters-017](ArggonManager/docs/specs/spec-methodology-adapters-017.md).
 
+## Adopter friction channel
+
+Every other channel is one-directional: the product reaches the adopter and nothing comes back. `arggon friction` closes that half of the loop for friction in **ArggonManager itself** — a flag that refuses, a rule that contradicts another rule, a generated file that will not regenerate ([ADR 0024](ArggonManager/docs/adr/0024-adopter-friction-channel.md)). One command appends a bounded, redacted record to a **local, append-only log that is never the tracker** — it cannot become a task by accident, never commits, never stages and never appears in `arggon validate` — and `--report` renders the deduped report (sorted by how often a class was seen, because the maintainer's attention is the scarce resource) with a prefilled issue URL for tier `b`. **The agent never opens an issue; a human does**, and no tier auto-submits. The trigger lives in the generated agent files, not only in a skill reference — a capability in the wrong place is absent, and `arggon doctor --json`'s `friction` block reports per file whether the trigger is there and at which version. Opting out (`x-friction: false`, or `ARGGON_NO_FRICTION=1` per invocation) gates **capture, never discoverability**: the command stays visible so the channel can be switched back on.
+
 ## Why ArggonManager
 
 Upgrades are safe by construction. Every doc the tool generates is adopter-owned the moment it exists and is never overwritten: re-running `arggon init` silently refreshes the docs you haven't touched, skips the ones you've modified and reports them, and `--backup` archives a modified doc before regenerating it. Your customization survives every tool upgrade.

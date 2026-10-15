@@ -44,6 +44,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const TIER1_DOCS = [
   ".agents/skills/arggon-cli/SKILL.md",
   ".agents/skills/arggon-cli/references/exploration.md",
+  ".agents/skills/arggon-cli/references/friction.md",
   ".agents/skills/arggon-cli/references/json-contract.md",
   ".agents/skills/arggon-cli/references/methodology.md",
   ".agents/skills/arggon-cli/references/orchestration.md",
@@ -78,6 +79,7 @@ const TIER1_DOCS = [
   ".claude-marketplace/arggon/hooks/hooks.json",
   ".claude-marketplace/arggon/skills/arggon-cli/SKILL.md",
   ".claude-marketplace/arggon/skills/arggon-cli/references/exploration.md",
+  ".claude-marketplace/arggon/skills/arggon-cli/references/friction.md",
   ".claude-marketplace/arggon/skills/arggon-cli/references/json-contract.md",
   ".claude-marketplace/arggon/skills/arggon-cli/references/methodology.md",
   ".claude-marketplace/arggon/skills/arggon-cli/references/orchestration.md",
@@ -378,6 +380,7 @@ describe("init", () => {
     expect(result.commit?.ignored).toEqual([
       ".agents/skills/arggon-cli/SKILL.md",
       ".agents/skills/arggon-cli/references/exploration.md",
+      ".agents/skills/arggon-cli/references/friction.md",
       ".agents/skills/arggon-cli/references/json-contract.md",
       ".agents/skills/arggon-cli/references/methodology.md",
       ".agents/skills/arggon-cli/references/orchestration.md",
