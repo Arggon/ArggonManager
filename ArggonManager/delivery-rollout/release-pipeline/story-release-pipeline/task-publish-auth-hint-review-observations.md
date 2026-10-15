@@ -9,7 +9,6 @@ parent: story-release-pipeline
 labels: [release, failure-mode, review-followup]
 created: "2026-10-12"
 updated: "2026-10-15"
-worktree_path: /home/arggon/Projects/ArggonManager-task-publish-auth-hint-review-observations
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-publish-auth-hint-review-observations.md
