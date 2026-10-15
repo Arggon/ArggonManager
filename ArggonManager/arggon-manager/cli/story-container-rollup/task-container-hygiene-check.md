@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-container-hygiene-check
 title: "Report-only check: a terminal container holding an open container (the 2026-10-14 reopen guard)"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-container-rollup
 labels: []
 created: "2026-10-15"
 updated: "2026-10-15"
-claimed_at: "2026-10-15T00:03:28.353Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-container-hygiene-check
 ---
 <!--
