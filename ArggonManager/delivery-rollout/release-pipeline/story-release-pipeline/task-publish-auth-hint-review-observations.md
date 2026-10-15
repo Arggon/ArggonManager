@@ -86,3 +86,7 @@ Test: wrapper-mode ENOBUFS test — fixture writes ~1.5 MiB synchronously with a
 - `npm test` (after `npm run build`) → 158 files / 3481 tests passed
 - `npm run lint` → clean; `npm run test:structure` → 5 passed
 - `npx prettier --check` on the three touched files → clean
+
+### handoff 2026-10-15 @arggon-maker — next: Standards review of PR #829 (both observations resolved, gates green); then merge and flip done.
+- branch: feat/task-publish-auth-hint-review-observations
+- open questions: None blocking; the one judgement call is usage() returning with process.exitCode = 2 instead of process.exit (rationale: the pipe-write drop probe, PR body).
