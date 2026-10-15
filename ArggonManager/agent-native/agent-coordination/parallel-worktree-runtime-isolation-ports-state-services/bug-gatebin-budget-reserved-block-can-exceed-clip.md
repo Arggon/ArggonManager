@@ -71,3 +71,6 @@ Decision (box 1): prioritise the exact fix with the truncation named — over-bu
 Box 4: the guaranteed clause is stated in the implementation comment at the enforcing point — the exact fix (the only clause the operator can act on without re-deriving; it leads, only the notice precedes), else the kept-path lead.
 
 Gates: focused start 73/73; full suite 160 files / 3543; validate/lint/structure/prettier green. Lead review + merge pending.
+
+### handoff 2026-10-15 @Arggon — next: Delivery lead: review + merge the PR when CI is green; then tick the four boxes and flip done.
+- branch: fix/bug-gatebin-budget-reserved-block-can-exceed-clip
