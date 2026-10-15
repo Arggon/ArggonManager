@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-container-status-vs-open-workstreams
 title: "Decide: container `done` labels over unfinished workstreams — correct the stored statuses (owner reopen) or derive the board label"
 assignee: arggon-delivery-lead
@@ -8,7 +8,6 @@ parent: story-container-rollup
 labels: []
 created: "2026-10-14"
 updated: "2026-10-15"
-claimed_at: "2026-10-15T01:15:44.367Z"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-container-rollup/task-container-status-vs-open-workstreams.md
