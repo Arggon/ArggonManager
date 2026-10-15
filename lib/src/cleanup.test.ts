@@ -16,16 +16,19 @@
  *     path plus the manual sequence for untracked content, and "commit or
  *     discard first" for tracked work, which force never discards.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   classifyCleanupEntry,
+  findMergedPr,
   parseRemovalBlockers,
   worktreeTrackedRefusal,
   worktreeUntrackedRefusal,
   type CleanupGit,
 } from "./cleanup.js";
 import type { WorkItem } from "./items.js";
+import type { GhExecutor } from "./import-issues.js";
 import { MAX_CLAIM_WRITE_NAMES } from "./worktree.js";
+import { MAX_HUMAN_ERROR_CHARS } from "@arggondev/lib";
 
 function item(branch = "fix/task-alpha"): WorkItem {
   return {
@@ -212,5 +215,45 @@ describe("cleanup's probe-degradation fallback (review N1 on PR #751)", () => {
     expect(entry.removable).toBe(true);
     expect(entry.reason).toBeNull();
     expect(entry.action).toBe("remove worktree and delete the merged branch");
+  });
+});
+
+/**
+ * The `gh auth status` wrapper's failure text (task-clip-class-sweep-remaining-sites).
+ *
+ * The class sweep's four deferred sites were reported "same shape" as the
+ * remedy-after-detail clip defect and then corrected OUT of the class: the
+ * detail is a BOUNDED argv echo, so the appended remedy is never clip-reachable.
+ * This is the kernel-side record for the cleanup wrapper — the other three
+ * (get-open-prs, import-issues, board) are recorded in their own suites.
+ */
+describe("findMergedPr's gh failure message (task-clip-class-sweep-remaining-sites)", () => {
+  it("keeps the message bounded, so the trailing remedy is never clip-reachable", () => {
+    // gh runs with stderr IGNORED (`stdio: ["ignore", "pipe", "ignore"]` in
+    // the kernel wrapper), so the interpolated detail is Node's BOUNDED
+    // `Command failed: gh … <argv>` echo — never an unbounded stderr tail —
+    // and the `check \`gh auth status\`` remedy appended AFTER it cannot be
+    // pushed past any head-kept clip. The branch is the only caller-controlled
+    // argv token and git caps a refname component at 255 chars, so this
+    // fixture is the real worst case. The mock reproduces Node's echo shape
+    // from the invocation the wrapper itself makes.
+    const branch = `feat/${"b".repeat(251)}`; // 255 chars: git's refname cap
+    const execGh = vi.fn((cmd: string, args: string[]) => {
+      throw new Error(`Command failed: ${cmd} ${args.join(" ")}`);
+    });
+    let message = "";
+    try {
+      findMergedPr(branch, "/repo", execGh as unknown as GhExecutor);
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    // Both the receipt and the trailing remedy arrive…
+    expect(message).toContain("gh pr list failed (Command failed: gh pr list");
+    expect(message).toContain("check `gh auth status`");
+    // …measured worst case ~396 chars, more than 1000 under the human-channel
+    // clip, so no ordering of these clauses can expose the remedy. A future
+    // edit that interpolates anything unbounded into this message fails here.
+    expect(message.length).toBeLessThan(MAX_HUMAN_ERROR_CHARS);
+    expect(MAX_HUMAN_ERROR_CHARS - message.length).toBeGreaterThan(1000);
   });
 });

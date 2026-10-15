@@ -151,6 +151,19 @@ export function defaultBoardGithub(): BoardGithub {
           fields: "number,headRefName,url,isDraft,state,statusCheckRollup",
         }) as GhPrJson[];
       } catch (err) {
+        // NOT part of the remedy-after-detail clip class
+        // (task-clip-class-sweep-remaining-sites, the sibling PR's F5
+        // correction): the interpolated `detail` comes from the kernel's
+        // `ghPrListJson`, which runs gh with stderr IGNORED, so it is Node's
+        // BOUNDED `Command failed: gh … <argv>` echo (this invocation's argv
+        // is fixed and short) — or the terse `gh not found (…)` line — never
+        // an unbounded stderr tail. The trailing
+        // `(or run plain \`arggon board\` …)` remedy therefore cannot be
+        // pushed past any head-kept clip: the whole message stays far under
+        // `MAX_HUMAN_ERROR_CHARS` (2000). Recorded compliant — do not re-audit
+        // this site as a clip site, and do not reorder it on a clip pretext;
+        // it is a CONSISTENCY choice, pinned by the bounded-message test
+        // beside it.
         const detail = err instanceof Error ? err.message : String(err);
         throw new Error(
           `GitHub overlay unavailable: ${detail} (or run plain \`arggon board\` for the offline snapshot)`,

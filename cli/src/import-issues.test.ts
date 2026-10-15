@@ -13,6 +13,7 @@ import {
   ghIssueListJson,
   importedBody,
   mapIssueState,
+  MAX_HUMAN_ERROR_CHARS,
   normalizeGhLabels,
   parseFrontmatter,
   resolveImportType,
@@ -585,6 +586,34 @@ describe("ghIssueListJson", () => {
     expect(() => ghIssueListJson({ execGh: execGh as unknown as GhExecutor })).toThrow(
       /gh issue list returned unparseable JSON/,
     );
+  });
+
+  it("keeps its gh failure message bounded, so the trailing remedy is never clip-reachable", () => {
+    // Recorded compliant by task-clip-class-sweep-remaining-sites (the sibling
+    // item's F5 correction): gh runs with stderr IGNORED
+    // (`stdio: ["ignore", "pipe", "ignore"]` in the kernel wrapper), so the
+    // interpolated detail is Node's BOUNDED `Command failed: gh … <argv>`
+    // echo — never an unbounded stderr tail — and the `check \`gh auth
+    // status\`` remedy appended AFTER it cannot be pushed past any head-kept
+    // clip. The mock reproduces Node's real echo shape, derived from the
+    // invocation the wrapper itself makes, so it tracks any argv change.
+    const execGh = vi.fn((cmd: string, args: string[]) => {
+      throw new Error(`Command failed: ${cmd} ${args.join(" ")}`);
+    });
+    let message = "";
+    try {
+      ghIssueListJson({ repo: "octocat/hello-world", execGh: execGh as unknown as GhExecutor });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    // Both the receipt and the trailing remedy arrive…
+    expect(message).toContain("gh issue list failed (Command failed: gh issue list");
+    expect(message).toContain("check `gh auth status`");
+    // …with more than 1000 chars of headroom under the human-channel clip, so
+    // no ordering of these clauses can expose the remedy to the clip. A future
+    // edit that interpolates anything unbounded into this message fails here.
+    expect(message.length).toBeLessThan(MAX_HUMAN_ERROR_CHARS);
+    expect(MAX_HUMAN_ERROR_CHARS - message.length).toBeGreaterThan(1000);
   });
 });
 

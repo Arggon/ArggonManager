@@ -511,24 +511,19 @@ describe("worktree failure composition vs the human head-clip (task-cli-start-re
     // ORDER pinned: the CLI's own remediation and the kernel's `npm ci` fix
     // both precede the FIRST named bin — not merely the last one. With the
     // remediation trailing (the pre-fix composition) the clip below ate it.
-    const remedy = message.indexOf(`arggon start ${ID} --worktree`);
-    const discard = message.indexOf("To discard it instead");
-    const detail = message.indexOf("Fix: run `npm ci` in ");
-    // Every needle is present BEFORE it is compared: `indexOf` answers -1 for
-    // an absent needle, and `-1 < anything` passes, so a missing clause would
-    // make the whole ordering assertion vacuous.
-    for (const [label, index] of [
-      ["remedy", remedy],
-      ["discard", discard],
-      ["detail", detail],
-      ["first bin", message.indexOf(firstEntry)],
-    ] as const) {
-      expect(index, `${label} needle must be present`).toBeGreaterThanOrEqual(0);
-    }
-    expect(remedy).toBeLessThan(discard);
-    expect(discard).toBeLessThan(detail);
-    expect(remedy).toBeLessThan(message.indexOf(firstEntry));
-    expect(detail).toBeLessThan(message.indexOf(firstEntry));
+    // `assertOrder` makes each clause's PRESENCE a precondition of the
+    // comparison, so a clause renamed out from under the test fails loudly
+    // instead of answering -1 and passing vacuously
+    // (bug-vacuous-substring-ordering-assertions). This was the suite's last
+    // inline presence-check + bare-`indexOf` ordering pair; the sweep converts
+    // it so the whole ordering contract rides the one helper.
+    assertOrder(
+      message,
+      `arggon start ${ID} --worktree`,
+      "To discard it instead",
+      "Fix: run `npm ci` in ",
+      firstEntry,
+    );
   });
 
   it("keeps the remediation inside the MAX_HUMAN_ERROR_CHARS head-clip at the worst case", () => {

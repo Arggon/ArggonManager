@@ -442,6 +442,21 @@ export function findMergedPr(
     ) {
       throw new Error("gh not found (install gh and run `gh auth login`)");
     }
+    // NOT part of the remedy-after-detail clip class
+    // (task-clip-class-sweep-remaining-sites, the sibling PR's F5 correction):
+    // gh runs with stderr IGNORED (`stdio: ["ignore", "pipe", "ignore"]`
+    // above), so the interpolated `message` is Node's BOUNDED
+    // `Command failed: gh … <argv>` echo (measured worst case 341 chars — a
+    // 255-char branch name is git's per-component refname limit), never an
+    // unbounded stderr tail. The trailing `check \`gh auth status\`` remedy
+    // therefore cannot be pushed past any head-kept clip: the whole message
+    // stays far under `MAX_HUMAN_ERROR_CHARS` (2000). This surface is also
+    // doubly machine-side: the kernel's classify step catches this throw and
+    // replaces it with a fixed skip reason (the gh text reaches no channel at
+    // all), and the CLI adapter's refusal/failure lines are separately clamped
+    // at `MAX_ENVELOPE_DETAIL_CHARS`. Recorded compliant — do not re-audit
+    // this site as a clip site, and do not reorder it on a clip pretext; it is
+    // a CONSISTENCY choice, pinned by the bounded-message test beside it.
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`gh pr list failed (${message}; check \`gh auth status\`)`);
   }

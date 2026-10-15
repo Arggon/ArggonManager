@@ -47,6 +47,7 @@ import {
   findTasksDir,
   itemsById,
   loadItems,
+  MAX_HUMAN_ERROR_CHARS,
   type ContractWorkItem as WorkItem,
   type KernelWorkItem,
 } from "@arggondev/lib";
@@ -1849,6 +1850,39 @@ describe("runBoard github overlay", () => {
       },
     };
     expect(() => runBoard({ cwd: dir, github: true, gh })).toThrow(/plain `arggon board`/);
+  });
+
+  it("keeps the overlay failure bounded, so the trailing remedy is never clip-reachable", () => {
+    // Recorded compliant by task-clip-class-sweep-remaining-sites (the sibling
+    // item's F5 correction). The wrapper appends its
+    // `(or run plain \`arggon board\` …)` remedy AFTER the kernel's detail,
+    // which LOOKS like the remedy-after-detail clip class — but the detail
+    // comes from the kernel's ghPrListJson, which runs gh with stderr IGNORED
+    // (`stdio: ["ignore", "pipe", "ignore"]`), so it is Node's BOUNDED
+    // `Command failed: gh … <argv>` echo — or the terse `gh not found (…)`
+    // line when no gh binary exists — never an unbounded stderr tail. So this
+    // drives the REAL wrapper (no `gh` injected: `opts.gh ?? defaultBoardGithub()`)
+    // against a temp non-repo dir, where gh always fails, and pins the
+    // composed bound on whichever bounded shape the environment produces.
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-gh-bounded-"));
+    writeBranchedTree(dir);
+    let message = "";
+    try {
+      runBoard({ cwd: dir, github: true, out: "out.html", generatedAt: GENERATED_AT, me: null });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    // The wrapper's own sentence and the kernel layer's remedy both arrive…
+    expect(message).toContain("GitHub overlay unavailable:");
+    expect(message).toContain("or run plain `arggon board`");
+    expect(message).toContain("gh auth status");
+    // …with more than 1000 chars of headroom under the human-channel clip, so
+    // no ordering of these clauses can expose the remedy. The kernel-side
+    // worst case (a 255-char branch / full argv echo) is measured in
+    // lib/src/get-open-prs.test.ts and lib/src/cleanup.test.ts; a future edit
+    // that interpolates anything unbounded into either layer fails here.
+    expect(message.length).toBeLessThan(MAX_HUMAN_ERROR_CHARS);
+    expect(MAX_HUMAN_ERROR_CHARS - message.length).toBeGreaterThan(1000);
   });
 });
 
