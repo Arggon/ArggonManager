@@ -328,8 +328,18 @@ describe("worktree cleanup classification (property)", () => {
 
         const item = itemFor(facts, facts.pathExists || facts.registered ? worktree : null);
         const itemBefore = JSON.stringify(item);
-        const entry = classifyCleanupEntry(item, root, "main", gitRunner, { gh });
-        const again = classifyCleanupEntry(item, root, "main", gitRunner, { gh });
+        // The porcelain probe is answered explicitly: this property models the
+        // CLEAN path, while the ambient tmp worktree is not a git repo (the real
+        // probe would not answer). The unanswered-probe degradation shape is
+        // pinned in cleanup.test.ts (review N1 on PR #751).
+        const entry = classifyCleanupEntry(item, root, "main", gitRunner, {
+          gh,
+          status: () => "",
+        });
+        const again = classifyCleanupEntry(item, root, "main", gitRunner, {
+          gh,
+          status: () => "",
+        });
 
         const terminal = CLEANUP_TERMINAL_STATUSES.has(facts.status);
         const integrationProven = facts.ancestor || facts.mergedPr !== null;
@@ -365,7 +375,14 @@ describe("worktree cleanup classification (property)", () => {
         // removable and says so. The classifier removes nothing itself in any
         // case: the path is still on disk afterwards and the git doubles above
         // throw if a removal were ever attempted.
-        if (facts.pathExists && !facts.registered && terminal && facts.hasBranch && integrationProven && remoteSafe) {
+        if (
+          facts.pathExists &&
+          !facts.registered &&
+          terminal &&
+          facts.hasBranch &&
+          integrationProven &&
+          remoteSafe
+        ) {
           expect(entry.removable).toBe(false);
           expect(entry.reason).toContain("not a git worktree of this repo");
         }

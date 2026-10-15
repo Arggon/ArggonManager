@@ -562,41 +562,50 @@ export function classifyCleanupEntry(
     // ONE porcelain probe decides whether the removal can actually happen
     // (bug-cleanup-prune-untracked-artifacts-no-force). Before this gate the
     // classifier reported `removable: true` for a worktree git always refuses,
-    // so an operator read "removable" and then hit a raw git error. A probe
-    // that does not answer degrades to the pre-probe classification — the
-    // removal attempt then reports its own failure, exactly as before.
+    // so an operator read "removable" and then hit a raw git error.
     const porcelain = (deps.status ?? defaultWorktreeStatus)(path);
-    if (porcelain !== undefined) {
-      const primaryRoots = (
-        deps.primaryRoots ?? [registered[0] ?? resolve(root), resolve(root)]
-      ).map((primary) => resolve(primary));
-      const blockers = parseRemovalBlockers(porcelain);
-      const untracked = blockers.untracked.filter(
-        (rel) => !isSelfReapedArtifact(path, rel, primaryRoots),
-      );
-      if (blockers.tracked.length > 0) {
-        // Uncommitted TRACKED work: refused with or without the force opt-in.
-        entry.reason = worktreeTrackedRefusal(item, path, blockers.tracked);
-        entry.blockingPaths = [...untracked, ...blockers.tracked].slice(0, MAX_CLAIM_WRITE_NAMES);
-        entry.blockingTotal = untracked.length + blockers.tracked.length;
-        entry.blockingTracked = blockers.tracked.slice(0, MAX_CLAIM_WRITE_NAMES);
-        entry.blockingTrackedTotal = blockers.tracked.length;
+    if (porcelain === undefined) {
+      // An unanswered probe is not "no blockers" (review N1 on PR #751): the
+      // probe is the only evidence that the removal will succeed, so
+      // classifying this entry `removable: true` would promise a removal the
+      // tool cannot verify — the removal then fails on git's own refusal with a
+      // raw error, exactly the classify/act mismatch the honesty rule removed
+      // for every path that CAN observe its blockers. The entry is an honest
+      // skip naming the failed probe and the manual sequence, and the force
+      // opt-in does not bypass it: force discards untracked content a WORKING
+      // probe observed, and an unanswered probe observed nothing.
+      entry.reason = worktreeProbeFailureRefusal(item, path);
+      return entry;
+    }
+    const primaryRoots = (deps.primaryRoots ?? [registered[0] ?? resolve(root), resolve(root)]).map(
+      (primary) => resolve(primary),
+    );
+    const blockers = parseRemovalBlockers(porcelain);
+    const untracked = blockers.untracked.filter(
+      (rel) => !isSelfReapedArtifact(path, rel, primaryRoots),
+    );
+    if (blockers.tracked.length > 0) {
+      // Uncommitted TRACKED work: refused with or without the force opt-in.
+      entry.reason = worktreeTrackedRefusal(item, path, blockers.tracked);
+      entry.blockingPaths = [...untracked, ...blockers.tracked].slice(0, MAX_CLAIM_WRITE_NAMES);
+      entry.blockingTotal = untracked.length + blockers.tracked.length;
+      entry.blockingTracked = blockers.tracked.slice(0, MAX_CLAIM_WRITE_NAMES);
+      entry.blockingTrackedTotal = blockers.tracked.length;
+      return entry;
+    }
+    if (untracked.length > 0) {
+      entry.blockingPaths = untracked.slice(0, MAX_CLAIM_WRITE_NAMES);
+      entry.blockingTotal = untracked.length;
+      if (deps.force !== true) {
+        // Conservative default: unknown untracked content blocks removal and
+        // is never discarded implicitly — the skip names the flag AND the
+        // manual sequence.
+        entry.reason = worktreeUntrackedRefusal(item, path, untracked);
         return entry;
       }
-      if (untracked.length > 0) {
-        entry.blockingPaths = untracked.slice(0, MAX_CLAIM_WRITE_NAMES);
-        entry.blockingTotal = untracked.length;
-        if (deps.force !== true) {
-          // Conservative default: unknown untracked content blocks removal and
-          // is never discarded implicitly — the skip names the flag AND the
-          // manual sequence.
-          entry.reason = worktreeUntrackedRefusal(item, path, untracked);
-          return entry;
-        }
-        // Armed force + untracked-only blockers: the removal is authorized to
-        // discard exactly this content (never tracked changes), and says so.
-        entry.forced = true;
-      }
+      // Armed force + untracked-only blockers: the removal is authorized to
+      // discard exactly this content (never tracked changes), and says so.
+      entry.forced = true;
     }
     // The action names exactly what the surface does, and a forced discard
     // says so (never a bare removal).
@@ -829,6 +838,29 @@ export function worktreeTrackedRefusal(item: WorkItem, path: string, paths: stri
     "opt-in never discards tracked work. Commit or discard that work first, then re-run prune — or " +
     `reap the worktree by hand: git worktree remove --force ${path}${branchStep}, then ` +
     "arggon cleanup --prune to clear the record."
+  );
+}
+
+/**
+ * The refusal for a terminal+merged worktree whose removal-blocker probe did
+ * not answer (review N1 on PR #751). The probe is the ONLY evidence that
+ * `git worktree remove` will succeed, so an unanswered probe is not "no
+ * blockers": reporting the entry `removable: true` would promise a removal the
+ * tool cannot verify, and the removal then fails on git's own refusal with a
+ * raw error. Nothing is removed; the reason names the failed probe and the
+ * manual sequence. The force opt-in does NOT bypass this refusal — it discards
+ * untracked content a WORKING probe observed, and an unanswered probe observed
+ * nothing.
+ */
+function worktreeProbeFailureRefusal(item: WorkItem, path: string): string {
+  const branchStep = item.branch ? `, then git branch -D ${item.branch}` : "";
+  return (
+    `skipping the worktree of '${item.id}': the removal-blocker probe ` +
+    `('git status --porcelain' in ${path}) did not answer, so it is unknown whether ` +
+    "'git worktree remove' would succeed. Nothing was removed. Inspect it by hand " +
+    `(git -C ${path} status --porcelain), then re-run prune — or reap the worktree by ` +
+    `hand: git worktree remove ${path} (add --force only for content you inspected and ` +
+    `chose to discard)${branchStep}, then arggon cleanup --prune to clear the record.`
   );
 }
 

@@ -346,6 +346,10 @@ program
                 // the dry run classifies the identical plan, so these numbers
                 // are exactly what the run it previews will carry.
                 adapters: result.adapters,
+                // Report-only `.arggon.env` gitignore probe (spec
+                // worktree-env-contract-016, additive): the current disk state,
+                // with the hint when the entry is missing.
+                envGitignore: result.envGitignore,
                 dryRun: true,
                 plan: result.plan,
                 ...(result.warning ? { warning: result.warning } : {}),
@@ -398,6 +402,11 @@ program
               // Per-artifact adapter selection outcome (task-adapter-selection-flags,
               // additive): written/skipped per adapter destination with reasons.
               adapters: result.adapters,
+              // Report-only `.arggon.env` gitignore probe (spec
+              // worktree-env-contract-016, additive), read after this run's
+              // writes: the adopter's kept `.gitignore` reports the missing
+              // entry; a generated one is clean.
+              envGitignore: result.envGitignore,
               commit: commitPayload(result.commit),
               ...(result.warning ? { warning: result.warning } : {}),
             },
@@ -465,6 +474,9 @@ program
             docs: result.docs,
             tracker: result.tracker,
             git: result.git,
+            // Report-only `.arggon.env` gitignore probe (spec
+            // worktree-env-contract-016, additive).
+            envGitignore: result.envGitignore,
             // OpenCode integration state (task-opencode-v2-doctor, additive).
             opencode: result.opencode,
             // Capability-matrix state (task-capability-matrix, additive;
@@ -558,6 +570,10 @@ program
               skipped: result.skipped,
               taskPath: result.taskPath,
               inventory: result.inventory,
+              // Report-only `.arggon.env` gitignore probe (spec
+              // worktree-env-contract-016, additive) — the pre-flight doctor's
+              // own read, surfaced at the adoption moment.
+              envGitignore: result.envGitignore,
               dryRun: result.dryRun,
               commit: commitPayload(result.commit),
             },
@@ -3331,6 +3347,9 @@ function printInitProposeHuman(result: InitResult): void {
   if (proposals.length === 0) {
     console.log("  (nothing to propose — every doc matches its current template)");
   }
+  // Report-only (spec worktree-env-contract-016), same as every other init
+  // mode: proposals never touch the adopter's `.gitignore`.
+  if (result.envGitignore.hint) console.log(`  hint: ${result.envGitignore.hint}`);
   console.log(
     "Originals untouched. Next: diff each proposal, merge what you want as normal work, then re-ack via `arggon adopt --ack` and delete the proposal file.",
   );
@@ -3363,6 +3382,8 @@ function printInitDryRun(result: InitDryRunResult): void {
         `${result.reapRefused.length} to keep (one row each above)`,
     );
   }
+  // Report-only (spec worktree-env-contract-016), from the current disk state.
+  if (result.envGitignore.hint) console.log(`  hint: ${result.envGitignore.hint}`);
   console.log("nothing was written (dry run)");
 }
 
@@ -3487,6 +3508,9 @@ function printInitHuman(result: InitResult): void {
     }
     printInitReaps(result.reaped, result.reapRefused);
     printInitAdapters(result.adapters);
+    // Report-only (spec worktree-env-contract-016): an adopter `.gitignore`
+    // kept by the modified-skip path misses the entry — say what to append.
+    if (result.envGitignore.hint) console.log(`arggon init: hint: ${result.envGitignore.hint}`);
     const commitLine = formatCommitLine(result.commit);
     if (commitLine && result.commit?.committed) console.log(`arggon init: ${commitLine}`);
     console.log("Next: create work with `arggon create` (coming soon), or copy from templates/.");
@@ -3524,6 +3548,10 @@ function printInitHuman(result: InitResult): void {
   if (result.convention) printInitConvention(result.convention);
   printInitReaps(result.reaped, result.reapRefused);
   printInitAdapters(result.adapters);
+  // Report-only (spec worktree-env-contract-016): the generated `.gitignore`
+  // carries the entry, so this only fires on a tree whose own `.gitignore`
+  // pre-existed — exactly the adoption case.
+  if (result.envGitignore.hint) console.log(`arggon init: hint: ${result.envGitignore.hint}`);
   console.log("Next:");
   console.log(
     `  1. Add an initiative under ${trackerName}/<slug>/<slug>.md (see ${trackerName}/docs/convention.md)`,

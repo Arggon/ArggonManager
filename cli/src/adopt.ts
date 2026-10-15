@@ -28,6 +28,7 @@ import {
 
 import { arggonVersion, checksumOf } from "./docs.js";
 import { bundledTemplatesDir } from "./package-assets.js";
+import { type EnvGitignoreReport } from "./env-gitignore.js";
 
 import { runDoctor } from "./doctor.js";
 
@@ -399,6 +400,15 @@ export type AdoptResult = {
   skipped: boolean;
   /** Absolute path of the created or existing task file. */
   taskPath: string;
+  /**
+   * Report-only probe of the tracked `.gitignore`'s `.arggon.env` entry
+   * (task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters,
+   * spec worktree-env-contract-016): the adoption moment is exactly when the
+   * missing entry should be surfaced, so the pre-flight doctor's own probe is
+   * reused — one read, and the report never writes, modifies or stages
+   * anything.
+   */
+  envGitignore: EnvGitignoreReport;
   /** Tracker auto-commit outcome for the files written this run. */
   commit?: TrackerCommitResult;
 };
@@ -427,6 +437,10 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
   const tasksDir = findTasksDir(opts.cwd);
   const dryRun = Boolean(opts.dryRun);
   const inventory = buildInventory(root);
+  // The pre-flight doctor already probed the tracked `.gitignore`
+  // (spec worktree-env-contract-016): reuse that read, so adopt reports exactly
+  // what doctor reports — and reports it at the adoption moment, report-only.
+  const envGitignore = doctor.envGitignore;
 
   const byId = itemsById(loadItems(tasksDir));
 
@@ -550,6 +564,7 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
         taskCreated: false,
         skipped: true,
         taskPath: existingTask.filePath,
+        envGitignore,
         commit: commitWritten(ADOPT_STORY_ID),
       };
     }
@@ -586,6 +601,7 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
       taskCreated: true,
       skipped: false,
       taskPath: created.path,
+      envGitignore,
       commit: commitWritten(created.id),
     };
   }
@@ -600,6 +616,7 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
     taskCreated: false,
     skipped: false,
     taskPath: "(dry run — not created)",
+    envGitignore,
   };
 }
 
@@ -660,6 +677,12 @@ export function formatAdoptReport(result: AdoptResult): string {
       .map((corpus) => `${corpus.format} (${corpus.files} files, ${corpus.origin})`)
       .join(", ");
     lines.push(`  spec corpora: ${corpora}`);
+  }
+  // Report-only (spec worktree-env-contract-016): the adopter's `.gitignore`
+  // misses the `.arggon.env` entry — name the exact line to append, never
+  // write it. The text is a constant; `--json` carries the same string.
+  if (result.envGitignore.hint) {
+    lines.push(`  hint: ${result.envGitignore.hint}`);
   }
   return `${lines.join("\n")}\n`;
 }
