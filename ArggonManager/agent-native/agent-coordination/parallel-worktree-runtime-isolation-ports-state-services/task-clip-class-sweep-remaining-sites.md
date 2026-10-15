@@ -177,3 +177,7 @@ Enumeration: sibling-fixed sites (worktreeFailureMessage, gh(), commitFile(), ru
 ### Gates (worktree cwd, build BEFORE test)
 
 npm run build ok (bundle byte-identical — comment-only lib edits) · npm run check:plugin no drift · npm run arggon -- validate ok (0 warnings) · 8 focused suites 417 passed · npm test 162 files / 3572 tests (final run green; one mid-sequence run hit the filed bug-headless-ci-twin-init-nondeterministic flake — the file passes standalone 7/7 and main is red there too) · npm run lint clean · npm run test:structure 5 passed · npm run lint:structure clean · npx prettier --check clean on all 12 touched files. Behavior change: none (doc comments, contract tests, docs); no smoke probe required — the composition contracts are driven end-to-end through the real runStart strict-gate path and the real-git pre-commit gate in the existing suites.
+
+### handoff 2026-10-15 @ses_ebfe1a5c0ffe0yJ7qSezc99RW7 (session: ses_ebfe1a5c0ffe0yJ7qSezc99RW7) — next: Review + merge PR #847: all six acceptance boxes evidenced on the item; gates green in the worktree.
+- branch: feat/task-clip-class-sweep-remaining-sites
+- open questions: None blocking; reviewer to confirm the four compliant records are the durable form wanted (comment + bounded-message test per site) and that leaving worktree.test.ts/cli.test.ts in the 61449604 varia…
