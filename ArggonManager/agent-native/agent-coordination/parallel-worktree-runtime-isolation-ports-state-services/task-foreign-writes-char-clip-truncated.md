@@ -10,7 +10,6 @@ labels: [opencode-seam, parity]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-15"
-worktree_path: /home/arggon/Projects/ArggonManager-task-foreign-writes-char-clip-truncated
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-foreign-writes-char-clip-truncated.md
