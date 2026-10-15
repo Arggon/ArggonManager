@@ -47,12 +47,12 @@ had.
 
 ## Acceptance
 
-- [ ] The CLI carries `stepsTruncated` alongside `prepSteps` — a mirror of the kernel's decision, not a re-derivation from a cap
-- [ ] The CLI and native surfaces agree on the same kernel event (the deep-equal per-entry log assertion #617 established extends to the truncation flag)
-- [ ] `docs/json-output.md` and `docs/opencode2.md` document the flag on BOTH surfaces; the opencode2 doc-contract suite (PR #609, extended by #617) gains the CLI shape as a scenario so it cannot be dropped again
-- [ ] An uncapped log stays unflagged on both surfaces
-- [ ] The refusal call sites thread the kernel's dropped-entry COUNT (shipped by `bug-fresh-worktree-refusal-prose-drops-prep-step-truncation`, PR #833): `cli/src/start.ts` passes `prepared.stepsDropped` to `freshWorktreeInstallRefusal`, and the native projection mirrors the count through its `boundedPreparation` before rendering the refusal — so the human-visible refusal on both surfaces states the dropped count, not only the kernel's own text
-- [ ] Lands after PR #617 (it owns the native projection and the regenerated bundle; no concurrent plugin edits)
+- [x] The CLI carries `stepsTruncated` alongside `prepSteps` — a mirror of the kernel's decision, not a re-derivation from a cap
+- [x] The CLI and native surfaces agree on the same kernel event (the deep-equal per-entry log assertion #617 established extends to the truncation flag)
+- [x] `docs/json-output.md` and `docs/opencode2.md` document the flag on BOTH surfaces; the opencode2 doc-contract suite (PR #609, extended by #617) gains the CLI shape as a scenario so it cannot be dropped again
+- [x] An uncapped log stays unflagged on both surfaces
+- [x] The refusal call sites thread the kernel's dropped-entry COUNT (shipped by `bug-fresh-worktree-refusal-prose-drops-prep-step-truncation`, PR #833): `cli/src/start.ts` passes `prepared.stepsDropped` to `freshWorktreeInstallRefusal`, and the native projection mirrors the count through its `boundedPreparation` before rendering the refusal — so the human-visible refusal on both surfaces states the dropped count, not only the kernel's own text
+- [x] Lands after PR #617 (it owns the native projection and the regenerated bundle; no concurrent plugin edits)
 
 ## Notes
 
