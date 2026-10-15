@@ -52,6 +52,7 @@ import {
   type AdapterSelectionReport,
   type AgentSelection,
 } from "./adapters.js";
+import { readEnvGitignore, type EnvGitignoreReport } from "./env-gitignore.js";
 
 const CONVENTION_YML =
   `version: ${CONVENTION_VERSION}\n` +
@@ -187,6 +188,15 @@ export type InitResult = {
   adapters: AdapterSelectionReport;
   /** Tracker auto-commit outcome for the files written this run. */
   commit?: TrackerCommitResult;
+  /**
+   * Report-only probe of the tracked `.gitignore`'s `.arggon.env` entry
+   * (task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters,
+   * spec worktree-env-contract-016), read AFTER this run's writes: a freshly
+   * generated `.gitignore` carries the entry (no hint), while an adopter's
+   * kept one reports the missing entry with the exact line to append. The probe
+   * never writes, modifies or stages anything.
+   */
+  envGitignore: EnvGitignoreReport;
   /**
    * Present only when the target tree is NOT a git repository
    * (bug-init-git-doctor-blindspot): branch/worktree/push/PR flows and the
@@ -1184,6 +1194,14 @@ export type InitDryRunResult = {
    * zero and the selection itself is still reported.
    */
   adapters: AdapterSelectionReport;
+  /**
+   * Report-only probe of the tracked `.gitignore`'s `.arggon.env` entry
+   * (spec worktree-env-contract-016), from the CURRENT disk state — a dry run
+   * writes nothing. `hint` is non-null exactly when an existing `.gitignore`
+   * does not ignore the per-worktree env file; a tree with no `.gitignore`
+   * reports no hint (a real run generates one that carries the entry).
+   */
+  envGitignore: EnvGitignoreReport;
   /** Same not-a-git-repo warning a real run would surface. */
   warning?: string;
 };
@@ -1242,6 +1260,9 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
         // which is why `scope` carries `propose`.
         counts: { total: 0, written: 0, replaced: 0, skipped: 0 },
       },
+      // Report-only, from the current disk state (a proposal sweep writes only
+      // side files): the same hint the real run and doctor report.
+      envGitignore: readEnvGitignore(root),
       warning,
     };
   }
@@ -1275,6 +1296,9 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
       reaped: plan.docs.reaped,
       reapRefused: reapRefusals(plan.docs.reapRefused),
       adapters,
+      // Nothing was written (dry run), so the probe reports the current disk
+      // state — the same entry an adopting human or agent has to append.
+      envGitignore: readEnvGitignore(root),
       warning,
     };
   }
@@ -1310,6 +1334,9 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
     reaped: plan.docs.reaped,
     reapRefused: reapRefusals(plan.docs.reapRefused),
     adapters,
+    // Preview only (nothing written): the hint a real run would report on this
+    // tree's existing `.gitignore`.
+    envGitignore: readEnvGitignore(root),
     warning,
   };
 }
@@ -1364,6 +1391,9 @@ export function runInit(opts: InitOptions): InitResult {
         // which is why `scope` carries `propose`.
         counts: { total: 0, written: 0, replaced: 0, skipped: 0 },
       },
+      // Report-only, after the sweep (proposal side files only): the current
+      // `.gitignore` state, with the hint when the entry is missing.
+      envGitignore: readEnvGitignore(root),
       warning: isGitRepo(root) ? undefined : NOT_A_REPO_WARNING,
     };
   }
@@ -1415,6 +1445,11 @@ export function runInit(opts: InitOptions): InitResult {
       // Built from the plan, not from the apply result, so a dry run over the
       // same options reports the same rows before anything is written.
       adapters,
+      // Report-only, after the docs were applied (spec
+      // worktree-env-contract-016): an adopter `.gitignore` kept by the
+      // modified-skip path reports the missing entry; a generated one carries
+      // it. Never a write.
+      envGitignore: readEnvGitignore(root),
       commit: commitGeneratedDocs(root, written, opts.commit),
       warning: gitWarning,
     };
@@ -1466,6 +1501,10 @@ export function runInit(opts: InitOptions): InitResult {
     reaped: docs.reaped,
     reapRefused: reapRefusals(docs.reapRefused),
     adapters,
+    // Report-only, after the writes above: a fresh scaffold's generated
+    // `.gitignore` carries the entry (no hint), an adopter's pre-existing one
+    // was kept byte-identical and reports the missing entry.
+    envGitignore: readEnvGitignore(root),
     commit: commitGeneratedDocs(root, written, opts.commit),
     warning: gitWarning,
   };
