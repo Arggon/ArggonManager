@@ -90,3 +90,14 @@ Test: wrapper-mode ENOBUFS test — fixture writes ~1.5 MiB synchronously with a
 ### handoff 2026-10-15 @arggon-maker — next: Standards review of PR #829 (both observations resolved, gates green); then merge and flip done.
 - branch: feat/task-publish-auth-hint-review-observations
 - open questions: None blocking; the one judgement call is usage() returning with process.exitCode = 2 instead of process.exit (rationale: the pipe-write drop probe, PR body).
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-14 (delivery lead)
+Merged as eb9ebe6f (PR #829). Both observations resolved, each with a recorded decision and non-vacuous pins.
+
+**Decision 1 — a code line is authoritative.** `classifyPublishFailure` now consults the message patterns only when the log carries no `code` line at all (`codes.length === 0`), matching the docstring (tightened to state the rule exactly). Pinned matrix: `E404` + auth phrase → `other` (was `auth`); no code + phrase → `auth`; no code + no phrase → `other`; `ENEEDAUTH`/`E401` unchanged. The maker ran the three new tests against the pre-change module — 3 failed — so they pin rather than pass vacuously.
+
+**Decision 2 — re-emit, don't raise.** On `child.error` the wrapper re-emits the captured `child.stderr` (probe: ENOBUFS keeps the truncated prefix, ~1.09M chars, status null) before failing closed with exit 2; raising the buffer was rejected as threshold-moving that leaves the lossy path. `usage()` now sets `process.exitCode` and every call site returns (the release-guard precedent) because the probe showed `process.exit` drops pending pipe writes (146 KB of 2 MiB arrived) — so the re-emit actually flushes. Publish semantics unchanged (the non-error path is untouched).
+
+Evidence: `cli/publish-auth-hint.test.ts` +88 (42 total; the lead re-ran 42/42); full suite 3481 green; lint/structure/prettier green; CI green on all lanes. Docs: the module docstring states the contract; a one-line lesson landed in `docs/playbooks/node.md` with this item's citation. Review was lead-only — a small, self-contained diff, and the risky part (the `usage()` refactor) was checked call-site by call-site.
