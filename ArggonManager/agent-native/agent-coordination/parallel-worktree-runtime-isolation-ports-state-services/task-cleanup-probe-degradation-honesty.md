@@ -61,3 +61,7 @@ Evidence (worktree, all green):
 Files: `lib/src/cleanup.ts`, `lib/src/cleanup.test.ts`, `lib/src/worktree.property.test.ts` (1-line probe injection, delivery-lead-approved: its tmp worktree is not a git repo, so the real probe never answered and the harness silently depended on the pre-fix degradation), `opencode/plugins/arggon/index.bundle.ts` (regenerated; plugin-copy drift gate requires it).
 
 PR #832 (branch pushed). Acceptance: (1) decided + recorded here and in the PR body; (2) pinned by an injected failing probe; (3) normal-path behavior unchanged — the only existing-test edit is the disclosed 1-line probe injection. Boxes left for the lead's completion call.
+
+### handoff 2026-10-15 @arggon-maker — next: Review and merge PR #832, then tick the 3 acceptance boxes and flip to done. Optional docs line for the probe-failure skip in agents.md §Cleanup / json-output.md §cleanup left to you.
+- branch: feat/task-cleanup-probe-degradation-honesty
+- open questions: Docs mention of the probe-failure skip left to the lead (out of kernel scope); property-test harness injection approved by the lead and disclosed in the PR.
