@@ -102,7 +102,16 @@ namespace:
   domain, deletes their branches and clears the records in one tracker commit.
   Push and the `gh` PR step stay explicit agent steps; the CLI
   (`arggon start --worktree`, `arggon cleanup --prune`) is the documented
-  fallback when the domain is unavailable.
+  fallback when the domain is unavailable. The CLI's `start` (plain and
+  `--worktree`) also reports the commits a claim branch cut by that run inherits
+  from the canonical checkout's **local** HEAD beyond its upstream base
+  (`inheritedCommits` with the named remedy — push the primary branch, or drop
+  the inherited commits), so unpushed tracker auto-commits cannot ride a PR diff
+  unnoticed (bug-start-claim-branch-inherits-unpushed-tracker-commits, see
+  [`json-output.md`](./json-output.md) §`start`); the native `preparation`
+  receipt does not carry that report yet — the branch is cut by the host
+  `ctx.worktree.create` domain — so a native run has no equivalent field until
+  parity lands.
 
   Payload contract (documented here; the output schemas stay loose to respect
   the ADR 0006 budget and the contract tests assert the envelopes):
