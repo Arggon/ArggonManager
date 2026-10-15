@@ -1,14 +1,16 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-mcp-server-binds-session-cwd-tracker-root
 title: "`arggon mcp` binds the whole session to the server's launch cwd — every tool call resolves the tracker root from it, never from the item's `worktree_path`, so a maker's comment/handoff/update lands in the wrong tree"
+assignee: arggon-delivery-lead
+branch: fix/bug-mcp-server-binds-session-cwd-tracker-root
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [tooling, mcp]
 created: "2026-10-11"
-updated: "2026-10-11"
+updated: "2026-10-15"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-mcp-server-binds-session-cwd-tracker-root
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-mcp-server-binds-session-cwd-tracker-root.md
   Leaves live only under a story. id is the filename stem: bug-mcp-server-binds-session-cwd-tracker-root.
@@ -28,10 +30,10 @@ Three candidate repairs were proposed by the maker (written up at https://github
 
 ## Acceptance
 
-- [ ] The defect is reproduced from the MCP surface (stdio JSON-RPC in a scratch tracker is the established pattern — see PR #713's verification)
-- [ ] One of the three repairs is chosen and implemented, with the reason recorded (refusing to write cross-tree is acceptable and minimal)
-- [ ] A regression test pins: a comment/handoff/update for an item whose `worktree_path` is another tree either lands in that tree or fails named — never writes into the launching tree
-- [ ] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green; `arggon validate` ok
+- [x] The defect is reproduced from the MCP surface (stdio JSON-RPC in a scratch tracker is the established pattern — see PR #713's verification)
+- [x] One of the three repairs is chosen and implemented, with the reason recorded (refusing to write cross-tree is acceptable and minimal)
+- [x] A regression test pins: a comment/handoff/update for an item whose `worktree_path` is another tree either lands in that tree or fails named — never writes into the launching tree
+- [x] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green; `arggon validate` ok
 
 ## Notes
 
@@ -51,3 +53,37 @@ Acceptance:
 - [ ] One of the three repairs is chosen and implemented, with the reason recorded (refusing to write cross-tree is acceptable and minimal)
 - [ ] A regression test pins: a comment/handoff/update for an item whose `worktree_path` is another tree either lands in that tree or fails named — never writes into the launching tree
 - [ ] `npm test`, `npm run build`, `npm run check:plugin`, `npm run lint` green; `arggon validate` ok
+
+### 2026-10-15 @Arggon
+
+PR #846 (branch fix/bug-mcp-server-binds-session-cwd-tracker-root). Impact class: Behavioral (agents.md + arggon-cli skill are methodology carriers).
+
+REPRO (MCP surface, before the fix) — real `arggon mcp` over stdio JSON-RPC, server launched from the primary of a scratch git repo whose item was claimed through `start --worktree`:
+
+- expected: comment/handoff land in the claim worktree (worktree_path tree).
+- observed: envelopes `ok: true` with `path: <primary>/ArggonManager/.../task-thing.md`; handoff recorded `branch: master`; two local-only commits on the primary's base branch; the worktree copy untouched. (`arggon_update --status done` rode the same door.)
+
+REPAIR — route through the item's `worktree_path` (the lead's steer), new `cli/src/mcp-routing.ts`: item-addressed tools (update/comment/handoff/show) resolve per call from the launch copy's own `worktree_path`, else the sibling worktrees' claim footprints (`.arggon.env` or their item copy). A write whose recorded claim tree is gone/not-a-tracker refuses with `error.code: "TRACKER_ROOT_MISMATCH"` (the native surface's code) naming both trees + remedies — never falls back to the launching tree; reads never refuse. Pool calls and start/branch/cleanup untouched; CLI stays unrouted by design. Boundary recorded in the module doc: a branch claim with no worktree records no worktree_path, so it has no address to route through.
+
+REPRO (after the fix) — same script: comment + handoff land in the worktree copy, handoff records `branch: feat/task-thing`, commits ride the claim branch, primary `git status` clean.
+
+REGRESSION — cli/src/mcp-routing.test.ts (10) + the mcp-server.test.ts block end-to-end over the in-process stdio server: comment/handoff/`update --status done` land in the claim worktree, launching tree byte-unchanged; `show` reads the claim copy; a gone worktree fails named with nothing written; a plain tree keeps the old behavior.
+
+GATES (worktree, expected → observed): `arggon validate` ok → ok (0 warnings) · MCP suites 90/90 → passed · `npm test` → 3581/3581 passed · `npm run lint` → clean · `npm run test:structure` → exit 0 · `prettier --check` on touched files → clean · `npm run check:plugin` → exit 0 (bundle byte-unchanged; the native surface needed no edit). Note: two intermediate full-suite runs hit a 30s timeout in prose-format.test.ts under this box's load average ~20 (pristine main isolation baseline for that file: 45s); the final full run is green.
+
+### handoff 2026-10-15 @Arggon — next: Review PR #846 (fix/bug-mcp-server-binds-session-cwd-tracker-root): the MCP item-addressed cwd routing; on merge, flip the item done once the PR fully finishes it.
+
+- branch: fix/bug-mcp-server-binds-session-cwd-tracker-root
+- open questions: None from the maker. Reviewer watch-points: the claim-footprint scan's per-worktree item-copy read (bounded 64) and the read/show routing asymmetry (reads never refuse).
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
+verdict: approve
+
+### Lead review + merge verification — 2026-10-15 (delivery lead)
+
+Merged as 9be5559c (PR #846). Repair (steered, chosen): item-addressed MCP calls resolve their cwd from the item's own claim — the launch copy's `worktree_path` first, then the repo's worktrees through their claim footprints (bounded: 64 roots, 5s `git worktree list` timeout, 8 KiB env file); the one unsafe state (recorded tree gone or no tracker there) REFUSES the write with the shared named code `TRACKER_ROOT_MISMATCH` naming both trees and the remedies — reads never refuse (a stale read is detectable, a wrong write is not). The CLI stays unrouted (single-checkout flow); pool calls and the worktree lifecycle tools untouched.
+
+Reproduced before/after over real stdio JSON-RPC: before — comment+handoff landed in the launch tree (primary, `branch: master` recorded, two local-only commits, worktree untouched); after — both land in the worktree copy, commits ride the claim branch, the primary stays byte-clean.
+
+Evidence: `cli/src/mcp-routing.ts` + 10 unit + 6 end-to-end MCP cases; full suite 3581 green; `check:plugin` green (bundle byte-unchanged — the native surface needed no edit; parity stated); validate/lint/structure/prettier green. Docs travel: `agents.md` §MCP server, `json-output.md`, README, the skill's json-contract + its Claude-seam copy (the two-destination rule working in practice). Impact class **Behavioral** stated. The `prose-format.test.ts` timeout in two intermediate runs is recorded as a load-average artifact, not the change.
