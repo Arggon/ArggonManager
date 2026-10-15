@@ -9,7 +9,6 @@ parent: story-container-rollup
 labels: []
 created: "2026-10-15"
 updated: "2026-10-15"
-worktree_path: /home/arggon/Projects/ArggonManager-task-board-no-done-over-open-work
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-container-rollup/task-board-no-done-over-open-work.md
