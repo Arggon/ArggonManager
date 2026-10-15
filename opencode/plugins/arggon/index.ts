@@ -3246,8 +3246,7 @@ function boundedPreparation(input: {
     (input.steps?.length ?? 0) > steps.length ||
     input.missingDependenciesTotal > input.missingDependencies.length ||
     (input.gateBins?.length ?? 0) > gateBins.length ||
-    (claim?.foreignWrites !== undefined &&
-      claim.foreignWrites.total > claim.foreignWrites.files.length) ||
+    (claim !== undefined && claimForeignWritesTruncated(claim, input.claim)) ||
     (claim !== undefined && claimTakeoverTruncated(claim, input.claim)) ||
     built.some((name, index) => name !== input.builtWorkspaces[index]) ||
     linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
@@ -3374,8 +3373,43 @@ function boundedClaimStamp(input: NativeClaimStamp): NativeClaimStamp {
 }
 
 /**
+ * True when bounding shortened the foreign-write report: an over-cap
+ * named-file list or a string clipped at `MAX_NATIVE_PREPARATION_VALUE_CHARS`
+ * (`owner`, `claimedAt`, each `files` entry), compared against the kernel's
+ * own values.
+ *
+ * The decision (task-foreign-writes-char-clip-truncated): the shared flag
+ * reports CHARACTER clipping for `foreignWrites` too — the same discipline
+ * {@link claimTakeoverTruncated} and the
+ * `built`/`linked`/`missingDependencies` projections already apply. The
+ * alternative reading ("the flag only names kernel count caps, character
+ * clipping stays silent") was rejected: a repo-relative path or identity
+ * silently shortened to 200 chars and then reported as the whole value is
+ * exactly the failure this flag exists to name, and the kernel never caps
+ * these strings. A pathological path makes the default receipt carry
+ * `truncated: true`; that is the honest account. The kernel owns `total`, so
+ * the count fold never re-derives evidence.
+ */
+function claimForeignWritesTruncated(
+  bounded: NativeClaimReceipt,
+  input: NativeClaimReceipt | undefined,
+): boolean {
+  if (input === undefined) return true
+  const report = bounded.foreignWrites
+  const source = input.foreignWrites
+  if (report === undefined || source === undefined) return false
+  return (
+    report.owner !== source.owner ||
+    report.claimedAt !== source.claimedAt ||
+    report.total > report.files.length ||
+    report.files.some((file, index) => file !== source.files[index])
+  )
+}
+
+/**
  * True when bounding shortened the take-over's evidence: an over-cap named-file
- * list, a string clipped at `MAX_NATIVE_PREPARATION_VALUE_CHARS`, or an over-cap
+ * list, a string clipped at `MAX_NATIVE_PREPARATION_VALUE_CHARS` (including
+ * every string inside a `replaced.takeovers[]` chain entry), or an over-cap
  * chain inside the replaced stamp.
  *
  * The length fold is the honest "you are not seeing all of it" signal (the
@@ -3390,7 +3424,11 @@ function boundedClaimStamp(input: NativeClaimStamp): NativeClaimStamp {
  * already caps `takeovers` at `MAX_CLAIM_TAKEOVERS` (5) before this mapper
  * ever sees it, so through the kernel it cannot fire. It stays because the
  * input is a file in the worktree's git dir, and an unreachable-but-harmless
- * branch is cheaper than a silent assumption.
+ * branch is cheaper than a silent assumption. The per-entry string comparison
+ * is NOT that: the kernel caps the chain's LENGTH, never its strings, so a
+ * hostile `by` inside a chain entry reaches this mapper intact and would
+ * otherwise clip silently — the same question as `foreignWrites`, answered the
+ * same way (task-foreign-writes-char-clip-truncated).
  */
 function claimTakeoverTruncated(
   bounded: NativeClaimReceipt,
@@ -3413,10 +3451,23 @@ function claimTakeoverTruncated(
     takeOver.replaced.assignee !== replaced.assignee ||
     takeOver.replaced.surface !== replaced.surface ||
     takeOver.files.some((file, index) => file !== source.files[index])
+  const chain = replaced.takeovers ?? []
+  const projectedChain = takeOver.replaced.takeovers ?? []
+  const chainClipped = chain.some((entry, index) => {
+    const projected = projectedChain[index]
+    return (
+      projected === undefined ||
+      projected.at !== entry.at ||
+      projected.by !== entry.by ||
+      projected.replacedIdentity !== entry.replacedIdentity ||
+      projected.replacedClaimedAt !== entry.replacedClaimedAt
+    )
+  })
   return (
     clipped ||
+    chainClipped ||
     takeOver.total > takeOver.files.length ||
-    (replaced.takeovers?.length ?? 0) > (takeOver.replaced.takeovers?.length ?? 0)
+    chain.length > projectedChain.length
   )
 }
 
