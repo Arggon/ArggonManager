@@ -338,7 +338,16 @@ export type { CommentOptions, CommentResult } from "./comment.js";
 export { HANDOFF_FIELD_CAP, HANDOFF_SESSION_CAP, runHandoff } from "./handoff.js";
 export type { HandoffOptions, HandoffResult } from "./handoff.js";
 export { runSync } from "./sync-command.js";
-export type { SyncResult } from "./sync-types.js";
+export { findBranchClaims } from "./branch-claims.js";
+export type { BranchClaimsGitExecutor, BranchClaimsOptions } from "./branch-claims.js";
+export type {
+  BranchClaim,
+  BranchClaimError,
+  BranchClaimsResult,
+  SyncResult,
+} from "./sync-types.js";
+export { formatRankedFrom, RANKED_FROM_NOTE, readRankedFrom } from "./tree-state.js";
+export type { RankedFrom, TreeGitExecutor } from "./tree-state.js";
 export { classifyVerdicts, parseVerdicts } from "./verdict.js";
 export type { VerdictComment, VerdictState } from "./verdict.js";
 export {

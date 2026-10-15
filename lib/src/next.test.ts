@@ -1,8 +1,16 @@
-import { mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runNext } from "./next.js";
+import { RANKED_FROM_NOTE } from "./tree-state.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -350,10 +358,7 @@ describe("runNext downstream-weight ranking (task-next-dependency-ranking)", () 
     write(
       root,
       "tasks/s/s.md",
-      md(
-        'type: story\nstatus: done\nid: s\ntitle: S\nlabels: []\ncreated: "2026-09-11"\n',
-        "S",
-      ),
+      md('type: story\nstatus: done\nid: s\ntitle: S\nlabels: []\ncreated: "2026-09-11"\n', "S"),
     );
     return root;
   }
@@ -522,5 +527,45 @@ describe("runNext priority-major ranking (task-next-priority-ranking)", () => {
     const { suggestion } = runNext({ cwd: root });
     expect(suggestion?.item.id).toBe("task-alpha"); // lexicographic on full ties
     expect(suggestion?.reason).toContain("unprioritized (ranks with the p3 tier)");
+  });
+});
+
+describe("runNext rankedFrom (bug-claim-pool-computed-from-main-misses-branch-claims)", () => {
+  /** Seed a real git checkout so the declaration has a branch + head to read. */
+  function gitSeed(root: string): void {
+    execFileSync("git", ["-C", root, "init", "-q", "-b", "main"]);
+    execFileSync("git", ["-C", root, "config", "user.email", "t@example.com"]);
+    execFileSync("git", ["-C", root, "config", "user.name", "T"]);
+    execFileSync("git", ["-C", root, "add", "-A"]);
+    execFileSync("git", ["-C", root, "commit", "-qm", "seed"]);
+  }
+
+  it("declares the branch and head the pool was ranked from", () => {
+    const root = makeTree();
+    gitSeed(root);
+
+    const { rankedFrom } = runNext({ cwd: root });
+
+    expect(rankedFrom.branch).toBe("main");
+    expect(rankedFrom.head).toBe(
+      execFileSync("git", ["-C", root, "rev-parse", "--short", "HEAD"], {
+        encoding: "utf8",
+      }).trim(),
+    );
+    // The pool never silently ranks from `main` alone: the caveat is carried
+    // with every suggestion and points at the surface that reads the branches.
+    expect(rankedFrom.note).toBe(RANKED_FROM_NOTE);
+    expect(rankedFrom.note).toContain("unmerged branches");
+    expect(rankedFrom.note).toContain("arggon sync");
+  });
+
+  it("reports a non-git tree honestly instead of guessing a branch", () => {
+    const root = makeTree();
+
+    expect(runNext({ cwd: root }).rankedFrom).toEqual({
+      branch: null,
+      head: null,
+      note: RANKED_FROM_NOTE,
+    });
   });
 });

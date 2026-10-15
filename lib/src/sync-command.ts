@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
+import { findBranchClaims } from "./branch-claims.js";
 import { loadItems } from "./items.js";
-import { findTasksDir } from "./paths.js";
+import { findTasksDir, repoRootFromTasks } from "./paths.js";
 import { getOpenPRs } from "./get-open-prs.js";
 import { matchItem, toSyncResult, type SyncFilled, type SyncResult } from "./sync-types.js";
 import { runUpdate } from "./update.js";
@@ -20,7 +21,7 @@ export function runSync(
     repo?: string;
     cwd?: string;
   },
-  execGh: typeof execFileSync = execFileSync
+  execGh: typeof execFileSync = execFileSync,
 ): SyncResult {
   if (opts.check && opts.write) {
     throw new Error("pass either --check or --write, not both");
@@ -30,8 +31,10 @@ export function runSync(
 
   let items;
   let prs;
+  let root: string;
   try {
     const tasksDir = findTasksDir(cwd);
+    root = repoRootFromTasks(tasksDir);
     items = loadItems(tasksDir);
     prs = getOpenPRs(opts.repo || null, cwd, execGh);
   } catch (err) {
@@ -83,5 +86,21 @@ export function runSync(
     verdicts[match.itemId] = classifyVerdicts(item.body);
   }
 
-  return toSyncResult(reported, mode, filled, updateErrors, verdicts);
+  // Branch-resident claims (bug-claim-pool-computed-from-main-misses-branch-
+  // claims): the claim commit rides the item branch, so this tree's copy of a
+  // claimed item still reads todo/unassigned until the branch merges. Read the
+  // branch copies (local git only) so "unclaimed" and "claimed on a branch I
+  // have not merged" are distinguishable. Report-only: never gates matching
+  // or the exit code, exactly like `verdicts`.
+  const branchClaims = findBranchClaims({ root, items, prs });
+
+  return toSyncResult(
+    reported,
+    mode,
+    filled,
+    updateErrors,
+    verdicts,
+    branchClaims.claims,
+    branchClaims.errors,
+  );
 }

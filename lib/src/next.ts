@@ -3,6 +3,7 @@ import { itemsById, loadItems, type WorkItem } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 import { buildBlockedByIndex } from "./filter.js";
 import { priorityRank, type Priority } from "./priority.js";
+import { readRankedFrom, type RankedFrom } from "./tree-state.js";
 
 export type NextOptions = {
   cwd: string;
@@ -45,6 +46,13 @@ export type NextSuggestion = {
 export type NextResult = {
   root: string;
   suggestion: NextSuggestion | null;
+  /**
+   * The checkout the candidate pool was ranked from (bug-claim-pool-computed-
+   * from-main-misses-branch-claims). `next` ranks the copies in THIS tree; a
+   * claim committed on an unmerged branch is not among them, so the envelope
+   * declares the tree and the caveat instead of ranking from `main` silently.
+   */
+  rankedFrom: RankedFrom;
 };
 
 const TERMINAL_STATUSES: ReadonlySet<string> = new Set(["done", "cancelled"]);
@@ -120,6 +128,7 @@ export function runNext(opts: NextOptions): NextResult {
   const items = loadItems(tasksDir);
   const byId = itemsById(items);
   const blockedByIndex = buildBlockedByIndex(items);
+  const rankedFrom = readRankedFrom(root);
 
   const lexicographic = (a: WorkItem, b: WorkItem) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   const todos = items
@@ -151,7 +160,7 @@ export function runNext(opts: NextOptions): NextResult {
     .map((entry) => entry.item);
   const pool = opts.ready ? rankedReady : [...rankedReady, ...blocked];
 
-  if (pool.length === 0) return { root, suggestion: null };
+  if (pool.length === 0) return { root, suggestion: null, rankedFrom };
 
   const item = pool[0]!;
   const chain: WorkItem[] = [];
@@ -203,5 +212,6 @@ export function runNext(opts: NextOptions): NextResult {
       blockedBy,
       unblocks,
     },
+    rankedFrom,
   };
 }

@@ -315,6 +315,13 @@ describe("CLI --json", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toMatch(/id\s+type\s+status\s+assignee\s+branch\s+title/);
     expect(result.stdout).toContain("launch-mvp");
+    // bug-claim-pool-computed-from-main-misses-branch-claims: the table's tree
+    // is declared, and the boundary is named instead of left silent.
+    expect(result.stdout).toContain(
+      "arggon list: ranked from this tree (no git checkout detected)",
+    );
+    expect(result.stdout).toContain("unmerged branches");
+    expect(result.stdout).toContain("arggon sync");
   });
 
   it("arggon update --json emits the contract {item} payload", () => {
@@ -487,6 +494,12 @@ describe("CLI --json", () => {
     expect(result.stdout).toContain("arggon next: task-work — Work");
     expect(result.stdout).toContain("why:");
     expect(result.stdout).toContain("arggon start task-work --assignee <login>");
+    // bug-claim-pool-computed-from-main-misses-branch-claims: the pool names
+    // the tree it ranked from and the boundary (claims on unmerged branches).
+    expect(result.stdout).toContain(
+      "arggon next: ranked from this tree (no git checkout detected)",
+    );
+    expect(result.stdout).toContain("arggon sync");
     // --include-stories opts the story back into the pool.
     const withStories = runCli(["next", "--include-stories"], dir);
     expect(withStories.status).toBe(0);
@@ -511,6 +524,11 @@ describe("CLI --json", () => {
       reason: expect.any(String),
     });
     expect(suggestion.item as Record<string, unknown>).toMatchObject({ id: "task-work" });
+    // bug-claim-pool-computed-from-main-misses-branch-claims: every ranking
+    // envelope declares the checkout it read and the branch-claims caveat.
+    expect(body.rankedFrom).toMatchObject({ branch: null, head: null });
+    expect(String((body.rankedFrom as { note?: string }).note)).toContain("unmerged branches");
+    expect(String((body.rankedFrom as { note?: string }).note)).toContain("arggon sync");
   });
 
   it("arggon next --json carries blockedBy and --ready skips blocked items", () => {

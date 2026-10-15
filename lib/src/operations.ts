@@ -61,6 +61,7 @@ import { readFrictionReport, type FrictionReport } from "./friction-report.js";
 import { runShow, type ShowComment, type ShowOptions } from "./show.js";
 import { runSync } from "./sync-command.js";
 import type { SyncFilled, SyncResult } from "./sync-types.js";
+import type { RankedFrom } from "./tree-state.js";
 import { commitPayload, type CommitPayload } from "./tracker-commit.js";
 import { runTrend, type TrendResult } from "./trend.js";
 import type { Issue, WorkItem as ContractWorkItem } from "./types.js";
@@ -139,7 +140,16 @@ export type ListOperationOptions = ListOptions & {
   full?: boolean;
 };
 
-export type ListPayload = { items: ContractWorkItem[] };
+export type ListPayload = {
+  items: ContractWorkItem[];
+  /**
+   * Additive (bug-claim-pool-computed-from-main-misses-branch-claims): the
+   * checkout the items were read from — `{ branch, head, note }`. Claims made
+   * on unmerged branches are not in this tree; the note says so and points at
+   * `arggon sync`, which reports them (`branchClaims`).
+   */
+  rankedFrom: RankedFrom;
+};
 
 export function listOperation(opts: ListOperationOptions): CommandOutcome<ListPayload> {
   try {
@@ -150,6 +160,7 @@ export function listOperation(opts: ListOperationOptions): CommandOutcome<ListPa
         items: result.items.map((item) =>
           toContractWorkItem(item, result.root, { full: opts.full === true }),
         ),
+        rankedFrom: result.rankedFrom,
       },
       readConventionVersion(result.root),
     );
@@ -222,6 +233,13 @@ export type NextPayload = {
     blockedBy: string[];
     unblocks: number;
   } | null;
+  /**
+   * Additive (bug-claim-pool-computed-from-main-misses-branch-claims): the
+   * checkout the candidate pool was ranked from — `{ branch, head, note }`.
+   * The pool never silently ranks from `main` alone: every envelope names the
+   * tree, and the note points at `arggon sync` for branch-resident claims.
+   */
+  rankedFrom: RankedFrom;
 };
 
 export function nextOperation(opts: NextOptions): CommandOutcome<NextPayload> {
@@ -236,7 +254,11 @@ export function nextOperation(opts: NextOptions): CommandOutcome<NextPayload> {
           unblocks: result.suggestion.unblocks,
         }
       : null;
-    return succeed("next", { suggestion }, readConventionVersion(result.root));
+    return succeed(
+      "next",
+      { suggestion, rankedFrom: result.rankedFrom },
+      readConventionVersion(result.root),
+    );
   } catch (err) {
     return fail("next", opts.cwd, "NEXT_FAILED", err);
   }
@@ -501,6 +523,16 @@ export type SyncPayload = {
   filled: SyncFilled | null;
   /** Additive, report-only review-verdict classification (task-review-verdict-checker). */
   verdicts: SyncResult["verdicts"];
+  /**
+   * Additive, report-only (bug-claim-pool-computed-from-main-misses-branch-
+   * claims): branch-resident claims — item copies on unmerged branches that
+   * hold a claim this tree does not show. Read from the branch copies
+   * (local git only), so "unclaimed" and "claimed on a branch I have not
+   * merged" are distinguishable.
+   */
+  branchClaims: SyncResult["branchClaims"];
+  /** Branches whose item copy could not be read — claim state unknown. */
+  branchClaimErrors: SyncResult["branchClaimErrors"];
   errors: string[];
   exit_code: 0 | 1;
 };
@@ -517,6 +549,8 @@ export function syncOperation(opts: SyncOperationOptions): CommandOutcome<SyncPa
       suggestions: result.suggestions,
       filled: result.filled,
       verdicts: result.verdicts,
+      branchClaims: result.branchClaims,
+      branchClaimErrors: result.branchClaimErrors,
       errors: result.errors,
       exit_code: result.exit_code,
     };

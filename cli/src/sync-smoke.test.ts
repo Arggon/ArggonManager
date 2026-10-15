@@ -215,6 +215,70 @@ describe("sync smoke (spawned CLI, fake gh)", () => {
     expect(failed.error?.code).toBe("SYNC_FAILED");
   }, 120_000);
 
+  // bug-claim-pool-computed-from-main-misses-branch-claims, end to end: a
+  // claim committed on an unmerged branch is invisible to the tree `sync` and
+  // `next` read, so the fixed surfaces must say so — `sync` reports the
+  // branch-resident claim, `next` names the tree it ranked from. Hermetic:
+  // temp repo, fake gh, no network.
+  it("surfaces a branch-resident claim and names the tree `next` ranked from", () => {
+    const t = initSyncTree();
+    const runGit = (...args: string[]): string => {
+      const r = spawnSync("git", ["-C", t.dir, ...args], { encoding: "utf8" });
+      expect(r.status, `git ${args.join(" ")}: ${r.stderr}`).toBe(0);
+      return r.stdout.trim();
+    };
+    runGit("config", "user.email", "t@example.com");
+    runGit("config", "user.name", "T");
+    const base = runGit("rev-parse", "--abbrev-ref", "HEAD");
+    runGit("add", "-A");
+    // --allow-empty: the tracker CLI may have auto-committed the seed tree
+    // already (a global git identity makes that succeed), and this commit only
+    // needs to exist as the branch point.
+    runGit("commit", "-q", "--allow-empty", "-m", "seed");
+
+    // The incident shape: the claim commit rides a branch, base stays todo.
+    runGit("checkout", "-q", "-b", "feat/task-set");
+    const claim = runCli(
+      ["update", "task-set", "--status", "in_progress", "--assignee", "alice"],
+      t.dir,
+      t.env,
+    );
+    expect(claim.status).toBe(0);
+    runGit("checkout", "-q", base);
+    expect(frontmatter(t.dir, "task-set").status).toBe("todo");
+
+    t.setPrs([]);
+    const json = runCli(["sync", "--json"], t.dir, t.env);
+    expect(json.status).toBe(0);
+    const body = JSON.parse(json.stdout) as Record<string, unknown>;
+    expect(body.branchClaims).toEqual([
+      {
+        id: "task-set",
+        branch: "feat/task-set",
+        pr: null,
+        assignee: "alice",
+        claimed_at: expect.any(String),
+        local: { status: "todo", assignee: null },
+      },
+    ]);
+    expect(body.branchClaimErrors).toEqual([]);
+
+    const human = runCli(["sync"], t.dir, t.env);
+    expect(human.status).toBe(0);
+    expect(human.stdout).toContain("branch-claim: task-set claimed by alice on feat/task-set");
+    expect(human.stdout).toContain("never force or steal");
+
+    // `next` never silently ranks from one tree: the envelope names the
+    // checkout and carries the caveat.
+    const next = runCli(["next", "--json"], t.dir, t.env);
+    expect(next.status).toBe(0);
+    const nextBody = JSON.parse(next.stdout) as Record<string, unknown>;
+    expect(nextBody.rankedFrom).toMatchObject({ branch: base });
+    expect(String((nextBody.rankedFrom as { note?: string }).note)).toContain("unmerged branches");
+    const nextHuman = runCli(["next"], t.dir, t.env);
+    expect(nextHuman.stdout).toContain(`arggon next: ranked from ${base}@`);
+  }, 120_000);
+
   it("rejects --check together with --write", () => {
     const t = initSyncTree();
     const r = runCli(["sync", "--check", "--write"], t.dir, t.env);
