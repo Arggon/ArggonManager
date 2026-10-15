@@ -11,7 +11,6 @@ priority: p1
 created: "2026-10-02"
 updated: "2026-10-15"
 depends_on: [task-friction-surface-parity-and-docs]
-worktree_path: /home/arggon/Projects/ArggonManager-task-friction-trigger-carrier
 ---
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-friction-trigger-carrier.md
