@@ -135,3 +135,7 @@ Evidence — compensating rule shipped (acceptance box 4), docs-only.
 - `npx prettier --check ArggonManager/docs/agents.md` → observed clean.
 
 **Not done / not applicable:** boxes 2–3 (the "if armed" branch: config line + refused-attach evidence) do not apply under the recorded keep-report-only decision; box 1 is the lead's recorded decision comment. No acceptance ticks changed in the item body — completion is the delivery lead's call.
+
+### handoff 2026-10-15 @arggon-maker — next: Delivery lead: review PR #842 (docs-only, one file, all gates green), merge it, then flip the item to done per the recorded keep-report-only decision.
+- branch: feat/task-arm-strict-worktree-writes
+- open questions: none; the sibling branch edits agents.md §Claim, so a trivial merge is expected
