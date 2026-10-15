@@ -41,11 +41,13 @@ import {
  * Full tool surface (ADR 0014, task-mcp-full-surface): ZCode has no code-mode
  * tool API, so the MCP server is a client's complete native surface. Beyond
  * the core nine it exposes `priority`/`sync`/`import_issues` through their
- * kernel operations in-process, and `start`/`branch`/`cleanup` by spawning
- * the arggon CLI itself (argv array, never a shell — injection-safe by
+ * kernel operations in-process, and `start`/`branch`/`cleanup`/`friction` by
+ * spawning the arggon CLI itself (argv array, never a shell — injection-safe by
  * construction) and returning the CLI's `--json` envelope. One implementation
  * path keeps the worktree ergonomics (the CLI's link-farm `start --worktree`,
- * `cleanup --prune`); the spawned CLI is the same path agents already use, so
+ * `cleanup --prune`) and the whole `friction --json` contract (the mode
+ * conflicts, the tier validation, the opt-out resolution, the record's
+ * `arggonVersion`); the spawned CLI is the same path agents already use, so
  * the kernel rules (no reopen, no steal — no `--force` surface anywhere) hold
  * unchanged. Kernel failures surface as tool errors and never kill the
  * session; a child that dies without an envelope (crash, timeout kill)
@@ -566,6 +568,49 @@ const TOOLS: ToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "arggon_friction",
+    description:
+      'Record friction in ArggonManager itself into the local append-only friction log (never the tracker, never the network), render its fingerprint-deduped report with `report: true` (tier "b" also carries the prefilled issues/new URL a HUMAN opens — arggon never submits it), or remove the whole log with `clear: true`. Spawns the arggon CLI. Returns the `friction --json` envelope: {ok, schemaVersion, conventionVersion, command, path, dropped?, record?, report?, rows?, count?, classes?, skippedVersions?, malformed?, optedOut, truncated?, dedupeScope?, publish?, clear?, cleared?}. A failure is a tool error with error.code "FRICTION_FAILED" plus a `reason` (`no-observation`, `no-command-shape`, `log-unwritable`, `evidence-unreadable`, the three mutually-exclusive conflicts, `unknown-tier`, `tier-without-report`).',
+    inputSchema: {
+      type: "object",
+      properties: {
+        observation: {
+          type: "string",
+          description: "one line about what broke (capped 2000; verbatim). Omit with report/clear.",
+        },
+        command: {
+          type: "string",
+          description: "the command that failed, as an argv shape (required for a capture)",
+        },
+        error: {
+          type: "string",
+          description: "the error.code from the failed envelope (capped 64)",
+        },
+        harness: { type: "string", description: "the agent harness (capped 32; default unknown)" },
+        evidence: {
+          type: "string",
+          description: "a file whose CONTENTS (never its path) are captured, capped 4000",
+        },
+        report: {
+          type: "boolean",
+          description: "render the deduped report instead of capturing",
+          default: false,
+        },
+        tier: {
+          type: "string",
+          enum: ["a", "b"],
+          description: 'report tier (requires report): "a" the report only; "b" adds publish',
+        },
+        clear: {
+          type: "boolean",
+          description: "remove the whole log (idempotent)",
+          default: false,
+        },
+      },
+      additionalProperties: false,
+    },
+  },
 ];
 
 /**
@@ -879,6 +924,26 @@ export function runMcpServer(opts: McpServerOptions): void {
           ...(args.take_over_worktree === true ? ["--take-over-worktree"] : []),
           ...(args.no_commit === true ? ["--no-commit"] : []),
           ...(args.no_gh === true ? ["--no-gh"] : []),
+        ]),
+      );
+    }
+    if (name === "arggon_friction") {
+      // Spawned, not in-process, for the same reason start/branch/cleanup are:
+      // the CLI owns the whole `friction --json` contract — the mode conflicts,
+      // the tier validation, the `x-friction` / `ARGGON_NO_FRICTION` opt-out
+      // resolution and the `arggonVersion()` every record carries. Re-entering
+      // the CLI is the one way those stay byte-identical instead of
+      // re-implemented four lines apart (task-friction-surface-parity-and-docs).
+      return toolResult(
+        spawnedOutcome(opts, "friction", [
+          ...(typeof args.observation === "string" ? [args.observation] : []),
+          ...(typeof args.command === "string" ? ["--command", args.command] : []),
+          ...(typeof args.error === "string" ? ["--error", args.error] : []),
+          ...(typeof args.harness === "string" ? ["--harness", args.harness] : []),
+          ...(typeof args.evidence === "string" ? ["--evidence", args.evidence] : []),
+          ...(args.report === true ? ["--report"] : []),
+          ...(typeof args.tier === "string" ? ["--tier", args.tier] : []),
+          ...(args.clear === true ? ["--clear"] : []),
         ]),
       );
     }

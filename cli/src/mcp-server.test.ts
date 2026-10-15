@@ -238,6 +238,7 @@ describe("mcp server", () => {
       "arggon_start",
       "arggon_branch",
       "arggon_cleanup",
+      "arggon_friction",
     ]);
     for (const tool of tools) {
       expect(tool.inputSchema.type).toBe("object");

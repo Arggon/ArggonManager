@@ -24,9 +24,9 @@ x-generated:
     generatedAt: "2026-10-15T16:04:32.505Z"
   .agents/skills/arggon-cli/references/json-contract.md:
     template: "skills/arggon-cli/references/json-contract.md"
-    checksum: "sha256:3db0a91bea1f3ebc2daf6d6191f8b7503c84e041498a5556f0f8a2606062dc91"
+    checksum: "sha256:2130f60c3bb5e8175950bd3d9e12fa06fbd278dd3a0829bac9aa174620d72717"
     arggonVersion: "0.10.0"
-    generatedAt: "2026-10-15T16:04:32.505Z"
+    generatedAt: "2026-10-15T21:11:11.068Z"
   .agents/skills/arggon-cli/references/methodology.md:
     template: "skills/arggon-cli/references/methodology.md"
     checksum: "sha256:3b71b3a122b67ee452512d5517da0c958adea7a6d72237c0fe8735285097920b"
@@ -159,7 +159,7 @@ x-generated:
     generatedAt: "2026-10-15T16:04:32.505Z"
   .claude-marketplace/arggon/skills/arggon-cli/references/json-contract.md:
     template: "docs/claude/arggon/skills/arggon-cli/references/json-contract.md"
-    checksum: "sha256:6083fbf17c8140529afad04656f2d8450d412e8918dfc4f68306c6aff8db9fe9"
+    checksum: "sha256:dfd0a53a2ad2f50ae4a5c982e859e970afac84f662df5655736fd3495fd208c4"
     arggonVersion: "0.10.0"
     generatedAt: "2026-10-15T16:04:32.505Z"
   .claude-marketplace/arggon/skills/arggon-cli/references/methodology.md:

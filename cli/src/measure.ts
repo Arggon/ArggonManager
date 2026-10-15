@@ -44,17 +44,25 @@ export const AGENTS_MD_BUDGET_BYTES = 2048;
  * parity decision — ZCode has no other native tool surface — outweighs the
  * bloat risk; the cap still keeps the surface inside ~4.1K tokens with modest
  * headroom. Advisory (no hard cap): report-only budget section.
+ *
+ * Raised from 16 KiB to 20 KiB by task-friction-surface-parity-and-docs, which
+ * added the sixteenth tool: `ArggonManager/docs/agents.md` §MCP makes a command
+ * that ships on one machine surface only a convention violation, so `arggon
+ * friction` had to join `arggon mcp` even though the surface is already at its
+ * advisory bound. Full 16-tool surface measured 18,054 B — the cap keeps it
+ * inside ~4.5K tokens. Raised with the delta named, not silently.
  */
-export const MCP_TOOLS_BUDGET_BYTES = 16_384;
+export const MCP_TOOLS_BUDGET_BYTES = 20_480;
 
 /**
  * Live tools/list bytes, reproduced two ways: the commit's own
  * `doctor --budget` and an independent stdio `tools/list` sum of
  * `JSON.stringify(tool)` lengths. 9,040 B / 9 tools at baseline commit 5d6c504
  * (2026-09-15); 15,701 B / 15 tools at the full-surface re-baseline
- * (2026-09-29, ADR 0014).
+ * (2026-09-29, ADR 0014); 18,054 B / 16 tools with `arggon_friction`
+ * (task-friction-surface-parity-and-docs).
  */
-export const MCP_TOOLS_BASELINE_BYTES = 15_701;
+export const MCP_TOOLS_BASELINE_BYTES = 18_054;
 
 export type McpToolBytes = {
   /** MCP tool name (e.g. arggon_update). */
@@ -287,7 +295,14 @@ export async function measureBudget(options: MeasureBudgetOptions = {}): Promise
     // git identity (task-spawned-tests-gh-path: without it the fixture comment
     // failed whenever no author source was available).
     runCli(
-      ["comment", firstTask, "fixture comment so show has content", "--author", "fixture", "--json"],
+      [
+        "comment",
+        firstTask,
+        "fixture comment so show has content",
+        "--author",
+        "fixture",
+        "--json",
+      ],
       dir,
     );
 

@@ -10077,6 +10077,7 @@ const MAX_NATIVE_PREPARATION_NAMES = 32;
 const MAX_NATIVE_PREPARATION_VALUE_CHARS = 200;
 const MAX_NATIVE_DETAIL_CHARS = 500;
 const MAX_NATIVE_ERROR_CHARS = 2048;
+const FRICTION_CLI_TIMEOUT_MS = 30_000;
 function asString(value) {
     return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
 }
@@ -11753,7 +11754,59 @@ const TOOL_SPECS = [
         }),
         mutates: true,
     },
+    {
+        name: "friction",
+        description: "Record friction in ArggonManager itself into the local log, render its deduped report, or clear the log. Runs the CLI; never the tracker, never the network.",
+        input: {
+            type: "object",
+            properties: {
+                observation: { type: "string" },
+                command: { type: "string" },
+                error: { type: "string", description: "error.code from the failed envelope." },
+                harness: { type: "string" },
+                evidence: { type: "string", description: "File whose CONTENTS are captured." },
+                report: { type: "boolean" },
+                tier: { type: "string", description: "a|b; requires report." },
+                clear: { type: "boolean" },
+            },
+            additionalProperties: false,
+        },
+        output: envelopeSchema({ record: OBJECT, rows: { type: "array" }, publish: OBJECT }),
+        run: (kernel, input, options) => nativeFriction(kernel, options, input),
+    },
 ];
+async function nativeFriction(kernel, options, input) {
+    const argv = [
+        "friction",
+        "--json",
+        ...(asString(input.observation) !== undefined ? [asString(input.observation)] : []),
+        ...argvValue(input, "command", "--command"),
+        ...argvValue(input, "error", "--error"),
+        ...argvValue(input, "harness", "--harness"),
+        ...argvValue(input, "evidence", "--evidence"),
+        ...argvSwitch(input, "report", "--report"),
+        ...argvValue(input, "tier", "--tier"),
+        ...argvSwitch(input, "clear", "--clear"),
+    ];
+    const result = await run(ARGGON_SERVER, argv, options.cwd, FRICTION_CLI_TIMEOUT_MS);
+    let envelope;
+    try {
+        envelope = JSON.parse(result.stdout);
+    }
+    catch {
+        return worktreeFail(kernel, "friction", "FRICTION_FAILED", `arggon friction needs the arggon CLI on PATH (it was not found or produced no JSON envelope); ` +
+            `run \`arggon friction --help\` to confirm the install, or use the arggon_friction MCP tool`, kernel.readConventionVersion(options.cwd));
+    }
+    const ok = envelope.ok === true && result.code === 0;
+    return { ok, envelope: envelope };
+}
+function argvValue(input, key, flag) {
+    const value = asString(input[key]);
+    return value !== undefined ? [flag, value] : [];
+}
+function argvSwitch(input, key, flag) {
+    return key in input && input[key] === true ? [flag] : [];
+}
 function worktreeOptions(ctx) {
     const project = ctx.location?.project;
     const projectID = asString(project?.id);

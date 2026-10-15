@@ -90,14 +90,15 @@ import {
 // positional env MAP — task-plugin-test-type-coverage). `runCli` is imported
 // for the negative control below, which pins that the wrong shapes stay TYPE
 // errors.
-import { runCli, runCliJson } from "../../../cli/src/test-spawn.js";
+import { runCli, cliNodeArgs, runCliJson } from "../../../cli/src/test-spawn.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 
 /**
- * The twelve spec tools (spec-native-first-011 §Tools) plus the three W4
- * worktree-domain tools (`start`/`branch`/`cleanup`,
+ * The spec-native kernel tools (spec-native-first-011 §Tools), the
+ * CLI-re-entering `friction` tool (task-friction-surface-parity-and-docs) and
+ * the three W4 worktree-domain tools (`start`/`branch`/`cleanup`,
  * task-native-permissions-worktrees).
  */
 const EXPECTED_TOOLS = [
@@ -113,13 +114,24 @@ const EXPECTED_TOOLS = [
   "priority",
   "sync",
   "import_issues",
+  "friction",
   "start",
   "branch",
   "cleanup",
 ] as const;
 
-/** ADR 0006 advisory tool-schema bound (the MCP `tools/list` cap, task-schema-budget). */
-const NATIVE_TOOLS_BUDGET_BYTES = 12_288;
+/**
+ * ADR 0006 advisory tool-schema bound (the MCP `tools/list` cap,
+ * task-schema-budget).
+ *
+ * Raised from 12,288 to 13,312 for task-friction-surface-parity-and-docs, which
+ * added one tool to the namespace as a deliberate convention requirement
+ * (`ArggonManager/docs/agents.md` §MCP: a command that ships on one surface
+ * only is a convention violation). The bound is ADVISORY — it measures the
+ * Code Mode catalog payload, it never rejects a call — so it is re-stated here
+ * with the delta named rather than moved silently.
+ */
+const NATIVE_TOOLS_BUDGET_BYTES = 13_312;
 
 const tmpDirs: string[] = [];
 afterEach(() => {
@@ -627,6 +639,235 @@ describe("native tool outputs mirror the CLI --json envelopes", () => {
       expect(trackerSnapshot(toolDir)).toEqual(trackerSnapshot(cliDir));
     });
   }
+});
+
+/**
+ * The native `friction` tool mirrors the CLI `friction --json` envelope
+ * (task-friction-surface-parity-and-docs).
+ *
+ * `tools.arggon.friction` is the one native tool that does NOT call the kernel
+ * in-process: it re-enters the CLI, because the CLI owns the whole contract —
+ * the three mode conflicts, the `--tier` validation, the opt-out resolution and
+ * the `arggonVersion()` every record carries (see `nativeFriction`). So what
+ * these tests pin is the RE-ENTRY: the same arguments reach the same command in
+ * the same resolved checkout, and the envelope a Code Mode script receives is
+ * the CLI's, byte for byte.
+ *
+ * A fake `arggon` on PATH keeps the lane hermetic — the same `fakeGh` pattern.
+ * The shim runs THIS worktree's CLI entry through the shared tsx loader, so the
+ * comparison is against the source under test, never against a globally
+ * installed build. `ARGGON_STATE_DIR` is pinned inside the fixture tree, so
+ * both sides write one log and the reported `path` normalizes to `<root>`.
+ */
+describe("native friction mirrors the CLI --json envelope (task-friction-surface-parity-and-docs)", () => {
+  const FRICTION_STATE_DIR = "friction-state";
+
+  /**
+   * Run `fn` with `pathValue` as the whole PATH and the friction state pinned.
+   * Replacing PATH wholesale (rather than prepending) is what lets the
+   * `arggon`-absent case be tested at all: a prepend still leaves the real
+   * binary reachable, so the failure would never happen here.
+   */
+  async function withFrictionEnv<T>(
+    pathValue: string,
+    state: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    const originalPath = process.env.PATH;
+    const originalState = process.env.ARGGON_STATE_DIR;
+    const originalOptOut = process.env.ARGGON_NO_FRICTION;
+    delete process.env.ARGGON_NO_FRICTION;
+    process.env.PATH = pathValue;
+    process.env.ARGGON_STATE_DIR = state;
+    try {
+      return await fn();
+    } finally {
+      process.env.PATH = originalPath;
+      if (originalState === undefined) delete process.env.ARGGON_STATE_DIR;
+      else process.env.ARGGON_STATE_DIR = originalState;
+      if (originalOptOut === undefined) delete process.env.ARGGON_NO_FRICTION;
+      else process.env.ARGGON_NO_FRICTION = originalOptOut;
+    }
+  }
+
+  /** `withFrictionEnv` with the fake `arggon` shim in front of the real PATH. */
+  async function withFakeArgon<T>(binDir: string, state: string, fn: () => Promise<T>): Promise<T> {
+    return withFrictionEnv(`${binDir}:${process.env.PATH ?? ""}`, state, fn);
+  }
+
+  /** The typed tool error from ONE rejected call (a `catch` that keeps the type). */
+  async function toolError(
+    defs: ArgonToolDefinition[],
+    name: string,
+    input: Record<string, unknown>,
+  ): Promise<ArgonToolError> {
+    try {
+      await tool(defs, name).execute(input);
+    } catch (err) {
+      expect(err, name).toBeInstanceOf(ArgonToolError);
+      return err as ArgonToolError;
+    }
+    throw new Error(`expected ${name} to fail with a typed tool error`);
+  }
+
+  /** A `arggon` shim that runs this worktree's CLI source (tsx loader). */
+  function fakeArgon(dir: string): string {
+    const binDir = join(dir, "bin");
+    mkdirSync(binDir, { recursive: true });
+    const shim = join(binDir, "arggon");
+    writeFileSync(
+      shim,
+      `#!/bin/sh\nexec ${process.execPath} ${cliNodeArgs().join(" ")} "$@"\n`,
+      "utf8",
+    );
+    chmodSync(shim, 0o755);
+    return binDir;
+  }
+
+  /** Seed `<state>/arggon/friction.jsonl` with already-shaped records. */
+  function seedLog(state: string, records: Array<Record<string, unknown>>): void {
+    const dir = join(state, "arggon");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, "friction.jsonl"),
+      `${records
+        .map((record) =>
+          JSON.stringify({
+            v: 1,
+            ts: "2026-10-02T10:00:00.000Z",
+            reporterId: "a1b2c3d4e5f6",
+            harness: "opencode",
+            arggonVersion: "0.6.0",
+            majorVersion: "0",
+            os: "linux",
+            arch: "x64",
+            node: "v22.12.0",
+            commandShape: "start --worktree <arg>",
+            ...record,
+          }),
+        )
+        .join("\n")}\n`,
+      "utf8",
+    );
+  }
+
+  const readCases: Array<{ input: Record<string, unknown>; args: string[] }> = [
+    { input: { report: true }, args: ["friction", "--report"] },
+    {
+      input: { observation: "start failed twice", command: "validate", error: "START_FAILED", harness: "opencode" },
+      args: ["friction", "start failed twice", "--command", "validate", "--error", "START_FAILED", "--harness", "opencode"],
+    },
+    { input: { clear: true }, args: ["friction", "--clear"] },
+  ];
+
+  for (const testCase of readCases) {
+    it(`${JSON.stringify(testCase.input)} equals \`${testCase.args.join(" ")} --json\``, async () => {
+      const dir = seedTree();
+      const binDir = fakeArgon(mkdtemp("arggon-w2-friction-bin-"));
+      const state = join(dir, FRICTION_STATE_DIR);
+      await withFakeArgon(binDir, state, async () => {
+        const expected = runCliJson(testCase.args, dir);
+        expect(expected.status, expected.stderr).toBe(0);
+        const output = await tool(definitions(dir), "friction").execute(testCase.input);
+        expect(normalize(`${JSON.stringify(output.output)}\n`, dir)).toBe(
+          normalize(expected.stdout, dir),
+        );
+      });
+    });
+  }
+
+  it("renders the seeded report and the tier-b publish doc identically", async () => {
+    const dir = seedTree();
+    const binDir = fakeArgon(mkdtemp("arggon-w2-friction-bin-"));
+    const state = join(dir, FRICTION_STATE_DIR);
+    await withFakeArgon(binDir, state, async () => {
+      seedLog(state, [
+        { ts: "2026-10-02T10:00:00.000Z", fingerprint: "aaa", errorCode: "START_FAILED", narrative: "one" },
+        { ts: "2026-10-09T18:45:00.000Z", fingerprint: "aaa", errorCode: "START_FAILED", narrative: "the newest" },
+      ]);
+      const expected = runCliJson(["friction", "--report", "--tier", "b"], dir);
+      expect(expected.status, expected.stderr).toBe(0);
+      const output = await tool(definitions(dir), "friction").execute({ report: true, tier: "b" });
+      expect(normalize(`${JSON.stringify(output.output)}\n`, dir)).toBe(
+        normalize(expected.stdout, dir),
+      );
+      expect(output.output).toMatchObject({
+        ok: true,
+        report: true,
+        count: 2,
+        classes: 1,
+        dedupeScope: "local-only",
+        publish: { tier: "b" },
+      });
+    });
+  });
+
+  it("surfaces every named failure as a typed tool error with the CLI's reason", async () => {
+    const dir = seedTree();
+    const binDir = fakeArgon(mkdtemp("arggon-w2-friction-bin-"));
+    const state = join(dir, FRICTION_STATE_DIR);
+    await withFakeArgon(binDir, state, async () => {
+      const cases: Array<{ input: Record<string, unknown>; reason: string }> = [
+        { input: { command: "validate" }, reason: "no-observation" },
+        { input: { observation: "an observation" }, reason: "no-command-shape" },
+        { input: { report: true, clear: true }, reason: "report-and-clear-mutually-exclusive" },
+        {
+          input: { clear: true, observation: "an observation", command: "validate" },
+          reason: "clear-and-capture-mutually-exclusive",
+        },
+        { input: { report: true, tier: "c" }, reason: "unknown-tier" },
+        { input: { tier: "a" }, reason: "tier-without-report" },
+      ];
+      for (const testCase of cases) {
+        const error = await toolError(definitions(dir), "friction", testCase.input);
+        expect(error.code, testCase.reason).toBe("FRICTION_FAILED");
+        expect(error.command, testCase.reason).toBe("friction");
+        expect(error.envelope, testCase.reason).toMatchObject({
+          ok: false,
+          schemaVersion: 1,
+          reason: testCase.reason,
+        });
+      }
+    });
+  });
+
+  it("fails log-unwritable with the CLI's named path and leaves the session alive", async () => {
+    const dir = seedTree();
+    const binDir = fakeArgon(mkdtemp("arggon-w2-friction-bin-"));
+    const state = join(dir, FRICTION_STATE_DIR);
+    await withFakeArgon(binDir, state, async () => {
+      const logDir = join(state, "arggon");
+      mkdirSync(logDir, { recursive: true });
+      const logPath = join(logDir, "friction.jsonl");
+      writeFileSync(logPath, "", "utf8");
+      chmodSync(logPath, 0o400);
+      const input = { observation: "an observation", command: "validate" };
+      const error = await toolError(definitions(dir), "friction", input);
+      expect(error.code).toBe("FRICTION_FAILED");
+      expect(error.envelope).toMatchObject({
+        ok: false,
+        schemaVersion: 1,
+        reason: "log-unwritable",
+      });
+      expect(String(error.envelope.path)).toContain("friction.jsonl");
+      // Failure isolation (ADR 0011): the same session can still call another
+      // tool after a typed tool error.
+      expect(await tool(definitions(dir), "validate").execute({}).then((r) => r.output.ok)).toBe(true);
+    });
+  });
+
+  it("names the CLI path a HUMAN needs when the arggon binary is unavailable", async () => {
+    const dir = seedTree();
+    const state = join(dir, FRICTION_STATE_DIR);
+    const error = await withFrictionEnv("/nonexistent-bin", state, () =>
+      toolError(definitions(dir), "friction", { report: true }),
+    );
+    expect(error.code).toBe("FRICTION_FAILED");
+    expect(error.envelope).toMatchObject({ ok: false, command: "friction" });
+    expect(String((error.envelope.error as { message?: unknown }).message)).toContain(
+      "arggon friction needs the arggon CLI on PATH",
+    );
+  });
 });
 
 /**

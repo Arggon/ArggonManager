@@ -16,11 +16,19 @@
  * `SyntaxError` from `JSON.parse`.
  */
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  chmodSync,
+  cpSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { PassThrough } from "node:stream";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runCreate } from "@arggondev/lib";
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
@@ -220,9 +228,20 @@ function normalize(envelope: Envelope, dir: string): Envelope {
   return JSON.parse(
     JSON.stringify(envelope)
       .replaceAll(dir, "<root>")
-      .replace(/"claimed_at":"[^"]*"/g, '"claimed_at":"<lease>"'),
+      .replace(/"claimed_at":"[^"]*"/g, '"claimed_at":"<lease>"')
+      // A friction record's `ts` (and a report row's `firstSeen`/`lastSeen`) is
+      // the wall clock of the invocation that wrote it, so two surfaces
+      // legitimately disagree on it while agreeing on everything else. Masked
+      // here rather than at each call site so every future comparison inherits
+      // it — the alternative is a friction assertion that can only pass by
+      // running both sides inside the same millisecond.
+      // task-friction-surface-parity-and-docs.
+      .replace(ISO_TIMESTAMP, "<ts>"),
   ) as Envelope;
 }
+
+/** ISO-8601 UTC with milliseconds — the only timestamp shape the envelopes carry. */
+const ISO_TIMESTAMP = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/g;
 
 function seedTree(dir: string): void {
   runInit({ dir, force: false });
@@ -614,6 +633,333 @@ describe("CLI <-> MCP parity", () => {
     expect(divergent.isError).toBe(false);
     expect(() => expectSameEnvelope(divergent, cliResult)).toThrow(/envelope mismatch/);
   });
+
+  /**
+   * `arggon friction` on the two machine surfaces
+   * (task-friction-surface-parity-and-docs): the same arguments must produce
+   * the same envelope, on the happy arms AND on every named error path. The
+   * third surface, the native `tools.arggon.friction`, is asserted against the
+   * CLI in `opencode/plugins/arggon/tools.test.ts` (the same pattern the
+   * GitHub-dependent kernel tools use there).
+   *
+   * ONE tree carries both sides on purpose. The friction log lives outside the
+   * tracker, so a twin tree would change exactly one thing — the `reporterId`
+   * (a digest over the per-machine salt and the repo path) — and pinning
+   * `ARGGON_STATE_DIR` INSIDE the tree makes the envelope's `path` normalize
+   * to the same `<root>` on both sides. The CLI child and the MCP-spawned CLI
+   * child both inherit `process.env`, so one variable pins both.
+   */
+  describe("friction surface parity", () => {
+    const FRICTION_STATE_DIR = "friction-state";
+    const savedEnv = new Map<string, string | undefined>();
+
+    beforeEach(() => {
+      savedEnv.set("ARGGON_STATE_DIR", process.env.ARGGON_STATE_DIR);
+      savedEnv.set("ARGGON_NO_FRICTION", process.env.ARGGON_NO_FRICTION);
+    });
+
+    afterEach(() => {
+      for (const [key, value] of savedEnv) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      savedEnv.clear();
+    });
+
+    /** One initialized tree whose friction log lives inside it. */
+    function frictionTree(): string {
+      const dir = mkdtempSync(join(tmpdir(), "arggon-parity-friction-"));
+      seedTree(dir);
+      process.env.ARGGON_STATE_DIR = join(dir, FRICTION_STATE_DIR);
+      return dir;
+    }
+
+    /** Both surfaces, one mode, compared. */
+    async function parity(
+      dir: string,
+      cliArgs: string[],
+      mcpArgs: Record<string, unknown>,
+      expectFailure = false,
+    ): Promise<{ cli: SurfaceRead; mcp: McpRead }> {
+      const cli = readCli(cliArgs, dir, !expectFailure);
+      const mcp = await mcpCall(dir, "arggon_friction", mcpArgs, CLI_SPAWN);
+      if (expectFailure) {
+        expect(
+          mcp.isError,
+          `MCP: arggon_friction was expected to be a tool error\n${mcp.raw}`,
+        ).toBe(true);
+      } else {
+        expectOk(mcp);
+      }
+      expectSameEnvelope(mcp, cli);
+      return { cli, mcp };
+    }
+
+    it("--report emits the same empty-log envelope through both entry points", async () => {
+      const dir = frictionTree();
+      const { cli, mcp } = await parity(dir, ["friction", "--report"], { report: true });
+      expectJsonOnly(cli, mcp);
+      // The schemaVersion never moved: the whole surface is additive.
+      expect(cli.envelope).toMatchObject({
+        ok: true,
+        schemaVersion: 1,
+        command: "friction",
+        report: true,
+        count: 0,
+        classes: 0,
+        dropped: 0,
+        optedOut: false,
+        dedupeScope: "local-only",
+      });
+      expect(cli.envelope.rows).toEqual([]);
+    });
+
+    it("a capture appends one identical record through both entry points", async () => {
+      const dir = frictionTree();
+      const observation = "start failed twice in the same tree";
+      const { cli } = await parity(
+        dir,
+        ["friction", observation, "--command", "arggon start --worktree task-x"],
+        { observation, command: "arggon start --worktree task-x" },
+      );
+      const record = cli.envelope.record as Record<string, unknown>;
+      // Same machine salt, same repo path, same stable fields ⇒ the same
+      // fingerprint and the same reporter id on both sides (that is what makes
+      // one tree the right choice here).
+      expect(record).toMatchObject({
+        v: 1,
+        commandShape: "start --worktree <arg>",
+        harness: "unknown",
+      });
+      expect(String(record.fingerprint)).toMatch(/^[0-9a-f]{16}$/);
+      expect(String(record.reporterId)).toMatch(/^[0-9a-f]{12}$/);
+      // `--error` / `--harness` are the same arguments on both surfaces.
+      const second = await parity(
+        dir,
+        [
+          "friction",
+          "classed",
+          "--command",
+          "validate",
+          "--error",
+          "VALIDATE_FAILED",
+          "--harness",
+          "opencode",
+        ],
+        {
+          observation: "classed",
+          command: "validate",
+          error: "VALIDATE_FAILED",
+          harness: "opencode",
+        },
+      );
+      expect((second.cli.envelope.record as { errorCode?: string }).errorCode).toBe(
+        "VALIDATE_FAILED",
+      );
+    });
+
+    it("--report renders the same deduped rows and tier-b publish doc through both entry points", async () => {
+      const dir = frictionTree();
+      const state = process.env.ARGGON_STATE_DIR as string;
+      const logDir = join(state, "arggon");
+      mkdirSync(logDir, { recursive: true });
+      writeFileSync(
+        join(logDir, "friction.jsonl"),
+        [
+          {
+            v: 1,
+            ts: "2026-10-02T10:00:00.000Z",
+            fingerprint: "aaa",
+            reporterId: "a1b2c3d4e5f6",
+            harness: "opencode",
+            arggonVersion: "0.6.0",
+            majorVersion: "0",
+            os: "linux",
+            arch: "x64",
+            node: "v22.12.0",
+            commandShape: "start --worktree <arg>",
+            errorCode: "START_FAILED",
+            narrative: "one",
+          },
+          {
+            v: 1,
+            ts: "2026-10-09T18:45:00.000Z",
+            fingerprint: "aaa",
+            reporterId: "a1b2c3d4e5f6",
+            harness: "opencode",
+            arggonVersion: "0.6.0",
+            majorVersion: "0",
+            os: "linux",
+            arch: "x64",
+            node: "v22.12.0",
+            commandShape: "start --worktree <arg>",
+            errorCode: "START_FAILED",
+            narrative: "the newest one",
+          },
+          {
+            v: 1,
+            ts: "2026-10-04T08:00:00.000Z",
+            fingerprint: "bbb",
+            reporterId: "a1b2c3d4e5f6",
+            harness: "opencode",
+            arggonVersion: "0.6.0",
+            majorVersion: "0",
+            os: "linux",
+            arch: "x64",
+            node: "v22.12.0",
+            commandShape: "validate",
+            errorCode: "VALIDATE_FAILED",
+            narrative: "x",
+          },
+        ]
+          .map((record) => JSON.stringify(record))
+          .join("\n") + "\n",
+        "utf8",
+      );
+      const { cli } = await parity(dir, ["friction", "--report"], { report: true });
+      expect(cli.envelope).toMatchObject({ count: 3, classes: 2, dedupeScope: "local-only" });
+      const rows = cli.envelope.rows as Array<Record<string, unknown>>;
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toMatchObject({ fingerprint: "aaa", count: 2, narrative: "the newest one" });
+      expect(rows[1]).toMatchObject({ fingerprint: "bbb", count: 1 });
+
+      // Tier b adds the prefilled publish doc a HUMAN opens; it must ride the
+      // same envelope on both surfaces (arggon never submits it).
+      const tierB = await parity(dir, ["friction", "--report", "--tier", "b"], {
+        report: true,
+        tier: "b",
+      });
+      expect(tierB.cli.envelope).toMatchObject({ publish: { tier: "b" } });
+      expect(String((tierB.cli.envelope.publish as { url: string }).url)).toContain(
+        "github.com/Arggon/ArggonManager/issues/new",
+      );
+    });
+
+    it("fails identically with reason no-observation through both entry points", async () => {
+      const dir = frictionTree();
+      const { cli } = await parity(
+        dir,
+        ["friction", "--command", "validate"],
+        { command: "validate" },
+        true,
+      );
+      expect(cli.envelope.ok).toBe(false);
+      expect((cli.envelope.error as { code: string }).code).toBe("FRICTION_FAILED");
+      expect(cli.envelope.reason).toBe("no-observation");
+    });
+
+    it("fails identically with reason no-command-shape through both entry points", async () => {
+      const dir = frictionTree();
+      const { cli } = await parity(
+        dir,
+        ["friction", "an observation"],
+        { observation: "an observation" },
+        true,
+      );
+      expect((cli.envelope.error as { code: string }).code).toBe("FRICTION_FAILED");
+      expect(cli.envelope.reason).toBe("no-command-shape");
+    });
+
+    it("fails identically on the report/clear conflict through both entry points", async () => {
+      const dir = frictionTree();
+      const { cli } = await parity(
+        dir,
+        ["friction", "--report", "--clear"],
+        { report: true, clear: true },
+        true,
+      );
+      expect(cli.envelope.ok).toBe(false);
+      expect((cli.envelope.error as { code: string }).code).toBe("FRICTION_FAILED");
+      expect(cli.envelope.reason).toBe("report-and-clear-mutually-exclusive");
+      // The conflict discriminant rides beside the error, so a machine can tell
+      // WHICH conflict it hit without parsing the prose.
+      expect(cli.envelope).toMatchObject({ report: true, clear: true });
+    });
+
+    it("fails identically on the clear/capture conflict and an unknown tier", async () => {
+      const dir = frictionTree();
+      const clear = await parity(
+        dir,
+        ["friction", "--clear", "an observation", "--command", "validate"],
+        { clear: true, observation: "an observation", command: "validate" },
+        true,
+      );
+      expect(clear.cli.envelope.reason).toBe("clear-and-capture-mutually-exclusive");
+
+      const tier = await parity(
+        dir,
+        ["friction", "--report", "--tier", "c"],
+        { report: true, tier: "c" },
+        true,
+      );
+      expect(tier.cli.envelope.reason).toBe("unknown-tier");
+
+      const without = await parity(dir, ["friction", "--tier", "a"], { tier: "a" }, true);
+      expect(without.cli.envelope.reason).toBe("tier-without-report");
+    });
+
+    it("fails identically with reason log-unwritable through both entry points", async () => {
+      const dir = frictionTree();
+      const state = process.env.ARGGON_STATE_DIR as string;
+      const logDir = join(state, "arggon");
+      mkdirSync(logDir, { recursive: true });
+      const logPath = join(logDir, "friction.jsonl");
+      writeFileSync(logPath, "", "utf8");
+      // The append is the only write, so a read-only log is enough to make it
+      // fail — and the failure must name the path it could not write.
+      chmodSync(logPath, 0o400);
+      const { cli } = await parity(
+        dir,
+        ["friction", "an observation", "--command", "validate"],
+        { observation: "an observation", command: "validate" },
+        true,
+      );
+      expect(cli.envelope.ok).toBe(false);
+      expect((cli.envelope.error as { code: string }).code).toBe("FRICTION_FAILED");
+      expect(cli.envelope.reason).toBe("log-unwritable");
+      expect(String(cli.envelope.path)).toContain("friction.jsonl");
+    });
+
+    it("--clear reports the same cleared count through both entry points", async () => {
+      const dir = frictionTree();
+      const state = process.env.ARGGON_STATE_DIR as string;
+      const logDir = join(state, "arggon");
+      const logPath = join(logDir, "friction.jsonl");
+      const line = `${JSON.stringify({
+        v: 1,
+        ts: "2026-10-02T10:00:00.000Z",
+        fingerprint: "aaa",
+        reporterId: "a1b2c3d4e5f6",
+        harness: "opencode",
+        arggonVersion: "0.6.0",
+        majorVersion: "0",
+        os: "linux",
+        arch: "x64",
+        node: "v22.12.0",
+        commandShape: "validate",
+        narrative: "n",
+      })}\n`;
+      // Each side needs its OWN log to remove — `clear` is destructive, so the
+      // log is re-seeded between the two reads rather than shared.
+      const seed = (): void => {
+        mkdirSync(logDir, { recursive: true });
+        writeFileSync(logPath, line, "utf8");
+      };
+      seed();
+      const cli = readCli(["friction", "--clear"], dir);
+      expect(cli.envelope).toMatchObject({ ok: true, clear: true, cleared: 1 });
+      seed();
+      const mcp = await mcpCall(dir, "arggon_friction", { clear: true }, CLI_SPAWN);
+      expectOk(mcp);
+      expectSameEnvelope(mcp, cli);
+
+      // Idempotent on the already-empty log, on the same state dir this time:
+      // "already clear" is what was asked for, so it reports 0 rather than an
+      // error — and it reports 0 identically on both surfaces.
+      const second = await parity(dir, ["friction", "--clear"], { clear: true });
+      expect(second.cli.envelope).toMatchObject({ ok: true, clear: true, cleared: 0 });
+    });
+  });
 });
 
 /**
@@ -700,6 +1046,9 @@ const PARITY_EXCEPTIONS: Record<string, Record<string, string>> = {
   cleanup: {
     "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
   },
+  friction: {
+    "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
+  },
 };
 
 /** Positional CLI arguments and the MCP schema property each maps to. */
@@ -719,6 +1068,7 @@ const POSITIONAL_MAP: Record<string, string[]> = {
   start: ["id"],
   branch: ["id"],
   cleanup: [],
+  friction: ["observation"],
 };
 
 /**
@@ -743,6 +1093,7 @@ const PARITY_COMMANDS = [
   "start",
   "branch",
   "cleanup",
+  "friction",
 ] as const;
 
 const TOOL_NAME: Record<string, string> = {
@@ -751,11 +1102,13 @@ const TOOL_NAME: Record<string, string> = {
 
 /**
  * Envelope parity (the describe above) covers only tools runnable on an
- * offline fixture: priority/branch/cleanup run both sides; sync and
+ * offline fixture: priority/branch/cleanup and the whole `friction` surface run
+ * both sides (friction is a local file — no network, no tracker write); sync and
  * import_issues need `gh` + a GitHub remote and start pushes, so they get
  * option-surface parity only — their kernel/CLI paths are the pre-existing,
  * CI-smoked surfaces (`smoke:native-start-cold` drives start cold on every
- * PR).
+ * PR). The native `tools.arggon.friction` is compared against the CLI in
+ * `opencode/plugins/arggon/tools.test.ts` (task-friction-surface-parity-and-docs).
  */
 
 function parityToolName(command: string): string {

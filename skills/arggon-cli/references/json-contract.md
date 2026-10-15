@@ -90,11 +90,12 @@ seam, never a new surface. **ZCode** registers it in the plugin bundle's
 local marketplace); **Claude Code** registers it through the init-generated
 `.mcp.json` (the `claude` seam, beside the generated `CLAUDE.md` ->
 `@AGENTS.md` pointer) — the `zcode:mcp` / `claude:mcp` mechanisms the
-capability matrix (`adapters/capability-matrix.json`) declares. **Fifteen
+capability matrix (`adapters/capability-matrix.json`) declares. **Sixteen
 tools**: the core nine `arggon_list`, `arggon_create`,
 `arggon_update`, `arggon_comment`, `arggon_handoff`, `arggon_show`,
 `arggon_next`, `arggon_report`, `arggon_validate`, plus `arggon_priority`,
-`arggon_sync`, `arggon_import_issues` (kernel operations, in-process) and the
+`arggon_sync`, `arggon_import_issues` (kernel operations, in-process), the
+local friction channel `arggon_friction` and the
 worktree lifecycle `arggon_start`, `arggon_branch`, `arggon_cleanup` (each
 spawns the arggon CLI — argv array, no shell — and returns its `--json`
 envelope; `start` pushes and may hit the network, with a 10-minute budget per

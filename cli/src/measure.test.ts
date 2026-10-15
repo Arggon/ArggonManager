@@ -233,7 +233,7 @@ describe("MCP tool-schema budget (task-schema-budget)", () => {
 
   it("evaluateBudget checks the live tools/list against the advisory 12 KiB budget", async () => {
     const m = await measureBudget();
-    expect(m.mcp.toolCount).toBe(15); // the live surface (mcp-parity.test.ts wraps the same 15 commands)
+    expect(m.mcp.toolCount).toBe(16); // the live surface (mcp-parity.test.ts wraps the same 16 commands)
     expect(m.mcp.totalBytes).toBeGreaterThan(MCP_TOOLS_BASELINE_BYTES - 2_000); // near the recorded baseline
     const checks = evaluateBudget(m);
     const mcpCheck = checks.find((c) => c.name === "mcp tools/list")!;
@@ -248,7 +248,7 @@ describe("MCP tool-schema budget (task-schema-budget)", () => {
 
   it("measureMcpSchema reads the LIVE server surface (never a copied schema list)", async () => {
     const budget = await measureMcpSchema();
-    expect(budget.toolCount).toBe(15);
+    expect(budget.toolCount).toBe(16);
     expect(budget.totalBytes).toBeGreaterThan(0);
     expect(budget.largestTools[0]!.name).toMatch(/^arggon_/);
   }, 60_000);

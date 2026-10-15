@@ -256,6 +256,8 @@ const MAX_NATIVE_PREPARATION_NAMES = 32
 const MAX_NATIVE_PREPARATION_VALUE_CHARS = 200
 const MAX_NATIVE_DETAIL_CHARS = 500
 const MAX_NATIVE_ERROR_CHARS = 2048
+/** Timeout for one `arggon friction` CLI invocation (local file I/O only). */
+const FRICTION_CLI_TIMEOUT_MS = 30_000
 
 // ---------------------------------------------------------------------------
 // Pure helpers (unit-tested; no I/O)
@@ -2371,9 +2373,11 @@ const BOOLEAN = { type: "boolean" }
 const NUMBER = { type: "number" }
 
 /**
- * The twelve kernel tools (spec-native-first-011 §Tools), each one a thin
- * adapter over its kernel operation. Inputs mirror the CLI/MCP option surface
- * (arrays where the kernel takes lists); outputs are the documented envelopes.
+ * The kernel tools (spec-native-first-011 §Tools), each one a thin adapter
+ * over its kernel operation — with one deliberate exception, `friction`, which
+ * re-enters the CLI so the three surfaces stay on one implementation path (see
+ * {@link nativeFriction}). Inputs mirror the CLI/MCP option surface (arrays
+ * where the kernel takes lists); outputs are the documented envelopes.
  *
  * Schemas stay deliberately lean: the Code Mode catalog renders each tool
  * signature (descriptions become comments) and the runtime caps the whole
@@ -2854,7 +2858,100 @@ const TOOL_SPECS: ArgonToolSpec[] = [
       }),
     mutates: true,
   },
+  {
+    name: "friction",
+    description:
+      "Record friction in ArggonManager itself into the local log, render its deduped report, or clear the log. Runs the CLI; never the tracker, never the network.",
+    input: {
+      type: "object",
+      properties: {
+        observation: { type: "string" },
+        command: { type: "string" },
+        error: { type: "string", description: "error.code from the failed envelope." },
+        harness: { type: "string" },
+        evidence: { type: "string", description: "File whose CONTENTS are captured." },
+        report: { type: "boolean" },
+        tier: { type: "string", description: "a|b; requires report." },
+        clear: { type: "boolean" },
+      },
+      additionalProperties: false,
+    },
+    output: envelopeSchema({ record: OBJECT, rows: { type: "array" }, publish: OBJECT }),
+    // Re-enters the CLI — see nativeFriction. NOT `mutates`: the friction log
+    // is not the tracker, so a resolved-vs-declared worktree disagreement is
+    // reported on the receipt, never refused (there is no tracker file the call
+    // could land on wrongly).
+    run: (kernel, input, options) => nativeFriction(kernel, options, input),
+  },
 ]
+
+/**
+ * `arggon friction` through the native tool (task-friction-surface-parity-and-docs).
+ *
+ * It re-enters the CLI instead of calling the kernel in-process, for the same
+ * reason the MCP server spawns it: the WHOLE `friction --json` contract is
+ * CLI-side — the three mode conflicts, the `--tier` validation, the
+ * `x-friction` / `ARGGON_NO_FRICTION` opt-out resolution, and the
+ * `arggonVersion()` every record carries. The plugin has no manifest to read a
+ * version from, so an in-process capture would fingerprint the SAME friction
+ * class differently from a CLI one (`majorVersion` `"unknown"` vs `"0"`), and
+ * the report's dedupe column would split one class into two rows on one
+ * machine. One argv array keeps all three surfaces on one implementation path.
+ *
+ * The call is an argv array through the same `run` helper the ambient paths
+ * use, so an argument can never inject a command. A child that produced no
+ * envelope (the `arggon` binary absent from PATH, a crash, a signal) is a typed
+ * tool error naming the CLI path — the session keeps running, exactly as it
+ * does for the worktree tools.
+ */
+async function nativeFriction(
+  kernel: ArgonKernel,
+  options: ArgonToolOptions,
+  input: Record<string, unknown>,
+): Promise<{ ok: boolean; envelope: Record<string, unknown> }> {
+  const argv = [
+    "friction",
+    "--json",
+    ...(asString(input.observation) !== undefined ? [asString(input.observation) as string] : []),
+    ...argvValue(input, "command", "--command"),
+    ...argvValue(input, "error", "--error"),
+    ...argvValue(input, "harness", "--harness"),
+    ...argvValue(input, "evidence", "--evidence"),
+    ...argvSwitch(input, "report", "--report"),
+    ...argvValue(input, "tier", "--tier"),
+    ...argvSwitch(input, "clear", "--clear"),
+  ]
+  const result = await run(ARGGON_SERVER, argv, options.cwd, FRICTION_CLI_TIMEOUT_MS)
+  let envelope: unknown
+  try {
+    envelope = JSON.parse(result.stdout)
+  } catch {
+    // No envelope: the child never ran (no `arggon` on PATH) or died before
+    // printing one. Stated as a FRICTION_FAILED with the CLI-path remedy
+    // instead of a silent empty tool result.
+    return worktreeFail(
+      kernel,
+      "friction",
+      "FRICTION_FAILED",
+      `arggon friction needs the arggon CLI on PATH (it was not found or produced no JSON envelope); ` +
+        `run \`arggon friction --help\` to confirm the install, or use the arggon_friction MCP tool`,
+      kernel.readConventionVersion(options.cwd),
+    )
+  }
+  const ok = (envelope as { ok?: unknown }).ok === true && result.code === 0
+  return { ok, envelope: envelope as Record<string, unknown> }
+}
+
+/** One `--flag <value>` pair, present only when the caller passed the value. */
+function argvValue(input: Record<string, unknown>, key: string, flag: string): string[] {
+  const value = asString(input[key])
+  return value !== undefined ? [flag, value] : []
+}
+
+/** One present-only boolean flag (`--report`, `--clear`). */
+function argvSwitch(input: Record<string, unknown>, key: string, flag: string): string[] {
+  return key in input && input[key] === true ? [flag] : []
+}
 
 // ---------------------------------------------------------------------------
 // Worktree domain (W4, task-native-permissions-worktrees)
