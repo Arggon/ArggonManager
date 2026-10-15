@@ -40,9 +40,11 @@ import {
   renderGeneratedDoc,
   resolveProjectName,
   TIER2_DESTS,
+  unprovenancedManagedFiles,
   type DocsPlan,
   type DocsPlanEntry,
   type OrphanReapDecision,
+  type UnprovenancedManagedFile,
 } from "./docs.js";
 import {
   agentForTemplate,
@@ -206,6 +208,15 @@ export type InitResult = {
    * Never auto-`git init` — explicitly out of scope.
    */
   warning?: string;
+  /**
+   * Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+   * files under a managed path whose own visible marker claims arggon
+   * provenance but which have no `x-generated` entry. init classifies these as
+   * adopter-modified and keeps them, which is why they used to be silent;
+   * naming them here (and in `doctor`) is what makes the class visible. Never a
+   * write, never a failure.
+   */
+  unprovenanced: UnprovenancedManagedFile[];
 };
 
 function ensureTemplates(root: string, force: boolean): string[] {
@@ -428,6 +439,14 @@ export type InitPlan = {
    * to the doc planner, so the plan and the real run can never disagree.
    */
   adapters: AgentSelection;
+  /**
+   * Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+   * files under a managed path whose own visible marker claims arggon
+   * provenance but which have no `x-generated` entry — read from the tree the
+   * plan decided against, so the preview and the real run report the same
+   * rows. Pure read; never a plan decision (init keeps such files).
+   */
+  unprovenanced: UnprovenancedManagedFile[];
   /** Fatal precondition, identical to the error runInit would throw. */
   error?: string;
 };
@@ -455,6 +474,16 @@ export function planInit(opts: InitOptions): InitPlan {
     backup: Boolean(opts.backup),
     layout,
     conventionPath,
+    // Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+    // computed ONCE, from the tree this plan decides against, so `runInit`,
+    // `--dry-run` and the carried result cannot disagree about it. A managed
+    // path with no `x-generated` entry and no marker is the sanctioned
+    // pre-provenance adopter file and is deliberately not reported.
+    unprovenanced: unprovenancedManagedFiles({
+      root,
+      layout,
+      ...(opts.templatesDir !== undefined ? { templatesDir: opts.templatesDir } : {}),
+    }),
   };
   // Adapter selection (spec §S2, task-adapter-selection-flags), resolved from
   // the flags plus the tree's own markers. The doc planner receives the very
@@ -1204,6 +1233,14 @@ export type InitDryRunResult = {
   envGitignore: EnvGitignoreReport;
   /** Same not-a-git-repo warning a real run would surface. */
   warning?: string;
+  /**
+   * Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+   * the same rows a real run with these flags would report — files under a
+   * managed path whose own marker claims provenance but which have no
+   * `x-generated` entry. A dry run writes nothing, so these are the current
+   * tree's rows.
+   */
+  unprovenanced: UnprovenancedManagedFile[];
 };
 
 export function dryRunInit(opts: InitOptions): InitDryRunResult {
@@ -1264,6 +1301,12 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
       // side files): the same hint the real run and doctor report.
       envGitignore: readEnvGitignore(root),
       warning,
+      // Report-only false-absence class, from the current tree (nothing was
+      // written): the same rows a real proposal sweep would report.
+      unprovenanced: unprovenancedManagedFiles({
+        root,
+        ...(opts.templatesDir !== undefined ? { templatesDir: opts.templatesDir } : {}),
+      }),
     };
   }
 
@@ -1300,6 +1343,10 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
       // state — the same entry an adopting human or agent has to append.
       envGitignore: readEnvGitignore(root),
       warning,
+      // Same rows a real run with these flags would report
+      // (bug-prover-agent-has-no-x-generated-entry): from the plan, so the
+      // preview and the run cannot disagree.
+      unprovenanced: plan.unprovenanced,
     };
   }
   const scaffoldWritten = plan.scaffold
@@ -1338,6 +1385,9 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
     // tree's existing `.gitignore`.
     envGitignore: readEnvGitignore(root),
     warning,
+    // Same rows a real run with these flags would report
+    // (bug-prover-agent-has-no-x-generated-entry), from the same plan.
+    unprovenanced: plan.unprovenanced,
   };
 }
 
@@ -1395,6 +1445,13 @@ export function runInit(opts: InitOptions): InitResult {
       // `.gitignore` state, with the hint when the entry is missing.
       envGitignore: readEnvGitignore(root),
       warning: isGitRepo(root) ? undefined : NOT_A_REPO_WARNING,
+      // Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+      // a proposal sweep writes no doc and mutates no state, so the class is
+      // read straight from the current tree.
+      unprovenanced: unprovenancedManagedFiles({
+        root,
+        ...(opts.templatesDir !== undefined ? { templatesDir: opts.templatesDir } : {}),
+      }),
     };
   }
   // Plan first (task-init-dry-run-plan): the shared pure planner computes
@@ -1452,6 +1509,9 @@ export function runInit(opts: InitOptions): InitResult {
       envGitignore: readEnvGitignore(root),
       commit: commitGeneratedDocs(root, written, opts.commit),
       warning: gitWarning,
+      // From the plan, so a dry run over the same options reports the same
+      // rows (bug-prover-agent-has-no-x-generated-entry).
+      unprovenanced: plan.unprovenanced,
     };
   }
 
@@ -1507,5 +1567,9 @@ export function runInit(opts: InitOptions): InitResult {
     envGitignore: readEnvGitignore(root),
     commit: commitGeneratedDocs(root, written, opts.commit),
     warning: gitWarning,
+    // From the plan (bug-prover-agent-has-no-x-generated-entry): the class the
+    // plan saw — a fresh scaffold starts with none, an upgrade names every
+    // marker-bearing file it will keep adopter-modified for lack of a row.
+    unprovenanced: plan.unprovenanced,
   };
 }

@@ -33,6 +33,7 @@ import {
   planOrphanReaps,
   renderGeneratedDoc,
   resolveProjectName,
+  unprovenancedManagedFiles,
 } from "./docs.js";
 import { agentForTemplate, AGENT_IDS, detectAgents, type AgentId } from "./adapters.js";
 import { readEnvGitignore, type EnvGitignoreReport } from "./env-gitignore.js";
@@ -88,6 +89,17 @@ export type DoctorDocs = {
    * per-destination detail behind the count.
    */
   outdatedDocs: string[];
+  /**
+   * False-absence class (bug-prover-agent-has-no-x-generated-entry): files
+   * under a managed path whose own visible marker claims arggon provenance but
+   * which have no `x-generated` entry at all. Report-only and independent of
+   * the entry buckets above (a no-row file has no entry to iterate): init
+   * classifies these adopter-modified and keeps them, so without this count
+   * they would be invisible.
+   */
+  unprovenanced: number;
+  /** Destinations counted in `unprovenanced` (posix, relative to root). */
+  unprovenancedDocs: string[];
 };
 
 /**
@@ -914,6 +926,8 @@ const ZERO_DOCS: DoctorDocs = {
   missing: 0,
   outdated: 0,
   outdatedDocs: [],
+  unprovenanced: 0,
+  unprovenancedDocs: [],
 };
 
 const NOT_A_REPO: DoctorGit = { isRepo: false, dirty: null, remote: null };
@@ -1127,6 +1141,16 @@ export function runDoctor(opts: {
 
   const items = loadItems(tasksDir);
   const matrix = readCapabilityMatrix({ root });
+  // False-absence class (bug-prover-agent-has-no-x-generated-entry): files under
+  // a managed path whose own marker claims provenance but which have no
+  // x-generated entry. Computed independently of the entry walk above — a
+  // no-row file has no entry to iterate — and pure read, report-only.
+  const unprovenanced = unprovenancedManagedFiles({
+    root,
+    templatesDir,
+    layout,
+    state: config.generated,
+  });
   return {
     root,
     initialized: true,
@@ -1142,6 +1166,8 @@ export function runDoctor(opts: {
       missing,
       outdated,
       outdatedDocs: outdatedDocs.sort(),
+      unprovenanced: unprovenanced.length,
+      unprovenancedDocs: unprovenanced.map((file) => file.dest).sort(),
     },
     tracker: {
       dir: relative(root, tasksDir).split(sep).join("/"),
@@ -1395,6 +1421,15 @@ export function formatDoctorReport(result: DoctorResult): string {
   if (result.docs.modified > 0) {
     lines.push(
       "  hint: re-run `arggon init --backup` to archive modified docs and regenerate them",
+    );
+  }
+  if (result.docs.unprovenanced > 0) {
+    lines.push(
+      "  hint: " +
+        `${result.docs.unprovenanced} file(s) under a managed path claim arggon provenance ` +
+        "(generated marker) but have no x-generated entry — init keeps them adopter-modified " +
+        "and never propagates template edits to them; regenerate from the owning template, " +
+        "remove the stranded file, or drop the marker if the content is yours",
     );
   }
   // task-adapter-orphan-reaping: `docs.stale` IS the orphan condition for a

@@ -352,6 +352,10 @@ program
                 // worktree-env-contract-016, additive): the current disk state,
                 // with the hint when the entry is missing.
                 envGitignore: result.envGitignore,
+                // Report-only false-absence class
+                // (bug-prover-agent-has-no-x-generated-entry, additive): the
+                // same rows a real run with these flags would report.
+                unprovenanced: result.unprovenanced,
                 dryRun: true,
                 plan: result.plan,
                 ...(result.warning ? { warning: result.warning } : {}),
@@ -409,6 +413,11 @@ program
               // writes: the adopter's kept `.gitignore` reports the missing
               // entry; a generated one is clean.
               envGitignore: result.envGitignore,
+              // Report-only false-absence class
+              // (bug-prover-agent-has-no-x-generated-entry, additive): files
+              // under a managed path whose own marker claims provenance but
+              // which have no x-generated entry.
+              unprovenanced: result.unprovenanced,
               commit: commitPayload(result.commit),
               ...(result.warning ? { warning: result.warning } : {}),
             },
@@ -3387,6 +3396,14 @@ function printInitDryRun(result: InitDryRunResult): void {
         `${result.reapRefused.length} to keep (one row each above)`,
     );
   }
+  // Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+  // a preview names the rows a real run would report.
+  if (result.unprovenanced.length > 0) {
+    console.log(
+      `  unprovenanced managed files (marker, no x-generated entry): ` +
+        `${sanitizeHumanError(result.unprovenanced.map((file) => file.dest).join(", "))}`,
+    );
+  }
   // Report-only (spec worktree-env-contract-016), from the current disk state.
   if (result.envGitignore.hint) console.log(`  hint: ${result.envGitignore.hint}`);
   console.log("nothing was written (dry run)");
@@ -3477,6 +3494,23 @@ function printInitConvention(convention: ConventionRewriteReport): void {
   console.log(`arggon init: .convention.yml ${kept}; ${replaced}`);
 }
 
+/**
+ * Human lines for the report-only false-absence class
+ * (bug-prover-agent-has-no-x-generated-entry): one line per file, so a managed
+ * path whose own marker claims provenance but which has no `x-generated` entry
+ * is never silent — the marker it claims and the fact that it is kept
+ * adopter-modified both travel with the path.
+ */
+function printInitUnprovenanced(files: readonly { dest: string; template: string }[]): void {
+  for (const file of files) {
+    console.log(
+      `arggon init: unprovenanced managed file: ${sanitizeHumanError(file.dest)} — ` +
+        `claims template ${sanitizeHumanError(file.template)} but has no x-generated entry; ` +
+        "kept adopter-modified (regenerate from the owning template, remove it, or drop the marker)",
+    );
+  }
+}
+
 function printInitHuman(result: InitResult): void {
   // bug-init-git-doctor-blindspot: human path warns on stderr; the --json
   // envelope carries the same text as the additive `warning` field instead.
@@ -3513,6 +3547,9 @@ function printInitHuman(result: InitResult): void {
     }
     printInitReaps(result.reaped, result.reapRefused);
     printInitAdapters(result.adapters);
+    // Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+    // a managed path with no provenance entry is named, never silent.
+    printInitUnprovenanced(result.unprovenanced);
     // Report-only (spec worktree-env-contract-016): an adopter `.gitignore`
     // kept by the modified-skip path misses the entry — say what to append.
     if (result.envGitignore.hint) console.log(`arggon init: hint: ${result.envGitignore.hint}`);
@@ -3553,6 +3590,9 @@ function printInitHuman(result: InitResult): void {
   if (result.convention) printInitConvention(result.convention);
   printInitReaps(result.reaped, result.reapRefused);
   printInitAdapters(result.adapters);
+  // Report-only false-absence class (bug-prover-agent-has-no-x-generated-entry):
+  // the same rows the `--json` envelope carries, never silent.
+  printInitUnprovenanced(result.unprovenanced);
   // Report-only (spec worktree-env-contract-016): the generated `.gitignore`
   // carries the entry, so this only fires on a tree whose own `.gitignore`
   // pre-existed — exactly the adoption case.

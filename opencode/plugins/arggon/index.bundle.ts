@@ -11823,8 +11823,7 @@ function boundedPreparation(input) {
         (input.steps?.length ?? 0) > steps.length ||
         input.missingDependenciesTotal > input.missingDependencies.length ||
         (input.gateBins?.length ?? 0) > gateBins.length ||
-        (claim?.foreignWrites !== undefined &&
-            claim.foreignWrites.total > claim.foreignWrites.files.length) ||
+        (claim !== undefined && claimForeignWritesTruncated(claim, input.claim)) ||
         (claim !== undefined && claimTakeoverTruncated(claim, input.claim)) ||
         built.some((name, index) => name !== input.builtWorkspaces[index]) ||
         linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
@@ -11909,6 +11908,18 @@ function boundedClaimStamp(input) {
     }
     return bounded;
 }
+function claimForeignWritesTruncated(bounded, input) {
+    if (input === undefined)
+        return true;
+    const report = bounded.foreignWrites;
+    const source = input.foreignWrites;
+    if (report === undefined || source === undefined)
+        return false;
+    return (report.owner !== source.owner ||
+        report.claimedAt !== source.claimedAt ||
+        report.total > report.files.length ||
+        report.files.some((file, index) => file !== source.files[index]));
+}
 function claimTakeoverTruncated(bounded, input) {
     if (input === undefined)
         return true;
@@ -11928,9 +11939,20 @@ function claimTakeoverTruncated(bounded, input) {
         takeOver.replaced.assignee !== replaced.assignee ||
         takeOver.replaced.surface !== replaced.surface ||
         takeOver.files.some((file, index) => file !== source.files[index]);
+    const chain = replaced.takeovers ?? [];
+    const projectedChain = takeOver.replaced.takeovers ?? [];
+    const chainClipped = chain.some((entry, index) => {
+        const projected = projectedChain[index];
+        return (projected === undefined ||
+            projected.at !== entry.at ||
+            projected.by !== entry.by ||
+            projected.replacedIdentity !== entry.replacedIdentity ||
+            projected.replacedClaimedAt !== entry.replacedClaimedAt);
+    });
     return (clipped ||
+        chainClipped ||
         takeOver.total > takeOver.files.length ||
-        (replaced.takeovers?.length ?? 0) > (takeOver.replaced.takeovers?.length ?? 0));
+        chain.length > projectedChain.length);
 }
 function boundedEnvReceipt(input) {
     const bounded = { written: input.written };
