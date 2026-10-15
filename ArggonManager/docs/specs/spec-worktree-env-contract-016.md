@@ -75,6 +75,21 @@ recorded in the receipt as `seededDotenv`.
 `git check-ignore .arggon.env` read-only and reports the boolean. `arggon
 init` gains `.arggon.env` in its generated `.gitignore` template.
 
+**Adopter hand-step (existing `.gitignore`):** `init` never rewrites an
+adopter-owned `.gitignore`, so a repo that adopted before this template shipped
+keeps its own file and the entry may never arrive. Append exactly this line:
+
+```gitignore
+.arggon.env
+```
+
+`arggon init`, `arggon adopt` and `arggon doctor` report the missing entry
+(stdout + the additive `envGitignore` field in `--json`), naming this spec. The
+report is strictly report-only: no file is written, modified or staged. The
+probe reads the repo's own `.gitignore` bytes rather than asking
+`git check-ignore`, because a machine-local or global exclude would hide the
+missing entry from every other clone — the exact failure the hint exists for.
+
 ### JSON shape (additive)
 
 `preparation` (CLI `--json` envelope and native receipt) gains:
