@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-mcp-server-binds-session-cwd-tracker-root
 title: "`arggon mcp` binds the whole session to the server's launch cwd — every tool call resolves the tracker root from it, never from the item's `worktree_path`, so a maker's comment/handoff/update lands in the wrong tree"
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [tooling, mcp]
 created: "2026-10-11"
 updated: "2026-10-15"
-claimed_at: "2026-10-15T15:03:26.369Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-mcp-server-binds-session-cwd-tracker-root
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-mcp-server-binds-session-cwd-tracker-root.md
   Leaves live only under a story. id is the filename stem: bug-mcp-server-binds-session-cwd-tracker-root.
