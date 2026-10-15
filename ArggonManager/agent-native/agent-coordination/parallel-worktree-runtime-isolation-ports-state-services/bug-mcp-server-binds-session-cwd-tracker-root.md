@@ -9,7 +9,6 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [tooling, mcp]
 created: "2026-10-11"
 updated: "2026-10-15"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-mcp-server-binds-session-cwd-tracker-root
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-mcp-server-binds-session-cwd-tracker-root.md
