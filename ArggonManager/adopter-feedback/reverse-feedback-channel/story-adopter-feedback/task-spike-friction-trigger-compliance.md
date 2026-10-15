@@ -14,7 +14,6 @@ claimed_at: "2026-10-15T23:18:37.313Z"
 depends_on: [task-friction-trigger-carrier]
 worktree_path: /home/arggon/Projects/ArggonManager-task-spike-friction-trigger-compliance
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-spike-friction-trigger-compliance.md
   Leaves live only under a story. id is the filename stem: task-spike-friction-trigger-compliance.
@@ -220,3 +219,148 @@ commit-ordering evidence, the end-to-end `../ArggonStores` observation, and the
 per-repo `friction.triggerPresent` table. The remaining three boxes are the
 **finding**, and a spike's acceptance is the recorded answer: they are answered in
 the 2026-10-15 comment, not ticked here.
+
+### 2026-10-15 @arggon-maker
+## Finding — task-spike-friction-trigger-compliance (2026-10-15)
+
+**Answer: nobody ran it — and the reason matters, because it is not yet a
+measurement of the trigger.**
+
+### 1. The criterion as written (pre-registered; commit `cf2a88bc`, 2026-10-15 20:28:05 -0300)
+
+PASS = at least one observed **non-maintainer adopter** repo yields ≥1 record of an
+actual invocation — a friction-log line whose `reporterId` matches that repo's
+absolute path, or an invocation in the repo's own history. NULL = zero
+adopter-attributable records across N observed adopter repos. Covariates
+(`friction.triggerPresent` per repo, command reachability, generated-file
+provenance) decide what a NULL *means*; they do not move the bar. Decision rule:
+PASS → tier C proceeds; NULL + trigger never seen → `NOT-YET-MEASURABLE`, defer and
+re-measure after the adopter's next `arggon init`; NULL + trigger seen and ignored
+→ tier B becomes the whole channel, with **no added instruction pressure**.
+
+### 2. Numbers (with denominators)
+
+- **N = 16** distinct repositories carrying a tracker observed, in **27 checkouts**:
+  1 maintainer repo (`ArggonManager`) + **15 adopter repos**.
+- **2/27** checkouts (**1/16** repos, **0/15** adopter repos) reported
+  `arggon doctor --json` `friction.triggerPresent: true`, both at
+  `triggerVersion 0.10.0` — the maintainer's primary checkout and this worktree.
+- **17/27** checkouts carried the two carrier files with the trigger **absent**;
+  **8/27** materialized no seam at all (no carrier file exists to be absent).
+- **0/27** checkouts (**0/16** repos) had any friction record attributable to their
+  absolute path — checked in the machine's only `arggon` friction log **and** in the
+  per-worktree state dir that `../ArggonStores/.arggon.env` names.
+- The log held **200** lines: **200 distinct `reporterId`s**, one argv
+  (`--command validate`), one narrative (`no override`), **2** fingerprints (the
+  pre/post length-prefix split — exactly the degradation the spec documents).
+  **200/200** are the one non-hermetic line in `cli/src/friction.test.ts:145-152`;
+  **0/200** come from any observed repo.
+- The observation itself wrote nothing: `wrote=no` on **27/27** (before/after
+  `git status --porcelain` + a SHA-256 per managed agent file).
+- **14** other `friction.jsonl` files on this machine are the **AutoHarness
+  exec-failure log** — a different artifact with a different schema
+  (`plugin`/`kind`/`tool`/`sessionHash`/`project`), **not** channel output.
+
+| Repository | Class | Checkouts | `friction.triggerPresent` | Command in the generated skill inventory | Records |
+| --- | --- | --- | --- | --- | --- |
+| `ArggonManager` | maintainer | 8 | true on 2, false on 6 (`0.10.0`) | yes | 0 |
+| `ArggonStores` | adopter | 5 | false (`null`) | yes (since 2026-10-14 08:25 -0300) | 0 |
+| `EPC`, `RealMMORPG`, `dotnet-batchyard`, `evajoyas`, `opencode-scheduled-tasks`, `zcode-seam-live-verify` | adopter | 6 | false (`null`) | no | 0 |
+| `arggon-cv`, `casa-pendiente`, `cuentas-claras`, `estanteria`, `guardian`, `racha`, `suizo`, `vencimientos` | adopter | 8 | false — no seam materialized | no | 0 |
+
+### 3. ArggonStores end to end (the one live product adopter)
+
+`arggon doctor --json` run from that tree: `friction.triggerPresent: false`,
+`triggerVersion: null`, `files: 2`, both rows false. **No file anywhere in the tree
+carries the `arggon:friction-trigger` marker**; `AGENTS.md` has no friction mention;
+`references/friction.md` is not bundled; the vendored plugin registers **no** native
+`friction` tool and 0.10.0's MCP server exposes no `arggon_friction`; no
+`x-friction` opt-out is set. The only on-disk carriers of the command are the one
+generated-commands inventory line in `.agents/skills/arggon-cli/SKILL.md` and the
+inlined kernel in `.opencode/plugins/arggon/index.ts`. Provenance:
+`generatedAt 2026-10-14T11:21:31.256Z` — 1 day 8 hours **before** the trigger landed
+on `main` (2026-10-15 19:57:12 -0300). History: the string entered through `7cfee718`
+(2026-10-14 08:25:59 -0300) and no invocation appears since. Records written: **0**.
+
+### 4. Verdict: **NULL**, and by the registered rule it is `NOT-YET-MEASURABLE`
+
+Zero adopter-attributable records across 15 adopter repos / 19 adopter checkouts,
+with `triggerPresent` false at all 19. So the honest label is **not** "adopters do not
+run it" — it is "the embedded trigger has never been observable at an adopter on this
+machine": it was 32 minutes old on `main` when the sweep ran, and every adopter's
+generated files predate it. The one real negative signal is about the route the
+evidence already condemned: at `ArggonStores` the command has sat in the generated
+skill inventory for ~39 hours (2026-10-14 08:25 → 2026-10-15 20:29 -0300) with zero
+records — consistent with `deftai/directive#3633`, worth recording, and still a
+different measurement from the one this spike exists to make.
+
+### 5. Recommendation for stage 2: **DEFER** (neither proceed nor abandon)
+
+- **Defer tier C.** Not because it lost — because it has not been tested. Shipping
+  `gh` upstream dedupe on a null that cannot separate never-seen from
+  seen-and-ignored would be exactly the papering-over the item's Notes forbid.
+- **Keep tier B as the primary channel**, which stage 1 already does. A null is the
+  input to preferring tier B, and this is a null.
+- **Name a re-measurement trigger, not a re-litigation:** after `../ArggonStores` runs
+  `arggon init` (the ADR 0016 upgrade channel) and the trigger has been present there
+  for a stated window, re-run this same sweep — criterion, table and attribution
+  script are all in the item and in `/tmp/opencode/spike-transcripts`. If the trigger
+  is present and the record count is still zero, **that** is the seen-and-ignored arm,
+  and tier B becomes the whole channel with the evidence to say so. (14 days is
+  enough for a point-in-time re-read; I would claim nothing more from it.)
+- **Add no instruction pressure** meanwhile. The item's Notes are explicit, and the
+  measured gap so far is a carrier-chain gap, not an agent's unwillingness.
+
+### 6. What this cannot establish (stated plainly)
+
+Point-in-time, one machine, one human on both sides, one live adopter. It cannot
+separate "no agent ever hit friction" from "an agent hit friction and did not record
+it". It says nothing about any adopter that does not exist on this machine. N = 1 live
+adopter is not a population.
+
+### 7. Two ArggonManager defects found while measuring (recorded as local friction, not filed)
+
+Written with `arggon friction` from this worktree at 20:34:12 / 20:34:24 -0300
+(`reporterId 21a4d8edc71c`), so they are visible in the log this spike measured —
+disclosed here so they are never miscounted as adopter records:
+
+1. `TEST_NOT_HERMETIC` / `npm test` — `cli/src/friction.test.ts:145-152` passes
+   `ARGGON_STATE_DIR: ""`, so the "no override" case appends one **real** record per
+   run to the platform state base, while the file's own docstring claims "every run
+   passes `ARGGON_STATE_DIR`". Every real capture on this machine is drowned in it;
+   this is why the log needed an attribution audit at all.
+2. `DOCTOR_MISSING_UNNAMED` / `doctor --json` — `docs.missing` is a bare count with no
+   paths (only `outdatedDocs` is named), so a destination recorded in `x-generated`
+   and absent from disk — the `deftai` "never deposited" shape — is not
+   machine-observable. Concretely: `.agents/skills/arggon-cli/references/friction.md`
+   is recorded generated at `2026-10-15T22:16:58.575Z` and is **not** on disk in the
+   primary checkout.
+
+Neither is filed as a tracker item: this is a spike, and review findings become items
+only when the delivery lead consolidates them.
+
+### 8. Commands run — expected vs observed
+
+- `arggon doctor --json`, once per checkout (27 runs, from each checkout's own
+  directory, post-#850 build `0.10.0 cef717f8`) — expected an additive `friction`
+  block with per-file `triggerPresent`/`triggerVersion`; observed it on **27/27**, with
+  `wrote=no` on 27/27 before/after snapshots. Transcripts `01..27-*-doctor.json`.
+- A `readFrictionLog`-equivalent audit of `~/.local/state/arggon/friction.jsonl`
+  (200 lines) plus a `sha256(machineSalt ‖ repoAbsPath)` attribution sweep over every
+  work tree on the machine — expected adopter-attributable records; observed **0**,
+  with 200/200 matching the test line's argv and narrative.
+- `git log --all --grep` / `-S "arggon friction"` per repo, plus a tracked-file grep in
+  `../ArggonStores` — expected an invocation in adopter history; observed only the
+  seam-absorption commit `7cfee718`.
+- `arggon friction` twice (the two defects above) — expected one appended, redacted
+  record each; observed exactly that (200 → 202 lines).
+
+### 9. Which acceptance boxes are ticked, and where the rest are answered
+
+Ticked in the file: the four boxes the file itself shows — `depends_on`, the
+pre-registered criterion with its commit-ordering evidence, the end-to-end adopter
+observation with its transcript path, and the per-repo `friction.triggerPresent` table.
+Boxes 5, 6 and 7 are the **finding**; they are answered in this comment (§2, §3–4 and
+§4 respectively) and deliberately left unticked, because a spike's acceptance is the
+recorded answer rather than a tick. No code ships in this spike — the only commits on
+`feat/task-spike-friction-trigger-compliance` are the item's own bookkeeping.
