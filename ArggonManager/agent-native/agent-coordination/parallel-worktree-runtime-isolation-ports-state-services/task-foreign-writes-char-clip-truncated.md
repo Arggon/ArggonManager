@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-foreign-writes-char-clip-truncated
 title: "claim.foreignWrites: per-character clipping does not set the native `truncated` flag (takeOver already does)"
 assignee: arggon-delivery-lead
@@ -10,10 +10,8 @@ labels: [opencode-seam, parity]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-15"
-claimed_at: "2026-10-15T12:11:33.930Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-foreign-writes-char-clip-truncated
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-foreign-writes-char-clip-truncated.md
   Leaves live only under a story. id is the filename stem: task-foreign-writes-char-clip-truncated.
