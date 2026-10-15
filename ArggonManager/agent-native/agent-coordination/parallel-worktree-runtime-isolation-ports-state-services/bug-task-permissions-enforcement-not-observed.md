@@ -93,3 +93,7 @@ Documented client setup + the existing kernel gates; **no new enforcement layer*
 `npm run arggon -- validate` ok · focused vitest 93 passed · `npm run build` green · `npm test` 164 files / 3618 tests passed · `npm run lint` clean · `npm run test:structure` 5 passed · prettier clean on every touched file except `templates/docs/opencode.jsonc` (the same three-comma deviation prettier reports at HEAD: its comma-less style is load-bearing because the init tests parse the stripped template as strict JSON).
 
 PR: https://github.com/Arggon/ArggonManager/pull/848
+
+### handoff 2026-10-15 @ses_ebf689266ffe1lF4ZC4yVUAxny (session: ses_ebf689266ffe1lF4ZC4yVUAxny) — next: Review PR #848 (per-runtime probe table + carrier decision + harness); after merge, tick the three acceptance boxes and flip the item to done.
+- branch: fix/bug-task-permissions-enforcement-not-observed
+- open questions: Acceptance boxes are intentionally left unticked for the lead at merge; the 2026-10-02 observation is recorded as not reproducible, not explained; shared smoke model pin is provider-quota-blocked tod…
