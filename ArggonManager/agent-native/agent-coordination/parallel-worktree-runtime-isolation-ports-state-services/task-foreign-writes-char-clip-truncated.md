@@ -79,3 +79,10 @@ Delivered on `feat/task-foreign-writes-char-clip-truncated`, PR #838 (ready, not
 
 ### 2026-10-15 @Arggon
 CI green on the pushed head `44ffd9a9`: cli pass (7m24s), tasks-validate pass (27s), ui-smoke pass (2m22s). PR #838 is ready, not draft; item left `in_progress` — review + merge is the delivery lead's call. Scope note: acceptance box 3 is implemented in `claimTakeoverTruncated` (chain-entry strings), so the diff touches the claim-receipt fold, not only the `foreignWrites` branch.
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-15 (delivery lead)
+Merged as 5abf622a (PR #838). The decision lands: the shared `truncated` flag reports CHARACTER clipping for `claim.foreignWrites` too — the same discipline the take-over / `built` / `linked` / `missingDependencies` projections already apply. The alternative ("the flag names only count caps; character clipping stays silent") is rejected in-code with the reasoning: a >200-char path silently shortened and then reported as the whole value is exactly what the flag exists to name, and the kernel never caps these strings. `claimForeignWritesTruncated` compares bounded vs kernel values (owner, claimedAt, each files entry, count); the chain-entry fold is added to `claimTakeoverTruncated` (acceptance #3 — the kernel caps the chain LENGTH, never its strings, so a hostile `by` inside a chain entry would otherwise clip silently).
+
+Evidence: +4 tests mirroring the #579 shape (hostile long path / owner / chain entry → fold; under-cap control silent); pre-fix proof (3 fold tests fail against the reverted source); focused 146, full suite 3529 green; lint/structure/prettier/`check:plugin` green; CI green. Bundle regenerated; `json-output.md`'s `claim` row states the fold. Scope note accepted: the diff covers the claim-receipt fold as a whole (acceptance #3 required the chain-entry path).
