@@ -43,3 +43,27 @@ The false positive follows from the role shape in `ArggonManager/docs/engineerin
 Rationale: the tracker has no identity layer, so "an agent role answered its own brief" is not determinable — any implementation would be a new id-shape taxonomy asserting a certainty the tracker deliberately does not have (the same limit ADR 0021 §4 already states for `self-accepted`). The owner-assigned case is not an anomaly to suppress but the NORMAL owner answer: `self-decided` is a same-name hint, and on an owner-assigned item the same name IS the owner. The state is report-only; the honest resolution is to state the case where readers meet it (spec §States, `json-output.md` §`decision_brief`, the engineering brief convention) and pin the behaviour with the repro test, so it is intentional rather than accidental.
 
 Implementation routed to a maker on `fix/bug-self-decided-false-positive-owner-assigned`: the repro pin, an ADR 0026 dated amendment, the three doc statements, report-only preservation, gates.
+
+### 2026-10-15 @arggon-maker
+**Evidence (maker) — PR [#837](https://github.com/Arggon/ArggonManager/pull/837), branch `fix/bug-self-decided-false-positive-owner-assigned`.**
+
+Decision implemented as recorded (semantics STAY "the `decided:` author equals the item's own `assignee`"); `lib/src/brief.ts` is untouched.
+
+**Repro (box 1)** — scratch tracker, CLI from source:
+
+```bash
+arggon update story-login --status in_progress --assignee gonzalo --no-commit
+arggon comment story-login "decide: add a second supplier?" --author lead --no-commit
+arggon comment story-login "decided: option B" --author gonzalo --no-commit
+arggon show story-login --json
+```
+
+expected `decision_brief: "self-decided"` (assignee == answer author, the normal owner answer); observed `decision_brief = "self-decided"`, `assignee = gonzalo`. Identical on `main` — this change is the pin plus the statement, not a behaviour change.
+
+Pinned in `cli/src/decision-brief-convention.test.ts` at both layers: classifier (`classifyDecisionBrief(body, "gonzalo")` → `self-decided`) and CLI (`arggon show story-login --json` → `self-decided`, with `spec analyze` returning no finding — only `open` fires, box 4).
+
+**Files**: ADR 0026 dated amendment (2026-10-15); `spec-owner-decision-brief-021.md` §States; `json-output.md` §`decision_brief`; `engineering.md` §Roles and authority → The decision brief; the test file.
+
+**Gates (box 5)**: `arggon validate` ok (0 warnings); `vitest run cli/src/decision-brief-convention.test.ts` 36 passed; `npm run build` + `npm test` 159 files / 3509 tests passed; `npm run lint` clean; `npm run test:structure` 5 passed + ast-grep scan exit 0; `prettier --check` clean on the 5 touched files; `arggon spec validate` ok (38 docs); `arggon spec analyze` 4 pre-existing findings, none for spec 021, exit 0 (report-only).
+
+Note: the lead's decision comment (56aa4f02, local main unpushed) was cherry-picked onto the branch so the item body is complete; expect a trivial item-file union at merge.
