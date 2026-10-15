@@ -84,3 +84,10 @@ Evidence — remedy (b), PR #839 (`fix/bug-prover-agent-has-no-x-generated-entry
 ### handoff 2026-10-15 @Arggon — next: Standards review of PR #839, then merge; completion is the delivery lead's call (item not flipped to done)
 - branch: fix/bug-prover-agent-has-no-x-generated-entry
 - open questions: Marker-vs-path boundary: a marker-less generated file (JSON destinations carry no marker) under a managed path with no row is still invisible — out of scope here; cli.ts carries a small additive edit…
+
+### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-15 (delivery lead)
+Merged as 507447c3 (PR #839). Remedy **(b)** shipped as the whole class: the finding is a file whose OWN bytes carry the visible provenance marker (anchored exactly as the stamp writes it — first line, or first line inside frontmatter; CRLF/BOM tolerated) but which has no `x-generated` entry — the false absence. That marker boundary is the key design call: a marker-less no-row file is the sanctioned pre-provenance adopter file and stays silent (a pure path check would false-positive on five adopter-owned no-row destinations in this repo — verified before choosing). The managed-path walk covers current destinations + every ledger-recorded destination + namespace directories, so a stranded sibling whose template left the install (the prover shape) is still seen; bounded (5000 files / 8 KiB head) and pure.
+
+Surfaces (recorded): the seam drift gate (`auditGeneratedProvenance` gains the `unprovenanced` kind), `arggon init` (additive `unprovenanced[]` + one human line; the file is never written), and `arggon doctor` (`docs.unprovenanced`). Clean-tree evidence: repo-self audit `[]`, whole-tree marker probe 0, `init --no-commit` reports `unprovenanced: []`. Tests: provenance-audit +130, init-docs +73, doctor +72; full suite 3537 green; CI green on the refreshed head. Recorded open question (out of scope): marker-less generated JSON destinations with no row remain invisible — noted on the item.
