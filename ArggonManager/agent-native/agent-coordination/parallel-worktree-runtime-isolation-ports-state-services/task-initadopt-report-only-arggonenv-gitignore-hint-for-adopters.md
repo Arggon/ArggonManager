@@ -77,3 +77,7 @@ Maker evidence — PR [#831](https://github.com/Arggon/ArggonManager/pull/831), 
 - `npm run build` + `npm test` → 159 files, 3494 tests passed
 - `npm run lint` → clean; `npm run test:structure` → 5 ast-grep rules passed (exit 0)
 - `npx prettier --check` on every touched file → clean; `json-output.md` byte-stable under a second `--write` (prose-format convergence rules)
+
+### handoff 2026-10-15 @arggon-maker — next: Standards review + merge PR #831 (all gates green); then verify the 4 acceptance boxes and flip done — completion is the delivery lead's call.
+- branch: feat/task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters
+- open questions: none — surface decision (all three, one shared probe) and report-only evidence are in the PR body and the evidence comment
