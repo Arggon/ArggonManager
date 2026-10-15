@@ -1,15 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-clip-class-sweep-remaining-sites
 title: "Clip-order class sweep: `cli/src/board.ts:141` and the kernel `gh auth status` wrappers (`lib/src/get-open-prs.ts:67`, `import-issues.ts:187`, `cleanup.ts:259`) still append their remedy after the detail"
+assignee: arggon-delivery-lead
+branch: feat/task-clip-class-sweep-remaining-sites
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [cli, native-seam]
 created: "2026-10-03"
-updated: "2026-10-03"
+updated: "2026-10-15"
+claimed_at: "2026-10-15T15:08:55.703Z"
 depends_on: [task-cli-start-remediation-tail-clipped-on-human-channel, bug-three-acceptance-parsers-diverging]
+worktree_path: /home/arggon/Projects/ArggonManager-task-clip-class-sweep-remaining-sites
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-clip-class-sweep-remaining-sites.md
   Leaves live only under a story. id is the filename stem: task-clip-class-sweep-remaining-sites.
