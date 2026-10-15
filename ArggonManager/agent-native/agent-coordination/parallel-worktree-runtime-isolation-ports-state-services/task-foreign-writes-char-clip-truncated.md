@@ -69,3 +69,7 @@ Delivered on `feat/task-foreign-writes-char-clip-truncated`, PR #838 (ready, not
 - Post-fix: focused `tools.test.ts` 146 passed; `npm test` 160 files / 3529 passed; `npm run arggon -- validate` ok (0 warnings); `npm run lint` exit 0; `npm run test:structure` 5 passed / 0 failed; `npx prettier --check` on touched files clean; `npm run check:plugin` exit 0 (bundle 573,559 B).
 
 **Acceptance boxes.** [1] decided and documented; [2] code + docs agree, hostile long-path test plus plain-path control pin it; [3] chain-entry answer documented and folded, with its own test. No blocker.
+
+### handoff 2026-10-15 @Arggon — next: Standards review + merge PR #838; confirm CI green on head 5fc596f1.
+- branch: feat/task-foreign-writes-char-clip-truncated
+- open questions: None blocking. The CLI's own claim receipt is not re-bounded, so the fold is native-only and documented as such.
