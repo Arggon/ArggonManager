@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-cli-surface-never-carries-steps-truncated
 title: "Neither surface carries `stepsTruncated`: the CLI assigns `prepSteps` and forwards only that, so #617 fixed the native mirror but the human/CLI surface still drops the kernel flag"
 assignee: arggon-delivery-lead
@@ -9,11 +9,9 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [cli, native-seam, json-contract]
 created: "2026-10-03"
 updated: "2026-10-15"
-claimed_at: "2026-10-15T10:14:51.729Z"
 depends_on: [bug-native-steps-truncated-flag-dropped]
 worktree_path: /home/arggon/Projects/ArggonManager-task-cli-surface-never-carries-steps-truncated
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-cli-surface-never-carries-steps-truncated.md
   Leaves live only under a story. id is the filename stem: task-cli-surface-never-carries-steps-truncated.
