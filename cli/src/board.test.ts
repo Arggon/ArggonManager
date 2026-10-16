@@ -3196,9 +3196,12 @@ describe("renderBoardHtml build stamp (task-board-build-stamp)", () => {
       me: null,
       build: BUILD,
     });
-    expect(readFileSync(injected.outPath, "utf8")).toContain(
-      `<footer class="build" id="board-build">build ${BUILD}</footer>`,
-    );
+    // Friction-tolerant (task-board-footer-links-the-friction-report): the
+    // footer may also carry the host's friction badge, so pin the build stamp
+    // presence, not the exact closing tag.
+    const injectedHtml = readFileSync(injected.outPath, "utf8");
+    expect(injectedHtml).toContain('id="board-build"');
+    expect(injectedHtml).toContain(`build ${BUILD}`);
     // Default path: the export carries the build's own identity
     // (`buildVersion()` — live git probe, else the baked dist/build-info.json
     // from cli/write-build-info.mjs), so the value is never hand-maintained.
@@ -3211,8 +3214,8 @@ describe("renderBoardHtml build stamp (task-board-build-stamp)", () => {
     // Resolved the same way runBoard resolves it; the assertion pins the
     // wiring, not a literal hash (the worktree's HEAD moves).
     const expected = buildVersion();
-    expect(readFileSync(stamped.outPath, "utf8")).toContain(
-      `<footer class="build" id="board-build">build ${expected}</footer>`,
-    );
+    const stampedHtml = readFileSync(stamped.outPath, "utf8");
+    expect(stampedHtml).toContain('id="board-build"');
+    expect(stampedHtml).toContain(`build ${expected}`);
   });
 });

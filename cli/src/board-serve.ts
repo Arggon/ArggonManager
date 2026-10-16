@@ -7,6 +7,7 @@ import {
   defaultBoardGithub,
   buildBoardSummary,
   buildBoardDetail,
+  readBoardFrictionSnapshot,
   type BoardGithub,
   type PrInfo,
 } from "./board.js";
@@ -19,6 +20,7 @@ import {
   resolveCurrentLogin,
   runUpdate,
   toContractWorkItem,
+  type FrictionReport,
 } from "@arggondev/lib";
 
 /**
@@ -181,6 +183,14 @@ export type BoardServeOptions = {
    * fixed string.
    */
   build?: string;
+  /**
+   * Friction snapshot baked into every served page
+   * (task-board-footer-links-the-friction-report): captured once at server
+   * start from the host's local log (the redacted `FrictionReport`), never a
+   * live per-request log read. A served board shows its own host's snapshot.
+   * Tests inject a fixed report; absent/empty renders no indicator.
+   */
+  friction?: FrictionReport;
 };
 
 export type BoardServeHandle = {
@@ -293,6 +303,14 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
   // checkout's drift, not the server's build.
   const build = opts.build ?? buildVersion();
 
+  // Friction snapshot (task-board-footer-links-the-friction-report): captured
+  // once at server start from the host's local log — the redacted report the
+  // host's `arggon friction --report` would print. Per-request log reads would
+  // report the log's drift, not the server's snapshot, and would touch local
+  // state on every reload; the snapshot stays fixed until restart. A served
+  // board shows its own host's snapshot.
+  const friction = opts.friction ?? readBoardFrictionSnapshot(root);
+
   const clients = new Set<ServerResponse>();
   let debounce: NodeJS.Timeout | undefined;
 
@@ -358,6 +376,9 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
         summary: buildBoardSummary(items),
         // Build stamp (task-board-build-stamp): the server-start capture above.
         build,
+        // Friction snapshot (task-board-footer-links-the-friction-report): the
+        // server-start capture above; absent/empty renders no indicator.
+        ...(friction ? { friction } : {}),
         // Serve-only item detail drawer (task-board-item-detail): cards fetch
         // `/api/item` through the kernel bounded read. The static export never
         // sets this flag and stays lean.

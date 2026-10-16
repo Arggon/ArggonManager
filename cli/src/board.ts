@@ -16,6 +16,9 @@ import {
   openDependencyIds,
   priorityCounts,
   readConventionConfig,
+  readFrictionOptOut,
+  readFrictionReport,
+  renderFrictionReport,
   repoRootFromTasks,
   resolveCurrentLogin,
   runShow,
@@ -26,6 +29,7 @@ import {
   treeEntries,
   type AcceptanceRow,
   type ContractWorkItem as WorkItem,
+  type FrictionReport,
   type KernelWorkItem,
   type PriorityCounts,
   type ShowComment,
@@ -78,6 +82,18 @@ export type BoardOptions = {
    * callers that pass nothing) renders no stamp, preserving the legacy bytes.
    */
   build?: string;
+  /**
+   * Friction snapshot baked into the page at generation time
+   * (task-board-footer-links-the-friction-report): the redacted
+   * `FrictionReport` from `readFrictionReport` (the same deduped render path
+   * `arggon friction --report` prints via `renderFrictionReport`), never the
+   * raw jsonl and never a live per-request log read. `runBoard` resolves it at
+   * export time; `startBoardServer` captures it once at server start — a served
+   * board shows its own host's snapshot. Tests inject a fixed report. Absent
+   * or empty (no log on the host) renders no indicator, preserving the legacy
+   * bytes.
+   */
+  friction?: FrictionReport;
 };
 
 export type BoardResult = {
@@ -191,6 +207,34 @@ export function defaultBoardGithub(): BoardGithub {
 }
 
 /**
+ * Friction snapshot for the board footer
+ * (task-board-footer-links-the-friction-report): the redacted `FrictionReport`
+ * the host's `arggon friction --report` would print, resolved through the same
+ * read path (`readFrictionOptOut` + `readFrictionReport` + `renderFrictionReport`
+ * at render) — never the raw jsonl, never invented redaction. Failure-isolated
+ * like `buildVersion()`: an unreadable log, a missing state dir or any throw
+ * degrades to `undefined` (no indicator) rather than failing the export. Empty
+ * (no log on the host, zero classes, or opted out) is also `undefined`, so the
+ * export stays byte-identical for existing assertions. A served board shows its
+ * own host's snapshot; say so in docs rather than implying cross-machine
+ * visibility.
+ */
+export function readBoardFrictionSnapshot(
+  cwd: string,
+  env: NodeJS.ProcessEnv = process.env,
+  home?: string,
+): FrictionReport | undefined {
+  try {
+    const { optedOut } = readFrictionOptOut(cwd, env);
+    const report = readFrictionReport({ env, ...(home !== undefined ? { home } : {}), optedOut });
+    if (report.classes === 0 || report.rows.length === 0) return undefined;
+    return report;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Load items from the shared kernel (same read path as `list`) and write a
  * static, self-contained HTML board. Read-only: nothing is read back from the
  * file, and no item in the tracker is modified. With `github`, live PR state is
@@ -239,6 +283,11 @@ export function runBoard(opts: BoardOptions): BoardResult {
   // `dist/build-info.json`), never hand-maintained. Injected builds stay for
   // hermetic tests.
   const build = opts.build ?? buildVersion();
+  // Friction snapshot (task-board-footer-links-the-friction-report): baked at
+  // export time from the host's local log, never a live per-request read.
+  // Injected snapshots stay for hermetic tests; absent/empty renders no
+  // indicator (legacy bytes).
+  const friction = opts.friction ?? readBoardFrictionSnapshot(root);
   const html = renderBoardHtml(contractItems, {
     generatedAt: opts.generatedAt ?? new Date().toISOString(),
     prs: overlay,
@@ -252,6 +301,7 @@ export function runBoard(opts: BoardOptions): BoardResult {
     details: opts.details === true,
     staticDetails: detailMap,
     build,
+    ...(friction ? { friction } : {}),
   });
   const outPath = opts.out ? resolve(opts.cwd, opts.out) : resolve(root, DEFAULT_BOARD_FILE);
   writeFileSync(outPath, html, "utf8");
@@ -1071,6 +1121,130 @@ function drawerMarkup(build?: string): string {
     <div id="board-drawer-body" class="drawer-body"></div>${stamp}
   </aside>
 </div>`;
+}
+
+/**
+ * Friction CSS (task-board-footer-links-the-friction-report): the footer badge
+ * and the report panel. The badge is a button (opens without devtools); the
+ * panel is a centered dialog like the move menu, hidden at load so the
+ * ready-page axe scan never sees it. Muted grey borders on the card fill, like
+ * the drawer chrome. The report body is a pre-wrap `<pre>` of the redacted
+ * `renderFrictionReport` text — narratives are untrusted data rendered as
+ * plain escaped text, never HTML, never the raw jsonl.
+ */
+const FRICTION_CSS = `
+#board-friction { margin-left: 8px; border: 1px solid var(--muted); background: var(--card); color: var(--fg-soft); border-radius: 10px; padding: 1px 10px; font-size: 12px; font-family: inherit; cursor: pointer; }
+#board-friction:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.friction-panel { position: fixed; inset: 0; z-index: 30; }
+.friction-panel[hidden] { display: none; }
+.friction-backdrop { position: absolute; inset: 0; background: var(--scrim); }
+.friction-dialog { position: absolute; top: 10%; left: 50%; transform: translateX(-50%); width: min(720px, 92vw); max-height: 76vh; overflow-y: auto; background: var(--card); border: 1px solid var(--muted); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); padding: 14px 16px; }
+.friction-title { margin: 0 34px 6px 0; font-size: 14px; }
+.friction-close { position: absolute; top: 8px; right: 10px; border: 1px solid var(--muted); background: var(--card); border-radius: 6px; width: 28px; height: 28px; font-size: 16px; line-height: 1; cursor: pointer; }
+.friction-pre { white-space: pre-wrap; font-size: 12px; font-family: ui-monospace, monospace; overflow-wrap: anywhere; margin: 8px 0 0; }
+.friction-note { color: var(--meta); font-size: 11px; margin-top: 8px; }
+`;
+
+/**
+ * Footer indicator (task-board-footer-links-the-friction-report): the badge
+ * next to the build stamp. The label carries the redacted snapshot's record
+ * count; the tooltip names classes too. Server-rendered and escaped — the count
+ * is numeric, so there is no hostile string here, but the shape mirrors the
+ * build stamp's `esc()` discipline.
+ */
+function frictionFooterMarkup(friction: FrictionReport): string {
+  const count = friction.count;
+  const classes = friction.classes;
+  const label = "friction " + String(count);
+  const title =
+    "friction report: " +
+    String(count) +
+    " records, " +
+    String(classes) +
+    " classes (local snapshot)";
+  return (
+    '<button type="button" id="board-friction" aria-expanded="false" aria-controls="board-friction-report" title="' +
+    escapeHtml(title) +
+    '">' +
+    escapeHtml(label) +
+    "</button>"
+  );
+}
+
+/**
+ * Redacted report panel (task-board-footer-links-the-friction-report): the
+ * `renderFrictionReport` text of the baked snapshot, escaped into a `<pre>`.
+ * Reuses the exact render path `arggon friction --report` prints — never the
+ * raw jsonl, never invented redaction, never a raw log path (the human report
+ * carries no path). Narratives are untrusted data rendered as plain text.
+ */
+function frictionReportMarkup(friction: FrictionReport): string {
+  const text = renderFrictionReport(friction);
+  return (
+    '<div id="board-friction-report" class="friction-panel" hidden aria-hidden="true">\n' +
+    '  <div class="friction-backdrop" id="board-friction-backdrop"></div>\n' +
+    '  <div class="friction-dialog" role="dialog" aria-modal="true" aria-labelledby="board-friction-title">\n' +
+    '    <button type="button" class="friction-close" id="board-friction-close" aria-label="close friction report">×</button>\n' +
+    '    <h2 class="friction-title" id="board-friction-title">friction report (local snapshot)</h2>\n' +
+    '    <pre class="friction-pre" id="board-friction-pre">' +
+    escapeHtml(text) +
+    "</pre>\n" +
+    '    <div class="friction-note">snapshot baked at generation time; a served board shows its own host\u2019s snapshot. Full report: <code>arggon friction --report</code>.</div>\n' +
+    "  </div>\n" +
+    "</div>"
+  );
+}
+
+/**
+ * Friction panel wiring (task-board-footer-links-the-friction-report).
+ * Embedded with `toString()` into the page script, so it must stay
+ * self-contained: no module-scope references, no template literals. Toggles
+ * the baked report panel from the footer badge; Esc/backdrop/close hides it
+ * and restores focus to the badge.
+ */
+export function wireBoardFriction(): void {
+  function setOpen(open: boolean): void {
+    const panel = document.getElementById("board-friction-report");
+    const badge = document.getElementById("board-friction");
+    if (!panel || !badge) return;
+    if (open) {
+      panel.hidden = false;
+      panel.setAttribute("aria-hidden", "false");
+      badge.setAttribute("aria-expanded", "true");
+      const close = document.getElementById("board-friction-close");
+      if (close && typeof (close as HTMLElement).focus === "function") {
+        (close as HTMLElement).focus();
+      }
+    } else {
+      panel.hidden = true;
+      panel.setAttribute("aria-hidden", "true");
+      badge.setAttribute("aria-expanded", "false");
+      if (typeof (badge as HTMLElement).focus === "function") {
+        (badge as HTMLElement).focus();
+      }
+    }
+  }
+  document.addEventListener("click", function (event) {
+    const target = event.target as Element | null;
+    if (!target || typeof target.closest !== "function") return;
+    if (target.closest("#board-friction")) {
+      const panel = document.getElementById("board-friction-report");
+      const open = !panel || panel.hidden;
+      setOpen(open);
+      return;
+    }
+    if (target.closest("#board-friction-close") || target.closest("#board-friction-backdrop")) {
+      setOpen(false);
+    }
+  });
+  document.addEventListener("keydown", function (event) {
+    const key = (event as KeyboardEvent).key;
+    if (key !== "Escape") return;
+    const panel = document.getElementById("board-friction-report");
+    if (panel && !panel.hidden) {
+      setOpen(false);
+    }
+  });
 }
 
 /**
@@ -3006,6 +3180,17 @@ export function renderBoardHtml(
      * empty renders no stamp (legacy bytes for direct callers).
      */
     build?: string;
+    /**
+     * Friction snapshot baked into the page
+     * (task-board-footer-links-the-friction-report): the redacted
+     * `FrictionReport` from `readFrictionReport` (the same deduped render path
+     * `arggon friction --report` prints via `renderFrictionReport`), never the
+     * raw jsonl. Rendered as a footer indicator next to the build stamp that
+     * opens the redacted report without devtools; narratives render as plain
+     * escaped text. Absent or empty renders no indicator (legacy bytes). A
+     * served board shows its own host's snapshot.
+     */
+    friction?: FrictionReport;
   } = {
     generatedAt: "",
   },
@@ -3027,6 +3212,16 @@ export function renderBoardHtml(
   // callers); runBoard/serve always pass the `buildVersion()` string.
   const build = typeof opts.build === "string" && opts.build !== "" ? opts.build : "";
   const buildMeta = build !== "" ? ` · build ${esc(build)}` : "";
+  // Friction snapshot (task-board-footer-links-the-friction-report): the
+  // export-time / server-start capture. Empty (zero classes, zero rows) renders
+  // no indicator, preserving the legacy bytes for direct callers and for hosts
+  // with no log.
+  const friction =
+    opts.friction && opts.friction.classes > 0 && opts.friction.rows.length > 0
+      ? opts.friction
+      : undefined;
+  const frictionFooter = friction ? frictionFooterMarkup(friction) : "";
+  const frictionReportPanel = friction ? frictionReportMarkup(friction) : "";
 
   // The client-side lens filters a snapshot of the card fields that travels
   // with the page (there is no server to read the tracker from). Only the
@@ -3612,7 +3807,7 @@ body[data-detail-endpoint] .tree-row { cursor: pointer; }
    container with open work below reads open on its row AND on its column
    card — same chip geometry, the neutral pair (see --st-open-*). */
 .status-chip.open { background: var(--st-open-bg); color: var(--st-open-fg); }
-${details ? DETAIL_CSS : ""}
+${details ? DETAIL_CSS : ""}${friction ? FRICTION_CSS : ""}
 </style>
 <script>
 'use strict';
@@ -3649,7 +3844,7 @@ ${columns}
   <h2 id="board-tree-heading">grouped ancestry <span class="count" id="board-tree-count">${sorted.length}</span></h2>
 ${treeHtml}
 </section>
-${build !== "" ? `<footer class="build" id="board-build">build ${esc(build)}</footer>` : ""}
+${build !== "" || friction ? `<footer class="build" id="board-build">${build !== "" ? `build ${esc(build)}` : ""}${build !== "" && friction ? " · " : ""}${friction ? frictionFooter : ""}</footer>` : ""}${friction ? "\n" + frictionReportPanel : ""}
 <div id="board-toast" role="status" aria-live="polite"></div>
 ${details ? drawerMarkup(build !== "" ? build : undefined) : ""}
 ${details ? MOVE_MENU_MARKUP : ""}
@@ -3666,7 +3861,7 @@ ${embeddedFunctionSource(wireBoardView)}
 ${embeddedFunctionSource(wireBoardColumns)}
 ${embeddedFunctionSource(wireBoardTheme)}
 ${embeddedFunctionSource(trapBoardFocus)}
-${embeddedFunctionSource(wireBoardMovePrompt)}
+${embeddedFunctionSource(wireBoardMovePrompt)}${friction ? "\n" + embeddedFunctionSource(wireBoardFriction) : ""}
 ${details ? embeddedFunctionSource(renderBoardDetail) : ""}
 ${details ? embeddedFunctionSource(wireBoardDetail) : ""}
 ${details ? embeddedFunctionSource(wireBoardKeyboardNav) : ""}
@@ -3692,7 +3887,7 @@ ${details ? embeddedFunctionSource(wireBoardMoveMenu) : ""}
   // Theme/density (task-board-theme-density): the <head> boot script already
   // applied the persisted state before first paint; this owns the buttons.
   wireBoardTheme();
-  var filterInput = document.getElementById("board-filter-input");
+${friction ? "  wireBoardFriction();\n" : ""}  var filterInput = document.getElementById("board-filter-input");
   var filterError = document.getElementById("board-filter-error");
   var filterCount = document.getElementById("board-filter-count");
   var lensChips = document.querySelectorAll("#board-lenses .lens");
