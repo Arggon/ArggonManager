@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr-0019-resolve-proposed-status
 title: "Resolve ADR 0019's Proposed status (STALE-PROPOSED-ADR gate is red — blocks every PR)"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: []
 created: "2026-10-16"
 updated: "2026-10-16"
-claimed_at: "2026-10-16T09:33:34.943Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0019-resolve-proposed-status
 ---
 <!--
