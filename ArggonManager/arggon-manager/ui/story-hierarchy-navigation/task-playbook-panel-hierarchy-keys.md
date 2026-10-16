@@ -31,3 +31,8 @@ Follow-up to `task-native-panel-hierarchy-links` (panel parent/children navigati
 - [ ] No existing playbook statement made false; prettier clean; `arggon validate` green; PR opened
 
 ## Notes
+
+### 2026-10-16 @Arggon
+verdict: approve (playbook hierarchy keys, commit ec4b88b0)
+- standards review: all 8 playbook claims spot-checked exact against tui.tsx/board.ts sources (binds, id-sorted children, BOARD_HIERARCHY_CHILD_KEYS=9, inline hints, all three miss toasts); edit purely additive, no statement falsified; scope confined; smoke exempt (docs-only)
+- verifier evidence: validate ok 0 warnings; prettier clean; playbook status 4 current none stale; diffstat 2 files (playbook + tracker md), tree clean
