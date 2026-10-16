@@ -35,3 +35,7 @@ Follow-up from the task-board-build-stamp review (PR #854, merged 2026-10-16): t
 
 ### 2026-10-16 @Arggon
 Evidence (maker, 2026-10-16, worktree commit 9e2ff093, branch feat/task-board-build-stamp-e2e-smoke-pin-for-board-build, pushed): e2e/board.smoke.spec.ts gains one case in the @smoke board --serve suite asserting footer #board-build visible with /^build \S+/ and #board-drawer-build visible with the identical string after opening the detail card drawer (no hard-coded sha; h1 readiness reused; flake-harness test import untouched, no throttling). README --details bullet now reads 'stays drawer-free and otherwise byte-identical'. Gates observed: npm run arggon -- validate ok (also via pre-commit); prettier --check clean on both files; npm run build green (incl. tsc -p tsconfig.e2e.json type-check of the spec); vitest build-stamp filter 10 passed; new spec case passes on real Chromium (1 passed, 4.4s); full @smoke board --serve describe 39 passed (27.7s); --grep @smoke --list shows 49 tests. No prod code touched; no product defect found (serve always renders both stamps: details:true + non-empty buildVersion). Scope: e2e spec + README only.
+
+### handoff 2026-10-16 @Arggon — next: Open the PR from feat/task-board-build-stamp-e2e-smoke-pin-for-board-build; confirm ui-smoke lane green, then tick acceptance and merge
+- branch: feat/task-board-build-stamp-e2e-smoke-pin-for-board-build
+- open questions: None; boxes unticked pending PR CI (ui-smoke on the PR is the remaining gate)
