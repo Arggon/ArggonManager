@@ -10,6 +10,7 @@ import {
   type BoardGithub,
   type PrInfo,
 } from "./board.js";
+import { buildVersion } from "./build-info.js";
 import {
   findTasksDir,
   loadItems,
@@ -173,6 +174,13 @@ export type BoardServeOptions = {
    * `runList`'s caller. Tests inject `null` to stay hermetic.
    */
   me?: string | null;
+  /**
+   * Build identity stamped into every served page (task-board-build-stamp):
+   * captured once at server start from `buildVersion()` (live git probe, else
+   * the baked `dist/build-info.json`), never hand-maintained. Tests inject a
+   * fixed string.
+   */
+  build?: string;
 };
 
 export type BoardServeHandle = {
@@ -279,6 +287,12 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
   // per-request resolution would shell out to gh on every reload.
   const me = opts.me !== undefined ? opts.me : (resolveCurrentLogin() ?? null);
 
+  // Build stamp (task-board-build-stamp): captured once at server start — the
+  // served pages name the build they were started from, so a stale deployment
+  // is diagnosable without devtools. Per-request probing would report the
+  // checkout's drift, not the server's build.
+  const build = opts.build ?? buildVersion();
+
   const clients = new Set<ServerResponse>();
   let debounce: NodeJS.Timeout | undefined;
 
@@ -342,6 +356,8 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
         // Summary header (task-board-progress-header): the kernel report
         // aggregation over the already-loaded items — static and serve parity.
         summary: buildBoardSummary(items),
+        // Build stamp (task-board-build-stamp): the server-start capture above.
+        build,
         // Serve-only item detail drawer (task-board-item-detail): cards fetch
         // `/api/item` through the kernel bounded read. The static export never
         // sets this flag and stays lean.

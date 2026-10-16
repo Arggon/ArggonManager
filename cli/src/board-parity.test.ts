@@ -14,7 +14,13 @@
  *
  * A deliberate edit to either copy makes part of this suite fail.
  */
-import { mkdirSync, mkdtempSync as _mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -24,8 +30,11 @@ import {
   buildBoardDetailMap,
   evaluateDrop,
   renderBoardHtml,
+  runBoard,
   type BoardLensItem,
 } from "./board.js";
+import { startBoardServer } from "./board-serve.js";
+import { buildVersion } from "./build-info.js";
 import { runCli, spawnNodeCli } from "./test-spawn.js";
 import { removeFixtureTree } from "./test-tmp.js";
 import {
@@ -770,4 +779,86 @@ describe("parity: static vs serve board envelopes (task-serve-envelope-groupby-p
       expect(typeof staticEnvelope.itemCount).toBe("number");
     }
   }, 60_000);
+});
+
+// ---------- build-stamp parity (task-board-build-stamp) ----------
+
+/**
+ * The served board and the static export expose the same build identity where
+ * a viewer can read it without devtools (header meta, page footer, drawer
+ * panel). These tests pin the stamp's presence and shape on both surfaces and
+ * the wiring that resolves it from the build (`buildVersion()` — live git
+ * probe, else the baked `dist/build-info.json` from `cli/write-build-info.mjs`),
+ * never hand-maintained: the static export stamps at export time, serve mode
+ * stamps once at server start.
+ */
+describe("parity: build stamp on the static export and the served board", () => {
+  const BUILD = "0.10.0 (abc1234, feat/task-board-build-stamp)";
+
+  function newStampTree(): string {
+    const root = mkdtempSync(join(tmpdir(), "arggon-build-stamp-"));
+    mkdirSync(join(root, "tasks/launch"), { recursive: true });
+    writeFileSync(join(root, "tasks/.convention.yml"), "version: 1\n", "utf8");
+    writeFileSync(
+      join(root, "tasks/launch/launch.md"),
+      `---\ntype: initiative\nstatus: todo\nid: launch\ntitle: Launch\nlabels: []\ncreated: "2026-09-11"\nupdated: "2026-09-11"\n---\n\n# Launch\n`,
+      "utf8",
+    );
+    return root;
+  }
+
+  it("stamps the header meta, the footer and the drawer panel with the build", () => {
+    const html = renderBoardHtml([], { generatedAt: "test", details: true, build: BUILD });
+    expect(html).toContain(`· build ${BUILD}`);
+    expect(html).toContain(`<footer class="build" id="board-build">build ${BUILD}</footer>`);
+    expect(html).toContain(
+      `<div class="drawer-build" id="board-drawer-build">build ${BUILD}</div>`,
+    );
+  });
+
+  it("renders no stamp surfaces without a build (legacy bytes)", () => {
+    const html = renderBoardHtml([], { generatedAt: "test", details: true });
+    expect(html).not.toContain('id="board-build"');
+    expect(html).not.toContain('id="board-drawer-build"');
+  });
+
+  it("the static export stamps at export time from the build", () => {
+    const root = newStampTree();
+    const result = runBoard({ cwd: root, out: "board.html", generatedAt: "test", me: null });
+    const html = readFileSync(result.outPath, "utf8");
+    const expected = buildVersion();
+    expect(html).toContain(`<footer class="build" id="board-build">build ${expected}</footer>`);
+    expect(html).toContain(`· build ${expected}`);
+  });
+
+  it("serve mode stamps at server start and matches the static export shape", async () => {
+    const root = newStampTree();
+    // The drawer chrome only ships with `details` (the plain static export
+    // stays drawer-free), so the full-shape parity export opts into it — the
+    // served board always renders the drawer.
+    const result = runBoard({
+      cwd: root,
+      out: "static.html",
+      generatedAt: "test",
+      me: null,
+      details: true,
+      build: BUILD,
+    });
+    const staticHtml = readFileSync(result.outPath, "utf8");
+    const handle = startBoardServer({ cwd: root, me: null, build: BUILD });
+    await handle.ready;
+    try {
+      const served = await (await fetch(`${handle.url}/`)).text();
+      for (const needle of [
+        `· build ${BUILD}`,
+        `<footer class="build" id="board-build">build ${BUILD}</footer>`,
+        `<div class="drawer-build" id="board-drawer-build">build ${BUILD}</div>`,
+      ]) {
+        expect(served, needle).toContain(needle);
+        expect(staticHtml, needle).toContain(needle);
+      }
+    } finally {
+      await handle.close();
+    }
+  }, 30_000);
 });

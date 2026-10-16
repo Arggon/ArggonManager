@@ -52,6 +52,7 @@ import {
   type KernelWorkItem,
 } from "@arggondev/lib";
 import { runCli } from "./test-spawn.js";
+import { buildVersion } from "./build-info.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -3126,5 +3127,92 @@ describe("transform-neutral page script (bug-tsx-board-dead-script)", () => {
     expect(html).not.toContain("__name(");
     expect(html).toContain("function applyBoardFilter");
     expect(html).toContain("function wireBoardTheme");
+  });
+});
+
+describe("renderBoardHtml build stamp (task-board-build-stamp)", () => {
+  const BUILD = "0.10.0 (abc1234, feat/task-board-build-stamp)";
+
+  it("stamps the header meta and the page footer, readable without devtools", () => {
+    const html = renderBoardHtml(
+      [item({ id: "task-a", type: "task", status: "todo", title: "A" })],
+      { generatedAt: GENERATED_AT, build: BUILD },
+    );
+    // Header meta names the build next to the freshness stamp.
+    expect(html).toContain(`· build ${BUILD}`);
+    // Footer carries the same identity with a stable id for the parity pin.
+    expect(html).toContain(`<footer class="build" id="board-build">build ${BUILD}</footer>`);
+  });
+
+  it("renders no stamp when no build is passed (legacy bytes)", () => {
+    const html = renderBoardHtml(
+      [item({ id: "task-a", type: "task", status: "todo", title: "A" })],
+      { generatedAt: GENERATED_AT },
+    );
+    // NOTE: the item id `task-board-build-stamp` appears in code comments,
+    // so the negative pins the element ids, never the bare substring.
+    expect(html).not.toContain('id="board-build"');
+    expect(html).not.toContain('id="board-drawer-build"');
+    expect(html).not.toContain("· build ");
+  });
+
+  it("renders the drawer build chrome with details, and none without the stamp", () => {
+    const stamped = renderBoardHtml(
+      [item({ id: "task-a", type: "task", status: "todo", title: "A" })],
+      { generatedAt: GENERATED_AT, details: true, build: BUILD },
+    );
+    expect(stamped).toContain('id="board-drawer-build"');
+    expect(stamped).toContain(
+      `<div class="drawer-build" id="board-drawer-build">build ${BUILD}</div>`,
+    );
+
+    const unstamped = renderBoardHtml(
+      [item({ id: "task-a", type: "task", status: "todo", title: "A" })],
+      { generatedAt: GENERATED_AT, details: true },
+    );
+    expect(unstamped).toContain('id="board-drawer"');
+    expect(unstamped).not.toContain("board-drawer-build");
+  });
+
+  it("escapes a hostile build string in every stamp surface", () => {
+    const hostile = '"><script>alert(1)</script>';
+    const html = renderBoardHtml(
+      [item({ id: "task-a", type: "task", status: "todo", title: "A" })],
+      { generatedAt: GENERATED_AT, details: true, build: hostile },
+    );
+    expect(html).not.toContain("<script>alert(1)");
+    expect(html).toContain("build &quot;&gt;&lt;script&gt;");
+  });
+
+  it("runBoard stamps the export at export time from the build, never hand-maintained", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-build-"));
+    mkdirSync(join(dir, "tasks"), { recursive: true });
+    writeFileSync(join(dir, "tasks/.convention.yml"), "version: 1\n", "utf8");
+    // Injected build: the export carries exactly what the build resolved.
+    const injected = runBoard({
+      cwd: dir,
+      out: "injected.html",
+      generatedAt: GENERATED_AT,
+      me: null,
+      build: BUILD,
+    });
+    expect(readFileSync(injected.outPath, "utf8")).toContain(
+      `<footer class="build" id="board-build">build ${BUILD}</footer>`,
+    );
+    // Default path: the export carries the build's own identity
+    // (`buildVersion()` — live git probe, else the baked dist/build-info.json
+    // from cli/write-build-info.mjs), so the value is never hand-maintained.
+    const stamped = runBoard({
+      cwd: dir,
+      out: "stamped.html",
+      generatedAt: GENERATED_AT,
+      me: null,
+    });
+    // Resolved the same way runBoard resolves it; the assertion pins the
+    // wiring, not a literal hash (the worktree's HEAD moves).
+    const expected = buildVersion();
+    expect(readFileSync(stamped.outPath, "utf8")).toContain(
+      `<footer class="build" id="board-build">build ${expected}</footer>`,
+    );
   });
 });
