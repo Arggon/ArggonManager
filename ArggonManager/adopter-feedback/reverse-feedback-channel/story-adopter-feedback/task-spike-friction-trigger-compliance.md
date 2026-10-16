@@ -9,7 +9,7 @@ parent: story-adopter-feedback
 labels: [method, research]
 priority: p2
 created: "2026-10-02"
-updated: "2026-10-15"
+updated: "2026-10-16"
 claimed_at: "2026-10-15T23:18:37.313Z"
 depends_on: [task-friction-trigger-carrier]
 worktree_path: /home/arggon/Projects/ArggonManager-task-spike-friction-trigger-compliance
