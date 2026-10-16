@@ -589,6 +589,33 @@ test.describe("@smoke board --serve", () => {
     expect(ids).toEqual(listItems.map((item) => item.id).sort());
   });
 
+  test("the served board stamps the build in the footer and the detail drawer (task-board-build-stamp)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    // The h1 is the existing readiness signal for "the board is up and
+    // rendered" (no blind sleep): the stamp below rides the served page.
+    await expect(page.locator("h1")).toContainText("arggon board");
+    // Footer stamp: viewer-visible build identity, never a hard-coded sha.
+    const footer = page.locator("#board-build");
+    await expect(footer).toBeVisible();
+    await expect(footer).toHaveText(/^build \S+/);
+    const stamped = (await footer.textContent()) ?? "";
+
+    // The same stamp rides inside the detail drawer panel as static chrome
+    // (no per-item fetch involved): open a card and compare viewer-visible.
+    await page.locator(`.card[data-id="${DETAIL_ITEM_ID}"]`).click();
+    const drawer = page.locator("#board-drawer");
+    await expect(drawer).toBeVisible();
+    const drawerStamp = page.locator("#board-drawer-build");
+    await expect(drawerStamp).toBeVisible();
+    await expect(drawerStamp).toHaveText(/^build \S+/);
+    expect(await drawerStamp.textContent()).toBe(stamped);
+
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+  });
+
   test("a saved lens filters the board, shrinks the column and round-trips through the URL", async ({
     page,
   }) => {
