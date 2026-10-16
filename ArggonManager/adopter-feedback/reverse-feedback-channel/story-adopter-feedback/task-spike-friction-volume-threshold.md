@@ -246,3 +246,7 @@ attributable across ≥ 2 weeks. Until both hold, a future agent reading ADR
 - §4 respected: §4 above; even at threshold, no unattended submission.
 - No code ships in this spike — commits on this branch are the item's
   Criterion/Analysis/Conclusion plus the ADR cross-ref line.
+
+### handoff 2026-10-16 @arggon-maker — next: Lead: review finding + ADR cross-ref, merge PR, tick acceptance only after compliance flips to done
+- branch: feat/task-spike-friction-volume-threshold
+- open questions: Confirm 14-day re-measurement window stands; confirm 3-reporters-per-30d threshold acceptable
