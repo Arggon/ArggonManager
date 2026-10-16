@@ -1,16 +1,19 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-spike-friction-volume-threshold
 title: "Spike: what friction volume would justify stage-3 automation?"
+assignee: arggon-delivery-lead
+branch: feat/task-spike-friction-volume-threshold
 parent: story-adopter-feedback
 labels: [research]
 priority: p3
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-16"
+claimed_at: "2026-10-16T03:19:57.928Z"
 depends_on: [task-spike-friction-trigger-compliance]
+worktree_path: /home/arggon/Projects/ArggonManager-task-spike-friction-volume-threshold
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-spike-friction-volume-threshold.md
   Leaves live only under a story. id is the filename stem: task-spike-friction-volume-threshold.
