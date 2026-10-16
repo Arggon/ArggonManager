@@ -29,7 +29,7 @@ Follow-up to `task-native-panel-hierarchy-links` (panel parent/children navigati
 ## Acceptance
 
 - [x] The playbook's TUI sections name the `p` (parent) and `1..9` (Nth child) binds with their toasts, or state with reasoning why the playbook stays generic
-- [ ] No existing playbook statement made false; prettier clean; `arggon validate` green; PR opened
+- [x] No existing playbook statement made false; prettier clean; `arggon validate` green; PR opened
 
 ## Notes
 
