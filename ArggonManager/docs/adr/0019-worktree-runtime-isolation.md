@@ -1,6 +1,7 @@
 # 0019 Worktree runtime isolation: environment contract by default, ephemeral service containers as an opt-in pattern
 
-- Status: Proposed
+- Status: Accepted
+- Status note (2026-10-16): accepted — the full content shipped (all four decision points plus amendments; epic agent-coordination closed) and the owner's 2026-10-01 acceptance of the recommendation is on the record; the status line lagged behind it (task-adr-0019-resolve-proposed-status, decided: Accept).
 - Date: 2026-10-01
 - Deciders: Product owner (accepted the recommendation, 2026-10-01); coordinator recorded
 - Evidence: [exploration-worktree-env-isolation-017](../explorations/exploration-worktree-env-isolation-017.md)
