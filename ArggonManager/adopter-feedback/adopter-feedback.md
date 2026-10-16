@@ -7,7 +7,6 @@ labels: []
 created: "2026-10-02"
 updated: "2026-10-02"
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/adopter-feedback.md (initiative index; required).
   No parent. Omit assignee when unassigned.
@@ -34,3 +33,7 @@ Opened 2026-10-02 as a fresh chain rather than reusing a `done` container — th
 repo's own rule is never to reopen `done`/`cancelled`, and
 `agents.md` §5 warns against modelling new administrative leaves under closed
 product containers.
+
+### 2026-10-16 @ses_eccc605dbffeHEwy9fqO3FP5tx
+### Lead note — stage 1 shipped, initiative stays open (delivery lead, 2026-10-16)
+Epic reverse-feedback-channel is done (story-adopter-feedback auto-completed; ADR 0024 Accepted; spec green). The initiative's second box is not yet true, so this container stays open honestly: trigger + capture + dedupe + tier-B human-gated publish have shipped, but no adopter carries the trigger yet and stages 2/3 are DEFERRED per the two spikes — tier C waits on a passing compliance re-sweep after ArggonStores runs init (trigger present ≥ 14 days), and any stage-3 automation waits on reporters(F, 30d) ≥ 3 attributable. When those data arrive, the re-sweeps — not new design — close this out.
