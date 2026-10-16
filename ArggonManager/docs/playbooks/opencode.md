@@ -316,7 +316,15 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
     (acceptance rows + prose, sanitized, 16 rows / 200 chars per row) — the
     panel stays display-only. `n`/`a` reuse the snapshot's kernel `next` id and
     the session's active id; `r` resolves the cursor by id so it survives a
-    reload. OpenTUI redraws only changed cells (a cursor move rewrites one
+    reload. Hierarchy walks ride the same layer
+    (`task-native-panel-hierarchy-links`, same 2.0.12 surface): `p` opens the
+    selected item's parent detail and `1`..`9` open the Nth id-sorted child
+    detail (`BOARD_HIERARCHY_CHILD_KEYS = 9`,
+    `opencode/plugins/arggon/board.ts`; the detail block names them inline as
+    `[p]` / `[1]`..`[9]` with a `… +M more — walk the tree` overflow row).
+    A miss toasts instead of moving: `arggon board: no parent` (no selection
+    or no parent edge), `arggon board: parent not found` (edge points nowhere),
+    `arggon board: no child N` (digit out of range). OpenTUI redraws only changed cells (a cursor move rewrites one
     cell, not the row), so `smoke:tui` replays the PTY capture into bounded
     screen frames (CUP/SGR/erase subset) and asserts the drawn states; raw
     capture substrings are not a reliable signal for diffed TUIs.

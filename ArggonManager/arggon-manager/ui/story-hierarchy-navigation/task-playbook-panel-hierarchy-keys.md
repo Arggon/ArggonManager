@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-playbook-panel-hierarchy-keys
 title: Document panel parent/children keys in the OpenCode playbook key table
+assignee: arggon-delivery-lead
+branch: feat/task-playbook-panel-hierarchy-keys
 parent: story-hierarchy-navigation
 labels: []
 created: "2026-10-11"
-updated: "2026-10-11"
+updated: "2026-10-16"
+claimed_at: "2026-10-16T13:32:41.846Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-playbook-panel-hierarchy-keys
 ---
 
 <!--
@@ -24,7 +28,14 @@ Follow-up to `task-native-panel-hierarchy-links` (panel parent/children navigati
 
 ## Acceptance
 
-- [ ] The playbook's TUI sections name the `p` (parent) and `1..9` (Nth child) binds with their toasts, or state with reasoning why the playbook stays generic
-- [ ] No existing playbook statement made false; prettier clean; `arggon validate` green; PR opened
+- [x] The playbook's TUI sections name the `p` (parent) and `1..9` (Nth child) binds with their toasts, or state with reasoning why the playbook stays generic
+- [x] No existing playbook statement made false; prettier clean; `arggon validate` green; PR opened
 
 ## Notes
+
+### 2026-10-16 @Arggon
+
+verdict: approve (playbook hierarchy keys, commit ec4b88b0)
+
+- standards review: all 8 playbook claims spot-checked exact against tui.tsx/board.ts sources (binds, id-sorted children, BOARD_HIERARCHY_CHILD_KEYS=9, inline hints, all three miss toasts); edit purely additive, no statement falsified; scope confined; smoke exempt (docs-only)
+- verifier evidence: validate ok 0 warnings; prettier clean; playbook status 4 current none stale; diffstat 2 files (playbook + tracker md), tree clean
