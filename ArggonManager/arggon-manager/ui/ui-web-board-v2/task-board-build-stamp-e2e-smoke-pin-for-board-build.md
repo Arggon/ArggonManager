@@ -29,7 +29,7 @@ Follow-up from the task-board-build-stamp review (PR #854, merged 2026-10-16): t
 ## Acceptance
 
 - [x] The CI `@smoke` spec asserts the served board exposes the build stamp viewer-visible (footer `#board-build` with the build string; drawer `#board-drawer-build` after opening a card)
-- [ ] `ui-smoke` lane green on the PR; `arggon validate` green; prettier clean
+- [x] `ui-smoke` lane green on the PR; `arggon validate` green; prettier clean
 - [x] README `--details` sentence no longer over-claims byte-identical: scoped to drawer-free (no drawer markup, no embedded payload, no extra script) since header/footer now always carry the stamp
 
 ## Notes
