@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-spike-friction-volume-threshold
 title: "Spike: what friction volume would justify stage-3 automation?"
 assignee: arggon-delivery-lead
@@ -10,7 +10,6 @@ labels: [research]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-16"
-claimed_at: "2026-10-16T03:19:57.928Z"
 depends_on: [task-spike-friction-trigger-compliance]
 worktree_path: /home/arggon/Projects/ArggonManager-task-spike-friction-volume-threshold
 ---
