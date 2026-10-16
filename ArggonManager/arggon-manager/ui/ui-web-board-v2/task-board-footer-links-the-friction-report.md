@@ -54,3 +54,7 @@ Gates expected-vs-observed:
 Acceptance readiness: 1-2 ready (served + static footer badge opens redacted report; narratives escaped, no jsonl path); 3 needs lead: PR not opened (lead opens per instructions), validate green + prettier clean done, parity pins in board-friction.test.ts. Did NOT flip status to done, did NOT open PR.
 
 Note: MCP tracker tools (tools.arggon.show/comment/handoff) blocked by harness gate (no checkers installed); worked via worktree files + npm run arggon CLI per item instructions. No harness files created (out of scope).
+
+### handoff 2026-10-16 @Arggon — next: Lead: review diff, open PR, tick acceptance
+- branch: feat/task-board-footer-links-the-friction-report
+- open questions: None; hostile-narrative escaping pinned; served snapshot is host-local by design
