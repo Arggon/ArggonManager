@@ -27,9 +27,9 @@ ADR 0019 (worktree runtime isolation, dated 2026-10-01) is still marked Proposed
 
 ## Acceptance
 
-- [ ] The product owner answers the decide: brief with a decided: comment (accept, reject, or supersede — with the reasoning recorded).
-- [ ] ADR 0019's status line is updated exactly per that answer, as a dated appended note; no other content rewritten (never-rewrite rule).
-- [ ] `arggon spec analyze` is green against the baseline again (docs-only PR; `arggon validate` ok).
+- [x] The product owner answers the decide: brief with a decided: comment (accept, reject, or supersede — with the reasoning recorded).
+- [x] ADR 0019's status line is updated exactly per that answer, as a dated appended note; no other content rewritten (never-rewrite rule).
+- [x] `arggon spec analyze` is green against the baseline again (docs-only PR; `arggon validate` ok).
 
 ## Notes
 
