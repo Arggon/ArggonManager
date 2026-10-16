@@ -10,7 +10,6 @@ created: "2026-10-02"
 updated: "2026-10-03"
 depends_on: [task-friction-trigger-carrier]
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-spike-friction-trigger-compliance.md
   Leaves live only under a story. id is the filename stem: task-spike-friction-trigger-compliance.
@@ -59,3 +58,10 @@ Two real adopters exist on this machine: `../ArggonStores` and this repo.
 Non-goal: shipping any code in this spike. If the answer is negative, the honest
 response is to make tier B (the prefilled URL a human clicks) the whole channel —
 not to add instruction pressure.
+
+### 2026-10-16 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-16 (delivery lead)
+The spike did exactly what the item demanded: criterion registered before observation (commit cf2a88bc, 60s ahead, blind spot disclosed), read-only sweep across 27 checkouts / 16 repos, numbers with denominators, and a null recorded as a null with the registered decision rule applied. NEVER-SEEN (trigger 32 minutes old on main, 0/15 adopter repos carrying it) is correctly distinguished from SEEN-AND-IGNORED, so the answer is NOT-YET-MEASURABLE and the stage-2 recommendation is DEFER with tier B as the primary channel — no new instruction pressure. The one genuine negative (command in the ArggonStores skill inventory ~39h, zero records) is recorded against the already-condemned skill-reference route, not the trigger. The two ArggonManager defects found while measuring were correctly recorded as local friction per the trigger's own rule; the TEST_NOT_HERMETIC line (friction.test.ts:145-152) is already on my list for the friction follow-ups.
+
+Evidence: finding comment in the item file (§§1-9), transcripts referenced, criterion + observation + numbers all committed pre-merge. Spike ships no code by design; PR #851 is documentation-only (2 files, item + carrier cross-ref). Ticking boxes 5-7 now — all three are satisfied in full by the filed finding comment (numbers reported, stage-2 decision made, null explicitly recorded).
