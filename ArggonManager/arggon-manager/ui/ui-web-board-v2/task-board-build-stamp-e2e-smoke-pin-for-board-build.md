@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-board-build-stamp-e2e-smoke-pin-for-board-build
 title: "Board build-stamp: e2e @smoke pin for #board-build"
+assignee: arggon-delivery-lead
+branch: feat/task-board-build-stamp-e2e-smoke-pin-for-board-build
 parent: ui-web-board-v2
 labels: []
 created: "2026-10-16"
 updated: "2026-10-16"
+claimed_at: "2026-10-16T10:52:11.885Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-board-build-stamp-e2e-smoke-pin-for-board-build
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-build-stamp-e2e-smoke-pin-for-board-build.md
   Leaves live only under a story. id is the filename stem: task-board-build-stamp-e2e-smoke-pin-for-board-build.
