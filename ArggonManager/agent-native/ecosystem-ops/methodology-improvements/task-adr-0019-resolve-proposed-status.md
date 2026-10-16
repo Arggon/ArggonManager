@@ -58,3 +58,9 @@ decide:
 ---
 
 **Hold note (lead, 2026-10-16):** PR #851 (friction spike, otherwise green and approved) cannot merge until this is answered — the STALE-PROPOSED-ADR finding fires on every branch while 0019 stays Proposed. Nothing in #851 can fix that; gaming the baseline to silence it would falsify the gate and is not on the table.
+
+### 2026-10-16 @ses_eccc605dbffeHEwy9fqO3FP5tx
+decided: Accept (product owner, in session 2026-10-16).
+verdict: approve
+### Lead close-out — 2026-10-16 (delivery lead)
+Executed per the owner's Accept: ADR 0019 status line → Accepted with a dated note citing the 2026-10-01 acceptance already on the record + the closed epic; no other content rewritten (never-rewrite rule, task-adr-status-housekeeping idiom). The ADR index row mirrors the new status (the parity gate caught the lag on the first CI run — fixed in-branch before merge). Merged as 487ab337 (PR #853), all three lanes green; spec analyze confirms 0 new findings vs baseline. This unblocks every PR behind the STALE-PROPOSED-ADR gate.
