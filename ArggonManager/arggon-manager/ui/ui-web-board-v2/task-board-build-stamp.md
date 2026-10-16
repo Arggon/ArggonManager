@@ -12,6 +12,7 @@ updated: "2026-10-16"
 claimed_at: "2026-10-16T10:20:05.656Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-board-build-stamp
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-build-stamp.md
   Leaves live only under a story. id is the filename stem: task-board-build-stamp.
@@ -27,19 +28,21 @@ Found 2026-10-12 from a product-owner report: the drawer on their board shows th
 
 ## Acceptance
 
-- [ ] The served board and the static export expose the build commit (hash and/or release version) somewhere the viewer can read without devtools (footer, drawer meta, or equivalent)
-- [ ] The value comes from the build (`write-build-info.mjs` or equivalent), never hand-maintained
-- [ ] Static export stamps at export time; serve mode stamps at server start
-- [ ] `board-parity` pins it; `arggon validate` green; prettier clean; PR opened
+- [x] The served board and the static export expose the build commit (hash and/or release version) somewhere the viewer can read without devtools (footer, drawer meta, or equivalent)
+- [x] The value comes from the build (`write-build-info.mjs` or equivalent), never hand-maintained
+- [x] Static export stamps at export time; serve mode stamps at server start
+- [x] `board-parity` pins it; `arggon validate` green; prettier clean; PR opened
 
 ## Notes
 
 ### 2026-10-16 @ses_ebbc5ea3effezfLY0eElZwxH3T
+
 Maker evidence (task-board-build-stamp, commit 1973bdf9, branch feat/task-board-build-stamp pushed to origin).
 
 Files changed (5, +256/-5): cli/src/board.ts (build opt on BoardOptions/renderBoardHtml, runBoard resolves buildVersion() at export time, header meta + footer#board-build + drawerMarkup(build) panel chrome, footer/drawer CSS), cli/src/board-serve.ts (build opt, captured once at server start, passed per render), cli/src/board.test.ts (+5 build-stamp tests), cli/src/board-parity.test.ts (+4 parity tests incl. serve-vs-static shape parity), README.md (build-stamp bullet).
 
 Gates (expected vs observed):
+
 - `npm run arggon -- validate` → expected ok, observed ok (0 warnings, convention v5; also ran as pre-commit hook on 1973bdf9)
 - `npx prettier --check` on 5 touched files → expected clean, observed clean (after --write on board.ts/board.test.ts)
 - `npx tsc --noEmit` → expected clean, observed clean
@@ -55,11 +58,14 @@ Follow-ups found (not filed — lead consolidates): none. Possible future: e2e @
 Acceptance readiness: all four boxes are ready to tick — served + static stamp viewer-visible (footer/header/drawer), value from buildVersion()/write-build-info.mjs, export-time vs server-start wiring + tests, board-parity + validate + prettier green. PR not opened (branch pushed; lead opens).
 
 ### handoff 2026-10-16 @ses_ebbc5ea3effezfLY0eElZwxH3T (session: ses_ebbc5ea3effezfLY0eElZwxH3T) — next: Lead: review 1973bdf9, tick acceptance, open PR from feat/task-board-build-stamp
+
 - branch: feat/task-board-build-stamp
 - open questions: PR creation left to lead; e2e @smoke pin for #board-build optional
 
 ### 2026-10-16 @Arggon
+
 verdict: approve (board build-stamp, commit 1973bdf9)
+
 - standards review: boundaries clean (cli/board surface, no schema fork, no new deps), value-from-build wiring real (runBoard export-time, serve server-start, same buildVersion as --version), three surfaces escaped via escapeHtml, legacy-bytes guard holds, tests discriminate, README travels, scope 5 files +256/-5
 - verifier evidence: validate ok 0 warnings; prettier clean 5 files; tsc clean; lint clean; vitest 6 files / 263 passed incl 9 new build-stamp tests; real-browser Chromium smoke PASS (footer #board-build visible, drawer #board-drawer-build visible after card click, cards match list)
 - probes 1-6 pass; probe 7 CI ui-smoke lane skipped locally, to confirm on PR
