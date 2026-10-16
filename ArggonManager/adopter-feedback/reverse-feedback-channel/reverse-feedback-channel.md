@@ -1,6 +1,6 @@
 ---
 type: epic
-status: in_progress
+status: done
 id: reverse-feedback-channel
 title: Reverse feedback channel
 assignee: arggon-delivery-lead
