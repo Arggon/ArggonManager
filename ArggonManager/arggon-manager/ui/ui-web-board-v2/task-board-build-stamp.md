@@ -53,3 +53,7 @@ Design notes for reviewer: JSON envelopes untouched (no json-output.md change ne
 Follow-ups found (not filed — lead consolidates): none. Possible future: e2e @smoke assertion for #board-build (currently covered by unit+parity+manual smoke only).
 
 Acceptance readiness: all four boxes are ready to tick — served + static stamp viewer-visible (footer/header/drawer), value from buildVersion()/write-build-info.mjs, export-time vs server-start wiring + tests, board-parity + validate + prettier green. PR not opened (branch pushed; lead opens).
+
+### handoff 2026-10-16 @ses_ebbc5ea3effezfLY0eElZwxH3T (session: ses_ebbc5ea3effezfLY0eElZwxH3T) — next: Lead: review 1973bdf9, tick acceptance, open PR from feat/task-board-build-stamp
+- branch: feat/task-board-build-stamp
+- open questions: PR creation left to lead; e2e @smoke pin for #board-build optional
