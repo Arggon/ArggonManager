@@ -43,11 +43,11 @@ number.
 
 ## Acceptance
 
-- [ ] Depends on `task-spike-friction-trigger-compliance` completing; **not answerable before it.**
-- [ ] The answer names a concrete volume measure (distinct reporters per fingerprint over what window) and what automation, if any, that volume would justify.
-- [ ] If volume remains unmeasured, the recorded conclusion is explicitly "no automation; revisit only with data" — a null result is a valid and expected outcome.
-- [ ] The conclusion is filed as a comment here and cross-referenced from ADR 0024's stage-3 bullet.
-- [ ] Any automation it eventually proposes still respects ADR 0024 §4: no unattended submission, human action required.
+- [x] Depends on `task-spike-friction-trigger-compliance` completing; **not answerable before it.**
+- [x] The answer names a concrete volume measure (distinct reporters per fingerprint over what window) and what automation, if any, that volume would justify.
+- [x] If volume remains unmeasured, the recorded conclusion is explicitly "no automation; revisit only with data" — a null result is a valid and expected outcome.
+- [x] The conclusion is filed as a comment here and cross-referenced from ADR 0024's stage-3 bullet.
+- [x] Any automation it eventually proposes still respects ADR 0024 §4: no unattended submission, human action required.
 
 ## Criterion (starting premise — not re-litigated)
 
