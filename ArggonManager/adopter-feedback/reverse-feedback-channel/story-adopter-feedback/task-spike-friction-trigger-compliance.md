@@ -11,7 +11,6 @@ priority: p2
 created: "2026-10-02"
 updated: "2026-10-16"
 depends_on: [task-friction-trigger-carrier]
-worktree_path: /home/arggon/Projects/ArggonManager-task-spike-friction-trigger-compliance
 ---
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-spike-friction-trigger-compliance.md

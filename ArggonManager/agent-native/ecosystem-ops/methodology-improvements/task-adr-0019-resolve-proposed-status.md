@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: []
 created: "2026-10-16"
 updated: "2026-10-16"
-worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0019-resolve-proposed-status
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr-0019-resolve-proposed-status.md

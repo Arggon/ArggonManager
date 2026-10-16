@@ -11,7 +11,6 @@ priority: p3
 created: "2026-10-02"
 updated: "2026-10-16"
 depends_on: [task-spike-friction-trigger-compliance]
-worktree_path: /home/arggon/Projects/ArggonManager-task-spike-friction-volume-threshold
 ---
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-spike-friction-volume-threshold.md
