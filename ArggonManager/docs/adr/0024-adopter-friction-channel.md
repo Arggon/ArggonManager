@@ -75,6 +75,7 @@ Rollout is staged on the ADR 0016 precedent:
   measured volume threshold, which is a spike
   (`task-spike-friction-volume-threshold`), and that spike's own answer may be
   "no automation; revisit only with data".
+  Finding (2026-10-16): `task-spike-friction-volume-threshold` concludes no automation — volume unmeasured (0/15 adopter repos); threshold defined as ≥3 attributable distinct reporterIds per fingerprint in 30 days, maintainer-side draft only, §4 intact.
 
 ### 2. The carrier change is behavioral, and reaches adopters by proposal
 
