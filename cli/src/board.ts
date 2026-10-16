@@ -31,6 +31,7 @@ import {
   type ShowComment,
 } from "@arggondev/lib";
 import { embeddedFunctionSource } from "./board-embed.js";
+import { buildVersion } from "./build-info.js";
 
 export const DEFAULT_BOARD_FILE = "board.html";
 
@@ -67,6 +68,16 @@ export type BoardOptions = {
    * the flag the export stays byte-identical and drawer-free.
    */
   details?: boolean;
+  /**
+   * Build identity stamped into the page at generation time
+   * (task-board-build-stamp): the `arggon --version` string
+   * (`buildVersion()` — live git probe, else the baked `dist/build-info.json`
+   * from `cli/write-build-info.mjs`), never hand-maintained. `runBoard`
+   * resolves it at export time; `startBoardServer` captures it once at server
+   * start. Tests inject a fixed string. Absent (direct `renderBoardHtml`
+   * callers that pass nothing) renders no stamp, preserving the legacy bytes.
+   */
+  build?: string;
 };
 
 export type BoardResult = {
@@ -223,6 +234,11 @@ export function runBoard(opts: BoardOptions): BoardResult {
   const detailMap = opts.details ? buildBoardDetailMap({ root, items, prs: overlay }) : undefined;
   const detailBytes =
     detailMap !== undefined ? Buffer.byteLength(embedJson(detailMap), "utf8") : undefined;
+  // Build stamp (task-board-build-stamp): resolved at export time from the
+  // build (`buildVersion()` — live git probe, else the baked
+  // `dist/build-info.json`), never hand-maintained. Injected builds stay for
+  // hermetic tests.
+  const build = opts.build ?? buildVersion();
   const html = renderBoardHtml(contractItems, {
     generatedAt: opts.generatedAt ?? new Date().toISOString(),
     prs: overlay,
@@ -235,6 +251,7 @@ export function runBoard(opts: BoardOptions): BoardResult {
     summary: buildBoardSummary(items),
     details: opts.details === true,
     staticDetails: detailMap,
+    build,
   });
   const outPath = opts.out ? resolve(opts.cwd, opts.out) : resolve(root, DEFAULT_BOARD_FILE);
   writeFileSync(outPath, html, "utf8");
@@ -1016,6 +1033,10 @@ body.drawer-open { overflow: hidden; }
 .drawer-comment { margin-top: 8px; }
 .drawer-who { color: var(--meta); font-size: 11px; }
 .drawer-panel a { color: var(--accent); }
+/* Build stamp (task-board-build-stamp): the served/exported build identity,
+   rendered inside the drawer panel so a stale deployment is diagnosable from
+   the drawer without devtools. Muted grey on the card fill, like .drawer-k. */
+.drawer-build { color: var(--meta); font-size: 11px; margin-top: 12px; border-top: 1px solid var(--separator); padding-top: 8px; }
 .move-menu { position: fixed; inset: 0; z-index: 30; }
 .move-menu[hidden] { display: none; }
 .move-menu-backdrop { position: absolute; inset: 0; background: var(--scrim); }
@@ -1028,13 +1049,29 @@ body.drawer-open { overflow: hidden; }
 .move-menu-target:focus-visible, .move-menu-cancel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 `;
 
-const DRAWER_MARKUP = `<div id="board-drawer" class="drawer" hidden aria-hidden="true">
+/**
+ * Drawer chrome (task-board-item-detail). Rendered only with `details: true`
+ * (`--serve`, or the static export's `--details` opt-in,
+ * task-board-static-details); the plain static export stays lean and
+ * byte-identical without it.
+ *
+ * The build stamp (task-board-build-stamp) rides inside the panel as static
+ * chrome: it names the served/exported build with no per-item payload and no
+ * devtools, so a stale deployment is diagnosable from the drawer itself.
+ */
+function drawerMarkup(build?: string): string {
+  const stamp =
+    build !== undefined && build !== ""
+      ? `\n    <div class="drawer-build" id="board-drawer-build">build ${escapeHtml(build)}</div>`
+      : "";
+  return `<div id="board-drawer" class="drawer" hidden aria-hidden="true">
   <div class="drawer-backdrop" id="board-drawer-backdrop"></div>
   <aside class="drawer-panel" role="dialog" aria-modal="true" aria-label="item detail">
     <button type="button" class="drawer-close" id="board-drawer-close" aria-label="close item detail">×</button>
-    <div id="board-drawer-body" class="drawer-body"></div>
+    <div id="board-drawer-body" class="drawer-body"></div>${stamp}
   </aside>
 </div>`;
+}
 
 /**
  * Serve-only card action menu shell (task-board-keyboard-a11y). One dialog for
@@ -2960,6 +2997,15 @@ export function renderBoardHtml(
      * Without `details` the map is ignored and the export stays byte-identical.
      */
     staticDetails?: Record<string, BoardDetailPayload>;
+    /**
+     * Build identity stamped into the page (task-board-build-stamp): the
+     * `arggon --version` string (`buildVersion()` — live git probe, else the
+     * baked `dist/build-info.json` from `cli/write-build-info.mjs`), never
+     * hand-maintained. Rendered in the header meta, the page footer and — with
+     * `details` — the drawer panel, all readable without devtools. Absent or
+     * empty renders no stamp (legacy bytes for direct callers).
+     */
+    build?: string;
   } = {
     generatedAt: "",
   },
@@ -2976,6 +3022,11 @@ export function renderBoardHtml(
   const lensNames = Object.keys(lenses);
   const me = opts.me ?? null;
   const details = opts.details === true;
+  // Build stamp (task-board-build-stamp): the page names the build it was
+  // rendered from. Empty/absent renders no stamp (legacy bytes for direct
+  // callers); runBoard/serve always pass the `buildVersion()` string.
+  const build = typeof opts.build === "string" && opts.build !== "" ? opts.build : "";
+  const buildMeta = build !== "" ? ` · build ${esc(build)}` : "";
 
   // The client-side lens filters a snapshot of the card fields that travels
   // with the page (there is no server to read the tracker from). Only the
@@ -3371,6 +3422,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 header { margin-bottom: 16px; }
 header h1 { margin: 0 0 4px; font-size: 20px; }
 header .meta { color: var(--meta); font-size: 13px; }
+/* Build stamp footer (task-board-build-stamp): the exported/served build
+   identity, readable without devtools. Muted grey on the page fill. */
+footer.build { color: var(--meta); font-size: 12px; margin-top: 16px; }
 .board { display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: var(--board-gap); align-items: start; }
 @media (max-width: 1100px) { .board { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); } }
 .column { background: var(--col); border-radius: 8px; padding: var(--col-pad); }
@@ -3572,7 +3626,7 @@ bootBoardTheme();
 <body${details ? ' data-detail-endpoint="/api/item"' : ""}>
 <header>
   <h1>arggon board${repo}</h1>
-  <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · <span id="status-counts">${counts}</span> · tracker files remain the source of truth; drops persist only against a live server (arggon board --serve)${live}</div>
+  <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · <span id="status-counts">${counts}</span>${buildMeta} · tracker files remain the source of truth; drops persist only against a live server (arggon board --serve)${live}</div>
   ${summaryPanel}
 </header>
 <div class="filterbar" id="board-filterbar" role="search" aria-label="board filters">
@@ -3595,8 +3649,9 @@ ${columns}
   <h2 id="board-tree-heading">grouped ancestry <span class="count" id="board-tree-count">${sorted.length}</span></h2>
 ${treeHtml}
 </section>
+${build !== "" ? `<footer class="build" id="board-build">build ${esc(build)}</footer>` : ""}
 <div id="board-toast" role="status" aria-live="polite"></div>
-${details ? DRAWER_MARKUP : ""}
+${details ? drawerMarkup(build !== "" ? build : undefined) : ""}
 ${details ? MOVE_MENU_MARKUP : ""}
 ${MOVE_PROMPT_MARKUP}
 <script>
