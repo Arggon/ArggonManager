@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-playbook-panel-hierarchy-keys
 title: Document panel parent/children keys in the OpenCode playbook key table
+assignee: arggon-delivery-lead
+branch: feat/task-playbook-panel-hierarchy-keys
 parent: story-hierarchy-navigation
 labels: []
 created: "2026-10-11"
-updated: "2026-10-11"
+updated: "2026-10-16"
+claimed_at: "2026-10-16T13:32:41.846Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-playbook-panel-hierarchy-keys
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/task-playbook-panel-hierarchy-keys.md
   Leaves live only under a story. id is the filename stem: task-playbook-panel-hierarchy-keys.
