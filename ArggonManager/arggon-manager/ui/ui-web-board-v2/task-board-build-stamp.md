@@ -57,3 +57,10 @@ Acceptance readiness: all four boxes are ready to tick — served + static stamp
 ### handoff 2026-10-16 @ses_ebbc5ea3effezfLY0eElZwxH3T (session: ses_ebbc5ea3effezfLY0eElZwxH3T) — next: Lead: review 1973bdf9, tick acceptance, open PR from feat/task-board-build-stamp
 - branch: feat/task-board-build-stamp
 - open questions: PR creation left to lead; e2e @smoke pin for #board-build optional
+
+### 2026-10-16 @Arggon
+verdict: approve (board build-stamp, commit 1973bdf9)
+- standards review: boundaries clean (cli/board surface, no schema fork, no new deps), value-from-build wiring real (runBoard export-time, serve server-start, same buildVersion as --version), three surfaces escaped via escapeHtml, legacy-bytes guard holds, tests discriminate, README travels, scope 5 files +256/-5
+- verifier evidence: validate ok 0 warnings; prettier clean 5 files; tsc clean; lint clean; vitest 6 files / 263 passed incl 9 new build-stamp tests; real-browser Chromium smoke PASS (footer #board-build visible, drawer #board-drawer-build visible after card click, cards match list)
+- probes 1-6 pass; probe 7 CI ui-smoke lane skipped locally, to confirm on PR
+- advisory nit (non-blocking): README --details byte-identical phrasing now version-relative; optional follow-up e2e @smoke pin for #board-build to file separately
