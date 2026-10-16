@@ -827,7 +827,10 @@ describe("parity: build stamp on the static export and the served board", () => 
     const result = runBoard({ cwd: root, out: "board.html", generatedAt: "test", me: null });
     const html = readFileSync(result.outPath, "utf8");
     const expected = buildVersion();
-    expect(html).toContain(`<footer class="build" id="board-build">build ${expected}</footer>`);
+    // Friction-tolerant (task-board-footer-links-the-friction-report): the
+    // footer may also carry the host's friction badge.
+    expect(html).toContain('id="board-build"');
+    expect(html).toContain(`build ${expected}`);
     expect(html).toContain(`· build ${expected}`);
   });
 
@@ -849,9 +852,14 @@ describe("parity: build stamp on the static export and the served board", () => 
     await handle.ready;
     try {
       const served = await (await fetch(`${handle.url}/`)).text();
+      // Friction-tolerant (task-board-footer-links-the-friction-report): the
+      // footer may also carry the host's friction badge, so pin the stamp
+      // presence, not the exact closing tag. Both surfaces share the host
+      // snapshot, so they agree with each other too.
       for (const needle of [
         `· build ${BUILD}`,
-        `<footer class="build" id="board-build">build ${BUILD}</footer>`,
+        'id="board-build"',
+        `build ${BUILD}`,
         `<div class="drawer-build" id="board-drawer-build">build ${BUILD}</div>`,
       ]) {
         expect(served, needle).toContain(needle);
