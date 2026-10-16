@@ -203,9 +203,9 @@ hours (2026-10-14 08:25 → 2026-10-15 20:29 -0300) with zero records.
 - [x] A pass/fail criterion is written **before** any observation is collected (the `deftai` post-mortem failed partly because "silent" was indistinguishable from "absent").
 - [x] At least one non-maintainer adopter repo is observed end to end: `arggon friction` invoked, or demonstrably not, with the transcript kept.
 - [x] `arggon doctor --json`'s `friction.triggerPresent` is recorded for each observed repo, so "the trigger was never seen" is distinguishable from "the trigger was seen and ignored".
-- [ ] The result is reported as a number with its denominator (N repos observed, N with the trigger present, N with a record written) — not as a qualitative impression.
-- [ ] The finding is filed as a comment on this item, and the answer decides whether **stage 2** (tier C, `gh` upstream dedupe) proceeds, is deferred, or is abandoned in favor of a human-only channel.
-- [ ] Explicitly recorded even if the answer is "nobody ran it": a null result here is the input to choosing tier B as the primary channel rather than tier C.
+- [x] The result is reported as a number with its denominator (N repos observed, N with the trigger present, N with a record written) — not as a qualitative impression.
+- [x] The finding is filed as a comment on this item, and the answer decides whether **stage 2** (tier C, `gh` upstream dedupe) proceeds, is deferred, or is abandoned in favor of a human-only channel.
+- [x] Explicitly recorded even if the answer is "nobody ran it": a null result here is the input to choosing tier B as the primary channel rather than tier C.
 
 ## Notes
 
@@ -368,3 +368,10 @@ recorded answer rather than a tick. No code ships in this spike — the only com
 ### handoff 2026-10-15 @arggon-maker — next: Stage 2 verdict is DEFER (NULL, trigger never observable at an adopter). Re-run the sweep once ../ArggonStores runs arggon init and the trigger has been present for the window the lead sets; criterio…
 - branch: feat/task-spike-friction-trigger-compliance
 - open questions: Confirm the re-measurement window (14 days proposed) and decide who files the two ArggonManager defects the maker recorded as local friction: TEST_NOT_HERMETIC in cli/src/friction.test.ts and DOCTOR_…
+
+### 2026-10-16 @ses_eccc605dbffeHEwy9fqO3FP5tx
+verdict: approve
+### Lead review + merge verification — 2026-10-16 (delivery lead)
+The spike did exactly what the item demanded: criterion registered before observation (commit cf2a88bc, 60s ahead, blind spot disclosed), read-only sweep across 27 checkouts / 16 repos, numbers with denominators, and a null recorded as a null with the registered decision rule applied. NEVER-SEEN (trigger 32 minutes old on main, 0/15 adopter repos carrying it) is correctly distinguished from SEEN-AND-IGNORED, so the answer is NOT-YET-MEASURABLE and the stage-2 recommendation is DEFER with tier B as the primary channel — no new instruction pressure. The one genuine negative (command in the ArggonStores skill inventory ~39h, zero records) is recorded against the already-condemned skill-reference route, not the trigger. The two ArggonManager defects found while measuring were correctly recorded as local friction per the trigger's own rule; the TEST_NOT_HERMETIC line (friction.test.ts:145-152) is already on my list for the friction follow-ups.
+
+Evidence: finding comment in the item file (§§1-9), transcripts referenced, criterion + observation + numbers all committed pre-merge. Spike ships no code by design; PR #851 is documentation-only (2 files, item + carrier cross-ref). Ticking boxes 5-7 now — all three are satisfied in full by the filed finding comment (numbers reported, stage-2 decision made, null explicitly recorded).
