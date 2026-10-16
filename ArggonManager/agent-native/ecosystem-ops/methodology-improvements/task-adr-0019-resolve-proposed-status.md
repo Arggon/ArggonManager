@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adr-0019-resolve-proposed-status
 title: "Resolve ADR 0019's Proposed status (STALE-PROPOSED-ADR gate is red — blocks every PR)"
+assignee: arggon-delivery-lead
+branch: feat/task-adr-0019-resolve-proposed-status
 parent: methodology-improvements
 labels: []
 created: "2026-10-16"
 updated: "2026-10-16"
+claimed_at: "2026-10-16T09:33:34.943Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0019-resolve-proposed-status
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr-0019-resolve-proposed-status.md
   Leaves live only under a story. id is the filename stem: task-adr-0019-resolve-proposed-status.
