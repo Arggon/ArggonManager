@@ -32,7 +32,7 @@ Shape notes for the maker: the log is per-machine local state (`arggon friction 
 
 - [x] The served board and the static export footer show a friction indicator (count/badge) next to the build stamp, opening the redacted friction report without devtools
 - [x] Narratives render as plain text (escaped); no raw log paths or secrets leak — redacted report surface only, never the raw jsonl
-- [ ] Snapshot discipline: export-time bake for static, server-start capture for serve; board-parity (or equivalent) pins it; `arggon validate` green; prettier clean; PR opened
+- [x] Snapshot discipline: export-time bake for static, server-start capture for serve; board-parity (or equivalent) pins it; `arggon validate` green; prettier clean; PR opened
 
 ## Notes
 
