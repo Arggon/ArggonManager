@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-board-build-stamp
 title: Board serves its build commit so a stale deployment is diagnosable from the drawer
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: ui-web-board-v2
 labels: []
 created: "2026-10-12"
 updated: "2026-10-16"
-claimed_at: "2026-10-16T10:20:05.656Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-board-build-stamp
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-build-stamp.md
   Leaves live only under a story. id is the filename stem: task-board-build-stamp.
