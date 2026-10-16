@@ -1,14 +1,14 @@
 ---
 type: epic
-status: todo
+status: in_progress
 id: reverse-feedback-channel
 title: Reverse feedback channel
+assignee: arggon-delivery-lead
 parent: adopter-feedback
 labels: []
 created: "2026-10-02"
-updated: "2026-10-02"
+updated: "2026-10-16"
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/reverse-feedback-channel.md (epic index; required).
   parent MUST be the initiative id. Container ids must not start with task-/bug-.
