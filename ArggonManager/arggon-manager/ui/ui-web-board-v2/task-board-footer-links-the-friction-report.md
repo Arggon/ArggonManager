@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-board-footer-links-the-friction-report
 title: Board footer links the friction report
+assignee: arggon-delivery-lead
+branch: feat/task-board-footer-links-the-friction-report
 parent: ui-web-board-v2
 labels: []
 created: "2026-10-16"
 updated: "2026-10-16"
+claimed_at: "2026-10-16T14:07:18.089Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-board-footer-links-the-friction-report
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-footer-links-the-friction-report.md
   Leaves live only under a story. id is the filename stem: task-board-footer-links-the-friction-report.
