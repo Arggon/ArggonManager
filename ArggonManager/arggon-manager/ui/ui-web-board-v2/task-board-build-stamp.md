@@ -9,7 +9,6 @@ parent: ui-web-board-v2
 labels: []
 created: "2026-10-12"
 updated: "2026-10-16"
-worktree_path: /home/arggon/Projects/ArggonManager-task-board-build-stamp
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-build-stamp.md
