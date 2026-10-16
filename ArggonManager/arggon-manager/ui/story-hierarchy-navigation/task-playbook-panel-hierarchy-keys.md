@@ -9,7 +9,6 @@ parent: story-hierarchy-navigation
 labels: []
 created: "2026-10-11"
 updated: "2026-10-16"
-worktree_path: /home/arggon/Projects/ArggonManager-task-playbook-panel-hierarchy-keys
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/task-playbook-panel-hierarchy-keys.md
