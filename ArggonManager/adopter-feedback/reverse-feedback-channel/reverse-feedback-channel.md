@@ -26,8 +26,12 @@ letting public automation read an agent's output as instructions.
 
 - [x] A validated, evidence-backed design exists
       ([`exploration-adopter-feedback-channel-024`](../../docs/explorations/exploration-adopter-feedback-channel-024.md))
-- [ ] An ADR settles the cross-cutting decision and the spec passes
-      `arggon spec analyze` with no NEW findings
+- [x] An ADR settles the cross-cutting decision and the spec passes
+      `arggon spec analyze` with no NEW findings (2026-10-16: ADR 0024 reads
+      Accepted; stage 1 shipped — trigger carrier #850, parity #849, tier B —
+      and `spec analyze` is green vs baseline. Stages 2/3 are DEFERRED per the
+      two spikes' findings, not abandoned: re-measurement triggers recorded on
+      the spike items.)
 
 **Left unticked on purpose** (reviewer N3): the two halves land at different
 times, and splitting them would contradict the ADR's own status line. The spec
