@@ -39,3 +39,9 @@ Evidence (maker, 2026-10-16, worktree commit 9e2ff093, branch feat/task-board-bu
 ### handoff 2026-10-16 @Arggon — next: Open the PR from feat/task-board-build-stamp-e2e-smoke-pin-for-board-build; confirm ui-smoke lane green, then tick acceptance and merge
 - branch: feat/task-board-build-stamp-e2e-smoke-pin-for-board-build
 - open questions: None; boxes unticked pending PR CI (ui-smoke on the PR is the remaining gate)
+
+### 2026-10-16 @Arggon
+verdict: approve (e2e @smoke pin, commit 9e2ff093)
+- standards review: scope on item (spec +27, README 1 line, no prod code), reuses readiness signal + flake-harness import, zero tracker writes / order-independent, assertions discriminate (visible + regex + cross-equality, no hard-coded sha), untouched siblings correctly left alone, docs-travel, negligible runtime cost
+- verifier evidence: npx playwright test --grep @smoke → 49 passed incl new case 'the served board stamps the build in the footer and the detail drawer'; validate ok 0 warnings; prettier clean both files; diffstat confined to spec + README (+ tracker md)
+- advisory (non-blocking): README:462 + board.ts drawer-chrome comment share the pre-stamp wording — left for a follow-up, not this PR
