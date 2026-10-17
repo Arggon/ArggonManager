@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-board-columns-sort-cards-by-most-recently-modified
 title: Board columns sort cards by most recently modified
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: ui-web-board-v2
 labels: []
 created: "2026-10-16"
 updated: "2026-10-17"
-claimed_at: "2026-10-16T14:38:09.548Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-board-columns-sort-cards-by-most-recently-modified
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-columns-sort-cards-by-most-recently-modified.md
   Leaves live only under a story. id is the filename stem: task-board-columns-sort-cards-by-most-recently-modified.
