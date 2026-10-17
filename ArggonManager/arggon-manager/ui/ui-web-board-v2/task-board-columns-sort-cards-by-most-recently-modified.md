@@ -29,8 +29,8 @@ Product-owner request 2026-10-16: the board should be sorted by last time a card
 ## Acceptance
 
 - [x] Columns view sorts cards within each status column by `updated` descending (most recently modified first), deterministic on ties (id tiebreak); grouped-ancestry tree keeps ancestry grouping
-- [ ] Lens/filter, saved views and existing sort controls (priority / next-rank) behave consistently with the new default — updated in docs where the order is described
-- [ ] Tests pin the order (unit/parity); `arggon validate` green; prettier clean; PR opened
+- [x] Lens/filter, saved views and existing sort controls (priority / next-rank) behave consistently with the new default — updated in docs where the order is described
+- [x] `arggon validate` green; prettier clean; PR opened (#858, merged 2026-10-17)
 
 ## Notes
 
