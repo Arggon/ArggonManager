@@ -9,7 +9,6 @@ parent: ui-web-board-v2
 labels: []
 created: "2026-10-16"
 updated: "2026-10-17"
-worktree_path: /home/arggon/Projects/ArggonManager-task-board-columns-sort-cards-by-most-recently-modified
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-columns-sort-cards-by-most-recently-modified.md
