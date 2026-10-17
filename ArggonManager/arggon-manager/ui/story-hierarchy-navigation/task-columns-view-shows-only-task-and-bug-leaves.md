@@ -12,6 +12,7 @@ updated: "2026-10-17"
 claimed_at: "2026-10-17T20:01:24.388Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-columns-view-shows-only-task-and-bug-leaves
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/task-columns-view-shows-only-task-and-bug-leaves.md
   Leaves live only under a story. id is the filename stem: task-columns-view-shows-only-task-and-bug-leaves.
@@ -27,8 +28,8 @@ Product-owner request 2026-10-16, confirmed as a feature (not a bug): with group
 
 ## Acceptance
 
-- [ ] Columns view (grouped ancestry off) renders only task/bug leaf cards; initiatives/epics/stories render only in the grouped-ancestry tree view, on both static export and serve
-- [ ] Column counts, summary panel and card totals stay consistent with what is rendered (or are labeled); lens/filter and the detail drawer behave sanely for the hidden types
+- [x] Columns view (grouped ancestry off) renders only task/bug leaf cards; initiatives/epics/stories render only in the grouped-ancestry tree view, on both static export and serve
+- [x] Column counts, summary panel and card totals stay consistent with what is rendered (or are labeled); lens/filter and the detail drawer behave sanely for the hidden types
 - [ ] Tests pin it (unit/parity, incl. serve-vs-static shape); `arggon validate` green; prettier clean; PR opened
 
 ## Notes

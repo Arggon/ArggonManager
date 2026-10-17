@@ -354,6 +354,9 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
 
   const render = (): string => {
     const items = sortByUpdated(loadItems(tasksDir));
+    // Columns render only task/bug leaves; the summary panel must stay
+    // consistent with what is rendered, so it rolls up the leaf set only.
+    const leafItems = items.filter((item) => item.type === "task" || item.type === "bug");
     // Saved views are re-read per render (the watcher reloads on config
     // changes); a malformed convention file degrades to no chips, never a 500.
     let lenses: Record<string, string> = {};
@@ -373,8 +376,9 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
         lenses,
         me,
         // Summary header (task-board-progress-header): the kernel report
-        // aggregation over the already-loaded items — static and serve parity.
-        summary: buildBoardSummary(items),
+        // aggregation over the leaf (task/bug) set — static and serve parity,
+        // consistent with the rendered columns.
+        summary: buildBoardSummary(leafItems),
         // Build stamp (task-board-build-stamp): the server-start capture above.
         build,
         // Friction snapshot (task-board-footer-links-the-friction-report): the
