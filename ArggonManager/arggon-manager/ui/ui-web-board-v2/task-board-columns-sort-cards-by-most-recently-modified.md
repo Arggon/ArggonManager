@@ -74,3 +74,9 @@ Open the PR and set the item to done once review lands. Acceptance checklist ite
 ### handoff 2026-10-17 @arggon-maker (session: ses_eb4ae9271ffeeyy127DokaoChY) — next: Lead opens the PR from branch feat/task-board-columns-sort-cards-by-most-recently-modified (commit b4cad27a, pushed to origin) and sets status done once review lands; the acceptance checklist is pinn…
 - branch: feat/task-board-columns-sort-cards-by-most-recently-modified
 - open questions: None — all acceptance gates green. One intentional doc decision: grouped-ancestry tree keeps id-sorted siblings (treeEntries untouched) while columns sort by updated; stated in code comments and READ…
+
+### 2026-10-17 @Arggon
+verdict: approve (sort by most recently modified, commit b4cad27a)
+- standards review (read-only): all bars pass; new single-source sortByUpdated in lib/src/view-model.ts consumed by board/serve/tui/panel; tree/drawer children stay id-sorted; friction/footer untouched (build · friction badge kept); build-stamp test adjusted to prefix compare
+- SCOPE (accepted as coherent, single-source): TUI default id→updated, panel default updated, priority/next-rank tie-breaks recency-then-id — docs + tests travel; id still explicit everywhere (s cycle ends → id, sort:id, applyTuiSort id)
+- verifier: validate ok 0 warnings; prettier clean; build green; lint clean; vitest 6 files / 417 pass incl new ordering pins; Playwright Chromium @smoke 49/49 pass (build stamp + friction footer preserved)
