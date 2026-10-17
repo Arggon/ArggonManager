@@ -115,7 +115,7 @@ describe("renderTui golden (80x8, color off)", () => {
     const got = lines(frame);
     expect(frame.startsWith("\x1b[H\x1b[2J")).toBe(true);
     expect(got).toEqual([
-      "arggon board --tui · 3 item(s) · sort: id" + " ".repeat(39),
+      "arggon board --tui · 3 item(s) · sort: updated" + " ".repeat(34),
       "todo (2)        " +
         "in_progress (1) " +
         "blocked (0)     " +
@@ -328,7 +328,7 @@ describe("clampTuiState and selection helpers", () => {
     expect(selectedTuiItem(THREE, { ...state, column: 3 })).toBeNull();
   });
 
-  it("visibleTuiItems sorts lexicographically by id and filters on id/title", () => {
+  it("visibleTuiItems sorts by updated then id and filters on id/title", () => {
     const visible = visibleTuiItems(THREE, "");
     expect(visible.map((i) => i.id)).toEqual(["bug-beta", "story-gamma", "task-alpha"]);
     expect(visibleTuiItems(THREE, "BUG").map((i) => i.id)).toEqual(["bug-beta"]); // case-insensitive
@@ -873,7 +873,9 @@ describe("tui freshness stamp (task-tui-live-refresh)", () => {
     expect(stamped).toContain("updated 12:03:44");
     expect(stamped).toContain("r refresh");
     const unstamped = renderTui(items, initialTuiState(200, 10), { color: false });
-    expect(unstamped).not.toContain("updated ");
+    // No freshness stamp before the data is stamped (the default sort header
+    // says "sort: updated" — that is not a stamp; the stamp is `updated HH:MM:SS`).
+    expect(unstamped).not.toMatch(/updated \d{2}:\d{2}:\d{2}/);
     expect(unstamped).toContain("q quit");
   });
 });
@@ -1027,14 +1029,27 @@ const SORT_SET: WorkItem[] = [
 ];
 
 describe("nextTuiSort (task-tui-sort-ready-lens)", () => {
-  it("cycles id -> priority -> next -> id", () => {
-    expect(nextTuiSort("id")).toBe("priority");
+  it("cycles updated -> priority -> next -> id -> updated", () => {
+    expect(nextTuiSort("updated")).toBe("priority");
     expect(nextTuiSort("priority")).toBe("next");
     expect(nextTuiSort("next")).toBe("id");
+    expect(nextTuiSort("id")).toBe("updated");
   });
 });
 
 describe("applyTuiSort + tuiViewItems (task-tui-sort-ready-lens)", () => {
+  it("updated sort is the default most-recently-modified order, id on ties", () => {
+    const dated = [
+      item({ id: "task-b", type: "task", status: "todo", updated: "2026-10-10" }),
+      item({ id: "task-a", type: "task", status: "todo", updated: "2026-10-12" }),
+      item({ id: "task-c", type: "task", status: "todo", updated: "2026-10-12" }),
+    ];
+    expect(applyTuiSort(dated, "updated").map((i) => i.id)).toEqual(["task-a", "task-c", "task-b"]);
+    expect(
+      tuiViewItems(dated, { filter: "", sort: "updated", readyOnly: false }).map((i) => i.id),
+    ).toEqual(["task-a", "task-c", "task-b"]);
+  });
+
   it("id sort is the canonical lexicographic order", () => {
     expect(applyTuiSort(SORT_SET, "id").map((i) => i.id)).toEqual([
       "alpha",
@@ -1044,7 +1059,7 @@ describe("applyTuiSort + tuiViewItems (task-tui-sort-ready-lens)", () => {
     ]);
   });
 
-  it("priority sort is the ADR 0009 tier order, id on ties", () => {
+  it("priority sort is the ADR 0009 tier order, recency then id on ties", () => {
     expect(applyTuiSort(SORT_SET, "priority").map((i) => i.id)).toEqual([
       "beta",
       "gamma",
@@ -1093,7 +1108,7 @@ describe("renderTui sort + lens frame (task-tui-sort-ready-lens)", () => {
     const lensed = lines(
       renderTui(SORT_SET, { ...initialTuiState(120, 12), readyOnly: true }, { color: false }),
     );
-    expect(lensed[0]).toContain("sort: id · ready-only");
+    expect(lensed[0]).toContain("sort: updated · ready-only");
     expect(lensed[1]).toContain("todo (2)"); // counts narrowed with the lens
   });
 
@@ -1131,6 +1146,8 @@ describe("handleKey sort + lens keys (task-tui-sort-ready-lens)", () => {
     expect(state.sort).toBe("next");
     state = handleKey(state, "s");
     expect(state.sort).toBe("id");
+    state = handleKey(state, "s");
+    expect(state.sort).toBe("updated");
     state = handleKey(state, "L");
     expect(state.readyOnly).toBe(true);
     state = handleKey(state, "L");
@@ -1143,7 +1160,7 @@ describe("handleKey sort + lens keys (task-tui-sort-ready-lens)", () => {
     state = handleKey(state, "L");
     expect(state.searching).toBe(true);
     expect(state.filter).toBe("sL");
-    expect(state.sort).toBe("id");
+    expect(state.sort).toBe("updated");
     expect(state.readyOnly).toBe(false);
   });
 });
@@ -2441,7 +2458,7 @@ describe("handleKey move flow (task-tui-actions-parity)", () => {
     const before = initialTuiState(80, 8);
     let state = handleKey(before, "m", { selected: ACTION_ITEM });
     state = handleKey(state, "s"); // ignored by the flow
-    expect(state.sort).toBe("id");
+    expect(state.sort).toBe("updated");
     state = handleKey(state, "q"); // ignored by the flow (Ctrl-C is the quit)
     expect(state.quit).toBe(false);
     state = handleKey(state, "\x1b");

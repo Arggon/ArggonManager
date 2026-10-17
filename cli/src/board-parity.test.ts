@@ -35,6 +35,7 @@ import {
 } from "./board.js";
 import { startBoardServer } from "./board-serve.js";
 import { buildVersion } from "./build-info.js";
+import { assertOrder } from "../../test/assert-order.js";
 import { runCli, spawnNodeCli } from "./test-spawn.js";
 import { removeFixtureTree } from "./test-tmp.js";
 import {
@@ -865,6 +866,44 @@ describe("parity: build stamp on the static export and the served board", () => 
         expect(served, needle).toContain(needle);
         expect(staticHtml, needle).toContain(needle);
       }
+    } finally {
+      await handle.close();
+    }
+  }, 30_000);
+});
+
+describe("parity: columns sort by updated on static and serve (task-board-columns-sort-cards-by-most-recently-modified)", () => {
+  function newDatedTree(): string {
+    const root = mkdtempSync(join(tmpdir(), "arggon-board-updated-"));
+    mkdirSync(join(root, "tasks"), { recursive: true });
+    writeFileSync(join(root, "tasks/.convention.yml"), "version: 0\n", "utf8");
+    const card = (id: string, updated: string): void => {
+      const dir = join(root, `tasks/${id}`);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        join(dir, `${id}.md`),
+        `---\ntype: task\nstatus: todo\nid: ${id}\nlabels: []\ncreated: "2026-09-11"\nupdated: "${updated}"\n---\n\n# ${id}\n`,
+        "utf8",
+      );
+    };
+    card("task-old", "2026-09-01");
+    card("task-new", "2026-10-12");
+    card("task-mid", "2026-10-10");
+    return root;
+  }
+
+  it("renders updated-descending with id tiebreak on both surfaces", async () => {
+    const root = newDatedTree();
+    const result = runBoard({ cwd: root, out: "static.html", generatedAt: "test", me: null });
+    const staticHtml = readFileSync(result.outPath, "utf8");
+    assertOrder(staticHtml, "task-new", "task-mid");
+    assertOrder(staticHtml, "task-mid", "task-old");
+    const handle = startBoardServer({ cwd: root, me: null });
+    await handle.ready;
+    try {
+      const served = await (await fetch(`${handle.url}/`)).text();
+      assertOrder(served, "task-new", "task-mid");
+      assertOrder(served, "task-mid", "task-old");
     } finally {
       await handle.close();
     }

@@ -3,8 +3,9 @@
  *
  * The three board surfaces — the static/served HTML board (`cli/src/board.ts`),
  * the terminal kanban (`cli/src/tui.ts`) and the OpenCode panel
- * (`opencode/plugins/arggon/board.ts`) — render the same derived data: id
- * ordering, dependency-blocked marks, column counts, grouping and the parent
+ * (`opencode/plugins/arggon/board.ts`) — render the same derived data:
+ * most-recently-modified ordering, dependency-blocked marks, column counts,
+ * grouping and the parent
  * tree flattening. Those derivations used to be implemented once per surface
  * (the exploration-ui-improvements-012 "Foundation gaps" finding); this module
  * is the single source so the surfaces cannot drift as the v2 features
@@ -85,9 +86,32 @@ export function hasOpenDependencies(
   return openDependencyIds(dependsOn, byId).length > 0;
 }
 
-/** Lexicographic id order (the canonical item order every surface renders). Pure; copies. */
+/** Lexicographic id order (the explicit `id` sort every surface offers). Pure; copies. */
 export function sortById<T extends { id: string }>(items: readonly T[]): T[] {
   return [...items].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/**
+ * Most-recently-modified order (task-board-columns-sort-cards-by-most-recently-modified):
+ * `updated` descending, lexicographic id on ties. `updated` is the quoted
+ * `YYYY-MM-DD` frontmatter date refreshed by every `arggon update`, so a plain
+ * string comparison is chronological; a missing/null/empty value sorts last
+ * (oldest). This is the columns-view default every surface renders; the
+ * grouped-ancestry tree keeps its id-sorted ancestry walk (`treeEntries`).
+ * Pure; copies.
+ */
+export function sortByUpdated<T extends { id: string; updated?: string | null }>(
+  items: readonly T[],
+): T[] {
+  const key = (item: T): string => item.updated ?? "";
+  return [...items].sort(
+    (a, b) => (key(b) < key(a) ? -1 : key(b) > key(a) ? 1 : 0) || compareId(a.id, b.id),
+  );
+}
+
+/** Lexicographic id tiebreak shared by the display sorts. */
+function compareId(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 /**
@@ -102,14 +126,16 @@ export function priorityTier(priority: string | null | undefined): number {
     : priorityRank("p3");
 }
 
-/** Priority-major order (ADR 0009), lexicographic id on ties. Pure; copies. */
-export function sortByPriority<T extends { id: string; priority?: string | null }>(
-  items: readonly T[],
-): T[] {
+/** Priority-major order (ADR 0009), most-recently-modified then id on ties. Pure; copies. */
+export function sortByPriority<
+  T extends { id: string; priority?: string | null; updated?: string | null },
+>(items: readonly T[]): T[] {
+  const key = (item: T): string => item.updated ?? "";
   return [...items].sort(
     (a, b) =>
       priorityTier(a.priority) - priorityTier(b.priority) ||
-      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      (key(b) < key(a) ? -1 : key(b) > key(a) ? 1 : 0) ||
+      compareId(a.id, b.id),
   );
 }
 
@@ -118,7 +144,8 @@ export function sortByPriority<T extends { id: string; priority?: string | null 
  * the ADR 0009 priority-major ordering (tier via `priorityTier`, unprioritized
  * with the p3 tier), then higher downstream weight — how many items become
  * ready once this one completes (`downstreamWeight`, the same atom `next`
- * ranks its pool with) — lexicographic id on ties. Deterministic. Composed
+ * ranks its pool with) — most-recently-modified, then id on ties.
+ * Deterministic. Composed
  * entirely from kernel atoms (`isReadyTodo`, `priorityTier`,
  * `downstreamWeight`); nothing here restates a kernel rule.
  *
@@ -138,6 +165,7 @@ export function sortByNextRank<
     assignee?: string | null;
     dependsOn?: string[];
     depends_on?: string[];
+    updated?: string | null;
   },
 >(items: readonly T[]): T[] {
   const byId = buildStatusIndex(items);
@@ -147,12 +175,16 @@ export function sortByNextRank<
   const ready = (item: T): boolean => isReadyTodo(item, byId);
   const tier = (item: T): number => priorityTier(item.priority);
   const weight = (item: T): number => downstreamWeight(item.id, blockedByIndex);
-  const lexicographic = (a: T, b: T): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const updatedKey = (item: T): string => item.updated ?? "";
+  const recency = (a: T, b: T): number =>
+    updatedKey(b) < updatedKey(a) ? -1 : updatedKey(b) > updatedKey(a) ? 1 : 0;
+  const lexicographic = (a: T, b: T): number => compareId(a.id, b.id);
   return [...items].sort(
     (a, b) =>
       Number(ready(b)) - Number(ready(a)) ||
       tier(a) - tier(b) ||
       weight(b) - weight(a) ||
+      recency(a, b) ||
       lexicographic(a, b),
   );
 }
@@ -169,20 +201,17 @@ export function matchesSubstringFilter(
   );
 }
 
-/** Id-sorted, substring-filtered items (the cards a surface renders). Pure; copies. */
-export function visibleItems<T extends { id: string; title?: string | null }>(
-  items: readonly T[],
-  filter: string,
-): T[] {
-  return sortById(items).filter((item) => matchesSubstringFilter(item, filter));
+/** Most-recently-modified, substring-filtered items (the cards a surface renders). Pure; copies. */
+export function visibleItems<
+  T extends { id: string; title?: string | null; updated?: string | null },
+>(items: readonly T[], filter: string): T[] {
+  return sortByUpdated(items).filter((item) => matchesSubstringFilter(item, filter));
 }
 
-/** Visible items of one column/status, in id order. Pure; copies. */
-export function itemsForStatus<T extends { id: string; title?: string | null; status: string }>(
-  items: readonly T[],
-  filter: string,
-  status: string,
-): T[] {
+/** Visible items of one column/status, in most-recently-modified order. Pure; copies. */
+export function itemsForStatus<
+  T extends { id: string; title?: string | null; status: string; updated?: string | null },
+>(items: readonly T[], filter: string, status: string): T[] {
   return visibleItems(items, filter).filter((item) => item.status === status);
 }
 
@@ -227,7 +256,7 @@ export type ViewGroup<T> = { key: string | null; items: T[] };
 
 /**
  * Bucket items by a key function, preserving input order inside each bucket
- * (`itemsForStatus`/`sortById` already ordered them). Keyed groups render in
+ * (`itemsForStatus`/`sortByUpdated` already ordered them). Keyed groups render in
  * ascending key order, the `null` ("no group") bucket last and only when at
  * least one keyed group exists — a fully key-less selection stays a single
  * unlabeled bucket, so a surface renders it exactly like an ungrouped list.
@@ -258,7 +287,9 @@ export function groupItemsBy<T>(
 export type ViewTreeEntry<T> = { item: T; depth: number };
 
 /**
- * Depth-first, id-sorted flattening of the parent tree. Roots are items whose
+ * Depth-first, id-sorted flattening of the parent tree (task-board-columns-sort-cards-by-most-recently-modified:
+ * the grouped-ancestry tree keeps this ancestry grouping and id-sorted siblings
+ * while the status columns sort by `updated`). Roots are items whose
  * parent is absent/blank/unknown (a malformed tree renders as roots instead of
  * disappearing); a visited set makes the walk total, so a parent cycle whose
  * members never reach a root renders afterwards as roots rather than being
@@ -384,6 +415,8 @@ export type ViewItem = {
   dependsOn?: string[];
   /** JSON-contract alias of `dependsOn` (snake_case); read only when `dependsOn` is absent. */
   depends_on?: string[];
+  /** Frontmatter `updated` date (`YYYY-MM-DD`); absent/null sorts last in recency order. */
+  updated?: string | null;
 };
 
 /** Filter/lens/sort options for `applyViewLens`. All fields optional. */
@@ -394,13 +427,13 @@ export type ViewLens = {
   ready?: boolean;
   /** Keep only items in this status (column selection). */
   status?: Status;
-  /** Ordering: `id` (default, lexicographic) or `priority` (ADR 0009). */
-  sort?: "id" | "priority";
+  /** Ordering: `updated` (default, most-recently-modified) or `priority` (ADR 0009); `id` keeps lexicographic. */
+  sort?: "id" | "priority" | "updated";
 };
 
 /**
  * Apply one display lens to already-loaded items: kernel filter expression,
- * status/readiness narrowing and id/priority ordering, in one pure pass. This
+ * status/readiness narrowing and updated/priority/id ordering, in one pure pass. This
  * is the shared entry the v2 filter/sort work builds on; `@me` in a filter
  * value stays the caller's job to resolve (the kernel rule,
  * `runList` does the same), and a malformed expression throws the kernel's
@@ -409,7 +442,7 @@ export type ViewLens = {
  * The `blocked-by:`/`ancestor:` predicates and the readiness rule are computed
  * over the WHOLE input (like `runList`): evaluating them on the already
  * narrowed set would make a filtered-out dependency look unknown — hence open.
- * Predicates are ANDed; the empty lens is `sortById(items)`. Cost is one pass
+ * Predicates are ANDed; the empty lens is `sortByUpdated(items)`. Cost is one pass
  * over the items plus the two index builds (O(items + dependency edges)); the
  * result is a fresh array, the input is untouched. Dependencies are read in
  * either accepted shape (see `ViewItem`): the readiness rule and the
@@ -435,7 +468,11 @@ export function applyViewLens<T extends ViewItem>(items: readonly T[], lens: Vie
       matchesPredicate(kernelItem, pred, blockedByIndex, ancestorIndex),
     );
   });
-  return lens.sort === "priority" ? sortByPriority(kept) : sortById(kept);
+  return lens.sort === "priority"
+    ? sortByPriority(kept)
+    : lens.sort === "id"
+      ? sortById(kept)
+      : sortByUpdated(kept);
 }
 
 /** Verdict of one display-filter expression: the kept items, or the refusal message. */

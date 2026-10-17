@@ -32,6 +32,7 @@ import {
   sanitizeHumanError,
   sanitizeHumanTextUncapped,
   sortById,
+  sortByUpdated,
   statusCounts,
   treeEntries,
   type ItemType,
@@ -166,25 +167,27 @@ export function boardSnapshot(cwd: string, input: BoardActiveInput = {}): BoardS
   }
   try {
     const root = repoRootFromTasks(tasksDir);
-    const kernelItems = loadItems(tasksDir);
+    // Columns order (task-board-columns-sort-cards-by-most-recently-modified):
+    // sort the kernel items by `updated` BEFORE flattening, so the panel list
+    // matches the HTML/TUI columns; the tree (`boardTreeEntries`) keeps its
+    // id-sorted ancestry grouping via `treeEntries`.
+    const kernelItems = sortByUpdated(loadItems(tasksDir));
     // Duplicate ids throw here; the guard above turns that into an error
     // snapshot instead of a plugin-slot crash.
     const byId = itemsById(kernelItems) as Map<string, { status: Status }>;
-    const items: BoardItem[] = sortById(
-      kernelItems.map((item) => ({
-        id: item.id,
-        type: item.type,
-        title: sanitizeHumanTextUncapped(item.title ?? item.id),
-        status: item.status,
-        parent: item.parent ?? null,
-        assignee: item.assignee ?? null,
-        priority: item.priority ?? null,
-        blockedReason: item.blockedReason ?? null,
-        dependsOn: [...item.dependsOn],
-        openDeps: openDependencyIds(item.dependsOn, byId),
-        active: false,
-      })),
-    );
+    const items: BoardItem[] = kernelItems.map((item) => ({
+      id: item.id,
+      type: item.type,
+      title: sanitizeHumanTextUncapped(item.title ?? item.id),
+      status: item.status,
+      parent: item.parent ?? null,
+      assignee: item.assignee ?? null,
+      priority: item.priority ?? null,
+      blockedReason: item.blockedReason ?? null,
+      dependsOn: [...item.dependsOn],
+      openDeps: openDependencyIds(item.dependsOn, byId),
+      active: false,
+    }));
 
     const activeId = activeBoardId(items, input);
     for (const item of items) item.active = item.id === activeId;
