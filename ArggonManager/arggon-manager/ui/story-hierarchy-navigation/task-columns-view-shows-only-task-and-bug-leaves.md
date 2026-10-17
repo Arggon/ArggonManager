@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-columns-view-shows-only-task-and-bug-leaves
 title: Columns view shows only task and bug leaves
+assignee: arggon-delivery-lead
+branch: feat/task-columns-view-shows-only-task-and-bug-leaves
 parent: story-hierarchy-navigation
 labels: []
 created: "2026-10-16"
-updated: "2026-10-16"
+updated: "2026-10-17"
+claimed_at: "2026-10-17T20:01:24.388Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-columns-view-shows-only-task-and-bug-leaves
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/task-columns-view-shows-only-task-and-bug-leaves.md
   Leaves live only under a story. id is the filename stem: task-columns-view-shows-only-task-and-bug-leaves.
