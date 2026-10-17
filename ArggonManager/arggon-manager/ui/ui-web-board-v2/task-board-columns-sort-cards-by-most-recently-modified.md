@@ -70,3 +70,7 @@ Branch feat/task-board-columns-sort-cards-by-most-recently-modified pushed to or
 
 ### Next step (for the lead)
 Open the PR and set the item to done once review lands. Acceptance checklist items are pinned by unit/parity tests; the checklist itself is not ticked by me (done flip is the lead's call).
+
+### handoff 2026-10-17 @arggon-maker (session: ses_eb4ae9271ffeeyy127DokaoChY) — next: Lead opens the PR from branch feat/task-board-columns-sort-cards-by-most-recently-modified (commit b4cad27a, pushed to origin) and sets status done once review lands; the acceptance checklist is pinn…
+- branch: feat/task-board-columns-sort-cards-by-most-recently-modified
+- open questions: None — all acceptance gates green. One intentional doc decision: grouped-ancestry tree keeps id-sorted siblings (treeEntries untouched) while columns sort by updated; stated in code comments and READ…
