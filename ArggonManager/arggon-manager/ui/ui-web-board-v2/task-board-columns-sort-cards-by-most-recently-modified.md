@@ -8,7 +8,7 @@ branch: feat/task-board-columns-sort-cards-by-most-recently-modified
 parent: ui-web-board-v2
 labels: []
 created: "2026-10-16"
-updated: "2026-10-16"
+updated: "2026-10-17"
 claimed_at: "2026-10-16T14:38:09.548Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-board-columns-sort-cards-by-most-recently-modified
 ---
