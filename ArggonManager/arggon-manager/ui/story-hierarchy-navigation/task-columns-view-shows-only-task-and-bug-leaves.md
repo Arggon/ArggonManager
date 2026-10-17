@@ -66,3 +66,7 @@ cli/src/board.ts, cli/src/board-serve.ts, cli/src/board.test.ts, cli/src/board-p
 ### Notes
 - PR not opened (lead opens per role boundary); branch pushed to origin
 - item status left as in_progress per maker/lead boundary
+
+### handoff 2026-10-17 @arggon-maker (session: ses_eb48aeb38ffem7z6oUPQW8YQMY) — next: Lead: open PR from branch feat/task-columns-view-shows-only-task-and-bug-leaves and flip item to done after merge
+- branch: feat/task-columns-view-shows-only-task-and-bug-leaves
+- open questions: None
