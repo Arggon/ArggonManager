@@ -610,7 +610,11 @@ test.describe("@smoke board --serve", () => {
     const drawerStamp = page.locator("#board-drawer-build");
     await expect(drawerStamp).toBeVisible();
     await expect(drawerStamp).toHaveText(/^build \S+/);
-    expect(await drawerStamp.textContent()).toBe(stamped);
+    // The footer carries `build <stamp> · friction <count>` (the friction badge
+    // merged on task-board-footer-links-the-friction-report); the drawer stamp
+    // rides only the build portion, so compare the build prefix, not the whole
+    // footer text — keep both build and friction in the footer itself.
+    expect(await drawerStamp.textContent()).toBe(stamped.split(" · ")[0]);
 
     await page.keyboard.press("Escape");
     await expect(drawer).toBeHidden();

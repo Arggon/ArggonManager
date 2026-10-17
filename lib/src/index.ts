@@ -193,6 +193,7 @@ export {
   sortById,
   sortByNextRank,
   sortByPriority,
+  sortByUpdated,
   statusCounts,
   treeEntries,
   visibleItems,

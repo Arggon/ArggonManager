@@ -53,6 +53,7 @@ import {
   sortById,
   sortByNextRank,
   sortByPriority,
+  sortByUpdated,
   statusCounts,
   toContractWorkItem,
   visibleItems,
@@ -64,10 +65,10 @@ export const TUI_DEFAULT_WIDTH = 80;
 export const TUI_DEFAULT_HEIGHT = 24;
 
 /** Board card order, cycled with `s` (task-tui-sort-ready-lens). */
-export type TuiSort = "id" | "priority" | "next";
+export type TuiSort = "updated" | "id" | "priority" | "next";
 
-/** The sort cycle order: id -> priority -> next -> id. */
-export const TUI_SORTS: readonly TuiSort[] = ["id", "priority", "next"];
+/** The sort cycle order: updated -> priority -> next -> id -> updated. */
+export const TUI_SORTS: readonly TuiSort[] = ["updated", "priority", "next", "id"];
 
 /** The next sort in the cycle (`s` key). Pure. */
 export function nextTuiSort(sort: TuiSort): TuiSort {
@@ -238,8 +239,8 @@ export type TuiState = {
   view: TuiView | null;
   /**
    * Card order within each column (task-tui-sort-ready-lens): `s` cycles
-   * `id` -> `priority` -> `next` (ready first, ADR 0009 tier, downstream
-   * weight, id on ties).
+   * `updated` -> `priority` -> `next` -> `id` (ready first, ADR 0009 tier,
+   * downstream weight, recency then id on ties).
    */
   sort: TuiSort;
   /**
@@ -292,7 +293,7 @@ export function initialTuiState(
     searching: false,
     filterError: null,
     view: null,
-    sort: "id",
+    sort: "updated",
     readyOnly: false,
     message: null,
     updatedAt: null,
@@ -304,8 +305,8 @@ export function initialTuiState(
 }
 
 /**
- * Items feeding the TUI: same kernel read path as the HTML board, sorted
- * lexicographically by id (same rule as renderBoardHtml / list), through the
+ * Items feeding the TUI: same kernel read path as the HTML board, sorted by
+ * most-recently-modified (same rule as renderBoardHtml), through the
  * shared view-model — plus the raw bodies the detail pane reads
  * (task-tui-detail-pane), keyed by id. Both come from the same `loadItems`
  * pass, so the board and the pane can never disagree about an item. The
@@ -320,7 +321,7 @@ export function loadTuiItems(cwd: string): {
 } {
   const tasksDir = findTasksDir(cwd);
   const root = repoRootFromTasks(tasksDir);
-  const kernelItems = sortById(loadItems(tasksDir));
+  const kernelItems = sortByUpdated(loadItems(tasksDir));
   const items = kernelItems.map((item) => toContractWorkItem(item, root));
   const details = new Map<string, TuiDetailSource>(
     // `acceptanceBody(item)` — the canonical body, comment sections included.
@@ -428,7 +429,7 @@ export function tuiFilterMatches(item: WorkItem, filter: string): boolean {
   return matchesSubstringFilter(item, filter);
 }
 
-/** Filtered + lexicographically sorted items (the cards the TUI renders). */
+/** Filtered + most-recently-modified items (the cards the TUI renders). */
 export function visibleTuiItems(items: WorkItem[], filter: string): WorkItem[] {
   return visibleItems(items, filter);
 }
@@ -472,10 +473,10 @@ export function tuiLensFilter(lens: Pick<TuiLens, "filter" | "view">): string {
  * narrowed to pullable work when the ready-only lens is on. Readiness is the
  * kernel `isReadyTodo` rule computed over the WHOLE tree (a filtered-out
  * dependency must not look unknown — the `applyViewLens` rule), so a filter
- * cannot change what counts as ready. Id-ordered (the caller sorts further).
+ * cannot change what counts as ready. Updated-ordered (the caller sorts further).
  */
 function tuiLensItems(items: WorkItem[], lens: TuiLens): WorkItem[] {
-  const sorted = sortById(items);
+  const sorted = sortByUpdated(items);
   const verdict = applyViewFilter(sorted, tuiLensFilter(lens));
   // A lens state that bypassed validation (never produced by the keymap) must
   // not crash the frame: it degrades to no filter, the prompt path is where
@@ -488,8 +489,10 @@ function tuiLensItems(items: WorkItem[], lens: TuiLens): WorkItem[] {
 
 /**
  * The cards the board renders for one lens, in the lens' sort order
- * (task-tui-sort-ready-lens): `id` (lexicographic), `priority` (ADR 0009
- * tier, id on ties) or `next` (ready first, tier, downstream weight, id).
+ * (task-tui-sort-ready-lens): `updated` (most-recently-modified, the default),
+ * `id` (lexicographic), `priority` (ADR 0009
+ * tier, recency then id on ties) or `next` (ready first, tier, downstream weight,
+ * recency then id).
  * The order applies per column: columns are status slices of this array, so
  * sorting the whole set once orders every column the same way.
  */
@@ -498,14 +501,16 @@ export function tuiViewItems(items: WorkItem[], lens: TuiLens): WorkItem[] {
 }
 
 /**
- * One sort applied on its own (public for tests): `id` restores the
- * canonical lexicographic order, `priority` and `next` delegate to the
+ * One sort applied on its own (public for tests): `updated` restores the
+ * default most-recently-modified order, `id` the lexicographic order,
+ * `priority` and `next` delegate to the
  * kernel orderings. Pure; copies.
  */
 export function applyTuiSort<T extends WorkItem>(items: readonly T[], sort: TuiSort): T[] {
   if (sort === "priority") return sortByPriority(items);
   if (sort === "next") return sortByNextRank(items);
-  return sortById(items);
+  if (sort === "id") return sortById(items);
+  return sortByUpdated(items);
 }
 
 /**
@@ -825,8 +830,8 @@ export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {})
     case "/":
       return { ...state, searching: true, message: null };
     case "s":
-      // Cycle the card order (task-tui-sort-ready-lens): id -> priority ->
-      // next -> id. The card index keeps its value; the post-key sync clamps
+      // Cycle the card order (task-tui-sort-ready-lens): updated -> priority ->
+      // next -> id -> updated. The card index keeps its value; the post-key sync clamps
       // it against the re-sorted column.
       return { ...state, sort: nextTuiSort(state.sort), message: null };
     case "L":
@@ -916,7 +921,8 @@ export function tuiParentOf(items: WorkItem[], id: string): WorkItem | null {
  * The open item's children through the kernel's recorded `parent` edges
  * (task-tui-hierarchy-jump): every item whose `parent` is the open id, from
  * the same `loadItems` snapshot the frame renders — no second hierarchy.
- * Canonical id order (the board's sort), so `[n]` numbers are stable. Pure;
+ * Canonical id order (intentionally NOT the columns' updated order), so `[n]`
+ * numbers are stable. Pure;
  * read-only; copies.
  */
 export function tuiChildrenOf(items: WorkItem[], id: string): WorkItem[] {
@@ -1927,7 +1933,7 @@ export const TUI_HELP: readonly TuiHelpGroup[] = [
     title: "view",
     rows: [
       ["v", "cycle the saved views (x-views): the view ANDs with the filter"],
-      ["s", "cycle the card order: id → priority → next"],
+      ["s", "cycle the card order: updated → priority → next → id"],
       ["L", "toggle the ready-only lens (pullable work only)"],
       ["r", "force a refresh (re-read the tree now)"],
     ],

@@ -19,6 +19,7 @@ import {
   repoRootFromTasks,
   resolveCurrentLogin,
   runUpdate,
+  sortByUpdated,
   toContractWorkItem,
   type FrictionReport,
 } from "@arggondev/lib";
@@ -352,7 +353,7 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
   };
 
   const render = (): string => {
-    const items = loadItems(tasksDir).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const items = sortByUpdated(loadItems(tasksDir));
     // Saved views are re-read per render (the watcher reloads on config
     // changes); a malformed convention file degrades to no chips, never a 500.
     let lenses: Record<string, string> = {};

@@ -164,7 +164,7 @@ describe("renderBoardHtml", () => {
     expect(html).not.toContain("<script>alert(1)</script>");
   });
 
-  it("orders cards lexicographically by id within a column", () => {
+  it("orders cards by id on updated ties within a column", () => {
     const html = renderBoardHtml(
       [
         item({ id: "task-b", type: "task", status: "todo" }),
@@ -173,6 +173,32 @@ describe("renderBoardHtml", () => {
       { generatedAt: GENERATED_AT },
     );
     assertOrder(html, "task-a", "task-b");
+  });
+
+  it("orders cards by most-recently-modified within a column, id on ties (task-board-columns-sort-cards-by-most-recently-modified)", () => {
+    const html = renderBoardHtml(
+      [
+        item({ id: "task-old", type: "task", status: "todo", updated: "2026-09-01" }),
+        item({ id: "task-new", type: "task", status: "todo", updated: "2026-10-12" }),
+        item({ id: "task-mid", type: "task", status: "todo", updated: "2026-10-10" }),
+      ],
+      { generatedAt: GENERATED_AT },
+    );
+    assertOrder(html, "task-new", "task-mid");
+    assertOrder(html, "task-mid", "task-old");
+  });
+
+  it("breaks updated ties by id deterministically", () => {
+    const html = renderBoardHtml(
+      [
+        item({ id: "task-b", type: "task", status: "todo", updated: "2026-10-12" }),
+        item({ id: "task-a", type: "task", status: "todo", updated: "2026-10-12" }),
+        item({ id: "task-missing", type: "task", status: "todo", updated: null }),
+      ],
+      { generatedAt: GENERATED_AT },
+    );
+    assertOrder(html, "task-a", "task-b");
+    assertOrder(html, "task-b", "task-missing");
   });
 
   it("renders a branch badge when set and none otherwise", () => {

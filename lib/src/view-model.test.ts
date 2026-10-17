@@ -31,6 +31,7 @@ import {
   sortById,
   sortByNextRank,
   sortByPriority,
+  sortByUpdated,
   statusCounts,
   treeEntries,
   visibleItems,
@@ -91,6 +92,26 @@ describe("sortById", () => {
   });
 });
 
+describe("sortByUpdated (task-board-columns-sort-cards-by-most-recently-modified)", () => {
+  it("orders most-recently-modified first, id on ties, missing last", () => {
+    const input = [
+      item({ id: "task-b", updated: "2026-10-10" }),
+      item({ id: "task-a", updated: "2026-10-12" }),
+      item({ id: "task-c", updated: "2026-10-12" }),
+      item({ id: "task-old" }),
+    ];
+    const sorted = sortByUpdated(input);
+    expect(sorted.map((entry) => entry.id)).toEqual(["task-a", "task-c", "task-b", "task-old"]);
+    expect(input.map((entry) => entry.id)).toEqual(["task-b", "task-a", "task-c", "task-old"]);
+    expect(sorted).not.toBe(input);
+  });
+
+  it("treats null and missing updated as oldest", () => {
+    const input = [item({ id: "task-b", updated: null }), item({ id: "task-a" })];
+    expect(sortByUpdated(input).map((entry) => entry.id)).toEqual(["task-a", "task-b"]);
+  });
+});
+
 describe("priorityTier and sortByPriority", () => {
   it("ranks p0..p3 and orders the unprioritized (or invalid) with the p3 tier", () => {
     expect(priorityTier("p0")).toBe(0);
@@ -102,7 +123,7 @@ describe("priorityTier and sortByPriority", () => {
     expect(priorityTier("p9")).toBe(3); // hand-edited invalid token: validate flags it
   });
 
-  it("sorts priority-major with lexicographic id ties, without mutating the input", () => {
+  it("sorts priority-major with recency then id ties, without mutating the input", () => {
     const input = [
       item({ id: "task-a", priority: null }),
       item({ id: "task-d", priority: "p3" }),
@@ -174,7 +195,7 @@ describe("substring filtering", () => {
     expect(matchesSubstringFilter(items[2]!, "nope")).toBe(false);
   });
 
-  it("visibleItems sorts by id and applies the substring filter (copy)", () => {
+  it("visibleItems sorts by updated then id and applies the substring filter (copy)", () => {
     expect(visibleItems(items, "login").map((entry) => entry.id)).toEqual(["bug-beta"]);
     expect(visibleItems(items, "bug").map((entry) => entry.id)).toEqual(["bug-beta"]);
     const all = visibleItems(items, "");
@@ -183,7 +204,7 @@ describe("substring filtering", () => {
     expect(all).not.toBe(items);
   });
 
-  it("itemsForStatus keeps one column of the visible items, id-sorted", () => {
+  it("itemsForStatus keeps one column of the visible items, updated-then-id sorted", () => {
     const mixed = [
       item({ id: "task-b", status: "todo" }),
       item({ id: "task-a", status: "done" }),
@@ -436,7 +457,7 @@ describe("applyViewLens", () => {
     item({ id: "epic-x", type: "epic", status: "in_progress" }),
   ];
 
-  it("applies the empty lens as a plain id sort (copy)", () => {
+  it("applies the empty lens as an updated-then-id sort (copy)", () => {
     expect(applyViewLens(base).map((entry) => entry.id)).toEqual([
       "bug-c",
       "epic-x",
@@ -444,6 +465,25 @@ describe("applyViewLens", () => {
       "task-a",
       "task-b",
       "task-blocker",
+    ]);
+  });
+
+  it("orders the default lens by updated descending with id tiebreak; sort:id keeps lexicographic", () => {
+    const dated = [
+      item({ id: "task-b", updated: "2026-10-10" }),
+      item({ id: "task-a", updated: "2026-10-12" }),
+      item({ id: "task-c", updated: "2026-10-12" }),
+    ];
+    expect(applyViewLens(dated).map((entry) => entry.id)).toEqual(["task-a", "task-c", "task-b"]);
+    expect(applyViewLens(dated, { sort: "updated" }).map((entry) => entry.id)).toEqual([
+      "task-a",
+      "task-c",
+      "task-b",
+    ]);
+    expect(applyViewLens(dated, { sort: "id" }).map((entry) => entry.id)).toEqual([
+      "task-a",
+      "task-b",
+      "task-c",
     ]);
   });
 
@@ -499,7 +539,7 @@ describe("applyViewLens", () => {
     ).toContain("task-terminal");
   });
 
-  it("sorts by priority rank with id ties, and does not mutate the input", () => {
+  it("sorts by priority rank with recency then id ties, and does not mutate the input", () => {
     expect(
       applyViewLens(base, { status: "todo", sort: "priority" }).map((entry) => entry.id),
     ).toEqual(["task-b", "task-a", "story-d"]);

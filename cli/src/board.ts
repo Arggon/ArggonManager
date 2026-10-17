@@ -24,6 +24,7 @@ import {
   runShow,
   showBoundedParts,
   sortById,
+  sortByUpdated,
   statusCounts,
   toContractWorkItem,
   treeEntries,
@@ -253,7 +254,7 @@ export function runBoard(opts: BoardOptions): BoardResult {
     }
     groupBy = opts.groupBy;
   }
-  const items = sortById(loadItems(tasksDir));
+  const items = sortByUpdated(loadItems(tasksDir));
   let overlay = new Map<string, PrInfo>();
   if (opts.github) {
     const reader = opts.gh ?? defaultBoardGithub();
@@ -886,7 +887,9 @@ type BoundedParts = { prose: string; allComments: ShowComment[]; comments: ShowC
 
 /**
  * Child index over one `loadItems` read (task-web-board-hierarchy-links):
- * parent id -> direct children in lexicographic id order. Built once per
+ * parent id -> direct children in lexicographic id order — intentionally NOT
+ * the columns' updated order (task-board-columns-sort-cards-by-most-recently-modified):
+ * the drawer children list and the TUI `[n]` numbers stay stable. Built once per
  * detail assembly (per route hit in `buildBoardDetail`, once per export in
  * `buildBoardDetailMap`); the drawer reads no second hierarchy source.
  */
@@ -2702,7 +2705,9 @@ export type BoardTreeNode<T = WorkItem> = { item: T; children: BoardTreeNode<T>[
  * recorded `parent` edges are the ONLY hierarchy source: a parent that is
  * absent, blank or unknown makes the item a root (a malformed tree renders as
  * roots instead of disappearing, and a parent cycle renders once, as a root),
- * and siblings stay id-sorted exactly like the flat walk. Pure.
+ * and siblings stay id-sorted exactly like the flat walk — intentionally NOT
+ * the columns' updated order (task-board-columns-sort-cards-by-most-recently-modified:
+ * the tree keeps ancestry grouping). Pure.
  */
 export function boardTreeRoots<T extends { id: string; parent?: string | null }>(
   items: readonly T[],
@@ -3028,7 +3033,9 @@ export function wireBoardView(
 /**
  * Pure renderer for the static board. Columns are the v0 statuses in enum
  * order; every card shows its own status (no rollup). All dynamic text is
- * HTML-escaped. Sorted lexicographically by id within each column. With
+ * HTML-escaped. Sorted by most-recently-modified (`updated` descending, id on
+ * ties) within each column (task-board-columns-sort-cards-by-most-recently-modified);
+ * the grouped-ancestry tree keeps its id-sorted ancestry grouping. With
  * `groupBy: "milestone"` (ADR 0003 prototype), cards inside each column are
  * grouped under milestone headers sorted ascending; items without a
  * milestone group last under a "no milestone" header - only when the column
@@ -3196,7 +3203,7 @@ export function renderBoardHtml(
   },
 ): string {
   const esc = escapeHtml;
-  const sorted = sortById(items);
+  const sorted = sortByUpdated(items);
   const prs = opts.prs ?? new Map<string, PrInfo>();
   // Offline snapshot stays byte-identical: the PR line only renders with the live overlay on.
   const showPr = opts.live === true;
