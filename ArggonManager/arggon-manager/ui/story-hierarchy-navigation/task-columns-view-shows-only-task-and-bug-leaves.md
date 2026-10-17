@@ -70,3 +70,8 @@ cli/src/board.ts, cli/src/board-serve.ts, cli/src/board.test.ts, cli/src/board-p
 ### handoff 2026-10-17 @arggon-maker (session: ses_eb48aeb38ffem7z6oUPQW8YQMY) — next: Lead: open PR from branch feat/task-columns-view-shows-only-task-and-bug-leaves and flip item to done after merge
 - branch: feat/task-columns-view-shows-only-task-and-bug-leaves
 - open questions: None
+
+### 2026-10-17 @Arggon
+verdict: approve (columns leaves-only, commit 66de9150)
+- standards review: flat columns render only task/bug leaves; tree/drawer children untouched (ancestry grouping keeps containers); lens/filter/counts derive from leafItems; detail drawer serves any type via GET /api/item; no schema change, no security surface; wave 1 friction footer and wave 2 sortByUpdated byte-identical; cli/README.md still accurate (no false statement); severity findings: none
+- verifier evidence: validate ok 0 warnings; prettier clean; build green; lint clean; vitest board/parity/serve/friction 216 pass; Chromium smoke 4/4 (cards data-type == {task,bug}, tree shows containers, static vs serve parity, sort-by-updated within leaves, friction badge present); git scope confined to board.ts + board-serve.ts + tests + README + tracker md
