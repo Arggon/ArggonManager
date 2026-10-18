@@ -37,3 +37,21 @@ Contributing shape: verdict comments auto-commit to main, so EVERY reviewed bran
 - [ ] `arggon validate` green; prettier clean; `npm test` green for the touched surface; PR opened
 
 ## Notes
+
+### 2026-10-18 @ses_eafd0e4ffffeBslXHAfWdTPHVB
+Merge-ownership close-out implemented (PR #861, branch fix/bug-auto-merge-armed-not-merged, commit 570f4bcb).
+
+Evidence (commands run, expected vs observed):
+- `arggon validate`: ok (0 warnings, convention v5) — expected green, observed green.
+- `npx prettier -- check` on touched files: clean.
+- `npx tsc -p tsconfig.typecheck.json --noEmit`: clean.
+- `npx vitest run cli/src/update.test.ts cli/src/done-gate.test.ts cli/src/sync-command.test.ts`: 82 passed.
+- New tests in cli/src/update.test.ts (5): done flip refused when an open PR targets the branch; allowed when no open PR; graceful degradation without execGh; no-branch makes no gh call; gh-failure allows the flip.
+
+Kernel change: lib/src/update.ts refuses flipping a task/bug to `done` while an open GitHub PR targets the item's branch, degrading gracefully when PR state can't be determined. Wired execGh into CLI (updateOperation + runUpdate) and MCP (arggon_update) entry points.
+
+Docs: rule written where the lead reads it — skills/arggon-cli/references/orchestration.md and ArggonManager/docs/agents.md §Orchestration → Merge verification; one-line lesson in pitfalls.md. Skill copies + Claude template regenerated via skills:sync; .convention.yml provenance checksum refreshed.
+
+Methodology impact: Behavioral (ADR 0016 adopter-upgrade channel) — adds a done-gate rule and PR guard.
+
+Ready for the delivery lead's review + merge verification; the done flip stays the lead's call after the PR merges.
