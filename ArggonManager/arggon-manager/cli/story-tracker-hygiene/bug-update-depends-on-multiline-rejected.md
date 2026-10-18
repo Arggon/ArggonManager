@@ -12,6 +12,7 @@ updated: "2026-10-18"
 claimed_at: "2026-10-18T20:21:15.069Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-update-depends-on-multiline-rejected
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/bug-update-depends-on-multiline-rejected.md
   Leaves live only under a story. id is the filename stem: bug-update-depends-on-multiline-rejected.
@@ -34,13 +35,19 @@ Found 2026-10-12 by the delivery lead while wiring `depends_on` on `task-validat
 ## Notes
 
 ### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
+
 **Second producer observed (2026-10-15, delivery lead), recorded here so the fix covers all producers.** While closing `task-cli-start-remediation-tail-clipped-on-human-channel`'s sweep item the standard close-out path (acceptance tick → `npx prettier --write <item.md>` → validate) produced the same unparseable shape from a THIRD producer — the repo's own formatter reflowing a long INLINE list:
-```yaml
-depends_on: [task-cli-start-remediation-tail-clipped-on-human-channel, bug-three-acceptance-parsers-diverging]
-```
-becomes
+
 ```yaml
 depends_on:
   [task-cli-start-remediation-tail-clipped-on-human-channel, bug-three-acceptance-parsers-diverging]
 ```
+
+becomes
+
+```yaml
+depends_on:
+  [task-cli-start-remediation-tail-clipped-on-human-channel, bug-three-acceptance-parsers-diverging]
+```
+
 and the strict single-line parser then refuses `invalid frontmatter line: "  [task-…, task-…]"` — `arggon validate` red and `arggon update --status done` refuses, so the close-out flow itself can make an item un-flippable. So the producers are: the `update` writer (block form, this item) and the formatter (two-line inline, plus `bug-start-claim-commit-frontmatter-fails-prettier`'s `title:` quoting hunk and `bug-session-formatter-normalizes-tracker-item-files`'s body normalisation). One parser/writer-side fix that accepts the wrapped-list shape — scoped so a genuinely broken line is still refused — closes my instance; my filed instance (`bug-prettier-reflow-breaks-item-frontmatter`) is being closed as a duplicate so the fix is not split across two items on the same parser line.
