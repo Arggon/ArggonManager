@@ -2,7 +2,7 @@
 type: bug
 status: in_progress
 id: bug-update-depends-on-multiline-rejected
-title: update --depends-on serializes multi-line flow YAML that validate rejects as BROKEN_YAML
+title: "A wrapped frontmatter list value (depends_on: + an indented [...] block) is refused as BROKEN_YAML, so a prettier-formatted item becomes un-flippable"
 assignee: arggon-delivery-lead
 branch: fix/bug-update-depends-on-multiline-rejected
 parent: story-tracker-hygiene
@@ -27,9 +27,9 @@ Found 2026-10-12 by the delivery lead while wiring `depends_on` on `task-validat
 
 ## Acceptance
 
-- [ ] `update --depends-on` / `--add-depends-on` (CLI + native) emits single-line frontmatter the kernel parser accepts, for any entry count — a round-trip test pins write→validate→read
-- [ ] The fix covers `labels` and any other list field sharing the serializer, or states why depends_on is the only one
-- [ ] `npm test` green; prettier clean; `arggon validate` green; PR opened
+- [x] `update --depends-on` / `--add-depends-on` (CLI + native) emits single-line frontmatter the kernel parser accepts, for any entry count — a round-trip test pins write→validate→read
+- [x] The fix covers `labels` and any other list field sharing the serializer, or states why depends_on is the only one
+- [x] `npm test` green; prettier clean; `arggon validate` green; PR opened
 
 ## Notes
 
