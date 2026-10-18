@@ -34,24 +34,19 @@ Found 2026-10-12 by the delivery lead while wiring `depends_on` on `task-validat
 ## Notes
 
 ### 2026-10-15 @ses_eccc605dbffeHEwy9fqO3FP5tx
-
 **Second producer observed (2026-10-15, delivery lead), recorded here so the fix covers all producers.** While closing `task-cli-start-remediation-tail-clipped-on-human-channel`'s sweep item the standard close-out path (acceptance tick → `npx prettier --write <item.md>` → validate) produced the same unparseable shape from a THIRD producer — the repo's own formatter reflowing a long INLINE list:
-
 ```yaml
-depends_on:
-  [task-cli-start-remediation-tail-clipped-on-human-channel, bug-three-acceptance-parsers-diverging]
+depends_on: [task-cli-start-remediation-tail-clipped-on-human-channel, bug-three-acceptance-parsers-diverging]
 ```
-
 becomes
-
 ```yaml
 depends_on:
   [task-cli-start-remediation-tail-clipped-on-human-channel, bug-three-acceptance-parsers-diverging]
 ```
-
 and the strict single-line parser then refuses `invalid frontmatter line: "  [task-…, task-…]"` — `arggon validate` red and `arggon update --status done` refuses, so the close-out flow itself can make an item un-flippable. So the producers are: the `update` writer (block form, this item) and the formatter (two-line inline, plus `bug-start-claim-commit-frontmatter-fails-prettier`'s `title:` quoting hunk and `bug-session-formatter-normalizes-tracker-item-files`'s body normalisation). One parser/writer-side fix that accepts the wrapped-list shape — scoped so a genuinely broken line is still refused — closes my instance; my filed instance (`bug-prettier-reflow-breaks-item-frontmatter`) is being closed as a duplicate so the fix is not split across two items on the same parser line.
 
 ### 2026-10-18 @Arggon
+
 verdict: request-changes (item-body record rewritten by formatter churn in the merge commit — the code change itself is approved on reading, pending the probes below)
 
 Standards review of PR #862 (branch `fix/bug-update-depends-on-multiline-rejected`, read-only; I ran no gates — execution evidence is the verifier's, routed below).
@@ -64,7 +59,7 @@ Standards review of PR #862 (branch `fix/bug-update-depends-on-multiline-rejecte
 
 1. **The writer is unchanged and always inline.** `formatValue`'s array branch (`lib/src/frontmatter.ts:352-363`) returns `[${…join(", ")}]` for any entry count. The item's original premise ("`update` serializes a multi-line flow block") is wrong and the maker's correction is right: the reflow producer is the formatter, which is why the failure only appeared at the next `validate`. There are 4 tracked item files with list lines over `printWidth: 100` (e.g. `task-validate-refuses-placeholder-bodies.md`, a 230-char `depends_on:`) — i.e. the wedge was latent across the tree, not a one-off.
 2. **The widening is genuinely scoped, by reading it line by line.** `readValue` consumes following lines only for (a) an indented `[`-opening flow sequence and (b) indented `- ` block entries; anything else leaves `key:` null so the next iteration refuses that line by name (`INVALID_FRONTMATTER_LINE` → `BROKEN_YAML`). `readFlow` refuses an unterminated sequence instead of swallowing it, and its depth scan is quote-aware (doubled single quotes, backslash escapes) — so a `]` inside a quoted element cannot close early, which the writer's own quoting makes reachable. Both loops terminate (`end + 1 < lines.length`, bounded block loop); no writes, no new runtime dependency.
-3. **The tests discriminate.** Every newly accepted shape was a hard throw before the change (a continuation line with no `:`), so the four-shape unit test and the two integration tests fail on `main` — they are not vacuous. `deps.test.ts` drives the kernel path (`runUpdate` from `@arggondev/lib`), which is exactly where the changed reader lives; the write→validate→read round trip and the `todo → in_progress → done` flip are pinned there. One honest gap: the CLI *argument* half of acceptance box 1 is not separately driven, and the formatter step is a pinned literal rather than a real `prettier` run (probes 1-3 close both).
+3. **The tests discriminate.** Every newly accepted shape was a hard throw before the change (a continuation line with no `:`), so the four-shape unit test and the two integration tests fail on `main` — they are not vacuous. `deps.test.ts` drives the kernel path (`runUpdate` from `@arggondev/lib`), which is exactly where the changed reader lives; the write→validate→read round trip and the `todo → in_progress → done` flip are pinned there. One honest gap: the CLI _argument_ half of acceptance box 1 is not separately driven, and the formatter step is a pinned literal rather than a real `prettier` run (probes 1-3 close both).
 4. **Docs travel with the change.** `convention.md` §Frontmatter schema gains the grammar the implementation actually has, in the same PR. Grepping the old strictness across `README.md` / `docs/**` / `skills/**`: the only hits are item Notes history (append-only; correctly left alone) and the abridged adopter template `templates/docs/docs/convention.md`, which states no line grammar at all — so no template or skill sync is owed (and `adopter-template-invariant-drift` pins only the carriers' invariants/scope bullets, not this section). `cli/src/spec.ts`'s separate `parseDocFrontmatter` deliberately ignores list/nested lines for prose docs, and `playbooks.ts` writes scalars only — the widening creates no second reader and no silent fork.
 5. **Methodology impact class: behavioral, correctly declared on both required surfaces** (PR description and an item comment — `agents.md` §Changing the methodology itself), with the ADR 0016 channel referenced. The ADR-process list does not owe an ADR for a permissive read-form widening (not a reserved namespace, not a breaking schema change); the impact declaration is the required surface and it is present and correct.
 6. **The vendored surface is covered.** `ci.yml:48` runs `check:plugin` in the `cli` job, so green CI pins `index.bundle.ts` to `lib/src`; I compared the bundle's embedded `parseFrontmatter`/`readValue`/`readFlow`/`parseValue` against the source and they are equivalent modulo type erasure. No other vendored copy of the parser exists (only `lib/dist`, an artifact, and the gitignored `.opencode/` build).
@@ -72,10 +67,11 @@ Standards review of PR #862 (branch `fix/bug-update-depends-on-multiline-rejecte
 ## F1 — BLOCKING: this branch's merge commit rewrote another writer's dated note in this item's body
 
 Evidence (read, not inferred):
+
 - `git show b5da6e12:<item>` **and** `git show 82f19eb2^2:<item>` both carry the §Notes/2026-10-15 record with its before/after pair: the first fence is the single-line `depends_on: [task-cli-…, bug-three-…]`, the second the wrapped form.
 - `git diff 82f19eb2^1 82f19eb2 -- <item>` shows the merge commit itself replacing the **first** fence's content with the already-wrapped form, adding a blank line after the closing `---` (now line 13) and after the `### 2026-10-15 @…` heading. The current file (lines 37-51) therefore reads "wrapped … becomes … wrapped", directly contradicting its own lead-in ("…the formatter reflowing a long INLINE list:").
 
-Why this blocks: the item body is the durable, append-only record and that dated note belongs to the delivery lead (2026-10-15), not to this branch's writer — a maker must not mutate another writer's recorded note. It is worse here than noise: the destroyed evidence is the before/after that *this very bug* exists to document. The blank-line-after-`---` hunk is the exact signature of `bug-start-claim-commit-frontmatter-fails-prettier`, and body normalization is what `bug-session-formatter-normalizes-tracker-item-files` exists to stop — so this PR carries a live instance of that class, in `story-tracker-hygiene`.
+Why this blocks: the item body is the durable, append-only record and that dated note belongs to the delivery lead (2026-10-15), not to this branch's writer — a maker must not mutate another writer's recorded note. It is worse here than noise: the destroyed evidence is the before/after that _this very bug_ exists to document. The blank-line-after-`---` hunk is the exact signature of `bug-start-claim-commit-frontmatter-fails-prettier`, and body normalization is what `bug-session-formatter-normalizes-tracker-item-files` exists to stop — so this PR carries a live instance of that class, in `story-tracker-hygiene`.
 
 Fix (narrow, item file only, no code change): restore the 2026-10-15 note's two blocks verbatim from `82f19eb2^2` and drop the incidental blank-line churn — **do not** `git checkout <main> -- <item>`, which would also drop the claim lines (`status`/`assignee`/`branch`/`claimed_at`/`worktree_path`) that must stay. Then re-run `npm run arggon -- validate`.
 
@@ -89,11 +85,11 @@ The naive `,` split in `parseValue` is real and correctly deferred: `assertLabel
 
 ## F4 — advisory: `convention.md` describes less than the implementation accepts
 
-Two accepted read shapes are not named by the new paragraph: (a) a flow sequence opened on the key's own line and continued below (`depends_on: [a,` / `  b]`), and (b) the `parseValue` empty-part drop (a trailing comma is dropped — documented indirectly — and an interior empty element `[a, , b]` is dropped too, where it previously became `""`). One more clause is worth having: a value that merely *starts* with `[` is now treated as a flow sequence, so a previously-loadable scalar such as `x-note: [TODO` now refuses loudly. That direction is conservative (loud, not silent) and consistent with the stated rule, but a reader of the contract should know it. Single sentence, non-blocking.
+Two accepted read shapes are not named by the new paragraph: (a) a flow sequence opened on the key's own line and continued below (`depends_on: [a,` / `  b]`), and (b) the `parseValue` empty-part drop (a trailing comma is dropped — documented indirectly — and an interior empty element `[a, , b]` is dropped too, where it previously became `""`). One more clause is worth having: a value that merely _starts_ with `[` is now treated as a flow sequence, so a previously-loadable scalar such as `x-note: [TODO` now refuses loudly. That direction is conservative (loud, not silent) and consistent with the stated rule, but a reader of the contract should know it. Single sentence, non-blocking.
 
 ## F5 — advisory: an unverified mechanism claim is being handed on as guidance
 
-Finding 2 ("in this sandbox `npx prettier` does not reformat markdown frontmatter for paths under `/tmp`") is recorded for other reviewers, and I could not verify it by reading. Prettier 3 infers the parser from the file extension and resolves config from the file's directory, so a temp file whose name has no `.md` extension (or with no config in scope) is at least as likely an explanation — probe 4 settles it. The test as written is fine either way (the literal is the captured formatter output); only the *explanation* should not be codified as a rule before it is probed.
+Finding 2 ("in this sandbox `npx prettier` does not reformat markdown frontmatter for paths under `/tmp`") is recorded for other reviewers, and I could not verify it by reading. Prettier 3 infers the parser from the file extension and resolves config from the file's directory, so a temp file whose name has no `.md` extension (or with no config in scope) is at least as likely an explanation — probe 4 settles it. The test as written is fine either way (the literal is the captured formatter output); only the _explanation_ should not be codified as a rule before it is probed.
 
 ## Not verified by me (needs the verifier)
 
