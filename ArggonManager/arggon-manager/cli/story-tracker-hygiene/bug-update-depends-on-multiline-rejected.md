@@ -6,7 +6,7 @@ title: update --depends-on serializes multi-line flow YAML that validate rejects
 parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
-updated: "2026-10-12"
+updated: "2026-10-18"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/bug-update-depends-on-multiline-rejected.md
