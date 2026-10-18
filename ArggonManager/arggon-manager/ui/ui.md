@@ -30,7 +30,7 @@ open). The dated record below carries the original spike and constraints.
 
 ## Acceptance
 
-- [ ] `story-hierarchy-navigation` closes with all three surfaces verified (web drawer, TUI, OpenCode panel) against its own acceptance
+- [x] `story-hierarchy-navigation` closes with all three surfaces verified (web drawer, TUI, OpenCode panel) against its own acceptance
 - [ ] The 2026-09-22 constraints still hold: no new runtime dependency (web artifact self-contained, TUI raw-ANSI), and no tracker write bypasses the kernel update path
 
 ## Notes
