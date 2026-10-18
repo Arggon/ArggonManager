@@ -74,3 +74,7 @@ and the strict single-line parser then refuses `invalid frontmatter line: "  [ta
 3. Pre-existing, unreachable-via-CLI: `parseValue` splits a flow list on `,` naively, so an element containing a comma (writer-side quoted, e.g. `labels: ["a, b"]`) would not round-trip. `assertLabels`/`assertValidId` forbid commas, so no reachable path produces it; left alone rather than widening this diff — say the word and I will file it as its own bug.
 
 Acceptance boxes 1–3 are met by this branch + PR #862; leaving the tick/flip to you.
+
+### handoff 2026-10-18 @ses_eaf525ec2ffeqC8K8Wm9a6jf2r (session: ses_eaf525ec2ffeqC8K8Wm9a6jf2r) — next: Review PR #862 (parser-side wrapped-list read + convention.md grammar note); then tick the 3 acceptance boxes and merge — no further maker work pending.
+- branch: fix/bug-update-depends-on-multiline-rejected
+- open questions: Is the prettier /tmp frontmatter no-op worth a playbook note? File the unreachable comma-in-element parse flaw as its own bug?
