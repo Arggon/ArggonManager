@@ -2120,10 +2120,13 @@ describe("renderBoardHtml summary header (task-board-progress-header)", () => {
   it("runBoard renders the summary panel on the static export (static + serve parity)", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-board-summary-static-"));
     writeBranchedTree(dir);
+    // writeBranchedTree: launch (initiative) -> story-a (in_progress) ->
+    // task-one (task, in_progress). Only the task leaf is a column card now,
+    // so the summary rolls up the leaf set: wip = 1.
     const result = runBoard({ cwd: dir, out: "out.html", generatedAt: GENERATED_AT, me: null });
     const html = readFileSync(result.outPath, "utf8");
     expect(html).toContain('id="board-summary"');
-    expect(html).toContain('id="board-summary-wip">2</span>');
+    expect(html).toContain('id="board-summary-wip">1</span>');
   });
 });
 
@@ -2662,24 +2665,37 @@ describe("derived displayed status (task-board-no-done-over-open-work)", () => {
     }
   });
 
-  it("applies the same mask to the column cards, with the chip, the count and the card name", () => {
+  it("keeps containers out of the column cards (tree-only) and renders task/bug leaves as cards", () => {
     const html = renderBoardHtml(tree(), { generatedAt: GENERATED_AT, details: true });
-    // The masked container's CARD (done column) reads open, carries the same
-    // disclosure and announces the displayed state plus the count.
-    const card = cardOf(html, "story-open");
-    expect(card).toContain('<span class="status-chip open">open</span>');
-    expect(card).toContain('<span class="tree-open">3 open</span>');
-    expect(card).toContain('data-display-status="open"');
-    expect(card).toContain('data-status="done"');
-    expect(html).toContain('aria-label="story story-open: Open work (open, 3 open descendants)"');
-    // Every other card is byte-identical to the pre-change shape: authored
-    // chip-less markup, no display attribute.
-    for (const id of ["story-clean", "story-cancelled", "task-done-leaf", "task-open"]) {
-      const other = cardOf(html, id);
-      expect(other, id).not.toContain("data-display-status");
-      expect(other, id).not.toContain("status-chip");
-    }
-    // The tree and the columns read the SAME count from the same walk.
+    // The board section (columns) only carries task/bug leaves — never
+    // initiatives, epics or stories. story-open (done, open work below) is a
+    // container: it reads `open` in the TREE but has NO column card at all.
+    const boardStart = html.indexOf('<main class="board"');
+    const boardEnd = html.indexOf("</main>", boardStart) + "</main>".length;
+    const board = html.slice(boardStart, boardEnd);
+    expect(board).not.toContain('data-id="init"');
+    expect(board).not.toContain('data-id="story-open"');
+    expect(board).not.toContain('data-id="story-clean"');
+    expect(board).not.toContain('data-id="story-wip"');
+    expect(board).not.toContain('data-id="story-cancelled"');
+    // The task/bug leaves render as column cards with their authored status.
+    expect(board).toContain('data-id="task-open"');
+    expect(board).toContain('data-id="task-wip"');
+    expect(board).toContain('data-id="bug-blocked"');
+    expect(board).toContain('data-id="task-done-leaf"');
+    expect(board).toContain('data-id="task-cancelled-child"');
+    // Leaves carry their authored status in data-status (leaves render no
+    // status chip — chips only appear on masked containers).
+    expect(cardOf(html, "task-open")).toContain('data-status="todo"');
+    expect(cardOf(html, "task-wip")).toContain('data-status="in_progress"');
+    expect(cardOf(html, "bug-blocked")).toContain('data-status="blocked"');
+    expect(cardOf(html, "task-done-leaf")).toContain('data-status="done"');
+    expect(cardOf(html, "task-cancelled-child")).toContain('data-status="todo"');
+    // The tree still shows everything, containers included, masked as before.
+    const treeSection = html.slice(html.indexOf('<section class="tree"'));
+    expect(treeSection).toContain('data-id="init"');
+    expect(treeSection).toContain('data-id="story-open"');
+    expect(rowOf(html, "story-open")).toContain('<span class="status-chip open">open</span>');
     expect(rowOf(html, "story-open")).toContain('<span class="tree-open">3 open</span>');
   });
 
@@ -2750,12 +2766,13 @@ describe("derived displayed status (task-board-no-done-over-open-work)", () => {
       expect(html).toContain('<span class="status-chip open">open</span>');
       expect(html).toContain('<span class="tree-open">3 open</span>');
     }
-    expect(staticHtml).toContain(
-      'aria-label="story story-open: Open work (open, 3 open descendants)"',
-    );
+    // The mask and the count ride the tree row; a task leaf's card carries its
+    // authored aria-label on both surfaces.
+    expect(staticHtml).toContain('aria-label="task task-open: Todo (todo)"');
     expect(serveHtml).toContain(
       'aria-label="story story-open: Open work (open, 3 open descendants)"',
     );
+    expect(serveHtml).toContain('aria-label="task task-open: Todo (todo)"');
   });
 });
 
@@ -3243,5 +3260,131 @@ describe("renderBoardHtml build stamp (task-board-build-stamp)", () => {
     const stampedHtml = readFileSync(stamped.outPath, "utf8");
     expect(stampedHtml).toContain('id="board-build"');
     expect(stampedHtml).toContain(`build ${expected}`);
+  });
+});
+
+describe("columns show only task/bug leaves (task-columns-view-shows-only-task-and-bug-leaves)", () => {
+  const mixed = (): WorkItem[] => [
+    item({ id: "init-a", type: "initiative", status: "todo", title: "Initiative A" }),
+    item({ id: "epic-a", type: "epic", status: "todo", title: "Epic A", parent: "init-a" }),
+    item({
+      id: "story-a",
+      type: "story",
+      status: "in_progress",
+      title: "Story A",
+      parent: "epic-a",
+    }),
+    item({ id: "task-a", type: "task", status: "todo", title: "Task A", parent: "story-a" }),
+    item({ id: "task-b", type: "task", status: "in_progress", title: "Task B", parent: "story-a" }),
+    item({ id: "bug-a", type: "bug", status: "blocked", title: "Bug A", parent: "story-a" }),
+  ];
+
+  function boardSection(html: string): string {
+    const start = html.indexOf('<main class="board"');
+    const end = html.indexOf("</main>", start) + "</main>".length;
+    return html.slice(start, end);
+  }
+
+  function treeSection(html: string): string {
+    const start = html.indexOf('<section class="tree"');
+    return html.slice(start, html.indexOf("</section>", start) + "</section>".length);
+  }
+
+  it("renders only task/bug cards in the columns view, on static and serve", () => {
+    const boards = [
+      ["static", renderBoardHtml(mixed(), { generatedAt: GENERATED_AT })],
+      ["serve", renderBoardHtml(mixed(), { generatedAt: GENERATED_AT, details: true, live: true })],
+    ] as const;
+    for (const [mode, html] of boards) {
+      const board = boardSection(html);
+      // Task/bug leaves render as column cards.
+      expect(board, mode).toContain('data-id="task-a"');
+      expect(board, mode).toContain('data-id="task-b"');
+      expect(board, mode).toContain('data-id="bug-a"');
+      // Containers never appear as column cards.
+      expect(board, mode).not.toContain('data-id="init-a"');
+      expect(board, mode).not.toContain('data-id="epic-a"');
+      expect(board, mode).not.toContain('data-id="story-a"');
+      // No container data-type badges in the columns.
+      expect(board, mode).not.toContain('data-type="initiative"');
+      expect(board, mode).not.toContain('data-type="epic"');
+      expect(board, mode).not.toContain('data-type="story"');
+    }
+  });
+
+  it("keeps all types in the grouped-ancestry tree", () => {
+    const html = renderBoardHtml(mixed(), { generatedAt: GENERATED_AT });
+    const tree = treeSection(html);
+    // Every type renders in the tree.
+    for (const id of ["init-a", "epic-a", "story-a", "task-a", "task-b", "bug-a"]) {
+      expect(tree).toContain(`data-id="${id}"`);
+    }
+    // Nesting is preserved: task/bug leaves sit under story-a under epic-a under init-a.
+    const initNode = tree.slice(tree.indexOf('data-id="init-a"'));
+    expect(initNode).toContain('data-id="epic-a"');
+    expect(initNode).toContain('data-id="story-a"');
+    expect(initNode).toContain('data-id="task-a"');
+    expect(initNode).toContain('data-id="task-b"');
+    expect(initNode).toContain('data-id="bug-a"');
+  });
+
+  it("column counts match the rendered leaf cards, not all items", () => {
+    const html = renderBoardHtml(mixed(), { generatedAt: GENERATED_AT });
+    const board = boardSection(html);
+    // 5 status columns: todo has task-a (+ init-a/epic-a/story-a filtered out),
+    // in_progress has task-b, blocked has bug-a; done and cancelled are empty.
+    expect(board).toContain('<span class="count">1</span>'); // todo: task-a only
+    expect(board).toContain('<span class="count">1</span>'); // in_progress: task-b only
+    expect(board).toContain('<span class="count">1</span>'); // blocked: bug-a only
+    expect(board).toContain('<span class="count">0</span>'); // done
+    expect(board).toContain('<span class="count">0</span>'); // cancelled
+    // The meta counts match the rendered columns.
+    expect(html).toContain(
+      '<span id="status-counts">todo: 1 · in_progress: 1 · blocked: 1 · done: 0 · cancelled: 0</span>',
+    );
+  });
+
+  it("lens/filter operates on the leaf cards in columns, with BOARD_ITEMS holding all items for the tree", () => {
+    const html = renderBoardHtml(mixed(), {
+      generatedAt: GENERATED_AT,
+      lenses: { tasks: "type:task", bugs: "type:bug" },
+    });
+    // The lens chips render for the saved views.
+    expect(html).toContain('data-name="tasks" data-filter="type:task"');
+    expect(html).toContain('data-name="bugs" data-filter="type:bug"');
+    // BOARD_ITEMS holds every item (for the client-side tree display), while
+    // the columns render only task/bug leaves.
+    expect(html).toContain("var BOARD_ITEMS = [");
+    const itemsMatch = html.match(/var BOARD_ITEMS = (\[[\s\S]*?\]);/);
+    expect(itemsMatch).toBeTruthy();
+    const boardItems = JSON.parse(itemsMatch![1]);
+    const types = boardItems.map((item: { type: string }) => item.type).sort();
+    expect(types).toEqual(["bug", "epic", "initiative", "story", "task", "task"]);
+    // The tree lens references the same BOARD_ITEMS snapshot; a type:initiative
+    // lens matches the initiative in BOARD_ITEMS but renders no column card
+    // (initiatives live in the tree view, not the flat columns).
+    expect(html).toContain("boardTreeDisplay(BOARD_ITEMS, visibleIds)");
+  });
+
+  it("runBoard static export excludes containers from columns on disk", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-columns-leaves-"));
+    mkdirSync(join(dir, "tasks"));
+    writeFileSync(join(dir, "tasks", ".convention.yml"), "version: 0\n", "utf8");
+    writeFileSync(
+      join(dir, "tasks", "init-a.md"),
+      '---\ntype: initiative\nstatus: todo\nid: init-a\ntitle: Initiative A\nlabels: []\ncreated: "2026-09-07"\nupdated: "2026-09-07"\n---\n\n# Initiative A\n',
+      "utf8",
+    );
+    writeFileSync(
+      join(dir, "tasks", "task-a.md"),
+      '---\ntype: task\nstatus: todo\nid: task-a\ntitle: Task A\nlabels: []\ncreated: "2026-09-07"\nupdated: "2026-09-07"\n---\n\n# Task A\n',
+      "utf8",
+    );
+    const result = runBoard({ cwd: dir, out: "out.html", generatedAt: GENERATED_AT, me: null });
+    const html = readFileSync(result.outPath, "utf8");
+    const board = boardSection(html);
+    expect(board).toContain('data-id="task-a"');
+    expect(board).not.toContain('data-id="init-a"');
+    expect(result.itemCount).toBe(2); // runBoard still reports all loaded items
   });
 });

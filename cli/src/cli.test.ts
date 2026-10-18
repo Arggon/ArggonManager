@@ -93,8 +93,14 @@ function initBoardGhTree(ghOk: boolean): { dir: string; env: Record<string, stri
   const dir = join(outer, "work");
   mkdirSync(dir, { recursive: true });
   expect(runCli(["init", dir]).status).toBe(0);
+  // The columns view only renders task/bug leaves, so the PR-overlay fixture
+  // must be a task (the branch/PR overlay lands on task cards now). Tasks
+  // require a story parent, so build a chain and put the branch on the leaf.
   expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
-  expect(runCli(["update", "launch-mvp", "--branch", "feat/launch-mvp"], dir).status).toBe(0);
+  expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+  expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+  expect(runCli(["create", "task", "Work", "--parent", "login"], dir).status).toBe(0);
+  expect(runCli(["update", "task-work", "--branch", "feat/launch-mvp"], dir).status).toBe(0);
   const bin = join(outer, "bin");
   mkdirSync(bin, { recursive: true });
   writeFileSync(

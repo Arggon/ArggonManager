@@ -303,9 +303,13 @@ describe("board --serve grouped-ancestry view (task-web-board-hierarchy-view)", 
       expect(html).toContain('aria-pressed="true">grouped ancestry</button>');
       // The fixture chain nests: the task's row sits inside the story's
       // subtree, the story's inside the epic's (recorded parent edges only).
-      const epicAt = html.indexOf('data-id="auth"');
-      const storyAt = html.indexOf('data-id="story-login"');
-      const taskAt = html.indexOf('data-id="task-a"');
+      // Columns also render task/bug leaves, so scope the nesting assertion
+      // to the tree section.
+      const treeStart = html.indexOf('<section class="tree"');
+      const treeHtml = html.slice(treeStart);
+      const epicAt = treeHtml.indexOf('data-id="auth"');
+      const storyAt = treeHtml.indexOf('data-id="story-login"');
+      const taskAt = treeHtml.indexOf('data-id="task-a"');
       expect(epicAt).toBeGreaterThan(-1);
       expect(storyAt).toBeGreaterThan(epicAt);
       expect(taskAt).toBeGreaterThan(storyAt);

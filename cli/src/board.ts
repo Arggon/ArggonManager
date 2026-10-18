@@ -272,6 +272,9 @@ export function runBoard(opts: BoardOptions): BoardResult {
   }
   const me = opts.me !== undefined ? opts.me : (resolveCurrentLogin() ?? null);
   const contractItems = items.map((item) => toContractWorkItem(item, root));
+  // Columns render only task/bug leaves; the summary panel must stay consistent
+  // with what is rendered, so it rolls up the leaf set only.
+  const leafItems = items.filter((item) => item.type === "task" || item.type === "bug");
   // --details (task-board-static-details): one bounded payload per item, built
   // from the ALREADY-LOADED items (kernel bounded read via showBoundedParts —
   // no per-item tracker walk). The embedded JSON byte count is the measured
@@ -297,8 +300,9 @@ export function runBoard(opts: BoardOptions): BoardResult {
     lenses,
     me,
     // Summary header (task-board-progress-header): the kernel report
-    // aggregation over the already-loaded items — static and serve parity.
-    summary: buildBoardSummary(items),
+    // aggregation over the leaf (task/bug) set — static and serve parity, and
+    // consistent with the rendered columns.
+    summary: buildBoardSummary(leafItems),
     details: opts.details === true,
     staticDetails: detailMap,
     build,
@@ -3204,6 +3208,11 @@ export function renderBoardHtml(
 ): string {
   const esc = escapeHtml;
   const sorted = sortByUpdated(items);
+  // Flat columns view: task/bug leaves only. Containers (initiative/epic/story)
+  // render only in the grouped-ancestry tree (`sorted`, untouched below), which
+  // is their home. `leafItems` drives the columns, the lens, the counts and the
+  // summary — everything the flat view renders.
+  const leafItems = sorted.filter((item) => item.type === "task" || item.type === "bug");
   const prs = opts.prs ?? new Map<string, PrInfo>();
   // Offline snapshot stays byte-identical: the PR line only renders with the live overlay on.
   const showPr = opts.live === true;
@@ -3297,7 +3306,7 @@ export function renderBoardHtml(
   const completionByParent = new Map<string, { done: number; total: number }>();
   if (groupByStory) {
     const byParent = new Map<string, WorkItem[]>();
-    for (const item of sorted) {
+    for (const item of leafItems) {
       if (!item.parent) continue;
       const list = byParent.get(item.parent) ?? [];
       list.push(item);
@@ -3319,7 +3328,7 @@ export function renderBoardHtml(
   let rovingAssigned = false;
 
   const columns = STATUSES.map((status) => {
-    const columnItems = sorted.filter((item) => item.status === status);
+    const columnItems = leafItems.filter((item) => item.status === status);
     const renderCard = (item: WorkItem): string => {
       const title = esc(item.title ?? item.id);
       const breadcrumb = item.parent ? `<div class="parent">${esc(item.parent)}</div>` : "";
@@ -3429,7 +3438,7 @@ export function renderBoardHtml(
 </section>`;
   }).join("\n");
 
-  const statusTotals = statusCounts(sorted);
+  const statusTotals = statusCounts(leafItems);
   const counts = STATUSES.map((status) => `${status}: ${statusTotals[status]}`).join(" · ");
   const repo = opts.repoName ? ` — ${esc(opts.repoName)}` : "";
   const live = showPr ? ` · live GitHub overlay (${prs.size} PR(s))` : "";

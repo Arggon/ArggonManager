@@ -909,3 +909,92 @@ describe("parity: columns sort by updated on static and serve (task-board-column
     }
   }, 30_000);
 });
+
+describe("parity: columns show only task/bug leaves on static and serve", () => {
+  function writeMixedTree(root: string): void {
+    mkdirSync(join(root, "tasks"), { recursive: true });
+    writeFileSync(join(root, "tasks", ".convention.yml"), "version: 0\n", "utf8");
+    const card = (rel: string, type: string, id: string, status: string, parent?: string): void => {
+      const full = join(root, rel);
+      mkdirSync(join(full, ".."), { recursive: true });
+      writeFileSync(
+        full,
+        `---\ntype: ${type}\nstatus: ${status}\nid: ${id}${
+          parent ? `\nparent: ${parent}` : ""
+        }\nlabels: []\ncreated: "2026-09-11"\nupdated: "2026-09-11"\n---\n\n# ${id}\n`,
+        "utf8",
+      );
+    };
+    card("tasks/init-a/init-a.md", "initiative", "init-a", "todo");
+    card("tasks/epic-a/epic-a.md", "epic", "epic-a", "todo", "init-a");
+    card("tasks/story-a/story-a.md", "story", "story-a", "todo", "epic-a");
+    card("tasks/task-a/task-a.md", "task", "task-a", "todo", "story-a");
+    card("tasks/task-b/task-b.md", "task", "task-b", "in_progress", "story-a");
+    card("tasks/bug-a/bug-a.md", "bug", "bug-a", "blocked", "story-a");
+  }
+
+  it("static and serve both render only task/bug in columns, all types in tree", async () => {
+    const root = mkdtempSync(join(tmpdir(), "arggon-parity-leaves-"));
+    writeMixedTree(root);
+
+    // Static export.
+    const staticResult = runBoard({
+      cwd: root,
+      out: "board.html",
+      generatedAt: "test",
+      me: null,
+    });
+    const staticHtml = readFileSync(staticResult.outPath, "utf8");
+    const staticBoard = staticHtml.slice(
+      staticHtml.indexOf('<main class="board"'),
+      staticHtml.indexOf("</main>") + "</main>".length,
+    );
+    const staticTree = staticHtml.slice(
+      staticHtml.indexOf('<section class="tree"'),
+      staticHtml.indexOf("</section>", staticHtml.indexOf('<section class="tree"')) +
+        "</section>".length,
+    );
+
+    // Served board.
+    const handle = startBoardServer({ cwd: root, me: null });
+    await handle.ready;
+    try {
+      const servedHtml = await (await fetch(`${handle.url}/`)).text();
+      const servedBoard = servedHtml.slice(
+        servedHtml.indexOf('<main class="board"'),
+        servedHtml.indexOf("</main>") + "</main>".length,
+      );
+      const servedTree = servedHtml.slice(
+        servedHtml.indexOf('<section class="tree"'),
+        servedHtml.indexOf("</section>", servedHtml.indexOf('<section class="tree"')) +
+          "</section>".length,
+      );
+
+      for (const [label, board, tree] of [
+        ["static", staticBoard, staticTree],
+        ["serve", servedBoard, servedTree],
+      ] as const) {
+        // Columns: only task/bug leaves.
+        expect(board, label).toContain('data-id="task-a"');
+        expect(board, label).toContain('data-id="task-b"');
+        expect(board, label).toContain('data-id="bug-a"');
+        expect(board, label).not.toContain('data-id="init-a"');
+        expect(board, label).not.toContain('data-id="epic-a"');
+        expect(board, label).not.toContain('data-id="story-a"');
+        expect(board, label).not.toContain('data-type="initiative"');
+        expect(board, label).not.toContain('data-type="epic"');
+        expect(board, label).not.toContain('data-type="story"');
+        // Tree: all types, nested.
+        expect(tree, label).toContain('data-id="init-a"');
+        expect(tree, label).toContain('data-id="epic-a"');
+        expect(tree, label).toContain('data-id="story-a"');
+        expect(tree, label).toContain('data-id="task-a"');
+        expect(tree, label).toContain('data-id="task-b"');
+        expect(tree, label).toContain('data-id="bug-a"');
+      }
+    } finally {
+      await handle.close();
+      removeFixtureTree(root);
+    }
+  }, 30_000);
+});
