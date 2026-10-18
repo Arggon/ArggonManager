@@ -173,3 +173,45 @@ Control method: instead of `git worktree add` (a git write) `main` was reproduce
 - Any `depends_on` entry count beyond 8 (probe 3 used 8 long ids).
 - The full set of genuinely broken shapes beyond the two refusal controls.
 - The `main` control ran from a `git archive` extract of `main`, not the primary checkout — functionally equivalent for the parser, stated for the record.
+
+### 2026-10-18 @arggon-delivery-lead
+verdict: approve — merge after green CI. F1 repaired, all six verifier probes pass, the three review follow-ups are filed.
+
+## Merge gate (ArggonManager/docs/engineering.md §Review bar)
+
+- **Architecture / boundaries** — the widening is scoped by *shape*, not by key: continuation lines are consumed only for an indented `[` flow sequence or indented `- ` block entries, and anything else still refuses by name (`INVALID_FRONTMATTER_LINE`). `convention.md` carries the grammar in the same PR, so there is no silent schema fork. F2 (key-agnostic scoping lets a list sit in a scalar field and be silently comma-joined) is a **pre-existing** class the PR only extended by one shape — filed as `bug-frontmatter-scalar-field-accepts-list`, not fixed here.
+- **Conventions** — item id / branch / PR naming correct; methodology impact class **behavioral** (ADR 0016) declared on both required surfaces.
+- **Evidence travels with the change** — unit (`cli/src/frontmatter.test.ts`: four shapes for `depends_on` *and* `labels`, the scoped refusals, the `key:`-empty path) + integration (`cli/src/deps.test.ts`: write→validate→read, and the prettier-wrapped shape through `todo → in_progress → done`), plus the verifier's six-probe table on this item.
+- **Docs travel with the change** — `ArggonManager/docs/convention.md` §Frontmatter schema.
+- **Scope stays on the item** — 6 files (kernel, convention, two test files, regenerated vendored bundle, this item), all on-item; the plugin bundle is regenerated because `lib/src/**` changed.
+- **Blocking end-to-end check** — probe 3 on the built binary: `update --depends-on <8 long ids>` writes ONE physical line, `validate` green, `npx prettier --write` reflows it into the wrapped form, `validate` **still** green, and the item still flips `todo → in_progress → done`. That is precisely the close-out path this item documents as having produced an un-flippable item.
+
+## Standards review
+
+`verdict: request-changes` on **F1 only** — the code change was approved on reading. F1: merge commit `82f19eb2` rewrote this item's own 2026-10-15 note — the before/after fence's *before* half was replaced by the *after* half, plus blank lines injected after the closing `---` and after the `### <date>` heading. One writer mutated another writer's recorded note, and the destroyed bytes were the evidence this bug exists to record.
+
+Repaired by the delivery lead in `d825c9f2`: the note restored verbatim from `82f19eb2^2`, **0 deletions** against the pre-merge copy, claim lines kept, `arggon validate` green (the file is now pre-merge content + the appended verdict blocks, nothing else). Probe 5 reproduces the churn mechanism, and that evidence is now recorded on `bug-session-formatter-normalizes-tracker-item-files` — which is the class this PR accidentally carried a live instance of.
+
+## Verifier (six probes, read-only, branch HEAD `d825c9f2`)
+
+6/6 as specified. The decisive pair is 2a/2b: the fixed binary validates the prettier-wrapped file (`ok:true, errors:[]`) while an **unmodified-`main`** build refuses the *same bytes* (`BROKEN_YAML`, `invalid frontmatter line: "  ["`) — so the fix is what makes it pass, not merely a green suite. Probe 6 pins the scoping on the CLI surface (an indented `garbage` line and an unterminated `labels: [a,` both still refuse). No tree change: scratch dirs deleted, `git status --short` empty.
+
+## F5 resolved against the maker's explanation
+
+The `/tmp` behaviour is **not** "the sandbox doesn't reformat markdown frontmatter". Prettier skips the *whole file* because this repo's `.gitignore` line 62 is `/tmp/` and prettier's default `ignorePath` is `[".gitignore", ".prettierignore"]`; with `--ignore-path /dev/null` the same `/tmp` file reflows. The claim was only ever in the maker's item comment — never codified in the tests or the docs — so no code change is owed. It is recorded here so it is not carried forward as a rule.
+
+## Follow-ups filed (review bar: deferred work becomes items, not comments)
+
+- `bug-frontmatter-scalar-field-accepts-list` (F2)
+- `bug-flow-list-comma-split-naive` (F3)
+- `task-convention-list-grammar-gaps` (F4)
+
+## Premise correction (accepted)
+
+The original title asserted that `update --depends-on` serializes a multi-line flow block. It never did: `formatValue` writes one inline line for any entry count, and the reflow producer is the formatter. The title is corrected on this item so the tracker stops asserting a producer that does not exist.
+
+## Acceptance checklist
+
+3/3 ticked on this branch (box 1 by probe 3 + `deps.test.ts`; box 2 by the four-shape unit test covering `depends_on` **and** `labels`; box 3 by CI + `arggon validate`).
+
+**Merge call:** merge PR #862 once this branch's CI is green — the `done` flip follows merge verification.
