@@ -1,4 +1,3 @@
-<!-- arggon:generated template="claude/arggon/skills/arggon-cli/references/pitfalls.md" -->
 # Pitfalls
 
 Part of the `arggon-cli` skill (`SKILL.md`). Traps that have actually bitten
@@ -67,6 +66,8 @@ agents in this codebase — read before mutating the tracker or merging.
 - **A claim branch cut from local HEAD inherits its unpushed commits: `start`
   reports `inheritedCommits` and the remedy — push main before the PR.**
   — bug-start-claim-branch-inherits-unpushed-tracker-commits
+- **Arming auto-merge is not ensuring merge:** `--auto` arms; poll till MERGED. DIRTY/BEHIND: merge main in, resolve, push, re-verify. Done flip refused while an open PR targets the branch.
+  — bug-auto-merge-armed-not-merged
 
 ## Repo hygiene and staging
 
