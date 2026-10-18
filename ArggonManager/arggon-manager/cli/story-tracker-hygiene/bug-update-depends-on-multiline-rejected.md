@@ -78,3 +78,8 @@ Acceptance boxes 1–3 are met by this branch + PR #862; leaving the tick/flip t
 ### handoff 2026-10-18 @ses_eaf525ec2ffeqC8K8Wm9a6jf2r (session: ses_eaf525ec2ffeqC8K8Wm9a6jf2r) — next: Review PR #862 (parser-side wrapped-list read + convention.md grammar note); then tick the 3 acceptance boxes and merge — no further maker work pending.
 - branch: fix/bug-update-depends-on-multiline-rejected
 - open questions: Is the prettier /tmp frontmatter no-op worth a playbook note? File the unreachable comma-in-element parse flaw as its own bug?
+
+### 2026-10-18 @ses_eaf525ec2ffeqC8K8Wm9a6jf2r
+**PR #862 is mergeable and fully green.** CI: `cli` pass, `tasks-validate` pass, `ui-smoke` pass.
+
+The first push came back `CONFLICTING`; the ONLY conflict was this item's own tracker file (the branch's claim frontmatter `claimed_at`/`worktree_path` vs main's `updated` bump + the comment blocks added on main). I merged `origin/main` into the branch (commit `82f19eb2`) and resolved it mechanically by keeping the claim lines that created this worktree and letting main's comment blocks auto-merge — flagging it because tracker-file merges are your call; override the resolution if the claim record should read differently. Post-merge gates re-run: `npm test` 167 files / 3699 tests green, `npm run check:plugin` clean, `arggon validate` ok.
