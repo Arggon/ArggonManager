@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-auto-merge-armed-not-merged
 title: "Arming auto-merge is not ensuring merge: delivery-lead merge ownership ends at --auto instead of at MERGED"
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-18"
-claimed_at: "2026-10-18T18:03:15.806Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-auto-merge-armed-not-merged
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/bug-auto-merge-armed-not-merged.md
   Leaves live only under a story. id is the filename stem: bug-auto-merge-armed-not-merged.
