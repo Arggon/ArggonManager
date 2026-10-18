@@ -9,7 +9,6 @@ parent: story-self-improvement
 labels: [native-tools, concurrency]
 created: "2026-10-13"
 updated: "2026-10-18"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-native-comment-lost-update
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-self-improvement/bug-native-comment-lost-update.md
