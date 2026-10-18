@@ -177,6 +177,15 @@ Note: a container's acceptance-aware cascade guard is any unticked checkbox that
 
 Every work item file begins with YAML frontmatter between `---` fences.
 
+**List values may wrap.** A list field (`labels`, `depends_on`, or an `x-*` extra) is _written_ on one line as a flow
+sequence — `depends_on: [task-a, task-b]` — and the _reader_ accepts that same list continued over the following
+lines in either shape a YAML writer produces: a wrapped flow sequence (`depends_on:` then an indented `[...]`, with
+one element per line and a trailing comma allowed), or an indented block sequence (`- task-a`). All of them read back
+as the identical list, which is what makes an item file safe to run the repo formatter over: `arggon update` writes
+the single-line form, the formatter may reflow it past `printWidth`, and `validate` still passes
+(bug-update-depends-on-multiline-rejected). The tolerance is scoped to a list value: an indented line that is neither
+a flow sequence nor a block entry, and a flow sequence that never closes, are still refused as `BROKEN_YAML`.
+
 ### Fields
 
 | Field            | Required    | Type            | Notes                                                                                                                                                                                                                                                                                                                                                 |

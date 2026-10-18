@@ -52,8 +52,10 @@ export function parseFrontmatter(raw: string): { data: Frontmatter; body: string
   }
   const yaml = rest.slice(0, endMatch.index);
   const body = rest.slice(endMatch.index + endMatch[0].length);
+  const lines = yaml.split(/\r?\n/);
   const data: Frontmatter = {};
-  for (const line of yaml.split(/\r?\n/)) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
     if (!line.trim() || line.trimStart().startsWith("#")) continue;
     const idx = line.indexOf(":");
     if (idx === -1) {
@@ -63,10 +65,144 @@ export function parseFrontmatter(raw: string): { data: Frontmatter; body: string
       );
     }
     const key = line.slice(0, idx).trim();
-    const value = line.slice(idx + 1).trim();
-    data[key] = parseValue(value);
+    const { value, end } = readValue(lines, i);
+    i = end;
+    data[key] = value;
   }
   return { data, body };
+}
+
+/**
+ * A LIST value continued over the following physical lines
+ * (bug-update-depends-on-multiline-rejected).
+ *
+ * The contract used to be exactly one physical `key: value` line per field, so
+ * ANY continuation line was refused — and the write path could not honor that
+ * and stay formatter-stable at once. A long list is written as
+ * `depends_on: [task-a, task-b, …]` on one line; the repo formatter (prettier,
+ * `printWidth: 100`) reflows it to
+ *
+ *   depends_on:
+ *     [task-a, task-b, …]
+ *
+ * or, past the wrap width, to the multi-line flow block
+ *
+ *   depends_on:
+ *     [
+ *       task-a,
+ *       task-b,
+ *     ]
+ *
+ * Both shapes are valid YAML the writer's own inline form becomes, so the
+ * reader refused bytes produced by its own tooling: `update` succeeded,
+ * the NEXT `validate` (the pre-commit hook) reported `BROKEN_YAML`, and
+ * `update --status done` then refused to flip the item — the close-out flow
+ * itself could produce an un-flippable item (the same class as the cancelled
+ * duplicate `bug-prettier-reflow-breaks-item-frontmatter`).
+ *
+ * The reader now accepts a value continued over the following lines when those
+ * lines are a list in one of the two shapes YAML (and the formatter) use — a
+ * wrapped FLOW sequence (`[...]`, closing bracket included) or an indented
+ * BLOCK sequence (`- item`). Both hand back exactly the list the single-line
+ * form yields, in any field: `depends_on`, `labels` and an `x-*` extra all
+ * share this one reader, just as they share `formatValue` on the write side.
+ *
+ * The permissiveness is SCOPED to that shape and a genuinely broken line is
+ * still refused: an indented line that is neither a block entry nor an open
+ * flow sequence (`  this is not yaml`) and a flow sequence that never closes
+ * both raise `INVALID_FRONTMATTER_LINE` (surfacing as the historical
+ * `BROKEN_YAML`).
+ */
+function readValue(lines: readonly string[], at: number): { value: unknown; end: number } {
+  const line = lines[at]!;
+  const inline = line.slice(line.indexOf(":") + 1).trim();
+
+  // A flow sequence opened on the key's own line — it may continue below.
+  if (inline.startsWith("[")) {
+    const flow = readFlow(lines, at, inline);
+    return { value: parseValue(flow.text), end: flow.end };
+  }
+  if (inline !== "") return { value: parseValue(inline), end: at };
+
+  // `key:` with the list on the following lines — the formatter's wrap.
+  const next = lines[at + 1];
+  if (next === undefined || next.trim() === "") return { value: null, end: at };
+  const first = next.trim();
+  if (first.startsWith("[")) {
+    const flow = readFlow(lines, at + 1, first);
+    return { value: parseValue(flow.text), end: flow.end };
+  }
+  if (BLOCK_ITEM.test(next)) {
+    const items: unknown[] = [];
+    let end = at;
+    for (let j = at + 1; j < lines.length; j++) {
+      const item = BLOCK_ITEM.exec(lines[j]!);
+      if (!item) break;
+      items.push(item[1] ? parseValue(item[1]) : null);
+      end = j;
+    }
+    return { value: items, end };
+  }
+  // Anything else: the continuation line is not a list, so `key:` stays null and
+  // the next iteration refuses that line by name.
+  return { value: null, end: at };
+}
+
+/** An indented block-sequence entry (`  - value`), with its value captured. */
+const BLOCK_ITEM = /^\s+-\s*(.*)$/;
+
+/**
+ * Assemble a flow sequence that may span physical lines (`[a,\n  b]`), stopping
+ * at the line that closes it. An unterminated sequence is refused rather than
+ * swallowed: the value is malformed, not a continuation.
+ */
+function readFlow(
+  lines: readonly string[],
+  at: number,
+  first: string,
+): { text: string; end: number } {
+  let text = first;
+  let end = at;
+  while (flowDepth(text) > 0 && end + 1 < lines.length) {
+    end++;
+    text = `${text} ${lines[end]!.trim()}`;
+  }
+  if (flowDepth(text) !== 0) {
+    throw new FrontmatterParseError(
+      "INVALID_FRONTMATTER_LINE",
+      `invalid frontmatter line: ${JSON.stringify(lines[at])}`,
+    );
+  }
+  return { text, end };
+}
+
+/**
+ * Net `[` depth of a flow sequence, quote-aware: the writer quotes every scalar
+ * containing a bracket, so a `]` inside a quoted element must not close the
+ * sequence early (and a `"` inside a single-quoted scalar, or vice versa, must
+ * not open a span). Single quotes escape by doubling, double quotes by `\`.
+ */
+function flowDepth(text: string): number {
+  let depth = 0;
+  let quote: '"' | "'" | null = null;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!;
+    if (quote === '"') {
+      if (ch === "\\") i++;
+      else if (ch === '"') quote = null;
+      continue;
+    }
+    if (quote === "'") {
+      if (ch !== "'") continue;
+      if (text[i + 1] === "'") i++;
+      else quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === "[") depth++;
+    else if (ch === "]") depth--;
+  }
+  return depth;
 }
 
 function parseValue(raw: string): unknown {
@@ -76,7 +212,15 @@ function parseValue(raw: string): unknown {
   if (raw.startsWith("[") && raw.endsWith("]")) {
     const inner = raw.slice(1, -1).trim();
     if (!inner) return [];
-    return inner.split(",").map((part) => parseScalar(part.trim()));
+    // Empty parts are dropped: the formatter's multi-line flow block puts a
+    // trailing comma before the closing bracket (`[a, b,\n]`), which is a
+    // separator, not an empty element. A genuinely empty STRING element is
+    // written quoted (`""`) and survives as a non-empty part.
+    return inner
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => part !== "")
+      .map((part) => parseScalar(part));
   }
   return parseScalar(raw);
 }

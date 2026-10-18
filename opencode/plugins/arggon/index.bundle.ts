@@ -3271,8 +3271,10 @@ function parseFrontmatter(raw) {
     }
     const yaml = rest.slice(0, endMatch.index);
     const body = rest.slice(endMatch.index + endMatch[0].length);
+    const lines = yaml.split(/\r?\n/);
     const data = {};
-    for (const line of yaml.split(/\r?\n/)) {
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
         if (!line.trim() || line.trimStart().startsWith("#"))
             continue;
         const idx = line.indexOf(":");
@@ -3280,10 +3282,85 @@ function parseFrontmatter(raw) {
             throw new FrontmatterParseError("INVALID_FRONTMATTER_LINE", `invalid frontmatter line: ${JSON.stringify(line)}`);
         }
         const key = line.slice(0, idx).trim();
-        const value = line.slice(idx + 1).trim();
-        data[key] = parseValue(value);
+        const { value, end } = readValue(lines, i);
+        i = end;
+        data[key] = value;
     }
     return { data, body };
+}
+function readValue(lines, at) {
+    const line = lines[at];
+    const inline = line.slice(line.indexOf(":") + 1).trim();
+    if (inline.startsWith("[")) {
+        const flow = readFlow(lines, at, inline);
+        return { value: parseValue(flow.text), end: flow.end };
+    }
+    if (inline !== "")
+        return { value: parseValue(inline), end: at };
+    const next = lines[at + 1];
+    if (next === undefined || next.trim() === "")
+        return { value: null, end: at };
+    const first = next.trim();
+    if (first.startsWith("[")) {
+        const flow = readFlow(lines, at + 1, first);
+        return { value: parseValue(flow.text), end: flow.end };
+    }
+    if (BLOCK_ITEM.test(next)) {
+        const items = [];
+        let end = at;
+        for (let j = at + 1; j < lines.length; j++) {
+            const item = BLOCK_ITEM.exec(lines[j]);
+            if (!item)
+                break;
+            items.push(item[1] ? parseValue(item[1]) : null);
+            end = j;
+        }
+        return { value: items, end };
+    }
+    return { value: null, end: at };
+}
+const BLOCK_ITEM = /^\s+-\s*(.*)$/;
+function readFlow(lines, at, first) {
+    let text = first;
+    let end = at;
+    while (flowDepth(text) > 0 && end + 1 < lines.length) {
+        end++;
+        text = `${text} ${lines[end].trim()}`;
+    }
+    if (flowDepth(text) !== 0) {
+        throw new FrontmatterParseError("INVALID_FRONTMATTER_LINE", `invalid frontmatter line: ${JSON.stringify(lines[at])}`);
+    }
+    return { text, end };
+}
+function flowDepth(text) {
+    let depth = 0;
+    let quote = null;
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (quote === '"') {
+            if (ch === "\\")
+                i++;
+            else if (ch === '"')
+                quote = null;
+            continue;
+        }
+        if (quote === "'") {
+            if (ch !== "'")
+                continue;
+            if (text[i + 1] === "'")
+                i++;
+            else
+                quote = null;
+            continue;
+        }
+        if (ch === '"' || ch === "'")
+            quote = ch;
+        else if (ch === "[")
+            depth++;
+        else if (ch === "]")
+            depth--;
+    }
+    return depth;
 }
 function parseValue(raw) {
     if (raw === "" || raw === "null" || raw === "~")
@@ -3296,7 +3373,11 @@ function parseValue(raw) {
         const inner = raw.slice(1, -1).trim();
         if (!inner)
             return [];
-        return inner.split(",").map((part) => parseScalar(part.trim()));
+        return inner
+            .split(",")
+            .map((part) => part.trim())
+            .filter((part) => part !== "")
+            .map((part) => parseScalar(part));
     }
     return parseScalar(raw);
 }
