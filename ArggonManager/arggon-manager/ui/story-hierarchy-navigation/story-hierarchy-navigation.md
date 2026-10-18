@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: story-hierarchy-navigation
 title: Parent-to-children navigation in every GUI surface
 assignee: arggon-delivery-lead
@@ -8,7 +8,6 @@ parent: ui
 labels: []
 created: "2026-10-11"
 updated: "2026-10-18"
-claimed_at: "2026-10-18T15:26:03.184Z"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/story-hierarchy-navigation/story-hierarchy-navigation.md (story index; required).
