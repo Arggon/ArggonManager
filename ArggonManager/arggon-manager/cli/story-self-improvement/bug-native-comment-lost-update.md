@@ -1,12 +1,16 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-native-comment-lost-update
 title: "Native comment lost update: two concurrent tools.arggon.comment calls, one body absent from every git object"
+assignee: arggon-delivery-lead
+branch: fix/bug-native-comment-lost-update
 parent: story-self-improvement
 labels: [native-tools, concurrency]
 created: "2026-10-13"
-updated: "2026-10-13"
+updated: "2026-10-18"
+claimed_at: "2026-10-18T17:03:39.404Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-native-comment-lost-update
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-self-improvement/bug-native-comment-lost-update.md
