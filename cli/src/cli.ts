@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { execFileSync } from "node:child_process";
 import { relative, sep } from "node:path";
 import { formatAdoptAckReport, formatAdoptReport, runAdopt, runAdoptAck } from "./adopt.js";
 import { displayPath, runBoard } from "./board.js";
@@ -1218,6 +1219,9 @@ program
               cascade: opts.cascade !== false,
               full: opts.full === true,
               commit: opts.commit,
+              // Merge-ownership close-out: the done-gate PR guard needs a gh
+              // executor to detect an open PR on the item's branch.
+              execGh: execFileSync,
             });
             emitJson(outcome.envelope);
             if (!outcome.ok) process.exitCode = 1;
@@ -1244,6 +1248,9 @@ program
             reason: opts.reason,
             waive: opts.waive,
             cascade: opts.cascade !== false,
+            // Merge-ownership close-out: the done-gate PR guard needs a gh
+            // executor to detect an open PR on the item's branch.
+            execGh: execFileSync,
           });
           // Tracker hygiene (task-autocommit-update-import): auto-commit ALL
           // item files written this run (the updated item + cascade-completed

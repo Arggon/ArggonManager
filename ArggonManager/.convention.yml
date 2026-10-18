@@ -39,14 +39,14 @@ x-generated:
     generatedAt: "2026-10-15T16:04:32.505Z"
   .agents/skills/arggon-cli/references/orchestration.md:
     template: "skills/arggon-cli/references/orchestration.md"
-    checksum: "sha256:3282a4af7265884efb417598739a8b8f6c14582a3781f38955c957dd3087daee"
+    checksum: "sha256:d60124e96797741fb59ae151fb9b53d60b7509f641407bc9b187ab7a88a14803"
     arggonVersion: "0.10.0"
-    generatedAt: "2026-10-15T16:04:32.505Z"
+    generatedAt: "2026-10-18T18:52:09.246Z"
   .agents/skills/arggon-cli/references/pitfalls.md:
     template: "skills/arggon-cli/references/pitfalls.md"
-    checksum: "sha256:ffe35f78e71cce64bce6b8bed593fb6a19fa9b3650ca4b0d80a2a2de027ff271"
+    checksum: "sha256:02aca23bf3bff0a17cfafe1f7737dc22220cced520a88db0ac8c46241431762a"
     arggonVersion: "0.10.0"
-    generatedAt: "2026-10-15T16:04:32.505Z"
+    generatedAt: "2026-10-18T18:54:50.535Z"
   .agents/skills/arggon-upgrade/SKILL.md:
     template: "skills/arggon-upgrade/SKILL.md"
     checksum: "sha256:dfaefcd25f116aa7984edf3a7d4c8548918613c9d7a96c063070e6e4de579871"

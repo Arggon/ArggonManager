@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 import { arggonVersion } from "./docs.js";
@@ -808,6 +808,9 @@ export function runMcpServer(opts: McpServerOptions): void {
           cascade: args.no_cascade !== true,
           full: args.full === true,
           agent: true,
+          // Merge-ownership close-out: the done-gate PR guard needs a gh
+          // executor to detect an open PR on the item's branch.
+          execGh: execFileSync,
         }),
       );
     }

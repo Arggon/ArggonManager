@@ -64,8 +64,15 @@ waive, force, reopen — and they are the product owner's (ADR 0021 §1/§2).
   coordination specifics: surgical staging, no cross-item files, no unrelated
   reformatting, acceptance ticks honest. Change requests and verdicts go back via
   `arggon comment <item-id>` on the item — never as GitHub PR comments.
-- **Merge verification:** after each maker's change, verify the merge; resolve
-  cross-item conflicts when waves overlap.
+- **Merge verification:** after each maker's change, verify the merge — arming
+  auto-merge (`gh pr merge --auto --merge`) is NOT ensuring merge. After arming,
+  poll or re-check until the PR reads MERGED; on DIRTY or BEHIND, merge main
+  in, resolve (keep both the maker report and the lead verdict), validate,
+  push, re-verify — never leave a reviewed PR unmerged without a named blocker
+  on its item. The kernel enforces the flip side: flipping a leaf to `done`
+  while an open PR targets its branch is refused (merge-ownership close-out,
+  bug-auto-merge-armed-not-merged), so the flip and the merge are linked steps,
+  not two unlinked ones. Resolve cross-item conflicts when waves overlap.
 - **Tracker ownership:** claim conflicts, blocked items, follow-up filing, and
   final wave verification (`arggon validate` ok, `arggon doctor` clean).
 - **Sequencing ≠ priority:** decide what is built next and in what order, and
