@@ -328,3 +328,98 @@ describe("update depends_on flags", () => {
     expect(result.item.dependsOn).toEqual(["task-b"]);
   });
 });
+
+/**
+ * bug-update-depends-on-multiline-rejected: the write path produced bytes the
+ * read path refused, and the failure surfaced only at the NEXT `validate`
+ * (the pre-commit hook) — not at the `update` call that caused it. The item
+ * files below are mutated on disk (a temp copy of a primed tree), so this is
+ * the integration half of the unit coverage in `frontmatter.test.ts`.
+ */
+describe("update depends_on write → validate → read (bug-update-depends-on-multiline-rejected)", () => {
+  /** Ids long enough that the writer's list line exceeds prettier's printWidth. */
+  const LONG_IDS = Array.from(
+    { length: 8 },
+    (_, i) => `task-long-dependency-identifier-${String(i).padStart(3, "0")}`,
+  );
+
+  /** Primed tree plus the long-id leaves the update points at. */
+  function treeWithLongIds(): { dir: string; path: string } {
+    const { dir, paths } = primedTree();
+    for (const [i, id] of LONG_IDS.entries()) {
+      runCreate({
+        cwd: dir,
+        type: "task",
+        title: `Long ${i}`,
+        parent: "story-login",
+        id,
+        body: "## Context\n\nSeed.\n\n## Acceptance\n\n- [x] seed\n",
+      });
+    }
+    return { dir, path: paths["task-a"] };
+  }
+
+  /**
+   * The formatter's long wrap for the same list, byte-for-byte what
+   * `npx prettier` emits for an over-long flow sequence in this repo
+   * (`printWidth: 100`): the key, then `[` and one indented element per line
+   * with a trailing comma.
+   */
+  function wrappedDependsOn(ids: readonly string[]): string {
+    return `depends_on:\n  [\n${ids.map((id) => `    ${id},`).join("\n")}\n  ]`;
+  }
+
+  it("writes ONE physical depends_on line for any entry count", () => {
+    const { dir, path } = treeWithLongIds();
+    const result = runUpdate({ cwd: dir, id: "task-a", dependsOn: LONG_IDS.join(", ") });
+    expect(result.changed).toEqual(["depends_on"]);
+    expect(result.item.dependsOn).toEqual(LONG_IDS);
+
+    const raw = readFileSync(path, "utf8");
+    const lines = raw.split("\n").filter((line) => line.startsWith("depends_on:"));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toBe(`depends_on: [${LONG_IDS.join(", ")}]`);
+    expect(lines[0]!.length).toBeGreaterThan(100); // it IS over the wrap width
+    // The write path's own output is what the read path accepts.
+    expect(runValidate({ cwd: dir }).errors).toEqual([]);
+    const loaded = softTryLoadItem(path);
+    if (loaded.kind !== "item") throw new Error("expected item");
+    expect(loaded.item.dependsOn).toEqual(LONG_IDS);
+  });
+
+  it("reads the formatter-wrapped shape back and keeps the close-out flip possible", () => {
+    const { dir, path } = treeWithLongIds();
+    runUpdate({ cwd: dir, id: "task-a", dependsOn: LONG_IDS.join(", ") });
+
+    // Rewrite the value the way the repo formatter does, then walk the exact
+    // close-out flow that used to wedge: validate, then flip to done.
+    const raw = readFileSync(path, "utf8");
+    const wrapped = raw.replace(/^depends_on: \[.*\]$/m, wrappedDependsOn(LONG_IDS));
+    expect(wrapped).not.toBe(raw);
+    writeFileSync(path, wrapped, "utf8");
+
+    expect(runValidate({ cwd: dir }).errors).toEqual([]);
+    const loaded = softTryLoadItem(path);
+    if (loaded.kind !== "item") throw new Error("expected item");
+    expect(loaded.item.dependsOn).toEqual(LONG_IDS);
+
+    const flipped = runUpdate({
+      cwd: dir,
+      id: "task-a",
+      status: "in_progress",
+      assignee: "arggon",
+    });
+    expect(flipped.item.status).toBe("in_progress");
+    const closed = runUpdate({ cwd: dir, id: "task-a", status: "done" });
+    expect(closed.item.status).toBe("done");
+    expect(closed.item.dependsOn).toEqual(LONG_IDS);
+  });
+
+  it("still refuses a genuinely broken continuation line", () => {
+    const { dir, path } = treeWithLongIds();
+    const raw = readFileSync(path, "utf8");
+    writeFileSync(path, raw.replace(/^status: todo$/m, "status: todo\n  this is not yaml"), "utf8");
+    const result = runValidate({ cwd: dir });
+    expect(result.errors.map((e) => e.code)).toContain("BROKEN_YAML");
+  });
+});

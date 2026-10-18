@@ -228,6 +228,81 @@ title: "nits: \\\\\\\\( here"
   });
 });
 
+describe("frontmatter list values across the formatter wrap (bug-update-depends-on-multiline-rejected)", () => {
+  // The three shapes the repo formatter produces for a long list, captured from
+  // `npx prettier <item-file>` in this repo (printWidth 100) and pinned
+  // byte-for-byte. The writer emits the first form; prettier reflows it to the
+  // other two, so the reader must read all three as the SAME list.
+  const LONG_IDS = Array.from(
+    { length: 8 },
+    (_, i) => `task-some-really-long-dependency-identifier-${String(i).padStart(3, "0")}`,
+  );
+
+  /** The writer's own single-line emission, and the two-element wrap hit live. */
+  const INLINE = `depends_on: [${LONG_IDS.join(", ")}]`;
+
+  /** Prettier's short wrap: the key, then the whole flow sequence indented. */
+  const SHORT_IDS = [LONG_IDS[0]!, LONG_IDS[1]!];
+  const SHORT_WRAP = `depends_on:\n  [${SHORT_IDS.join(", ")}]`;
+
+  /** Prettier's long wrap: one element per line with a trailing comma. */
+  const LONG_WRAP = `depends_on:\n  [\n${LONG_IDS.map((id) => `    ${id},`).join("\n")}\n  ]`;
+
+  /** The block-sequence form a hand repair (or another YAML writer) uses. */
+  const BLOCK = `depends_on:\n${LONG_IDS.map((id) => `  - ${id}`).join("\n")}`;
+
+  const HEAD = "---\ntype: task\nstatus: todo\nid: task-x\n";
+
+  it("reads the writer's single-line form and the formatter's wraps as the same list", () => {
+    for (const [shape, value, expected] of [
+      ["inline", INLINE, LONG_IDS],
+      ["short wrap", SHORT_WRAP, SHORT_IDS],
+      ["long wrap", LONG_WRAP, LONG_IDS],
+      ["block", BLOCK, LONG_IDS],
+    ] as const) {
+      const { data } = parseFrontmatter(`${HEAD}${value}\n---\n\n# x\n`);
+      expect(data.depends_on, `${shape} shape`).toEqual(expected);
+    }
+  });
+
+  it("covers labels too — the fix is on the shared value reader, not on depends_on", () => {
+    const { data } = parseFrontmatter(
+      `${HEAD}labels:\n  [\n    native-seam,\n    tracker-hygiene,\n  ]\ndepends_on:\n  - task-a\n---\n\n# x\n`,
+    );
+    expect(data.labels).toEqual(["native-seam", "tracker-hygiene"]);
+    expect(data.depends_on).toEqual(["task-a"]);
+  });
+
+  it("rewrites a wrapped value back to the single-line form (the writer is unchanged)", () => {
+    const wrapped = parseFrontmatter(`${HEAD}${LONG_WRAP}\n---\n\n# x\n`);
+    const written = stringifyFrontmatter(wrapped.data, wrapped.body);
+    expect(written).toContain(INLINE);
+    // ...and that write is a fixed point.
+    const again = parseFrontmatter(written);
+    expect(again.data.depends_on).toEqual(LONG_IDS);
+    expect(stringifyFrontmatter(again.data, again.body)).toBe(written);
+  });
+
+  it("still refuses a continuation line that is not a list — the permissiveness is scoped", () => {
+    expect(() => parseFrontmatter(`${HEAD}title: ok\n  this is not yaml\n---\n\n# x\n`)).toThrow(
+      /invalid frontmatter line: "  this is not yaml"/,
+    );
+    // An unterminated flow sequence is malformed, not a continuation to swallow.
+    expect(() => parseFrontmatter(`${HEAD}labels: [a,\n  b\n---\n\n# x\n`)).toThrow(
+      /invalid frontmatter line: "labels: \[a,"/,
+    );
+    // `key:` with an ordinary indented line below keeps the historical refusal.
+    expect(() => parseFrontmatter(`${HEAD}labels:\n  garbage\n---\n\n# x\n`)).toThrow(
+      /invalid frontmatter line: "  garbage"/,
+    );
+  });
+
+  it("keeps `key:` with no continuation value null (empty-value path unchanged)", () => {
+    const { data } = parseFrontmatter(`${HEAD}labels:\n---\n\n# x\n`);
+    expect(data.labels).toBeNull();
+  });
+});
+
 describe("frontmatter ambiguous plain scalars (bug-frontmatter-ambiguous-plain-scalar-loss)", () => {
   /** Tokens `parseValue`/`parseScalar` would decode as a NON-string when bare. */
   const TOKENS = [
