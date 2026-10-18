@@ -565,7 +565,9 @@ test.describe("@smoke board --serve", () => {
     if (fixture) rmSync(fixture, { recursive: true, force: true });
   });
 
-  test("renders one card per tracker item", async ({ page }) => {
+  test("columns render only task/bug leaf cards (task-columns-view-shows-only-task-and-bug-leaves)", async ({
+    page,
+  }) => {
     await page.goto(server?.url ?? "");
     // The h1 is the existing readiness signal for "the board is up and rendered"
     // (no blind sleep): everything below — including the axe scan — is asserted
@@ -580,13 +582,25 @@ test.describe("@smoke board --serve", () => {
     await expect(page.locator('.column[data-status="done"] .empty')).toHaveCount(1);
     await axeScan(page);
 
+    // Columns (grouped ancestry off) render only task/bug leaves; initiatives,
+    // epics and stories render only in the grouped-ancestry tree view.
+    const leafItems = cliJson<{ items: ListedItem[] }>(fixture, [
+      "list",
+      "--type",
+      "task",
+    ]).items.concat(cliJson<{ items: ListedItem[] }>(fixture, ["list", "--type", "bug"]).items);
     const cards = page.locator(".board .card");
-    await expect(cards).toHaveCount(listItems.length);
-    // Card ids come from `data-id`; parity is exact, not just a count match.
+    await expect(cards).toHaveCount(leafItems.length);
+    // Card ids come from `data-id`; parity with the leaf set is exact.
     const ids = await cards.evaluateAll((elements) =>
       elements.map((element) => element.getAttribute("data-id")).sort(),
     );
-    expect(ids).toEqual(listItems.map((item) => item.id).sort());
+    expect(ids).toEqual(leafItems.map((item) => item.id).sort());
+    // No container type leaks into the flat columns.
+    const types = await cards.evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute("data-type")),
+    );
+    expect(types.every((type) => type === "task" || type === "bug")).toBe(true);
   });
 
   test("the served board stamps the build in the footer and the detail drawer (task-board-build-stamp)", async ({
@@ -633,12 +647,14 @@ test.describe("@smoke board --serve", () => {
     await expect(page.locator(`.card:not(.filtered-out)[data-id="${FILTER_ITEM_ID}"]`)).toHaveCount(
       1,
     );
-    // Column counts and the meta line reflect the filtered set.
+    // Column counts and the meta line reflect the filtered set over the leaf
+    // cards (columns render only task/bug leaves).
+    const leafCount =
+      cliJson<{ items: ListedItem[] }>(fixture, ["list", "--type", "task"]).items.length +
+      cliJson<{ items: ListedItem[] }>(fixture, ["list", "--type", "bug"]).items.length;
     await expect(page.locator('.column[data-status="todo"] .count')).toHaveText("1");
     await expect(page.locator('.column[data-status="done"] .count')).toHaveText("0");
-    await expect(page.locator("#board-filter-count")).toHaveText(
-      `1 of ${listItems.length} item(s)`,
-    );
+    await expect(page.locator("#board-filter-count")).toHaveText(`1 of ${leafCount} item(s)`);
     await expect(page.locator("#board-filter-input")).toHaveValue("label:smoke");
     expect(filterFromUrl(page.url())).toBe("label:smoke");
     // The filtered/lens state is a scanned surface of its own
@@ -655,7 +671,7 @@ test.describe("@smoke board --serve", () => {
 
     // Clearing restores the full board and drops the hash filter.
     await page.locator("#board-filter-clear").click();
-    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(listItems.length);
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(leafCount);
     await expect(page.locator("#board-filter-input")).toHaveValue("");
     expect(filterFromUrl(page.url())).toBeNull();
   });
@@ -835,9 +851,9 @@ test.describe("@smoke board --serve", () => {
     await page.goto(server?.url ?? "");
     const panel = page.locator("#board-summary");
     await expect(panel).toBeVisible();
-    // The fixture's one epic (`core`) with its story leaves; fractions move as
-    // tests reorder cards, so match the shape, not frozen numbers.
-    await expect(panel.locator("#board-summary-epics .epic")).toHaveText([/^core \d+\/\d+$/]);
+    // Summary rolls up the rendered leaf set only (columns show task/bug
+    // leaves; containers live in the tree view), so no epic rollup appears.
+    await expect(panel.locator("#board-summary-epics")).toHaveText("none");
     await expect(panel.locator("#board-summary-wip")).toHaveText(/^\d+$/);
     // Priority mix: all five buckets, zero-filled (the fixture sets no priorities).
     await expect(panel.locator("#board-summary-priorities")).toHaveText(
@@ -1118,11 +1134,14 @@ test.describe("@smoke board --serve", () => {
     await page.reload();
     await expect(tree).toBeVisible();
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
-    // ... and the columns stay one toggle away, with their cards intact.
+    // ... and the columns stay one toggle away, with their leaf cards intact.
+    const leafCount =
+      cliJson<{ items: ListedItem[] }>(fixture, ["list", "--type", "task"]).items.length +
+      cliJson<{ items: ListedItem[] }>(fixture, ["list", "--type", "bug"]).items.length;
     await toggle.click();
     await expect(columns).toBeVisible();
     await expect(tree).toBeHidden();
-    await expect(page.locator(".board .card")).toHaveCount(listItems.length);
+    await expect(page.locator(".board .card")).toHaveCount(leafCount);
     expect(new URL(page.url()).hash).toBe("");
   });
 
@@ -1412,7 +1431,10 @@ test.describe("@smoke board --serve", () => {
     await page.locator("#board-filter-input").focus();
     await page.keyboard.press("Escape");
     await expect(page.locator("#board-filter-input")).toHaveValue("");
-    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(listItems.length);
+    const leafCount =
+      cliJson<{ items: ListedItem[] }>(fixture, ["list", "--type", "task"]).items.length +
+      cliJson<{ items: ListedItem[] }>(fixture, ["list", "--type", "bug"]).items.length;
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(leafCount);
   });
 
   test("renders the live-overlay PR badge as a link (and refuses non-http URLs)", async ({
@@ -2543,15 +2565,12 @@ test.describe("@smoke board tree open-descendant disclosure", () => {
     await expect(badge(OPEN_STORY_ID)).toHaveText("2 open");
     // The all-terminal container hides (nothing visible hangs below it).
     await expect(row(CLEAN_EPIC_ID)).toBeHidden();
-    // The columns compose the same way: the done column stays (it hosts the
-    // masked containers, which read open) and only the genuinely terminal cards
-    // inside it hide; the cancelled column has no such card and hides whole.
+    // Columns render only task/bug leaves; containers (story/initiative) live
+    // in the tree view and no longer appear as flat cards.
     await page.locator("#board-view-toggle").click();
     await expect(page.locator('.column[data-status="done"]')).toBeVisible();
-    await expect(page.locator(`.card[data-id="${OPEN_STORY_ID}"]`)).toBeVisible();
-    await expect(
-      page.locator(`.card[data-id="${OPEN_ROOT_ID}"] .card-head > .status-chip`),
-    ).toHaveText("open");
+    await expect(page.locator(`.card[data-id="${OPEN_STORY_ID}"]`)).toHaveCount(0);
+    await expect(page.locator(`.card[data-id="${OPEN_ROOT_ID}"]`)).toHaveCount(0);
     await expect(page.locator(`.card[data-id="${OPEN_DONE_TASK_ID}"]`)).toBeHidden();
     await expect(page.locator('.column[data-status="cancelled"]')).toBeHidden();
     await page.locator("#board-view-toggle").click();
