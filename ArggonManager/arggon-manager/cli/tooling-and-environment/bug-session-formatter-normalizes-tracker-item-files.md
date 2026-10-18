@@ -8,7 +8,6 @@ labels: [formatter, tracker-schema, tooling]
 created: "2026-10-11"
 updated: "2026-10-11"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-session-formatter-normalizes-tracker-item-files.md
   Leaves live only under a story. id is the filename stem: bug-session-formatter-normalizes-tracker-item-files.
@@ -54,3 +53,29 @@ its author wrote.
 - [ ] `npm test` green, prettier clean, `npm run build` ok
 
 ## Notes
+
+### 2026-10-18 @arggon-delivery-lead
+evidence: live instance reproduced 2026-10-18 while closing `bug-update-depends-on-multiline-rejected` (PR #862)
+
+Probe 5 (run by `arggon-verifier`, on the PR's worktree) reproduces this item's rewrite exactly:
+
+```
+cp <item>.md .probe/item-copy.md
+npx prettier --write .probe/item-copy.md
+diff <(git show 82f19eb2^2:<item>.md) .probe/item-copy.md
+```
+
+Observed, in one `prettier --write` on a tracked item file:
+
+1. an inline example **inside a fenced ```yaml block** was reflowed — the fence documented a before/after pair, and the "before" single-line form was rewritten into the "after" wrapped form, destroying the very evidence the item existed to record;
+2. a blank line was added after the closing `---`;
+3. blank lines were added around the `### <date> @<author>` heading.
+
+That churn is what landed in merge commit `82f19eb2` of PR #862 (the maker resolved the item-file conflict and prettier's formatting came along with it). The standards reviewer blocked on it (finding F1: "a maker must not mutate another writer's recorded note" — the note belonged to the delivery lead, 2026-10-15), and the delivery lead restored the note verbatim in `d825c9f2` — 0 deletions against the pre-merge copy.
+
+Two things this adds to the item:
+
+- the **comment-body** instance in the title is not the only surface: fenced examples inside a note are rewritten too, which is worse, because their content is evidence;
+- the trigger is not exotic — any `npx prettier --write <item.md>` on an in-repo path does it. Same probe found prettier skips paths under `/tmp` only because this repo's `.gitignore` line 62 is `/tmp/` and prettier's default `ignorePath` is `[".gitignore", ".prettierignore"]` — not because frontmatter is exempt there. Related: `task-session-formatter-bypasses-prettierignore`.
+
+Evidence for the sibling item `bug-prettier-reflow-breaks-item-frontmatter` (cancelled as a duplicate of `bug-update-depends-on-multiline-rejected`, now fixed parser-side) is in the same probe table on that item.
