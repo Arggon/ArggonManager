@@ -107,3 +107,69 @@ The real `prettier` bytes on a repo path; the end-to-end close-out on the built 
 ## Merge call
 
 **No merge yet.** F1 is a narrow, mechanical fix on the item file and touches no code; the code change itself is approved as read (scoped widening, discriminating tests, docs in the same PR, correct impact class, vendored bundle pinned). Re-approval after the fix needs only the restored record, the probe results and the two follow-up items filed.
+
+### 2026-10-18 @arggon-verifier
+verdict: all six probes pass — the code change is confirmed at the CLI surface (not only by unit tests); probe 4 refutes the advisory `/tmp` mechanism claim (see below).
+
+Read-only execution on branch `fix/bug-update-depends-on-multiline-rejected` (HEAD `d825c9f2`), worktree `/home/arggon/Projects/ArggonManager-bug-update-depends-on-multiline-rejected`. Prerequisite: `npm run build` → exit 0; the regenerated `opencode/plugins/arggon/index.bundle.ts` was byte-identical to the committed one. No tree change; scratch dirs deleted; `git status --short` empty at the end.
+
+## Probe 1 — real prettier byte shape for the 230-char `depends_on:` on a repo path
+- command: `mkdir -p .probe && cp ArggonManager/arggon-manager/cli/story-tracker-hygiene/task-validate-refuses-placeholder-bodies.md .probe/ && npx prettier --write .probe/task-validate-refuses-placeholder-bodies.md && sed -n '1,20p' .probe/task-validate-refuses-placeholder-bodies.md`
+- expected: a shape `readValue` now accepts (wrapped flow sequence), not a block sequence or folded scalar
+- observed: reflowed to a wrapped FLOW sequence — `depends_on:` then indented `[`, one element per line, trailing comma
+- exit 0. Does not prove: that the new reader parses it (probe 2 does); one file is not all shapes; printWidth only reflows above 100 chars.
+
+## Probe 2 — real binary on the wrapped file, and the CONTROL on unmodified `main`
+Control method: instead of `git worktree add` (a git write) `main` was reproduced with `git archive main | tar -x` into `/tmp/opencode/ctl-862`, `node_modules` symlinked per-entry with `@arggondev/lib` pointed at the archive's own `lib/`, and its own `npm run build` (exit 0). No git write; the item worktree was untouched.
+
+- 2a command: `cd /tmp/opencode/arggon-p2 && node <WT>/dist/cli.js validate --json` (temp tree: `init`, epic/story chain, 6 dep items, the prettier-wrapped task file placed at a leaf position)
+  - expected `ok:true, errors:[]` → observed `{"ok":true,…,"errors":[],"warnings":[]}`, exit 0
+- 2b command: `cd /tmp/opencode/arggon-p2 && node /tmp/opencode/ctl-862/dist/cli.js validate --json` (same tree, same bytes, unmodified `main` parser)
+  - expected `BROKEN_YAML` with `invalid frontmatter line: "  ["` → observed exactly that, `"code":"BROKEN_YAML"`, exit 1
+
+→ The fix is what makes the tree pass; the reported failure reproduces on `main` for identical bytes.
+
+## Probe 3 — close-out wedge end-to-end on the real binary (acceptance box 1)
+- command: `node dist/cli.js update task-probe-closeout --depends-on <8 long ids> --json`; count physical `depends_on:` lines; `validate --json`; `npx prettier --write <item>`; `validate --json`; `update --status in_progress --json`; `update --status done --json`
+- expected: one physical `depends_on:` line, 8 ids, validate `errors:[]` before AND after prettier, both flips ok
+- observed: update `ok:true`, 8 ids (JSON key is `item.depends_on`); physical `depends_on:` lines **1** (length 324); validate after update `{"ok":true,…,"errors":[]}`; prettier reflowed it to `depends_on:` + indented `[…]`; validate after prettier `{"ok":true,…,"errors":[]}`; `in_progress` `ok:true`; `done` `ok:true` — exits 0/0/0/0/0
+
+→ Decisive: after `npx prettier --write` reflowed the list the item stayed valid **and flippable** — the exact close-out path this item documents as previously producing an un-flippable item. Does not prove: entry counts beyond 8; the temp tree is a fixture.
+
+## Probe 4 — `/tmp` reflow mechanism: MECHANISM REFUTED, true cause identified
+- command: the same >100-char inline list written to (A) `.probe/x.md`, (B) `/tmp/opencode/arggon-probe/x.md`, (C) same as B with `npx prettier --config .prettierrc.json --write`, plus (D) `/home/arggon/arggon-probe-outside/x.md`
+- observed: A **REFLOWED**; B **NOT reflowed** (byte-identical); C **NOT reflowed** (`--config` made no difference); D **REFLOWED** (full multi-line block)
+- causal follow-up (decisive): the file is **ignored**, not unformattable. Prettier's default `ignorePath` is `[".gitignore", ".prettierignore"]` and this repo's `.gitignore` line 62 is `/tmp/` (line 63 `tmp/`). `--ignore-path /dev/null` on `/tmp/t1.md` → REFLOWED; default ignore-path → unchanged; `--check /tmp/t1.md` → "All matched files use Prettier code style!" (the ignored-file signature).
+
+→ The claim recorded from the maker ("in this sandbox `npx prettier` does not reformat markdown frontmatter for paths under `/tmp`") is **wrong on both counts**: not sandbox-specific, not markdown/frontmatter-specific — prettier skips the whole file because the repo's own `.gitignore` `/tmp/` pattern matches via the default ignore-path. The reviewer's alternative hypothesis (missing config / missing `.md` extension) is also not the cause. The test in the PR is fine (its literal is real repo-path output); only the explanation must not be codified. Delivery lead: recorded as refuted in the lead verdict; no code change owed.
+
+## Probe 5 — formatter churn vs merge commit `82f19eb2^2`
+- command: `cp <item> .probe/item-copy.md && npx prettier --write .probe/item-copy.md && diff <(git show 82f19eb2^2:<item>) .probe/item-copy.md`
+- expected: the churn that landed in `82f19eb2` — the inline example inside the ````yaml` fence reflowed; blank lines added after the closing `---` and after the `### <date>` heading
+- observed: reproduced — the first fence's single-line `depends_on: […]` became the wrapped form, plus a blank line after the closing `---` and blank lines around the `### <date>` heading
+- exit 1 (diff found differences, as expected). Does not prove: that this is the only rewrite producer; it demonstrates the mechanism on this one item file.
+
+→ Supplies `bug-session-formatter-normalizes-tracker-item-files` with its evidence.
+
+## Probe 6 — refusal controls on the real (fixed) binary
+- command: `validate --json` on a valid fixture tree plus two malformed leaves
+- expected: `BROKEN_YAML` for each malformed item
+- observed: `{"ok":false,…,"errors":[{"path":"…/task-bad-garbage.md","message":"invalid frontmatter line: \"  garbage\"","code":"BROKEN_YAML"},{"path":"…/task-bad-open-bracket.md","message":"invalid frontmatter line: \"labels: [a,\"","code":"BROKEN_YAML"}]}` exit 1
+
+→ The permissiveness is scoped by shape on the CLI surface, not only in unit tests. Does not prove: the full space of broken shapes (two controls are two controls; scoping is key-agnostic, per F2).
+
+## Summary
+| # | Probe | Expected | Observed | As specified |
+|---|---|---|---|---|
+| 1 | prettier on a repo-path item copy | wrapped shape the reader accepts | wrapped flow sequence | yes |
+| 2a | fixed binary, wrapped file at an item position | `ok:true, errors:[]` | exact match | yes |
+| 2b | control: unmodified `main`, same bytes | `BROKEN_YAML` `invalid frontmatter line: "  ["` | exact match | yes |
+| 3 | update → validate → prettier → validate → in_progress → done | 1 physical line, 8 ids, both validates green, both flips ok | all met | yes |
+| 4 | repo path vs `/tmp` path reflow | report which reflow | repo reflows, `/tmp` never (any config) | mechanism claim refuted; cause = `.gitignore` `/tmp/` |
+| 5 | `diff` pre-merge item vs prettier(item) | merge churn reproduced | reproduced | yes |
+| 6 | malformed items on the fixed binary | `BROKEN_YAML` ×2 | exact match | yes |
+
+## Unverified / limits
+- Any `depends_on` entry count beyond 8 (probe 3 used 8 long ids).
+- The full set of genuinely broken shapes beyond the two refusal controls.
+- The `main` control ran from a `git archive` extract of `main`, not the primary checkout — functionally equivalent for the parser, stated for the record.
