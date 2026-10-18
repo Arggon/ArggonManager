@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-native-comment-lost-update
 title: "Native comment lost update: two concurrent tools.arggon.comment calls, one body absent from every git object"
 assignee: arggon-delivery-lead
@@ -9,10 +9,8 @@ parent: story-self-improvement
 labels: [native-tools, concurrency]
 created: "2026-10-13"
 updated: "2026-10-18"
-claimed_at: "2026-10-18T17:03:39.404Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-native-comment-lost-update
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-self-improvement/bug-native-comment-lost-update.md
   Leaves live only under a story. id is the filename stem: bug-native-comment-lost-update.
