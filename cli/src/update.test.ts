@@ -1,10 +1,19 @@
 import { mkdtempSync as _mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseFrontmatter, runCreate, runUpdate } from "@arggondev/lib";
+import {
+  findTasksDir,
+  itemsById,
+  loadItems,
+  parseFrontmatter,
+  runCreate,
+  runUpdate,
+} from "@arggondev/lib";
 
 import { runInit } from "./init.js";
+import { satisfyAcceptance } from "../../test/acceptance.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -264,5 +273,162 @@ describe("update --issue", () => {
       /positive integer.*or 0 to clear/,
     );
     expect(() => runUpdate({ cwd: dir, id, issue: 1.5, now: NOW })).toThrow(/positive integer/);
+  });
+});
+
+// Merge-ownership close-out (bug-auto-merge-armed-not-merged): a done flip is
+// refused while an open PR targets the item's branch — arming auto-merge is
+// not ensuring merge, and the flip and the merge are not two unlinked steps.
+// Degrades gracefully when PR state cannot be determined (no execGh, gh
+// unavailable/unauthenticated), mirroring the issue-round-trip tolerance.
+describe("done flip merge-ownership guard", () => {
+  function withGithubOrigin(dir: string): void {
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["remote", "add", "origin", "https://github.com/octocat/hello-world.git"], {
+      cwd: dir,
+    });
+  }
+
+  /** Claimed task, ticked acceptance, branch `fix/bug-x`, GitHub origin. */
+  function primed(dir: string): string {
+    runInit({ dir, force: false });
+    runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
+    runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
+    runCreate({
+      cwd: dir,
+      type: "story",
+      title: "Login",
+      parent: "auth",
+      id: "story-login",
+      now: NOW,
+    });
+    const task = runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Rate limiting",
+      parent: "story-login",
+      id: "rate-limit",
+      now: NOW,
+    });
+    runUpdate({
+      cwd: dir,
+      id: task.id,
+      status: "in_progress",
+      assignee: "arggon",
+      branch: "fix/bug-x",
+      now: NOW,
+    });
+    satisfyAcceptance(dir, task.id);
+    withGithubOrigin(dir);
+    return task.id;
+  }
+
+  function itemStatus(dir: string, id: string): string {
+    return itemsById(loadItems(findTasksDir(dir))).get(id)!.status;
+  }
+
+  it("refuses the flip when an open PR targets the item's branch", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-merge-guard-"));
+    const id = primed(dir);
+    const execGh = vi.fn(() =>
+      JSON.stringify([
+        {
+          number: 731,
+          title: "Arming auto-merge is not ensuring merge",
+          headRefName: "fix/bug-x",
+        },
+      ]),
+    );
+    expect(() =>
+      runUpdate({
+        cwd: dir,
+        id,
+        status: "done",
+        now: LATER,
+        execGh: execGh as unknown as typeof execFileSync,
+      }),
+    ).toThrow(/targets branch 'fix\/bug-x'/);
+    expect(itemStatus(dir, id)).toBe("in_progress");
+  });
+
+  it("allows the flip when no open PR targets the branch", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-merge-guard-"));
+    const id = primed(dir);
+    const execGh = vi.fn(() => JSON.stringify([]));
+    const result = runUpdate({
+      cwd: dir,
+      id,
+      status: "done",
+      now: LATER,
+      execGh: execGh as unknown as typeof execFileSync,
+    });
+    expect(result.item.status).toBe("done");
+  });
+
+  it("allows the flip when execGh is not injected (graceful degradation)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-merge-guard-"));
+    const id = primed(dir);
+    const result = runUpdate({ cwd: dir, id, status: "done", now: LATER });
+    expect(result.item.status).toBe("done");
+  });
+
+  it("allows the flip when the item has no branch and does not call gh", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-merge-guard-"));
+    runInit({ dir, force: false });
+    runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
+    runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
+    runCreate({
+      cwd: dir,
+      type: "story",
+      title: "Login",
+      parent: "auth",
+      id: "story-login",
+      now: NOW,
+    });
+    const task = runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Rate limiting",
+      parent: "story-login",
+      id: "rate-limit",
+      now: NOW,
+    });
+    runUpdate({
+      cwd: dir,
+      id: task.id,
+      status: "in_progress",
+      assignee: "arggon",
+      now: NOW,
+    });
+    satisfyAcceptance(dir, task.id);
+    withGithubOrigin(dir);
+    const execGh = vi.fn(() =>
+      JSON.stringify([{ number: 1, title: "unrelated", headRefName: "other-branch" }]),
+    );
+    const result = runUpdate({
+      cwd: dir,
+      id: task.id,
+      status: "done",
+      now: LATER,
+      execGh: execGh as unknown as typeof execFileSync,
+    });
+    expect(result.item.status).toBe("done");
+    expect(execGh).not.toHaveBeenCalled();
+  });
+
+  it("allows the flip when gh fails (graceful degradation)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-merge-guard-"));
+    const id = primed(dir);
+    const execGh = vi.fn(() => {
+      throw new Error("gh not found");
+    });
+    const result = runUpdate({
+      cwd: dir,
+      id,
+      status: "done",
+      now: LATER,
+      execGh: execGh as unknown as typeof execFileSync,
+    });
+    expect(result.item.status).toBe("done");
   });
 });

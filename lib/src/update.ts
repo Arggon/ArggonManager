@@ -35,6 +35,7 @@ import {
 import { closeLinkedIssue, type IssueRoundtripResult } from "./issue-roundtrip.js";
 import { readConventionConfig } from "./convention.js";
 import { sanitizeHumanError } from "./sanitize.js";
+import { getOpenPRs } from "./get-open-prs.js";
 
 /**
  * The gate's "no opinion" verdict, for the transitions it does not gate (any
@@ -43,6 +44,44 @@ import { sanitizeHumanError } from "./sanitize.js";
  * future third refusal has exactly one place to widen the union.
  */
 const GATE_ALLOWS: AcceptanceGateVerdict = { gated: false };
+
+/**
+ * Merge-ownership close-out guard (bug-auto-merge-armed-not-merged).
+ *
+ * When a leaf is about to flip to `done` and its `branch` is set, refuse the
+ * flip if an open GitHub PR still targets that branch — the flip and the merge
+ * must not be two unlinked steps (the item could otherwise read `done` with
+ * the change unmerged). Degrades gracefully: when `execGh` is not injected, or
+ * `gh` is unavailable / unauthenticated / the repo is undetectable, PR state
+ * cannot be determined, so the flip is not blocked by this guard — the
+ * acceptance-checklist gate still applies. Mirrors the issue-round-trip
+ * tolerance (gh failures degrade to a skip, never fail the flip).
+ */
+export type PrOpenForBranchResult = {
+  /** True when an open PR's head branch matches `branch`. */
+  open: boolean;
+  /** Human-readable reason when `open` is true. */
+  reason: string;
+};
+export function prOpenForBranch(
+  branch: string,
+  cwd: string,
+  execGh: typeof import("node:child_process").execFileSync,
+): PrOpenForBranchResult | null {
+  try {
+    const prs = getOpenPRs(null, cwd, execGh);
+    const match = prs.find((pr) => pr.headRefName === branch);
+    if (!match) return null;
+    return {
+      open: true,
+      reason: `an open PR (#${match.number}, ${match.title}) still targets branch '${branch}' — verify MERGED before flipping done (merge verification, engineering.md §Orchestration)`,
+    };
+  } catch {
+    // gh not found, not authenticated, or repo undetectable: cannot determine
+    // PR state, so do not block the flip.
+    return null;
+  }
+}
 
 export type UpdateOptions = {
   cwd: string;
@@ -579,6 +618,21 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     } else if (gated) {
       throw new Error(
         `cannot mark '${id}' done: the acceptance checklist in the item's live '## Acceptance' section still has unchecked boxes. Tick every box there, or pass --waive "<reason>" to record a dated waiver`,
+      );
+    }
+
+    // Merge-ownership close-out (bug-auto-merge-armed-not-merged): refuse
+    // flipping a leaf to `done` while an open PR still targets its branch —
+    // arming auto-merge is not ensuring merge, and the flip and the merge are
+    // not two unlinked steps. Degrades gracefully when PR state cannot be
+    // determined (no execGh, gh unavailable/unauthenticated).
+    const prGuard =
+      flippingToDone && gatedLeaf && item.branch && opts.execGh !== undefined
+        ? prOpenForBranch(item.branch, opts.cwd, opts.execGh)
+        : null;
+    if (prGuard?.open) {
+      throw new Error(
+        `cannot mark '${id}' done: ${prGuard.reason} Merge the PR (or close it), then flip done; never leave a reviewed PR unmerged without a named blocker on its item.`,
       );
     }
 
