@@ -9,7 +9,6 @@ parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-18"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-update-depends-on-multiline-rejected
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/bug-update-depends-on-multiline-rejected.md
