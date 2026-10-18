@@ -167,6 +167,7 @@ __arggonEdges.set("lib/src/update.ts\u0000./atomic.js", "lib/src/atomic.ts")
 __arggonEdges.set("lib/src/update.ts\u0000./convention.js", "lib/src/convention.ts")
 __arggonEdges.set("lib/src/update.ts\u0000./dates.js", "lib/src/dates.ts")
 __arggonEdges.set("lib/src/update.ts\u0000./frontmatter.js", "lib/src/frontmatter.ts")
+__arggonEdges.set("lib/src/update.ts\u0000./get-open-prs.js", "lib/src/get-open-prs.ts")
 __arggonEdges.set("lib/src/update.ts\u0000./ids.js", "lib/src/ids.ts")
 __arggonEdges.set("lib/src/update.ts\u0000./issue-roundtrip.js", "lib/src/issue-roundtrip.ts")
 __arggonEdges.set("lib/src/update.ts\u0000./items.js", "lib/src/items.ts")
@@ -7156,6 +7157,7 @@ function parseLog(out) {
 __arggonModules.set("lib/src/update.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.prOpenForBranch = prOpenForBranch;
 exports.parseCsvList = parseCsvList;
 exports.runUpdate = runUpdate;
 exports.maybeCommitUpdate = maybeCommitUpdate;
@@ -7176,7 +7178,23 @@ const tracker_commit_js_1 = require("./tracker-commit.js");
 const issue_roundtrip_js_1 = require("./issue-roundtrip.js");
 const convention_js_1 = require("./convention.js");
 const sanitize_js_1 = require("./sanitize.js");
+const get_open_prs_js_1 = require("./get-open-prs.js");
 const GATE_ALLOWS = { gated: false };
+function prOpenForBranch(branch, cwd, execGh) {
+    try {
+        const prs = (0, get_open_prs_js_1.getOpenPRs)(null, cwd, execGh);
+        const match = prs.find((pr) => pr.headRefName === branch);
+        if (!match)
+            return null;
+        return {
+            open: true,
+            reason: `an open PR (#${match.number}, ${match.title}) still targets branch '${branch}' — verify MERGED before flipping done (merge verification, engineering.md §Orchestration)`,
+        };
+    }
+    catch {
+        return null;
+    }
+}
 function parseCsvList(raw) {
     return raw
         .split(",")
@@ -7414,6 +7432,12 @@ function runUpdate(opts) {
         }
         else if (gated) {
             throw new Error(`cannot mark '${id}' done: the acceptance checklist in the item's live '## Acceptance' section still has unchecked boxes. Tick every box there, or pass --waive "<reason>" to record a dated waiver`);
+        }
+        const prGuard = flippingToDone && gatedLeaf && item.branch && opts.execGh !== undefined
+            ? prOpenForBranch(item.branch, opts.cwd, opts.execGh)
+            : null;
+        if (prGuard?.open) {
+            throw new Error(`cannot mark '${id}' done: ${prGuard.reason} Merge the PR (or close it), then flip done; never leave a reviewed PR unmerged without a named blocker on its item.`);
         }
         const currentAssignee = item.assignee ?? null;
         let newAssignee;
