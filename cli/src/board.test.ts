@@ -3344,7 +3344,7 @@ describe("columns show only task/bug leaves (task-columns-view-shows-only-task-a
     );
   });
 
-  it("lens/filter operates on the filtered leaf set", () => {
+  it("lens/filter operates on the leaf cards in columns, with BOARD_ITEMS holding all items for the tree", () => {
     const html = renderBoardHtml(mixed(), {
       generatedAt: GENERATED_AT,
       lenses: { tasks: "type:task", bugs: "type:bug" },
@@ -3352,16 +3352,17 @@ describe("columns show only task/bug leaves (task-columns-view-shows-only-task-a
     // The lens chips render for the saved views.
     expect(html).toContain('data-name="tasks" data-filter="type:task"');
     expect(html).toContain('data-name="bugs" data-filter="type:bug"');
-    // The lens is evaluated against task/bug items only — type:initiative
-    // matches nothing in the columns view (no initiatives in BOARD_ITEMS).
+    // BOARD_ITEMS holds every item (for the client-side tree display), while
+    // the columns render only task/bug leaves.
     expect(html).toContain("var BOARD_ITEMS = [");
     const itemsMatch = html.match(/var BOARD_ITEMS = (\[[\s\S]*?\]);/);
     expect(itemsMatch).toBeTruthy();
     const boardItems = JSON.parse(itemsMatch![1]);
-    const types = boardItems.map((item: { type: string }) => item.type);
-    expect(types).toEqual(["bug", "task", "task"]);
-    // The tree lens still references the same BOARD_ITEMS snapshot, so a
-    // type:initiative lens expression matches nothing in either layout.
+    const types = boardItems.map((item: { type: string }) => item.type).sort();
+    expect(types).toEqual(["bug", "epic", "initiative", "story", "task", "task"]);
+    // The tree lens references the same BOARD_ITEMS snapshot; a type:initiative
+    // lens matches the initiative in BOARD_ITEMS but renders no column card
+    // (initiatives live in the tree view, not the flat columns).
     expect(html).toContain("boardTreeDisplay(BOARD_ITEMS, visibleIds)");
   });
 
