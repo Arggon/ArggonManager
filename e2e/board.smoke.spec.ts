@@ -647,14 +647,13 @@ test.describe("@smoke board --serve", () => {
     await expect(page.locator(`.card:not(.filtered-out)[data-id="${FILTER_ITEM_ID}"]`)).toHaveCount(
       1,
     );
-    // Column counts and the meta line reflect the filtered set over the leaf
-    // cards (columns render only task/bug leaves).
-    const leafCount =
-      cliJson<{ items: ListedItem[] }>(fixture, ["list", "--type", "task"]).items.length +
-      cliJson<{ items: ListedItem[] }>(fixture, ["list", "--type", "bug"]).items.length;
+    // Column counts reflect the rendered leaf cards; the filter-count total is
+    // the whole item universe (BOARD_ITEMS), consistent with the tree view.
     await expect(page.locator('.column[data-status="todo"] .count')).toHaveText("1");
     await expect(page.locator('.column[data-status="done"] .count')).toHaveText("0");
-    await expect(page.locator("#board-filter-count")).toHaveText(`1 of ${leafCount} item(s)`);
+    await expect(page.locator("#board-filter-count")).toHaveText(
+      `1 of ${listItems.length} item(s)`,
+    );
     await expect(page.locator("#board-filter-input")).toHaveValue("label:smoke");
     expect(filterFromUrl(page.url())).toBe("label:smoke");
     // The filtered/lens state is a scanned surface of its own
@@ -670,6 +669,9 @@ test.describe("@smoke board --serve", () => {
     await expect(page.locator('.column[data-status="todo"] .count')).toHaveText("1");
 
     // Clearing restores the full board and drops the hash filter.
+    const leafCount =
+      cliJson<{ items: ListedItem[] }>(fixture, ["list", "--type", "task"]).items.length +
+      cliJson<{ items: ListedItem[] }>(fixture, ["list", "--type", "bug"]).items.length;
     await page.locator("#board-filter-clear").click();
     await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(leafCount);
     await expect(page.locator("#board-filter-input")).toHaveValue("");

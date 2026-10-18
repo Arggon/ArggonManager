@@ -3242,7 +3242,7 @@ export function renderBoardHtml(
   // The client-side lens filters a snapshot of the card fields that travels
   // with the page (there is no server to read the tracker from). Only the
   // fields the embedded predicate mirror reads are included.
-  const lensItems: BoardLensItem[] = leafItems.map((item) => ({
+  const lensItems: BoardLensItem[] = sorted.map((item) => ({
     id: item.id,
     title: item.title,
     type: item.type,
