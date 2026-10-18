@@ -2568,9 +2568,10 @@ test.describe("@smoke board tree open-descendant disclosure", () => {
     // The all-terminal container hides (nothing visible hangs below it).
     await expect(row(CLEAN_EPIC_ID)).toBeHidden();
     // Columns render only task/bug leaves; containers (story/initiative) live
-    // in the tree view and no longer appear as flat cards.
+    // in the tree view and no longer appear as flat cards. Terminal-hide is on,
+    // so every done/cancelled leaf is hidden and its column hides whole.
     await page.locator("#board-view-toggle").click();
-    await expect(page.locator('.column[data-status="done"]')).toBeVisible();
+    await expect(page.locator('.column[data-status="done"]')).toBeHidden();
     await expect(page.locator(`.card[data-id="${OPEN_STORY_ID}"]`)).toHaveCount(0);
     await expect(page.locator(`.card[data-id="${OPEN_ROOT_ID}"]`)).toHaveCount(0);
     await expect(page.locator(`.card[data-id="${OPEN_DONE_TASK_ID}"]`)).toBeHidden();
