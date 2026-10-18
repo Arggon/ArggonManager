@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-update-depends-on-multiline-rejected
 title: "A wrapped frontmatter list value (depends_on: + an indented [...] block) is refused as BROKEN_YAML, so a prettier-formatted item becomes un-flippable"
 assignee: arggon-delivery-lead
@@ -9,7 +9,6 @@ parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-18"
-claimed_at: "2026-10-18T20:21:15.069Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-update-depends-on-multiline-rejected
 ---
 <!--
