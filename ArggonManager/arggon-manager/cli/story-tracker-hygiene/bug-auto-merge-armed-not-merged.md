@@ -55,3 +55,7 @@ Docs: rule written where the lead reads it — skills/arggon-cli/references/orch
 Methodology impact: Behavioral (ADR 0016 adopter-upgrade channel) — adds a done-gate rule and PR guard.
 
 Ready for the delivery lead's review + merge verification; the done flip stays the lead's call after the PR merges.
+
+### handoff 2026-10-18 @ses_eafd0e4ffffeBslXHAfWdTPHVB (session: ses_eafd0e4ffffeBslXHAfWdTPHVB) — next: Review and merge PR #861 (branch fix/bug-auto-merge-armed-not-merged); the done flip stays the lead's call after merge verification.
+- branch: fix/bug-auto-merge-armed-not-merged
+- open questions: None; acceptance checklist fully addressed except lead's review/merge/done flip.
