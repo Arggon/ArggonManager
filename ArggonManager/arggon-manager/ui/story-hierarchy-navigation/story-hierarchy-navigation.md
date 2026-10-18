@@ -28,9 +28,9 @@ What exists today is query-side only: the `ancestor:`/`parent:` list predicates 
 
 ## Acceptance
 
-- [ ] Each of the three child tasks merges with its per-surface acceptance met, reviewed against the project's review bar (evidence travels, docs travel, scope on the item)
-- [ ] Parent and children resolve through the kernel's recorded `parent` edges (no second hierarchy), and an item with no parent / no children renders that honestly rather than hiding the section
-- [ ] The ZCode `/arggon-board` path (served `board --serve` + loopback URL) inherits the web fix with no extra work — verified, not assumed
-- [ ] `arggon validate` green; `npm test` + `ui-smoke` green; prettier clean
+- [x] Each of the three child tasks merges with its per-surface acceptance met, reviewed against the project's review bar (evidence travels, docs travel, scope on the item)
+- [x] Parent and children resolve through the kernel's recorded `parent` edges (no second hierarchy), and an item with no parent / no children renders that honestly rather than hiding the section
+- [x] The ZCode `/arggon-board` path (served `board --serve` + loopback URL) inherits the web fix with no extra work — verified, not assumed
+- [x] `arggon validate` green; `npm test` + `ui-smoke` green; prettier clean
 
 ## Notes
