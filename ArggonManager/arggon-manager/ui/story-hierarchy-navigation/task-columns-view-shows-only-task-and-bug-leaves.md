@@ -30,7 +30,7 @@ Product-owner request 2026-10-16, confirmed as a feature (not a bug): with group
 
 - [x] Columns view (grouped ancestry off) renders only task/bug leaf cards; initiatives/epics/stories render only in the grouped-ancestry tree view, on both static export and serve
 - [x] Column counts, summary panel and card totals stay consistent with what is rendered (or are labeled); lens/filter and the detail drawer behave sanely for the hidden types
-- [ ] Tests pin it (unit/parity, incl. serve-vs-static shape); `arggon validate` green; prettier clean; PR opened (#859)
+- [x] Tests pin it (unit/parity, incl. serve-vs-static shape); `arggon validate` green; prettier clean; PR opened (#859)
 
 ## Notes
 
