@@ -9,7 +9,6 @@ parent: story-tracker-hygiene
 labels: []
 created: "2026-10-12"
 updated: "2026-10-18"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-auto-merge-armed-not-merged
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/bug-auto-merge-armed-not-merged.md
