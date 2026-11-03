@@ -1,14 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-publish-canonical-agent-workflow
 title: Publish canonical agent workflow
-parent: story-docs-sync
+assignee: arggon-superagent
 branch: agent/canonical-agent-workflow-281c0949f690
-worktree_path: /home/arggon/.dsh/state/superagent/work/canonical-agent-workflow-281c0949f690
+parent: story-docs-sync
 labels: []
 created: "2026-11-03"
 updated: "2026-11-03"
+claimed_at: "2026-11-03T22:21:18.552Z"
+worktree_path: /home/arggon/.dsh/state/superagent/work/canonical-agent-workflow-281c0949f690
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-docs-sync/task-publish-canonical-agent-workflow.md
