@@ -1,13 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-create-needs-a-body-flag-to-author-a-live-contract
 title: "`arggon create` has no `--body`, so the first write of a live acceptance contract is a hand-edit — and the done gate now refuses any item that has none"
+assignee: arggon-delivery-lead
 branch: agent/create-success-reporting-fc252b1eac20
 parent: methodology-improvements
 labels: [cli, tracker-schema]
 created: "2026-10-06"
 updated: "2026-11-03"
+claimed_at: "2026-11-03T22:20:37.237Z"
 worktree_path: /home/arggon/.dsh/state/superagent/work/create-success-reporting-fc252b1eac20
 ---
 <!--
