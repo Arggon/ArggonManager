@@ -2194,6 +2194,91 @@ async function completedWorktree(
   return { worktreePath, defs, calls };
 }
 
+describe("native start assignee precedence (bug-start-overwrites-board-assignee)", () => {
+  /**
+   * Mirrors the three CLI cases in `cli/src/start.test.ts`. The resolution
+   * logic is duplicated in `nativeStart`; without these, a plugin-only edit
+   * that prefers the login over `item.assignee` would stay green.
+   */
+  async function withGithubUser<T>(
+    login: string | undefined,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    const prevUser = process.env.GITHUB_USER;
+    const prevActor = process.env.GITHUB_ACTOR;
+    if (login === undefined) delete process.env.GITHUB_USER;
+    else process.env.GITHUB_USER = login;
+    // Pin the resolution source: otherwise GITHUB_ACTOR / gh / git-config can
+    // leak a different login into the fallback case.
+    delete process.env.GITHUB_ACTOR;
+    try {
+      return await run();
+    } finally {
+      if (prevUser === undefined) delete process.env.GITHUB_USER;
+      else process.env.GITHUB_USER = prevUser;
+      if (prevActor === undefined) delete process.env.GITHUB_ACTOR;
+      else process.env.GITHUB_ACTOR = prevActor;
+    }
+  }
+
+  async function startPlain(
+    dir: string,
+    input: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const started = await tool(defs, "start").execute({ worktree: false, ...input });
+    return started.output as Record<string, unknown>;
+  }
+
+  it("keeps an existing board assignee when input.assignee is omitted", async () => {
+    const dir = seedGitTree();
+    runUpdate({ cwd: dir, id: "task-rate-limit", assignee: "Engineer" });
+    if (gitOut(dir, ["status", "--porcelain"]) !== "") {
+      git(dir, ["add", "ArggonManager"]);
+      git(dir, ["commit", "-qm", "test: board assignee Engineer"]);
+    }
+    const output = await withGithubUser("Arggon", () =>
+      startPlain(dir, { id: "task-rate-limit" }),
+    );
+    expect(output.ok).toBe(true);
+    expect(itemData(dir, "task-rate-limit")).toMatchObject({
+      status: "in_progress",
+      assignee: "Engineer",
+    });
+  });
+
+  it("lets an explicit input.assignee override the board assignee", async () => {
+    const dir = seedGitTree();
+    runUpdate({ cwd: dir, id: "task-rate-limit", assignee: "Engineer" });
+    if (gitOut(dir, ["status", "--porcelain"]) !== "") {
+      git(dir, ["add", "ArggonManager"]);
+      git(dir, ["commit", "-qm", "test: board assignee Engineer"]);
+    }
+    const output = await withGithubUser("Arggon", () =>
+      startPlain(dir, { id: "task-rate-limit", assignee: "PM" }),
+    );
+    expect(output.ok).toBe(true);
+    expect(itemData(dir, "task-rate-limit")).toMatchObject({
+      status: "in_progress",
+      assignee: "PM",
+    });
+  });
+
+  it("falls back to the login when the item has no assignee", async () => {
+    const dir = seedGitTree();
+    // Fixture leaf starts unassigned; pin GITHUB_USER so gh/git cannot win.
+    const output = await withGithubUser("me-user", () =>
+      startPlain(dir, { id: "task-rate-limit" }),
+    );
+    expect(output.ok).toBe(true);
+    expect(itemData(dir, "task-rate-limit")).toMatchObject({
+      status: "in_progress",
+      assignee: "me-user",
+    });
+  });
+});
+
 describe("worktree domain tools (W4)", () => {
   it("start claims, creates the worktree through the domain and records branch + worktree_path in the worktree copy", async () => {
     const dir = seedGitTree();
