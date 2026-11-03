@@ -1,13 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-revision-bound-verdicts
 title: Bind verdicts to reviewed revisions
+assignee: arggon-delivery-lead
 branch: agent/revision-bound-verdicts-cdec590a668b
 parent: story-self-improvement
 labels: []
 created: "2026-11-03"
 updated: "2026-11-03"
+claimed_at: "2026-11-03T22:20:52.946Z"
 worktree_path: /home/arggon/.dsh/state/superagent/work/revision-bound-verdicts-cdec590a668b
 ---
 <!--
