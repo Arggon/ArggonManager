@@ -29,7 +29,7 @@ authoritative role table — role, what it decides, the product owner's boundary
 is `ArggonManager/docs/engineering.md` §Roles and authority; read it instead of
 inferring your role from this prompt.
 
-<!-- arggon:friction-trigger begin triggerVersion=0.10.0 -->
+<!-- arggon:friction-trigger begin triggerVersion=0.11.0 -->
 
 Friction in **ArggonManager itself** is not adoptable work: do not work around it
 and do not file it in this repo's tracker. Record it locally instead —
