@@ -2677,7 +2677,7 @@ program
   .command("start")
   .description("Claim an item, check out its branch, commit, push, and optionally open a draft PR")
   .argument("<id>", "work item id")
-  .option("--assignee <login>", "claim as this login (default: GITHUB_USER / GITHUB_ACTOR)")
+  .option("--assignee <login>", "claim as this login (default: existing item assignee, else GITHUB_USER / GITHUB_ACTOR)")
   .option("--open-pr", "open a draft PR after pushing", false)
   .option(
     "--worktree",

@@ -4371,12 +4371,18 @@ async function nativeStart(
     )
   }
   const item = (show.envelope.item ?? {}) as Record<string, unknown>
+  // Prefer explicit input, then the item's existing board assignee (role names
+  // like Engineer), then the GitHub/git login. Shared bot logins must not
+  // overwrite a role assignee on claim.
   const assignee =
-    asString(input.assignee) ?? asString(kernel.resolveCurrentLogin()) ?? undefined
+    asString(input.assignee) ??
+    asString(item.assignee) ??
+    asString(kernel.resolveCurrentLogin()) ??
+    undefined
   if (assignee === undefined) {
     return startNotAttempted(
       kernel,
-      "could not resolve assignee (pass assignee, or set GITHUB_USER/GITHUB_ACTOR, or authenticate gh)",
+      "could not resolve assignee (pass assignee, set a board assignee on the item, or set GITHUB_USER/GITHUB_ACTOR / authenticate gh)",
       version,
       { id },
       "assignee unavailable",
