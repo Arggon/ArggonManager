@@ -231,9 +231,30 @@ describe("start", () => {
     const git = fakeGit({ resolveMe: () => "me-user" });
     const result = runStart({ cwd: dir, id, now: NOW }, { git });
     expect(result.item.assignee).toBe("me-user");
+    // Fresh unassigned item: with no board assignee and no resolvable login, start fails.
+    const other = primedTask();
     expect(() =>
-      runStart({ cwd: dir, id, now: NOW }, { git: fakeGit({ resolveMe: () => undefined }) }),
+      runStart(
+        { cwd: other.dir, id: other.id, now: NOW },
+        { git: fakeGit({ resolveMe: () => undefined }) },
+      ),
     ).toThrow(/could not resolve assignee/);
+  });
+
+  it("keeps an existing board assignee when --assignee is omitted", () => {
+    const { dir, id } = primedTask();
+    runUpdate({ cwd: dir, id, assignee: "Engineer", now: NOW });
+    const git = fakeGit({ resolveMe: () => "Arggon" });
+    const result = runStart({ cwd: dir, id, now: NOW }, { git });
+    expect(result.item.assignee).toBe("Engineer");
+  });
+
+  it("lets an explicit --assignee override the board assignee", () => {
+    const { dir, id } = primedTask();
+    runUpdate({ cwd: dir, id, assignee: "Engineer", now: NOW });
+    const git = fakeGit({ resolveMe: () => "Arggon" });
+    const result = runStart({ cwd: dir, id, assignee: "PM", now: NOW }, { git });
+    expect(result.item.assignee).toBe("PM");
   });
 });
 

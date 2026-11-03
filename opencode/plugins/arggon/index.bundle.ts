@@ -12628,9 +12628,12 @@ async function nativeStart(kernel, input, options, tool) {
         return startNotAttempted(kernel, envelopeMessage(show.envelope, "item lookup failed"), version, { id }, "item lookup failed");
     }
     const item = (show.envelope.item ?? {});
-    const assignee = asString(input.assignee) ?? asString(kernel.resolveCurrentLogin()) ?? undefined;
+    const assignee = asString(input.assignee) ??
+        asString(item.assignee) ??
+        asString(kernel.resolveCurrentLogin()) ??
+        undefined;
     if (assignee === undefined) {
-        return startNotAttempted(kernel, "could not resolve assignee (pass assignee, or set GITHUB_USER/GITHUB_ACTOR, or authenticate gh)", version, { id }, "assignee unavailable");
+        return startNotAttempted(kernel, "could not resolve assignee (pass assignee, set a board assignee on the item, or set GITHUB_USER/GITHUB_ACTOR / authenticate gh)", version, { id }, "assignee unavailable");
     }
     let progress;
     try {

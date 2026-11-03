@@ -878,11 +878,15 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
   }
 
   const providedResolveMe = deps.git?.resolveMe;
-  const assignee =
-    opts.assignee ?? (providedResolveMe ? providedResolveMe() : resolveCurrentLogin()) ?? null;
+  // Prefer an explicit --assignee, then the item's existing board assignee
+  // (role names like Engineer), and only then the GitHub/git login. Every bot
+  // here commits as the shared GitHub user, so falling through to resolveMe
+  // first was rewriting role assignees to that login on every claim.
+  const resolvedMe = providedResolveMe ? providedResolveMe() : resolveCurrentLogin();
+  const assignee = opts.assignee ?? item.assignee ?? resolvedMe ?? null;
   if (!assignee) {
     throw new Error(
-      "could not resolve assignee (pass --assignee or set GITHUB_USER / GITHUB_ACTOR)",
+      "could not resolve assignee (pass --assignee, set a board assignee on the item, or set GITHUB_USER / GITHUB_ACTOR)",
     );
   }
 
