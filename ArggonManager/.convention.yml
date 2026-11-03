@@ -223,12 +223,12 @@ x-generated:
     generatedAt: "2026-10-15T16:04:32.505Z"
   .opencode/agents/arggon-delivery-lead.md:
     template: "docs/opencode/agents/arggon-delivery-lead.md"
-    checksum: "sha256:bc14a63dc32d691fefa6154d6e61e701efd355c3efed52be97bbb8788ca86cb0"
+    checksum: "sha256:c0a13b6fecfc3f789f51cf271d3925dd409fbc9a6b3731d075f8ff0111f0b9ec"
     arggonVersion: "0.10.0"
     generatedAt: "2026-10-15T22:39:30.754Z"
   .opencode/agents/arggon-maker.md:
     template: "docs/opencode/agents/arggon-maker.md"
-    checksum: "sha256:6447edfc3f2f64162ce7d7da46a56c62d88b3f29d73e8e9ce4e13aba61b3ad9a"
+    checksum: "sha256:9cf1a8f9449733bf4e9edec4efd0948b60f7871a6f39be2e4a2b53049d467e6e"
     arggonVersion: "0.10.0"
     generatedAt: "2026-10-15T22:39:30.753Z"
   .opencode/agents/arggon-standards-reviewer.md:

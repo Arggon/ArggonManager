@@ -62,7 +62,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CONVENTION_VERSION } from "@arggondev/lib";
-import { checksumOf } from "./docs.js";
+import { checksumOf, renderWorkflowPin } from "./docs.js";
 import { freshCloneCopy } from "./pack-fixtures.js";
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
 import { runCli } from "./test-spawn.js";
@@ -480,7 +480,15 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     expect(existsSync(join(fixture, "ArggonManager/.convention.yml"))).toBe(true);
     const vendored = readFileSync(join(fixture, WORKFLOW_DEST), "utf8");
     expect(vendored.startsWith(`${WORKFLOW_MARKER}\n`)).toBe(true);
-    expect(vendored).toBe(`${WORKFLOW_MARKER}\n${readFileSync(WORKFLOW_TEMPLATE, "utf8")}`);
+    // init rewrites the template's literal ARGGON_VERSION pin to the running
+    // CLI version (bug-init-writes-stale-workflow-pin / #844). During a
+    // release PR package.json is already bumped while the template pin stays
+    // at the last published version until the post-publish re-pin, so the
+    // vendored copy must equal marker + pin-rewritten template — not the
+    // raw template bytes.
+    expect(vendored).toBe(
+      `${WORKFLOW_MARKER}\n${renderWorkflowPin(readFileSync(WORKFLOW_TEMPLATE, "utf8"), binVersion)}`,
+    );
 
     const validate = runStep(VALIDATE_STEP, fixture);
     expect(validate.status, validate.stderr).toBe(0);
