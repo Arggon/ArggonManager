@@ -95,11 +95,12 @@ trusting an acceptance, so it is a first-class state and not a footnote.
 
 ### Surfaces (all additive, all report-only)
 
-| Surface            | Field                                                                                 |
-| ------------------ | ------------------------------------------------------------------------------------- |
-| `report --json`    | `groups[].containers[].acceptance` — `accepted｜changes-noted｜none｜self-accepted`   |
-| `show <id> --json` | additive `acceptance` beside the existing `acceptance_complete` / done-gate verdict   |
-| `spec analyze`     | `MISSING-PRODUCT-ACCEPTANCE` — a **container** that reached `done` with no acceptance |
+| Surface            | Field                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------- |
+| `report --json`    | `groups[].containers[].acceptance` — `accepted｜changes-noted｜none｜self-accepted`                 |
+| `report --json`    | `risk.leaves[]` — open risk-triggered leaves whose latest acceptance is not `accepted` (issue #871) |
+| `show <id> --json` | additive `acceptance` beside the existing `acceptance_complete` / done-gate verdict                 |
+| `spec analyze`     | `MISSING-PRODUCT-ACCEPTANCE` — a **container** that reached `done` with no acceptance               |
 
 **Correction to ADR 0021 §4 (dated amendment owed by the implementation PR).** §4 assigned
 the classification to `arggon sync --json`. Grounding for this spec found that surface
@@ -118,18 +119,31 @@ statement the change makes false is fixed in the same PR (`docs/agents.md`
 The tier table itself lands in `docs/engineering.md`
 (`task-wire-role-model-carriers`); this spec fixes its **content**.
 
-| Tier | Applies to                   | Who accepts                                                         | Blocking?                    |
-| ---- | ---------------------------- | ------------------------------------------------------------------- | ---------------------------- |
-| T0   | `task` / `bug` leaves        | the agent self-certifies on the review-bar evidence + the gates     | no — and the default         |
-| T1   | `story` containers           | the product owner, recorded as an `accept:` comment                 | no — recorded, never gated   |
-| T2   | the four irreversible powers | a human, already structurally gated; the acceptance records the why | yes, by ADR 0015 / TTY gates |
+| Tier | Applies to                                          | Who accepts                                                                                         | Blocking?                                                        |
+| ---- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| T0   | `task` / `bug` leaf with **no risk trigger**        | the agent self-certifies on the review-bar evidence + the gates                                     | no — and the default                                             |
+| T1   | `story` containers, and risk-triggered leaves       | the product owner or a named human reviewer, recorded as an `accept:` comment                       | no — recorded, never gated                                       |
+| T2   | the four irreversible powers, and irreversible risk | a human, gated structurally or as the operator of the irreversible step; the acceptance records why | yes, by ADR 0015 / TTY gates, or the human-run irreversible step |
+
+**Amendment (2026-11-04, issue #871): T0 is conditional on a risk triage.** A leaf whose
+change hits a risk trigger — `risk-security`, `risk-destructive`, `risk-compatibility`,
+`risk-supply-chain`, `risk-safety-critical` — is escalated even when the diff is small:
+security/compatibility/supply-chain to T1 (recorded acceptance plus the authenticated
+GitHub review the project declares, CODEOWNERS or a named reviewer), destructive and
+irreversible safety-critical work to T2 (a person runs or approves the irreversible
+step). The trigger is recorded as a `risk-…` label on the item; the full table and the
+authenticated-versus-recorded rule live in `docs/engineering.md` §Review bar → Risk
+triage. `report --json` gains the bounded `risk` block above as the report-only audit,
+and `show`/`list --json` expose the labels. Nothing else in this spec changes: the
+tracker `accept:` record is still prose, still attributed, still never a gate.
 
 Two rules that make the tiers survivable in practice:
 
 - **Absence of a product owner never blocks.** A repo with no product owner is compliant
   at T0 by default and stays silent: the finding only fires when the repo has **armed**
   `x-tracker.product-acceptance: true`. Arming is the act of saying "we have a product
-  owner and we want the record".
+  owner and we want the record". A risk-triggered leaf still owes its record; where no
+  authenticated reviewer is declared, the missing record is reported, never enforced.
 - **No timers, no PO-blocked status.** Acceptance is a comment at any hour; `claimed_at`
   staleness stays advisory (`docs/convention.md:302`). There is no SLA and no new
   status, so an absent product owner can never wedge a container's children — only its
@@ -199,6 +213,7 @@ already took for review verdicts (`docs/engineering.md:109`).
 - **A `role:` / `owner:` frontmatter field** — rejected in ADR 0021: schema change
   carrying a fact `assignee` already carries, and a kernel-trusted field a worker could
   write to nominate itself.
-- **Product-owner review per leaf** — spends the scarce input; T0 is the default for a
-  reason (METR's field evidence, ADR 0021 F12).
+- **Product-owner review per leaf** — spends the scarce input; T0 stays the default for a
+  routine leaf (METR's field evidence, ADR 0021 F12). The risk-triggered leaf is the named
+  exception, not the rule.
 - **Acceptance on PRs.** The record lives on the item; the PR carries the item id.

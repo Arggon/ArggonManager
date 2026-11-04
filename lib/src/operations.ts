@@ -40,7 +40,7 @@ import {
   type PriorityMigrateEntry,
   type PriorityMigrateOptions,
 } from "./priority.js";
-import { runReport, type ReportGroup, type ReportHygiene } from "./report.js";
+import { runReport, type ReportGroup, type ReportHygiene, type ReportRisk } from "./report.js";
 import {
   FrictionError,
   appendFrictionRecord,
@@ -276,6 +276,8 @@ export type ReportPayload = {
   groups: ReportGroup[];
   /** Additive (task-container-hygiene-check): report-only terminal-container hygiene. */
   hygiene: ReportHygiene;
+  /** Additive (issue #871): report-only risk-triage audit. */
+  risk: ReportRisk;
   trend?: TrendResult;
 };
 
@@ -294,7 +296,11 @@ export function reportOperation(opts: ReportOperationOptions): CommandOutcome<Re
       }
     }
     const result = runReport({ cwd: opts.cwd });
-    const payload: ReportPayload = { groups: result.groups, hygiene: result.hygiene };
+    const payload: ReportPayload = {
+      groups: result.groups,
+      hygiene: result.hygiene,
+      risk: result.risk,
+    };
     if (trend) payload.trend = trend;
     return succeed("report", payload, readConventionVersion(result.root));
   } catch (err) {

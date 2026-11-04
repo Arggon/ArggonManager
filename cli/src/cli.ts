@@ -20,6 +20,7 @@ import {
   formatListTable,
   formatReportHygiene,
   formatReportMarkdown,
+  formatReportRisk,
   formatReportTable,
   formatTrendMarkdown,
   formatTrendTable,
@@ -1003,7 +1004,7 @@ program
 program
   .command("report")
   .description(
-    "Aggregate leaf statuses per container, grouped by epic, plus a report-only terminal-container hygiene check (display only)",
+    "Aggregate leaf statuses per container, grouped by epic, plus report-only terminal-container hygiene and risk-triage checks (display only)",
   )
   .option(
     "--format <format>",
@@ -1081,6 +1082,8 @@ program
       process.stdout.write(formatReportTable(result.groups));
       // Additive, report-only hygiene block (task-container-hygiene-check).
       process.stdout.write(formatReportHygiene(result.hygiene));
+      // Additive, report-only risk-triage block (issue #871).
+      process.stdout.write(formatReportRisk(result.risk));
       if (trend) process.stdout.write(formatTrendTable(trend));
     } catch (err) {
       printHumanError("arggon report", err instanceof Error ? err.message : String(err));
@@ -2677,7 +2680,10 @@ program
   .command("start")
   .description("Claim an item, check out its branch, commit, push, and optionally open a draft PR")
   .argument("<id>", "work item id")
-  .option("--assignee <login>", "claim as this login (default: existing item assignee, else GITHUB_USER / GITHUB_ACTOR)")
+  .option(
+    "--assignee <login>",
+    "claim as this login (default: existing item assignee, else GITHUB_USER / GITHUB_ACTOR)",
+  )
   .option("--open-pr", "open a draft PR after pushing", false)
   .option(
     "--worktree",

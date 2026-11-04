@@ -13,10 +13,12 @@ import {
   completedOf,
   findTasksDir,
   formatReportMarkdown,
+  formatReportRisk,
   formatReportTable,
   loadItems,
   MAX_HYGIENE_OFFENDERS,
   MAX_HYGIENE_OPEN_CONTAINERS,
+  MAX_RISK_LEAVES,
   priorityCounts,
   runReport,
 } from "@arggondev/lib";
@@ -589,5 +591,241 @@ describe("container hygiene caps", () => {
     expect(human.stdout).toContain("hygiene: 12 offenders (31 containers checked)");
     expect(human.stdout).toContain("(+2 more)");
     expect(human.stdout).toContain("… and 2 more");
+  });
+});
+
+// ---------- risk triage audit (issue #871) ----------
+
+/** An `accept:` comment in the kernel's convention shape. */
+function acceptanceComment(author: string, value = "approve"): string {
+  return `\n### 2026-10-05 @${author}\naccept: ${value}\n- checked against the spec\n`;
+}
+
+/**
+ * The risk-audit fixture: a routine leaf, a risk-labeled leaf that is not
+ * (routine T0), a risk leaf with a human acceptance (cleared), a terminal risk
+ * leaf (excluded), a self-accepted risk leaf (a gap), and a multi-trigger leaf.
+ */
+function makeRiskTree(): string {
+  const root = mkdtempSync(join(tmpdir(), "arggon-report-risk-"));
+  write(root, "tasks/.convention.yml", "version: 0\n");
+  write(
+    root,
+    "tasks/launch/launch.md",
+    md(`type: initiative\nstatus: todo\nid: launch\ntitle: Launch\nlabels: []\n${D}`, "Launch"),
+  );
+  write(
+    root,
+    "tasks/launch/epic-a/epic-a.md",
+    md(
+      `type: epic\nstatus: todo\nid: epic-a\nparent: launch\ntitle: Epic A\nlabels: []\n${D}`,
+      "Epic A",
+    ),
+  );
+  write(
+    root,
+    "tasks/launch/epic-a/story-a/story-a.md",
+    md(
+      `type: story\nstatus: in_progress\nid: story-a\nparent: epic-a\ntitle: Story A\nlabels: []\n${D}`,
+      "Story A",
+    ),
+  );
+  const leaf = (id: string, frontmatter: string, title: string): void => {
+    write(root, `tasks/launch/epic-a/story-a/${id}.md`, md(frontmatter, title));
+  };
+  // Routine T0 leaf: no risk label, never examined.
+  leaf(
+    "task-routine",
+    `type: task\nstatus: todo\nid: task-routine\nparent: story-a\nlabels: [security]\n${D}`,
+    "Routine",
+  );
+  // A risk-triggered leaf with no acceptance: a gap.
+  leaf(
+    "task-security-gap",
+    `type: task\nstatus: todo\nid: task-security-gap\nparent: story-a\nlabels: [risk-security]\n${D}`,
+    "Security gap",
+  );
+  // A risk-triggered leaf a human accepted: cleared.
+  write(
+    root,
+    "tasks/launch/epic-a/story-a/task-security-accepted.md",
+    `${md(
+      `type: task\nstatus: in_progress\nid: task-security-accepted\nparent: story-a\nlabels: [risk-security]\n${D}`,
+      "Security accepted",
+    )}${acceptanceComment("gonzalo")}`,
+  );
+  // A terminal risk-triggered leaf: excluded from the gap list, still checked.
+  leaf(
+    "task-destructive-done",
+    `type: task\nstatus: done\nid: task-destructive-done\nparent: story-a\nlabels: [risk-destructive]\n${D}`,
+    "Done destructive",
+  );
+  // A risk leaf whose only acceptance is from its own assignee: a gap.
+  write(
+    root,
+    "tasks/launch/epic-a/story-a/bug-self-accepted.md",
+    `${md(
+      `type: bug\nstatus: blocked\nid: bug-self-accepted\nparent: story-a\nassignee: arggon-superagent\nblocked_reason: waiting\nlabels: [risk-supply-chain, risk-safety-critical]\n${D}`,
+      "Self accepted",
+    )}${acceptanceComment("arggon-superagent")}`,
+  );
+  // A multi-trigger leaf: every risk label is carried into the audit row.
+  leaf(
+    "task-multi-trigger",
+    `type: task\nstatus: in_progress\nid: task-multi-trigger\nparent: story-a\nlabels: [risk-compatibility, risk-security, security]\n${D}`,
+    "Multi trigger",
+  );
+  return root;
+}
+
+describe("risk triage audit (issue #871)", () => {
+  it("escalates risk-triggered leaves out of routine T0", () => {
+    const { risk } = runReport({ cwd: makeRiskTree() });
+    // 5 risk-labeled leaves (routine `security` is NOT one); 3 have no accepted record.
+    expect(risk.checked).toBe(5);
+    expect(risk.leavesTotal).toBe(3);
+    expect(risk.leaves.map((l) => l.id)).toEqual([
+      "bug-self-accepted",
+      "task-multi-trigger",
+      "task-security-gap",
+    ]);
+
+    const byId = new Map(risk.leaves.map((l) => [l.id, l]));
+    expect(byId.get("task-security-gap")).toMatchObject({
+      type: "task",
+      title: "task-security-gap",
+      status: "todo",
+      labels: ["risk-security"],
+      acceptance: "none",
+      storyId: "story-a",
+      epicId: "epic-a",
+    });
+    expect(byId.get("bug-self-accepted")).toMatchObject({
+      type: "bug",
+      status: "blocked",
+      labels: ["risk-supply-chain", "risk-safety-critical"],
+      acceptance: "self-accepted",
+    });
+    expect(byId.get("task-multi-trigger")!.labels).toEqual(["risk-compatibility", "risk-security"]);
+    // Accepted and terminal leaves are not gaps.
+    expect(byId.has("task-security-accepted")).toBe(false);
+    expect(byId.has("task-destructive-done")).toBe(false);
+    expect(byId.has("task-routine")).toBe(false);
+  });
+
+  it("surfaces the audit in the JSON payload, human table and markdown standup", () => {
+    const root = makeRiskTree();
+    const json = runCli(["--json", "report"], root);
+    expect(json.status, json.stderr).toBe(0);
+    const body = JSON.parse(json.stdout) as {
+      risk: { checked: number; leavesTotal: number; leaves: Array<{ id: string }> };
+    };
+    expect(body.risk.checked).toBe(5);
+    expect(body.risk.leavesTotal).toBe(3);
+    expect(body.risk.leaves.map((l) => l.id)).toEqual([
+      "bug-self-accepted",
+      "task-multi-trigger",
+      "task-security-gap",
+    ]);
+
+    const human = runCli(["report"], root);
+    expect(human.status, human.stderr).toBe(0);
+    expect(human.stdout).toContain(
+      "risk: 3 open risk-triggered leaves without human acceptance (5 risk-labeled leaves checked)",
+    );
+    expect(human.stdout).toContain(
+      "task-security-gap (task, todo) — risk-security; acceptance: none — story-a ← epic-a",
+    );
+
+    const markdown = formatReportMarkdown(runReport({ cwd: root }), { date: "2026-10-15" });
+    expect(markdown).toContain("## Risk");
+    expect(markdown).toContain(
+      "- 3 open risk-triggered leaves without human acceptance (5 risk-labeled leaves checked)",
+    );
+    expect(markdown).toContain(
+      "**task-security-gap** (task, todo) — risk-security; acceptance: none",
+    );
+  });
+
+  it("reports clean when no leaf carries a risk label", () => {
+    const { risk } = runReport({ cwd: makeTree() });
+    expect(risk).toEqual({ checked: 0, leaves: [], leavesTotal: 0 });
+    expect(formatReportRisk(risk)).toContain("risk: clean");
+    const human = runCli(["report"], makeTree());
+    expect(human.status, human.stderr).toBe(0);
+    expect(human.stdout).toContain(
+      "risk: clean — no open risk-triggered leaf needs review escalation",
+    );
+  });
+
+  it("bounds the gap list with explicit totals and an overflow marker", () => {
+    const root = mkdtempSync(join(tmpdir(), "arggon-report-risk-caps-"));
+    write(root, "tasks/.convention.yml", "version: 0\n");
+    write(
+      root,
+      "tasks/launch/launch.md",
+      md(`type: initiative\nstatus: todo\nid: launch\ntitle: Launch\nlabels: []\n${D}`, "Launch"),
+    );
+    write(
+      root,
+      "tasks/launch/epic-a/epic-a.md",
+      md(
+        `type: epic\nstatus: todo\nid: epic-a\nparent: launch\ntitle: Epic A\nlabels: []\n${D}`,
+        "Epic A",
+      ),
+    );
+    write(
+      root,
+      "tasks/launch/epic-a/story-a/story-a.md",
+      md(
+        `type: story\nstatus: in_progress\nid: story-a\nparent: epic-a\ntitle: Story A\nlabels: []\n${D}`,
+        "Story A",
+      ),
+    );
+    for (let i = 1; i <= MAX_RISK_LEAVES + 2; i++) {
+      const id = `task-risk-${String(i).padStart(2, "0")}`;
+      write(
+        root,
+        `tasks/launch/epic-a/story-a/${id}.md`,
+        md(
+          `type: task\nstatus: todo\nid: ${id}\nparent: story-a\nlabels: [risk-security]\n${D}`,
+          "Risk",
+        ),
+      );
+    }
+
+    const { risk } = runReport({ cwd: root });
+    expect(risk.checked).toBe(MAX_RISK_LEAVES + 2);
+    expect(risk.leavesTotal).toBe(MAX_RISK_LEAVES + 2);
+    expect(risk.leaves).toHaveLength(MAX_RISK_LEAVES);
+
+    const human = runCli(["report"], root);
+    expect(human.status, human.stderr).toBe(0);
+    expect(human.stdout).toContain("… and 2 more");
+
+    const markdown = formatReportMarkdown(runReport({ cwd: root }), { date: "2026-10-15" });
+    expect(markdown).toContain("- … and 2 more");
+  });
+});
+
+describe("risk triage read surfaces (issue #871)", () => {
+  it("keeps the triage queryable in list and visible in show", () => {
+    const root = makeRiskTree();
+
+    const listing = runCli(["--json", "list", "--filter", "label:risk-security"], root);
+    expect(listing.status, listing.stderr).toBe(0);
+    const ids = (JSON.parse(listing.stdout) as { items: Array<{ id: string }> }).items.map(
+      (item) => item.id,
+    );
+    expect([...ids].sort()).toEqual([
+      "task-multi-trigger",
+      "task-security-accepted",
+      "task-security-gap",
+    ]);
+    expect(ids).not.toContain("task-routine");
+
+    const shown = runCli(["show", "task-security-gap"], root);
+    expect(shown.status, shown.stderr).toBe(0);
+    expect(shown.stdout).toContain("labels: risk-security");
   });
 });

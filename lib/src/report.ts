@@ -54,6 +54,8 @@ export type ReportResult = {
   blocked: ReportBlocked[];
   /** Report-only container hygiene (task-container-hygiene-check); see `containerHygiene`. */
   hygiene: ReportHygiene;
+  /** Report-only risk-triage audit (issue #871); see `riskAudit`. */
+  risk: ReportRisk;
 };
 
 /** A blocked leaf: reason is never empty (convention requires blocked_reason). */
@@ -106,6 +108,51 @@ export type ReportHygiene = {
 export const MAX_HYGIENE_OFFENDERS = 10;
 export const MAX_HYGIENE_OPEN_CONTAINERS = 5;
 
+/**
+ * The risk-triage convention (issue #871; `docs/engineering.md` §Review bar →
+ * Risk triage): a `risk-…` label records that a leaf hit a risk trigger, so its
+ * T0 self-certification default does not apply. Report-only here — the audit
+ * names the gaps, it never blocks. `risk-` is a reserved label prefix.
+ */
+export const RISK_LABEL_PREFIX = "risk-";
+
+/** True for a label the risk-triage convention reserves (`risk-security`, …). */
+export function isRiskLabel(label: string): boolean {
+  return label.startsWith(RISK_LABEL_PREFIX);
+}
+
+/** Cap on the risk-audit list — the same bounded-report discipline as hygiene. */
+export const MAX_RISK_LEAVES = 10;
+
+/**
+ * Report-only risk triage (issue #871): one entry per OPEN risk-triggered leaf
+ * — `task`/`bug` carrying at least one `risk-…` label — whose latest `accept:`
+ * state is not `accepted`. `self-accepted` counts as a gap: the convention asks
+ * for a human record, and the tracker's attribution is the only signal it has.
+ */
+export type ReportRiskLeaf = {
+  id: string;
+  type: "task" | "bug";
+  title: string;
+  status: "todo" | "in_progress" | "blocked";
+  /** The item's `risk-…` labels, in frontmatter order. */
+  labels: string[];
+  /** The latest `accept:` state — never `accepted` for a listed leaf. */
+  acceptance: AcceptanceState;
+  storyId: string | null;
+  epicId: string | null;
+};
+
+/** The `report` command's additive risk-triage section (schemaVersion 1, display only). */
+export type ReportRisk = {
+  /** Risk-labeled leaves examined (open or terminal). */
+  checked: number;
+  /** Open risk-triggered leaves without an `accepted` record, sorted by id, capped at `MAX_RISK_LEAVES`. */
+  leaves: ReportRiskLeaf[];
+  /** Full gap count before the cap (equals `leaves.length` when nothing was dropped). */
+  leavesTotal: number;
+};
+
 /** Container types (the items that can hold work); leaves are excluded. */
 const CONTAINER_TYPES: ReadonlySet<string> = new Set(["initiative", "epic", "story"]);
 /** Container types an open workstream can have: initiatives are roots, so only story/epic nest. */
@@ -130,6 +177,7 @@ export function aggregateReport(items: WorkItem[]): {
   groups: ReportGroup[];
   blocked: ReportBlocked[];
   hygiene: ReportHygiene;
+  risk: ReportRisk;
 } {
   const byId = itemsById(items);
 
@@ -206,7 +254,7 @@ export function aggregateReport(items: WorkItem[]): {
       };
     });
 
-  return { groups, blocked, hygiene: containerHygiene(items) };
+  return { groups, blocked, hygiene: containerHygiene(items), risk: riskAudit(items) };
 }
 
 /**
@@ -273,6 +321,51 @@ export function containerHygiene(items: WorkItem[]): ReportHygiene {
 }
 
 /**
+ * Report-only risk triage (issue #871): an OPEN `task`/`bug` leaf carrying a
+ * `risk-…` label is escalated out of T0 — it owes a recorded human `accept:`
+ * (T1) or a human-gated irreversible step (T2) — so a leaf still lacking an
+ * `accepted` record is a gap the audit names. It never gates: `report` stays
+ * exit 0 and `validate` is unchanged. Pure; reads already-loaded items.
+ *
+ * `checked` counts every risk-labeled leaf (terminal ones included) so the
+ * audit states its own denominator; only non-terminal leaves can be gaps.
+ */
+export function riskAudit(items: WorkItem[]): ReportRisk {
+  const byId = itemsById(items);
+  const riskLeaves = items.filter(
+    (item) => (item.type === "task" || item.type === "bug") && item.labels.some(isRiskLabel),
+  );
+  const leaves: ReportRiskLeaf[] = riskLeaves
+    .filter((leaf) => !TERMINAL_STATUSES.has(leaf.status))
+    .map((leaf) => {
+      const acceptance = classifyAcceptance(leaf.body, leaf.assignee);
+      return { leaf, acceptance };
+    })
+    .filter(({ acceptance }) => acceptance !== "accepted")
+    .map(({ leaf, acceptance }) => {
+      const story = leaf.parent ? byId.get(leaf.parent) : undefined;
+      const epic = story?.parent ? byId.get(story.parent) : undefined;
+      return {
+        id: leaf.id,
+        type: leaf.type as "task" | "bug",
+        title: titleOf(leaf),
+        status: leaf.status as ReportRiskLeaf["status"],
+        labels: leaf.labels.filter(isRiskLabel),
+        acceptance,
+        storyId: story?.id ?? null,
+        epicId: epic?.id ?? null,
+      };
+    })
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+  return {
+    checked: riskLeaves.length,
+    leaves: leaves.slice(0, MAX_RISK_LEAVES),
+    leavesTotal: leaves.length,
+  };
+}
+
+/**
  * Aggregate leaf (task/bug) statuses up the tree for display only.
  * Grouped by epic; every story gets a row (zeros when leafless);
  * cancelled leaves have their own explicit column. Never writes.
@@ -280,8 +373,8 @@ export function containerHygiene(items: WorkItem[]): ReportHygiene {
 export function runReport(opts: { cwd: string }): ReportResult {
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
-  const { groups, blocked, hygiene } = aggregateReport(loadItems(tasksDir));
-  return { root, groups, blocked, hygiene };
+  const { groups, blocked, hygiene, risk } = aggregateReport(loadItems(tasksDir));
+  return { root, groups, blocked, hygiene, risk };
 }
 
 /**
@@ -356,6 +449,37 @@ export function formatReportHygiene(hygiene: ReportHygiene): string {
 }
 
 /**
+ * The table's additive risk-triage block (issue #871): one summary line, one
+ * line per open risk-triggered leaf without human acceptance, bounded at
+ * `MAX_RISK_LEAVES`. Report-only display — the block never gates and the
+ * command still exits 0. Appended after the hygiene block by the CLI.
+ */
+export function formatReportRisk(risk: ReportRisk): string {
+  const checked = `${risk.checked} risk-labeled ${risk.checked === 1 ? "leaf" : "leaves"} checked`;
+  if (risk.leavesTotal === 0) {
+    return `risk: clean — no open risk-triggered leaf needs review escalation (${checked})\n`;
+  }
+  const noun = risk.leavesTotal === 1 ? "leaf" : "leaves";
+  const lines = [
+    `risk: ${risk.leavesTotal} open risk-triggered ${noun} without human acceptance (${checked})`,
+  ];
+  for (const leaf of risk.leaves) {
+    const where = [leaf.storyId, leaf.epicId]
+      .filter((part): part is string => Boolean(part))
+      .map((part) => sanitizeHumanTextUncapped(part))
+      .join(" ← ");
+    const scope = where ? ` — ${where}` : "";
+    const labels = leaf.labels.map((label) => sanitizeHumanTextUncapped(label)).join(", ");
+    lines.push(
+      `  ${sanitizeHumanTextUncapped(leaf.id)} (${leaf.type}, ${leaf.status}) — ${labels}; acceptance: ${leaf.acceptance}${scope}`,
+    );
+  }
+  const dropped = risk.leavesTotal - risk.leaves.length;
+  if (dropped > 0) lines.push(`  … and ${dropped} more`);
+  return `${lines.join("\n")}\n`;
+}
+
+/**
  * Standup markdown (task-report-markdown): per-epic progress lines plus a
  * blocked section with reasons. Completion is (done + cancelled) / total,
  * matching the story's read-only rollup definition. Pure tree data — no
@@ -422,6 +546,33 @@ export function formatReportMarkdown(result: ReportResult, opts: { date?: string
       );
     }
     const dropped = result.hygiene.offendersTotal - result.hygiene.offenders.length;
+    if (dropped > 0) lines.push(`- … and ${dropped} more`);
+    lines.push("");
+  }
+
+  // Additive risk-triage section (issue #871): the same bounded gaps the
+  // `--json` payload carries, in the standup export.
+  lines.push("## Risk", "");
+  const riskChecked = `${result.risk.checked} risk-labeled ${result.risk.checked === 1 ? "leaf" : "leaves"} checked`;
+  if (result.risk.leavesTotal === 0) {
+    lines.push(`_No open risk-triggered leaf needs review escalation (${riskChecked})._`, "");
+  } else {
+    const noun = result.risk.leavesTotal === 1 ? "leaf" : "leaves";
+    lines.push(
+      `- ${result.risk.leavesTotal} open risk-triggered ${noun} without human acceptance (${riskChecked})`,
+    );
+    for (const leaf of result.risk.leaves) {
+      const where = [leaf.storyId, leaf.epicId]
+        .filter((part): part is string => Boolean(part))
+        .map((part) => sanitizeHumanTextUncapped(part))
+        .join(" ← ");
+      const scope = where ? ` — ${where}` : "";
+      const labels = leaf.labels.map((label) => sanitizeHumanTextUncapped(label)).join(", ");
+      lines.push(
+        `- **${sanitizeHumanTextUncapped(leaf.id)}** (${leaf.type}, ${leaf.status}) — ${labels}; acceptance: ${leaf.acceptance}${scope}`,
+      );
+    }
+    const dropped = result.risk.leavesTotal - result.risk.leaves.length;
     if (dropped > 0) lines.push(`- … and ${dropped} more`);
     lines.push("");
   }
