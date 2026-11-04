@@ -1,6 +1,6 @@
 {
   "name": "arggon-manager",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Git-native project management CLI (ArggonManager)",
   "type": "module",
   "workspaces": [
@@ -54,7 +54,7 @@
     "node": ">=22.12.0"
   },
   "dependencies": {
-    "@arggondev/lib": "0.11.0",
+    "@arggondev/lib": "0.12.0",
     "commander": "^13.1.0"
   },
   "devDependencies": {

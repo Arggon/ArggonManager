@@ -6,6 +6,28 @@ All notable changes to ArggonManager are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0](https://github.com/Arggon/ArggonManager/compare/v0.11.0...v0.12.0) (2026-11-04)
+
+
+### Added
+
+* author create contracts and report rejected auto-commits ([#870](https://github.com/Arggon/ArggonManager/issues/870)) ([#877](https://github.com/Arggon/ArggonManager/issues/877)) ([9b5d5b9](https://github.com/Arggon/ArggonManager/commit/9b5d5b9783dc978a43d26ded71cd0d4ca70e9c22))
+* bind review verdicts to the reviewed revision ([#872](https://github.com/Arggon/ArggonManager/issues/872)) ([#880](https://github.com/Arggon/ArggonManager/issues/880)) ([ba78152](https://github.com/Arggon/ArggonManager/commit/ba781526320ab29aed9484d1a0059c331c2fb759))
+* escalate review oversight by risk triage ([#871](https://github.com/Arggon/ArggonManager/issues/871)) ([#875](https://github.com/Arggon/ArggonManager/issues/875)) ([3bd63a8](https://github.com/Arggon/ArggonManager/commit/3bd63a874a44e17b2aa8004cfbcad315506ad8f4))
+
+
+### Changed
+
+* **auto:** mark items done (PR [#873](https://github.com/Arggon/ArggonManager/issues/873) merged) ([#874](https://github.com/Arggon/ArggonManager/issues/874)) ([bd5c2be](https://github.com/Arggon/ArggonManager/commit/bd5c2beeab4847970b74f229e87ff45deda85a2e))
+* **auto:** mark items done (PR [#875](https://github.com/Arggon/ArggonManager/issues/875) merged) ([#876](https://github.com/Arggon/ArggonManager/issues/876)) ([b0dfd5f](https://github.com/Arggon/ArggonManager/commit/b0dfd5f6858a85977a9ec410eccda31ca2c8a820))
+* **auto:** mark items done (PR [#877](https://github.com/Arggon/ArggonManager/issues/877) merged) ([#878](https://github.com/Arggon/ArggonManager/issues/878)) ([c695dea](https://github.com/Arggon/ArggonManager/commit/c695dea8f4a2e8c557ee7309361e97120219679d))
+* **auto:** mark items done (PR [#879](https://github.com/Arggon/ArggonManager/issues/879) merged) ([#882](https://github.com/Arggon/ArggonManager/issues/882)) ([4a8807d](https://github.com/Arggon/ArggonManager/commit/4a8807d63cd263074aec0fad5a9f5f1f87cbc912))
+* **auto:** mark items done (PR [#880](https://github.com/Arggon/ArggonManager/issues/880) merged) ([#881](https://github.com/Arggon/ArggonManager/issues/881)) ([95c6ef1](https://github.com/Arggon/ArggonManager/commit/95c6ef1748f034f58abdfe9eacd182d3ba0eb511))
+* cut methodology to a budgeted operational core ([#873](https://github.com/Arggon/ArggonManager/issues/873)) ([d6c4899](https://github.com/Arggon/ArggonManager/commit/d6c4899c73f93d7d68d4077f1a86eafcf3bab75b))
+* **deps-dev:** bump vite from 8.2.2 to 8.3.5 ([#864](https://github.com/Arggon/ArggonManager/issues/864)) ([72ed71a](https://github.com/Arggon/ArggonManager/commit/72ed71a5162db88083bf7e8866b14e2b697bfc27))
+* **deps:** bump @vitest/mocker and vitest ([#865](https://github.com/Arggon/ArggonManager/issues/865)) ([35423db](https://github.com/Arggon/ArggonManager/commit/35423dbcae4b6f709b260e07d6fde525351a7615))
+* **workflow:** publish one canonical agent workflow and generate its copies ([#869](https://github.com/Arggon/ArggonManager/issues/869)) ([#879](https://github.com/Arggon/ArggonManager/issues/879)) ([dbbdc34](https://github.com/Arggon/ArggonManager/commit/dbbdc34ce93959d54ecefebf0754bd526edf3ff4))
+
 ## [0.11.0](https://github.com/Arggon/ArggonManager/compare/v0.10.0...v0.11.0) (2026-11-03)
 
 Commits on `main` since `v0.10.0` through [#866](https://github.com/Arggon/ArggonManager/pull/866) merge `1c33f8a6`. Board-only `chore(tasks):` noise omitted. Semver: **minor** (new surfaces since 0.10.0), not patch.
