@@ -25,7 +25,7 @@ Source: https://github.com/Arggon/ArggonManager/issues/869
 - [x] The `arggon instructions` copy-paste snippet, the adopter AGENTS/CONTRIBUTING/copilot templates and the bundled skill are generated from or link to that contract.
 - [x] Root entrypoints (`AGENTS.md`, `CONTRIBUTING.md`, `.github/copilot-instructions.md`) no longer teach a bare agent claim or pre-merge completion.
 - [x] A check-only drift command and a test fail on stale copies and on the old phrasing, and CI runs the drift check.
-- [ ] Verification: workflow/instructions/init-docs tests, lint, `arggon validate` and the context-budget check pass.
+- [x] Verification: workflow/instructions/init-docs tests, lint, `arggon validate` and the context-budget check pass.
 
 ## Notes
 
