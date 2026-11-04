@@ -3,11 +3,13 @@ type: task
 status: todo
 id: task-publish-canonical-agent-workflow
 title: Publish one canonical agent workflow contract and generate its copies
+branch: agent/single-agent-workflow-fe86b2bdf75c
 parent: story-docs-sync
 labels: []
 created: "2026-11-04"
 updated: "2026-11-04"
 issue: 869
+worktree_path: /home/arggon/.dsh/state/superagent/work/single-agent-workflow-fe86b2bdf75c
 ---
 ## Context
 
