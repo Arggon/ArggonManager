@@ -554,9 +554,7 @@ describe("opencode seam: fresh init", () => {
       /\s+/g,
       " ",
     );
-    expect(flat).toContain(
-      "**Claim before dispatch (task-coordinator-claims-through-native-start):**",
-    );
+    expect(flat).toContain("**Claim before dispatch:**");
     expect(flat).toContain("tools.arggon.start({ id, assignee, worktree: true })");
     expect(flat).not.toContain("each worker claims its item");
     expect(flat).not.toContain("Claim **your** item (`in_progress` + assignee)");
@@ -577,9 +575,7 @@ describe("opencode seam: fresh init", () => {
     // The skill now routes to the canonical contract, not a divergent copy.
     expect(skill).toContain("`ArggonManager/docs/agents.md` §Orchestration");
     const core = flat("ArggonManager/docs/agents.md");
-    expect(core).toContain(
-      "**Claim before dispatch (task-coordinator-claims-through-native-start):**",
-    );
+    expect(core).toContain("**Claim before dispatch:**");
     expect(core).toContain("tools.arggon.start({ id, assignee, worktree: true })");
     expect(skill).not.toContain("Claim **your** item (`in_progress` + assignee)");
     // 2. the maker contract: dispatched means already-claimed, never re-claim

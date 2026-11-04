@@ -18,7 +18,7 @@ source sections remain authoritative; do not edit these copies by hand.
 
 <!-- arggon:generated-excerpt start: dispatch -->
 
-- **Claim before dispatch (task-coordinator-claims-through-native-start):** the lead calls `tools.arggon.start({ id, assignee, worktree: true })` before launching a maker, and passes the returned worktree path. Stamp the writer's role id, never the product owner's login. Never dispatch a maker as first claimant or hold an idle claim; unclaim **and release** unused worktrees.
+- **Claim before dispatch:** the lead calls `tools.arggon.start({ id, assignee, worktree: true })` before launching a maker, and passes the returned worktree path. Stamp the writer's role id, never the product owner's login. Never dispatch a maker as first claimant or hold an idle claim; unclaim **and release** unused worktrees.
 - Launch makers foreground in headless OpenCode runs. Each maker confirms its existing claim and works only in the handed-off worktree; it does not re-claim, replace a live writer's stamp, or flip done.
 
 <!-- arggon:generated-excerpt end: dispatch -->
