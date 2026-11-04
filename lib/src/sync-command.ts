@@ -1,11 +1,35 @@
 import { execFileSync } from "node:child_process";
+import { basename } from "node:path";
 import { findBranchClaims } from "./branch-claims.js";
 import { loadItems } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
-import { getOpenPRs } from "./get-open-prs.js";
-import { matchItem, toSyncResult, type SyncFilled, type SyncResult } from "./sync-types.js";
+import { getOpenPRsWithRepo } from "./get-open-prs.js";
+import {
+  readCompareChangedFiles,
+  resolveReviewFreshness,
+  type ReviewFreshness,
+} from "./review-freshness.js";
+import {
+  matchItem,
+  toSyncResult,
+  type PRInfo,
+  type SyncFilled,
+  type SyncMatchResult,
+  type SyncResult,
+} from "./sync-types.js";
 import { runUpdate } from "./update.js";
-import { classifyVerdicts, type VerdictState } from "./verdict.js";
+import { classifyVerdicts, latestVerdict, type VerdictState } from "./verdict.js";
+
+/**
+ * The head OID of the single PR a match resolved to, or null when the match
+ * does not identify one PR (pending / ambiguous) or gh omitted the field. A
+ * null head makes freshness `unbound`, never fresh.
+ */
+function matchedHeadOid(match: SyncMatchResult, prs: PRInfo[]): string | null {
+  if (match.status !== "matched" && match.status !== "fillable") return null;
+  const head = prs.find((pr) => pr.number === match.prNumber)?.headRefOid ?? "";
+  return head.length > 0 ? head : null;
+}
 
 /**
  * Reconcile the tracker with the repo's open GitHub PRs. Check mode (the default)
@@ -30,13 +54,18 @@ export function runSync(
   const cwd = opts.cwd || process.cwd();
 
   let items;
-  let prs;
+  let prs: PRInfo[];
   let root: string;
+  let repoSlug: { owner: string; repo: string };
+  let trackerPath = "";
   try {
     const tasksDir = findTasksDir(cwd);
     root = repoRootFromTasks(tasksDir);
+    trackerPath = basename(tasksDir);
     items = loadItems(tasksDir);
-    prs = getOpenPRs(opts.repo || null, cwd, execGh);
+    const resolved = getOpenPRsWithRepo(opts.repo || null, cwd, execGh);
+    prs = resolved.prs;
+    repoSlug = resolved.repo;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return toSyncResult([], mode, null, [msg]);
@@ -86,6 +115,30 @@ export function runSync(
     verdicts[match.itemId] = classifyVerdicts(item.body);
   }
 
+  // Review freshness (issue #872): bind each verdict to the revision it
+  // recorded and compare it with the PR head. The verdict's own tracker commit
+  // lives under the tracker root, so a tracker-only `reviewed..head` diff
+  // stays fresh while any code change after the approval makes it stale. The
+  // comparison is read from GitHub, so it does not depend on the PR head being
+  // fetched locally; when it cannot be resolved the state is `unbound`, never
+  // fresh. Report-only: this never gates matching or the exit code.
+  const reviewFreshness: Record<string, ReviewFreshness> = {};
+  for (const match of reported) {
+    if (match.status === "no_pr") continue;
+    if (verdicts[match.itemId] === "none") continue;
+    const item = byId.get(match.itemId)!;
+    reviewFreshness[match.itemId] = resolveReviewFreshness({
+      reviewed: latestVerdict(item.body)?.reviewed ?? null,
+      head: matchedHeadOid(match, prs),
+      trackerPath,
+      readChangedFiles: (base, head) =>
+        readCompareChangedFiles(repoSlug.owner, repoSlug.repo, base, head, execGh),
+    });
+  }
+  const reassessmentRequired = Object.keys(reviewFreshness).filter(
+    (id) => reviewFreshness[id]!.freshness === "stale",
+  );
+
   // Branch-resident claims (bug-claim-pool-computed-from-main-misses-branch-
   // claims): the claim commit rides the item branch, so this tree's copy of a
   // claimed item still reads todo/unassigned until the branch merges. Read the
@@ -102,5 +155,7 @@ export function runSync(
     verdicts,
     branchClaims.claims,
     branchClaims.errors,
+    reviewFreshness,
+    reassessmentRequired,
   );
 }

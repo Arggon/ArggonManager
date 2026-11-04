@@ -179,7 +179,26 @@ When selecting or running the applicable end-to-end smoke gate: [read details](.
 
 ### Review verdicts (comment convention)
 
-Verdicts land **on the item** with `arggon comment <id>` — never as GitHub PR comments. A verdict comment starts with a bounded header line, `verdict: approve` or `verdict: request-changes` (optionally followed by a short scope), and then the evidence list: commands run, expected vs observed. This is documentation, not schema — human-written prose. `arggon sync --json` reads it report-only and classifies every item it reconciles with an open PR as `approved` (latest verdict is an approve), `changes-requested` (the latest verdict is a request-changes) or `none`; a later `verdict: approve` supersedes an earlier `verdict: request-changes`. A blocking merge gate is deliberately out of scope until the report proves low-noise.
+Verdicts land **on the item** with `arggon comment <id>` — never as GitHub PR comments. A verdict comment starts with a bounded header line, `verdict: approve` or `verdict: request-changes` (optionally followed by a short scope), and then the evidence list: commands run, expected vs observed. This is documentation, not schema — human-written prose. `arggon sync --json` reads it report-only and classifies every item it reconciles with an open PR as `approved` (latest verdict is an approve), `changes-requested` (the latest verdict is a request-changes) or `none`; a later `verdict: approve` supersedes an earlier `verdict: request-changes`.
+
+**Bind the verdict to the revision it reviewed.** Add an optional bounded second header line naming the commit the verdict applies to:
+
+```
+### 2026-09-29 @Reviewer
+verdict: approve
+reviewed: abc1234
+- commands run, expected vs observed
+```
+
+`reviewed:` takes a 7–40 character hexadecimal commit id (short or full, case-insensitive) in the same dated comment as the verdict; only its first occurrence counts. A verdict with no `reviewed:` line remains readable but is **unbound**: it records no revision, so sync cannot show that it still covers the PR head.
+
+`arggon sync --json` reports the binding separately from the verdict in `reviewFreshness` (per item carrying a verdict): `reviewed_revision`, the PR's current `head_revision`, and `freshness`:
+
+- `fresh` — the reviewed revision is the head, or every path changed between them lives under the tracker root. The verdict's own tracker commit (the `arggon comment` that recorded it) therefore does not invalidate the verdict it records.
+- `stale` — at least one non-tracker path changed after the reviewed revision. An approval no longer covers the code: **reassessment is required** before it reads as current, and the item id is also listed in `reassessmentRequired`.
+- `unbound` — no `reviewed:` revision was recorded, or the reviewed..head comparison could not be resolved. Unbound is never reported as fresh.
+
+The comparison is read from GitHub's compare API, so freshness does not depend on the PR head being fetched into the local checkout; a comparison that cannot be resolved is `unbound`, never fresh. Like the verdict classification, freshness is **report-only**: it never gates matching or the sync exit code. A new `verdict: approve` recording the new head returns the item to `fresh`.
 
 Example:
 

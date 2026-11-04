@@ -26,16 +26,40 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
 
 type MockFn = ReturnType<typeof vi.fn>;
 
+type TestPr = {
+  number: number;
+  title: string;
+  headRefName: string;
+  url: string;
+  headRefOid?: string;
+};
+
 /** Create a mock for the gh executor that returns the given PR list. */
-function createGhMock(
-  prs: Array<{ number: number; title: string; headRefName: string; url: string }>,
-): MockFn {
+function createGhMock(prs: Array<TestPr>): MockFn {
   return vi.fn((cmd: string, args: string[]) => {
     if (cmd === "gh" && args[0] === "pr" && args[1] === "list") {
       return JSON.stringify(prs);
     }
     if (cmd === "git" && args[0] === "remote" && args[1] === "get-url" && args[2] === "origin") {
       return "https://github.com/test/test.git";
+    }
+    throw new Error(`Unexpected command: ${cmd} ${args.join(" ")}`);
+  });
+}
+
+/**
+ * Mock for review-freshness tests: the PR list plus the GitHub compare payload
+ * `sync` reads when the reviewed revision differs from the PR head. A null
+ * payload makes the comparison fail (the unbound path).
+ */
+function createFreshnessGhMock(prs: Array<TestPr>, compareFiles: string[] | null): MockFn {
+  return vi.fn((cmd: string, args: string[]) => {
+    if (cmd === "gh" && args[0] === "pr" && args[1] === "list") {
+      return JSON.stringify(prs);
+    }
+    if (cmd === "gh" && args[0] === "api" && String(args[1]).includes("/compare/")) {
+      if (compareFiles === null) throw new Error("compare unavailable");
+      return JSON.stringify({ files: compareFiles.map((filename) => ({ filename })) });
     }
     throw new Error(`Unexpected command: ${cmd} ${args.join(" ")}`);
   });
@@ -569,6 +593,144 @@ describe("sync command", () => {
     );
 
     expect(result.verdicts).toEqual({});
+  });
+
+  // Review freshness (issue #872): the verdict's `reviewed:` revision is
+  // compared with the PR head. A code commit after the approval makes it
+  // stale (reassessment required); the verdict's own tracker commit does not.
+  describe("review freshness (issue #872)", () => {
+    const REVIEWED = "abc1234";
+    const PR_HEAD = "def4567890abcdef1234567890abcdef12345678";
+
+    function approveTask(dir: string, id: string, reviewed: string): string {
+      const path = createTask(dir, id, `feat/${id}`);
+      appendComment(path, "2026-09-28", `verdict: approve\nreviewed: ${reviewed}`);
+      return path;
+    }
+
+    function prFor(id: string, headRefOid: string): TestPr {
+      return {
+        number: 501,
+        title: `PR ${id}`,
+        headRefName: `feat/${id}`,
+        headRefOid,
+        url: `https://github.com/test/test/pull/501`,
+      };
+    }
+
+    it("reports stale / reassessment required after a code commit", () => {
+      const dir = createTestRepo();
+      approveTask(dir, "task-approved", REVIEWED);
+
+      const execGh = createFreshnessGhMock([prFor("task-approved", PR_HEAD)], [
+        "ArggonManager/arggon-manager/cli/x/task-approved.md",
+        "lib/src/verdict.ts",
+      ]);
+      const result = runSync(
+        { check: true, cwd: dir, repo: "test/test" },
+        execGh as unknown as typeof execFileSync,
+      );
+
+      expect(result.verdicts).toEqual({ "task-approved": "approved" });
+      expect(result.reviewFreshness).toEqual({
+        "task-approved": {
+          reviewed_revision: REVIEWED,
+          head_revision: PR_HEAD,
+          freshness: "stale",
+          reason: null,
+        },
+      });
+      expect(result.reassessmentRequired).toEqual(["task-approved"]);
+      // Report-only: freshness never gates matching or the exit code.
+      expect(result.exit_code).toBe(0);
+      expect(result.matched).toEqual(["task-approved"]);
+      expect(execGh).toHaveBeenCalledTimes(2);
+    });
+
+    it("stays fresh when only the verdict's tracker commit followed the review", () => {
+      const dir = createTestRepo();
+      approveTask(dir, "task-tracker-only", REVIEWED);
+
+      const execGh = createFreshnessGhMock([prFor("task-tracker-only", PR_HEAD)], [
+        "ArggonManager/arggon-manager/cli/x/task-tracker-only.md",
+      ]);
+      const result = runSync(
+        { check: true, cwd: dir, repo: "test/test" },
+        execGh as unknown as typeof execFileSync,
+      );
+
+      expect(result.reviewFreshness["task-tracker-only"]).toEqual({
+        reviewed_revision: REVIEWED,
+        head_revision: PR_HEAD,
+        freshness: "fresh",
+        reason: null,
+      });
+      expect(result.reassessmentRequired).toEqual([]);
+      expect(result.exit_code).toBe(0);
+    });
+
+    it("returns to fresh when a new approval records the new head", () => {
+      const dir = createTestRepo();
+      const path = createTask(dir, "task-reapproved", "feat/task-reapproved");
+      appendComment(path, "2026-09-28", `verdict: approve\nreviewed: ${REVIEWED}`);
+      // The code changed; a new approval records the new head.
+      appendComment(path, "2026-10-02", `verdict: approve\nreviewed: ${PR_HEAD}`);
+
+      const execGh = createFreshnessGhMock([prFor("task-reapproved", PR_HEAD)], null);
+      const result = runSync(
+        { check: true, cwd: dir, repo: "test/test" },
+        execGh as unknown as typeof execFileSync,
+      );
+
+      expect(result.reviewFreshness["task-reapproved"]).toEqual({
+        reviewed_revision: PR_HEAD,
+        head_revision: PR_HEAD,
+        freshness: "fresh",
+        reason: null,
+      });
+      expect(result.reassessmentRequired).toEqual([]);
+      // Same revision: no compare call, only the PR list.
+      expect(execGh).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports a legacy verdict with no revision as unbound, not fresh", () => {
+      const dir = createTestRepo();
+      const path = createTask(dir, "task-legacy", "feat/task-legacy");
+      appendComment(path, "2026-09-28", "verdict: approve");
+
+      const execGh = createFreshnessGhMock([prFor("task-legacy", PR_HEAD)], null);
+      const result = runSync(
+        { check: true, cwd: dir, repo: "test/test" },
+        execGh as unknown as typeof execFileSync,
+      );
+
+      expect(result.reviewFreshness["task-legacy"]).toEqual({
+        reviewed_revision: null,
+        head_revision: PR_HEAD,
+        freshness: "unbound",
+        reason: "no reviewed revision recorded",
+      });
+      expect(result.reassessmentRequired).toEqual([]);
+    });
+
+    it("reports unbound, never fresh, when the comparison is unavailable", () => {
+      const dir = createTestRepo();
+      approveTask(dir, "task-unverifiable", REVIEWED);
+
+      const execGh = createFreshnessGhMock([prFor("task-unverifiable", PR_HEAD)], null);
+      const result = runSync(
+        { check: true, cwd: dir, repo: "test/test" },
+        execGh as unknown as typeof execFileSync,
+      );
+
+      expect(result.reviewFreshness["task-unverifiable"]).toMatchObject({
+        reviewed_revision: REVIEWED,
+        head_revision: PR_HEAD,
+        freshness: "unbound",
+        reason: "reviewed..head comparison unavailable",
+      });
+      expect(result.reassessmentRequired).toEqual([]);
+    });
   });
 
   // bug-claim-pool-computed-from-main-misses-branch-claims, box 4 regression:

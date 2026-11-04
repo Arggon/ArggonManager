@@ -917,6 +917,9 @@ describe("sync stays byte-identical", () => {
       "matched",
       "mode",
       "pending",
+      // issue #872: additive report-only review-freshness fields.
+      "reassessmentRequired",
+      "reviewFreshness",
       "suggestions",
       "unmatched",
       "verdicts",
