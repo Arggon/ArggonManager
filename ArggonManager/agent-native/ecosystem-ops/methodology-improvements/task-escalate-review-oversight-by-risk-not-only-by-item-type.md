@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-escalate-review-oversight-by-risk-not-only-by-item-type
 title: "Escalate review oversight by risk, not only by item type"
 assignee: arggon-superagent
@@ -9,11 +9,9 @@ parent: methodology-improvements
 labels: [methodology, agents]
 created: "2026-11-04"
 updated: "2026-11-04"
-claimed_at: "2026-11-04T18:33:42.521Z"
 issue: 871
 worktree_path: /home/arggon/.dsh/state/superagent/work/risk-based-escalation-e8713e4ab5af
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-escalate-review-oversight-by-risk-not-only-by-item-type.md
   Leaves live only under a story. id is the filename stem: task-escalate-review-oversight-by-risk-not-only-by-item-type.
