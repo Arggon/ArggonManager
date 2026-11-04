@@ -1,14 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-cut-methodology-reading-to-an-operational-core
 title: Cut methodology reading to an operational core
+assignee: arggon-superagent
+branch: agent/methodology-operational-core-ac4110cc6356
 parent: methodology-improvements
 labels: []
-branch: agent/methodology-operational-core-ac4110cc6356
-worktree_path: /home/arggon/.dsh/state/superagent/work/methodology-operational-core-ac4110cc6356
 created: "2026-11-04"
 updated: "2026-11-04"
+claimed_at: "2026-11-04T12:06:14.567Z"
+worktree_path: /home/arggon/.dsh/state/superagent/work/methodology-operational-core-ac4110cc6356
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-cut-methodology-reading-to-an-operational-core.md
