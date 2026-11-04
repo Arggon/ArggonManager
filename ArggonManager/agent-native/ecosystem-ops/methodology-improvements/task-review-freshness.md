@@ -23,13 +23,13 @@ This task binds the verdict to the revision it reviewed and reports that binding
 
 ## Acceptance
 
-- [ ] `verdict: approve` can carry a reviewed revision, and the parser round-trips it; verdicts without one remain readable as `unbound`.
-- [ ] `sync --json` fetches the PR head and reports the reviewed revision, the head revision, and a freshness state.
-- [ ] An approval followed by a code commit reports `stale` / reassessment-required.
-- [ ] An approval followed only by its own tracker commit remains `fresh`.
-- [ ] A new approval at the new head returns to `fresh`.
-- [ ] `ArggonManager/docs/engineering.md` §Review verdicts and the JSON output docs describe the new fields and the staleness rule.
-- [ ] Tests cover approve → code change → stale, approve → tracker-only commit → fresh, and legacy unbound verdicts.
+- [x] `verdict: approve` can carry a reviewed revision, and the parser round-trips it; verdicts without one remain readable as `unbound`.
+- [x] `sync --json` fetches the PR head and reports the reviewed revision, the head revision, and a freshness state.
+- [x] An approval followed by a code commit reports `stale` / reassessment-required.
+- [x] An approval followed only by its own tracker commit remains `fresh`.
+- [x] A new approval at the new head returns to `fresh`.
+- [x] `ArggonManager/docs/engineering.md` §Review verdicts and the JSON output docs describe the new fields and the staleness rule.
+- [x] Tests cover approve → code change → stale, approve → tracker-only commit → fresh, and legacy unbound verdicts.
 
 ## Notes
 
