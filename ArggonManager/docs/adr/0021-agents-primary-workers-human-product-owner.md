@@ -296,6 +296,23 @@ with early-2025 tools, time lost to reviewing, prompting and waiting; follow-up
 weak evidence) is the reason: human attention is the scarce input, so the model must
 reduce per-item human cost, never add one.
 
+> **Amendment (2026-11-04, issue #871): T0 is conditional on a risk triage.** The
+> decision above is unchanged for routine leaves — they stay agent-self-certified and
+> owe no product-owner review per leaf PR. What the original text did not name is that
+> the default followed an item's **type**, so a one-line auth, crypto, destructive
+> migration, public-schema, CI-permission or billing change was also "T0". A
+> `task`/`bug` leaf that hits a risk trigger now escalates even when the diff is small:
+> T1 (recorded human acceptance plus the authenticated GitHub review the project
+> declares) for security, compatibility and supply-chain triggers; T2 for destructive
+> or otherwise irreversible steps, where a person runs or approves the step. The
+> trigger is recorded as a `risk-…` label; the table and the
+> authenticated-versus-recorded rule live in `docs/engineering.md` §Review bar → Risk
+> triage, and the report-only audit is `report --json`'s `risk` block. The tracker
+> `accept:` artifact in §4 is unchanged — still attributed, never authenticated, never
+> a gate — and now also records a risk-triggered leaf's acceptance. The "cap" paragraph
+> above is amended accordingly: product-owner touchpoints are bounded to containers,
+> risk-triggered leaves, waivers and irreversible steps.
+
 ### 4. One recorded artifact: the product acceptance
 
 A bounded, author-attributed comment header on a container item, exactly mirroring

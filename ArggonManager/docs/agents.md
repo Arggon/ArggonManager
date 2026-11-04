@@ -103,7 +103,7 @@ Operational **done** means all of the following:
 2. The completing PR is **merged**, or the completing change is on the default branch.
 3. The delivery lead runs `arggon update <id> --status done`; `updated` is refreshed automatically. Claim first: do not jump `todo` → `done`.
 
-Never claim completion before the merge. The kernel also refuses a leaf's done flip while an open PR targets its branch. Product acceptance is separate: use the canonical [promotion policy](./engineering.md#product-acceptance-product-owner), not a substitute for honest acceptance ticks. Human-only overrides are in the [authority map](./engineering.md#roles-and-authority); an agent never self-waives.
+Never claim completion before the merge. The kernel also refuses a leaf's done flip while an open PR targets its branch. Product acceptance is separate: use the canonical [promotion policy](./engineering.md#product-acceptance-product-owner), not a substitute for honest acceptance ticks. A risk-triggered leaf is **not** routine T0 — record its `risk-…` label and follow the [risk triage](./engineering.md#product-acceptance-product-owner) escalation before merge. Human-only overrides are in the [authority map](./engineering.md#roles-and-authority); an agent never self-waives.
 
 Terminal updates can cascade to ancestors only when their subtree is terminal and their own acceptance permits completion. Use `--no-cascade` for administrative close-out that must not complete product containers. [Container rules](./convention.md#parent-status) carry the schema detail. Don't model administrative leaves as a product container's sole child.
 

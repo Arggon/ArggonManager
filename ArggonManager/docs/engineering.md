@@ -115,17 +115,31 @@ A PR merges only when **all** applicable bars pass:
 - Behavior matches product intent and is shippable.
 - The product owner may bounce a change that is technically clean.
 
-**Promotion policy — how deep product-owner review goes per class of work** (ADR 0021 §3; content fixed by [spec promotion-policy-018](./specs/spec-promotion-policy-018.md)). A written, agreed-in-advance tiered review path keeps human attention the scarce input it is: leaves are agent-owned end to end, so no product-owner review per leaf PR.
+**Promotion policy — how deep product-owner review goes per class of work** (ADR 0021 §3; content fixed by [spec promotion-policy-018](./specs/spec-promotion-policy-018.md)). A written, agreed-in-advance tiered review path keeps human attention the scarce input it is: routine leaves are agent-owned end to end, so no product-owner review per routine leaf PR.
 
-| Tier | Applies to                                          | Who accepts                                                                               | Blocking?                     |
-| ---- | --------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------- |
-| T0   | `task` / `bug` leaves                               | the agent self-certifies on the review-bar evidence plus the project's verification gates | no — and the **default**      |
-| T1   | `story` containers                                  | the product owner, recorded as an `accept:` comment                                       | no — recorded, never gated    |
-| T2   | the four irreversible powers (§Roles and authority) | a human, already structurally gated; the acceptance records the why                       | yes — by ADR 0015 / TTY gates |
+| Tier | Applies to                                          | Who accepts                                                                                             | Blocking?                                                                                |
+| ---- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| T0   | `task` / `bug` leaf with **no risk trigger**        | the agent self-certifies on the review-bar evidence plus the project's verification gates               | no — and the **default**                                                                 |
+| T1   | `story` containers, and risk-triggered leaves       | the product owner or a named human reviewer, recorded as an `accept:` comment                           | the record never gates; a risk-triggered leaf also needs the authenticated GitHub review |
+| T2   | the four irreversible powers, and irreversible risk | a human, gated structurally or as the operator of the irreversible step; the acceptance records the why | yes — ADR 0015 / TTY gates, or the human-run irreversible step                           |
 
-A repository with **no product owner is compliant by default**: T0 applies, nothing is blocked, and every surface stays silent unless the project arms the convention itself. There is no SLA and no product-owner-blocked status, so an absent product owner can never wedge a container's children — only its bookkeeping.
+**Risk triage — the T0 exception.** T0 is the default only while a leaf hits no risk trigger. A triggered leaf is escalated even when the diff is one line: **a small diff never lowers the tier.** Record every matching `risk-…` label on the item when it is created or claimed (`create --labels risk-security`, or `update --labels …`; no trigger needs no label) so the triage is visible in `show`, in `list --json` and `list --filter "label:risk-security"`, and in the PR.
 
-**The record (bounded, mirrors the verdict convention).** A product acceptance is a comment on the item whose first acceptance-looking line is the header:
+| Trigger label          | Hits when the change touches                                                                  | Escalation                                                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `risk-security`        | authentication/authorization, crypto, secrets, PII, untrusted-input parsing, a trust boundary | T1 recorded acceptance **plus** an authenticated GitHub review before merge                         |
+| `risk-destructive`     | data deletion, a destructive migration, an irreversible backfill, force operations            | **T2**: a person runs or approves the irreversible step; the acceptance records why                 |
+| `risk-compatibility`   | a public API, schema, wire-format or protocol change; any breaking change                     | T1 recorded acceptance **plus** an authenticated GitHub review before merge                         |
+| `risk-supply-chain`    | dependency sources, CI permissions, release/publish, signing                                  | T1 recorded acceptance **plus** an authenticated GitHub review before merge                         |
+| `risk-safety-critical` | billing, payments, regulated or safety-relevant behavior                                      | T1 recorded acceptance **plus** an authenticated GitHub review before merge; **T2** if irreversible |
+
+**Which gate is authenticated, which is recorded.** The tracker has no identity, so an `accept:` comment is a **recorded** artifact — attributed (an approval by the item's own assignee is `self-accepted`), never authenticated, and never a merge gate on its own. The **authenticated** gate is the project's GitHub review: the PR template asks "Does this hit a risk trigger? Which one?", and for `risk-security`, `risk-compatibility` and `risk-supply-chain` a named human reviewer — CODEOWNERS (`.github/CODEOWNERS`) requests one — must approve the PR before merge; the agent that wrote the change does not approve it. The tracker acceptance stays the durable record of _why_. T2's irreversible steps keep the structural gates of §Roles and authority.
+
+**The audit (report-only, first iteration).** `arggon report --json` carries `risk: { checked, leaves, leavesTotal }` — every open `risk-…`-labeled leaf whose latest `accept:` state is not `accepted`, with its story/epic chain. The human table and the markdown standup print the same bounded block; nothing gates on it and `report` still exits 0. This is how the policy is measured before any gate exists.
+
+A repository with **no product owner is compliant by default**: routine leaves stay T0, the tracker acceptance never blocks, and every opt-in surface stays silent unless the project arms the convention itself. A risk-triggered leaf still owes the record above; where the project declares no authenticated reviewer the missing record is reported, not enforced. There is no SLA and no product-owner-blocked status, so an absent product owner can never wedge a container's children — only its bookkeeping.
+
+**The record (bounded, mirrors the verdict convention).** A product acceptance is a comment on the item — a container, or a risk-triggered leaf — whose first acceptance-looking line is the header:
 
 ```
 ### 2026-10-04 @gonzalo
@@ -135,7 +149,7 @@ accept: approve
 
 `accept: approve` or `accept: changes-requested`, optionally followed by a short scope in parentheses, then the evidence list; a later `approve` supersedes an earlier `changes-requested`. Prose, documentation, not schema.
 
-**Never a gate.** The tracker has no identity — the session id is correlation metadata only (`agents.md` §MCP server) — so an acceptance cannot be authenticated; a gate built on it would be forgeable or unusable, and both are worse than none. An acceptance written by the item's own assignee is reported as self-accepted rather than blocked. [spec promotion-policy-018](./specs/spec-promotion-policy-018.md) specifies the read-only surfaces that classify it (`report` / `show` per container, plus one opt-in `spec analyze` finding); none of them gates a transition, ever.
+**Never a gate.** The tracker has no identity — the session id is correlation metadata only (`agents.md` §MCP server) — so an acceptance cannot be authenticated; a gate built on it would be forgeable or unusable, and both are worse than none. An acceptance written by the item's own assignee is reported as self-accepted rather than blocked. [spec promotion-policy-018](./specs/spec-promotion-policy-018.md) specifies the read-only surfaces that classify it (`report` per container and for the risk audit, `show` per item, plus one opt-in `spec analyze` finding); none of them gates a transition, ever.
 
 The **request** that precedes an acceptance — how a decision is asked, the six-field brief and its `decide:`/`decided:` grammar, the routing rule and the answer's report-only surface — is §Roles and authority → The decision brief (ADR 0026). A brief never replaces the `accept:` record above: the one is the request, the other the answer.
 

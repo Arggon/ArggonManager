@@ -312,7 +312,14 @@ export { runList } from "./list.js";
 export type { ListOptions, ListResult } from "./list.js";
 export { runShow, showBoundedParts } from "./show.js";
 export type { ShowComment, ShowOptions, ShowResult } from "./show.js";
-export { aggregateReport, completedOf, containerHygiene, runReport } from "./report.js";
+export {
+  aggregateReport,
+  completedOf,
+  containerHygiene,
+  isRiskLabel,
+  riskAudit,
+  runReport,
+} from "./report.js";
 export type {
   ReportBlocked,
   ReportContainer,
@@ -321,9 +328,16 @@ export type {
   ReportHygieneOffender,
   ReportHygieneOpenContainer,
   ReportResult,
+  ReportRisk,
+  ReportRiskLeaf,
   StatusCounts,
 } from "./report.js";
-export { MAX_HYGIENE_OFFENDERS, MAX_HYGIENE_OPEN_CONTAINERS } from "./report.js";
+export {
+  MAX_HYGIENE_OFFENDERS,
+  MAX_HYGIENE_OPEN_CONTAINERS,
+  MAX_RISK_LEAVES,
+  RISK_LABEL_PREFIX,
+} from "./report.js";
 export { runTrend } from "./trend.js";
 export type { RunTrendOptions, TrendCycleTime, TrendResult, TrendWeek } from "./trend.js";
 export { isoWeekKey, parseLog, parseSince } from "./trend.js";
@@ -553,7 +567,12 @@ export {
 } from "./tracker-commit.js";
 export { formatListTable, resolveCurrentLogin } from "./list.js";
 export { DEFAULT_TAIL_COMMENTS, renderShowText } from "./show.js";
-export { formatReportHygiene, formatReportMarkdown, formatReportTable } from "./report.js";
+export {
+  formatReportHygiene,
+  formatReportMarkdown,
+  formatReportRisk,
+  formatReportTable,
+} from "./report.js";
 export { formatTrendMarkdown, formatTrendTable } from "./trend.js";
 export { formatValidateHuman } from "./validate.js";
 export { ghPrListJson } from "./get-open-prs.js";

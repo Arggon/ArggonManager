@@ -4083,10 +4083,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.liveContextRegion = exports.liveAcceptanceUnchecked = exports.liveAcceptanceRows = exports.liveAcceptanceRegion = exports.liveAcceptanceCriteria = exports.itemsById = exports.acceptanceUnchecked = exports.acceptanceRows = exports.acceptanceGate = exports.acceptanceCriteria = exports.acceptanceComplete = exports.acceptanceBody = void 0;
 exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = void 0;
 exports.resolveRepoAbsPath = exports.redactFrictionText = exports.readOrCreateMachineSalt = exports.readFrictionLog = exports.readFrictionDropped = exports.normalizeCommandShape = exports.frictionStateDir = exports.frictionStateBase = exports.frictionSaltPath = exports.frictionReporterId = exports.frictionMajorVersion = exports.frictionLogPath = exports.frictionFingerprintMaterial = exports.frictionFingerprint = exports.frictionDroppedPath = exports.clearFrictionLog = exports.buildFrictionRecord = exports.appendFrictionRecord = exports.FrictionError = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SECRET_PLACEHOLDER = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_REDACTION_MAX_SUBSTITUTIONS = exports.FRICTION_REDACTED_FIELD = exports.FRICTION_PATH_PLACEHOLDER = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_MAX_LINES = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_HARNESS_CAP = exports.FRICTION_FORMAT_VERSION = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_DROPPED_FILE_NAME = exports.FRICTION_DEFAULT_HARNESS = exports.FRICTION_COMMAND_SHAPE_CAP = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByUpdated = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = void 0;
-exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.stripInlineCodeSpans = exports.regionHasScaffoldMarker = exports.placeholderSections = exports.bodyHasScaffoldPlaceholder = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.MAX_HYGIENE_OPEN_CONTAINERS = exports.MAX_HYGIENE_OFFENDERS = exports.runReport = exports.containerHygiene = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.readFrictionTrigger = exports.isManagedAgentDest = exports.carriesFrictionTrigger = exports.isFrictionPublishTier = exports.buildFrictionPublishUrl = exports.buildFrictionPublishTitle = exports.buildFrictionPublishDoc = exports.buildFrictionPublishBody = exports.FRICTION_PUBLISH_URL_BASE = exports.FRICTION_PUBLISH_TITLE_PREFIX = exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = exports.FRICTION_PUBLISH_TIERS = exports.FRICTION_PUBLISH_NARRATIVE_CAP = exports.FRICTION_PUBLISH_MAX_URL_CHARS = exports.FRICTION_PUBLISH_MAX_CLASSES = exports.FRICTION_PUBLISH_LABEL = exports.FRICTION_PUBLISH_FENCE_INFO = exports.resolveFrictionOptOut = exports.readFrictionOptOut = exports.FRICTION_OPT_OUT_ENV = exports.summarizeFrictionLog = exports.renderFrictionReport = exports.readFrictionReport = exports.frictionFenceFor = exports.FRICTION_REPORT_MAX_ROWS = void 0;
-exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.isStartOwnedWorktreeEnv = exports.isStartOwnedNodeModulesInstall = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeUntrackedRefusal = exports.worktreeTrackedRefusal = exports.worktreeReleaseRefusal = exports.parseRemovalBlockingPaths = exports.parseRemovalBlockers = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.readRankedFrom = exports.RANKED_FROM_NOTE = exports.formatRankedFrom = exports.findBranchClaims = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = void 0;
-exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.frictionClearOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_NODE_MODULES_ENTRY = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.formatReportHygiene = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = void 0;
+exports.stripInlineCodeSpans = exports.regionHasScaffoldMarker = exports.placeholderSections = exports.bodyHasScaffoldPlaceholder = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.RISK_LABEL_PREFIX = exports.MAX_RISK_LEAVES = exports.MAX_HYGIENE_OPEN_CONTAINERS = exports.MAX_HYGIENE_OFFENDERS = exports.runReport = exports.riskAudit = exports.isRiskLabel = exports.containerHygiene = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.readFrictionTrigger = exports.isManagedAgentDest = exports.carriesFrictionTrigger = exports.isFrictionPublishTier = exports.buildFrictionPublishUrl = exports.buildFrictionPublishTitle = exports.buildFrictionPublishDoc = exports.buildFrictionPublishBody = exports.FRICTION_PUBLISH_URL_BASE = exports.FRICTION_PUBLISH_TITLE_PREFIX = exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = exports.FRICTION_PUBLISH_TIERS = exports.FRICTION_PUBLISH_NARRATIVE_CAP = exports.FRICTION_PUBLISH_MAX_URL_CHARS = exports.FRICTION_PUBLISH_MAX_CLASSES = exports.FRICTION_PUBLISH_LABEL = exports.FRICTION_PUBLISH_FENCE_INFO = exports.resolveFrictionOptOut = exports.readFrictionOptOut = exports.FRICTION_OPT_OUT_ENV = exports.summarizeFrictionLog = exports.renderFrictionReport = exports.readFrictionReport = exports.frictionFenceFor = exports.FRICTION_REPORT_MAX_ROWS = void 0;
+exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.isStartOwnedWorktreeEnv = exports.isStartOwnedNodeModulesInstall = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeUntrackedRefusal = exports.worktreeTrackedRefusal = exports.worktreeReleaseRefusal = exports.parseRemovalBlockingPaths = exports.parseRemovalBlockers = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.readRankedFrom = exports.RANKED_FROM_NOTE = exports.formatRankedFrom = exports.findBranchClaims = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = void 0;
+exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.frictionClearOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_NODE_MODULES_ENTRY = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportRisk = exports.formatReportMarkdown = exports.formatReportHygiene = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceBody", { enumerable: true, get: function () { return items_js_1.acceptanceBody; } });
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
@@ -4296,10 +4296,14 @@ var report_js_1 = require("./report.js");
 Object.defineProperty(exports, "aggregateReport", { enumerable: true, get: function () { return report_js_1.aggregateReport; } });
 Object.defineProperty(exports, "completedOf", { enumerable: true, get: function () { return report_js_1.completedOf; } });
 Object.defineProperty(exports, "containerHygiene", { enumerable: true, get: function () { return report_js_1.containerHygiene; } });
+Object.defineProperty(exports, "isRiskLabel", { enumerable: true, get: function () { return report_js_1.isRiskLabel; } });
+Object.defineProperty(exports, "riskAudit", { enumerable: true, get: function () { return report_js_1.riskAudit; } });
 Object.defineProperty(exports, "runReport", { enumerable: true, get: function () { return report_js_1.runReport; } });
 var report_js_2 = require("./report.js");
 Object.defineProperty(exports, "MAX_HYGIENE_OFFENDERS", { enumerable: true, get: function () { return report_js_2.MAX_HYGIENE_OFFENDERS; } });
 Object.defineProperty(exports, "MAX_HYGIENE_OPEN_CONTAINERS", { enumerable: true, get: function () { return report_js_2.MAX_HYGIENE_OPEN_CONTAINERS; } });
+Object.defineProperty(exports, "MAX_RISK_LEAVES", { enumerable: true, get: function () { return report_js_2.MAX_RISK_LEAVES; } });
+Object.defineProperty(exports, "RISK_LABEL_PREFIX", { enumerable: true, get: function () { return report_js_2.RISK_LABEL_PREFIX; } });
 var trend_js_1 = require("./trend.js");
 Object.defineProperty(exports, "runTrend", { enumerable: true, get: function () { return trend_js_1.runTrend; } });
 var trend_js_2 = require("./trend.js");
@@ -4453,6 +4457,7 @@ Object.defineProperty(exports, "renderShowText", { enumerable: true, get: functi
 var report_js_3 = require("./report.js");
 Object.defineProperty(exports, "formatReportHygiene", { enumerable: true, get: function () { return report_js_3.formatReportHygiene; } });
 Object.defineProperty(exports, "formatReportMarkdown", { enumerable: true, get: function () { return report_js_3.formatReportMarkdown; } });
+Object.defineProperty(exports, "formatReportRisk", { enumerable: true, get: function () { return report_js_3.formatReportRisk; } });
 Object.defineProperty(exports, "formatReportTable", { enumerable: true, get: function () { return report_js_3.formatReportTable; } });
 var trend_js_3 = require("./trend.js");
 Object.defineProperty(exports, "formatTrendMarkdown", { enumerable: true, get: function () { return trend_js_3.formatTrendMarkdown; } });
@@ -5485,7 +5490,11 @@ function reportOperation(opts) {
             }
         }
         const result = (0, report_js_1.runReport)({ cwd: opts.cwd });
-        const payload = { groups: result.groups, hygiene: result.hygiene };
+        const payload = {
+            groups: result.groups,
+            hygiene: result.hygiene,
+            risk: result.risk,
+        };
         if (trend)
             payload.trend = trend;
         return succeed("report", payload, (0, convention_js_1.readConventionVersion)(result.root));
@@ -5990,14 +5999,17 @@ function assertParentEdge(childType, parentType) {
 __arggonModules.set("lib/src/report.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MAX_HYGIENE_OPEN_CONTAINERS = exports.MAX_HYGIENE_OFFENDERS = void 0;
+exports.MAX_RISK_LEAVES = exports.RISK_LABEL_PREFIX = exports.MAX_HYGIENE_OPEN_CONTAINERS = exports.MAX_HYGIENE_OFFENDERS = void 0;
 exports.emptyCounts = emptyCounts;
+exports.isRiskLabel = isRiskLabel;
 exports.aggregateReport = aggregateReport;
 exports.containerHygiene = containerHygiene;
+exports.riskAudit = riskAudit;
 exports.runReport = runReport;
 exports.completedOf = completedOf;
 exports.formatReportTable = formatReportTable;
 exports.formatReportHygiene = formatReportHygiene;
+exports.formatReportRisk = formatReportRisk;
 exports.formatReportMarkdown = formatReportMarkdown;
 const acceptance_js_1 = require("./acceptance.js");
 const items_js_1 = require("./items.js");
@@ -6009,6 +6021,11 @@ function emptyCounts() {
 }
 exports.MAX_HYGIENE_OFFENDERS = 10;
 exports.MAX_HYGIENE_OPEN_CONTAINERS = 5;
+exports.RISK_LABEL_PREFIX = "risk-";
+function isRiskLabel(label) {
+    return label.startsWith(exports.RISK_LABEL_PREFIX);
+}
+exports.MAX_RISK_LEAVES = 10;
 const CONTAINER_TYPES = new Set(["initiative", "epic", "story"]);
 const OPEN_CONTAINER_TYPES = new Set(["story", "epic"]);
 const TERMINAL_STATUSES = new Set(["done", "cancelled"]);
@@ -6080,7 +6097,7 @@ function aggregateReport(items) {
             blockedReason: leaf.blockedReason,
         };
     });
-    return { groups, blocked, hygiene: containerHygiene(items) };
+    return { groups, blocked, hygiene: containerHygiene(items), risk: riskAudit(items) };
 }
 function containerHygiene(items) {
     const byId = (0, items_js_1.itemsById)(items);
@@ -6124,11 +6141,42 @@ function containerHygiene(items) {
         offendersTotal: offenders.length,
     };
 }
+function riskAudit(items) {
+    const byId = (0, items_js_1.itemsById)(items);
+    const riskLeaves = items.filter((item) => (item.type === "task" || item.type === "bug") && item.labels.some(isRiskLabel));
+    const leaves = riskLeaves
+        .filter((leaf) => !TERMINAL_STATUSES.has(leaf.status))
+        .map((leaf) => {
+        const acceptance = (0, acceptance_js_1.classifyAcceptance)(leaf.body, leaf.assignee);
+        return { leaf, acceptance };
+    })
+        .filter(({ acceptance }) => acceptance !== "accepted")
+        .map(({ leaf, acceptance }) => {
+        const story = leaf.parent ? byId.get(leaf.parent) : undefined;
+        const epic = story?.parent ? byId.get(story.parent) : undefined;
+        return {
+            id: leaf.id,
+            type: leaf.type,
+            title: titleOf(leaf),
+            status: leaf.status,
+            labels: leaf.labels.filter(isRiskLabel),
+            acceptance,
+            storyId: story?.id ?? null,
+            epicId: epic?.id ?? null,
+        };
+    })
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    return {
+        checked: riskLeaves.length,
+        leaves: leaves.slice(0, exports.MAX_RISK_LEAVES),
+        leavesTotal: leaves.length,
+    };
+}
 function runReport(opts) {
     const tasksDir = (0, paths_js_1.findTasksDir)(opts.cwd);
     const root = (0, paths_js_1.repoRootFromTasks)(tasksDir);
-    const { groups, blocked, hygiene } = aggregateReport((0, items_js_1.loadItems)(tasksDir));
-    return { root, groups, blocked, hygiene };
+    const { groups, blocked, hygiene, risk } = aggregateReport((0, items_js_1.loadItems)(tasksDir));
+    return { root, groups, blocked, hygiene, risk };
 }
 function completedOf(counts) {
     return counts.done + counts.cancelled;
@@ -6170,6 +6218,29 @@ function formatReportHygiene(hygiene) {
         lines.push(`  ${(0, sanitize_js_1.sanitizeHumanTextUncapped)(offender.id)} (${offender.status}) — open containers: ${formatHygieneOpenContainers(offender)}`);
     }
     const dropped = hygiene.offendersTotal - hygiene.offenders.length;
+    if (dropped > 0)
+        lines.push(`  … and ${dropped} more`);
+    return `${lines.join("\n")}\n`;
+}
+function formatReportRisk(risk) {
+    const checked = `${risk.checked} risk-labeled ${risk.checked === 1 ? "leaf" : "leaves"} checked`;
+    if (risk.leavesTotal === 0) {
+        return `risk: clean — no open risk-triggered leaf needs review escalation (${checked})\n`;
+    }
+    const noun = risk.leavesTotal === 1 ? "leaf" : "leaves";
+    const lines = [
+        `risk: ${risk.leavesTotal} open risk-triggered ${noun} without human acceptance (${checked})`,
+    ];
+    for (const leaf of risk.leaves) {
+        const where = [leaf.storyId, leaf.epicId]
+            .filter((part) => Boolean(part))
+            .map((part) => (0, sanitize_js_1.sanitizeHumanTextUncapped)(part))
+            .join(" ← ");
+        const scope = where ? ` — ${where}` : "";
+        const labels = leaf.labels.map((label) => (0, sanitize_js_1.sanitizeHumanTextUncapped)(label)).join(", ");
+        lines.push(`  ${(0, sanitize_js_1.sanitizeHumanTextUncapped)(leaf.id)} (${leaf.type}, ${leaf.status}) — ${labels}; acceptance: ${leaf.acceptance}${scope}`);
+    }
+    const dropped = risk.leavesTotal - risk.leaves.length;
     if (dropped > 0)
         lines.push(`  … and ${dropped} more`);
     return `${lines.join("\n")}\n`;
@@ -6223,6 +6294,28 @@ function formatReportMarkdown(result, opts = {}) {
             lines.push(`- **${(0, sanitize_js_1.sanitizeHumanTextUncapped)(offender.id)}** (${offender.status}) — open containers: ${formatHygieneOpenContainers(offender)}`);
         }
         const dropped = result.hygiene.offendersTotal - result.hygiene.offenders.length;
+        if (dropped > 0)
+            lines.push(`- … and ${dropped} more`);
+        lines.push("");
+    }
+    lines.push("## Risk", "");
+    const riskChecked = `${result.risk.checked} risk-labeled ${result.risk.checked === 1 ? "leaf" : "leaves"} checked`;
+    if (result.risk.leavesTotal === 0) {
+        lines.push(`_No open risk-triggered leaf needs review escalation (${riskChecked})._`, "");
+    }
+    else {
+        const noun = result.risk.leavesTotal === 1 ? "leaf" : "leaves";
+        lines.push(`- ${result.risk.leavesTotal} open risk-triggered ${noun} without human acceptance (${riskChecked})`);
+        for (const leaf of result.risk.leaves) {
+            const where = [leaf.storyId, leaf.epicId]
+                .filter((part) => Boolean(part))
+                .map((part) => (0, sanitize_js_1.sanitizeHumanTextUncapped)(part))
+                .join(" ← ");
+            const scope = where ? ` — ${where}` : "";
+            const labels = leaf.labels.map((label) => (0, sanitize_js_1.sanitizeHumanTextUncapped)(label)).join(", ");
+            lines.push(`- **${(0, sanitize_js_1.sanitizeHumanTextUncapped)(leaf.id)}** (${leaf.type}, ${leaf.status}) — ${labels}; acceptance: ${leaf.acceptance}${scope}`);
+        }
+        const dropped = result.risk.leavesTotal - result.risk.leaves.length;
         if (dropped > 0)
             lines.push(`- … and ${dropped} more`);
         lines.push("");
