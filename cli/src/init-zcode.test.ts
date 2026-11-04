@@ -748,8 +748,13 @@ describe("zcode automation templates (opt-in, spec S5)", () => {
       expect(template, rel).toContain("Nothing is scheduled or runs until");
       expect(template, rel).toContain("Deleting it is the off switch");
     }
-    // Docs travel: agents.md §ZCode documents the pair as opt-in automations.
-    const agents = readFileSync(join(repoRoot, "ArggonManager/docs/agents.md"), "utf8");
+    // The core routes setup to the reference; the full opt-in contract stays guarded.
+    const core = readFileSync(join(repoRoot, "ArggonManager/docs/agents.md"), "utf8");
+    expect(core).toContain("./references/agent-runtime.md#zcode");
+    const agents = readFileSync(
+      join(repoRoot, "ArggonManager/docs/references/agent-runtime.md"),
+      "utf8",
+    );
     expect(agents).toContain("templates/automations/spec-drift-scan.md");
     expect(agents).toContain("templates/automations/stale-claim-sweep.md");
     expect(agents).toContain("**Automations (opt-in)**");

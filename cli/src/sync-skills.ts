@@ -17,6 +17,7 @@ import {
   generatedMarker,
 } from "./docs.js";
 import { loadCliCommands, spliceGeneratedCommands } from "./skill-commands.js";
+import { syncCoreExcerpts } from "./methodology-excerpts.js";
 
 // task-adr0006-docs-budget: .agents/skills/arggon-cli/SKILL.md is a generated
 // copy of skills/arggon-cli/SKILL.md (gitignored — single committed source).
@@ -161,6 +162,7 @@ export function syncBundledSkills(root: string = repoRoot): number {
 // Direct invocation (`npm run skills:sync`) vs. import by tests: the guard
 // keeps the script side-effect-free on import.
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  syncCoreExcerpts(repoRoot);
   const count = syncBundledSkills();
   console.log(`synced ${count} bundled skill file(s) from their single sources`);
 }

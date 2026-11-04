@@ -554,9 +554,7 @@ describe("opencode seam: fresh init", () => {
       /\s+/g,
       " ",
     );
-    expect(flat).toContain(
-      "**Claim before dispatch (task-coordinator-claims-through-native-start):**",
-    );
+    expect(flat).toContain("**Claim before dispatch:**");
     expect(flat).toContain("tools.arggon.start({ id, assignee, worktree: true })");
     expect(flat).not.toContain("each worker claims its item");
     expect(flat).not.toContain("Claim **your** item (`in_progress` + assignee)");
@@ -574,8 +572,11 @@ describe("opencode seam: fresh init", () => {
 
     // 1. the skill reference both agent templates load first
     const skill = flat("skills/arggon-cli/references/orchestration.md");
-    expect(skill).toContain("**Claim before dispatch:**");
-    expect(skill).toContain("worktree: true");
+    // The skill now routes to the canonical contract, not a divergent copy.
+    expect(skill).toContain("`ArggonManager/docs/agents.md` §Orchestration");
+    const core = flat("ArggonManager/docs/agents.md");
+    expect(core).toContain("**Claim before dispatch:**");
+    expect(core).toContain("tools.arggon.start({ id, assignee, worktree: true })");
     expect(skill).not.toContain("Claim **your** item (`in_progress` + assignee)");
     // 2. the maker contract: dispatched means already-claimed, never re-claim
     const maker = flat("templates/docs/opencode/agents/arggon-maker.md");
