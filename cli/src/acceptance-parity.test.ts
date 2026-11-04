@@ -141,7 +141,7 @@ const CORPUS: Array<{ name: string; body: string }> = [
     body: "- [x] wrap it in `- [ ]` when you mean the literal box\n- [ ] do the thing\n",
   },
   // An item whose ONLY boxes live in a comment section — the shape `create`
-  // produces (it has no `--body` flag). `shown.prose` / `bounded.prose` drops
+  // produced before issue #870 added `--body`. `shown.prose` / `bounded.prose` drops
   // these; `acceptanceBody(item)` keeps them. This is the #605 round-2 defect.
   {
     name: "checklist only in a comment section",
@@ -895,8 +895,8 @@ describe("acceptance parity over real items (bug-three-acceptance-parsers-diverg
       "criterion filed as a comment",
     ]);
 
-    // ...and every consumer reports it. This is the 21/280 shape: `create` has
-    // no `--body` flag, so a comment checklist is the DEFAULT path for a new item.
+    // ...and every consumer reports it. This is the 21/280 shape: before issue
+    // #870 added `--body`, a comment checklist was the DEFAULT path for a new item.
     expect(acceptanceCriteria(canonical)).toHaveLength(2);
     const detail = boardItemDetail(root, "task-comment-only");
     // The create-time bare placeholder under `## Acceptance` is still shown as a

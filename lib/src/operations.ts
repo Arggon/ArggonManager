@@ -369,15 +369,34 @@ export type CreatePayload = {
 export function createOperation(opts: CreateOperationOptions): CommandOutcome<CreatePayload> {
   try {
     const result = runCreate(opts);
-    return succeed(
-      "create",
-      {
-        path: relativePath(result.root, result.path),
-        item: toContractWorkItem(result.item, result.root, { full: opts.full === true }),
-        commit: commitPayload(result.commit),
-      },
-      readConventionVersion(result.root),
-    );
+    const payload: CreatePayload = {
+      path: relativePath(result.root, result.path),
+      item: toContractWorkItem(result.item, result.root, { full: opts.full === true }),
+      commit: commitPayload(result.commit),
+    };
+    const conventionVersion = readConventionVersion(result.root);
+    if (result.commit?.failure) {
+      // Creation already wrote the item (issue #870): a rejected or lost
+      // auto-commit must never read as success, but the created file is kept.
+      // Keep its address, item and commit receipt on the failure envelope so
+      // the caller repairs/commits the EXISTING file instead of re-running
+      // create (which would collide on the id). Benign skips stay ok:true.
+      return {
+        ok: false,
+        envelope: failEnvelope({
+          command: "create",
+          code: "CREATE_COMMIT_FAILED",
+          message:
+            `Created '${result.id}' at ${payload.path}, but its auto-commit failed: ` +
+            `${result.commit.skipReason}. The item is retained; fix the cause, stage the ` +
+            "existing file, and commit it instead of re-running create.",
+          conventionVersion,
+          payload,
+        }) as KernelFailureEnvelope<CreatePayload>,
+        exitCode: 1,
+      };
+    }
+    return succeed("create", payload, conventionVersion);
   } catch (err) {
     return fail("create", opts.cwd, "CREATE_FAILED", err);
   }

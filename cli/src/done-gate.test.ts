@@ -292,7 +292,7 @@ describe("done gate: envelope (task-done-gate-acceptance-waiver)", () => {
 });
 
 describe("done gate: placeholders are not criteria (bug-empty-template-checkbox)", () => {
-  it("scaffolds `## Acceptance` with no checkbox, and a fresh scaffold is refused as having no contract", () => {
+  it("the shipped scaffold publishes one unchecked criterion, so a fresh leaf refuses as unchecked", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-done-gate-scaffold-"));
     runInit({ dir, force: false });
     const story = seedChain(dir, "story-s");
@@ -304,24 +304,23 @@ describe("done gate: placeholders are not criteria (bug-empty-template-checkbox)
       id: "scaffolded",
       now: NOW,
     });
-    // No checkbox is scaffolded at all: the acceptance contract starts empty.
-    expect(itemOf(dir, task.id).body).toMatch(/## Acceptance/);
-    expect(itemOf(dir, task.id).body).not.toMatch(/^- \[.\]/m);
-    // The whole-body question still reads "nothing outstanding" — and the gate
-    // still refuses, because there is nothing published to be outstanding ABOUT
-    // (bug-done-gate-counts-checkboxes-inside-comment-blocks). An item that has
-    // published no contract does not get a free pass to `done`.
-    expect(acceptanceComplete(itemOf(dir, task.id).body)).toBe(true);
-    expect(acceptanceGate(itemOf(dir, task.id).body)).toEqual({
+    // Issue #870: the shipped task/bug scaffold carries real Context prose and
+    // one unchecked, title-derived criterion — never a bare box or a placeholder
+    // marker, so a fresh leaf validates and can be authored from.
+    const body = itemOf(dir, task.id).body;
+    expect(body).toMatch(/## Acceptance/);
+    expect(body).toMatch(/^- \[ \] Scaffolded$/m);
+    expect(acceptanceComplete(body)).toBe(false);
+    expect(acceptanceGate(body)).toEqual({
       gated: true,
-      reason: "no-live-contract",
+      reason: "unchecked-live-criteria",
     });
     claim(dir, task.id);
     expect(() => runUpdate({ cwd: dir, id: task.id, status: "done", now: NOW })).toThrow(
-      /live '## Acceptance' section has no acceptance criteria/,
+      /live '## Acceptance' section still has unchecked boxes/,
     );
     expect(itemOf(dir, task.id).status).toBe("in_progress");
-    // The honest path: write the criteria where the gate reads them.
+    // The honest path: tick the criterion where the gate reads it.
     setBody(
       dir,
       task.id,
@@ -392,6 +391,9 @@ describe("done gate: placeholders are not criteria (bug-empty-template-checkbox)
       title: "Commented contract",
       parent: story,
       id: "commented-contract",
+      // The pre-#870 scaffold shape: the live section publishes no criterion,
+      // so the checklist filed as a comment is the only record.
+      body: "## Context\n\nSeed.\n\n## Acceptance\n\n<!-- placeholder -->\n",
       now: NOW,
     });
     runComment({

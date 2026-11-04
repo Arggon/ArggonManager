@@ -15,14 +15,14 @@ updated: "YYYY-MM-DD"
   parent MUST be the story id. Omit assignee when unassigned. Omit blocked_reason unless status is blocked.
 -->
 
-# <title>
+# <title-inline>
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+Reported problem: <title-inline>.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] Resolved: <title-inline>
 
 ## Notes

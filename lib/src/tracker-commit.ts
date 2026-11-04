@@ -21,24 +21,46 @@ import { sanitizeHumanError } from "./sanitize.js";
  *    the rest), which used to leave a dirty index with no commit.
  *  - Best effort by design: non-git trees, missing git, or a no-op commit
  *    (nothing staged) skip with a reason instead of failing the command —
- *    the whole CLI already works without git. Exception (task-nothing-to-
- *    commit-masking): a "nothing to commit" whose mutated paths still carry
- *    changes means a concurrent index rewrite lost our staged entry — that
- *    skip is REPORTED (stderr warning + payload), never quiet.
+ *    the whole CLI already works without git. Actionable failures (failed
+ *    add/commit, exhausted index-lock retry, lost staged entry) carry the
+ *    additive `failure` classification so a caller that must not report a
+ *    rejected mutation as success (create, issue #870) can fail its command;
+ *    the other mutators keep this best-effort contract. Exception
+ *    (task-nothing-to-commit-masking): a "nothing to commit" whose mutated
+ *    paths still carry changes means a concurrent index rewrite lost our
+ *    staged entry — that skip is REPORTED (stderr warning + payload), never
+ *    quiet.
  *  - Default ON, opt-out per invocation (`--no-commit`) and per tree
  *    (`tasks/.convention.yml` `x-tracker.auto-commit: false`, namespaced
  *    like `x-playbooks`); precedence is CLI flag > config > built-in
  *    default (true).
  */
 
+/**
+ * Actionable auto-commit failures, distinct from the expected best-effort
+ * skips (opt-out, non-git tree, missing git, genuinely nothing to commit).
+ * Surfaces that must not report a rejected mutation as success (create,
+ * issue #870) key their failure on this classification; the other mutators
+ * keep their historical best-effort semantics and may ignore it.
+ */
+export type TrackerCommitFailure =
+  "git-add-failed" | "git-commit-failed" | "git-index-locked" | "staged-entry-lost";
+
 /** The commit result as it appears in the additive `commit` field of `--json` payloads. */
 export type CommitPayload =
-  { hash: string; message: string; ignored?: string[] } | { skipped: string; ignored?: string[] };
+  | { hash: string; message: string; ignored?: string[] }
+  | { skipped: string; failure?: TrackerCommitFailure; ignored?: string[] };
 
 export type TrackerCommitResult = {
   committed: boolean;
   /** Why nothing was committed; present only when `committed` is false. */
   skipReason?: string;
+  /**
+   * Additive machine classification for a rejected or lost auto-commit.
+   * Benign skips omit it; the caller decides whether a failure rejects its
+   * command (create does; the other mutators stay best-effort).
+   */
+  failure?: TrackerCommitFailure;
   /** Short hash of the created commit; present only when `committed` is true. */
   hash?: string;
   /** Commit message as recorded; present only when `committed` is true. */
@@ -301,9 +323,11 @@ export function trackerGitLockKey(commonGitDir: string): string {
  * root-relative, all resolved inside the repository root; Git pathspec magic is
  * rejected. Then create one commit with
  * `message` covering them. Never throws — every failure mode (non-git tree,
- * git absent, nothing staged, failed commit) returns a skip result so the
- * caller's command succeeds. The user's pre-existing dirty files (and
- * anything staged elsewhere) are never swept into the commit.
+ * git absent, nothing staged, failed commit) returns a result. Actionable
+ * failures carry `failure`; callers decide whether to fail the command (create
+ * does) or retain the historical best-effort semantics. The user's
+ * pre-existing dirty files (and anything staged elsewhere) are never swept
+ * into the commit.
  *
  * Paths a `.gitignore` rule matches are partitioned out before staging and
  * reported in the additive `ignored` field (bug-init-ignored-artifacts-dirty-
@@ -394,6 +418,7 @@ export function commitTrackerMutation(
         result = {
           committed: false,
           skipReason: `git add failed: ${firstLine(add.err || add.out)}`,
+          failure: "git-add-failed",
         };
         return;
       }
@@ -422,7 +447,7 @@ export function commitTrackerMutation(
           if (residue.code === 0 && residue.out.trim().length > 0) {
             const lost = "nothing to commit (staged entry lost under contention)";
             warnGitSkip(lost);
-            result = { committed: false, skipReason: lost };
+            result = { committed: false, skipReason: lost, failure: "staged-entry-lost" };
             return;
           }
           result = { committed: false, skipReason: "nothing to commit" };
@@ -437,6 +462,7 @@ export function commitTrackerMutation(
         result = {
           committed: false,
           skipReason: `git commit failed: ${firstLine(commit.err || commit.out)}`,
+          failure: "git-commit-failed",
         };
         return;
       }
@@ -445,7 +471,11 @@ export function commitTrackerMutation(
     }
     if (locked !== null || commit === undefined) {
       warnGitSkip(locked ?? "git commit failed");
-      result = { committed: false, skipReason: locked ?? "git commit failed" };
+      result = {
+        committed: false,
+        skipReason: locked ?? "git commit failed",
+        failure: locked !== null ? "git-index-locked" : "git-commit-failed",
+      };
       return;
     }
     if (commit.code !== 0) {
@@ -455,6 +485,7 @@ export function commitTrackerMutation(
       result = {
         committed: false,
         skipReason: `git commit failed: ${firstLine(commit.err || commit.out)}`,
+        failure: "git-commit-failed",
       };
       return;
     }
@@ -472,12 +503,20 @@ export function commitTrackerMutation(
       // The outer lock timed out (another arggon process held the git-mutation
       // lock past the budget): same reported-skip semantics as index.lock.
       warnGitSkip("git index locked");
-      result = { committed: false, skipReason: "git index locked" };
+      result = {
+        committed: false,
+        skipReason: "git index locked",
+        failure: "git-index-locked",
+      };
     }
   } else {
     attempt();
   }
-  const outcome = result ?? { committed: false, skipReason: "git commit failed" };
+  const outcome: TrackerCommitResult = result ?? {
+    committed: false,
+    skipReason: "git commit failed",
+    failure: "git-commit-failed",
+  };
   return ignoredPayload !== undefined ? { ...outcome, ignored: ignoredPayload } : outcome;
 }
 
@@ -488,7 +527,11 @@ export function commitPayload(result: TrackerCommitResult | undefined): CommitPa
   if (result.committed && result.hash) {
     return { hash: result.hash, message: result.message ?? "", ...ignored };
   }
-  return { skipped: result.skipReason ?? "skipped", ...ignored };
+  return {
+    skipped: result.skipReason ?? "skipped",
+    ...(result.failure ? { failure: result.failure } : {}),
+    ...ignored,
+  };
 }
 
 /**

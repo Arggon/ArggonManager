@@ -301,7 +301,7 @@ export type {
   FrictionRecord,
 } from "./friction.js";
 export { commitPayload } from "./tracker-commit.js";
-export type { CommitPayload, TrackerCommitResult } from "./tracker-commit.js";
+export type { CommitPayload, TrackerCommitFailure, TrackerCommitResult } from "./tracker-commit.js";
 export type { SyncFilled } from "./sync-types.js";
 
 // --- Command kernels (raw results; operations assemble the envelopes) -------

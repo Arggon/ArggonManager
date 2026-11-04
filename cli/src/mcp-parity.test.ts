@@ -284,6 +284,10 @@ function gitInit(dir: string): void {
     });
   const init = git(["init"]);
   expect(init.status, init.stderr).toBe(0);
+  // The tracker auto-commit runs inside this repo, so it needs an identity
+  // like every other commit: the CLI create in these fixtures must commit.
+  expect(git(["config", "user.name", "parity"]).status).toBe(0);
+  expect(git(["config", "user.email", "parity@example.com"]).status).toBe(0);
   expect(git(["commit", "--allow-empty", "-m", "seed"]).status).toBe(0);
 }
 
@@ -307,6 +311,56 @@ describe("CLI <-> MCP parity", () => {
     );
     const mcpResult = await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
     expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
+  });
+
+  it("authors the same body from a CLI file and inline MCP content", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    const body =
+      "## Context\n\nRate limits prevent abuse.\n\n## Acceptance\n\n- [ ] Requests are limited.\n";
+    writeFileSync(join(cliDir, "contract.md"), body, "utf8");
+    const cliResult = readCli(
+      [
+        "create",
+        "task",
+        CREATE_ARGS.title,
+        "--parent",
+        CREATE_ARGS.parent,
+        "--id",
+        "rate-limit",
+        "--body",
+        "contract.md",
+      ],
+      cliDir,
+    );
+    const mcpResult = await mcpCall(mcpDir, "arggon_create", { ...CREATE_ARGS, body });
+    expectOk(mcpResult);
+    expectSameEnvelope(mcpResult, cliResult);
+    const path = (cliResult.envelope.item as { path: string }).path;
+    expect(readFileSync(join(cliDir, path), "utf8")).toContain(body);
+    expect(readFileSync(join(mcpDir, path), "utf8")).toContain(body);
+  });
+
+  it("reports a rejected create commit identically through CLI and MCP", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    for (const dir of [cliDir, mcpDir]) {
+      gitInit(dir);
+      const hook = join(dir, ".git/hooks/pre-commit");
+      writeFileSync(hook, "#!/bin/sh\necho rejected-contract >&2\nexit 1\n", "utf8");
+      chmodSync(hook, 0o755);
+    }
+    const cliResult = readCli(
+      ["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"],
+      cliDir,
+      false,
+    );
+    const mcpResult = await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
+    expect(cliResult.envelope).toMatchObject({
+      ok: false,
+      error: { code: "CREATE_COMMIT_FAILED" },
+      commit: { failure: "git-commit-failed" },
+    });
+    expect(mcpResult.isError).toBe(true);
     expectSameEnvelope(mcpResult, cliResult);
   });
 
@@ -984,6 +1038,8 @@ const PARITY_EXCEPTIONS: Record<string, Record<string, string>> = {
       "default-on flip semantics governed tree-wide by x-tracker.auto-commit; MCP resolves commit identically without a flag",
     "--priority":
       "convention v4 field ships CLI/kernel-first (task-priority-field-schema); the arggon_create/arggon_update schemas gain `priority` with the ranking wave (task-next-priority-ranking)",
+    "--acceptance":
+      "CLI authoring convenience for the common one-criterion case; MCP callers author the same unchecked rows in the inline `body`",
   },
   update: {
     "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",

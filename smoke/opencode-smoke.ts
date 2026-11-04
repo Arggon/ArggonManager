@@ -222,6 +222,36 @@ function opencodeAvailable(): boolean {
  * as a unit-test failure (the tests run this over the real `templates/*.md`)
  * instead of a silently mangled body. Pure; no provider needed to pin it.
  */
+/**
+ * Replace ONE live section's content (heading through the next rank-1/2
+ * heading) with `content`. A body without that section is returned unchanged.
+ * The generated template files are LF; the smoke fixtures never need a
+ * LineTerminator set here.
+ */
+function replaceLiveSection(body: string, heading: string, content: string): string {
+  const headingRe = new RegExp(`^##[ \\t]+${heading}[ \\t]*$`, "i");
+  const lines = body.split("\n");
+  const start = lines.findIndex((line) => headingRe.test(line));
+  if (start === -1) return body;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^#{1,2}[ \t]/.test(lines[i]!)) {
+      end = i;
+      break;
+    }
+  }
+  return [...lines.slice(0, start + 1), "", content, "", ...lines.slice(end)].join("\n");
+}
+
+/**
+ * Replace a fixture item's live Context and Acceptance content with real prose
+ * so the fixture models a healthy tracker. It handles BOTH scaffold shapes:
+ * the containers' `<!-- … -->` markers and the shipped task/bug skeleton
+ * (title-derived prose plus one unchecked criterion, issue #870) — the latter
+ * is already valid, so the fixture supplies its own criterion and `ticked`
+ * shapes a done-ready item. The placement comment and every later section are
+ * left untouched.
+ */
 export function fleshOutScaffoldBody(
   body: string,
   context: string,
@@ -229,15 +259,7 @@ export function fleshOutScaffoldBody(
   ticked = false,
 ): string {
   const row = `- [${ticked ? "x" : " "}] ${criterion}`;
-  return body
-    .replace(
-      /^(## Context[ \t]*)\n+<!--[^\n]*-->/m,
-      (_match, heading: string) => `${heading}\n\n${context}`,
-    )
-    .replace(
-      /^(## Acceptance[ \t]*)\n+<!--[^\n]*-->/m,
-      (_match, heading: string) => `${heading}\n\n${row}`,
-    );
+  return replaceLiveSection(replaceLiveSection(body, "Context", context), "Acceptance", row);
 }
 
 class Fixture {

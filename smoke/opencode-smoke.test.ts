@@ -164,7 +164,7 @@ describe("opencode-smoke: fleshOutScaffoldBody", () => {
   const templatesDir = resolve(dirname(fileURLToPath(import.meta.url)), "..", "templates");
   const template = (type: string): string => readFileSync(join(templatesDir, `${type}.md`), "utf8");
 
-  it.each(["task", "bug", "story", "epic", "initiative"])(
+  it.each(["story", "epic", "initiative"])(
     "removes the marker from the %s template's live sections",
     (type) => {
       const raw = template(type);
@@ -174,6 +174,23 @@ describe("opencode-smoke: fleshOutScaffoldBody", () => {
       expect(placeholderSections(fleshed)).toEqual([]);
       expect(fleshed).toContain("## Context\n\nReal context prose.");
       expect(fleshed).toContain("## Acceptance\n\n- [ ] Real criterion.");
+      // The placement comment is OUTSIDE the live sections: untouched.
+      expect(fleshed).toContain("Placement (v0)");
+    },
+  );
+
+  it.each(["task", "bug"])(
+    "rewrites the shipped %s skeleton's live sections (issue #870)",
+    (type) => {
+      const raw = template(type);
+      // The shipped leaf template is already valid without a marker; the
+      // fixture helper still supplies its own context and criterion.
+      expect(placeholderSections(raw)).toEqual([]);
+      const fleshed = fleshOutScaffoldBody(raw, "Real context prose.", "Real criterion.", false);
+      expect(placeholderSections(fleshed)).toEqual([]);
+      expect(fleshed).toContain("## Context\n\nReal context prose.");
+      expect(fleshed).toContain("## Acceptance\n\n- [ ] Real criterion.");
+      expect(fleshed).not.toContain("Requested work:");
       // The placement comment is OUTSIDE the live sections: untouched.
       expect(fleshed).toContain("Placement (v0)");
     },
@@ -190,10 +207,13 @@ describe("opencode-smoke: fleshOutScaffoldBody", () => {
     expect(placeholderSections(fleshed)).toEqual([]);
   });
 
-  it("leaves a body without the marker line unchanged (never eats a later section)", () => {
+  it("rewrites the live sections and never eats a later section", () => {
     const body =
       "# T\n\n## Context\n\nReal context.\n\n## Acceptance\n\n- [ ] Real criterion.\n\n## Notes\n\n<!-- history -->\n";
-    expect(fleshOutScaffoldBody(body, "x", "y")).toBe(body);
+    const fleshed = fleshOutScaffoldBody(body, "x", "y");
+    expect(fleshed).toContain("## Context\n\nx");
+    expect(fleshed).toContain("## Acceptance\n\n- [ ] y");
+    expect(fleshed).toContain("## Notes\n\n<!-- history -->");
   });
 });
 

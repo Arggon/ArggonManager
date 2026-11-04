@@ -924,8 +924,8 @@ function buildChildrenIndex<T extends { id: string; parent?: string | null; stat
  * The acceptance fields read `acceptanceBody(kernelItem)` — the whole body,
  * comments included — and NOT `bounded.prose` (bug-three-acceptance-parsers-diverging,
  * the #605 round-2 defect): `prose` excludes comment sections, so a checklist
- * filed as a comment (`create` has no `--body` flag, so that is the default
- * path for every new item) rendered as an empty acceptance list while the done
+ * filed as a comment (the only path before issue #870 added `create --body`)
+ * rendered as an empty acceptance list while the done
  * gate kept refusing the flip.
  */
 function detailPayloadOf(
