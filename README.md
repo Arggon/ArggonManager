@@ -6,6 +6,15 @@ Tasks live _inside_ the repository as Markdown. Create a file, open a branch, up
 
 > **Status:** early design — convention + CLI first.
 
+## Read this first
+
+- **Core / normal item:** [Start here](ArggonManager/docs/agents.md) → [convention](ArggonManager/docs/convention.md) + [engineering](ArggonManager/docs/engineering.md) + [CLI umbrella](skills/arggon-cli/SKILL.md). These four files have a combined **120 KiB** ceiling; start-here has a **20 KiB** ceiling.
+- **Core / review:** [Review bar, verdict and promotion policy](ArggonManager/docs/engineering.md#review-bar-blocks-merge).
+- **Reference / only when needed:** [command contracts](ArggonManager/docs/json-output.md), [runtime setup](ArggonManager/docs/references/agent-runtime.md), [documentation and adoption](ArggonManager/docs/references/documentation.md), or [recovery](ArggonManager/docs/runbooks/agent-recovery.md).
+- **History / why:** [ADRs](ArggonManager/docs/adr/README.md), [explorations](ArggonManager/docs/explorations/), [specs](ArggonManager/docs/specs/) and [plans](ArggonManager/docs/plans/).
+
+`npm run context:report` prints the core's source bytes; tests enforce the limits.
+
 ## Demo
 
 A 30-second tour — list, claim, create, finish, validate, board (autoplay below; also available as [MP4](ArggonManager/docs/assets/arggon-demo.mp4)):
@@ -67,9 +76,7 @@ ArggonManager's process — find → claim → work → review → merge → don
 - **Invariants:** work-loop parity: any human and any agent may claim, work, review, comment and merge under the same kernel rules and the same JSON contracts; state lives in git; discipline is enforceable; docs travel with code; never-steal / never-reopen, with authority asymmetric and named — the irreversible overrides stay product-owner powers, structurally human-only.
 - **Version:** tracks the ArggonManager package version; changes reach adopters through the [adopter upgrade channel](ArggonManager/docs/adr/0016-adopter-upgrade-channel.md) ([ADR 0020](ArggonManager/docs/adr/0020-methodology-first-productization.md)).
 
-**Roles, not job titles** ([ADR 0021](ArggonManager/docs/adr/0021-agents-primary-workers-human-product-owner.md) §6.1): agents are the primary workers, and every agent role is named by **what it decides** — **delivery lead** (sequences work, dispatches, owns tracker state), **practice & standards** (whether a change is right by the project's own bar), **maker** (produces the change), **verifier** (executes the project's verification gates and reports observed-versus-expected; it does not decide the verdict). The human in the loop is the **product owner**, and its authority is bounded and named: direction and priority, product acceptance, risk waiver, claim takeover, release — the last four irreversible steps are structurally human-only.
-
-**The promotion policy** ([ADR 0021](ArggonManager/docs/adr/0021-agents-primary-workers-human-product-owner.md) §3): product-owner review is tiered by blast radius, so no leaf waits on a human — `task`/`bug` leaves are agent-self-certified (the default), `story` containers may carry a recorded `accept:` approval, and the irreversible powers stay gated. A repo with no product owner is compliant by default and never blocked.
+The canonical [role and authority table](ArggonManager/docs/engineering.md#roles-and-authority) names who decides; the [promotion policy](ArggonManager/docs/engineering.md#product-acceptance-product-owner) defines product acceptance. The README routes to these rules rather than restating them.
 
 The carriers, one hop from here:
 

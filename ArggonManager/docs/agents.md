@@ -1,4 +1,4 @@
-# Agent playbook (v0)
+# Agent playbook — start here
 
 > **Methodology carrier (per [ADR 0020](./adr/0020-methodology-first-productization.md)).** This document is a carrier of the ArggonManager methodology — declared together with `ArggonManager/docs/agents.md`, `ArggonManager/docs/engineering.md`, `ArggonManager/docs/convention.md`, and the bundled `arggon-cli` skill.
 >
@@ -7,650 +7,179 @@
 > - **Version:** tracks the ArggonManager package version.
 > - **Upgrade channel:** methodology changes reach adopters through the adopter upgrade channel ([ADR 0016](./adr/0016-adopter-upgrade-channel.md)).
 
-Humans and agents share one **work loop**: any of them may claim an item, work it, review it, comment on it and merge it, under the same kernel rules and the same JSON contracts. What is **not** shared is authority — a small, named set of decisions belongs to the **product owner**, and the irreversible ones are structurally human-only ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §1). Work lives in git under the tracker root (`ArggonManager/`; legacy `tasks/` trees are auto-detected and keep working) — see [`ArggonManager/docs/convention.md`](./convention.md). The role table, the authority map and the promotion-policy tiers live in [`ArggonManager/docs/engineering.md`](./engineering.md) §Roles and authority and §Review bar. This playbook is the short loop: find → claim → work → update → PR.
+## Reading map
+
+| Layer                    | Read when                                                                     | Entry                                                                                                                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Core**                 | A normal item: find → start → implement → verify → PR → review → merge → done | This page, [convention](./convention.md), [engineering](./engineering.md), [CLI umbrella](../../skills/arggon-cli/SKILL.md)                                                                                 |
+| **Core / review**        | Reviewing a change                                                            | [Review bar and verdict](./engineering.md#review-bar-blocks-merge), then the item's acceptance contract                                                                                                     |
+| **Reference**            | A specific command, schema extension or client requires detail                | [JSON contract](./json-output.md), [schema reference](./references/convention.md), [engineering reference](./references/engineering.md), [runtime and integration reference](./references/agent-runtime.md) |
+| **Reference**            | Delegation/runtime binding, documentation or adoption                         | [Orchestration runtime](./references/orchestration.md), [documentation and adoption](./references/documentation.md)                                                                                         |
+| **Reference / recovery** | A claim, start, merge or cleanup failed                                       | [Agent recovery](./runbooks/agent-recovery.md), [start diagnostics](./references/agent-runtime.md#native-start-dependency-contract), [merge recovery](./engineering.md#merging-a-pr-refused-as-out-of-date) |
+| **History**              | The reason for a decision, not a second set of instructions                   | [ADR register](./adr/README.md), [explorations](./explorations/), [specs](./specs/), [plans](./plans/)                                                                                                      |
+
+The **core is exactly the four files in the first row**, at most **120 KiB (122,880 bytes)** combined; this start-here page is at most **20 KiB (20,480 bytes)**. `npm run context:report` reports their UTF-8 source bytes and the test suite rejects a regression. References are loaded only at their point of use, not as another required bundle.
+
+Canonical homes: **claim and terminal-state policy** in [convention](./convention.md#claim-rule); **operational done** in [§5](#5-done-criteria); **review and promotion policy** in [engineering](./engineering.md#review-bar-blocks-merge). Other pages link to those rules rather than maintaining another version.
 
 ## Prerequisites
 
-- Node.js 22.12+ and a checkout of the target repo (with a tracker already initialized, or run `arggon init`).
-- From the ArggonManager package root (or a linked `arggon` binary):
+- Node.js 22.12+ and a checkout of the target repo, with a tracker initialized (`arggon init` for a new tracker).
+- From the package root (or use a linked `arggon` binary):
 
 - `npm install`
 - `npm run arggon -- <command>`
 
-Upgrading is non-destructive for agents too: an agent's edits to a generated doc are respected on every re-run — `arggon init` refreshes untouched docs quietly, skips modified ones (listed in the command's JSON output) rather than clobbering them, and archives the originals under `backup/<date>/` first when run with `--backup`. The one thing `init` deletes is an **orphan** — a generated destination whose template this arggon version no longer ships (so it can neither be refreshed nor kept generated), and only when its bytes are still exactly as arggon wrote them: an edited or acknowledged orphan is reported and kept, never removed (see [Reaping orphans](#orphaned-destinations-init-reaps-and-when)).
+`npm run arggon -- …` runs source; after pulling, rebuild an installed `dist/cli.js` with `npm run build`. Pass `--json` for supported machine-readable commands; a failure is a non-zero exit plus an error envelope. Prefer bounded `next` and `show` to a whole-tree scan.
 
-#### Agent seams: `arggon init --agents` / `--no-agents`
-
-`arggon init` also materializes the per-client **adapter seams** (the OpenCode config + `.opencode/agents|commands` + vendored plugin, the `.zcode-marketplace/` bundle, the `.claude-marketplace/` bundle plus the `CLAUDE.md`/`.mcp.json` pair). Adapters are **enhancers**: docs + CLI alone remain a complete methodology, so an absent or failing adapter never bricks the workflow, and the kernel stays the enforcement of record ([ADR 0020](./adr/0020-methodology-first-productization.md), [spec §S2](./specs/spec-methodology-adapters-017.md)).
-
-- `arggon init --agents <opencode,zcode,claude>` materializes exactly those seams; `--no-agents` materializes none (docs + CLI only). With no flag the selection is every **detected** agent, from the tree's own markers; a tree with **no** marker at all (a fresh scaffold) selects every known agent, so the pre-flag default seams are never silently dropped from a brand-new tree — narrow an existing tree with `--agents`.
-- **Selection never deletes.** An unselected seam is simply not generated; nothing on disk is removed, and an adopter-edited generated file is still skipped rather than overwritten. Re-running with a wider `--agents` list materializes the missing seams; that is how you add an adapter later. (Reaping an _orphan_ is not selection — see below.)
-- An **unknown agent name is refused by name** (`INIT_FAILED`, nothing written) — a typo must never silently install a different seam than you asked for.
-- `--json` gains an additive `adapters` block: the resolved `selection` (`mode`, `known`, `detected`, `selected`, `reason`) plus one row per adapter destination — `written`, `replaced` (`--backup` archived the original and regenerated it) or `skipped` — with its reason and honest `counts` that sum to the total. `--dry-run` reports the identical block from the identical plan.
-- `arggon doctor --agents` is the mirror image (report-only): per agent, every adapter file as `present` / `acknowledged` / `acknowledged-drifted` / `adopter-edited` / `stale` / `missing` / `unverified` / `orphaned`, plus that agent's capability-matrix gap rows. Each status names what `init` would do with the file; `adopter-edited` and the acked statuses are your bytes (skipped unless `--backup`), only `stale` is one `arggon init` would actually refresh, and `orphaned` is the one a single `arggon init` would **delete** — with the per-file verdict (`reap.action`) saying whether it would. Gap rows stay advisory everywhere. (The derived vendored plugin copies are never `adopter-edited`: init re-vendors them, so the `opencode` line's `vendored plugin current`/`STALE` verdict is the one to read there.)
-
-#### Orphaned destinations: what `init` reaps, and when
-
-`init` never deletes a file it did not generate — with **one** exception, because a release that drops or renames a template would otherwise strand its destination forever, and a stranded file under `.opencode/agents/` is still **dispatchable**. An **orphan** is a destination recorded in `x-generated` whose `template:` is absent from this arggon version: the recorded provenance is the whole detection mechanism, so no new state is needed.
-
-**`init` DELETES** an orphan when all of these hold: it is inside the repo root · it is a regular file (never a directory, never a symlink) · it was recorded by no **newer** arggon than the one running (a downgrade reports instead of deleting) · and its bytes are **unchanged since the recorded baseline** — byte-identical to the recorded checksum.
-
-**`init` REFUSES and names** it in every other case: an edit since that baseline (yours — never deleted), a downgrade, a destination outside the repo root, a directory or symlink, or a destination not on disk.
-
-**The one middle case — an ACKNOWLEDGED orphan — is refused by default and needs one opt-in flag.** Read this before "fixing" it, because the reasoning is not obvious:
-
-- `arggon adopt --ack` acks **every** `x-generated` entry **and re-records its checksum from the on-disk bytes**. So for an acknowledged entry, "matches the recorded checksum" proves only **unchanged since the ack** — _not_ "arggon wrote exactly these bytes". A file you **curated and then acked** matches too, and **no recorded state can tell the two apart** (the generated marker survives hand edits as well). That is the whole reason this case is not automatic: deleting it could destroy your curated content.
-- The flag is `x-tracker.reap-acked-orphans: true` in `ArggonManager/.convention.yml` — the same default-refused shape as `x-tracker.allow-steal`. Absent or `false`, an acknowledged orphan is **never** deleted: `init` reports it in `reapRefused[]` with a reason naming both routes out (delete it by hand now, or arm the flag for future runs). Armed, the acknowledged+unchanged case reaps like any other, and the reason still names `(acknowledged baseline, adopt --ack)` so the record shows a sanctioned file was removed **deliberately**.
-- Bytes that **differ** are refused whether or not the flag is armed: that is a known edit, not an unknowable one.
-- Why opt-in rather than refuse-always: the agent rename ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §6.2a′) gates on reaping, and a stranded `.opencode/agents/arggon-*.md` stays **dispatchable**. Refusing outright would push that cleanup onto exactly the repos that adopted properly; the flag gives them the choice, with a default that cannot lose work.
-- Run `arggon doctor --agents` **before** `arggon init` when upgrading across a rename: it shows every orphan, whether `init` would reap it, and why.
-
-Reaping is never silent: `--json` carries `reaped[]` and `reapRefused[]` (their own action family, never folded into the create/replace/skip counts) and human output prints one line per file. `init --dry-run` previews both without writing. A reaped destination loses its `x-generated` entry in the same run and the removal rides the auto-commit, so a later `init` reaps nothing and a committed tree never keeps provenance for a file that is gone.
+For adapter selection, safe regeneration, orphan handling and client installation, read [installation and upgrades](./references/agent-runtime.md#installation-and-upgrades) only when setting up or upgrading.
 
 ## 0. Issue tracking: the tracker (`ArggonManager/`), not GitHub issues
 
-All work — features, tasks, bugs, review follow-ups — is tracked as work items under the **tracker root** via `arggon create`, **not** as GitHub issues. GitHub is for **PRs only**.
+All work — features, tasks, bugs and review follow-ups — lives under the tracker root, **not GitHub issues**. GitHub is for PRs only. This repository's own work lives under `ArggonManager/arggon-manager/`; the CLI also detects legacy `tasks/` layouts.
 
-**Layout (convention v5, [ADR 0012](./adr/0012-tracker-root-layout.md)).** The tracker root is `ArggonManager/` and every product doc lives under `ArggonManager/docs/`. Legacy `tasks/` trees (docs at `<repo root>/docs/`) are auto-detected and keep working — no hard break; `arggon validate` reports the legacy location and `arggon migrate --layout` moves the tree and docs, rewrites the `x-generated` paths and bumps the file to v5 (idempotent, never auto-commits). The CLI resolves the layout for you: use repo-root-relative paths in docs, and `npm run arggon -- <command>` works in either layout.
+```bash
+npm run arggon -- create task "<title>" --parent <story-id>
+npm run arggon -- create bug "<title>" --parent <story-id>
+```
 
-- File findings where they are found: `npm run arggon -- create bug "<title>" --parent <story-id>` (bugs/tasks live only under a story; create the story/epic/initiative chain if the area has none yet).
-- **Comments are the agent handoff channel.** When you stop work (blocked, done, or handing off), leave context on the item itself: `arggon comment <id> "why blocked / what the next agent should know"` appends a timestamped, author-attributed section to the item body. Body-only write (frontmatter, including `updated`, is never touched); allowed on `done`/`cancelled` items — a comment is history, not a reopen. For session end, prefer the structured form: `arggon handoff <id> --next "<first step for the resuming agent>" [--open-questions "..."]` appends a bounded handoff section (branch, next step, open questions — each field capped at 200 chars).
-- **Tracker mutations commit themselves** (tracker hygiene): `create`, `update` (cascade ancestors included), `comment`, `adopt`, `cleanup --prune`, and `import-issues` auto-commit only the files they wrote (`chore(tasks): <verb> <id>`) — your own dirty files are never swept in, and `start`'s clean-tree precondition never blocks tool-generated state. Opt out per call with `--no-commit` or tree-wide via the tracker `.convention.yml` `x-tracker.auto-commit: false`.
-- **Friction in ArggonManager itself is not a tracker item.** When the tool is the obstacle — a flag that refuses, a rule that contradicts another rule, a generated file that will not regenerate — do not work around it and do not file it in this repo's tracker. Record it with `arggon friction "<one line>" --command "<argv shape>"` ([ADR 0024](./adr/0024-adopter-friction-channel.md)) and keep working: the record goes to a local, append-only log **outside** the tracker, redacted at write, and never to GitHub. `arggon friction --report` renders the deduped, redacted report a human acts on; tier `b` prints a prefilled issue URL **the human opens, never the agent**. Opting out (`x-friction: false` in the tracker `.convention.yml`, or `ARGGON_NO_FRICTION=1` per invocation) stops the write without removing the rule from the generated agent files — an adopter who wants the channel back must still be able to find it.
-- **Consolidate review findings into follow-ups.** Every actionable finding from a code review, audit, or incident (PR review comments, review summaries, post-merge observations) MUST be filed as a `task`/`bug` under the story that owns the affected area, with context (links to the PR/comment) and an acceptance checklist in the body. Do this **before the reviewed PR merges, or immediately after** — a PR comment alone is not tracking and gets lost. If no story covers the area, create one under the matching epic first.
-- **Merge, don't squash, PRs that carry tracker auto-commits.** Squash-merging rewrites the branch's local `chore(tasks): ...` auto-commits into one new commit on main, so the stale branch diverges on identical content at the next pull (vencimientos merge #1 needed a manual `rebase --onto`).
-  - If squash is unavoidable: after merge, `git pull --rebase origin main` from the stale branch (enable rerere) or delete the branch and restart from fresh main. For stacked branches, prefer `--no-commit` on mutations and let the PR carry the tracker change.
-  - Prevention beats recovery: when mutating the tracker from the **primary checkout** (auto-commits land on local main), push main immediately after every mutation — before opening or merging any PR.
-- Reference the item id in the PR description; move the item to `done` only when the PR fully finishes it.
-- Do **not** open new GitHub issues. Pre-existing GitHub issues migrate into the tracker with `arggon import-issues` (one-shot and idempotent; `--dry-run` previews the mapping) — each item records its GitHub issue number in the additive `issue` frontmatter field, so `arggon start <id> --open-pr` appends `Closes #N` to the PR body and GitHub closes the issue on merge. With `x-github.issue-roundtrip: true` in the tracker `.convention.yml` (opt-in, default OFF), flipping such an item to `done` also closes the linked issue via gh — best effort, never blocking the flip. Hand-built items can carry the same field: `arggon create --issue <n>` / `arggon update <id> --issue <n>` (`--issue 0` clears).
+Create a matching story/epic/initiative chain if the area has none. Author real Context and a checkable live `## Acceptance` section in the new item; don't leave scaffolding. New items stay `todo` until claimed. When work reveals additional work, file it instead of expanding this PR.
+
+**Every actionable review, audit or incident finding becomes a follow-up task/bug** under the owning story, with source context and acceptance criteria, before the reviewed PR merges or immediately after. A PR comment alone is not tracking. A maker reports findings to the delivery lead, who consolidates and files them.
+
+Tracker writes (`create`, `update`, `comment`, `adopt`, cleanup and import) auto-commit only their own files. Use `--no-commit` for a deliberately staged batch; never sweep unrelated changes into a commit. PRs carrying tracker auto-commits use merge commits, not squash. Push primary-checkout tracker auto-commits immediately so they cannot hitchhike onto an unrelated branch.
+
+Friction **in ArggonManager itself** uses `arggon friction "<observation>" --command "<argv shape>"`, not a workaround or a tracker item. The record is local and redacted; the [friction reference](../../skills/arggon-cli/references/friction.md) explains reporting and opt-out.
 
 ## 1. Find open work
 
-Prefer machine-readable list output:
+```bash
+npm run arggon -- next --json
+npm run arggon -- show <id> --meta --json
+npm run arggon -- sync --json  # GitHub-backed repositories
+```
 
-- `npm run arggon -- list --status todo --json`
-- `npm run arggon -- list --status todo --type task --json`
-- `npm run arggon -- list --assignee @me --json`
+Read the selected item's full acceptance contract (`show <id> --body --json`) before starting. Use `list` only when a pool scan is actually needed. Empty `next` output is success, not an error.
 
-Human table (no `--json`) is fine for a quick scan. Filter with `--type` / `--status` / `--assignee` as needed.
-
-Pick a **claimable** item: `story`, `task`, or `bug` in `todo` (or return to `in_progress` only if you already own it).
+Apply the [claim rule and branch-claim authority](./convention.md#claim-rule): a primary checkout may still show `todo` while an unmerged branch owns the item. Inspect `sync`'s `branchClaims` and `branchClaimErrors` before treating that item as free. `sync` requires a GitHub remote; in an isolated local-only fixture inspect its branches and worktrees directly. A failed reconciliation never proves an item free: coordinate if ownership is uncertain.
 
 ## 2. Claim
 
-**Claim** (convention v0) = claimable type + non-null `assignee` + `status: in_progress`.
-
-- `npm run arggon -- update <id> --status in_progress --assignee <github-login>`
-
-If another assignee already holds the claim, `update` refuses the reassignment (claim conflict) unless `--force` — do not force; see [`ArggonManager/docs/claim.md`](./claim.md). Prefer a different item or coordinate in the issue/PR. Claims carry a soft lease (`claimed_at`): `arggon list --stale --older-than 7d` reports stale claims, and reclaiming one is a **human-only** `update <id> --steal --reason "..." --assignee <you>` — agents are never allowed to steal. The CLI enforces this structurally (bug-cli-steal-not-gated): the repo must arm `x-tracker.allow-steal: true` in the tracker `.convention.yml` and the takeover must be confirmed at an interactive terminal; non-interactive (agent/script/CI) invocations are refused.
-
-Rules:
-
-- Do **not** set `in_progress` on a claimable item without `assignee` (`update` enforces this).
-- Initiative/epic may be `in_progress` without assignee (container status only).
-
-**Which copy is authoritative while a claim is in flight.** A claim made through `start` commits the item's frontmatter — `status`, `assignee`, `claimed_at`, `branch`, `worktree_path` — on the item's **branch**. Until that branch merges, the **branch's copy is authoritative** and the primary checkout's copy (normally `main`) still reads `todo`/unassigned. The disagreement is expected, not a lost claim: `show` from the primary legitimately answers `todo`, and `list`/`next` ranked from the primary cannot see the claim (every ranking envelope names the checkout it read — `rankedFrom`). Before treating a `todo`/unassigned item as claimable, run `arggon sync` and read its `branchClaims`: it reports the claims riding unmerged branches (`assignee` + `claimed_at` per branch, read from the branch copies themselves) and `branchClaimErrors` names branches it could not read. Treat a branch-claimed item as held — coordinate, and never force or steal to make the pool look clean.
+The [claim contract](./convention.md#claim-rule), [claim lease](./convention.md#claim-lease-claimed_at) and [terminal-state policy](./convention.md#reopen--status-policy) are canonical. For ordinary work use **start with a worktree**, not a bare status update; §4 gives the command. A refusal names a condition to remedy, not permission to bypass it.
 
 ## 3. Create bugs/tasks from findings
 
-When work reveals new work, create items under the correct parent story — this is the issue tracker (see §0); do not file GitHub issues:
-
-- `npm run arggon -- create task "Add rate limiting" --parent story-login`
-- `npm run arggon -- create bug "Login 500 on empty password" --parent story-login`
-- `npm run arggon -- create task "..." --parent <story-id> --json`
-
-Defaults: `status: todo`, quoted `YYYY-MM-DD` timestamps, omit `assignee` when unassigned. Leave new items `todo` unless you claim them immediately.
+Use [§0](#0-issue-tracking-the-tracker-arggonmanager-not-github-issues). Keep new work separate from the current acceptance contract.
 
 ## 4. Branch naming
 
-Generate the branch from the work item `id` following the configured patterns (tracker `.convention.yml`, `branch_patterns`):
+```bash
+npm run arggon -- start <id> --worktree --assignee <your-agent-role-id> --json
+```
 
-- `npm run arggon -- branch <id>`
+This claims, creates or attaches to the item's branch/worktree, commits and pushes the claim. Use the returned and recorded **`worktree_path`**, not a guessed sibling path. Do all edits, builds and commits there. One item → one worktree → one writer; never hand-roll `git worktree add` for a claim. `branch <id>` is bookkeeping for an existing workflow, not a replacement for this entry point.
 
-This checks out the branch and records it in the item's `branch` field. If the right branch already exists and matches, it attaches to it. Defaults follow `feat/<id>` / `fix/<id>` / `docs/<id>` (e.g. `feat/task-rate-limit`, `fix/bug-empty-password-500`).
+Move the session into that worktree (OpenCode: `session_move`), then `show <id> --meta --json` must confirm the claimed state, assignee and branch. Check `trackerRoot`/`trackerRootMismatch` on native operations; a shell's cwd alone does not establish the session binding. [Binding diagnostics](./references/orchestration.md) apply when these disagree.
 
-#### Worktree in the claim (`start --worktree`)
+Start prepares dependencies before the claim commit. If it refuses or reports an unusable install, fix the named cause and re-run start to attach to the **kept** worktree. Never run `npm ci` through a link to the primary install. Read [worktree mechanics](./references/agent-runtime.md#worktree-mechanics) for the exact readiness receipt, strict gates, hook and ownership diagnostics.
 
-The manual worktree step (`git worktree add ../<repo>-<id> -b <branch>`) can be folded into the claim: `arggon start <id> --worktree --assignee <login>` claims the item, creates (or attaches to) the worktree at `../<repo-name>-<id>`, and runs the claim commit / push / optional `--open-pr` inside it, recording the path on the item's `worktree_path` field.
+### Implement and verify
 
-Before the claim commit it prepares the worktree for the project gate:
+Keep the change on the item, stage explicit paths, and keep its acceptance ticks honest. Follow the [review bar](./engineering.md#review-bar-blocks-merge) and the project's declared verification commands. Run `arggon validate` before committing. Check every doc statement made false by the change and update it **in the same PR**; [documentation maintenance](./references/documentation.md#documentation-maintenance-docs-adrs-specs-plans) gives the change-type map.
 
-- **Linked installs.** When the primary checkout has a `node_modules` and the worktree does not (a fresh worktree never does), start links the primary install in — best-effort, reported as `linkedNodeModules` in `--json` and on stdout — so a dependency-needing pre-commit gate (`npm run arggon -- validate`) runs in the fresh worktree with no manual symlink dance.
-- **Workspace packages become a link farm.** When the worktree carries its own copy of a workspace package (here `@arggondev/lib`), the install is a per-worktree **link farm** — a real `node_modules` directory whose entries link the primary's packages — or a bare symlink to the primary install when the worktree shadows no workspace package. That copy is built with the package's own `build` script before the claim commit and resolved worktree-locally (printed on stdout). The build's exit is honored: a failed build never flips, so it falls back to the primary's copy even when it still emitted the entry; builds are skipped when the install cannot consume them (a bare symlink has no farm to flip, so an attach re-run does not rebuild). A local copy that could not be built stays on the primary's install and is named in `linkedWorkspaces` (`--json` + stdout).
+A non-trivial feature needs a spec and implementation plan before implementation; greenfield work first follows the [exploration protocol](../../skills/arggon-cli/references/exploration.md). Read [specs and plans](./references/documentation.md#specs-and-plans-for-non-trivial-features) for artifact and analysis gates, and the project's technology playbooks for stack-specific conventions.
 
-#### Readiness reporting (`manifestCoverage`)
+### PR, review verdict and merge
 
-**A linked install is only a mirror of the primary's, so it is only as current as that install**: a dependency declared in `package.json` after the primary's last `npm install` cannot be resolved from any worktree. Preparation reports that as `manifestCoverage: "stale"` with the names in `missingDependencies` (sorted, capped; `missingDependenciesTotal` is the full count) and `ready: false`, instead of reporting the mirrored install as ready.
+Open a small PR referencing the item id, with problem, approach and actual verification evidence. The delivery lead reviews every maker change against the canonical [review bar and verdict convention](./engineering.md#review-bar-blocks-merge), records the verdict **on the item**, and addresses change requests before merge. Green CI is necessary, not sufficient. The verifier supplies expected-versus-observed execution evidence; it does not approve.
 
-- `satisfied` means every declared top-level `dependencies`/`devDependencies` name resolves through the install on the worktree's resolution path — presence only: no version, no transitive walk, and `optionalDependencies` are excluded because being absent is what they allow.
-- `unknown` means nothing was compared (no install, an unreadable manifest) — it is never `satisfied`.
-- The signal is informational: a stale mirror still produces a usable, linked, claimed worktree.
-
-**Remedy: re-install the primary checkout (`npm install` _in it_ — never `npm ci` through a link to it) or give the worktree its own install (`npm ci` in the worktree, e.g. via `x-worktree.post-start: npm ci`).**
-
-#### Install hygiene
-
-- Start never commits the install (the claim commit stages only the item file) — but stage explicit paths, never `git add -A`.
-- The install is removed before a configured `x-worktree.post-start` hook runs (so the canonical `npm ci` bootstraps a real install instead of reifying through it and emptying the primary checkout) and re-created only when the hook leaves no `node_modules` (the re-link outcome is reported: `postStartRelink: "relinked" | "failed"` — never swallowed).
-- Hooks are never bypassed (`--no-verify` is never passed).
-
-#### Fresh-worktree install gate (bug-start-install-ordering)
-
-A start that **created** the worktree must leave a gate-usable install — or
-fail itself, before any claim commit, with the named cause. Whenever the
-preparation leaves a gate binary resolving outside the worktree (`external`,
-`path`, or `missing`), the claim is refused before the claim update with the
-offending bins, the bounded `prepSteps` log (which prep path ran: link farm
-created / reused / skipped-and-why, per-workspace build decisions), and the
-`npm ci` fix — no flag required. Attach re-runs keep the report-only receipt
-(or the `x-tracker.strict-gate-bins` refusal when armed), so the fix-then-
-attach remedy stays possible, and an empty `gateBins` report (nothing declared
-exposes a bin) never violates the gate. The preparation log rides the CLI
-`--json` envelope (`prepSteps`) and the native `preparation` payload (`steps`);
-a fresh worktree whose item file is unexpectedly clean at claim-commit time is
-a named error, never a silently skipped commit.
-
-#### Worktree env contract (`.arggon.env`)
-
-Every `--worktree` checkout carries a portable runtime environment (spec
-[worktree-env-contract-016](specs/spec-worktree-env-contract-016.md)): start
-writes a gitignored, dotenv-style `.arggon.env` at the worktree root with the
-per-worktree identity — `ARGON_ITEM` (the name the OpenCode plugin already
-correlates sessions with, deliberately un-prefixed), `ARGGON_WORKTREE_ID`
-(`<repo>-<item-id>`), `ARGGON_WORKTREE_PATH`, `ARGGON_WORKTREE_BRANCH`, and
-`ARGGON_STATE_DIR`/`ARGGON_CACHE_DIR` (per-OS state/cache bases — XDG on
-Linux, `~/Library` on macOS, `%LOCALAPPDATA%` on Windows — suffixed with the
-worktree id, created `mkdir -p`). A primary `.env` is seeded copy-if-absent
-(never overwritten, never interpreted); an existing `.arggon.env` (attach
-re-run) is left byte-identical; the read-only `git check-ignore` probe is
-reported as `env.gitignored`. The whole path is best-effort: `written: false`
-with a `warning` (the `x-worktree.env: false` opt-out, a write failure, the
-attach keep) never blocks the claim, and the env file is never staged — the
-claim commit still contains only the item file. Projects pull the convention
-in by reading the keys: servers bind an ephemeral port (`:0`) or one derived
-from the worktree id, and services are isolated by identifier (per-worktree
-database name/schema) against one local server — adopters who read none of it
-are unaffected. `cleanup --prune` reaps a start-created env file (contract
-shape only) before `git worktree remove`, so an unignored one never wedges
-pruning. The receipt rides both surfaces: the CLI envelope's additive `env`
-field and the native `preparation.env`.
-
-#### Single-writer ownership (claim stamp, exploration 017 F12)
-
-One claimed item → one worktree → one writer session: ownership is a
-convention every agent must hold, and start now carries the detection layer
-underneath it. **The worktree belongs to the session the stamp names** — the
-delivery lead owns the item, the maker owns the worktree while the claim lives
-(§Orchestration → Worktree ownership and collisions) — and no session writes in
-a worktree another live session holds.
-Every `start --worktree` writes a claim stamp (`arggon-claim.json`
-inside the worktree's **git dir** — never in the work tree, so it cannot dirty
-`git status`, block `git worktree remove`, or need cleanup) recording the owning
-identity (calling session id on the native tools, assignee on the CLI), the
-item, branch, claim timestamp, and surface. On an **attach** the previous stamp
-is read before it is replaced: a DIFFERENT identity plus tracked files modified
-after that claim is reported — a bounded, named warning (`claim.foreignWrites`
-in `--json`; `note: single-writer check — …` on stdout; the native
-`preparation.claim`) naming the stamped owner, the claim time, and up to 10 of
-the newer files with an exact total. Read it as "a concurrent writer may be
-active under the previous owner's claim" and check before writing — the F12
-incident (a claimed worktree written into by a concurrent session) is exactly
-this signature. With `x-tracker.strict-worktree-writes: true` the same
-observation refuses the attach before any item mutation; the remedy is
-coordination with the stamped session, then re-running `start --worktree` (the
-owner's own re-attach never fires — the stamp is refreshed with its identity).
-Detection is bounded and best-effort: one porcelain read plus one `stat` per
-dirty path, covering the UNCOMMITTED collision window; committed work is
-history, and a missing or unreadable stamp (pre-feature worktrees) degrades to
-no detection, never to a false accusation. A fired detection never re-stamps the worktree, so the previous owner stays stamped and every retry re-detects — a strict refusal cannot be unlocked by retrying. If the stamped session is gone, there are two recovery paths, and both start with the same step — confirm no live writer (ask the coordinator if you cannot tell):
-
-1. Take the worktree over explicitly — the designed, auditable path
-   (task-strict-attach-dead-owner-hatch). It applies only when the
-   detection actually fired: it re-stamps the worktree with your identity and
-   records a dated take-over naming the stamp it replaced (`claim.takeOver` in
-   `--json`, `note: single-writer take-over — …` on stdout, plus a bounded
-   `takeovers` chain in the stamp itself). On a clean attach there is nothing to
-   take over, so the flag changes nothing. Never use it to override a LIVE
-   owner: coordination is the refusal's first remedy and always cheaper.
-   - CLI: `arggon start <id> --worktree --take-over-worktree`
-   - Native tool: `tools.arggon.start({ id, assignee, takeOverWorktree: true })`
-     (default OFF, requires `worktree`; the take-over rides
-     `preparation.claim.takeOver`).
-2. Remove the stamp by hand:
-   `rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"` —
-   the escape hatch for the case where the take-over is not available at all
-   (an older CLI or plugin build without the flag). It discards the ownership
-   record, so prefer (1).
-
-The **native** refusal therefore no longer advertises a plain re-run: while the fired detection stands, every retry re-detects against the same evidence, so it names the take-over input instead (the shared kernel refusal still carries the coordinate-first advice — "coordinate with the stamped session, then re-run start --worktree" — which is correct when the owner can still re-attach and refresh the stamp; a crashed owner has no such session, which is what the take-over and the manual `rm` are for).
-
-#### Failure semantics
-
-A failure after the worktree exists **never** rolls it back: the worktree and branch are kept for inspection, and the error names the failing step, the worktree path, the remediation, and the fact that re-running `arggon start <id> --worktree` attaches to it. A failed push is the exception — attach does not retry it, and the error instructs `git push -u origin <branch>` manually.
-
-#### Force-push spellings: what the seam permits and what it refuses
-
-The generated seam's shell gates discriminate on the **lease**, never on how `--force` is spelled. Know this before you attempt one:
-
-- **Permitted** — `git push --force-with-lease origin <branch>`, `git push --force-with-lease=<ref>:<expect> origin <branch>`, and `git push --force-if-includes …` (in either order with `--force-with-lease`). They are lease-checked: git refuses the update unless the remote ref still points where your remote-tracking ref says it did, so they replace history **you** published without clobbering work you have not seen. **This is the spelling to use after a rebase** — `git push --force-with-lease -u origin <branch>` is the shape the claim loop takes.
-- **Refused** — bare `--force` (`git push --force origin main`), `-f`, and the `+refspec` spelling (`git push origin +main`, refused even next to a lease flag). `git commit --no-verify` is refused by the same block. The refusal arrives as `{"error":{"type":"permission.rejected","message":"Permission denied: shell"}}` from the session's own shell layer — not as a git error, and not as an auth or lease failure.
-- **The refname is not part of the discriminator.** `git push --force-with-lease origin main:other` is permitted as well: the colon-free `git push --force-with-lease origin main` is permitted too, so refusing the colon form would refuse legitimate spellings (`HEAD:<branch>`) while refusing nothing it means to refuse — this seam's own defect class, recorded in `bug-force-push-gate-blocks-the-rebase-path-the-lead-must-use`.
-- **Text matching has a known limit.** The gate reads shell text, so a command that combines an allowed lease flag with a _second_, bare `--force`/`-f` is not caught, and neither is a force push hidden behind a separator or an interpreter (`cd x && git push --force`, `bash -c "git push --force"`). The kernel invariants, the pre-commit `arggon validate` gate and CI stay the enforcement of record: this gate stops the accidental spelling, not a determined one. On the ZCode and Claude Code seams the hook gate (`hooks/gate.mjs`) still denies `--force-with-lease` with the same over-broad `--force\b` matcher, so use the flag spelling and expect the refusal there until that seam is fixed separately.
-
-#### Which layer enforces the seam's shell gates
-
-Probed 2026-10-15 (`bug-task-permissions-enforcement-not-observed`, harness `npm run smoke:permissions-probe`; OpenCode v2.0.29) — one denied and one allowed command per client runtime, recorded as command / expected / observed / exit / does-NOT-prove:
-
-- **OpenCode V2 session — honors it.** The runtime's own permission layer reads the project `permissions` block for every agent (the project rules are appended after each agent's own rules, last match wins). A session started _without_ the block allows `git commit --no-verify -m probe`; after the block is written to the same fixture, the _same_ session refuses it (`Permission denied: shell`). That holds for a fresh headless `opencode run`, for a session continued across runs, and for a session attached to a long-lived background service (the desktop app's runtime shape) — a running session is not stuck with a frozen permission surface.
-- **ZCode and Claude Code seams — their own gate, not this file.** Neither seam reads `opencode.jsonc`; the plugin bundle's `hooks/gate.mjs` PreToolUse gate denies `git push --force` / `-f` / `+refspec` and `git commit --no-verify` for every session (fail-open by design) and still refuses the lease-checked spelling.
-- **The native plugin — no permission surface of its own.** The vendored bundle registers tools and session hooks; it declares no `config` hook and no permission rules, so its tools are filtered by the runtime's permission layer and its kernel calls are refused by the kernel.
-- **The CLI / kernel — the enforcement of record.** Reopening a `done`/`cancelled` item and stealing a claim are refused whatever any client's permission surface says; ordinary tracker writes are not impaired.
-
-An earlier observation on this topic (a live session allowing both denied dry-runs after the file was repaired, 2026-10-02) **could not be reproduced** on the current runtime and config state; the probes above are the recorded answer, and the harness is what keeps it honest — a leg that cannot run records a skip, and a probe whose permission layer was never exercised is inconclusive, not a pass.
-
-Impact class: **Behavioral** ([ADR 0016](./adr/0016-adopter-upgrade-channel.md)) — the permitted set changed for every session (the deny used to catch `--force-with-lease`, which stopped a live wave at the merge step on 2026-10-11), so an adopting repo absorbs this through the propose channel and an agent must re-learn which spelling to reach for.
-
-#### Cleanup
-
-When the work is done and merged, `arggon cleanup` lists (and with `--prune` removes) the stale worktrees; a kept worktree you do not want (e.g. after a claim conflict) is discarded with the exact command the failure message prints (`git worktree remove --force <path>`, plus `git branch -D <branch>` when start created the branch). `cleanup --prune` also auto-commits (it clears `worktree_path`), so push main right after it — an unpushed cleanup auto-commit has traveled as contraband on a branch cut before.
-
-`--prune` is honest about what it can actually remove (bug-cleanup-prune-untracked-artifacts-no-force). A terminal+merged worktree with removal-blocking content is **not** reported `removable: true` and then failed on a raw git error; classification probes the worktree (`git status --porcelain`) and skips it with a reason that names the blocking files and the exact remedy:
-
-- **Untracked blockers** (generated scaffolding that only ever lived in the worktree — agent-harness output, local tool state, the incident's `.opencode/harness/`) — `removable: false`, with `blockingPaths`/`blockingTotal` in the envelope. Nothing is discarded without the opt-in: `--force` (native: `tools.arggon.cleanup({ prune: true, force: true })`) reaps it by passing `--force` to that removal alone, reports `forced: true` on the candidate and the `removed worktree` action, and stops there — a terminal+merged item only, never a live claim, never a tracked modification. Without the flag, unknown untracked work is safe from an accidental prune; `--force` requires `--prune` and is refused alone. The skip also names the manual sequence (`git worktree remove --force <path>`, `git branch -D <branch>`, then `arggon cleanup --prune` to clear the record).
-- **Tracked modifications** — refused WITH and WITHOUT `--force` (`blockingTracked`/`blockingTrackedTotal`): the force opt-in never discards uncommitted tracked work. Commit or discard it first.
-- The start-owned artifacts every run reaps itself — start's install link/farm and a start-shaped `.arggon.env` — are never blockers, so those worktrees keep pruning exactly as before.
-
-`--prune` only reaps **finished** work (terminal item + merged branch), so it cannot reap an **abandoned claim**: an item back in `todo` is invisible to it. That is what `--release <id>` is for (bug-unclaim-leaves-worktree-record-without-reaper) — the inverse of `start --worktree`, the other arm of the same worktree domain:
-
-- `arggon cleanup --release <id>` (native: `tools.arggon.cleanup({ release: "<id>" })`) removes that item's worktree, deletes its branch, reaps the start-created `.arggon.env` and the `arggon-claim.json` stamp, and clears the `worktree_path` record — reported as its own `release`/`released` action family, never mixed into `pruned`. Run it from the checkout whose tracker copy carries the record: the claim commit rides the feature branch, so before it merges that copy is the **worktree itself** (release from the claiming session's worktree).
-- It is **refused**, never forced, while the item is still `in_progress` with an assignee: a re-claimed item has a live owner, and the cheap remedy is that owner's own unclaim. `--take-over-worktree` does **not** bypass this (the hatch is for a _presumed-dead stamped owner on an unclaimed item_, where nothing durable would record the override).
-- Two more refusals, same shape and same both-surfaces reporting: a stamp held by another identity whose window shows a live writer (the F12 evidence rides `release.foreignWrites`), and a worktree with uncommitted or untracked content (`release.blockingPaths`/`blockingTotal`) — refused during classification, before anything is reaped, so a failed release leaves the worktree's claim stamp and `.arggon.env` standing and the next attempt still has its evidence. The claim stamp is reaped only AFTER an observed removal.
-- `arggon cleanup --release <id> --take-over-worktree` / `tools.arggon.cleanup({ release, take_over_worktree: true })` is the audited hatch for a presumed-dead stamped owner, exactly like `start --take-over-worktree`: it passes those two refusals, records the replaced stamp in `release.takeOver`, and is the only thing that forces a release's removal (prune's own, narrower opt-in is `--force`, above) — so uncommitted work is never discarded silently. Without a release it is refused (`--take-over-worktree requires --release <id>`), and `--force` is refused without `--prune`.
-- A recorded worktree that is already **gone as work** — the directory removed, or leftover debris whose gitdir link is gone (git lists the record `prunable` after an interrupted removal, or a manual `git worktree prune` dropped it) — is a stale record, not a release target (bug-cleanup-release-stale-record-wedge): the release skips the removal, prunes the dead git record itself (no manual `git worktree prune`), still deletes the branch that record names — the worktree can no longer be asked and the unclaim cleared the item's `branch` field — and clears the `worktree_path` record, leaving any leftover directory in place.
-- A `blocked` item is not a claim (it keeps its assignee as context, not as a lease), so it is not refused here — the single-writer and content gates still protect a live writer.
-- `--release` and `--prune` are mutually exclusive — two reapers, one run.
-
-Native `tools.arggon.start` uses that same kernel dependency-preparation path before its explicit claim commit. Its bounded `preparation` and `claimCommit` receipts make a required install, pre-commit gate, or claim-commit failure a typed failure (with the worktree kept and an attach/retry instruction), never an unqualified success; see §Orchestration → Native `start` dependency contract.
-
-One primary claimable id per branch when possible. Open a PR early; keep it small.
+The lead verifies the PR actually reads **MERGED**, not merely that auto-merge is armed. A dirty/behind branch requires [merge recovery](./engineering.md#merging-a-pr-refused-as-out-of-date), preserving both maker and reviewer records. Never leave a reviewed PR unmerged without a named blocker on its item; a deployment that requires a person to merge has that named delivery boundary.
 
 ## 5. Done criteria
 
-An item is **done** when:
+Operational **done** means all of the following:
 
-1. The item's **live `## Acceptance` section** carries at least one acceptance criterion and every one of them is ticked (or the flip is explicitly waived in Notes with rationale). This is kernel-enforced ([ADR 0015](./adr/0015-done-gate-acceptance-waiver.md), scoped by [ADR 0025](./adr/0025-done-gate-live-acceptance-section.md)): `update --status done` on a task/bug is refused when that section still has an unticked criterion **or** when it publishes no criterion at all (absent, empty, or still the template placeholder). Boxes inside dated `## Notes` comment blocks are history, not the contract, and a `- [ ]` row inside a **fenced code block** is content, not the contract either — a bug item whose repro shows what a formatter does to a checkbox row is exactly the shape that used to be stuck. So the honest fix is to write (or transcribe) the criteria in the live section, never to tick history or fence a criterion; the alternative is a HUMAN passing `--waive "<reason>"` (records a dated `### Waiver` section in the body; agents cannot waive — the MCP/native tools expose no waive parameter).
-2. Frontmatter `status` is `done` via `arggon update <id> --status done`.
-3. `updated` date is refreshed (`arggon update` does this automatically).
-4. The PR referencing the work item id is merged (or the completing change is on the default branch).
+1. The live `## Acceptance` section has at least one real criterion and all criteria are ticked, or a human has explicitly waived the gate with a recorded rationale. The [acceptance grammar and kernel gate](./convention.md#acceptance-rows-the-one-grammar) decide what counts; historical comments and fenced repro boxes aren't criteria.
+2. The completing PR is **merged**, or the completing change is on the default branch.
+3. The delivery lead runs `arggon update <id> --status done`; `updated` is refreshed automatically. Claim first: do not jump `todo` → `done`.
 
-Do **not** jump `todo` → `done` — claim first (`in_progress`), then complete.
+Never claim completion before the merge. The kernel also refuses a leaf's done flip while an open PR targets its branch. Product acceptance is separate: use the canonical [promotion policy](./engineering.md#product-acceptance-product-owner), not a substitute for honest acceptance ticks. Human-only overrides are in the [authority map](./engineering.md#roles-and-authority); an agent never self-waives.
 
-**The checklist is the domain-invariant done contract**: it is what the project declares as done, whichever tool checks it, in any domain (ADR 0021 §6.2). The kernel enforces it — see 1 above; nothing about it is a software artifact.
+Terminal updates can cascade to ancestors only when their subtree is terminal and their own acceptance permits completion. Use `--no-cascade` for administrative close-out that must not complete product containers. [Container rules](./convention.md#parent-status) carry the schema detail. Don't model administrative leaves as a product container's sole child.
 
-**Product acceptance is separate, bounded and never a gate.** For a `story` container the product owner may additionally record an acceptance as an `accept:` comment; the promotion-policy tiers decide which items ever reach them (leaves are agent-self-certified by default), and the acceptance is **recorded, never enforced** — the tracker has no identity, so it can be attributed but not authenticated ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §3/§4; `ArggonManager/docs/engineering.md` §Review bar → Product acceptance). An acceptance written by the item's own assignee is reported as self-accepted, never blocked — and never a substitute for the checklist being honest. The enforced human steps are the four irreversible ones: steal, waive, force, reopen (§Roles and authority).
-
-**Automatic container completion:** updates that reach a terminal state (`done`/`cancelled`) auto-complete any ancestor container whose entire subtree is terminal (up to the initiative; see the exception in `ArggonManager/docs/convention.md`). Use `--no-cascade` when ancestors must not be touched. The cascade is predictable, but closing an **administrative** task (adoption/migration bookkeeping) should consciously pass `--no-cascade` when its product containers must stay open — and never model administrative leaves as sole children of product containers. The cascade is acceptance-aware: a container whose own body still has unchecked acceptance checkboxes is never auto-completed — tick the checklist (or use `--no-cascade`) when a container must stay open.
-
-### Auto-done on merge
-
-The `auto-done` workflow (`.github/workflows/auto-done.yml`) mirrors `start` on the done side: when a PR referencing `task-*`/`bug-*` ids merges into `main`, it flips claimed items to `done` through `arggon update`, runs the test suite on the flip tree, and lands the change as a squashed `github-actions[bot]` PR (the workflow posts the required `cli` check on the flip commit itself — bot pushes/PRs don't trigger CI). Limits you must still cover yourself:
-
-- It only performs the legal `in_progress` → `done` transition. Items still `todo` or `blocked` when the PR merges are skipped with a warning annotation — claim before merging, or mark them manually.
-- It never edits acceptance checklists and never touches containers (story/epic/initiative) — tick the checklist in the item's live `## Acceptance` section before the PR merges; fenced repro boxes and dated comment blocks never count, so nothing in a body has to be rewritten to satisfy the gate. Since the done gate ([ADR 0015](./adr/0015-done-gate-acceptance-waiver.md), scoped by [ADR 0025](./adr/0025-done-gate-live-acceptance-section.md)), a flip refused by the gate is tolerated like the skipped-todo case: a warning annotation, and the item stays `in_progress` until a human ticks the live checklist, publishes one where there is none, or waives (`arggon update <id> --status done --waive "<reason>"`).
-- Reference the item id in the PR title or body (the id is what the workflow greps for).
-
-**Why flip PRs can wedge:** merging several PRs rapidly triggers concurrent auto-done runs, and sibling main commits (other flips, review comments) make the open flip PRs out-of-date, so the bot's self-merge fails — and it cannot be repaired with `update-branch`, because a rebased bot head would lack the required `cli` check (bot pushes never trigger CI). The workflow is race-tolerant since task-autodone-flip-race: before each merge attempt it rebases the flip branch onto fresh `origin/main`, re-posts the `cli` check on the new head, and retries (3 attempts). If the rebase itself conflicts — possible since task-autodone-flip-wedge-3, when a coordinator `arggon comment` on a flipped item auto-commits the same item file to main mid-flight — the workflow instead redoes the flip on a fresh `origin/main` worktree (bounded, 2 attempts: re-run the idempotent `update --status done`, push a new flip branch, re-post the check, merge, delete the wedged branch). If it still fails, the only recovery is an admin merge of the flip PR — the run log names this in a `::warning::`.
+After merge, `arggon cleanup` lists finished worktrees; inspect before `cleanup --prune`. [Recovery](./runbooks/agent-recovery.md) covers failed auto-done, unclaim/release and removal blockers.
 
 ### Blocked
 
-Set `status: blocked`, keep `assignee` on claimable types, and set non-empty `blocked_reason` per convention:
-
 ```bash
-arggon update <id> --status blocked --blocked-reason "Waiting on OAuth app credentials"
+arggon update <id> --status blocked --blocked-reason "<specific missing prerequisite>"
+arggon handoff <id> --next "<first step for the resuming agent>" --open-questions "<unresolved question>"
 ```
+
+Keep the assignee as context on a blocked item. Leave bounded context on the item whenever stopping, completing or handing off; `comment`/`handoff` append history without reopening terminal items.
+
+### Auto-done on merge
+
+For this repository's workflow and its limits, read [auto-done](./runbooks/agent-recovery.md#auto-done-on-merge) when relying on it. It does not repair acceptance checklists.
 
 ### Unclaim
 
-`in_progress` → `todo` clears `assignee` and the recorded `branch` (v0). Prefer
-that over leaving a stale claim:
-
-```bash
-arggon update <id> --status todo
-```
-
-**Unclaiming does not release the worktree.** A claim made through
-`start --worktree` also owns a worktree, a branch, a `.arggon.env` and a claim
-stamp, and the assignee is only one of those: the worktree survives the unclaim
-(only `worktree_path` stays recorded, since `update` is a frontmatter-only
-operation — it is the very call `cleanup` uses to clear that record, and it must
-never destroy a working tree on a status flip). So the unclaim call itself
-reports what it left behind and names the path that reaps it — `claimFootprint`
-in the `--json` envelope, `⚠ claim dropped: … release it with: arggon cleanup
---release <id>` on stdout, and the native `update` tool's `claimFootprint`
-carrying `tools.arggon.cleanup({ release: "<id>" })`. If you drop a claim that
-created a worktree, release it with `arggon cleanup --release <id>` (§Cleanup);
-nothing else will, because `--prune` only reaps terminal, merged work. The
-receipt is **unclaim-only**: a `→ done` flip leaves the same footprint, but there
-`cleanup --prune` is the merge-gated remedy (a release force-deletes the branch
-and never checks merge state), and a blocked item keeps its assignee, so neither
-names a release.
+For an abandoned claim use [unclaim and release](./runbooks/agent-recovery.md#unclaim): clearing the assignee does not release the worktree.
 
 ### Reopen
 
-Agents **MUST NOT** reopen `done` / `cancelled`. This is enforced, not just documented (bug-reopen-ungated-cli): the MCP layer refuses agent callers via the shared rules module lib/src/rules.ts, and the CLI — which has no caller identity — gates the transition behind an interactive terminal: `arggon update <id> --status todo` on a `done`/`cancelled` item requires a `y/N` confirmation over a TTY stdin. Piped stdin (agents, scripts, CI) is refused even with `y` piped in; there is no `--yes` override and no config opt-in. Humans keep the ability by confirming at their terminal.
+Follow the [terminal-state policy](./convention.md#reopen--status-policy). Create follow-up work instead of reopening a terminal item.
 
 ## Orchestration (multi-agent work)
 
-Non-trivial items are **orchestrated by default**: the delivery lead delegates them to subagents instead of working them inline. Trivial items (one-line fixes, doc tweaks) stay inline.
+Non-trivial items are **orchestrated by default**: the delivery lead delegates instead of implementing inline. Trivial items stay inline. [Engineering](./engineering.md#roles-and-authority) owns the role table, named authority and promotion policy, not a separate agent dialect.
 
-**OpenCode V2 is the reference implementation** ([ADR 0010](./adr/0010-opencode2-native-architecture.md)): the rules below are unchanged, but on V2 they are enforced with native primitives. `arggon init` generates the surface (`.opencode/agents/`, `.opencode/commands/`) — one of the selectable adapter seams (§Prerequisites → Agent seams), so pass `--agents opencode` when that is the seam you want and the others are not:
+- Plan file-disjoint waves; items touching the same files belong in separate waves.
 
-- **Agents, by role** ([role table](./engineering.md#roles-and-authority); ADR 0021 §6.1/§6.2a′): `arggon-delivery-lead` (**delivery lead**) plans waves, delegates, reviews and owns the tracker; `arggon-maker` (**maker**, subagent) owns exactly one item; `arggon-standards-reviewer` (**practice & standards**, subagent) reviews read-only; `arggon-verifier` (**verifier**, subagent) executes the project's verification gates a verdict needs and returns expected-vs-observed evidence. Each id names its **role** — never the software title, never the process verb — and each prompt opens with the role and points at that table, so the contract and the table cannot drift.
-- **An agent claims as its role id, never as the product owner's login** (ADR 0021 §5): stamp `assignee: "arggon-delivery-lead"` on the claim you take — a claim identifies **its writer**, and the writer is not the owner. The schema already allows an agent id (`assignee` is "GitHub login **or agent id**"), so this is doctrine, not migration. `@me` resolves the **human** login, so an agent claim correctly does **not** appear under `--assignee @me`: that is the signal working, not a bug. Filing agent work under the owner's login is what makes it look like human ownership in `list --assignee @me`, stale-claim reports and CODEOWNERS review routing.
-- **Permissions keep the model honest**: the delivery lead's `subagent` allow-list is `arggon-maker` / `arggon-standards-reviewer` / `arggon-verifier` / `explore` (any other agent is denied, and the list is pinned to the shipped ids by a test — a rename can never silently strand the lead); makers cannot launch subagents (nesting stops at one level); the standards reviewer cannot edit — `edit`/`write`/`patch` are removed from its catalog while reads and shell stay available for the review.
-- **The generated seam bytes are what your session runs** (bug-generated-seam-bytes-predate-050): `.opencode/plugins/arggon/index.ts` is a generated, gitignored copy of the committed bundle, so a release can merge while your machine's copy stays a version behind — and the native `tools.arggon.*` surface you call is whatever those bytes said when the session started (a missing tool input is a symptom, not a bug in the tool). After pulling a release, refresh the generated seam (`arggon init`, or `npm test`, which rewrites the copy) and **start a new session**; `arggon doctor` reports it either way (`vendored plugin current` / `STALE` / `unverified` — "unverified" means the tree has no local bundle, which is a plain adopter tree vendored from the installed package), plus the CLI skill's frontmatter version against the release.
-- **Who proves, who reviews** (`task-prover-agent-reviewer-split`, Behavioral per ADR 0016 — an agent's operating contract changes): `arggon-standards-reviewer` (**practice & standards**) is **read-and-reason**. It does not run the project's gates; when its verdict genuinely needs execution evidence it ends its report with a `## Probes needed` block (exact command + cwd + what it demonstrates + what the result would change), and the delivery lead routes those to `arggon-verifier` (or runs them itself) and hands the evidence back. `arggon-verifier` (**verifier**) is the mirror image: **shell allowed** for the gates, `edit`/`subagent`/every tracker write and `git commit|push|merge|rebase` denied, and its output contract is `command / expected / observed / exit / does NOT prove` — expected-vs-observed, verbatim output, failures never summarized as passes, skips reported as skips, and every result bounded by what it does not prove. Its tracker **reads are granted explicitly** (`show`, `list`, `next`, `report`, `validate`, in both the native and the MCP spellings; `bug-verifier-cannot-read-the-tracker-no-allow-side`), so the read-only boundary is **config-enforced, not prompt-enforced**: the permission block removes the denied write tools — `comment` included, since a body append is a tracker write — from the verifier's session catalog while the granted reads stay callable, and the prompt's "never post to the tracker" restates what the config already refuses. It **reports, it does not rule**: the verifier decides nothing — no verdict, no approval, no `done` — so its evidence never becomes an approver's (ADR 0021 §6.1). Rationale: a reviewer that runs gates burns its context on execution, races the maker's own runs, and can hit environment walls (a stale `lib/dist`, a missing fixture) that it then reports as findings. On the ZCode seam the split is structural: the standards reviewer's `tools:` allowlist carries no shell at all, and no verifier is shipped for v1 — the delivery lead or the maker runs the probes there.
-- **Flow**: the claim comes **first** and the worktree comes from it — the delivery lead claims the item it is about to dispatch through `tools.arggon.start({ id, assignee, worktree: true })` (CLI: `arggon start <id> --worktree`), then launches the maker into the recorded path; an agent that works an item itself claims it the same way (one worktree per item, recorded on `worktree_path`; `opencode.session_move` moves the session into the worktree, and every `tools.arggon.*` call resolves the tracker root from the **calling session's** directory, so the move is what carries tracker writes onto the item branch — `docs/opencode2.md` §Where every native tool resolves the tracker root); the delivery lead launches makers **foreground** (a background child would outlive a headless `opencode run`); the native `arggon` tools carry tracker reads/writes while git stays on the shell; verdicts land **on the item** with `arggon comment`, never as GitHub comments. `/arggon-review` runs the standards-reviewer pass; `/arggon-done` verifies the checklist, the merge and the gates before the delivery lead flips the item.
-- **A moved session is not a guarantee — verify the binding, do not assume it** (bug-native-arggon-tools-resolve-tracker-root-to-session-cwd): `session_move` **does** rebind the tracker root (verified against the real runtime 2026-10-05), but it only helps a session that actually moved. A worker whose _shell_ is in a worktree while its _session_ is still in the primary used to resolve the primary, commit there and report `ok: true` with a hash — silently, which is how 7 open PRs became invisible to the tracker. Two rules close it, and a worker follows both:
-  1. **Move the session, then confirm it.** After `opencode.session_move`, one read settles it: `tools.arggon.show({ id, meta: true })` must answer with the item's claimed state (`status: in_progress` + `assignee` + `branch`). If it answers `todo` with no assignee, the session is still bound to the primary — move it, do not start writing.
-  2. **Never rely on the write to report where it landed.** When a worktree is involved the envelope carries `trackerRoot` (the checkout that answered), `trackerWorktree` (the `.arggon.env` identity read from it — spec [worktree-env-contract-016](specs/spec-worktree-env-contract-016.md)) and, when the caller declares a worktree the call did not resolve into, `trackerRootMismatch`. A **write** in that state is **refused** with `error.code: "TRACKER_ROOT_MISMATCH"` naming the resolved-vs-expected mismatch; a **read** reports it instead of failing, so the state is detectable without a mutation. The remedy is named in the refusal: move the session into the declared worktree, or clear the stale declaration.
+<!-- arggon:excerpt start: dispatch -->
 
-  Sourcing a worktree's `.arggon.env` (the pairing the README documents) is ONE
-  way to give the seam an expectation — it is no longer the only one, and it is
-  no longer load-bearing. Since bug-native-guard-silent-without-worktree-declaration
-  the **claim itself declares**: `start --worktree` writes the worktree's
-  `.arggon.env` at claim time, and an item-scoped call that declares nothing
-  reads that footprint from the sibling worktrees of the resolved checkout
-  (`git worktree list`, keyed by the call's item id). A write from an unsourced,
-  unmoved session to an item whose claim lives in a worktree therefore
-  **reports** `trackerRoot` + `trackerRootMismatch` — the claiming worktree named,
-  with the file its declaration was read from — instead of proceeding silently:
-  the state the incident hid now rides every item-scoped envelope, read or write.
-  It reports rather than refuses because the claim's own lifecycle legitimately
-  writes from the canonical checkout (the post-merge terminal flip, the unclaim
-  of a dropped claim); the decision, its bounds and the exemptions are in
-  [opencode2.md](opencode2.md) §The binding guard → Design decision. **Rule 1 is
-  still load-bearing** — a report tells you a write landed in the wrong place, it
-  does not reroute it — but it is no longer the only thing protecting the
-  unsourced case.
+- **Claim before dispatch (task-coordinator-claims-through-native-start):** the lead calls `tools.arggon.start({ id, assignee, worktree: true })` before launching a maker, and passes the returned worktree path. Stamp the writer's role id, never the product owner's login. Never dispatch a maker as first claimant or hold an idle claim; unclaim **and release** unused worktrees.
+- Launch makers foreground in headless OpenCode runs. Each maker confirms its existing claim and works only in the handed-off worktree; it does not re-claim, replace a live writer's stamp, or flip done.
 
-- **Evidence harness**: `npm run smoke:opencode:wave` runs headless `opencode run` sessions on a fixture with a **local bare remote** — permission probes (standards reviewer edit denied, maker subagent denied, delivery-lead allow-list), then a scripted four-phase wave (plan → two foreground makers in disjoint worktrees → reviewer verdicts → merge verification and done flips) and the run's context accounting. Separate from `npm test` and from `npm run smoke:opencode`; both are **model-driven and timing sensitive — run each one alone**, never beside a test suite or another headless harness (a stalled provider call can leave a scenario half-done past the per-command timeout); exits 0 with `skipped: opencode not installed` when the binary is absent.
-- **Deterministic native-start gate**: `npm run smoke:native-start-cold` is the model-free, offline counterpart for the worktree path itself (needs `npm run build` first): on a disposable fixture it proves a dependency-requiring `pre-commit` gate fails in a cold worktree, then drives the real `tools.arggon.start` seam and requires a bounded readiness/claim-commit receipt, a claim commit containing only the item file, a deterministic re-run attach, and untouched primary installs. Run it whenever `start`/worktree behavior changes — it needs no provider, so it is safe beside anything and it complements (never replaces) the wave transcripts above.
+<!-- arggon:excerpt end: dispatch -->
 
-**Delivery lead duties** ([role table](./engineering.md#roles-and-authority), ADR 0021 §6.1):
+- The lead owns tracker state, conflict coordination, review and merge verification, and final `validate`/`doctor` checks. Sequencing is not authority to change product priority; use the [authority map and decision brief](./engineering.md#roles-and-authority).
+- Follow §4 for implementation, evidence, verdict and merge, and §5 for close-out. Report findings to the lead for consolidation.
 
-- **Wave planning by file-disjointness:** group claimable items into waves whose members touch disjoint files/modules. Items that would collide go in different waves.
-- **Claim before dispatch (task-coordinator-claims-through-native-start):** claim every item you are about to delegate — `tools.arggon.start({ id, assignee, worktree: true })` (CLI: `arggon start <id> --worktree`) — **before** launching its maker, then launch into the path the claim returned; `assignee` is **your role id** (see §Agents, by role above), never a human login. The claim is not bookkeeping wrapped around the worktree, it _is_ the worktree step: one call takes the single-writer stamp (§Single-writer ownership), creates `../<repo>-<id>`, pre-builds the workspace packages that copy owns, writes the claim commit and records `branch` + `worktree_path` on the item. The ordering is the substance: the maker's prompt must carry the worktree path, and the **recorded** `worktree_path` is the only honest source for it — `../<repo>-<id>` is a convention guess that drifts silently. A maker-first claim leaves every `start` guarantee inert — no stamp (so no foreign-writer detection), no recorded `worktree_path` (`cleanup` can then neither classify nor reap the worktree), no worktree install/pre-build and no `gateBins` receipt — which is how unowned worktrees accumulate beside items that are still `todo`.
-  - Never hand-roll `git worktree add` for a claim, and never let a dispatched maker be the first claimant.
-  - Never claim an item you are not dispatching: an idle claim takes the item out of the pool and records a writer that is not writing. Unclaim it instead — `tools.arggon.update({ id, status: "todo" })` clears the assignee (v0; `--force` on `update` is human-only and never the remedy). **When the claim created a worktree, the unclaim is only half the job** (bug-unclaim-leaves-worktree-record-without-reaper): the worktree, its branch, its `.arggon.env` and its claim stamp outlive the assignee, `cleanup --prune` cannot reap a `todo` item, and nothing reaps it otherwise. So unclaim **and release** — `tools.arggon.cleanup({ release: id })` (CLI: `arggon cleanup --release <id>`), run from the checkout carrying the record (§Cleanup: the worktree copy, until the claim branch merges). The unclaim's own `claimFootprint` receipt names that command on both surfaces; a release is refused while another session's live writer holds the worktree (`take_over_worktree` / `--take-over-worktree` is the audited hatch for a dead owner).
-  - A start **refusal is evidence, not a retry** — read the cause it names (see §Native `start` dependency contract): claim already taken → do not dispatch that item, pick another or reconcile the existing claim; gate binaries that do not resolve inside the worktree → `npm ci` in the returned worktree, then re-run `start` to attach. That refusal has **two** arms with the same remedy — it is **unconditional** for a worktree this start created (a `start` that created the worktree vouches for its install; `bug-start-install-ordering`) and is what `x-tracker.strict-gate-bins` (armed in this repo) turns on for an **attach**; `--force` never applies to `start` and never gets you past either. A single-writer refusal (§Single-writer ownership) is the same shape — coordinate with the stamped session; `--take-over-worktree` is only for a **dead** owner, never a live one.
-- **Per-item worktrees:** one maker per item, each working in its own worktree — the item's recorded `worktree_path` (`../<repo>-<id>` is the naming convention `start` follows, not a path to re-derive), created by that claim and never by hand; no two makers share a working tree.
-- **Code review (practice & standards):** the delivery lead reviews **every** maker's change before merge — against **the blocking bar the project's engineering docs declare** (this project's: `ArggonManager/docs/engineering.md` §Review bar — architecture-first, conventions first, quality/scalability/security bar, evidence travels with the change, docs travel with code, scope stays on the item, **blocking end-to-end check**; the software worked example of that bar is probe evidence in the verdict for a CLI change and a real-browser drive via Playwright CLI for a UI change) plus the coordination specifics: surgical staging, no cross-item files, no unrelated reformatting, acceptance ticks honest. Change requests and verdicts go back to the maker via `arggon comment <item-id>` on the item (auto-committed to the tracker) — never as GitHub PR comments — and are addressed before merge; only a review that passes merges. Verdict comments start with the bounded `verdict: approve | request-changes` header line (`docs/engineering.md` §Review bar → Review verdicts), which `arggon sync --json` classifies report-only per PR-reconciled item. Green CI is necessary, not sufficient.
-- **Merge verification:** after each maker's change, the delivery lead verifies the merge — arming auto-merge (`gh pr merge --auto --merge`) is not ensuring merge. After arming, poll or re-check until the PR reads MERGED; on DIRTY or BEHIND, merge main in, resolve (keep both the maker report and the lead verdict), validate, push, re-verify — never leave a reviewed PR unmerged without a named blocker on its item. The kernel enforces the flip side: flipping a leaf to `done` while an open PR targets its branch is refused (merge-ownership close-out, bug-auto-merge-armed-not-merged), so the flip and the merge are linked steps, not two unlinked ones. When waves overlap, the delivery lead resolves cross-item conflicts.
-- **Tracker ownership:** the delivery lead owns tracker state — claim conflicts, blocked items, follow-up filing, and final wave verification (0 open items, `arggon validate` ok, `arggon doctor` clean).
-- **Sequencing ≠ priority:** the delivery lead decides **what is built next and in what order**, who is dispatched, and the tracker state; the `priority` field is the **product owner's** ([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §2/§6.1). Recommend a priority change — never present your ordering as the priority call, and never let a wave plan read as one.
-- **Bringing a decision to the product owner (the decision brief):** when a decision owes the owner's answer, the lead writes a bounded, plain-language brief **on the item** rather than asking in a session — the six fields, the `decide:`/`decided:` grammar and the routing rule are in the subsection below. Phrased in role language: the brief is **what the lead brings to the product owner**. It does not move any authority — the map lives in [`ArggonManager/docs/engineering.md`](./engineering.md) §Roles and authority and is unchanged (the lead still recommends, the owner still decides).
-
-### Worktree ownership and collisions
-
-One claimed item → one worktree → one writer: the worktree belongs to the
-session its claim stamp names (`arggon-claim.json` in the worktree's git dir —
-§Single-writer ownership). The delivery lead owns the **item**; the maker owns
-the **worktree** while the claim lives, and no session writes in a worktree
-another **live** session holds.
-
-A collision is noticed through the attach-time single-writer observation the
-start receipt carries (`claim.foreignWrites` — the stamped owner, the claim
-time, and the newer files) and through the stamp itself; `arggon doctor` reports
-the surrounding repo/tracker state, not per-worktree stamps.
-
-Resolution belongs to the stamped owner first: the owner re-attaches (the stamp
-is refreshed with its identity), and coordinating with that owner is always the
-cheaper remedy. When the owner is gone, the lead resolves it through
-`start --worktree --take-over-worktree` (audited — it re-stamps the worktree
-and records the take-over) or the manual
-`rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"`
-escape hatch — never by hand-writing into another live session's worktree.
-Recovery and merge-prep writes after that session has ended are the lead's
-call.
-
-The strict refusal (`x-tracker.strict-worktree-writes`) remains **unarmed by
-deliberate choice** in this repo (decision recorded 2026-10-15,
-`task-arm-strict-worktree-writes`): the default stays report-only, and this
-rule is the compensating coordination discipline in its place.
-
-### Decision briefs and the answer grammar
-
-The delivery lead asks with a comment on the item headed `decide:`, written for **one** reader whose vocabulary is not assumed; the **product owner** answers with a comment headed `decided:`. Both are prose under the dated heading `arggon comment` writes (`### <YYYY-MM-DD> @<author>`), never schema — no flag writes one and there is no frontmatter field (ADR 0026 §6). The authoritative statement of the convention, beside the authority map it is bounded by, is [`ArggonManager/docs/engineering.md`](./engineering.md) §Roles and authority → The decision brief; cite it rather than restating its tables.
-
-**The six brief fields, in this order** (ADR 0026 §1): 1. **the question**, one sentence, any specialist term translated at first use into what it changes for the product; 2. **why it matters**, in outcome terms — never in mechanism terms; 3. **the options**, two or three and never one, each with its consequence in plain words and the recommended one's honest cost stated; 4. **the recommendation**, and why; 5. **the strongest argument against that recommendation** — a brief that omits this field is not a brief; 6. **the default**, what the lead will do if no answer arrives and the **absolute** date after which it happens, never a relative deadline. The test of a well-written brief is mechanical: could the reader restate the choice and its consequence in their own words?
-
-**The answer** carries the chosen option — or `other`, a first-class reply — optionally with a scope in parentheses, then the reasoning; a later `decided:` supersedes an earlier one, and a superseded brief is never rewritten.
-
-**The routing rule — which decisions owe a brief** (ADR 0026 §5): only the **rows of the ADR 0021 §2 authority map** — direction and priority, product acceptance of a container, accepting residual risk, taking over another writer's claim, publishing a release — and **hard-to-reverse calls**. Everything else the lead **decides and records on the item as a plain comment**; a one-option question is not a brief. A brief never replaces the record a row already has (the `priority` field, an `accept:` comment, the ADR 0015 waiver, the claim-takeover gate, the human-pushed release); it is the **request**, not the answer. **One item is canonical for a decision** — a second brief links to it. The rule is normative: without it every decision becomes a brief and the model adds human cost instead of removing it (`docs/engineering.md` §Roles and authority → The decision brief). The stated default **executes** on its date, so silence selects a default the owner was shown in advance, never an answer by abstention (ADR 0026 §3); a brief therefore replaces a chat question rather than adding a step.
-
-**Report-only, never a gate** (ADR 0026 §6): no transition consults a brief, no command refuses because one is missing, and CI never fails on one. The surfaces are `show`'s additive `decision_brief` field and one opt-in `spec analyze` finding; `report` and `sync` are unchanged (see §JSON for agents and [`ArggonManager/docs/json-output.md`](./json-output.md)).
-
-**This project's worked example — software, an example only.** The convention's own language is the six field names and the two header tokens, which are domain-neutral; software is **this project's** example, never the convention's vocabulary (ADR 0026 §7). A brief in this repository's own terms might open `decide: a shared library for the date handling` and name "a feature flag" or "a database index" among its options — the ADR's own software cases — while a non-software adopter writes the same six fields in its own words. The worked example in full is in [`ArggonManager/docs/engineering.md`](./engineering.md) §Roles and authority → The decision brief; the non-software example is in [spec-owner-decision-brief-021](./specs/spec-owner-decision-brief-021.md) §Synopsis.
-
-**Subagent rules:**
-
-- Work an item inside the worktree you were handed, and only when the item is **already claimed** — a delivery lead that dispatches work claims it first (see **Claim before dispatch**), so confirm with `tools.arggon.show({ id, meta: true })` and never re-claim, never take over the stamp and never hand-roll a worktree. Claim it through `start` (never a bare `update --status in_progress`) only when you picked the item up yourself and no claim exists — stamping **your role id**, never a human login.
-- Never flip your item `done` — completion is the delivery lead's call after merge verification — and never reopen `done`/`cancelled` or steal a claim.
-- Expect the delivery lead's code review on your change and address change requests before it merges. Come with evidence for behavior changes: **the gates this project declares**, executed end-to-end and reported as expected-vs-observed (in software: changed commands probed on a fixture, UI changes browser-driven per [ADR 0008](./adr/0008-review-smoke-gate.md)) — the smoke gate blocks merge.
-- Report findings back to the delivery lead instead of filing tracker items — the delivery lead consolidates and files.
-
-The claim, branch, PR, and validate rules above apply to subagents **unchanged**: same commands, same gates, same "never" list.
-
-### Native `start` dependency contract
-
-`tools.arggon.start({ id, assignee, worktree: true })` and
-`arggon start <id> --worktree` use the same kernel-level
-`prepareWorktreeDependencies` implementation before either surface writes the
-claim. It links the primary checkout's existing `node_modules` when the fresh
-worktree has none, builds workspace packages that the worktree owns, and
-re-reads which packages still resolve into the primary. The native result
-carries a bounded `preparation` receipt (`ready`, `install`,
-`linkedNodeModules`, `builtWorkspaces`, `linkedWorkspaces`, `gateBins`) and an
-explicit
-`claimCommitted`/`claimCommit` outcome. `ready` is the conjunction of four
-clauses: an install is present, no worktree-owned workspace package resolves
-into the primary, the install provides what the worktree's own
-`package.json` declares, and every reported gate binary resolves inside the
-worktree (`gateBins`; an empty report — nothing declared exposes a bin —
-leaves that clause vacuous) — a linked install mirrors the primary's, so a
-devDependency merged since that install ran is missing from every worktree and
-`ready: false` is reported instead of a readiness the gate cannot use. The
-receipt names the reason on BOTH surfaces: `manifestCoverage`,
-`missingDependencies` (kernel-capped at 10 names), `missingDependenciesTotal`
-and `gateBins` (which node_modules each gate binary resolves from —
-`worktree`/`external`/`path`/`missing`; a `path` source is a sibling
-checkout's bin silently running the gate on a foreign install)
-are part of the native `preparation` payload as well as the CLI `--json`
-envelope, so neither caller has to shell out to the other to learn which
-declared dependency is missing (see §4). The remedy is the same on both
-surfaces: re-install the primary checkout, or give the worktree its own install. A required dependency or
-pre-commit failure is a typed `START_FAILED`, never an unqualified `ok:true`: the native
-worktree and branch are kept, the skip reason is bounded, and the message gives
-the `tools.arggon.start` attach/retry command. The preparation receipt also
-carries the bounded `steps` log (bug-start-install-ordering): which prep path
-ran — link farm created / reused / skipped-and-why, per-workspace build
-decisions, the gate-bin verdict — so a broken worktree can always be
-correlated with the exact decision that produced it; the CLI envelope carries
-the same log as `prepSteps`.
-
-**Fresh-worktree install gate (bug-start-install-ordering).** A start that
-CREATED the worktree must leave a gate-usable install — or fail itself, before
-any claim commit, with the named cause. The eight-incident record behind
-`bug-start-install-ordering` was exactly this ordering: the preparation steps
-degraded silently (the primary install missing or mid-install at prep time, a
-farm that could not be created, a sibling checkout's `.bin` on PATH masking
-the absent install) and the claim commit then died at the gate with a bare
-`tsx: command not found`. Both surfaces therefore refuse the claim BEFORE the
-claim update whenever the worktree was created this run and the receipt
-reports any gate bin resolving outside the worktree — no flag required
-(`claimCommit.reason: "fresh-worktree install gate refused"` on the native
-surface; the CLI wraps the same refusal with its step/keep/attach report).
-The refusal names the offending bins, the `steps` log, and the fix (`npm ci`
-in the worktree, or `npm install` in a stale/missing primary), and the
-worktree is kept: fix the install, re-run start, and the attach retries the
-claim. Attach re-runs keep the historical semantics — report-only without the
-flag, refused by `x-tracker.strict-gate-bins` when armed — so the documented
-`npm ci` then attach remedy stays possible. The carve-out is unchanged: a
-project with no dependency-needing gate may still have no install and commit
-the claim (an empty `gateBins` report violates neither gate). Related
-never-silent rules from the same fix: a fresh worktree whose item file is
-unexpectedly clean at claim-commit time is a named error, not a skipped
-commit (a lost mutation must not look like success), and a post-start hook
-that leaves the worktree without an install has its re-link outcome
-(`relinked`/`failed`) reported instead of swallowed.
-
-The commit outcome is the
-authority; `claimCommit.status: "not-needed"` means no second commit was needed,
-not that a commit was silently skipped. Re-running after fixing the gate
-retries a dirty claim instead of treating the no-op update as success.
-
-Ordering is part of that contract. Native start settles branch ownership
-(create/attach/switch) BEFORE the claim mutation: a switch that fails leaves the
-item byte-identical and unclaimed, and a claim refused after this run created a
-branch rolls back only that owned branch — the checkout returns to its previous
-branch first, the deletion is observed, and the result reports `rollback`
-(`branchDeleted: null` means no branch was owned). An unexpected failure after
-the phases above began is reported with the state observed so far, so a claim
-commit that already landed stays `claimCommitted: true` with its committed
-status/hash instead of being downgraded to "not attempted".
-
-Native start does not run the CLI-only `x-worktree.post-start` hook; a project that
-needs a full local install must first remove the start-created link/farm (the
-CLI hook does this automatically) and then run its package-native bootstrap in
-the returned worktree. Never run `npm ci` through a link to the primary
-install. Both surfaces keep the install out of the claim commit and never use
-`--no-verify`.
-
-## JSON for agents
-
-Pass `--json` on supported commands for a stable object on stdout (see [`ArggonManager/docs/json-output.md`](./json-output.md)). On failure, expect non-zero exit and a JSON error object when `--json` was set.
-
-## MCP server
-
-`arggon mcp` starts a stdio MCP (JSON-RPC 2.0, newline-delimited) server that exposes the shared kernel and the bounded read surface as **sixteen** tools: the core nine `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`, `arggon_handoff`, `arggon_show`, `arggon_next`, `arggon_report` and `arggon_validate` (task-mcp-parity-full: the pure-read `next`/`report`/`validate` commands complete the ADR 0006 next-first surface for MCP-only agents), the kernel tools `arggon_priority`, `arggon_sync` and `arggon_import_issues` (ADR 0014, `task-mcp-full-surface`), and the worktree lifecycle `arggon_start`, `arggon_branch` and `arggon_cleanup`, each of which re-enters the CLI as an argv array with no shell (§Worktrees), plus `arggon_friction` — the local friction channel ([spec friction-capture-020](./specs/spec-friction-capture-020.md)), also a CLI re-entry, because the CLI owns the whole `friction --json` contract (the mode conflicts, the `--tier` validation, the opt-out resolution and the `arggonVersion` every record carries). That list is generated from one registry — the `TOOLS` array in `cli/src/mcp-server.ts` — and `cli/src/mcp-doc-contract.test.ts` pins every enumeration of it in this file, in `ArggonManager/docs/json-output.md`, in `README.md` and in the CLI skill's `references/json-contract.md` to that registry, so a tool added there without a matching doc edit fails the suite. Tool results are the documented `--json` envelope objects (see [`ArggonManager/docs/json-output.md`](./json-output.md)) serialized as text content; kernel failures surface as tool errors with the CLI's message text. `arggon init` generates a `.mcp.json` that registers the server project-scoped for MCP clients — **as part of the `claude` adapter seam** (it is the surface that hands a Claude Code tree its tools, alongside the `CLAUDE.md` pointer), so it is generated with the default selection but **not** under `--no-agents`, nor under `--agents` without `claude`; if your repo already has a `.mcp.json`, the arggon entry is never overwritten — add `{"command": "arggon", "args": ["mcp"]}` under `mcpServers` manually. **OpenCode V2 does not need it**: since W3 the generated `opencode.jsonc` carries no `mcp.servers` stanza and the vendored plugin serves the native `arggon` tools in-process (`.opencode/agents/`, `.opencode/commands/arggon-*.md`, `.opencode/plugins/arggon/`); MCP is a conditional adapter for other clients, and `doctor` reports a present stanza as optional. See [exploration-opencode-v2-native-009](explorations/exploration-opencode-v2-native-009.md) and `ArggonManager/docs/playbooks/opencode.md`.
-
-The MCP layer always calls the kernel with the agent playbook rules applied: an MCP caller cannot reopen `done`/`cancelled` items and cannot steal a claim — no `force` parameter touches a claim (`update --force` stays human-only, with no native/MCP parameter). The one `force` on the surface is `arggon_cleanup`'s audited prune opt-in (bug-cleanup-prune-untracked-artifacts-no-force): terminal+merged items whose only removal blockers are untracked, refused without `prune` (`force requires prune`), and it never discards tracked modifications. These rules live in one module (`lib/src/rules.ts`) shared by the CLI and the MCP server, so both entry points enforce identical semantics.
-
-**Session attribution (task-opencode-v2-mcp-meta).** OpenCode V2 sends the invoking session ID in `CallToolRequest.params._meta.sessionID` for calls made on behalf of a session — direct tools and Code Mode, over stdio and Streamable HTTP — and documents it as an opaque correlation value ([MCP servers](https://opencode.ai/v2/docs/mcp-servers/), accessed 2026-09-17). `arggon mcp` reads it absent-safely and uses it as the **default** `session` for `arggon_handoff` and the **default** `author` for `arggon_comment`/`arggon_handoff`; explicit **non-empty** tool arguments always win, and a caller that omits the metadata keeps the previous behavior (`@me` author resolution, no session). The value is normalized once at the boundary (`sessionIDFromMeta`) before any consumer sees it (task-opencode-v2-mcp-meta-hardening, finding F1): surrounding whitespace is trimmed, the token is cut at the first whitespace, control, format or lone-surrogate character so it is always single-line, and it is capped at 64 characters with `…` — the same bound the handoff `session` field enforces. A value that normalizes to nothing (whitespace-only, control-only, empty) counts as absent; the meta-derived `author` therefore cannot inject an extra heading line or unbounded prose, and explicit arguments keep their existing kernel semantics (comment trims its author; handoff caps its `session` at 64). The ID is correlation metadata only: never authentication or authorization, never logged, and it triggers no state transitions — `lib/src/rules.ts` stays the only path for updates and the CLI is unchanged.
-
-**Item-addressed cwd (bug-mcp-server-binds-session-cwd-tracker-root).** The server binds one session to the cwd it was launched from (`runMcpServer({ cwd: process.cwd() })`), but the item-addressed tools — `arggon_update`, `arggon_comment`, `arggon_handoff`, `arggon_show` — resolve their tracker root per call through the item's own `worktree_path` (the claim address `start --worktree` records on the item; when the launch copy is stale, the claiming worktree is found through its `.arggon.env` or its copy of the item). A comment/handoff/update for an item claimed in a worktree therefore lands in THAT tree — on the item's branch, with the handoff's auto-detected `branch` correct — never in the launching tree just because the server started there: the incident this closes (PR #713) landed a maker's comment + handoff on the primary checkout's stale base branch, duplicating content already on the fix branch, and left `arggon_update --status done` able to flip an item in a tree the branch is not on. When the recorded claim tree cannot be written into (gone, or no tracker there) a WRITE refuses with `error.code: "TRACKER_ROOT_MISMATCH"` naming both trees and the remedies, instead of landing in the launching tree — reads never refuse, they answer from the launching tree. Pool calls (`list`/`create`/`next`/`report`/`validate`/`priority`/`sync`/`import_issues`) and the worktree lifecycle tools (`start`/`branch`/`cleanup`) are untouched, and the CLI itself is deliberately unrouted (one cwd, one tree — the single-checkout flow). Behavioral change for MCP callers (their writes now land on the item's branch); the same class was fixed on the native surface by bug-native-arggon-tools-resolve-tracker-root-to-session-cwd.
-
-The MCP tool input schemas are **parity-tested against the CLI** (`cli/src/mcp-parity.test.ts` derives the commander option surface for `list`/`create`/`update`/`comment` and asserts it matches the tool schemas both ways, minus a documented exception list). Keep MCP schema changes **additive only**; a breaking change to a tool input schema must bump the `schemaVersion` of the JSON output contract.
-
-Wire it up with any MCP client config:
-
-```json
-{
-  "command": "arggon",
-  "args": ["mcp"]
-}
-```
+For permissions, client gaps, binding guards, a writer collision or native evidence harness, read the [orchestration runtime reference](./references/orchestration.md).
 
 ## Documentation maintenance (docs, ADRs, specs, plans)
 
-Agents and humans keep the docs alive **in the same PR as the change** — never as a TODO, a review comment, or a follow-up that blocks release.
-
-### What to update, by change type
-
-| Change                                                                        | Update (same PR)                                                                                                                                                                         |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| New or changed CLI command / flag                                             | `README.md` (user-facing section) **and** `ArggonManager/docs/json-output.md` (payload section + the `command` enum in the envelope table)                                               |
-| JSON contract field or shape                                                  | `ArggonManager/docs/json-output.md` (`WorkItem` table or the command section). Additive fields note their additivity; breaking changes bump `schemaVersion`                              |
-| Task-tree / frontmatter / validate behavior                                   | `ArggonManager/docs/convention.md` — non-negotiable, see the review bar in `docs/engineering.md`                                                                                         |
-| Cross-cutting decision (stack, identity, schema model, new top-level package) | ADR under `ArggonManager/docs/adr/` — see the ADR process in `ArggonManager/docs/engineering.md` (4-digit id, `Proposed` in the PR, `Accepted` on merge, supersede instead of rewriting) |
-| Non-trivial feature worth design review                                       | Spec in `ArggonManager/docs/specs/` + implementation plan in `ArggonManager/docs/plans/` (see below)                                                                                     |
-| Agent playbook rules themselves                                               | This file (`ArggonManager/docs/agents.md`)                                                                                                                                               |
-| A lesson — a trap that bit you, or an approach this item refuted              | The carrier that owns the topic, as one line ≤ 160 characters with a citation — see §Promoting lessons                                                                                   |
-
-### Specs and plans (for non-trivial features)
-
-- **Greenfield/new project?** Exploration comes first (arggon-cli skill, `references/exploration.md`; ADR 0017): the six-phase protocol hunts edge cases into spec acceptance criteria, explicit non-goals or spike items, and no implementation task is claimed before a spec with clean `spec analyze`.
-- **Spec** (`ArggonManager/docs/specs/spec-<slug>-NNN.md`): the reviewable contract — purpose, synopsis, flags, JSON shapes, invariants ("never overwrites", "pure read"), and acceptance criteria. Write it **before** implementing; frontmatter carries `spec_id`, `title`, `status` (`proposed` → `implemented`), `created`.
-- **Plan** (`ArggonManager/docs/plans/plan-<slug>-NNN.md`): the implementation breakdown derived from the spec — ordered tasks, each with verifiable acceptance criteria and a link back to the spec. Frontmatter: `plan_id`, `spec`, `status`.
-- **One number per document, per directory.** An ADR (`NNNN-<slug>.md`), an exploration (`exploration-<slug>-NNN.md`), a spec (`spec-<slug>-NNN.md`) and a plan (`plan-<slug>-NNN.md`) each own their number for good, and the number is unique **inside its own directory** — a spec and a plan may both be `-017`. A slug may contain digits; the number is the **last** `-NNN` before `.md` (`spec-phase-2-009.md` is number 009, `plan-sync-2-003.md` is 003). Pick the next **FREE** number — the highest in use in that directory plus one (`arggon spec new` does exactly this for specs/plans) — never "whatever the last one was, plus one": two parallel branches each create `-018`, git merges both, and because the ids _inside_ the files differ, `spec_id`/`plan_id` uniqueness stays silent. `arggon spec analyze` reports the collision (`duplicate-doc-number`, naming every file that shares the number) and `arggon spec validate` warns (`DOC_NUMBER_COLLISION`); both are report-only. Repair by renumbering the newer document to a free number (updating its citations) or superseding it — never by deleting the other one.
-- When the feature lands, flip both statuses in the same PR as the implementation (never leave a shipped feature `proposed`).
-- Tooling: `arggon spec validate [--file <path>]` checks spec/plan structure read-only (CI-safe, non-zero on errors; corpus mode also warns on a number shared by two documents) and `arggon spec new <slug> [--title <t>] [--plan]` scaffolds the next numbered spec/plan from `templates/spec.md` / `templates/plan.md` — never overwrites. See [`ArggonManager/docs/specs/spec-spec-pipeline-002.md`](specs/spec-spec-pipeline-002.md).
-- Before implementing, run `arggon spec analyze` (report-only): it flags ambiguity (vague quantifiers, TODO/TBD markers, missing error paths, untestable acceptance) and spec ↔ tasks/plans inconsistency (implemented specs nothing cites, plans pointing at missing specs, two documents sharing one number) — findings never fail the run, resolve them by editing the spec. It also flags decision-pipeline gaps (`DECISION-PENDING-EXPLORATION`, `STALE-PROPOSED-ADR`, `SPEC-STATUS-DRIFT`): close them by writing the ADR, moving the ADR out of `Proposed`, flipping the spec status, or — when a spike genuinely needs no ADR — recording `No ADR required — <reason>` in the exploration's Decision section; never by editing the finding. For multi-wave refactors, gate each wave with `spec analyze --baseline <file>` (non-zero exit = NEW findings vs the committed snapshot). See [`ArggonManager/docs/specs/spec-spec-analyze-004.md`](specs/spec-spec-analyze-004.md) and [`ArggonManager/docs/specs/spec-analyze-decision-gaps-013.md`](specs/spec-analyze-decision-gaps-013.md).
-- Migrating a legacy corpus? `arggon spec import openspec <path>` converts an OpenSpec corpus (`specs/<capability>/spec.md`) mechanically: Purpose mapping, Acceptance criteria verbatim with per-requirement verification checklists, a provenance line, and a per-file zero-loss assertion — all-or-nothing per run, never overwrites, `--dry-run` inventories first. The format adapter (`cli/src/spec-import.ts`) is the extension point for other corpus formats. See [`ArggonManager/docs/specs/spec-spec-import-openspec-005.md`](specs/spec-spec-import-openspec-005.md).
-- After a migration (or periodically), run `arggon spec audit` (report-only): it classifies every `ArggonManager/docs/specs/*.md` pair as DUPLICATE / MERGE / KEEP-SEPARATE from shingle-Jaccard similarity plus shared verbatim requirement/scenario titles, with thresholds you can tune — see [`ArggonManager/docs/specs/spec-spec-audit-006.md`](specs/spec-spec-audit-006.md).
-
-### Technology playbooks (stack decisions and doc freshness)
-
-Stack/technology decisions follow the pipeline: **explore → ADR → playbook → status/--file-task**.
-
-1. `arggon stack explore <topic>` records the spike (`ArggonManager/docs/explorations/exploration-<slug>-NNN.md`): candidates, criteria, findings with dated sources, recommendation.
-2. The decision lands as an ADR under `ArggonManager/docs/adr/` (link it in the exploration's Decision section).
-3. `arggon playbook new <tech> --version <v>` generates `ArggonManager/docs/playbooks/<tech>.md` — the chosen version plus Setup / Conventions / Testing / Security / Upgrade policy. The research is the caller's job (with dated sources); the CLI records it.
-4. `arggon playbook status` flags playbooks older than the threshold (default 90 days, `x-playbooks.max-age-days` in the tracker `.convention.yml`); `--file-task <story-id>` files one re-research task per stale playbook into the tracker. After re-researching, `arggon playbook refresh <tech> --version <v>` updates the frontmatter.
-
-Agents follow `ArggonManager/docs/playbooks/` by default (the init-generated `AGENTS.md` points there) and refresh playbooks when `playbook status` flags them stale.
-
-### Promoting lessons (promote, never store)
-
-A lesson — a trap that bit you, or an approach this item refuted — is **promoted, never stored**: when the work **repeats** a class another item already met, write it into the carrier that already owns the topic. No lesson store, no lessons section, no new file type.
-
-| Lesson kind                           | Carrier (the one that owns the topic)      |
-| ------------------------------------- | ------------------------------------------ |
-| Loop/tool mechanics, repo conventions | `skills/arggon-cli/references/pitfalls.md` |
-| Technology behaviour                  | `ArggonManager/docs/playbooks/<tech>.md`   |
-| A refuted approach (a dead end)       | the `## Context` of a tracker item         |
-| A cross-cutting decision              | an ADR under `ArggonManager/docs/adr/`     |
-
-- **One line, ≤ 160 characters excluding the citation, with a mandatory citation** (`— <item-id>` or `— ADR NNNN`); the rationale stays in the item that produced the lesson. The bound stops a carrier from becoming the unbounded per-item record it indexes; the citation is what makes the line findable and supersedable by the change that moves the mechanism. `references/pitfalls.md` also holds a total ceiling of **12,288 B** (read with `wc -c` when the file is edited): a section that does not fit shortens or supersedes a line, it never raises the ceiling in the same PR.
-- **The promotion moment is the second occurrence.** A maker promotes when the work repeats a class another item already met; the standards reviewer checks the promoted line like any other doc that must travel with the change; the delivery lead may consolidate a class the tracker shows repeating. No new ceremony, no new role, no new merge step.
-- **Contradiction supersedes, never juxtaposes.** Rewrite the line in place with a dated note naming what changed and which item produced it (`superseded <date> by <item-id>: <reason>`); appending a second, contradicting bullet is forbidden — two answers in one carrier with no way to choose is worse than either.
-- **Staleness is per carrier.** Technology lessons inherit `arggon playbook status` (`x-playbooks.max-age-days`, default 90). Mechanism lessons carry **no clock**: a lesson becomes false when the mechanism changes, not when the date advances, and the citation is the pointer that change follows.
-- **A carrier edit is a methodology edit.** A lesson landing in `skills/arggon-cli/**` or `templates/**` reaches adopting repos through the [ADR 0016](./adr/0016-adopter-upgrade-channel.md) propose channel, never by overwrite, and states its impact class, keeping the skill and its copies byte-equal (§Changing the methodology itself).
-
-### Verification before opening the PR
-
-- `grep` the new command/flag/field across `README.md`, `ArggonManager/docs/json-output.md`, `ArggonManager/docs/convention.md`, `ArggonManager/docs/agents.md` — every hit must match the implemented behavior.
-- `arggon validate` passes.
-- If the change made any doc statement false, that doc edit belongs in this PR.
+Trivial documentation corrections use the ordinary same-PR rule in §4. Read the [documentation reference](./references/documentation.md#documentation-maintenance-docs-adrs-specs-plans) for changed commands/schema, authoring a spec/plan, refreshing a playbook, adoption or promoting a repeated lesson. The rule and its carriers live there; do not duplicate them in the umbrella skill.
 
 ## Changing the methodology itself
 
-The methodology is the contract ([ADR 0011](./adr/0011-native-first-architecture.md)), and [ADR 0016](./adr/0016-adopter-upgrade-channel.md) defines how changes reach adopting repos. A PR that touches a **methodology carrier** — `ArggonManager/docs/agents.md`, `ArggonManager/docs/engineering.md`, `ArggonManager/docs/convention.md`, or `skills/arggon-cli/**` (including `references/`) — states its **impact class** in the PR description and as a comment on the work item:
+A PR touching `ArggonManager/docs/{agents,engineering,convention}.md` or `skills/arggon-cli/**` states its **impact class** in the PR description and a work-item comment:
 
-- **Advisory** — wording, structure, or doc reorganization; adopters' agents re-read the docs anyway and no rule, gate, command contract, or pipeline step changed.
-- **Behavioral** — agents must re-learn something: a rule, a gate, a command contract, a pipeline step. Behavioral PRs reference the adopter-upgrade channel ([ADR 0016](./adr/0016-adopter-upgrade-channel.md)), keep the skill and its copies in sync in the same PR (`skills/arggon-cli/` ↔ `.agents/skills/arggon-cli/`, byte-equal), and update every doc statement the change makes false (see §Documentation maintenance).
+- **Advisory**: wording, structure or reorganization; no rule, gate, command contract or pipeline step changes.
+- **Behavioral**: agents must re-learn a rule, gate, command contract or pipeline step. Reference [ADR 0016](./adr/0016-adopter-upgrade-channel.md), sync the skill and its generated copies (`npm run skills:sync`, byte-equal modulo generated marker), and update all statements made false in the same PR.
 
-Reviewers check the impact statement like any review-bar item; a behavioral change without it is a change request.
+Reviewers check the impact statement. References extracted from these carriers remain methodology: moving a rule into a reference does not exempt its edits from this requirement.
 
 ## Adoption sweep (existing repos)
 
-`arggon adopt` turns "start using ArggonManager here" into a tracked, agent-executable migration. It requires an initialized tree (`arggon init` first — the command pre-flights through the same logic as `arggon doctor`), inventories the repo's governing docs (present/absent, arggon-managed via `x-generated` provenance vs adopter-owned, plus cheap stack-manifest hints), and files one task — `task-adopt-arggon`, "Adopt ArggonManager in this repo" — whose body is the checklist below. `--dry-run` prints the inventory and planned actions and writes nothing; the same JSON is how the executing agent re-derives the inventory mid-flight. The task is created under `--story <story-id>` when given, else under `story-arggon-adoption` (auto-created under the first epic; when the tree has no epic at all — e.g. a fresh `init --full` — adopt auto-creates the initiative/epic chain `arggon-adoption` → `epic-arggon-adoption` itself, so pass `--story` when adopting an existing repo with its own structure). Idempotent: an already-open `task-adopt-arggon` is reported, not duplicated.
+Read [adoption sweep](./references/documentation.md#adoption-sweep-existing-repos) only when adopting or migrating an existing repository.
 
-Any agent executing the adoption task follows this procedure (the task body carries the same steps as an acceptance checklist):
+## JSON for agents
 
-1. **Read the arggon-generated docs first**: `AGENTS.md`, `ArggonManager/docs/convention.md`, `ArggonManager/docs/engineering.md`, `ArggonManager/docs/playbooks/` (if present) — they govern the rest of the migration.
-2. **Sweep the existing repo docs** (list them from the inventory): extract the project description, conventions, workflows, and stack info. **Extract, don't wholesale-copy** — rewrite into the target doc's structure and drop duplicated or outdated material.
-3. **Complete the arggon-generated docs** with the extracted content — fill the TODO placeholders: project description in `AGENTS.md`; `CONTRIBUTING.md` specifics (environment setup, build/test commands); `ARCHITECTURE.md` problem statement. The `SECURITY.md` contact is human input — leave it flagged for a human, never invent it.
-4. **Archive replaced originals** to `backup/<YYYY-MM-DD>/` preserving their relative paths (today's date). Only docs you **replaced** get archived; **never archive README.md — merge into it instead**.
-5. **Detect the stack from the manifests** (package.json / requirements.txt / go.mod / Cargo.toml / pom.xml — filenames only); for each technology create a playbook (`arggon playbook new <tech>`), research current versions and best practices with dated sources, then record them with `arggon playbook refresh <tech> --version <v>`.
-6. **Baseline the sanctioned edits**: run `arggon adopt --ack` so the generated docs you completed in step 3 become the new `x-generated` baseline (their checksums are refreshed and they stop reporting as modified). Hand edits made AFTER this ack still report modified — the protection stays intact.
-7. **Verify**: `arggon validate` + `arggon spec validate` (if specs exist) + `arggon playbook status`.
-8. **Report**: comment on the adoption task (`arggon comment task-adopt-arggon`) listing the extracted content, archived files, and created playbooks; flip the task done when the human reviews.
+Read the relevant command in the [JSON contract](./json-output.md) for envelope fields, output bounds and schema compatibility; don't load the whole matrix for an ordinary item.
 
-If the adopting repo carries a pre-existing spec corpus (OpenSpec — `openspec/config.yaml` + `specs/*/spec.md` — or another format such as ADR/RFC markdown), follow the phased migration checklist the adoption task generates: detection fingerprints, then Fase 0 mapping (format -> spec template, e.g. OpenSpec `## Requirements` -> Acceptance criteria verbatim), Fase 1 one spec per capability with a zero-loss assertion, Fase 2 duplication audit, Fase 3 consolidation, Fase 4 contract refactor in file-disjoint waves — with the gates per phase (`spec validate` 0/0, `spec analyze` without NEW findings vs baseline; consolidar antes de reescribir).
+## MCP server
+
+Read [MCP server](./references/agent-runtime.md#mcp-server) when wiring a client or changing MCP behavior.
 
 ## Reference integrations
 
-Copy-paste wiring so agents follow ArggonManager rules **by default** — same CLI, same rules, no private dialect (Phase 3, [#20](https://github.com/Arggon/ArggonManager/issues/20)).
-
-Or print it on demand: `arggon instructions` extracts these snippets from this file at runtime (`--json` emits them as structured fields), so doc and command cannot drift.
-
-The generated AGENTS.md also mandates the bundled **arggon-cli skill** (`.agents/skills/arggon-cli/SKILL.md`, copied by `arggon init` from this repo's `skills/arggon-cli/SKILL.md` — single source, no duplicate): agents load it before any arggon invocation for the JSON contract, claim rules and pitfalls. It is an umbrella — `SKILL.md` plus `references/{json-contract,methodology,exploration,orchestration,pitfalls}.md`, bundled beside it; V2 advertises the supporting paths and the model reads the relevant reference on demand instead of carrying all detail per step. A parity test (`cli/src/skill-copy.test.ts`) keeps every bundled file byte-equal to its source, modulo the generated marker.
+The minimal snippets below remain the source extracted by `arggon instructions`; use [CI wiring](./ci.md) for the complete branch-aware seam gate and the [runtime reference](./references/agent-runtime.md#reference-integrations) for client adapters.
 
 ### Pre-commit gate
 
-`.git/hooks/pre-commit` (make executable) — rejects commits with invalid frontmatter or tree:
+`.git/hooks/pre-commit` (make executable):
 
 ```sh
 #!/bin/sh
@@ -658,22 +187,6 @@ npm run arggon -- validate
 ```
 
 ### CI gate
-
-Add a job to your workflow (mirrors the workflow `arggon init` writes to
-`.github/workflows/arggon.yml`; full recipe and install variants in
-[`ArggonManager/docs/ci.md`](./ci.md)). The bin is the packaged `arggon`
-headless CLI — no model, no MCP, no OpenCode session.
-
-That snippet is the minimum (bootstrap + validate). The full recipe also ships
-a **seam drift gate**, and it is **branch-aware**: it compares the committed
-seam against the generator that owns it — this checkout's own build when the
-repo IS the seam's source (so a PR that legitimately changes generated content
-can go green without waiting for a release), the pinned `ARGGON_VERSION`
-release everywhere else — plus a pinned-lag assertion so a pin can never sit
-behind the seam it must reproduce. Copy the workflow `arggon init` writes
-rather than hand-rolling the gate, and read
-[`docs/ci.md`](./ci.md) §Which generator the gate compares against before
-changing either half.
 
 ```yaml
 tasks-validate:
@@ -683,8 +196,6 @@ tasks-validate:
     - uses: actions/setup-node@v4
       with:
         node-version: 22
-    # Both packages are published since 0.4.0; full recipe and the
-    # pinned-checkout variant live in ArggonManager/docs/ci.md.
     - name: Install arggon
       run: npm install -g arggon-manager
     - run: arggon init --no-commit
@@ -693,86 +204,48 @@ tasks-validate:
 
 ### Agent instructions snippet
 
-Adopters get this wiring for free: `arggon init` generates a spec-compliant `AGENTS.md` (plus a one-line `CLAUDE.md` shim with `@AGENTS.md` and a `.github/copilot-instructions.md` pointer) from master templates — it never overwrites an existing file. Repos that do not use `init` can still paste the snippet below into their `AGENTS.md` (or equivalent) so coding agents loop through the CLI:
-
 ```markdown
 ## Task workflow (ArggonManager)
 
-Work items live under the tracker root (ArggonManager/) — see ArggonManager/docs/convention.md and ArggonManager/docs/agents.md.
-
-1. Find work: `npm run arggon -- list --status todo --json`
-2. Claim before starting: `npm run arggon -- update <id> --status in_progress --assignee <your-login>`
-3. Branch `feat/<id>` / `fix/<id>`; one claimed item per branch.
-4. Never steal a claim; if taken, pick another item or coordinate.
-5. Create follow-up work with `arggon create task|bug "<title>" --parent <story-id>`.
-6. Done = acceptance checklist complete + `arggon update <id> --status done` + PR linked.
-7. Never reopen done/cancelled items.
+Start with ArggonManager/docs/agents.md for the operational core and its targeted references.
 ```
 
 ### OpenCode V2
 
-`arggon init` generates the OpenCode **V2** seam (tier-1; never overwrites an existing file): a root `opencode.jsonc` — **only when the repo has no OpenCode config of its own** (`opencode.json(c)` or `.opencode/opencode.json(c)`) — carrying a git-root-anchored prettier formatter override + compaction retention and **no MCP stanza** (ADR 0011 §5/§6: MCP left the default path in W3), plus `.opencode/agents/arggon-{delivery-lead,maker,standards-reviewer,verifier}.md` and the eleven native `.opencode/commands/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook,adopt}.md` (prompt templates that drive the native tools and write the methodology artifacts directly — no CLI-driving prose, no shell blocks). The generated `.mcp.json` still serves other clients (e.g. Claude Code) — it belongs to the `claude` seam, so a tree initialized with `--no-agents` (or `--agents` without `claude`) has none of this V2 seam **and no `.mcp.json`**; the skills bundled under `.agents/skills/` are always generated (no config needed):
-
-```jsonc
-{
-  // formatter override + compaction retention; the native `arggon` tools come
-  // from the vendored plugin, so no MCP stanza is needed. The prettier
-  // override anchors the session formatter at the edited file's own git root,
-  // so sibling-worktree files (the `start` layout) keep their own
-  // .prettierignore — the full command is in the generated opencode.jsonc.
-  "$schema": "https://opencode.ai/config.json",
-  "formatter": {
-    "prettier": {
-      "command": [
-        "sh",
-        "-c",
-        "<git-root-anchored prettier --write>",
-        "prettier-cwd-guard",
-        "$FILE",
-      ],
-    },
-  },
-  "compaction": { "keep": { "tokens": 15000 } },
-}
-```
-
-V2 recognizes `AGENTS.md` only — **no `CLAUDE.md` fallback** (that shim serves other tools) — and accepts but does not load the `instructions` config array. Never map V1 fields into V2 config (`mcp.<name>`, `enabled`, `autoupdate`); the published `https://opencode.ai/config.json` schema is **V1** and is _not_ a field-level source of truth for V2 — the vendor's V2 guidance (runtime v2.0.26) says verbatim: _"The schema served from <https://opencode.ai/config.json> may describe V1 even though V2 configuration files include that URL for editor integration. Never use it to infer V2 field names or shapes."_ Take V2 names from the V2 surface instead — `plugins`, `agents` (with `system`/`permissions`), `commands` — never from that schema. `arggon init` also vendors the OpenCode V2 plugin (`.opencode/plugins/arggon/index.ts`, same never-overwrite + provenance semantics as the skills): since W3 it is the **single-file, dependency-free bundle** built from `opencode/plugins/arggon/index.ts` with `@arggondev/lib` inlined (`npm run build:plugin`; drift-gated by `cli/src/plugin-copy.test.ts` — assert-before-write — and `npm run check:plugin` in CI), so it loads in a dependency-less adopter tree with zero config. Since W5 (`task-native-tui`) it also vendors the **TUI entry** `.opencode/plugins/arggon/tui.tsx` beside the bundle: OpenCode discovers it from the same plugin directory, the runtime resolves `solid-js`, and the board/status surface (`session.panel` + `sidebar.content`, opened with `/arggon-board`) reads the tracker through the inlined kernel — still no `node_modules`. It registers the **native `arggon` tool namespace** (W2/W3, `task-native-tools`; W4 adds the worktree domain, T5 adds `friction`): sixteen Code Mode tools with `ctx.tool.transform` (`options.namespace: "arggon"`, `codemode: true`; nine of them also `options.pinned` — `list`, `create`, `update`, `show`, `next`, `validate`, `comment`, `handoff` and W4's `start`, the claim → worktree entry `/arggon-start` drives) that call the kernel in-process and return the documented `--json` envelopes, with kernel failures surfacing as typed tool errors and the session continuing. The W4 worktree tools (`start`, `branch`, `cleanup`) own the item worktree through `ctx.worktree` while the kernel keeps the claim/branch/`worktree_path` records: `start` creates `../<repo>-<id>` (name `<repo>-<id>`), records the branch + path inside the worktree copy so the claim commit lands on the feature branch, and `cleanup` classifies with the shared kernel rule, removes merged worktrees through the domain and clears the records; push and the `gh` PR step stay explicit agent steps, and the CLI (`arggon start --worktree` / `arggon cleanup --prune`) is the fallback when the domain is unavailable. The generated seam and the shipped agents also carry the W4 permission defaults (minimal shell gates; reviewer read-only shell gates; native + MCP tool-level least privilege) that complement — never replace — the kernel invariants. Ambient behavior: it correlates the session to the active work item — `ARGON_ITEM` env → observed `arggon` calls (shell invocations **and** Code Mode `tools.arggon.<name>(…)` calls, W3) → `feat/<id>`/`fix/<id>` branch — injects a **bounded** item block through the context hook, rebuilt per call so it survives compaction, **stamps every admitted prompt with the worktree env-contract identity** (`.arggon.env` item/branch/worktree, written into the prompt's own `metadata` and never into its text), **retains that item block in the compaction request itself** so the checkpoint summary is produced with the item in scope, renames the session on claim, and logs a non-blocking hygiene warning when `arggon validate` fails after a commit. MCP auto-registration was **removed** in W3 (ADR 0011 §5/§6): the plugin never touches `ctx.mcp`; an adopter who wants the stdio server configures `mcp.servers.arggon` explicitly. Headless evidence: `npm run smoke:opencode` — fresh-init seam + dependency-less bundle + one bounded session per native command + the context/hygiene scenarios on opencode v2.0.12. Config precedence, skills discovery, bundling, testing and the upgrade policy live in the [OpenCode playbook](./playbooks/opencode.md) (pinned 2.0.12).
+Read [OpenCode V2](./references/agent-runtime.md#opencode-v2) when installing or debugging that adapter.
 
 ### ZCode
 
-`arggon init` generates the **ZCode seam** (tier-1, ADR 0014; same never-overwrite + provenance semantics): `.zcode-marketplace/` — a marketplace **catalog** (`marketplace.json`) plus the vendored declarative plugin at `arggon/` (`.zcode-plugin/plugin.json`, the thirteen `commands/arggon-*.md` rewritten against the arggon **MCP** surface, the two `agents/arggon-{maker,standards-reviewer}.md` in ZCode frontmatter, a seam `README.md`, `templates/goal-mode.md`, the opt-in `templates/automations/` pair, and `hooks/`). **In ZCode the main session IS the delivery lead** (`task-zcode-lead-role-belongs-to-the-main-session`): ZCode can only surface plugin agents as dispatchable subagents — it has no primary/session-agent concept — while the delivery lead is the primary worker who interacts with the product owner (ADR 0021 §6.1/§6.2a′), so the seam ships only the subagent roles (`arggon-maker`, `arggon-standards-reviewer`; the OpenCode seam keeps the lead as its selectable `mode: primary` session agent) and the lead's contract rides the carriers (`AGENTS.md` → this document §Orchestration, `engineering.md` §Roles and authority, and the seam `README.md`), which state that no ZCode surface dispatches a lead. A client whose plugin agents are all subagents materializes only the roles it can express — the rule the shipped Claude Code seam follows too (§Claude Code: plugin agents are subagents there as well; the lead role belongs in the generated `CLAUDE.md`/instruction material). ZCode has no code-mode tool API, so the plugin's `mcpServers` field registers `arggon mcp` — the **sixteen-tool** MCP surface is the client's whole native tool surface (ADR 0014, `task-mcp-full-surface`), and it requires the `arggon` CLI on `PATH`. **One manual step** the platform requires: in ZCode, Plugin Marketplace → Add → Add Plugin Marketplace, paste the repo's `.zcode-marketplace/` directory, then install the `arggon` plugin from it; the plugin ships the MCP registration, so no `.zcode/config.json` stanza is generated (an adopter who skips the plugin adds `mcp.servers.arggon` themselves — ADR 0011 §5/§6 carries over).
-**Goal Mode** (spec methodology-adapters-017 §S5, ADR 0020, `task-zcode-goal-mode`): ZCode's Goal Mode loops plan → execute → verify, so the seam ships a **goal-mode contract template** — `.zcode-marketplace/arggon/templates/goal-mode.md`, generated with the same provenance + never-overwrite rules as every other seam file. The template is only the _shape_: `arggon goal <item-id>` (ZCode: `/arggon-goal`) instantiates it from the item in git, and the derived contract is **one goal per claimed item** — objective, verification contract, loop, and the worktree it may run in. **Whether work remains is the KERNEL's answer, not this command's — and the kernel is the only grammar left to ask.** `bug-three-acceptance-parsers-diverging` (PR #611) unified the six acceptance-box grammars that used to exist (the gate plus the board, the TUI, the native detail block, `spec` and this goal contract) into one in `lib/src/items.ts`: `acceptanceRows` / `acceptanceCriteria` / `acceptanceUnchecked` / `acceptanceComplete`, with `acceptanceBody` as THE canonical input. `arggon goal` reads both the verdict (`acceptanceGate(acceptanceBody(item)).gated`, the `done` flip’s own verdict) and the criterion text (`liveAcceptanceRows` on the same body, i.e. the item’s live `## Acceptance` section — a dated comment block is history, so its boxes are neither the contract nor the work left) from it, so the contract cannot disagree with the done gate, nor with itself. Which lines are rows and which rows gate is decided in [`convention.md` §Acceptance rows](./convention.md) (`- [ ] x` and `- [ ]x` are rows; `-  [ ] x` is not); line breaks are the whole ECMAScript **LineTerminator** set, so CRLF and U+2028/U+2029 bodies need no special case. The one live hazard is the INPUT, not the grammar: hand `acceptanceRows` a reader’s bounded `prose` (body minus comment sections) instead of `acceptanceBody(item)` and a checklist filed as an `arggon comment` — first-class here, since `create` has no `--body` flag — vanishes from the goal while the gate still refuses to close the item. Kernel parity corpus: `cli/src/acceptance-parity.test.ts`; this adapter’s own corpus (including the comment-filed case) is in `cli/src/goal-mode.test.ts`. Normally the objective is the first unchecked criterion and the verification contract is every unchecked one (they must all hold before `done`); when the gate says the contract is satisfied, the goal is an explicit “define the goal first” contract — never an empty one. Bounded by construction: byte-clipped rows, at most eight inlined criteria, counted overflow, and a clipped template copy, so a tampered or oversized item cannot produce an unbounded contract (the template is clipped BEFORE its slots are filled, so an adopter copy over 8 KiB can lose its `{{...}}` placeholders while the structured `goal.*` fields still carry the values). One worktree per item means the item's recorded worktree — an item that records none (`start` without `--worktree`) is scoped to the repo root you are in, never a sibling's. **One goal per claimed item, one worktree per item** — `arggon goal` REFUSES, with no override flag: an unresolvable caller identity (`GOAL_IDENTITY_UNKNOWN` — the claim holder cannot be proven to be you, so nothing renders; set `GITHUB_USER`/`GITHUB_ACTOR` or authenticate `gh`), a `done`/`cancelled` item (`GOAL_ITEM_CLOSED`), an unclaimed item (`GOAL_UNCLAIMED`, claim it with `arggon start` — the claim is what creates the worktree), an item claimed by **another identity** (`GOAL_FOREIGN_CLAIM`), a run from any checkout that is not the item’s recorded `worktree_path` (`GOAL_WORKTREE_MISMATCH`), one whose worktree no longer exists (`GOAL_WORKTREE_MISSING`), a missing template (`GOAL_TEMPLATE_UNAVAILABLE`), and an unknown id / missing tracker (`GOAL_FAILED`). Pointing a goal at another session’s worktree is a refusal, not a mode, and there is no flag to route around it. The hard boundaries and the refusal list are appended by the CLI from constants, **not** read from the template file, so an adopter who edits their copy of the template still gets them in the rendered contract — the goal cannot become a path around the dispatch-scoped reviewer backstop below (the reviewer window stays read-only; the goal says so). Adopter copy wins over the packaged one when the file exists (never-overwrite means it is yours); the packaged template is the fallback. The kernel is the enforcement of record: `arggon validate`, the claim lease and the done gate decide what is allowed — the contract is a prompt. Headless evidence: `cli/src/goal-mode.test.ts` (parity corpus, boundaries, **every** refusal code, row clipping/overflow, envelope) and `cli/src/init-zcode.test.ts` (template generated with provenance, never-overwrite, instantiated from a real item).
-
-**Automations (opt-in)** (spec methodology-adapters-017 §S5, plan T5, `task-zcode-automations`): beside the goal-mode contract the seam ships two automation contract templates — `.zcode-marketplace/arggon/templates/automations/spec-drift-scan.md` (daily) and `.zcode-marketplace/arggon/templates/automations/stale-claim-sweep.md` (weekly), generated with the same provenance + never-overwrite rules as every other seam file. **Opt-in means init schedules and runs nothing**: a template is a contract an adopter wires into their own scheduler (cron, CI timer, agent loop) at a cadence they chose, and deleting the file is the off switch. Each carries the claim/branch preconditions — it holds no claim, runs inside no item's `worktree_path`, never claims/branches/checks out, and refuses to run anywhere but the primary checkout on the default branch with a clean tree (filing appends the tracker auto-commit, which must never land on an item's feature branch). The scan is read-only — `arggon validate`, `arggon spec validate`, `arggon spec analyze`, `arggon doctor --agents`, and for the sweep `arggon list --stale --older-than 7d` + `arggon show` — and the ONLY write either may ever make is `arggon create`: one item per NEW drift finding or per deduplicated stale claim (capped, and never filed twice for the same finding), under the drifted spec's story (resp. the stale item's parent story), with the evidence in an `arggon comment` on the NEW item. Neither automation ever touches the items it scans — no `arggon update`, no comment on a scanned or stale item, no claim release (that decision belongs to the claim's assignee or the lead), no hand `git commit`/`push` — the kernel invariants (claim/steal/reopen, `arggon validate`) outrank the contract, which is a prompt. Headless evidence: `cli/src/init-zcode.test.ts` — provenance markers, never-overwrite, the precondition contract, a read-only allowlist over every quoted scan command, create-only filing, and the opt-in declaration.
-
-Hooks replace the per-agent permission DSL ZCode lacks (hook input carries `session_id` + `tool_input`, never an agent identity). The plugin ships one dependency-free Node script (`hooks/gate.mjs`, invoked through `node` via a `process` hook — no exec bit, no shell) with two gates: **global** — every session is denied `git push --force`/`-f` and `git commit --no-verify` (the W4 seam gates, ported); **dispatch-scoped reviewer backstop** — while an Agent dispatch naming `arggon-standards-reviewer` is in flight (`PreToolUse(Agent)` marks the session, `PostToolUse(Agent)` closes the window, `Stop` clears it, parallel dispatches count), the gate denies `Write`/`Edit`, mutating `arggon` shell invocations, git history commands and the mutating `mcp__arggon__*` tools for that session — the reviewer reads with `arggon_show` and posts its verdict with `arggon_comment`. That matcher is a string, so the shipped reviewer id and the matcher are bound by a test that reads the id out of the shipped template (`cli/src/init-zcode.test.ts`): renaming the agent without the gate would otherwise disarm the backstop with no failure anywhere. Like the OpenCode seam's shell-text patterns, the gates are best-effort defense-in-depth that complement — never replace — the kernel invariants (no reopen, no steal hold whatever the hooks say). Known platform gaps: the TUI board panel has no ZCode equivalent (the `/arggon-board` command serves `arggon board --serve` and hands back the loopback URL), and agent `tools:` allowlists cannot express the OpenCode per-tool deny lists — the reviewer agent's allowlist plus the dispatch-scoped hook gate are the replacement. Headless evidence: `cli/src/init-zcode.test.ts` — fresh-init seam shape, manifest/marketplace consistency, provenance markers, never-overwrite, and the gate script contract (global gates, marker lifecycle, parallel dispatches, Stop clearing).
+Read [ZCode](./references/agent-runtime.md#zcode) when installing that adapter, enabling goal mode or opting into scan automations.
 
 ### Claude Code
 
-`arggon init` generates the **Claude Code seam** (tier-1, ADR 0014, spec-claude-code-adapter-024; same never-overwrite + provenance semantics): `.claude-marketplace/` — a marketplace **catalog** (`.claude-plugin/marketplace.json`, `arggon-local`) plus the vendored declarative plugin at `arggon/` (`.claude-plugin/plugin.json`, the thirteen `commands/<command>.md` rewritten against the arggon **MCP** surface, the two `agents/arggon-{maker,standards-reviewer}.md`, the bundled `arggon-cli` skill, a seam `README.md`, and `hooks/hooks.json` + `hooks/gate.mjs`). Claude Code namespaces every component under the plugin name, so the commands run as **`/arggon:<command>`** (the file stems drop the ZCode seam's `arggon-` prefix, which the namespace would repeat) and the subagents dispatch as **`arggon:arggon-maker`** / **`arggon:arggon-standards-reviewer`**; agent file names keep the `arggon-` prefix because the file stem IS the wire id, which ADR 0021 §6.2a′ forbids forking per client. **The main session IS the delivery lead**, exactly as on ZCode: Claude Code surfaces plugin agents as dispatchable subagents and has no primary/session-agent concept, so the seam ships only those **two** subagent roles and the lead's contract rides the generated repo-root `CLAUDE.md` → `@AGENTS.md` carriers plus the seam `README.md`, which state that no surface of this plugin dispatches a lead. No `arggon-verifier` agent ships (the verifier needs shell without writes; the ZCode seam's subagent-only precedent applies), and `agents` is deliberately absent from the manifest — the key validates but replaces the client's convention `agents/` scan and surfaces zero agents (probed on claude 2.1.289), so omitting it is what loads the shipped pair.
-
-**One server, one name**: the manifest registers exactly one server, keyed `arggon`, with the same `command`/`args` (`arggon mcp`) as the generated repo-root `.mcp.json`. Claude Code loads a plugin's `mcpServers` together with the project `.mcp.json` and a later declaration of a name replaces an earlier one, so two differently named servers over one tracker must never exist; `claude mcp list` shows both surfaces — `plugin:arggon:arggon` and the project-scoped `arggon` — and the plugin-bundled tools are spelled `mcp__plugin_arggon_arggon__<tool>` (the project registration keeps `mcp__arggon__<tool>`). **One manual step** the platform requires: `claude plugin marketplace add <repo>/.claude-marketplace`, then `claude plugin install arggon@arggon-local` (both probed on 2.1.289). The plugin ships the MCP registration, so no `.claude/settings.json` stanza is generated — an adopter who skips the install keeps the `.mcp.json` floor — and the `arggon` CLI must be on `PATH` (`npm i -g arggon-manager`): `arggon mcp` is this client's whole typed tool surface, the same fifteen tools and envelopes as every other seam.
-
-**Hook gates** (`hooks/gate.mjs`, invoked in exec form — `node` + `${CLAUDE_PLUGIN_ROOT}` as `args`, no shell, no exec bit): **global** — every session is denied `git push --force`/`-f` and `git commit --no-verify` (`PreToolUse` on `Bash` and the mutating tool names; a denied form merely quoted as documentation passes, while quoted text a shell would still execute stays in the scan); **dispatch-scoped reviewer backstop** — Claude Code's `SubagentStart`/`SubagentStop` events carry the agent type natively, so the window opens on `^arggon:arggon-standards-reviewer$` and denies `Write`/`Edit`, mutating `arggon` shell invocations, git history commands and the mutating `mcp__arggon__*`/`mcp__plugin_arggon_arggon__*` tools for that session (parallel dispatches counted, `Stop` clearing any residue, `arggon_comment` left open as the verdict channel). The reviewer matcher is bound to the id read out of the shipped agent file by `cli/src/init-claude.test.ts`: renaming the agent without the gate fails the suite instead of silently disarming the backstop. The gates **fail open** by design — like the ZCode gate they are defense-in-depth, and the kernel, the pre-commit `arggon validate` gate and CI remain the enforcement of record, which the capability matrix records per row (`claude:plugin.hooks.PreToolUse`). Known gap: this client has no session-context hook, so nothing injects the active work item — the agent fetches it with `arggon show`, and the matrix keeps `docs-travel-with-code` a claude gap. Headless evidence: `cli/src/init-claude.test.ts` — fresh-init seam shape, marketplace/manifest consistency, provenance markers, never-overwrite, the selection matrix, the two-agent/no-lead rule, the gate script contract (global denies, window lifecycle, parallel dispatches, `Stop`, both MCP spellings), one-server byte-equality, skill parity, a live `arggon_show` stdio round-trip, and the optional `claude`-binary probes (recorded `skipped: claude not installed` when absent). Impact class: **Behavioral** (ADR 0016) — agents must re-learn a new client surface.
+Read [Claude Code](./references/agent-runtime.md#claude-code) when installing or debugging that adapter.
 
 ## Self-improvement loop
 
-Findings flow back into the tool through two documented, repeatable protocols (`ArggonManager/docs/labs/`), plus the adopter friction channel below — which captures friction met in **any** session, an adopter's as much as a maintainer's, and deliberately does **not** file through the tracker:
+Read the [self-improvement protocols](./references/documentation.md#self-improvement-loop) for audits, telemetry mining and friction visibility.
 
-- **Adversarial audit** ([`ArggonManager/docs/labs/adversarial-audit.md`](./labs/adversarial-audit.md)): attack the behavioral invariants (claim exclusivity, never-reopen/steal, never-overwrite, cascade honesty, lost pushes) and sweep the normative doc statements ("never/always/only/requires") against built behavior, in a throwaway temp tree. Run after a notable feature wave or before a release (~1h). Findings file via the tracker; never patch the tool from an audit.
-- **Telemetry mining** ([`ArggonManager/docs/labs/telemetry-mining.md`](./labs/telemetry-mining.md)): mine ZCode session logs, the experiment repos' tracker commit histories, and `.evidence/` dirs for friction signatures (retries, fallbacks, manual tracker git work, chore-commit clusters). Run after each real-usage session or experiment — not on a timer.
+## Earlier entry points
 
-Both file through the normal loop (`arggon create task|bug --parent <story-id>`) with literal repro + evidence.
+Old section links remain entry points to the targeted references:
 
-- **Adopter friction channel** ([ADR 0024](./adr/0024-adopter-friction-channel.md), [spec-friction-capture-020](./specs/spec-friction-capture-020.md)): `arggon friction "<one line>" --command "<argv shape>"` appends one bounded, redacted record to a **local, append-only JSONL log that is never the tracker** — it cannot become a task by accident, never stages, never commits and never appears in `arggon validate`. `--report` dedupes by a stable-fields fingerprint (`commandShape` + `errorCode` + `harness` + major version — never the narrative, per Sentry's grouping rule) and renders a report a human acts on; tier `b` adds a prefilled issue URL the human opens. No tier auto-submits, and the tool never reads an inbound issue body.
-  - **The trigger lives in the generated agent files** (a marked `arggon:friction-trigger` block), not only in a skill reference: `deftai/directive#3633` shipped a sanctioned escalation skill and an agent that was actively escalating still missed it because the skill was absent from the host's discovery inventory — silent loss that looks like success. A capability in the wrong place is absent.
-  - **Visibility is per file, and that is measurable**: `arggon doctor --json`'s additive `friction` block reports, per managed agent file, whether it carries the block and at which `triggerVersion`. It is not the channel's discoverability (a template edit already surfaces as an outdated managed doc); it is what separates _trigger absent_ from generic template drift, which is the observable `task-spike-friction-trigger-compliance` needs to tell "never seen" from "seen and ignored" before stage 2 is worth building.
-  - **Opt-out gates capture, never discoverability** (ADR 0024 §3): `x-friction: false` (documented in [`convention.md`](./convention.md)) and `ARGGON_NO_FRICTION=1` write nothing and render an empty report with `optedOut: true`; neither removes the trigger from the agent files nor hides the command. Adopters take on the duty to re-run `arggon init` when the trigger goes stale.
+<a id="agent-playbook-v0"></a><a id="related"></a>
 
-## Related
+Read [agents.md](./agents.md) for these moved sections.
 
-- Convention: [`ArggonManager/docs/convention.md`](./convention.md)
-- Engineering: [`ArggonManager/docs/engineering.md`](./engineering.md)
-- Claim concurrency: [`ArggonManager/docs/claim.md`](./claim.md)
-- JSON contract: [`ArggonManager/docs/json-output.md`](./json-output.md)
-- Contributing: [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
+<a id="agent-seams-arggon-init---agents----no-agents"></a><a id="orphaned-destinations-what-init-reaps-and-when"></a><a id="worktree-in-the-claim-start---worktree"></a><a id="readiness-reporting-manifestcoverage"></a><a id="install-hygiene"></a><a id="fresh-worktree-install-gate-bug-start-install-ordering"></a><a id="worktree-env-contract-arggonenv"></a><a id="single-writer-ownership-claim-stamp-exploration-017-f12"></a><a id="failure-semantics"></a><a id="force-push-spellings-what-the-seam-permits-and-what-it-refuses"></a><a id="which-layer-enforces-the-seams-shell-gates"></a><a id="native-start-dependency-contract"></a>
+
+Read [agent-runtime.md](./references/agent-runtime.md) for these moved sections.
+
+<a id="cleanup"></a>
+
+Read [agent-recovery.md](./runbooks/agent-recovery.md) for these moved sections.
+
+<a id="worktree-ownership-and-collisions"></a><a id="decision-briefs-and-the-answer-grammar"></a>
+
+Read [orchestration.md](./references/orchestration.md) for these moved sections.
+
+<a id="what-to-update-by-change-type"></a><a id="specs-and-plans-for-non-trivial-features"></a><a id="technology-playbooks-stack-decisions-and-doc-freshness"></a><a id="promoting-lessons-promote-never-store"></a><a id="verification-before-opening-the-pr"></a>
+
+Read [documentation.md](./references/documentation.md) for these moved sections.

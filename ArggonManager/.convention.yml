@@ -14,9 +14,9 @@ x-generated:
   projectName: "ArggonManager"
   .agents/skills/arggon-cli/SKILL.md:
     template: "skills/arggon-cli/SKILL.md"
-    checksum: "sha256:58e95bf1589c65b33e4484862d9354a6ea67b6792df870f1be454f36a0b5c572"
-    arggonVersion: "0.10.0"
-    generatedAt: "2026-10-15T22:16:58.572Z"
+    checksum: "sha256:d4984d56a4aec1ee70ba7ad93e1cce13638ee82707a188ffa61983e7afa02dd8"
+    arggonVersion: "0.11.0"
+    generatedAt: "2026-11-04T16:46:08.474Z"
   .agents/skills/arggon-cli/references/exploration.md:
     template: "skills/arggon-cli/references/exploration.md"
     checksum: "sha256:3553e0c6084ca5c138cf2a9a1ddd4f157728bc0917928c00f1d9f4a7fb75a6f1"
@@ -34,19 +34,19 @@ x-generated:
     generatedAt: "2026-10-15T21:11:11.068Z"
   .agents/skills/arggon-cli/references/methodology.md:
     template: "skills/arggon-cli/references/methodology.md"
-    checksum: "sha256:3b71b3a122b67ee452512d5517da0c958adea7a6d72237c0fe8735285097920b"
-    arggonVersion: "0.10.0"
-    generatedAt: "2026-10-15T16:04:32.505Z"
+    checksum: "sha256:bf0f6c3747e30c48889456760c46b804251db5abf44647ddc98b1be6f81dddbc"
+    arggonVersion: "0.11.0"
+    generatedAt: "2026-11-04T16:46:08.474Z"
   .agents/skills/arggon-cli/references/orchestration.md:
     template: "skills/arggon-cli/references/orchestration.md"
-    checksum: "sha256:d60124e96797741fb59ae151fb9b53d60b7509f641407bc9b187ab7a88a14803"
-    arggonVersion: "0.10.0"
-    generatedAt: "2026-10-18T18:52:09.246Z"
+    checksum: "sha256:74d5b8fd1f8174944351290a828f4885d7385c38b79acc6858ae4843fa2f520c"
+    arggonVersion: "0.11.0"
+    generatedAt: "2026-11-04T16:46:08.474Z"
   .agents/skills/arggon-cli/references/pitfalls.md:
     template: "skills/arggon-cli/references/pitfalls.md"
-    checksum: "sha256:02aca23bf3bff0a17cfafe1f7737dc22220cced520a88db0ac8c46241431762a"
-    arggonVersion: "0.10.0"
-    generatedAt: "2026-10-18T18:54:50.535Z"
+    checksum: "sha256:f205840b91577d34ce6053166f45efc8bfac5d0509fac36ed25a390281dcf90b"
+    arggonVersion: "0.11.0"
+    generatedAt: "2026-11-04T16:46:08.474Z"
   .agents/skills/arggon-upgrade/SKILL.md:
     template: "skills/arggon-upgrade/SKILL.md"
     checksum: "sha256:dfaefcd25f116aa7984edf3a7d4c8548918613c9d7a96c063070e6e4de579871"
@@ -154,9 +154,9 @@ x-generated:
     generatedAt: "2026-10-15T16:04:32.505Z"
   .claude-marketplace/arggon/skills/arggon-cli/SKILL.md:
     template: "docs/claude/arggon/skills/arggon-cli/SKILL.md"
-    checksum: "sha256:a6b141d90d9a65b12d66b5f93178cfd4da350c69b5b360940cae344e0cd6e4c4"
-    arggonVersion: "0.10.0"
-    generatedAt: "2026-10-15T22:18:48.124Z"
+    checksum: "sha256:ba57b0429954237a836131fd0a65d58951914259143aed4247a1b0b9ba1bca8a"
+    arggonVersion: "0.11.0"
+    generatedAt: "2026-11-04T16:46:08.474Z"
   .claude-marketplace/arggon/skills/arggon-cli/references/exploration.md:
     template: "docs/claude/arggon/skills/arggon-cli/references/exploration.md"
     checksum: "sha256:e077beb6b5a4d1007a9ae2e9632ef78ae949b23d07a88038b244a11dab68f7ed"
@@ -174,19 +174,19 @@ x-generated:
     generatedAt: "2026-10-15T16:04:32.505Z"
   .claude-marketplace/arggon/skills/arggon-cli/references/methodology.md:
     template: "docs/claude/arggon/skills/arggon-cli/references/methodology.md"
-    checksum: "sha256:5cbedbcdb2e9fec50f459dfd51fc9425b89ad5a5189dad7c1d68b2011f3b7207"
-    arggonVersion: "0.10.0"
-    generatedAt: "2026-10-15T16:04:32.505Z"
+    checksum: "sha256:029aa57cd3acd5b7b139557c57c21132fadacf39bd4b88ab3783d7057ab96f92"
+    arggonVersion: "0.11.0"
+    generatedAt: "2026-11-04T16:46:08.474Z"
   .claude-marketplace/arggon/skills/arggon-cli/references/orchestration.md:
     template: "docs/claude/arggon/skills/arggon-cli/references/orchestration.md"
-    checksum: "sha256:d0ce5c8d921198586559ac0b40dfddb46b5a2cd9615427b1c722e6e2aa16bf11"
-    arggonVersion: "0.10.0"
-    generatedAt: "2026-10-15T16:04:32.505Z"
+    checksum: "sha256:837741a30f3eec6651a8a1a7376bc85c7a8321f1fc293f0edf3588852a253745"
+    arggonVersion: "0.11.0"
+    generatedAt: "2026-11-04T16:47:17.848Z"
   .claude-marketplace/arggon/skills/arggon-cli/references/pitfalls.md:
     template: "docs/claude/arggon/skills/arggon-cli/references/pitfalls.md"
-    checksum: "sha256:e6df13740099f6e6bee653a5073888d8cf73cd4c664fbd6013122777e61b50a8"
-    arggonVersion: "0.10.0"
-    generatedAt: "2026-10-15T16:04:32.505Z"
+    checksum: "sha256:389ce7da07e828bd90600dfa46d35fae26a65f6fb80dfd3c0b3a9399f661faf0"
+    arggonVersion: "0.11.0"
+    generatedAt: "2026-11-04T16:47:17.848Z"
   .editorconfig:
     template: "docs/editorconfig"
     checksum: "sha256:13683ae1820c1cf4ef46cc076940c7b43c7e895890ea93dfb885029163793698"

@@ -26,37 +26,14 @@ lean. A 40-line spec beats a 4-page one nobody reads.
 - If the work reveals more work, file it (`arggon create task|bug`) — don't grow
   the PR's scope, and don't leave it only in code comments.
 
-## Quality bar (every PR, no exceptions)
+## Quality bar
 
-- **Architecture is part of done:** code being cheap to WRITE never excuses
-  structural debt — boundaries, small surfaces, and tests are the deliverable,
-  never deferred as "refactor later".
-- **Conventions first:** read the project's `ArggonManager/docs/convention.md`,
-  `ArggonManager/docs/engineering.md`, and the relevant `ArggonManager/docs/playbooks/<tech>.md` before
-  writing code. If project docs disagree with what you're about to do, fix the
-  docs in the same PR or file a blocking follow-up — never fork silently.
-- **Tests are part of the change** when behavior changes; run the full suite plus
-  lint/typecheck gates the project defines, and keep the acceptance checklist in
-  the item's LIVE `## Acceptance` section honest — the done gate enforces it
-  (ADR 0015, scoped by ADR 0025): a task/bug whose live section has an unticked
-  criterion, or publishes no criterion at all, refuses `--status done` unless a
-  HUMAN passes `--waive "<reason>"` (recorded in the body). Boxes inside dated
-  comment blocks are history, and rows inside a fenced code block are content —
-  neither gates the flip, so a bug whose repro shows what a formatter does to a
-  `- [ ]` list item is still completable. Transcribe criteria into the live
-  section, never tick history and never fence a criterion. That checklist is the **domain invariant**: it is
-  what the project declares as done, whatever it checks it with.
-- **Docs travel with code:** any change that makes a doc statement false updates
-  that doc in the same PR (change-type → doc mapping in `ArggonManager/docs/agents.md`
-  §Documentation maintenance).
-- **Handoffs are written:** blocked work, out-of-scope discoveries and decisions go
-  in `arggon comment` on the item — the next agent should never re-derive your
-  context. Close a session with a structured handoff
-  (`arggon handoff <id> --next "<step>"`). Review verdicts also land on the item
-  via `arggon comment <id>`, never as GitHub PR comments.
-- **Leave it cleaner:** release expired claims (`--status todo`), prune merged
-  worktrees (`arggon cleanup --prune`), flag stale playbooks, and keep the tree
-  validating before every commit.
+The project's canonical bar is `ArggonManager/docs/engineering.md` §Review bar;
+its verdict and promotion conventions live there too. Operational done is
+`ArggonManager/docs/agents.md` §5; the acceptance grammar and kernel gate are
+`ArggonManager/docs/convention.md`. Follow those sections, not another checklist
+maintained in this reference. The change-type-to-document map is
+`ArggonManager/docs/references/documentation.md` §Documentation maintenance.
 
 ## Pipeline references
 

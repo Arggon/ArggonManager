@@ -146,7 +146,7 @@ function countsNextToTools(paragraph: string): number[] {
  * here when one starts listing the surface — the rule then covers it for free.
  */
 const ENUMERATIONS: ReadonlyArray<{ file: string; anchor: string }> = [
-  { file: "ArggonManager/docs/agents.md", anchor: "the bounded read surface as" },
+  { file: "ArggonManager/docs/references/agent-runtime.md", anchor: "the bounded read surface as" },
   { file: "ArggonManager/docs/json-output.md", anchor: "tool-result text content for its" },
   { file: "README.md", anchor: "Starts a stdio MCP server (JSON-RPC 2.0) exposing" },
   {
@@ -161,6 +161,12 @@ const CORPUS_FILES: readonly string[] = [
   "ArggonManager/docs/agents.md",
   "ArggonManager/docs/convention.md",
   "ArggonManager/docs/engineering.md",
+  "ArggonManager/docs/references/convention.md",
+  "ArggonManager/docs/references/engineering.md",
+  "ArggonManager/docs/references/agent-runtime.md",
+  "ArggonManager/docs/references/orchestration.md",
+  "ArggonManager/docs/references/documentation.md",
+  "ArggonManager/docs/runbooks/agent-recovery.md",
   "ArggonManager/docs/json-output.md",
 ];
 const CORPUS_DIRS: readonly string[] = [
@@ -260,7 +266,7 @@ describe("the documented native (Code Mode) surface matches the plugin", () => {
   });
 
   it("pins every name the carrier lists next to options.pinned", () => {
-    const file = "ArggonManager/docs/agents.md";
+    const file = "ArggonManager/docs/references/agent-runtime.md";
     // The pinned tools are enumerated inside the parenthetical that carries the
     // claim — `codemode: true`; nine of them also `options.pinned` — `list`, …,
     // W4's `start`, the claim → worktree entry `/arggon-start` drives)`. The
@@ -274,7 +280,7 @@ describe("the documented native (Code Mode) surface matches the plugin", () => {
   });
 
   it("states the native tool count the plugin registers", () => {
-    const file = "ArggonManager/docs/agents.md";
+    const file = "ArggonManager/docs/references/agent-runtime.md";
     const counts = countsNextToTools(paragraphWith(file, "options.pinned"));
     expect(
       counts.length,

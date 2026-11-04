@@ -54,8 +54,9 @@
  * does not have, and that failure is in the code's own file header as much as in
  * the prose.
  *
- * Scope: both rules cover the same three methodology carriers — rule 1 via
- * `STATUS_CARRIERS`, rule 2 via `LINK_CARRIERS`. They are separate constants
+ * Scope: both rules cover the three methodology cores plus their extracted
+ * references/runbook — rule 1 via `STATUS_CARRIERS`, rule 2 via
+ * `LINK_CARRIERS`. They are separate constants
  * because they are separate rules, not because their scope differs: rule 2 used
  * to stop at `engineering.md` because `convention.md` linked
  * `./adr/0015-done-gate.md`, a file that does not exist — the one dead link
@@ -88,6 +89,12 @@ const STATUS_CARRIERS: readonly string[] = [
   "ArggonManager/docs/engineering.md",
   "ArggonManager/docs/agents.md",
   "ArggonManager/docs/convention.md",
+  "ArggonManager/docs/references/agent-runtime.md",
+  "ArggonManager/docs/references/orchestration.md",
+  "ArggonManager/docs/references/documentation.md",
+  "ArggonManager/docs/runbooks/agent-recovery.md",
+  "ArggonManager/docs/references/convention.md",
+  "ArggonManager/docs/references/engineering.md",
 ];
 
 /**
@@ -116,20 +123,25 @@ const STATUS_CARRIERS: readonly string[] = [
  * (`cli/src/skill-generated-commands.test.ts`) — separate work, not a dead-link
  * repair.
  *
- * One boundary is a recorded choice, not an oversight: the link shape is
- * `./adr/`, and `convention.md` writes 6 of its 14 ADR references bare
- * (`adr/NNNN-….md`, no `./`), which this rule skips. Widening the SHAPE is a
- * separate decision with its own blast radius; widening the CARRIERS is this
- * one, and it is safe to do independently.
+ * Extraction widens the shape deliberately: `./adr/`, bare `adr/` and the
+ * reference directory's `../adr/` all name the same authority. Keep the target
+ * spelling and resolve it from the carrier's own directory, never docsDir;
+ * otherwise a moved link can pass while its on-disk destination is broken.
  */
 const LINK_CARRIERS: readonly string[] = [
   "ArggonManager/docs/engineering.md",
   "ArggonManager/docs/agents.md",
   "ArggonManager/docs/convention.md",
+  "ArggonManager/docs/references/agent-runtime.md",
+  "ArggonManager/docs/references/orchestration.md",
+  "ArggonManager/docs/references/documentation.md",
+  "ArggonManager/docs/runbooks/agent-recovery.md",
+  "ArggonManager/docs/references/convention.md",
+  "ArggonManager/docs/references/engineering.md",
 ];
 
-/** `./adr/0003-milestone-field.md` — the ADR index link `./adr/README.md` is not one. */
-const ADR_LINK = /\(\.\/adr\/(\d{4})-([a-z0-9-]+)\.md\)/g;
+/** Core and extracted reference paths; the ADR index is not an individual ADR. */
+const ADR_LINK = /\(((?:\.{1,2}\/)?adr\/(\d{4})-[a-z0-9-]+\.md)\)/g;
 
 /**
  * Delimiters that end one ADR reference's label region and start the next.
@@ -224,9 +236,9 @@ function adrReferences(source: string): CarrierReference[] {
       const until = matches[index + 1]?.index ?? line.length;
       const tail = line.slice(end, until).split(TAIL_STOPS)[0] ?? "";
       references.push({
-        number: match[1]!,
+        number: match[2]!,
         label: `${head} ${tail}`.trim(),
-        target: `./adr/${match[1]}-${match[2]}.md`,
+        target: match[1]!, // Preserve the path to resolve from the carrier's own directory.
       });
     }
   }
@@ -303,6 +315,16 @@ describe("the carrier pins ADR references to the ADR files", () => {
     expect(statedStatuses(before[0]!.label)).toEqual([]);
     expect(statedStatuses(before[1]!.label)).toEqual(["Proposed"]);
     expect(statedStatuses(before[2]!.label)).toEqual([]);
+
+    // Both newly covered spellings must still detect restated status and retain
+    // their real path, not normalize it to a core-directory link.
+    for (const prefix of ["../adr/", "adr/"]) {
+      const reference = adrReferences(`[ADR 0003](${prefix}0003-milestone-field.md) (Proposed)`);
+      expect(reference).toHaveLength(1);
+      expect(reference[0]!.target).toBe(`${prefix}0003-milestone-field.md`);
+      expect(reference[0]!.number).toBe("0003");
+      expect(statedStatuses(reference[0]!.label)).toEqual(["Proposed"]);
+    }
 
     // §ADR process states the lifecycle in the same vocabulary with no ADR link
     // in its label region, so it is prose about the process, not a claim about
@@ -413,7 +435,7 @@ describe("the carrier pins ADR references to the ADR files", () => {
     const files = new Set(adrFiles());
     const problems: string[] = [];
     for (const reference of adrReferences(read(carrier))) {
-      const resolved = resolve(docsDir, reference.target);
+      const resolved = resolve(dirname(join(repoRoot, carrier)), reference.target);
       if (!existsSync(resolved)) {
         const actual = [...files].filter((name) => name.startsWith(`${reference.number}-`));
         problems.push(
@@ -422,7 +444,7 @@ describe("the carrier pins ADR references to the ADR files", () => {
         );
         continue;
       }
-      const stem = reference.target.slice("./adr/".length);
+      const stem = reference.target.split("/").at(-1)!;
       if (!stem.startsWith(`${reference.number}-`)) {
         problems.push(
           `${carrier}: links ${reference.target} but numbers it ADR ${reference.number}`,

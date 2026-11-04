@@ -1,21 +1,17 @@
 # Claim / concurrency (v0)
 
-Rules for humans and agents so two workers do not silently double-work the same item. Schema details live in [`convention.md`](convention.md) (Claim rule, Unclaim, statuses).
+Layer: **reference**. Read for concurrent-claim behavior; start the ordinary
+workflow in [agents](./agents.md). Claim schema, conflicts and terminal-state
+policy have one canonical home in [convention](./convention.md#claim-rule).
 
 ## Definition
 
-**Claim** = (`type` ∈ {story, task, bug}) ∧ `assignee` set ∧ `status: in_progress`.
-
-Initiative and epic may be `in_progress` without an assignee (container status, not a claim).
+See the [claim rule](./convention.md#claim-rule).
 
 ## Conflict
 
-If an item is already claimed, `arggon update` **refuses** reassignment to a different assignee unless `--force`.
-
-- Default: fail with a claim conflict (no silent steal).
-- `--force`: allow reassignment; still enforce status transitions, the claim rule, and `blocked_reason` rules.
-
-Coordinate first when possible. Prefer unclaim + reclaim over force.
+See [claim conflict policy](./convention.md#claim-rule)
+and the [human-only authority map](./engineering.md#roles-and-authority).
 
 ## Concurrent claims (atomic check-and-set)
 
@@ -39,75 +35,16 @@ Resulting semantics for simultaneous `arggon start` processes on one item:
 
 ## Unclaim recovery
 
-v0 unclaim: `in_progress` → `todo` clears `assignee` (CLI `update` default), and
-it clears the recorded `branch` with it.
-
-```bash
-arggon update <id> --status todo
-# then
-arggon update <id> --status in_progress --assignee <you>
-```
-
-**An unclaim releases nothing but the claim.** A claim taken through
-`start --worktree` also owns a worktree at `../<repo>-<id>`, its `.arggon.env`
-and its `arggon-claim.json` stamp, and none of those die with the assignee:
-`worktree_path` stays recorded (only `assignee`, `branch` and the `claimed_at`
-lease go), `update` is a frontmatter-only operation — it is the very call
-`cleanup` uses to CLEAR such a record — and `cleanup --prune` reaps only FINISHED
-work (terminal item + merged branch), so an item back in `todo` is invisible to
-it (bug-unclaim-leaves-worktree-record-without-reaper). So the unclaim reports
-what it left behind: the additive `claimFootprint` receipt
-(`{ worktreePath, release: { cli, native } }`, printed on stdout as
-`⚠ claim dropped: …`) names the release path, and the release itself is
-`arggon cleanup --release <id>` (native `tools.arggon.cleanup({ release })`) —
-the inverse of `start --worktree`, refused while the item is still claimed or
-while another session's live writer holds the worktree
-([agents.md](./agents.md) §Cleanup).
-
-The receipt is **unclaim-only** on purpose. A `→ done` flip leaves the same
-footprint, but its remedy is `cleanup --prune` — whose merge gate protects a
-branch that still carries unmerged work — so no release is named there; a
-blocked item keeps its assignee as context rather than as a lease, so it is not
-an abandoned claim and gets no receipt either.
+Read [unclaim and release](./runbooks/agent-recovery.md#unclaim) when abandoning
+a claim or removing its remaining worktree footprint.
 
 ## Stale claims (claim leases)
 
-Every claim now carries a soft lease: the CLI maintains `claimed_at` (ISO date-time) — set when a claimable item is claimed, cleared when the claim is released. Staleness is **advisory reporting**, never enforcement:
-
-```bash
-arggon list --stale --older-than 7d   # claimed items whose lease is older than 7d
-```
-
-Items claimed before `claimed_at` existed count as stale (no lease recorded).
-
-Reclaiming a stale claim is a **human-only supervised takeover** (BREAKING hardening, bug-cli-steal-not-gated: steal is now opt-in per repo and interactive — the unconditional flow before this change is gone):
-
-```bash
-arggon update <id> --steal --reason "owner left; taking over" --assignee <you>
-```
-
-The flow (both gates are required):
-
-1. **Arm the repo once**: `x-tracker.allow-steal: true` in the tracker `.convention.yml` (default when absent: steal is refused with `steal is disabled in this repo (x-tracker.allow-steal: true in the tracker .convention.yml arms it)`).
-2. **A human runs it in their terminal**: `--steal` requires an interactive stdin — scripts, CI, and agents (non-TTY) are refused with `--steal requires an interactive terminal (agents must not steal claims — `ArggonManager/docs/agents.md`)`, even with the repo armed and even with `y` piped in. In a TTY, the CLI asks `Steal '<id>' from '<current-assignee>'? [y/N]` and aborts on anything but y/yes. There is no `--yes` override — the prompt is the point.
-3. As before: a non-empty `--reason` (recorded in the item body as a dated note) and `--assignee <you>` are required.
-
-- Agents are refused (same playbook rule as `--force`) — they unclaim-and-reclaim through coordination instead, or pick another item.
+Read the [canonical lease contract](./convention.md#claim-lease-claimed_at)
+for staleness, reporting and supervised takeover.
 
 ## Claiming (playbook)
 
-Claiming follows **work-loop parity**: any human and any agent claims under the
-same rules, the same kernel and the same JSON contracts. Authority is **asymmetric
-and named** — a small set of decisions belongs to the product owner, and the
-irreversible ones are structurally human-only
-([ADR 0021](./adr/0021-agents-primary-workers-human-product-owner.md) §1). The one
-that reaches this page is rule 2: taking over another writer's claim (`--steal`) is
-a product-owner power. The full authority map lives in
-[`engineering.md`](engineering.md) §Roles and authority.
-
-1. Claim before starting (`--status in_progress --assignee <you>`).
-2. Do not steal; unclaim or use `--force` only when coordinated. Unclaiming a claim that created a worktree also releases it (`arggon cleanup --release <id>`) — see §Unclaim recovery.
-3. Unclaim when releasing work (`--status todo`).
-4. Do not reopen `done`/`cancelled` as an agent — enforced: the MCP layer refuses agent callers, and the CLI requires an interactive-terminal y/N confirmation for `--status todo` on a `done`/`cancelled` item (see convention reopen policy).
-
-Longer loop (find → claim → work → PR): [`agents.md`](agents.md). Prefer that playbook for the full agent workflow; keep claim/concurrency rules here.
+Use [start with a worktree](./agents.md#4-branch-naming), not an alternative
+bare-update checklist. [Operational done](./agents.md#5-done-criteria) includes
+the actual merge, not just a status flip.
