@@ -46,6 +46,10 @@ jobs:
         # build above regenerates it, so a diff against HEAD means the source
         # changed without `npm run build:plugin` (review F1, PR #376).
         run: npm run check:plugin
+      - name: Fail if a canonical workflow copy drifted from docs/agents.md
+        # Issue #869: one normative contract, generated entrypoints. Check-only
+        # on purpose — CI must never repair a stale copy silently.
+        run: npm run workflow:check
       - run: npm run test
       - run: npm run lint
       - run: npm run test:structure
