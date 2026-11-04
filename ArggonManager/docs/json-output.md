@@ -139,12 +139,12 @@ Every command that loads domain objects emits this envelope; the envelope is ass
 
 ### `instructions`
 
-| Field                | Type                 | Notes                                                                          |
-| -------------------- | -------------------- | ------------------------------------------------------------------------------ |
-| `source`             | `string`             | Playbook doc the snippets were extracted from (`ArggonManager/docs/agents.md`) |
-| `snippets.install`   | `{ language, body }` | Prerequisite shell commands, one per line                                      |
-| `snippets.precommit` | `{ language, body }` | `.git/hooks/pre-commit` gate                                                   |
-| `snippets.ci`        | `{ language, body }` | CI validate job                                                                |
+| Field                | Type                 | Notes                                                                                               |
+| -------------------- | -------------------- | --------------------------------------------------------------------------------------------------- |
+| `source`             | `string`             | Playbook doc the snippets were extracted from (`ArggonManager/docs/agents.md`)                      |
+| `snippets.install`   | `{ language, body }` | Prerequisite shell commands, one per line                                                           |
+| `snippets.precommit` | `{ language, body }` | `.git/hooks/pre-commit` gate                                                                        |
+| `snippets.ci`        | `{ language, body }` | CI validate job                                                                                     |
 | `snippets.agent`     | `{ language, body }` | AGENTS.md wiring snippet: the playbook's generated copy region plus the canonical workflow contract |
 
 Snippets are extracted from the playbook at runtime; the agent snippet also composes the playbook's canonical workflow contract, so the printed copy-paste instructions cannot drift from §2. Failures use `error.code: "INSTRUCTIONS_FAILED"`.

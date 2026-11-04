@@ -93,7 +93,7 @@ export function canonicalContract(source: string): string {
 export function renderWorkflowCopy(target: string, source: string, excerpt: boolean): string {
   const contract = canonicalContract(source);
   const region = workflowRegion(target, "copy");
-  const body = `${PROVENANCE}\n${POINTER}\n${excerpt ? `\n${contract}` : ""}`;
+  const body = `${PROVENANCE}\n\n${POINTER}\n${excerpt ? `\n${contract}` : ""}`;
   return target.slice(0, region.start) + body + target.slice(region.end);
 }
 
