@@ -517,8 +517,8 @@ describe("lab: synthetic legacy tree, full adoption flow (guardian/cuentas/suizo
     // Sanctioned sweep edit (step 3 of the checklist): fill in a placeholder.
     const agentsPath = join(dir, "AGENTS.md");
     const swept = readFileSync(agentsPath, "utf8").replace(
-      "arggon list --status todo --json",
-      "SWEEP: our entrypoint is npm run dev; arggon list --status todo --json",
+      "Keep `arggon validate` green",
+      "SWEEP: our entrypoint is npm run dev; Keep `arggon validate` green",
     );
     expect(swept).not.toBe(readFileSync(agentsPath, "utf8"));
     writeFileSync(agentsPath, swept, "utf8");
