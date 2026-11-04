@@ -1,0 +1,26 @@
+---
+type: task
+status: todo
+id: task-publish-canonical-agent-workflow
+title: Publish one canonical agent workflow contract and generate its copies
+parent: story-docs-sync
+labels: []
+created: "2026-11-04"
+updated: "2026-11-04"
+issue: 869
+---
+## Context
+
+Issue #869 (methodology review, part 2 of 5): the agent-facing surfaces disagree on how to claim and when an item is done, and nothing states the human single-checkout boundary. After #873 the operational core lives in `ArggonManager/docs/agents.md`; this item publishes the normative claim/completion contract there and generates its copies, so the surfaces cannot drift again.
+
+Source: https://github.com/Arggon/ArggonManager/issues/869
+
+## Acceptance
+
+- [ ] `ArggonManager/docs/agents.md` names one normative workflow contract covering the agent worktree claim, the delegated maker, the single-checkout human path and post-merge completion.
+- [ ] The `arggon instructions` copy-paste snippet, the adopter AGENTS/CONTRIBUTING/copilot templates and the bundled skill are generated from or link to that contract.
+- [ ] Root entrypoints (`AGENTS.md`, `CONTRIBUTING.md`, `.github/copilot-instructions.md`) no longer teach a bare agent claim or pre-merge completion.
+- [ ] A check-only drift command and a test fail on stale copies and on the old phrasing, and CI runs the drift check.
+- [ ] Verification: workflow/instructions/init-docs tests, lint, `arggon validate` and the context-budget check pass.
+
+## Notes
