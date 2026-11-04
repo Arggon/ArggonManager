@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-review-freshness
 title: Bind review verdicts to the reviewed revision and flag stale approvals
 assignee: arggon-superagent
@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: [cli, agents]
 created: "2026-11-04"
 updated: "2026-11-04"
-claimed_at: "2026-11-04T20:51:26.201Z"
 issue: 872
 worktree_path: /home/arggon/.dsh/state/superagent/work/revision-bound-approvals-bfb49eb17950
 ---
