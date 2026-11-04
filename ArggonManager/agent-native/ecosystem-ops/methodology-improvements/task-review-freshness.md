@@ -9,6 +9,8 @@ labels: [cli, agents]
 created: "2026-11-04"
 updated: "2026-11-04"
 issue: 872
+branch: agent/revision-bound-approvals-bfb49eb17950
+worktree_path: /home/arggon/.dsh/state/superagent/work/revision-bound-approvals-bfb49eb17950
 ---
 # Bind review verdicts to the reviewed revision and flag stale approvals
 
