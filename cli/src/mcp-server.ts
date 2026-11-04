@@ -161,6 +161,11 @@ const TOOLS: ToolDefinition[] = [
       properties: {
         type: { type: "string", enum: [...ITEM_TYPES], description: "item type to create" },
         title: { type: "string", description: "human title (non-empty)" },
+        body: {
+          type: "string",
+          description:
+            "Markdown body content replacing the template (not a file path); author Context and Acceptance here",
+        },
         parent: {
           type: "string",
           description: "parent container id (required for non-initiatives)",
@@ -774,6 +779,7 @@ export function runMcpServer(opts: McpServerOptions): void {
           cwd: opts.cwd,
           type: str(args.type) ?? "",
           title: str(args.title) ?? "",
+          body: str(args.body),
           parent: str(args.parent),
           id: str(args.id),
           assignee: str(args.assignee),

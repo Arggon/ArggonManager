@@ -248,8 +248,8 @@ describe("parity corpus: the goal never disagrees with the done gate", () => {
       objective: /publishes no criteria/,
     },
     // The ONLY boxes live in an `arggon comment` section — a first-class shape
-    // here (`create` has no `--body` flag; `bug-empty-template-checkbox` is the
-    // stale empty box that shape leaves behind). A dated comment block is history
+    // here (the only path before issue #870 added `--body`; `bug-empty-template-checkbox`
+    // is the stale empty box that shape leaves behind). A dated comment block is history
     // and is not the contract, so the live section here carries no criterion: the
     // gate refuses (rather than counting the comment's boxes), and the goal must
     // not hand an agent a comment-filed criterion as the objective to loop on.
@@ -510,8 +510,8 @@ describe("runGoal (rendered contract from a real item)", () => {
   });
 
   it("agrees with the done gate when the checklist is filed as a comment, end to end", () => {
-    // `arggon create` has no `--body` flag, so a checklist filed as an
-    // `arggon comment` is a first-class shape (bug-empty-template-checkbox is
+    // Before issue #870 added `create --body`, a checklist filed as an
+    // `arggon comment` was the first-class shape (bug-empty-template-checkbox is
     // the stale empty box it leaves). The gate reads the item's LIVE `##`
     // `Acceptance` section (bug-done-gate-counts-checkboxes-inside-comment-blocks),
     // so here it refuses for `no-live-contract` — and the goal must read the same

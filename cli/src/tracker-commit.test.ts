@@ -351,6 +351,7 @@ describe("tracker auto-commit with gitignored paths", () => {
       expect(result.ignored).toBeUndefined();
       expect(commitPayload(result)).toEqual({
         skipped: expect.stringMatching(/^git add failed: The following paths are ignored/),
+        failure: "git-add-failed",
       });
       expect(stderr).toHaveBeenCalledWith(
         expect.stringContaining("commit skipped: git add failed: The following paths are ignored"),
@@ -985,9 +986,11 @@ describe("commitTrackerMutation edge cases", () => {
       expect(result).toEqual({
         committed: false,
         skipReason: "nothing to commit (staged entry lost under contention)",
+        failure: "staged-entry-lost",
       });
       expect(commitPayload(result)).toEqual({
         skipped: "nothing to commit (staged entry lost under contention)",
+        failure: "staged-entry-lost",
       });
       expect(stderr).toHaveBeenCalledWith(
         expect.stringContaining(
@@ -1035,13 +1038,17 @@ describe("commitTrackerMutation edge cases", () => {
         message: trackerCommitMessage("commented", ["task-rate-limit"]),
       });
 
-      expect(result).toEqual({ committed: false, skipReason: rawReason });
+      expect(result).toEqual({
+        committed: false,
+        skipReason: rawReason,
+        failure: "git-commit-failed",
+      });
       // stderr warning: exactly one inert line.
       expect(stderr).toHaveBeenCalledWith(`arggon: warning: commit skipped: ${inertReason}\n`);
       // human stdout line: same value, also inert.
       expect(mod.formatCommitLine(result)).toBe(`no-commit: ${inertReason}`);
       // payload view keeps the raw value.
-      expect(commitPayload(result)).toEqual({ skipped: rawReason });
+      expect(commitPayload(result)).toEqual({ skipped: rawReason, failure: "git-commit-failed" });
     } finally {
       vi.doUnmock("node:child_process");
       stderr.mockRestore();
@@ -1095,8 +1102,15 @@ describe("commitTrackerMutation index.lock contention (bug-autocommit-silent-ski
         commitRetryTimeoutMs: 300,
       });
 
-      expect(result).toEqual({ committed: false, skipReason: "git index locked" });
-      expect(commitPayload(result)).toEqual({ skipped: "git index locked" });
+      expect(result).toEqual({
+        committed: false,
+        skipReason: "git index locked",
+        failure: "git-index-locked",
+      });
+      expect(commitPayload(result)).toEqual({
+        skipped: "git index locked",
+        failure: "git-index-locked",
+      });
       // Human output is never silent: the skip warns on stderr...
       expect(stderr).toHaveBeenCalledWith(
         expect.stringContaining("commit skipped: git index locked"),
@@ -1181,8 +1195,15 @@ describe("repo-level git-mutation lock (bug-torture-contention-flake3)", () => {
         commitRetryTimeoutMs: 300,
       });
 
-      expect(result).toEqual({ committed: false, skipReason: "git index locked" });
-      expect(commitPayload(result)).toEqual({ skipped: "git index locked" });
+      expect(result).toEqual({
+        committed: false,
+        skipReason: "git index locked",
+        failure: "git-index-locked",
+      });
+      expect(commitPayload(result)).toEqual({
+        skipped: "git index locked",
+        failure: "git-index-locked",
+      });
       expect(stderr).toHaveBeenCalledWith(
         expect.stringContaining("commit skipped: git index locked"),
       );

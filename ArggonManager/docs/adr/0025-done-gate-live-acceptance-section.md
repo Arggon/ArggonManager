@@ -119,9 +119,9 @@ honour it.
    reporter pasted into one. Comment blocks are stripped _before_ the section is
    located, so a `## Acceptance` pasted inside a comment cannot become the
    contract. History is never edited to satisfy a gate.
-   *(Amended 2026-10-11, see the note at the top: fenced code blocks are
+   _(Amended 2026-10-11, see the note at the top: fenced code blocks are
    excluded on the same footing, and the fence is consulted before the heading
-   rules.)*
+   rules.)_
 2. **A missing contract is refused too.** The flip is also refused when the live
    section publishes **no criterion at all** — absent, empty, whitespace-only,
    still the template placeholder, nothing but bare `- [ ]` rows, or nothing but
@@ -204,3 +204,18 @@ honour it.
   alone (`liveCriteria=0`, five whole-body unticked boxes), so a container whose
   live section is empty cannot auto-complete for the same reason a leaf cannot
   flip.
+
+## Amendment — 2026-11-04 (issue #870, `task-create-needs-a-body-flag-to-author-a-live-contract`)
+
+The "no `--body` flag" limitation stated in Context, Consequences and Alternatives
+is resolved. `arggon create` now accepts `--body <file>` (complete UTF-8 Markdown
+replacement) and repeatable `--acceptance '<criterion>'` (unchecked live rows),
+with the same inputs on MCP/native create as inline `body` content. The shipped
+task/bug templates now scaffold title-derived `## Context` prose and one
+unchecked live criterion instead of a bare placeholder comment, so a default
+leaf passes `validate` and commits under the validate pre-commit hook while
+still requiring an honest completion tick. The decision itself is recorded in
+[`convention.md` §Authoring a contract versus creating a skeleton](../convention.md#authoring-a-contract-versus-creating-a-skeleton).
+The "let agents transcribe automatically at `create`" alternative is therefore
+no longer deferred; the mandatory-body and auto-checked-criterion alternatives
+remain rejected for the reasons on this page.

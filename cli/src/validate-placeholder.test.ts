@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   acceptanceBody,
+  acceptanceRows,
   findTasksDir,
   itemsById,
   liveAcceptanceRegion,
@@ -68,19 +69,24 @@ function templateBody(type: string): string {
   return raw.slice(end + 4).replace(/^\n/, "");
 }
 
-/** The live `## Context` marker of one scaffold template (a bare comment). */
-function contextMarker(type: string): string {
-  const region = liveContextRegion(templateBody(type));
-  expect(region, `templates/${type}.md live ## Context is the scaffold marker`).toMatch(
+/**
+ * The live `## Context` scaffold marker, derived from a template that still
+ * ships one. The story template is the stable source: task/bug no longer
+ * scaffold a placeholder (issue #870 ships real title-derived prose and one
+ * unchecked criterion there), while the guard under test is type-agnostic.
+ */
+function contextMarker(): string {
+  const region = liveContextRegion(templateBody("story"));
+  expect(region, "templates/story.md live ## Context is the scaffold marker").toMatch(
     /^\s*<!--[\s\S]*?-->\s*$/,
   );
   return region!.trim();
 }
 
-/** The live `## Acceptance` marker of one scaffold template (a bare comment). */
-function acceptanceMarker(type: string): string {
-  const region = liveAcceptanceRegion(templateBody(type));
-  expect(region, `templates/${type}.md live ## Acceptance is the scaffold marker`).toMatch(
+/** The live `## Acceptance` scaffold marker (same story-template source). */
+function acceptanceMarker(): string {
+  const region = liveAcceptanceRegion(templateBody("story"));
+  expect(region, "templates/story.md live ## Acceptance is the scaffold marker").toMatch(
     /^\s*<!--[\s\S]*?-->\s*$/,
   );
   return region!.trim();
@@ -132,8 +138,8 @@ function placeholderFixture(section: "Context" | "Acceptance"): { dir: string; i
   const dir = mkdtempSync(join(tmpdir(), "arggon-validate-placeholder-"));
   runInit({ dir, force: false });
   const story = seedChain(dir, "story-s");
-  const context = contextMarker("task");
-  const acceptance = acceptanceMarker("task");
+  const context = contextMarker();
+  const acceptance = acceptanceMarker();
   const task = runCreate({
     cwd: dir,
     type: "task",
@@ -182,7 +188,7 @@ describe("validate refuses placeholder bodies on open items", () => {
       title: "Both placeholders",
       parent: story,
       id: "both-placeholders",
-      body: `## Context\n\n${contextMarker("bug")}\n\n## Acceptance\n\n${acceptanceMarker("bug")}\n`,
+      body: `## Context\n\n${contextMarker()}\n\n## Acceptance\n\n${acceptanceMarker()}\n`,
       now: NOW,
     });
     const errors = placeholderErrors(dir);
@@ -219,7 +225,7 @@ describe("validate refuses placeholder bodies on open items", () => {
       title: "Placeholder story",
       parent: "e",
       id: "placeholder-story",
-      body: `## Context\n\n${contextMarker("story")}\n\n## Acceptance\n\n${acceptanceMarker("story")}\n`,
+      body: `## Context\n\n${contextMarker()}\n\n## Acceptance\n\n${acceptanceMarker()}\n`,
       now: NOW,
     });
     const errors = placeholderErrors(dir);
@@ -256,7 +262,7 @@ describe("validate refuses placeholder bodies on open items", () => {
     const story = seedChain(dir, "story-s");
     // The marker TEXTS, derived from the templates above, quoted as content:
     // an inline code span and a fenced block. Both must read as prose.
-    const quoted = contextMarker("task");
+    const quoted = contextMarker();
     runCreate({
       cwd: dir,
       type: "task",
@@ -314,7 +320,7 @@ describe("validate refuses placeholder bodies on open items", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-validate-placeholder-cli-"));
     runInit({ dir, force: false });
     const story = seedChain(dir, "story-s");
-    const quoted = acceptanceMarker("task");
+    const quoted = acceptanceMarker();
     runCreate({
       cwd: dir,
       type: "task",
@@ -330,12 +336,27 @@ describe("validate refuses placeholder bodies on open items", () => {
   });
 });
 
+describe("shipped leaf templates author a usable skeleton (issue #870)", () => {
+  it.each(["task", "bug"] as const)(
+    "templates/%s.md carries live prose and exactly one unchecked criterion",
+    (type) => {
+      const body = templateBody(type);
+      expect(placeholderSections(body)).toEqual([]);
+      const region = liveAcceptanceRegion(body) ?? "";
+      const rows = acceptanceRows(region);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ checked: false, criterion: true });
+      expect(liveContextRegion(body)?.trim().length).toBeGreaterThan(0);
+    },
+  );
+});
+
 describe("placeholderSections unit grammar", () => {
   it("reads sections in document order and returns [] on real prose", () => {
     expect(placeholderSections("## Context\n\nReal.\n\n## Acceptance\n\n- [x] done\n")).toEqual([]);
     expect(
       placeholderSections(
-        `## Context\n\n${contextMarker("epic")}\n\n## Acceptance\n\n${acceptanceMarker("epic")}\n`,
+        `## Context\n\n${contextMarker()}\n\n## Acceptance\n\n${acceptanceMarker()}\n`,
       ),
     ).toEqual(["Context", "Acceptance"]);
   });

@@ -544,6 +544,21 @@ describe("native tool outputs mirror the CLI --json envelopes", () => {
     });
   }
 
+  it("authors inline Markdown through the native create input", async () => {
+    const dir = seedTree();
+    const body =
+      "## Context\n\nKeep requests bounded.\n\n## Acceptance\n\n- [ ] Rate limiting works.\n";
+    const result = await tool(definitions(dir), "create").execute({
+      type: "task",
+      title: "Authored contract",
+      parent: "story-login",
+      body,
+    });
+    const output = result.output as { ok: boolean; path: string };
+    expect(output.ok).toBe(true);
+    expect(readFileSync(join(dir, output.path), "utf8")).toContain(body);
+  });
+
   const writeCases: Array<{
     name: string;
     input: Record<string, unknown>;

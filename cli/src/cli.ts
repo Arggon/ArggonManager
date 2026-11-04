@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { relative, sep } from "node:path";
 import { formatAdoptAckReport, formatAdoptReport, runAdopt, runAdoptAck } from "./adopt.js";
 import { displayPath, runBoard } from "./board.js";
@@ -637,6 +638,16 @@ program
   .option("--status <status>", "status (default: todo)", "todo")
   .option("--blocked-reason <text>", "required when --status blocked")
   .option(
+    "--body <file>",
+    "replace the template body with UTF-8 Markdown read from <file> (author Context and Acceptance; bypasses templates)",
+  )
+  .option(
+    "--acceptance <criterion>",
+    "author one live '## Acceptance' criterion as an unchecked row (repeatable; mutually exclusive with --body)",
+    (value: string, previous: string[]) => [...previous, value],
+    [] as string[],
+  )
+  .option(
     "--issue <n>",
     "GitHub issue number recorded in the additive issue frontmatter field (start --open-pr appends Closes #N; positive integer)",
   )
@@ -662,6 +673,8 @@ program
         priority?: string;
         status?: string;
         blockedReason?: string;
+        body?: string;
+        acceptance?: string[];
         issue?: string;
         commit?: boolean;
         full?: boolean;
@@ -670,6 +683,11 @@ program
     ) => {
       const json = jsonEnabled(opts);
       try {
+        // Read the body before any mutation: an unreadable file must fail with
+        // nothing written. An explicit empty file is still a body override.
+        const body = opts.body !== undefined ? readFileSync(opts.body, "utf8") : undefined;
+        const acceptance =
+          opts.acceptance !== undefined && opts.acceptance.length > 0 ? opts.acceptance : undefined;
         if (json) {
           // The kernel operation assembles the documented envelope; the CLI
           // only emits it (ADR 0011 §4: one logic path, one library).
@@ -684,6 +702,8 @@ program
             priority: opts.priority,
             status: opts.status,
             blockedReason: opts.blockedReason,
+            body,
+            acceptance,
             issue: opts.issue !== undefined ? Number(opts.issue) : undefined,
             commit: opts.commit === false ? false : undefined,
             templatesDir: bundledTemplatesDir(),
@@ -704,10 +724,21 @@ program
           priority: opts.priority,
           status: opts.status,
           blockedReason: opts.blockedReason,
+          body,
+          acceptance,
           issue: opts.issue !== undefined ? Number(opts.issue) : undefined,
           commit: opts.commit === false ? false : undefined,
           templatesDir: bundledTemplatesDir(),
         });
+        if (result.commit?.failure) {
+          printHumanError(
+            "arggon create",
+            `CREATE_COMMIT_FAILED: the item was written but its auto-commit failed: ${result.commit.skipReason}. ` +
+              `It is kept at ${result.path}; fix the cause, stage and commit the existing item — do not create it again.`,
+          );
+          process.exitCode = 1;
+          return;
+        }
         console.log(`arggon create: ${result.item.type} ${sanitizeHumanError(result.id)}`);
         console.log(`  ${sanitizeHumanError(result.path)}`);
         const commitLine = formatCommitLine(result.commit);

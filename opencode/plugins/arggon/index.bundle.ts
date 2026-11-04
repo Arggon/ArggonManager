@@ -2025,17 +2025,26 @@ function runCreate(opts) {
         throw new Error(`File already exists: ${filePath}`);
     }
     const today = (0, dates_js_1.formatDate)(opts.now ?? new Date());
-    const templatePath = resolveTemplate(tasksDir, type, opts.templatesDir);
-    const template = (0, node_fs_1.readFileSync)(templatePath, "utf8");
-    const body = opts.body !== undefined
-        ? opts.body
-        : fillTemplateBody(stripFrontmatterBody(template), {
+    if (opts.body !== undefined && opts.acceptance !== undefined && opts.acceptance.length > 0) {
+        throw new Error("body and acceptance are mutually exclusive (a body already authors the contract)");
+    }
+    const criteria = normalizeAcceptanceCriteria(opts.acceptance);
+    let body;
+    if (opts.body !== undefined) {
+        body = opts.body;
+    }
+    else {
+        const templatePath = resolveTemplate(tasksDir, type, opts.templatesDir);
+        body = fillTemplateBody(stripFrontmatterBody((0, node_fs_1.readFileSync)(templatePath, "utf8")), {
             type,
             id,
             title,
             parent: parentItem,
             byId,
         });
+        if (criteria.length > 0)
+            body = withAcceptanceRows(body, criteria);
+    }
     const data = {
         type,
         status,
@@ -2085,6 +2094,43 @@ function resolveTemplate(tasksDir, type, templatesDir) {
     }
     throw new Error(`Template not found: ${name}`);
 }
+function normalizeAcceptanceCriteria(acceptance) {
+    if (acceptance === undefined)
+        return [];
+    const criteria = [];
+    for (const value of acceptance) {
+        const criterion = value.trim();
+        if (criterion.length === 0) {
+            throw new Error("acceptance criterion must not be empty (one --acceptance per criterion)");
+        }
+        if (/[\n\r\u2028\u2029]/.test(criterion)) {
+            throw new Error("acceptance criterion must be a single line (one --acceptance per criterion)");
+        }
+        criteria.push(criterion);
+    }
+    return criteria;
+}
+function withAcceptanceRows(body, criteria) {
+    const rows = criteria.map((criterion) => `- [ ] ${criterion}`);
+    const lines = body.split(/\r\n|\r|\n/);
+    let heading = -1;
+    for (let i = 0; i < lines.length; i += 1) {
+        if (/^##[ \t]+acceptance[ \t]*$/i.test(lines[i])) {
+            heading = i;
+            break;
+        }
+    }
+    if (heading === -1)
+        return `${body.endsWith("\n") ? body : `${body}\n`}\n## Acceptance\n\n${rows.join("\n")}\n`;
+    let end = lines.length;
+    for (let i = heading + 1; i < lines.length; i += 1) {
+        if (/^#{1,2}[ \t]/.test(lines[i])) {
+            end = i;
+            break;
+        }
+    }
+    return [...lines.slice(0, heading + 1), "", ...rows, "", ...lines.slice(end)].join("\n");
+}
 function stripFrontmatterBody(raw) {
     const end = raw.indexOf("\n---", 3);
     if (end === -1)
@@ -2094,9 +2140,18 @@ function stripFrontmatterBody(raw) {
         body = body.slice(1);
     return body;
 }
+function inlineTitle(title) {
+    return title
+        .replace(/\s+/g, " ")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/[\\`*_[\]{}()#!|~]/g, "\\$&");
+}
 function fillTemplateBody(body, ctx) {
     const tokens = {
         title: ctx.title,
+        "title-inline": inlineTitle(ctx.title),
         id: ctx.id,
         "inner-slug": (0, ids_js_1.innerSlug)(ctx.id),
     };
@@ -2121,11 +2176,7 @@ function fillTemplateBody(body, ctx) {
     let out = body;
     out = out.replaceAll("task-<inner-slug>", ctx.type === "task" ? ctx.id : "task-<inner-slug>");
     out = out.replaceAll("bug-<inner-slug>", ctx.type === "bug" ? ctx.id : "bug-<inner-slug>");
-    const keys = Object.keys(tokens).sort((a, b) => b.length - a.length);
-    for (const key of keys) {
-        out = out.replaceAll(`<${key}>`, tokens[key]);
-    }
-    return out;
+    return out.replace(/<([^<>]+)>/g, (match, key) => Object.hasOwn(tokens, key) ? tokens[key] : match);
 }
 })
 
@@ -5534,11 +5585,28 @@ function validateOperation(opts) {
 function createOperation(opts) {
     try {
         const result = (0, create_js_1.runCreate)(opts);
-        return succeed("create", {
+        const payload = {
             path: relativePath(result.root, result.path),
             item: (0, contract_js_1.toContractWorkItem)(result.item, result.root, { full: opts.full === true }),
             commit: (0, tracker_commit_js_1.commitPayload)(result.commit),
-        }, (0, convention_js_1.readConventionVersion)(result.root));
+        };
+        const conventionVersion = (0, convention_js_1.readConventionVersion)(result.root);
+        if (result.commit?.failure) {
+            return {
+                ok: false,
+                envelope: (0, json_js_1.failEnvelope)({
+                    command: "create",
+                    code: "CREATE_COMMIT_FAILED",
+                    message: `Created '${result.id}' at ${payload.path}, but its auto-commit failed: ` +
+                        `${result.commit.skipReason}. The item is retained; fix the cause, stage the ` +
+                        "existing file, and commit it instead of re-running create.",
+                    conventionVersion,
+                    payload,
+                }),
+                exitCode: 1,
+            };
+        }
+        return succeed("create", payload, conventionVersion);
     }
     catch (err) {
         return fail("create", opts.cwd, "CREATE_FAILED", err);
@@ -6964,6 +7032,7 @@ function commitTrackerMutation(root, filePaths, opts) {
                 result = {
                     committed: false,
                     skipReason: `git add failed: ${firstLine(add.err || add.out)}`,
+                    failure: "git-add-failed",
                 };
                 return;
             }
@@ -6975,7 +7044,7 @@ function commitTrackerMutation(root, filePaths, opts) {
                     if (residue.code === 0 && residue.out.trim().length > 0) {
                         const lost = "nothing to commit (staged entry lost under contention)";
                         warnGitSkip(lost);
-                        result = { committed: false, skipReason: lost };
+                        result = { committed: false, skipReason: lost, failure: "staged-entry-lost" };
                         return;
                     }
                     result = { committed: false, skipReason: "nothing to commit" };
@@ -6991,6 +7060,7 @@ function commitTrackerMutation(root, filePaths, opts) {
                 result = {
                     committed: false,
                     skipReason: `git commit failed: ${firstLine(commit.err || commit.out)}`,
+                    failure: "git-commit-failed",
                 };
                 return;
             }
@@ -6999,7 +7069,11 @@ function commitTrackerMutation(root, filePaths, opts) {
         }
         if (locked !== null || commit === undefined) {
             warnGitSkip(locked ?? "git commit failed");
-            result = { committed: false, skipReason: locked ?? "git commit failed" };
+            result = {
+                committed: false,
+                skipReason: locked ?? "git commit failed",
+                failure: locked !== null ? "git-index-locked" : "git-commit-failed",
+            };
             return;
         }
         if (commit.code !== 0) {
@@ -7007,6 +7081,7 @@ function commitTrackerMutation(root, filePaths, opts) {
             result = {
                 committed: false,
                 skipReason: `git commit failed: ${firstLine(commit.err || commit.out)}`,
+                failure: "git-commit-failed",
             };
             return;
         }
@@ -7023,13 +7098,21 @@ function commitTrackerMutation(root, filePaths, opts) {
         }
         catch {
             warnGitSkip("git index locked");
-            result = { committed: false, skipReason: "git index locked" };
+            result = {
+                committed: false,
+                skipReason: "git index locked",
+                failure: "git-index-locked",
+            };
         }
     }
     else {
         attempt();
     }
-    const outcome = result ?? { committed: false, skipReason: "git commit failed" };
+    const outcome = result ?? {
+        committed: false,
+        skipReason: "git commit failed",
+        failure: "git-commit-failed",
+    };
     return ignoredPayload !== undefined ? { ...outcome, ignored: ignoredPayload } : outcome;
 }
 function commitPayload(result) {
@@ -7039,7 +7122,11 @@ function commitPayload(result) {
     if (result.committed && result.hash) {
         return { hash: result.hash, message: result.message ?? "", ...ignored };
     }
-    return { skipped: result.skipReason ?? "skipped", ...ignored };
+    return {
+        skipped: result.skipReason ?? "skipped",
+        ...(result.failure ? { failure: result.failure } : {}),
+        ...ignored,
+    };
 }
 function formatCommitLine(result) {
     if (!result)
@@ -11608,6 +11695,10 @@ const TOOL_SPECS = [
                     description: "initiative|epic|story|task|bug.",
                 },
                 title: { type: "string" },
+                body: {
+                    type: "string",
+                    description: "Inline Markdown body replacing the template, not a file path.",
+                },
                 parent: {
                     type: "string",
                     description: "Required except for initiatives.",
@@ -11639,6 +11730,7 @@ const TOOL_SPECS = [
             cwd: options.cwd,
             type: asString(input.type) ?? "",
             title: asString(input.title) ?? "",
+            body: asString(input.body),
             parent: asString(input.parent),
             id: asString(input.id),
             assignee: asString(input.assignee),

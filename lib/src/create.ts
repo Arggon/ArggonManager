@@ -48,9 +48,19 @@ export type CreateOptions = {
   /**
    * Replace the template-derived body with verbatim content (e.g.
    * import-issues writes the original issue body plus a provenance line).
-   * Omit to fill the type's template body as usual.
+   * Omit to fill the type's template body as usual. Mutually exclusive with
+   * `acceptance`: an authored body is already the complete contract.
    */
   body?: string;
+  /**
+   * Author the live `## Acceptance` section as unchecked criteria
+   * (`- [ ] <criterion>` each), replacing whatever the template put there.
+   * The common case for `create --acceptance '<criterion>'` (issue #870):
+   * the Context stays the template's, the contract is authored. Mutually
+   * exclusive with `body`; each criterion must be non-empty and single-line
+   * so one flag cannot inject extra rows or headings.
+   */
+  acceptance?: string[];
   /**
    * Auto-commit the created item file (tracker hygiene,
    * task-auto-commit-tracker). `undefined` resolves via `x-tracker.auto-commit`
@@ -143,18 +153,28 @@ export function runCreate(opts: CreateOptions): CreateResult {
   }
 
   const today = formatDate(opts.now ?? new Date());
-  const templatePath = resolveTemplate(tasksDir, type, opts.templatesDir);
-  const template = readFileSync(templatePath, "utf8");
-  const body =
-    opts.body !== undefined
-      ? opts.body
-      : fillTemplateBody(stripFrontmatterBody(template), {
-          type,
-          id,
-          title,
-          parent: parentItem,
-          byId,
-        });
+  if (opts.body !== undefined && opts.acceptance !== undefined && opts.acceptance.length > 0) {
+    throw new Error(
+      "body and acceptance are mutually exclusive (a body already authors the contract)",
+    );
+  }
+  const criteria = normalizeAcceptanceCriteria(opts.acceptance);
+  let body: string;
+  if (opts.body !== undefined) {
+    // An authored body is complete: it must not depend on a local or bundled
+    // template being installed (and is never token-expanded).
+    body = opts.body;
+  } else {
+    const templatePath = resolveTemplate(tasksDir, type, opts.templatesDir);
+    body = fillTemplateBody(stripFrontmatterBody(readFileSync(templatePath, "utf8")), {
+      type,
+      id,
+      title,
+      parent: parentItem,
+      byId,
+    });
+    if (criteria.length > 0) body = withAcceptanceRows(body, criteria);
+  }
 
   const data: Frontmatter = {
     type,
@@ -206,12 +226,85 @@ function resolveTemplate(tasksDir: string, type: ItemType, templatesDir?: string
   throw new Error(`Template not found: ${name}`);
 }
 
+/**
+ * Validate and normalize the repeatable `--acceptance` criteria. Each flag is
+ * one live acceptance row, so a value that carries a line terminator or is
+ * empty is refused BEFORE anything is written: `- [ ] a\n- [x] b` must never
+ * smuggle a second row or a heading into the authored contract.
+ */
+function normalizeAcceptanceCriteria(acceptance: string[] | undefined): string[] {
+  if (acceptance === undefined) return [];
+  const criteria: string[] = [];
+  for (const value of acceptance) {
+    const criterion = value.trim();
+    if (criterion.length === 0) {
+      throw new Error("acceptance criterion must not be empty (one --acceptance per criterion)");
+    }
+    if (/[\n\r\u2028\u2029]/.test(criterion)) {
+      throw new Error(
+        "acceptance criterion must be a single line (one --acceptance per criterion)",
+      );
+    }
+    criteria.push(criterion);
+  }
+  return criteria;
+}
+
+/**
+ * Replace the live `## Acceptance` section's content with unchecked rows.
+ * Runs on the filled template body (never on an authored `--body`), whose
+ * Acceptance section is the generated scaffold; a custom template with no
+ * such section gets one appended so the flag always authors the contract it
+ * names. Section ends at the next rank 1/2 heading, matching the kernel's
+ * live-section address.
+ */
+function withAcceptanceRows(body: string, criteria: string[]): string {
+  const rows = criteria.map((criterion) => `- [ ] ${criterion}`);
+  // Accept CRLF/CR template bodies: the heading and section-end tests run on
+  // whole lines, so the generated body is normalized to LF here.
+  const lines = body.split(/\r\n|\r|\n/);
+  let heading = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (/^##[ \t]+acceptance[ \t]*$/i.test(lines[i]!)) {
+      heading = i;
+      break;
+    }
+  }
+  if (heading === -1)
+    return `${body.endsWith("\n") ? body : `${body}\n`}\n## Acceptance\n\n${rows.join("\n")}\n`;
+  let end = lines.length;
+  for (let i = heading + 1; i < lines.length; i += 1) {
+    if (/^#{1,2}[ \t]/.test(lines[i]!)) {
+      end = i;
+      break;
+    }
+  }
+  // heading + blank + rows + blank, then the next heading (or EOF) verbatim.
+  return [...lines.slice(0, heading + 1), "", ...rows, "", ...lines.slice(end)].join("\n");
+}
+
 function stripFrontmatterBody(raw: string): string {
   const end = raw.indexOf("\n---", 3);
   if (end === -1) return raw;
   let body = raw.slice(end + 4);
   if (body.startsWith("\n")) body = body.slice(1);
   return body;
+}
+
+/**
+ * Render a title as inline Markdown text: collapse every line terminator to a
+ * space (so a title can open no heading, fence or extra row), HTML-escape the
+ * markup characters, and backslash-escape the inline-Markdown punctuation.
+ * The result is inserted as `<title-inline>` in the shipped task/bug
+ * templates; `<title>` stays the raw value for frontmatter and the H1.
+ */
+function inlineTitle(title: string): string {
+  return title
+    .replace(/\s+/g, " ")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/[\\`*_[\]{}()#!|~]/g, "\\$&");
 }
 
 function fillTemplateBody(
@@ -226,6 +319,7 @@ function fillTemplateBody(
 ): string {
   const tokens: Record<string, string> = {
     title: ctx.title,
+    "title-inline": inlineTitle(ctx.title),
     id: ctx.id,
     "inner-slug": innerSlug(ctx.id),
   };
@@ -247,9 +341,10 @@ function fillTemplateBody(
   let out = body;
   out = out.replaceAll("task-<inner-slug>", ctx.type === "task" ? ctx.id : "task-<inner-slug>");
   out = out.replaceAll("bug-<inner-slug>", ctx.type === "bug" ? ctx.id : "bug-<inner-slug>");
-  const keys = Object.keys(tokens).sort((a, b) => b.length - a.length);
-  for (const key of keys) {
-    out = out.replaceAll(`<${key}>`, tokens[key]);
-  }
-  return out;
+  // Replace only tokens present in the template, in ONE pass: a title supplied
+  // for <title-inline> must never be re-interpreted as another token (a title
+  // such as "<id>" stays that literal text).
+  return out.replace(/<([^<>]+)>/g, (match, key: string) =>
+    Object.hasOwn(tokens, key) ? tokens[key] : match,
+  );
 }

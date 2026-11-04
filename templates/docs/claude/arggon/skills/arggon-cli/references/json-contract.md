@@ -8,7 +8,7 @@ or building filters.
 - Success: `{ok, schemaVersion: 1, conventionVersion, command, ...payload}` on stdout.
 - Failure (with `--json`): `{ok: false, error: {message, code}}` + non-zero exit.
 - Human output (no `--json`) is for eyes only — never parse it; re-run with `--json`.
-- Error codes: `INIT_FAILED, CREATE_FAILED, LIST_FAILED, UPDATE_FAILED, VALIDATE_FAILED,
+- Error codes: `INIT_FAILED, CREATE_FAILED, CREATE_COMMIT_FAILED, LIST_FAILED, UPDATE_FAILED, VALIDATE_FAILED,
 BRANCH_FAILED, START_FAILED, BOARD_FAILED, SYNC_FAILED, NEXT_FAILED, REPORT_FAILED,
 TREND_FAILED, DOCTOR_FAILED, ADOPT_FAILED, SPEC_FAILED, INSTRUCTIONS_FAILED,
 EXPLORE_FAILED, PLAYBOOK_FAILED, COMMENT_FAILED, IMPORT_FAILED, CLEANUP_FAILED,
@@ -32,6 +32,35 @@ PRIORITY_FAILED`.
   explicit opt-in for the full body — prefer it over reading whole item files.
 - Label at creation with `create --labels <csv>` (same kebab-case rules as
   `update --labels`); no follow-up update needed.
+
+## Create: authoring and commit receipts
+
+- CLI `create ... --body <file>` reads UTF-8 Markdown as the **complete body
+  replacement**, bypassing templates; the frontmatter serializer normalizes the
+  final newline. Repeatable `--acceptance '<criterion>'` authors the live
+  `## Acceptance` section as unchecked rows and replaces the template skeleton;
+  it is mutually exclusive with `--body`, and each value must be one non-empty
+  line. MCP/native create take additive optional `body: string` as **inline
+  Markdown content**, not a filename (authoring convenience flags stay CLI-only).
+- Body is optional. The shipped task/bug templates use title-derived Context and
+  one **unchecked** criterion (bug: `Resolved: <title>`); the title-inline token
+  is HTML/Markdown escaped. This is a skeleton, not evidence of completed work.
+  Custom/local templates still win, so older adopter templates may still yield
+  placeholders; an explicit body or `--acceptance` bypasses them. Container
+  templates are unchanged.
+- A body may honestly carry checked criteria for already-performed work. Claim
+  first, then complete only with all live criteria ticked; no waiver or manual
+  item edit is needed to author the contract.
+- Failed auto-commit: `ok: false`, `error.code: "CREATE_COMMIT_FAILED"`, non-zero
+  CLI exit, with `path`, `item`, and `commit` retained. Additive `commit.failure`
+  is `git-add-failed` | `git-commit-failed` | `git-index-locked` |
+  `staged-entry-lost`; `commit.skipped` keeps its human-readable reason.
+  **The written file is kept: repair the cause and commit that existing file;
+  never rerun create.** Opt-out/non-git/missing-git/genuinely-nothing-to-commit
+  skips stay successful and quiet on stderr. Other mutators stay best-effort.
+- Impact: **Behavioral**, through the ADR 0016 adopter-upgrade propose channel;
+  optional body, unchecked skeletons and typed partial failure preserve existing
+  create callers without a mandatory breaking flag or fabricated completion.
 
 ## Views and reports
 

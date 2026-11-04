@@ -341,8 +341,8 @@ ADR 0026 §6, not a decision to take at the keyboard.
 - [ ] **AC 3 — `show`.** Additive `decision_brief` (`none｜open｜decided｜self-decided`)
       on the item's own classification, additive within `schemaVersion` 1, bounded like
       its neighbours (ADR 0006), read from the item's canonical body so a brief filed as
-      a comment — the default path, since `create` has no `--body` flag — is still
-      classified. The human `arggon show` view gains **no** field line: the brief is
+      a comment — a supported path, and the only one before issue #870 added
+      `create --body` — is still classified. The human `arggon show` view gains **no** field line: the brief is
       already visible there as the item's own comment text, verbatim — exactly how
       `acceptance` renders today (`docs/json-output.md:607`).
 - [ ] **AC 4 — `spec analyze` finding.** `UNANSWERED-DECISION-BRIEF` fires only when

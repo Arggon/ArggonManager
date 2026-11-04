@@ -443,8 +443,8 @@ export interface AcceptanceBodySource {
  * **Never pass a reader-derived string to an acceptance predicate.** A reader
  * that trims, clips, byte-caps, strips HTML comments or strips COMMENT
  * SECTIONS before calling has changed the question, and on reachable shapes
- * it changes the ANSWER: a checklist filed as a comment (`arggon create` has
- * no `--body` flag, so this is the path every new item takes) then reads as
+ * it changes the ANSWER: a checklist filed as a comment (the only path before
+ * issue #870 added `create --body`) then reads as
  * "nothing unchecked" from a consumer while the gate still blocks the flip.
  * That inversion is the defect this accessor exists to prevent, and it is
  * structural: the only way to get it wrong now is to bypass the accessor.

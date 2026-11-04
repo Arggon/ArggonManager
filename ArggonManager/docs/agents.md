@@ -43,7 +43,11 @@ npm run arggon -- create task "<title>" --parent <story-id>
 npm run arggon -- create bug "<title>" --parent <story-id>
 ```
 
-Create a matching story/epic/initiative chain if the area has none. Author real Context and a checkable live `## Acceptance` section in the new item; don't leave scaffolding. New items stay `todo` until claimed. When work reveals additional work, file it instead of expanding this PR.
+Create a matching story/epic/initiative chain if the area has none. Author real Context and a checkable live `## Acceptance` section in the new item; don't leave scaffolding.
+
+Author the live contract at creation: `--body <file>` takes complete Markdown, or repeatable `--acceptance '<criterion>'` authors unchecked rows. Shipped task/bug defaults scaffold title-derived prose and one unchecked criterion. A rejected auto-commit returns `CREATE_COMMIT_FAILED` and keeps the item — fix and commit it, never rerun create. See [authoring](./convention.md#authoring-a-contract-versus-creating-a-skeleton).
+
+New items stay `todo` until claimed. When work reveals additional work, file it instead of expanding this PR.
 
 **Every actionable review, audit or incident finding becomes a follow-up task/bug** under the owning story, with source context and acceptance criteria, before the reviewed PR merges or immediately after. A PR comment alone is not tracking. A maker reports findings to the delivery lead, who consolidates and files them.
 

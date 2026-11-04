@@ -9,7 +9,7 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { commitTrackerMutation } from "./tracker-commit.js";
+import { commitPayload, commitTrackerMutation } from "./tracker-commit.js";
 
 const roots: string[] = [];
 
@@ -38,6 +38,18 @@ function repo(): string {
 }
 
 describe("commitTrackerMutation", () => {
+  it("does not label an intentional no-commit as a failure", () => {
+    const root = repo();
+    writeFileSync(join(root, "target.md"), "target 1\n");
+    const result = commitTrackerMutation(root, ["target.md"], {
+      message: "chore(tasks): created task-test",
+      commit: false,
+    });
+    expect(result).toEqual({ committed: false, skipReason: "auto-commit disabled" });
+    expect(commitPayload(result)).toEqual({ skipped: "auto-commit disabled" });
+    expect(git(root, ["diff", "--cached", "--name-only"])).toBe("");
+  });
+
   it("commits only the requested path and leaves unrelated staged work staged", () => {
     const root = repo();
     writeFileSync(join(root, "target.md"), "target 1\n");
@@ -123,6 +135,11 @@ describe("commitTrackerMutation", () => {
 
     expect(result.committed).toBe(false);
     expect(result.skipReason).toContain("git commit failed");
+    expect(result.failure).toBe("git-commit-failed");
+    expect(commitPayload(result)).toMatchObject({
+      skipped: expect.stringContaining("git commit failed"),
+      failure: "git-commit-failed",
+    });
     expect(readFileSync(join(root, "hook-ran"), "utf8")).toBe("hook-ran\n");
     expect(git(root, ["status", "--short"])).toContain("M  target.md");
   });

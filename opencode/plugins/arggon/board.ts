@@ -488,8 +488,8 @@ export type BoardItemDetail = {
 // in two ways. `\s+` then `\s?` accepted rows the gate does not — `-  [ ] text`
 // (two spaces) counted, so the panel could print "0/2 acceptance" on an item the
 // gate considered finished. And it ran over `runShow`'s prose, which EXCLUDES
-// comment sections, so a checklist filed as a comment (`create` has no `--body`
-// flag, so that is the default path) counted 0/0 while the gate blocked. It was
+// comment sections, so a checklist filed as a comment (the only path before
+// issue #870 added `create --body`) counted 0/0 while the gate blocked. It was
 // NOT CRLF-blind — this module split on `/\r?\n/` and `trimEnd()`; the CRLF
 // blindness lived in `cli/src/board.ts`, which split on `"\n"` alone.
 
@@ -499,8 +499,8 @@ export type BoardItemDetail = {
  * kernel's `acceptanceRows` over `acceptanceBody(item)` — the whole body,
  * COMMENT SECTIONS INCLUDED. `runShow`'s `prose` excludes comment sections, so
  * reading rows from it made a checklist filed as a comment render as "no
- * acceptance rows" while the gate blocked the flip (`create` has no `--body`
- * flag, so a comment checklist is the default shape for every new item).
+ * acceptance rows" while the gate blocked the flip (the only path before
+ * issue #870 added `create --body`).
  */
 function acceptanceRenderRows(item: KernelWorkItem): string[] {
   return acceptanceRows(acceptanceBody(item)).map((row) => {

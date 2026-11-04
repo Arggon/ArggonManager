@@ -64,6 +64,17 @@ function initSyncTree(): {
   const dir = join(outer, "work");
   mkdirSync(dir, { recursive: true });
   expect(spawnSync("git", ["init", "--quiet"], { cwd: dir, encoding: "utf8" }).status).toBe(0);
+  // The CLI's tracker auto-commit runs inside this fixture, so the repo needs
+  // an identity (issue #870: a rejected create commit is now an honest failure).
+  expect(
+    spawnSync("git", ["config", "user.name", "sync-smoke"], { cwd: dir, encoding: "utf8" }).status,
+  ).toBe(0);
+  expect(
+    spawnSync("git", ["config", "user.email", "sync-smoke@example.com"], {
+      cwd: dir,
+      encoding: "utf8",
+    }).status,
+  ).toBe(0);
   expect(
     spawnSync("git", ["remote", "add", "origin", "https://github.com/o/r.git"], {
       cwd: dir,

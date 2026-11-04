@@ -2444,6 +2444,10 @@ const TOOL_SPECS: ArgonToolSpec[] = [
           description: "initiative|epic|story|task|bug.",
         },
         title: { type: "string" },
+        body: {
+          type: "string",
+          description: "Inline Markdown body replacing the template, not a file path.",
+        },
         parent: {
           type: "string",
           description: "Required except for initiatives.",
@@ -2476,6 +2480,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
         cwd: options.cwd,
         type: asString(input.type) ?? "",
         title: asString(input.title) ?? "",
+        body: asString(input.body),
         parent: asString(input.parent),
         id: asString(input.id),
         assignee: asString(input.assignee),

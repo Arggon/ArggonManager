@@ -25,7 +25,7 @@
  *      flip's refusal set are the SAME rows, computed by the SAME functions, over
  *      the SAME bytes.
  *      `acceptanceBody(item)` is that input, verbatim: a checklist filed as an
- *      `arggon comment` (first-class here — `create` has no `--body` flag) is
+ *      `arggon comment` (first-class here, and the only path before #870) is
  *      inside it, while a reader's bounded `prose` is not, and passing one of
  *      those to a predicate changes the question.
  *      Bounded on the ROWS, as the kernel documents: byte-clipped lines, a fixed
@@ -519,7 +519,7 @@ export function runGoal(opts: GoalOptions): GoalResult {
   //
   // Do NOT hand a reader's string to these: a bounded `prose` (body minus
   // comments) makes a checklist filed as an `arggon comment` — first-class here,
-  // since `create` has no `--body` flag — vanish from the goal while the gate
+  // and the only path before issue #870 added `create --body` — vanish from the goal while the gate
   // still refuses to close the item. That inversion is what this call site exists
   // to prevent.
   const body = acceptanceBody(item);
