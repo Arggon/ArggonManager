@@ -96,6 +96,7 @@ describe("getOpenPRs", () => {
           number: 42,
           title: "Add feature",
           headRefName: "feat/add-feature",
+          headRefOid: "4a1f0c2b9e8d7a6f5e4d3c2b1a0f9e8d7c6b5a49",
           url: "https://github.com/arggon/test/pull/42",
         },
       ]),
@@ -109,6 +110,7 @@ describe("getOpenPRs", () => {
         number: 42,
         title: "Add feature",
         headRefName: "feat/add-feature",
+        headRefOid: "4a1f0c2b9e8d7a6f5e4d3c2b1a0f9e8d7c6b5a49",
         url: "https://github.com/arggon/test/pull/42",
       },
     ]);
@@ -125,6 +127,7 @@ describe("getOpenPRs", () => {
           number: 99,
           title: "API PR",
           headRefName: "feat/api-pr",
+          head: { sha: "9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c" },
           url: "https://github.com/arggon/test/pull/99",
         },
       ]),
@@ -137,6 +140,7 @@ describe("getOpenPRs", () => {
         number: 99,
         title: "API PR",
         headRefName: "feat/api-pr",
+        headRefOid: "9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c",
         url: "https://github.com/arggon/test/pull/99",
       },
     ]);
@@ -176,6 +180,7 @@ describe("getOpenPRs", () => {
           number: 1,
           title: "Explicit repo PR",
           headRefName: "feat/explicit",
+          headRefOid: "1".repeat(40),
           url: "https://github.com/explicit/repo/pull/1",
         },
       ]),
@@ -187,6 +192,7 @@ describe("getOpenPRs", () => {
         number: 1,
         title: "Explicit repo PR",
         headRefName: "feat/explicit",
+        headRefOid: "1".repeat(40),
         url: "https://github.com/explicit/repo/pull/1",
       },
     ]);
@@ -243,12 +249,14 @@ describe("getOpenPRsForRepo", () => {
           number: 10,
           title: "PR One",
           headRefName: "feat/one",
+          headRefOid: "1".repeat(40),
           url: "https://github.com/owner/repo/pull/10",
         },
         {
           number: 20,
           title: "PR Two",
           headRefName: "feat/two",
+          headRefOid: "2".repeat(40),
           url: "https://github.com/owner/repo/pull/20",
         },
       ]),
@@ -260,15 +268,23 @@ describe("getOpenPRsForRepo", () => {
         number: 10,
         title: "PR One",
         headRefName: "feat/one",
+        headRefOid: "1".repeat(40),
         url: "https://github.com/owner/repo/pull/10",
       },
       {
         number: 20,
         title: "PR Two",
         headRefName: "feat/two",
+        headRefOid: "2".repeat(40),
         url: "https://github.com/owner/repo/pull/20",
       },
     ]);
+    // The head OID is requested so sync can bind a verdict to the reviewed revision.
+    expect(execGh).toHaveBeenCalledWith(
+      "gh",
+      expect.arrayContaining(["number,title,headRefName,url,headRefOid"]),
+      expect.any(Object),
+    );
   });
 
   it("returns empty array when no open PRs", () => {

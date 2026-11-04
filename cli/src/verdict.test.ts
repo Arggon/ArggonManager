@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyVerdicts, parseVerdicts } from "@arggondev/lib";
+import { classifyVerdicts, latestVerdict, parseVerdicts } from "@arggondev/lib";
 
 /**
  * Unit tests for the review-verdict convention parser
@@ -87,8 +87,14 @@ describe("verdict classifier (task-review-verdict-checker)", () => {
       ].join("\n"),
     );
     expect(parsed).toEqual([
-      { date: "2026-09-28", order: 0, value: "request-changes", scope: "(smoke evidence missing)" },
-      { date: "2026-09-29", order: 1, value: "approve", scope: null },
+      {
+        date: "2026-09-28",
+        order: 0,
+        value: "request-changes",
+        scope: "(smoke evidence missing)",
+        reviewed: null,
+      },
+      { date: "2026-09-29", order: 1, value: "approve", scope: null, reviewed: null },
     ]);
   });
 
@@ -116,5 +122,87 @@ describe("verdict classifier (task-review-verdict-checker)", () => {
   it("does not match near-miss tokens like `approved` or `approvals`", () => {
     const body = comment("2026-09-29", ["verdict: approved", "verdict: approvals"]);
     expect(classifyVerdicts(body)).toBe("none");
+  });
+});
+
+/**
+ * Reviewed-revision binding (issue #872): a verdict comment may carry a bounded
+ * `reviewed: <sha>` line. The parser round-trips it; legacy verdicts stay
+ * readable with `reviewed: null` (unbound); malformed/reviewed-looking lines
+ * outside the comment header do not bind.
+ */
+describe("verdict reviewed-revision binding (issue #872)", () => {
+  const comment = (date: string, lines: string[], author = "Reviewer"): string =>
+    `\n### ${date} @${author}\n${lines.join("\n")}\n`;
+
+  it("round-trips a reviewed revision on the latest verdict", () => {
+    const body = [
+      comment("2026-09-28", ["verdict: approve", "reviewed: abc1234", "- evidence"]),
+      comment("2026-10-02", [
+        "verdict: approve",
+        "reviewed: 0123456789abcdef0123456789abcdef01234567",
+        "- re-reviewed the new head",
+      ]),
+    ].join("\n");
+    expect(parseVerdicts(body)).toEqual([
+      { date: "2026-09-28", order: 0, value: "approve", scope: null, reviewed: "abc1234" },
+      {
+        date: "2026-10-02",
+        order: 1,
+        value: "approve",
+        scope: null,
+        reviewed: "0123456789abcdef0123456789abcdef01234567",
+      },
+    ]);
+    expect(latestVerdict(body)?.reviewed).toBe("0123456789abcdef0123456789abcdef01234567");
+  });
+
+  it("keeps a legacy verdict readable as unbound", () => {
+    const body = comment("2026-09-29", ["verdict: approve", "- no revision line"]);
+    expect(parseVerdicts(body)[0]?.reviewed).toBeNull();
+    expect(latestVerdict(body)?.reviewed).toBeNull();
+  });
+
+  it("accepts the reviewed line before the verdict line and normalizes case", () => {
+    const body = comment("2026-09-29", ["Reviewed: ABC1234", "verdict: approve"]);
+    expect(parseVerdicts(body)[0]?.reviewed).toBe("abc1234");
+  });
+
+  it("only the first reviewed line in a comment counts", () => {
+    const body = comment("2026-09-29", [
+      "verdict: approve",
+      "reviewed: abc1234",
+      "reviewed: def5678",
+    ]);
+    expect(parseVerdicts(body)[0]?.reviewed).toBe("abc1234");
+  });
+
+  it("binds reviewed across comments, never to a different one", () => {
+    const body = [
+      comment("2026-09-28", ["verdict: approve", "reviewed: abc1234"]),
+      comment("2026-09-29", ["verdict: request-changes"]),
+    ].join("\n");
+    expect(parseVerdicts(body).map((v) => v.reviewed)).toEqual(["abc1234", null]);
+  });
+
+  it("ignores malformed or out-of-comment reviewed lines", () => {
+    for (const bad of ["reviewed: abc12", "reviewed: not-a-sha", "- reviewed: abc1234"]) {
+      expect(parseVerdicts(comment("2026-09-29", ["verdict: approve", bad]))[0]?.reviewed).toBeNull();
+    }
+    const body = [
+      "reviewed: abc1234",
+      "### handoff 2026-09-29 @Arggon — next: merge",
+      "reviewed: def5678",
+      "verdict: approve",
+    ].join("\n");
+    expect(parseVerdicts(body)).toEqual([]);
+  });
+
+  it("does not let an inline evidence mention bind a revision", () => {
+    const body = comment("2026-09-29", [
+      "verdict: approve",
+      "- reviewer said reviewed: abc1234 in chat",
+    ]);
+    expect(parseVerdicts(body)[0]?.reviewed).toBeNull();
   });
 });

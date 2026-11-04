@@ -94,6 +94,26 @@ export function getOpenPRs(
   execGh: typeof execFileSync = execFileSync,
   execGit: GitExecutor = defaultExecGit,
 ): PRInfo[] {
+  return getOpenPRsWithRepo(repo, cwd, execGh, execGit).prs;
+}
+
+/** Open PRs plus the repo they were read from (the compare reader needs it). */
+export type OpenPRsWithRepo = {
+  repo: DetectedRepo;
+  prs: PRInfo[];
+};
+
+/**
+ * Resolve the repository (explicit `--repo` or origin remote), then read its
+ * open PRs. One detection serves both the PR list and the review-freshness
+ * compare, so a sync run never asks git for the remote twice.
+ */
+export function getOpenPRsWithRepo(
+  repo: string | null,
+  cwd: string,
+  execGh: typeof execFileSync = execFileSync,
+  execGit: GitExecutor = defaultExecGit,
+): OpenPRsWithRepo {
   const detected: DetectedRepo | null = repo ? parseRepoSlug(repo) : detectRepo(cwd, execGit);
 
   if (!detected) {
@@ -102,7 +122,7 @@ export function getOpenPRs(
     );
   }
 
-  return getOpenPRsForRepo(detected.owner, detected.repo, execGh);
+  return { repo: detected, prs: getOpenPRsForRepo(detected.owner, detected.repo, execGh) };
 }
 
 /** Get open PRs for a specific GitHub repository. Exported for testing. */
@@ -114,13 +134,14 @@ export function getOpenPRsForRepo(
   try {
     const data = ghPrListJson({
       repo: `${owner}/${repo}`,
-      fields: "number,title,headRefName,url",
+      fields: "number,title,headRefName,url,headRefOid",
       execGh,
     }) as Array<{
       number: number;
       title: string;
       headRefName: string;
       url: string;
+      headRefOid?: string | null;
     }>;
 
     return data.map((pr) => ({
@@ -128,6 +149,7 @@ export function getOpenPRsForRepo(
       headRefName: pr.headRefName,
       title: pr.title,
       url: pr.url,
+      headRefOid: typeof pr.headRefOid === "string" ? pr.headRefOid : "",
     }));
   } catch {
     try {
@@ -142,6 +164,7 @@ export function getOpenPRsForRepo(
         title: string;
         headRefName: string;
         url: string;
+        head?: { sha?: string | null } | null;
       }>;
 
       return data.map((pr) => ({
@@ -149,6 +172,7 @@ export function getOpenPRsForRepo(
         headRefName: pr.headRefName,
         title: pr.title,
         url: pr.url,
+        headRefOid: typeof pr.head?.sha === "string" ? pr.head.sha : "",
       }));
     } catch (apiError) {
       throw new Error(`GitHub API error: ${(apiError as Error).message}`);

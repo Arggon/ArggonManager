@@ -549,6 +549,14 @@ export type SyncPayload = {
   /** Additive, report-only review-verdict classification (task-review-verdict-checker). */
   verdicts: SyncResult["verdicts"];
   /**
+   * Additive, report-only review freshness (issue #872): the revision each
+   * item's latest verdict recorded, the PR head, and whether the verdict still
+   * covers it. `stale` means a relevant code change landed after the review.
+   */
+  reviewFreshness: SyncResult["reviewFreshness"];
+  /** Items whose latest verdict is stale — reassessment required before they read as current. */
+  reassessmentRequired: SyncResult["reassessmentRequired"];
+  /**
    * Additive, report-only (bug-claim-pool-computed-from-main-misses-branch-
    * claims): branch-resident claims — item copies on unmerged branches that
    * hold a claim this tree does not show. Read from the branch copies
@@ -574,6 +582,8 @@ export function syncOperation(opts: SyncOperationOptions): CommandOutcome<SyncPa
       suggestions: result.suggestions,
       filled: result.filled,
       verdicts: result.verdicts,
+      reviewFreshness: result.reviewFreshness,
+      reassessmentRequired: result.reassessmentRequired,
       branchClaims: result.branchClaims,
       branchClaimErrors: result.branchClaimErrors,
       errors: result.errors,

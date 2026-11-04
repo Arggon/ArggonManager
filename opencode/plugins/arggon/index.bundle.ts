@@ -79,6 +79,7 @@ __arggonEdges.set("lib/src/index.ts\u0000./placeholder.js", "lib/src/placeholder
 __arggonEdges.set("lib/src/index.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./relations.js", "lib/src/relations.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./report.js", "lib/src/report.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./review-freshness.js", "lib/src/review-freshness.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./rules.js", "lib/src/rules.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./show.js", "lib/src/show.ts")
@@ -155,6 +156,7 @@ __arggonEdges.set("lib/src/sync-command.ts\u0000./branch-claims.js", "lib/src/br
 __arggonEdges.set("lib/src/sync-command.ts\u0000./get-open-prs.js", "lib/src/get-open-prs.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./paths.js", "lib/src/paths.ts")
+__arggonEdges.set("lib/src/sync-command.ts\u0000./review-freshness.js", "lib/src/review-freshness.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./sync-types.js", "lib/src/sync-types.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./update.js", "lib/src/update.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./verdict.js", "lib/src/verdict.ts")
@@ -3604,6 +3606,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseRepoSlug = parseRepoSlug;
 exports.ghPrListJson = ghPrListJson;
 exports.getOpenPRs = getOpenPRs;
+exports.getOpenPRsWithRepo = getOpenPRsWithRepo;
 exports.getOpenPRsForRepo = getOpenPRsForRepo;
 const node_child_process_1 = require("node:child_process");
 const detect_repo_js_1 = require("./detect-repo.js");
@@ -3652,17 +3655,20 @@ function ghPrListJson(opts) {
     }
 }
 function getOpenPRs(repo, cwd, execGh = node_child_process_1.execFileSync, execGit = defaultExecGit) {
+    return getOpenPRsWithRepo(repo, cwd, execGh, execGit).prs;
+}
+function getOpenPRsWithRepo(repo, cwd, execGh = node_child_process_1.execFileSync, execGit = defaultExecGit) {
     const detected = repo ? parseRepoSlug(repo) : (0, detect_repo_js_1.detectRepo)(cwd, execGit);
     if (!detected) {
         throw new Error("Cannot determine GitHub repository. Pass --repo or ensure origin is a GitHub remote.");
     }
-    return getOpenPRsForRepo(detected.owner, detected.repo, execGh);
+    return { repo: detected, prs: getOpenPRsForRepo(detected.owner, detected.repo, execGh) };
 }
 function getOpenPRsForRepo(owner, repo, execGh) {
     try {
         const data = ghPrListJson({
             repo: `${owner}/${repo}`,
-            fields: "number,title,headRefName,url",
+            fields: "number,title,headRefName,url,headRefOid",
             execGh,
         });
         return data.map((pr) => ({
@@ -3670,6 +3676,7 @@ function getOpenPRsForRepo(owner, repo, execGh) {
             headRefName: pr.headRefName,
             title: pr.title,
             url: pr.url,
+            headRefOid: typeof pr.headRefOid === "string" ? pr.headRefOid : "",
         }));
     }
     catch {
@@ -3685,6 +3692,7 @@ function getOpenPRsForRepo(owner, repo, execGh) {
                 headRefName: pr.headRefName,
                 title: pr.title,
                 url: pr.url,
+                headRefOid: typeof pr.head?.sha === "string" ? pr.head.sha : "",
             }));
         }
         catch (apiError) {
@@ -4135,9 +4143,9 @@ exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = expo
 exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = void 0;
 exports.resolveRepoAbsPath = exports.redactFrictionText = exports.readOrCreateMachineSalt = exports.readFrictionLog = exports.readFrictionDropped = exports.normalizeCommandShape = exports.frictionStateDir = exports.frictionStateBase = exports.frictionSaltPath = exports.frictionReporterId = exports.frictionMajorVersion = exports.frictionLogPath = exports.frictionFingerprintMaterial = exports.frictionFingerprint = exports.frictionDroppedPath = exports.clearFrictionLog = exports.buildFrictionRecord = exports.appendFrictionRecord = exports.FrictionError = exports.FRICTION_STATE_SUBDIR = exports.FRICTION_SECRET_PLACEHOLDER = exports.FRICTION_SALT_FILE_NAME = exports.FRICTION_REPORTER_ID_CHARS = exports.FRICTION_REDACTION_MAX_SUBSTITUTIONS = exports.FRICTION_REDACTED_FIELD = exports.FRICTION_PATH_PLACEHOLDER = exports.FRICTION_NARRATIVE_CAP = exports.FRICTION_MAX_LINES = exports.FRICTION_LOG_FILE_NAME = exports.FRICTION_HARNESS_CAP = exports.FRICTION_FORMAT_VERSION = exports.FRICTION_FINGERPRINT_CHARS = exports.FRICTION_EVIDENCE_CAP = exports.FRICTION_ENV_FACT_CAP = exports.FRICTION_DROPPED_FILE_NAME = exports.FRICTION_DEFAULT_HARNESS = exports.FRICTION_COMMAND_SHAPE_CAP = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByUpdated = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = void 0;
 exports.stripInlineCodeSpans = exports.regionHasScaffoldMarker = exports.placeholderSections = exports.bodyHasScaffoldPlaceholder = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.RISK_LABEL_PREFIX = exports.MAX_RISK_LEAVES = exports.MAX_HYGIENE_OPEN_CONTAINERS = exports.MAX_HYGIENE_OFFENDERS = exports.runReport = exports.riskAudit = exports.isRiskLabel = exports.containerHygiene = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.readFrictionTrigger = exports.isManagedAgentDest = exports.carriesFrictionTrigger = exports.isFrictionPublishTier = exports.buildFrictionPublishUrl = exports.buildFrictionPublishTitle = exports.buildFrictionPublishDoc = exports.buildFrictionPublishBody = exports.FRICTION_PUBLISH_URL_BASE = exports.FRICTION_PUBLISH_TITLE_PREFIX = exports.FRICTION_PUBLISH_TITLE_MAX_CHARS = exports.FRICTION_PUBLISH_TIERS = exports.FRICTION_PUBLISH_NARRATIVE_CAP = exports.FRICTION_PUBLISH_MAX_URL_CHARS = exports.FRICTION_PUBLISH_MAX_CLASSES = exports.FRICTION_PUBLISH_LABEL = exports.FRICTION_PUBLISH_FENCE_INFO = exports.resolveFrictionOptOut = exports.readFrictionOptOut = exports.FRICTION_OPT_OUT_ENV = exports.summarizeFrictionLog = exports.renderFrictionReport = exports.readFrictionReport = exports.frictionFenceFor = exports.FRICTION_REPORT_MAX_ROWS = void 0;
-exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.isStartOwnedWorktreeEnv = exports.isStartOwnedNodeModulesInstall = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeUntrackedRefusal = exports.worktreeTrackedRefusal = exports.worktreeReleaseRefusal = exports.parseRemovalBlockingPaths = exports.parseRemovalBlockers = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.classifyVerdicts = exports.readRankedFrom = exports.RANKED_FROM_NOTE = exports.formatRankedFrom = exports.findBranchClaims = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = void 0;
-exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.frictionClearOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_NODE_MODULES_ENTRY = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportRisk = exports.formatReportMarkdown = exports.formatReportHygiene = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = void 0;
+exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.isStartOwnedWorktreeEnv = exports.isStartOwnedNodeModulesInstall = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeUntrackedRefusal = exports.worktreeTrackedRefusal = exports.worktreeReleaseRefusal = exports.parseRemovalBlockingPaths = exports.parseRemovalBlockers = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseDecisionBriefs = exports.itemsWithUnansweredBrief = exports.classifyDecisionBrief = exports.DECISION_BRIEF_STATES = exports.parseAcceptances = exports.containersMissingAcceptance = exports.classifyAcceptance = exports.ACCEPTANCE_STATES = exports.ACCEPTANCE_CONTAINER_TYPES = exports.parseVerdicts = exports.latestVerdict = exports.classifyVerdicts = exports.readRankedFrom = exports.RANKED_FROM_NOTE = exports.formatRankedFrom = exports.revisionMatches = exports.resolveReviewFreshness = exports.readCompareChangedFiles = exports.isTrackerPath = exports.findBranchClaims = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = void 0;
+exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.frictionReportOperation = exports.frictionOperation = exports.frictionClearOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_NODE_MODULES_ENTRY = exports.WORKTREE_ENV_KEYS = exports.WORKTREE_ENV_FILE = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportRisk = exports.formatReportMarkdown = exports.formatReportHygiene = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceBody", { enumerable: true, get: function () { return items_js_1.acceptanceBody; } });
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
@@ -4384,12 +4392,18 @@ var sync_command_js_1 = require("./sync-command.js");
 Object.defineProperty(exports, "runSync", { enumerable: true, get: function () { return sync_command_js_1.runSync; } });
 var branch_claims_js_1 = require("./branch-claims.js");
 Object.defineProperty(exports, "findBranchClaims", { enumerable: true, get: function () { return branch_claims_js_1.findBranchClaims; } });
+var review_freshness_js_1 = require("./review-freshness.js");
+Object.defineProperty(exports, "isTrackerPath", { enumerable: true, get: function () { return review_freshness_js_1.isTrackerPath; } });
+Object.defineProperty(exports, "readCompareChangedFiles", { enumerable: true, get: function () { return review_freshness_js_1.readCompareChangedFiles; } });
+Object.defineProperty(exports, "resolveReviewFreshness", { enumerable: true, get: function () { return review_freshness_js_1.resolveReviewFreshness; } });
+Object.defineProperty(exports, "revisionMatches", { enumerable: true, get: function () { return review_freshness_js_1.revisionMatches; } });
 var tree_state_js_1 = require("./tree-state.js");
 Object.defineProperty(exports, "formatRankedFrom", { enumerable: true, get: function () { return tree_state_js_1.formatRankedFrom; } });
 Object.defineProperty(exports, "RANKED_FROM_NOTE", { enumerable: true, get: function () { return tree_state_js_1.RANKED_FROM_NOTE; } });
 Object.defineProperty(exports, "readRankedFrom", { enumerable: true, get: function () { return tree_state_js_1.readRankedFrom; } });
 var verdict_js_1 = require("./verdict.js");
 Object.defineProperty(exports, "classifyVerdicts", { enumerable: true, get: function () { return verdict_js_1.classifyVerdicts; } });
+Object.defineProperty(exports, "latestVerdict", { enumerable: true, get: function () { return verdict_js_1.latestVerdict; } });
 Object.defineProperty(exports, "parseVerdicts", { enumerable: true, get: function () { return verdict_js_1.parseVerdicts; } });
 var acceptance_js_1 = require("./acceptance.js");
 Object.defineProperty(exports, "ACCEPTANCE_CONTAINER_TYPES", { enumerable: true, get: function () { return acceptance_js_1.ACCEPTANCE_CONTAINER_TYPES; } });
@@ -5687,6 +5701,8 @@ function syncOperation(opts) {
             suggestions: result.suggestions,
             filled: result.filled,
             verdicts: result.verdicts,
+            reviewFreshness: result.reviewFreshness,
+            reassessmentRequired: result.reassessmentRequired,
             branchClaims: result.branchClaims,
             branchClaimErrors: result.branchClaimErrors,
             errors: result.errors,
@@ -6392,6 +6408,102 @@ function formatReportMarkdown(result, opts = {}) {
 }
 })
 
+__arggonModules.set("lib/src/review-freshness.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.revisionMatches = revisionMatches;
+exports.isTrackerPath = isTrackerPath;
+exports.resolveReviewFreshness = resolveReviewFreshness;
+exports.readCompareChangedFiles = readCompareChangedFiles;
+const node_child_process_1 = require("node:child_process");
+const COMPARE_FILE_CAP = 300;
+function revisionMatches(a, b) {
+    const left = a.trim().toLowerCase();
+    const right = b.trim().toLowerCase();
+    if (left.length === 0 || right.length === 0)
+        return false;
+    if (left === right)
+        return true;
+    const [shorter, longer] = left.length < right.length ? [left, right] : [right, left];
+    return longer.startsWith(shorter);
+}
+function isTrackerPath(path, trackerPath) {
+    const prefix = trackerPath.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+$/, "");
+    if (prefix.length === 0)
+        return false;
+    const normalized = path.replace(/\\/g, "/").replace(/^\.\//, "");
+    return normalized === prefix || normalized.startsWith(`${prefix}/`);
+}
+function resolveReviewFreshness(args) {
+    const reviewed = args.reviewed ? args.reviewed.trim().toLowerCase() : null;
+    const head = args.head ? args.head.trim().toLowerCase() : null;
+    if (!reviewed) {
+        return {
+            reviewed_revision: null,
+            head_revision: head,
+            freshness: "unbound",
+            reason: "no reviewed revision recorded",
+        };
+    }
+    if (!head) {
+        return {
+            reviewed_revision: reviewed,
+            head_revision: null,
+            freshness: "unbound",
+            reason: "PR head revision unavailable",
+        };
+    }
+    if (revisionMatches(reviewed, head)) {
+        return { reviewed_revision: reviewed, head_revision: head, freshness: "fresh", reason: null };
+    }
+    const changed = args.readChangedFiles(reviewed, head);
+    if (!changed) {
+        return {
+            reviewed_revision: reviewed,
+            head_revision: head,
+            freshness: "unbound",
+            reason: "reviewed..head comparison unavailable",
+        };
+    }
+    const relevant = changed.paths.filter((path) => !isTrackerPath(path, args.trackerPath));
+    if (relevant.length > 0) {
+        return { reviewed_revision: reviewed, head_revision: head, freshness: "stale", reason: null };
+    }
+    if (changed.truncated) {
+        return {
+            reviewed_revision: reviewed,
+            head_revision: head,
+            freshness: "stale",
+            reason: "reviewed..head comparison truncated; assuming a relevant change",
+        };
+    }
+    return { reviewed_revision: reviewed, head_revision: head, freshness: "fresh", reason: null };
+}
+function readCompareChangedFiles(owner, repo, base, head, execGh = node_child_process_1.execFileSync) {
+    let out;
+    try {
+        out = execGh("gh", ["api", `repos/${owner}/${repo}/compare/${base}...${head}`], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+            timeout: 30_000,
+        });
+    }
+    catch {
+        return null;
+    }
+    try {
+        const data = JSON.parse(out);
+        const paths = (data.files ?? [])
+            .map((file) => file.filename)
+            .filter((filename) => typeof filename === "string");
+        return { paths, truncated: paths.length >= COMPARE_FILE_CAP };
+    }
+    catch {
+        return null;
+    }
+}
+})
+
 __arggonModules.set("lib/src/rules.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -6668,13 +6780,21 @@ __arggonModules.set("lib/src/sync-command.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.runSync = runSync;
 const node_child_process_1 = require("node:child_process");
+const node_path_1 = require("node:path");
 const branch_claims_js_1 = require("./branch-claims.js");
 const items_js_1 = require("./items.js");
 const paths_js_1 = require("./paths.js");
 const get_open_prs_js_1 = require("./get-open-prs.js");
+const review_freshness_js_1 = require("./review-freshness.js");
 const sync_types_js_1 = require("./sync-types.js");
 const update_js_1 = require("./update.js");
 const verdict_js_1 = require("./verdict.js");
+function matchedHeadOid(match, prs) {
+    if (match.status !== "matched" && match.status !== "fillable")
+        return null;
+    const head = prs.find((pr) => pr.number === match.prNumber)?.headRefOid ?? "";
+    return head.length > 0 ? head : null;
+}
 function runSync(opts, execGh = node_child_process_1.execFileSync) {
     if (opts.check && opts.write) {
         throw new Error("pass either --check or --write, not both");
@@ -6684,11 +6804,16 @@ function runSync(opts, execGh = node_child_process_1.execFileSync) {
     let items;
     let prs;
     let root;
+    let repoSlug;
+    let trackerPath = "";
     try {
         const tasksDir = (0, paths_js_1.findTasksDir)(cwd);
         root = (0, paths_js_1.repoRootFromTasks)(tasksDir);
+        trackerPath = (0, node_path_1.basename)(tasksDir);
         items = (0, items_js_1.loadItems)(tasksDir);
-        prs = (0, get_open_prs_js_1.getOpenPRs)(opts.repo || null, cwd, execGh);
+        const resolved = (0, get_open_prs_js_1.getOpenPRsWithRepo)(opts.repo || null, cwd, execGh);
+        prs = resolved.prs;
+        repoSlug = resolved.repo;
     }
     catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -6729,8 +6854,23 @@ function runSync(opts, execGh = node_child_process_1.execFileSync) {
         const item = byId.get(match.itemId);
         verdicts[match.itemId] = (0, verdict_js_1.classifyVerdicts)(item.body);
     }
+    const reviewFreshness = {};
+    for (const match of reported) {
+        if (match.status === "no_pr")
+            continue;
+        if (verdicts[match.itemId] === "none")
+            continue;
+        const item = byId.get(match.itemId);
+        reviewFreshness[match.itemId] = (0, review_freshness_js_1.resolveReviewFreshness)({
+            reviewed: (0, verdict_js_1.latestVerdict)(item.body)?.reviewed ?? null,
+            head: matchedHeadOid(match, prs),
+            trackerPath,
+            readChangedFiles: (base, head) => (0, review_freshness_js_1.readCompareChangedFiles)(repoSlug.owner, repoSlug.repo, base, head, execGh),
+        });
+    }
+    const reassessmentRequired = Object.keys(reviewFreshness).filter((id) => reviewFreshness[id].freshness === "stale");
     const branchClaims = (0, branch_claims_js_1.findBranchClaims)({ root, items, prs });
-    return (0, sync_types_js_1.toSyncResult)(reported, mode, filled, updateErrors, verdicts, branchClaims.claims, branchClaims.errors);
+    return (0, sync_types_js_1.toSyncResult)(reported, mode, filled, updateErrors, verdicts, branchClaims.claims, branchClaims.errors, reviewFreshness, reassessmentRequired);
 }
 })
 
@@ -6784,7 +6924,7 @@ function matchItem(item, prs) {
     }
     return { status: "pending", itemId: item.id };
 }
-function toSyncResult(matches, mode, filled = null, errors = [], verdicts = {}, branchClaims = [], branchClaimErrors = []) {
+function toSyncResult(matches, mode, filled = null, errors = [], verdicts = {}, branchClaims = [], branchClaimErrors = [], reviewFreshness = {}, reassessmentRequired = []) {
     const matched = [];
     const unmatched = [];
     const pending = [];
@@ -6825,6 +6965,8 @@ function toSyncResult(matches, mode, filled = null, errors = [], verdicts = {}, 
         suggestions,
         filled,
         verdicts,
+        reviewFreshness,
+        reassessmentRequired,
         branchClaims,
         branchClaimErrors,
         errors,
@@ -8400,39 +8542,61 @@ __arggonModules.set("lib/src/verdict.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseVerdicts = parseVerdicts;
+exports.latestVerdict = latestVerdict;
 exports.classifyVerdicts = classifyVerdicts;
 const COMMENT_HEADING = /^###\s+(\d{4}-\d{2}-\d{2})\s+@/;
 const VERDICT_LINE = /^[ \t]*verdict:[ \t]*(approve|request-changes)(?=$|[ \t(])/i;
+const REVIEWED_LINE = /^[ \t]*reviewed:[ \t]*([0-9a-f]{7,40})(?=$|[ \t])/i;
 function parseVerdicts(body) {
     const verdicts = [];
     let order = -1;
     let currentDate = null;
     let seenVerdictInComment = false;
+    let seenReviewedInComment = false;
+    let currentReviewed = null;
+    let currentCommentVerdict = null;
     for (const line of body.split("\n")) {
         if (/^###\s/.test(line)) {
             order++;
             const heading = COMMENT_HEADING.exec(line);
             currentDate = heading ? heading[1] : null;
             seenVerdictInComment = false;
+            seenReviewedInComment = false;
+            currentReviewed = null;
+            currentCommentVerdict = null;
             continue;
         }
-        if (currentDate === null || seenVerdictInComment)
+        if (currentDate === null)
+            continue;
+        if (!seenReviewedInComment) {
+            const reviewed = REVIEWED_LINE.exec(line);
+            if (reviewed) {
+                seenReviewedInComment = true;
+                currentReviewed = reviewed[1].toLowerCase();
+                if (currentCommentVerdict)
+                    currentCommentVerdict.reviewed = currentReviewed;
+                continue;
+            }
+        }
+        if (seenVerdictInComment)
             continue;
         const match = VERDICT_LINE.exec(line);
         if (!match)
             continue;
         const scope = line.slice(match.index + match[0].length).trim();
-        verdicts.push({
+        currentCommentVerdict = {
             date: currentDate,
             order,
             value: match[1].toLowerCase(),
             scope: scope.length > 0 ? scope : null,
-        });
+            reviewed: currentReviewed,
+        };
+        verdicts.push(currentCommentVerdict);
         seenVerdictInComment = true;
     }
     return verdicts;
 }
-function classifyVerdicts(body) {
+function latestVerdict(body) {
     let latest = null;
     for (const verdict of parseVerdicts(body)) {
         if (latest === null ||
@@ -8441,6 +8605,10 @@ function classifyVerdicts(body) {
             latest = verdict;
         }
     }
+    return latest;
+}
+function classifyVerdicts(body) {
+    const latest = latestVerdict(body);
     if (!latest)
         return "none";
     return latest.value === "approve" ? "approved" : "changes-requested";

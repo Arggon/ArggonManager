@@ -12,6 +12,7 @@ function pr(number: number, headRefName: string): PRInfo {
   return {
     number,
     headRefName,
+    headRefOid: "a".repeat(40),
     title: `PR #${number}`,
     url: `https://github.com/test/test/pull/${number}`,
   };

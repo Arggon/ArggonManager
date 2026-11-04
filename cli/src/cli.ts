@@ -3731,6 +3731,24 @@ program
           console.log(`  verdict:   ${sanitizeHumanError(id)} -> ${sanitizeHumanError(verdict)}`);
         }
       }
+      // Report-only review freshness (issue #872): a stale verdict predates a
+      // relevant code change and needs reassessment; an unbound one records no
+      // verifiable revision. Fresh verdicts stay silent.
+      for (const [id, review] of Object.entries(result.reviewFreshness)) {
+        if (review.freshness === "fresh") continue;
+        const detail =
+          review.freshness === "stale"
+            ? "reassessment required"
+            : "no current-review evidence";
+        const reviewed = review.reviewed_revision ?? "unrecorded";
+        const head = review.head_revision ?? "unknown";
+        console.log(
+          `  review:    ${sanitizeHumanError(id)} -> ${sanitizeHumanError(review.freshness)} ` +
+            `(reviewed ${sanitizeHumanError(reviewed.slice(0, 12))}, head ` +
+            `${sanitizeHumanError(head.slice(0, 12))}; ${detail})` +
+            `${review.reason ? ` — ${sanitizeHumanError(review.reason)}` : ""}`,
+        );
+      }
       for (const [id, branch] of Object.entries(result.filled ?? {})) {
         console.log(`  filled:    ${sanitizeHumanError(id)} -> ${sanitizeHumanError(branch)}`);
       }
