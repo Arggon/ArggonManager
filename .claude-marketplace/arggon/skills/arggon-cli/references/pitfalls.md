@@ -1,4 +1,4 @@
-<!-- arggon:generated template="docs/claude/arggon/skills/arggon-cli/references/pitfalls.md" -->
+<!-- arggon:generated template="claude/arggon/skills/arggon-cli/references/pitfalls.md" -->
 # Pitfalls
 
 Part of the `arggon-cli` skill (`SKILL.md`). Traps that have actually bitten

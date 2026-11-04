@@ -1,4 +1,4 @@
-<!-- arggon:generated template="docs/claude/arggon/skills/arggon-cli/references/orchestration.md" -->
+<!-- arggon:generated template="claude/arggon/skills/arggon-cli/references/orchestration.md" -->
 # Orchestration — reading route
 
 Part of the `arggon-cli` skill. In an adopting repository, read root `AGENTS.md`
