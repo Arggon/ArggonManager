@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-cut-methodology-reading-to-an-operational-core
 title: Cut methodology reading to an operational core
 assignee: arggon-superagent
@@ -9,7 +9,6 @@ parent: methodology-improvements
 labels: []
 created: "2026-11-04"
 updated: "2026-11-04"
-claimed_at: "2026-11-04T12:06:14.567Z"
 worktree_path: /home/arggon/.dsh/state/superagent/work/methodology-operational-core-ac4110cc6356
 ---
 <!--
