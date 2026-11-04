@@ -119,11 +119,11 @@ statement the change makes false is fixed in the same PR (`docs/agents.md`
 The tier table itself lands in `docs/engineering.md`
 (`task-wire-role-model-carriers`); this spec fixes its **content**.
 
-| Tier | Applies to                                          | Who accepts                                                                                         | Blocking?                                                        |
-| ---- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| T0   | `task` / `bug` leaf with **no risk trigger**        | the agent self-certifies on the review-bar evidence + the gates                                     | no — and the default                                             |
-| T1   | `story` containers, and risk-triggered leaves       | the product owner or a named human reviewer, recorded as an `accept:` comment                       | no — recorded, never gated                                       |
-| T2   | the four irreversible powers, and irreversible risk | a human, gated structurally or as the operator of the irreversible step; the acceptance records why | yes, by ADR 0015 / TTY gates, or the human-run irreversible step |
+| Tier | Applies to                                          | Who accepts                                                                                         | Blocking?                                                                      |
+| ---- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| T0   | `task` / `bug` leaf with **no risk trigger**        | the agent self-certifies on the review-bar evidence + the gates                                     | no — and the default                                                           |
+| T1   | `story` containers, and risk-triggered leaves       | the product owner or a named human reviewer, recorded as an `accept:` comment                       | the record never gates; a risk leaf also needs the authenticated GitHub review |
+| T2   | the four irreversible powers, and irreversible risk | a human, gated structurally or as the operator of the irreversible step; the acceptance records why | yes, by ADR 0015 / TTY gates, or the human-run irreversible step               |
 
 **Amendment (2026-11-04, issue #871): T0 is conditional on a risk triage.** A leaf whose
 change hits a risk trigger — `risk-security`, `risk-destructive`, `risk-compatibility`,

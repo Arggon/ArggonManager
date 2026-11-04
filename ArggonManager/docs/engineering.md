@@ -117,11 +117,11 @@ A PR merges only when **all** applicable bars pass:
 
 **Promotion policy — how deep product-owner review goes per class of work** (ADR 0021 §3; content fixed by [spec promotion-policy-018](./specs/spec-promotion-policy-018.md)). A written, agreed-in-advance tiered review path keeps human attention the scarce input it is: routine leaves are agent-owned end to end, so no product-owner review per routine leaf PR.
 
-| Tier | Applies to                                          | Who accepts                                                                                             | Blocking?                                                      |
-| ---- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| T0   | `task` / `bug` leaf with **no risk trigger**        | the agent self-certifies on the review-bar evidence plus the project's verification gates               | no — and the **default**                                       |
-| T1   | `story` containers, and risk-triggered leaves       | the product owner or a named human reviewer, recorded as an `accept:` comment                           | no — recorded, never gated                                     |
-| T2   | the four irreversible powers, and irreversible risk | a human, gated structurally or as the operator of the irreversible step; the acceptance records the why | yes — ADR 0015 / TTY gates, or the human-run irreversible step |
+| Tier | Applies to                                          | Who accepts                                                                                             | Blocking?                                                                                |
+| ---- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| T0   | `task` / `bug` leaf with **no risk trigger**        | the agent self-certifies on the review-bar evidence plus the project's verification gates               | no — and the **default**                                                                 |
+| T1   | `story` containers, and risk-triggered leaves       | the product owner or a named human reviewer, recorded as an `accept:` comment                           | the record never gates; a risk-triggered leaf also needs the authenticated GitHub review |
+| T2   | the four irreversible powers, and irreversible risk | a human, gated structurally or as the operator of the irreversible step; the acceptance records the why | yes — ADR 0015 / TTY gates, or the human-run irreversible step                           |
 
 **Risk triage — the T0 exception.** T0 is the default only while a leaf hits no risk trigger. A triggered leaf is escalated even when the diff is one line: **a small diff never lowers the tier.** Record every matching `risk-…` label on the item when it is created or claimed (`create --labels risk-security`, or `update --labels …`; no trigger needs no label) so the triage is visible in `show`, in `list --json` and `list --filter "label:risk-security"`, and in the PR.
 
