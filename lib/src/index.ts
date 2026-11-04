@@ -362,6 +362,17 @@ export type { HandoffOptions, HandoffResult } from "./handoff.js";
 export { runSync } from "./sync-command.js";
 export { findBranchClaims } from "./branch-claims.js";
 export type { BranchClaimsGitExecutor, BranchClaimsOptions } from "./branch-claims.js";
+export {
+  isTrackerPath,
+  readCompareChangedFiles,
+  resolveReviewFreshness,
+  revisionMatches,
+} from "./review-freshness.js";
+export type {
+  ChangedFilesResult,
+  ReviewFreshness,
+  ReviewFreshnessState,
+} from "./review-freshness.js";
 export type {
   BranchClaim,
   BranchClaimError,
@@ -370,7 +381,7 @@ export type {
 } from "./sync-types.js";
 export { formatRankedFrom, RANKED_FROM_NOTE, readRankedFrom } from "./tree-state.js";
 export type { RankedFrom, TreeGitExecutor } from "./tree-state.js";
-export { classifyVerdicts, parseVerdicts } from "./verdict.js";
+export { classifyVerdicts, latestVerdict, parseVerdicts } from "./verdict.js";
 export type { VerdictComment, VerdictState } from "./verdict.js";
 export {
   ACCEPTANCE_CONTAINER_TYPES,

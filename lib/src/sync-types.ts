@@ -1,4 +1,5 @@
 import type { WorkItem } from "./types.js";
+import type { ReviewFreshness } from "./review-freshness.js";
 import type { VerdictState } from "./verdict.js";
 
 export type SyncMatchResult =
@@ -98,6 +99,23 @@ export type SyncResult = {
    */
   verdicts: Record<string, VerdictState>;
   /**
+   * Report-only review freshness (issue #872): per item whose body carries a
+   * verdict comment, the revision the latest verdict recorded (`reviewed:`),
+   * the current PR head, and whether the verdict still covers it. `stale`
+   * means a non-tracker change landed after the reviewed revision, so the
+   * verdict (an approval in particular) needs reassessment; `unbound` means no
+   * revision was recorded or the comparison could not be resolved. Additive
+   * within schemaVersion 1 and report-only — never gates matching or
+   * exit_code.
+   */
+  reviewFreshness: Record<string, ReviewFreshness>;
+  /**
+   * Items whose latest verdict is stale — the approval (or request-changes)
+   * predates a relevant code change and must be reassessed before it is read
+   * as current. Additive and report-only, like `reviewFreshness`.
+   */
+  reassessmentRequired: string[];
+  /**
    * Branch-resident claims (bug-claim-pool-computed-from-main-misses-branch-
    * claims), read from the branch copies themselves: every locally-unclaimed
    * claimable item whose recorded branch, a local/origin ref referencing its
@@ -114,6 +132,8 @@ export type SyncResult = {
 export type PRInfo = {
   number: number;
   headRefName: string;
+  /** Current head commit OID from `gh pr list --json headRefOid`; "" when unavailable. */
+  headRefOid: string;
   title: string;
   url: string;
 };
@@ -190,6 +210,8 @@ export function toSyncResult(
   verdicts: Record<string, VerdictState> = {},
   branchClaims: BranchClaim[] = [],
   branchClaimErrors: BranchClaimError[] = [],
+  reviewFreshness: Record<string, ReviewFreshness> = {},
+  reassessmentRequired: string[] = [],
 ): SyncResult {
   const matched: string[] = [];
   const unmatched: string[] = [];
@@ -232,6 +254,8 @@ export function toSyncResult(
     suggestions,
     filled,
     verdicts,
+    reviewFreshness,
+    reassessmentRequired,
     branchClaims,
     branchClaimErrors,
     errors,

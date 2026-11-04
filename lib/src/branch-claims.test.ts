@@ -105,7 +105,13 @@ function itemsOf(root: string) {
 }
 
 function pr(number: number, headRefName: string): PRInfo {
-  return { number, headRefName, title: `PR #${number}`, url: `https://example.test/${number}` };
+  return {
+    number,
+    headRefName,
+    headRefOid: "a".repeat(40),
+    title: `PR #${number}`,
+    url: `https://example.test/${number}`,
+  };
 }
 
 describe("findBranchClaims", () => {
