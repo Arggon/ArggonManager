@@ -30,6 +30,8 @@
     "dev": "tsx cli/src/cli.ts",
     "arggon": "tsx cli/src/cli.ts",
     "skills:sync": "tsx cli/src/sync-skills.ts",
+    "workflow:sync": "tsx cli/src/workflow-docs.ts --write",
+    "workflow:check": "tsx cli/src/workflow-docs.ts",
     "context:report": "tsx smoke/context-report.ts",
     "smoke:opencode": "tsx smoke/opencode-smoke.ts",
     "smoke:opencode:wave": "tsx smoke/opencode-wave.ts",

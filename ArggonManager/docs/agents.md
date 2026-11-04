@@ -20,7 +20,7 @@
 
 The **core is exactly the four files in the first row**, at most **120 KiB (122,880 bytes)** combined; this start-here page is at most **20 KiB (20,480 bytes)**. `npm run context:report` reports their UTF-8 source bytes and the test suite rejects a regression. References are loaded only at their point of use, not as another required bundle.
 
-Canonical homes: **claim and terminal-state policy** in [convention](./convention.md#claim-rule); **operational done** in [§5](#5-done-criteria); **review and promotion policy** in [engineering](./engineering.md#review-bar-blocks-merge). Other pages link to those rules rather than maintaining another version.
+Canonical homes: the **claim and completion workflow** in [§2](#canonical-workflow-contract); claim _state_ in [convention](./convention.md#claim-rule); **review and promotion policy** in [engineering](./engineering.md#review-bar-blocks-merge). Other pages link to those rules rather than maintaining another version.
 
 ## Prerequisites
 
@@ -30,9 +30,9 @@ Canonical homes: **claim and terminal-state policy** in [convention](./conventio
 - `npm install`
 - `npm run arggon -- <command>`
 
-`npm run arggon -- …` runs source; after pulling, rebuild an installed `dist/cli.js` with `npm run build`. Pass `--json` for supported machine-readable commands; a failure is a non-zero exit plus an error envelope. Prefer bounded `next` and `show` to a whole-tree scan.
+`npm run arggon -- …` runs source; after pulling, rebuild an installed `dist/cli.js` with `npm run build`. Pass `--json` for supported machine-readable commands; a failure is a non-zero exit plus an error envelope.
 
-For adapter selection, safe regeneration, orphan handling and client installation, read [installation and upgrades](./references/agent-runtime.md#installation-and-upgrades) only when setting up or upgrading.
+Read [installation and upgrades](./references/agent-runtime.md#installation-and-upgrades) only when setting up, upgrading or selecting an adapter.
 
 ## 0. Issue tracking: the tracker (`ArggonManager/`), not GitHub issues
 
@@ -43,15 +43,13 @@ npm run arggon -- create task "<title>" --parent <story-id>
 npm run arggon -- create bug "<title>" --parent <story-id>
 ```
 
-Create a matching story/epic/initiative chain if the area has none. Author real Context and a checkable live `## Acceptance` section in the new item; don't leave scaffolding.
-
-Author the live contract at creation: `--body <file>` takes complete Markdown, or repeatable `--acceptance '<criterion>'` authors unchecked rows. Shipped task/bug defaults scaffold title-derived prose and one unchecked criterion. A rejected auto-commit returns `CREATE_COMMIT_FAILED` and keeps the item — fix and commit it, never rerun create. See [authoring](./convention.md#authoring-a-contract-versus-creating-a-skeleton).
+Create a matching story/epic/initiative chain if the area has none. Author a checkable live `## Acceptance` section (`--body <file>` takes complete Markdown; repeatable `--acceptance '<criterion>'` adds unchecked rows). Shipped task/bug defaults scaffold title-derived prose and one unchecked criterion. A rejected auto-commit returns `CREATE_COMMIT_FAILED` and keeps the item — fix and commit it, never rerun create. See [authoring](./convention.md#authoring-a-contract-versus-creating-a-skeleton).
 
 New items stay `todo` until claimed. When work reveals additional work, file it instead of expanding this PR.
 
-**Every actionable review, audit or incident finding becomes a follow-up task/bug** under the owning story, with source context and acceptance criteria, before the reviewed PR merges or immediately after. A PR comment alone is not tracking. A maker reports findings to the delivery lead, who consolidates and files them.
+**Every actionable review, audit or incident finding becomes a follow-up task/bug** under the owning story, with source context and acceptance criteria, before the reviewed PR merges or immediately after. A PR comment alone is not tracking. Makers report findings to the lead.
 
-Tracker writes (`create`, `update`, `comment`, `adopt`, cleanup and import) auto-commit only their own files. Use `--no-commit` for a deliberately staged batch; never sweep unrelated changes into a commit. PRs carrying tracker auto-commits use merge commits, not squash. Push primary-checkout tracker auto-commits immediately so they cannot hitchhike onto an unrelated branch.
+Tracker writes auto-commit only their own files; use `--no-commit` for a staged batch, never sweep unrelated changes, and push primary-checkout tracker commits immediately.
 
 Friction **in ArggonManager itself** uses `arggon friction "<observation>" --command "<argv shape>"`, not a workaround or a tracker item. The record is local and redacted; the [friction reference](../../skills/arggon-cli/references/friction.md) explains reporting and opt-out.
 
@@ -63,29 +61,34 @@ npm run arggon -- show <id> --meta --json
 npm run arggon -- sync --json  # GitHub-backed repositories
 ```
 
-Read the selected item's full acceptance contract (`show <id> --body --json`) before starting. Use `list` only when a pool scan is actually needed. Empty `next` output is success, not an error.
+Read the full acceptance contract before starting; use `list` only for a pool scan. A primary checkout can still show `todo` while an unmerged branch owns the item: inspect `sync`'s `branchClaims`/`branchClaimErrors` (or the branches and worktrees directly, locally) before treating it as free. Empty `next` is success, not an error; a failed reconciliation never proves an item free.
 
-Apply the [claim rule and branch-claim authority](./convention.md#claim-rule): a primary checkout may still show `todo` while an unmerged branch owns the item. Inspect `sync`'s `branchClaims` and `branchClaimErrors` before treating that item as free. `sync` requires a GitHub remote; in an isolated local-only fixture inspect its branches and worktrees directly. A failed reconciliation never proves an item free: coordinate if ownership is uncertain.
+## 2. Claim — the canonical workflow contract
 
-## 2. Claim
+<a id="canonical-workflow-contract"></a>
 
-The [claim contract](./convention.md#claim-rule), [claim lease](./convention.md#claim-lease-claimed_at) and [terminal-state policy](./convention.md#reopen--status-policy) are canonical. For ordinary work use **start with a worktree**, not a bare status update; §4 gives the command. A refusal names a condition to remedy, not permission to bypass it.
+**Normative for claiming and completing work.** §4–§5 and Orchestration elaborate it; every other agent-facing surface links here or is generated from it. Claim _state_ is defined in [convention](./convention.md#claim-rule), review and promotion in [engineering](./engineering.md#review-bar-blocks-merge).
+
+<!-- arggon:workflow-source:start -->
+
+- **Agents claim through the worktree:** `arggon start <id> --worktree --assignee <agent-id>` (native `tools.arggon.start({ id, assignee, worktree: true })`). Work only in the returned `worktree_path`; start records the branch, prepares the install and stamps ownership. Never hand-roll a worktree, use a bare `update` claim, or bypass a refusal.
+- **Delegated work:** the delivery lead claims before dispatch. A handed-off maker confirms the existing claim (`arggon show <id> --json`) in that worktree and never re-claims or replaces its stamp. A self-starting agent claims only unclaimed work with its own agent id.
+- **Single-checkout humans only:** `arggon update <id> --status in_progress --assignee <your-login>`, then `arggon branch <id>`. This is not an agent fallback.
+- **Done after merge:** every live acceptance criterion is ticked **and** the completing PR is merged (or the change is on the default branch). The maker never flips `done`; the delivery lead verifies the checklist and the merge before running `arggon update <id> --status done`, or `auto-done` flips it after merge. A linked PR or armed auto-merge is not completion.
+
+<!-- arggon:workflow-source:end -->
+
+Never steal a claim or reopen `done`/`cancelled`; coordinate or file follow-up work.
 
 ## 3. Create bugs/tasks from findings
 
 Use [§0](#0-issue-tracking-the-tracker-arggonmanager-not-github-issues). Keep new work separate from the current acceptance contract.
 
-## 4. Branch naming
+## 4. Branch and worktree
 
-```bash
-npm run arggon -- start <id> --worktree --assignee <your-agent-role-id> --json
-```
+Claim with [start and a worktree](#canonical-workflow-contract) (§2), then move the session into the returned **`worktree_path`** (OpenCode: `session_move`) and confirm the claimed state, assignee and branch with `show <id> --meta --json`. A shell's cwd alone does not establish the native session binding: check `trackerRoot`/`trackerRootMismatch`, and read [binding diagnostics](./references/orchestration.md) when they disagree.
 
-This claims, creates or attaches to the item's branch/worktree, commits and pushes the claim. Use the returned and recorded **`worktree_path`**, not a guessed sibling path. Do all edits, builds and commits there. One item → one worktree → one writer; never hand-roll `git worktree add` for a claim. `branch <id>` is bookkeeping for an existing workflow, not a replacement for this entry point.
-
-Move the session into that worktree (OpenCode: `session_move`), then `show <id> --meta --json` must confirm the claimed state, assignee and branch. Check `trackerRoot`/`trackerRootMismatch` on native operations; a shell's cwd alone does not establish the session binding. [Binding diagnostics](./references/orchestration.md) apply when these disagree.
-
-Start prepares dependencies before the claim commit. If it refuses or reports an unusable install, fix the named cause and re-run start to attach to the **kept** worktree. Never run `npm ci` through a link to the primary install. Read [worktree mechanics](./references/agent-runtime.md#worktree-mechanics) for the exact readiness receipt, strict gates, hook and ownership diagnostics.
+Do all edits, builds and commits in that worktree. If start refuses or reports an unusable install, fix the named cause and re-run it to attach to the **kept** worktree; never run `npm ci` through a link to the primary install. Read [worktree mechanics](./references/agent-runtime.md#worktree-mechanics) for the readiness receipt, strict gates, hook and ownership diagnostics.
 
 ### Implement and verify
 
@@ -101,13 +104,12 @@ The lead verifies the PR actually reads **MERGED**, not merely that auto-merge i
 
 ## 5. Done criteria
 
-Operational **done** means all of the following:
+Operational done means all of:
 
 1. The live `## Acceptance` section has at least one real criterion and all criteria are ticked, or a human has explicitly waived the gate with a recorded rationale. The [acceptance grammar and kernel gate](./convention.md#acceptance-rows-the-one-grammar) decide what counts; historical comments and fenced repro boxes aren't criteria.
-2. The completing PR is **merged**, or the completing change is on the default branch.
-3. The delivery lead runs `arggon update <id> --status done`; `updated` is refreshed automatically. Claim first: do not jump `todo` → `done`.
+2. The completing PR is **merged** (or the change is on the default branch); the delivery lead then runs `arggon update <id> --status done` (never jump `todo` → `done`).
 
-Never claim completion before the merge. The kernel also refuses a leaf's done flip while an open PR targets its branch. Product acceptance is separate: use the canonical [promotion policy](./engineering.md#product-acceptance-product-owner), not a substitute for honest acceptance ticks. A risk-triggered leaf is **not** routine T0 — record its `risk-…` label and follow the [risk triage](./engineering.md#product-acceptance-product-owner) escalation before merge. Human-only overrides are in the [authority map](./engineering.md#roles-and-authority); an agent never self-waives.
+The kernel also refuses a leaf's done flip while an open PR targets its branch. Product acceptance is separate: use the canonical [promotion policy](./engineering.md#product-acceptance-product-owner), not a substitute for honest acceptance ticks. A risk-triggered leaf records its `risk-…` label and follows the [risk triage](./engineering.md#product-acceptance-product-owner) escalation before merge. Human-only overrides are in the [authority map](./engineering.md#roles-and-authority); an agent never self-waives.
 
 Terminal updates can cascade to ancestors only when their subtree is terminal and their own acceptance permits completion. Use `--no-cascade` for administrative close-out that must not complete product containers. [Container rules](./convention.md#parent-status) carry the schema detail. Don't model administrative leaves as a product container's sole child.
 
@@ -148,7 +150,6 @@ Non-trivial items are **orchestrated by default**: the delivery lead delegates i
 <!-- arggon:excerpt end: dispatch -->
 
 - The lead owns tracker state, conflict coordination, review and merge verification, and final `validate`/`doctor` checks. Sequencing is not authority to change product priority; use the [authority map and decision brief](./engineering.md#roles-and-authority).
-- Follow §4 for implementation, evidence, verdict and merge, and §5 for close-out. Report findings to the lead for consolidation.
 
 For permissions, client gaps, binding guards, a writer collision or native evidence harness, read the [orchestration runtime reference](./references/orchestration.md).
 
@@ -211,7 +212,11 @@ tasks-validate:
 ```markdown
 ## Task workflow (ArggonManager)
 
-Start with ArggonManager/docs/agents.md for the operational core and its targeted references.
+<!-- arggon:workflow-copy:start -->
+<!-- Generated by npm run workflow:sync; edit ArggonManager/docs/agents.md instead. -->
+
+Follow the [canonical workflow contract](https://github.com/Arggon/ArggonManager/blob/main/ArggonManager/docs/agents.md#canonical-workflow-contract) for claiming and completing work.
+<!-- arggon:workflow-copy:end -->
 ```
 
 ### OpenCode V2
@@ -232,24 +237,22 @@ Read the [self-improvement protocols](./references/documentation.md#self-improve
 
 ## Earlier entry points
 
-Old section links remain entry points to the targeted references:
+Old section links route to the targeted references:
 
 <a id="agent-playbook-v0"></a><a id="related"></a>
 
-Read [agents.md](./agents.md) for these moved sections.
+<a id="orphaned-destinations-what-init-reaps-and-when"></a><a id="agent-seams-arggon-init---agents----no-agents"></a><a id="worktree-in-the-claim-start---worktree"></a><a id="readiness-reporting-manifestcoverage"></a><a id="install-hygiene"></a><a id="fresh-worktree-install-gate-bug-start-install-ordering"></a><a id="worktree-env-contract-arggonenv"></a><a id="single-writer-ownership-claim-stamp-exploration-017-f12"></a><a id="failure-semantics"></a><a id="force-push-spellings-what-the-seam-permits-and-what-it-refuses"></a><a id="which-layer-enforces-the-seams-shell-gates"></a><a id="native-start-dependency-contract"></a>
 
-<a id="agent-seams-arggon-init---agents----no-agents"></a><a id="orphaned-destinations-what-init-reaps-and-when"></a><a id="worktree-in-the-claim-start---worktree"></a><a id="readiness-reporting-manifestcoverage"></a><a id="install-hygiene"></a><a id="fresh-worktree-install-gate-bug-start-install-ordering"></a><a id="worktree-env-contract-arggonenv"></a><a id="single-writer-ownership-claim-stamp-exploration-017-f12"></a><a id="failure-semantics"></a><a id="force-push-spellings-what-the-seam-permits-and-what-it-refuses"></a><a id="which-layer-enforces-the-seams-shell-gates"></a><a id="native-start-dependency-contract"></a>
-
-Read [agent-runtime.md](./references/agent-runtime.md) for these moved sections.
+→ [agent-runtime.md](./references/agent-runtime.md)
 
 <a id="cleanup"></a>
 
-Read [agent-recovery.md](./runbooks/agent-recovery.md) for these moved sections.
+→ [agent-recovery.md](./runbooks/agent-recovery.md)
 
 <a id="worktree-ownership-and-collisions"></a><a id="decision-briefs-and-the-answer-grammar"></a>
 
-Read [orchestration.md](./references/orchestration.md) for these moved sections.
+→ [orchestration.md](./references/orchestration.md)
 
 <a id="what-to-update-by-change-type"></a><a id="specs-and-plans-for-non-trivial-features"></a><a id="technology-playbooks-stack-decisions-and-doc-freshness"></a><a id="promoting-lessons-promote-never-store"></a><a id="verification-before-opening-the-pr"></a>
 
-Read [documentation.md](./references/documentation.md) for these moved sections.
+→ [documentation.md](./references/documentation.md)

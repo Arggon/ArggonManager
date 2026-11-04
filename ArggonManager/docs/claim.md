@@ -45,6 +45,4 @@ for staleness, reporting and supervised takeover.
 
 ## Claiming (playbook)
 
-Use [start with a worktree](./agents.md#4-branch-naming), not an alternative
-bare-update checklist. [Operational done](./agents.md#5-done-criteria) includes
-the actual merge, not just a status flip.
+Agents claim with [start and a worktree](./agents.md#4-branch-and-worktree), never a bare-update checklist; the [canonical workflow contract](./agents.md#canonical-workflow-contract) also names the single-checkout human path. [Operational done](./agents.md#5-done-criteria) includes the actual merge, not just a status flip.

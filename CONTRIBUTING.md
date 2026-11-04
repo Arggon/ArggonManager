@@ -323,7 +323,7 @@ control, surface or state indicator, add its boundary pair to that test —
 
 ## Claim work
 
-Follow claim rules in the convention: for `story` / `task` / `bug`, `in_progress` requires an `assignee`. Prefer claiming via the CLI when those commands exist; until then, edit frontmatter + open a PR.
+Follow the [canonical workflow contract](ArggonManager/docs/agents.md#canonical-workflow-contract) for claiming and completing work. It separates the agent worktree claim, delegated makers and the single-checkout human path; do not claim by editing frontmatter, and never flip `done` before the PR is merged.
 
 ## License
 

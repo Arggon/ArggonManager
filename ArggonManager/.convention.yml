@@ -134,9 +134,9 @@ x-generated:
     generatedAt: "2026-11-04T20:00:43.860Z"
   .claude-marketplace/arggon/commands/start.md:
     template: "docs/claude/arggon/commands/start.md"
-    checksum: "sha256:bcf8165182fba2fa175c8474ba5b4bc54adbafa6a966550f1b504dc042b8e392"
+    checksum: "sha256:cfecb035ef5e4ca59f5f0b9fe039e6dd8dcc537e0662259f341bdf5b420d5cce"
     arggonVersion: "0.11.0"
-    generatedAt: "2026-11-04T20:00:43.860Z"
+    generatedAt: "2026-11-04T20:55:18.911Z"
   .claude-marketplace/arggon/commands/status.md:
     template: "docs/claude/arggon/commands/status.md"
     checksum: "sha256:b4952cb5c242b8669d5d95c57e52d78dfc8bd588a6e3a98709964faab02ab6e4"
@@ -288,9 +288,9 @@ x-generated:
     generatedAt: "2026-11-04T18:39:27.494Z"
   .opencode/commands/arggon-start.md:
     template: "docs/opencode/commands/arggon-start.md"
-    checksum: "sha256:27b4f181586d17cb07aace3e2ca19794ca8fe02cfcf65524ce7e13178ad33aac"
+    checksum: "sha256:2d6c539859d65ab6eef1e15ededc290826ebd1288150f7201fb76fe948cf9da7"
     arggonVersion: "0.11.0"
-    generatedAt: "2026-11-04T18:39:27.494Z"
+    generatedAt: "2026-11-04T20:55:18.911Z"
   .opencode/commands/arggon-status.md:
     template: "docs/opencode/commands/arggon-status.md"
     checksum: "sha256:d893951a9dd8a58f05b73711a5bbad573eade6b7715af78f60147c337e459d51"
@@ -298,9 +298,9 @@ x-generated:
     generatedAt: "2026-11-04T18:39:27.494Z"
   .opencode/plugins/arggon/index.ts:
     template: "opencode/plugins/arggon/index.bundle.ts"
-    checksum: "sha256:4156bb4db4fb9061c2eae9c1e85c92c392da03053d3f9e298d89b25d54418db6"
+    checksum: "sha256:60777ca307cf637ee572021acfdc4d3943074b5f4c25eafcb8c5fca4f7fa1ae7"
     arggonVersion: "0.11.0"
-    generatedAt: "2026-11-04T18:39:27.494Z"
+    generatedAt: "2026-11-04T20:55:18.911Z"
   .opencode/plugins/arggon/tui.tsx:
     template: "opencode/plugins/arggon/tui.tsx"
     checksum: "sha256:6bd1110ae01264203bc067cc50a50f93520749928b21dac8b3e0f4c92a28399e"
@@ -383,9 +383,9 @@ x-generated:
     generatedAt: "2026-11-04T18:39:27.494Z"
   .zcode-marketplace/arggon/commands/arggon-start.md:
     template: "docs/zcode/arggon/commands/arggon-start.md"
-    checksum: "sha256:72d15e70cd2f0aea2c03f749555d4c56c02c531de927026da7ee9ac5c79d4e34"
+    checksum: "sha256:fd578acf1a3d38052eb19dad29ecc2a6f4ce6b4da22ee83f6287c1397428d604"
     arggonVersion: "0.11.0"
-    generatedAt: "2026-11-04T18:39:27.494Z"
+    generatedAt: "2026-11-04T20:55:18.911Z"
   .zcode-marketplace/arggon/commands/arggon-status.md:
     template: "docs/zcode/arggon/commands/arggon-status.md"
     checksum: "sha256:7e307d60e7638be8f73e093fabf9794676419069cb6c035f4cb452ceb5093adf"
