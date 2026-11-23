@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-validate-missing-frontmatter-command-surface-assertions
 title: `MISSING_FRONTMATTER` / `UNTERMINATED_FRONTMATTER` have no assertion at the `validate` COMMAND surface — only library-level `runValidate` calls
+assignee: Arggon
+branch: feat/task-validate-missing-frontmatter-command-surface-assertions
 parent: tooling-and-environment
 labels: [tests, tracker-schema]
 created: "2026-10-06"
-updated: "2026-10-06"
+updated: "2026-11-23"
+claimed_at: "2026-11-23T08:24:12.560Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-validate-missing-frontmatter-command-surface-assertions
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-validate-missing-frontmatter-command-surface-assertions.md
   Leaves live only under a story. id is the filename stem: task-validate-missing-frontmatter-command-surface-assertions.
