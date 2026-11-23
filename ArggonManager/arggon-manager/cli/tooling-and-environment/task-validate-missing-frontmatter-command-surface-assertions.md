@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-validate-missing-frontmatter-command-surface-assertions
 title: `MISSING_FRONTMATTER` / `UNTERMINATED_FRONTMATTER` have no assertion at the `validate` COMMAND surface — only library-level `runValidate` calls
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: tooling-and-environment
 labels: [tests, tracker-schema]
 created: "2026-10-06"
 updated: "2026-11-23"
-claimed_at: "2026-11-23T08:24:12.560Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-validate-missing-frontmatter-command-surface-assertions
 ---
 <!--
@@ -33,11 +32,11 @@ The envelope is already proven at the command surface in that same test file for
 
 ## Acceptance
 
-- [ ] At least one test per new code (`MISSING_FRONTMATTER`, `UNTERMINATED_FRONTMATTER`) that runs the **command** — `dist/cli.js validate --json` with cwd on a fixture copy — and asserts the typed code, the offending path, and a non-zero exit
-- [ ] Assert the **whole** code, not a substring: a test that greps the envelope can stay green when the code is renamed or dropped and a generic `BROKEN_YAML` is emitted instead
-- [ ] Cover the unterminated case as its own assertion, since it now has a distinct code rather than sharing the generic parse failure
-- [ ] A negative control: a non-item markdown file must still exit 0, so the command-surface test cannot be satisfied by a check that over-fires
-- [ ] Verified against the authority — `docs/agents.md`'s envelope contract and whatever the current declared error codes are — not against this item's prose
+- [x] At least one test per new code (`MISSING_FRONTMATTER`, `UNTERMINATED_FRONTMATTER`) that runs the **command** — `dist/cli.js validate --json` with cwd on a fixture copy — and asserts the typed code, the offending path, and a non-zero exit
+- [x] Assert the **whole** code, not a substring: a test that greps the envelope can stay green when the code is renamed or dropped and a generic `BROKEN_YAML` is emitted instead
+- [x] Cover the unterminated case as its own assertion, since it now has a distinct code rather than sharing the generic parse failure
+- [x] A negative control: a non-item markdown file must still exit 0, so the command-surface test cannot be satisfied by a check that over-fires
+- [x] Verified against the authority — `docs/agents.md`'s envelope contract and whatever the current declared error codes are — not against this item's prose
 
 ## Notes
 
