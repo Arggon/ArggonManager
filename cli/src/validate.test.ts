@@ -1,7 +1,9 @@
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync as _mkdtempSync,
   readdirSync,
+  readFileSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -183,5 +185,71 @@ describe("validate human output sanitization (bug-validate-stdout-injection)", (
         "warning tasks: tracker uses the legacy tasks/ layout — run `arggon migrate --layout` to move it to ArggonManager/ (docs included) [LEGACY_LAYOUT]\n" +
         "arggon validate: failed with 1 error(s), 1 warning(s)\n",
     );
+  });
+});
+
+// task-validate-missing-frontmatter-command-surface-assertions: the structural
+// cases above all call the library's runValidate. A command-surface regression
+// (generic throw, dropped code, envelope replaced by human output) would keep
+// them green, so spawn the real CLI on a fixture COPY and assert the declared
+// envelope: ArggonManager/docs/json-output.md §`validate` / §`validate` failure
+// and the codes declared in ArggonManager/docs/convention.md — not this item's
+// prose. runCli is the same command surface as `dist/cli.js validate --json`
+// (same cli.ts entry), without depending on a built artifact in the test tree.
+describe("validate command surface for missing frontmatter (task-validate-missing-frontmatter-command-surface-assertions)", () => {
+  type Issue = { code: string; path: string; message: string };
+  type ValidateEnvelope = {
+    ok: boolean;
+    command: string;
+    errors: Issue[];
+    error?: { code: string };
+  };
+
+  function runValidateCommand(fixtureName: string) {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-validate-command-"));
+    cpSync(join(invalidRoot, fixtureName), dir, { recursive: true });
+    const proc = runCli(["validate", "--json"], dir);
+    expect(proc.stderr).toBe("");
+    return { proc, body: JSON.parse(proc.stdout) as ValidateEnvelope };
+  }
+
+  it("emits MISSING_FRONTMATTER with the offending path and a non-zero exit", () => {
+    const { proc, body } = runValidateCommand("missing-frontmatter");
+    expect(proc.status).toBe(1);
+    expect(body.command).toBe("validate");
+    expect(body.ok).toBe(false);
+    expect(body.error?.code).toBe("VALIDATE_FAILED");
+    // Whole-code equality: a BROKEN_YAML fallback (or a renamed code) is a
+    // regression, not a passing test.
+    expect(body.errors.map((e) => e.code)).toEqual(["MISSING_FRONTMATTER"]);
+    expect(body.errors[0]?.path).toBe("tasks/demo/e1/s1/task-wiped.md");
+  });
+
+  it("emits UNTERMINATED_FRONTMATTER as its own code at the command surface", () => {
+    const { proc, body } = runValidateCommand("unterminated-frontmatter");
+    expect(proc.status).toBe(1);
+    expect(body.ok).toBe(false);
+    expect(body.error?.code).toBe("VALIDATE_FAILED");
+    expect(body.errors.map((e) => e.code)).toEqual(["UNTERMINATED_FRONTMATTER"]);
+    expect(body.errors[0]?.path).toBe("tasks/demo/e1/s1/task-open.md");
+  });
+
+  it("exits 0 on a non-item markdown file (the command check does not over-fire)", () => {
+    const { proc, body } = runValidateCommand("non-item-markdown");
+    expect(proc.status).toBe(0);
+    expect(body.ok).toBe(true);
+    expect(body.errors).toEqual([]);
+    expect(body.error).toBeUndefined();
+  });
+
+  it("asserts the codes against the declared authority, not the item prose", () => {
+    const convention = readFileSync(
+      join(process.cwd(), "ArggonManager/docs/convention.md"),
+      "utf8",
+    );
+    expect(convention).toContain("MISSING_FRONTMATTER");
+    expect(convention).toContain("UNTERMINATED_FRONTMATTER");
+    const envelope = readFileSync(join(process.cwd(), "ArggonManager/docs/json-output.md"), "utf8");
+    expect(envelope).toContain('"code": "VALIDATE_FAILED"');
   });
 });
